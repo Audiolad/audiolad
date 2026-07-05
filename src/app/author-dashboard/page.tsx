@@ -124,12 +124,12 @@ export default function AuthorDashboardPage() {
   Новая практика
 </Link>
 
-            <button
-              type="button"
-              className="rounded-[22px] border border-[#c6afe6] bg-white px-4 py-4 font-semibold text-[#7042c5]"
-            >
-              Новая программа
-            </button>
+<Link
+  href="/author-dashboard/new-program"
+  className="flex items-center justify-center rounded-[22px] border border-[#c6afe6] bg-white px-4 py-4 text-center font-semibold text-[#7042c5]"
+>
+  Новая программа
+</Link>
           </section>
 
           <section className="mt-7">
