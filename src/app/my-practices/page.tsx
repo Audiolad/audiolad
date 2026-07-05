@@ -149,9 +149,16 @@ export default function MyPracticesPage() {
                   </div>
 
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <h2 className="line-clamp-2 text-[17px] font-semibold leading-6">
-                      {practice.title}
-                    </h2>
+<Link
+  href={
+    practice.title === "Мои личные границы"
+      ? "/practice/personal-boundaries"
+      : "#"
+  }
+  className="line-clamp-2 text-[17px] font-semibold leading-6"
+>
+  {practice.title}
+</Link>
 
                     <Link
                       href="/authors"
