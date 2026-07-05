@@ -223,13 +223,13 @@ export default function MyPracticesPage() {
   <span>Плейлисты</span>
 </Link>
 
-          <button
-            type="button"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
-          >
-            <span className="text-[25px] leading-none">◎</span>
-            <span>Профиль</span>
-          </button>
+<Link
+  href="/profile"
+  className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
+>
+  <span className="text-[25px] leading-none">◎</span>
+  <span>Профиль</span>
+</Link>
         </nav>
       </div>
     </main>
