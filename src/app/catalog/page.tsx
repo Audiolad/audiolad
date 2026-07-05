@@ -220,10 +220,13 @@ export default function CatalogPage() {
             <span>Каталог</span>
           </Link>
 
-          <button className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]">
-            <span className="text-[25px] leading-none">▥</span>
-            <span>Мои практики</span>
-          </button>
+<Link
+  href="/my-practices"
+  className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
+>
+  <span className="text-[25px] leading-none">▥</span>
+  <span>Мои практики</span>
+</Link>
 
           <button className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]">
             <span className="text-[25px] leading-none">♫</span>
