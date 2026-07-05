@@ -6,16 +6,19 @@ const favoriteAuthors = [
     name: "Сергей и Зоя",
     description: "Совместные медитации и программы",
     image: "/audiolad-logo.png",
+    href: "/authors/sergey-and-zoya",
   },
   {
     name: "Зоя Петрова",
     description: "Женские практики и медитации",
     image: "/audiolad-logo.png",
+    href: "/authors/zoya-petrova",
   },
   {
     name: "Сергей Петров",
     description: "Энергопотоки и внутренняя сила",
     image: "/audiolad-logo.png",
+    href: "/authors/sergey-petrov",
   },
 ];
 
@@ -130,19 +133,25 @@ export default function ProfilePage() {
                   key={author.name}
                   className="w-[154px] shrink-0 rounded-[22px] border border-[#eadff8] bg-white p-3 shadow-sm"
                 >
-                  <div className="aspect-square overflow-hidden rounded-[18px] bg-[#f7effe]">
-                    <Image
-                      src={author.image}
-                      alt={author.name}
-                      width={160}
-                      height={160}
-                      className="h-full w-full object-contain p-4"
-                    />
-                  </div>
+<Link
+  href={author.href}
+  className="block aspect-square overflow-hidden rounded-[18px] bg-[#f7effe]"
+>
+  <Image
+    src={author.image}
+    alt={author.name}
+    width={160}
+    height={160}
+    className="h-full w-full object-contain p-4"
+  />
+</Link>
 
-                  <h3 className="mt-3 text-[15px] font-semibold">
-                    {author.name}
-                  </h3>
+<Link
+  href={author.href}
+  className="mt-3 block text-[15px] font-semibold"
+>
+  {author.name}
+</Link>
 
                   <p className="mt-1 line-clamp-2 min-h-[40px] text-xs leading-5 text-[#796ba0]">
                     {author.description}
