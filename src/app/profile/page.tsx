@@ -69,12 +69,12 @@ export default function ProfilePage() {
                   Ваш путь в АудиоЛаде
                 </p>
 
-                <button
-                  type="button"
-                  className="mt-3 rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
-                >
-                  Редактировать профиль
-                </button>
+<Link
+  href="/profile/edit"
+  className="mt-3 inline-flex rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
+>
+  Редактировать профиль
+</Link>
               </div>
             </div>
 
