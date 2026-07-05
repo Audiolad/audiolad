@@ -97,23 +97,39 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          <section className="mt-6 grid grid-cols-4 gap-2">
-            {[
-              ["▢", "Мои покупки"],
-              ["♡", "Избранное"],
-              ["⇩", "Скачанные"],
-              ["◷", "История"],
-            ].map(([icon, title]) => (
-              <button
-                key={title}
-                type="button"
-                className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-              >
-                <span className="text-2xl text-[#7042c5]">{icon}</span>
-                <span className="mt-2 text-[11px] leading-4">{title}</span>
-              </button>
-            ))}
-          </section>
+<section className="mt-6 grid grid-cols-4 gap-2">
+  <button
+    type="button"
+    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+  >
+    <span className="text-2xl text-[#7042c5]">▢</span>
+    <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
+  </button>
+
+  <Link
+    href="/favorites"
+    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+  >
+    <span className="text-2xl text-[#7042c5]">♡</span>
+    <span className="mt-2 text-[11px] leading-4">Избранное</span>
+  </Link>
+
+  <button
+    type="button"
+    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+  >
+    <span className="text-2xl text-[#7042c5]">⇩</span>
+    <span className="mt-2 text-[11px] leading-4">Скачанные</span>
+  </button>
+
+  <button
+    type="button"
+    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+  >
+    <span className="text-2xl text-[#7042c5]">◷</span>
+    <span className="mt-2 text-[11px] leading-4">История</span>
+  </button>
+</section>
 
           <section className="mt-8">
             <div className="flex items-center justify-between">
