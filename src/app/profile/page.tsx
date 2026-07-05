@@ -45,13 +45,13 @@ export default function ProfilePage() {
 
             <h1 className="text-[28px] font-semibold">Профиль</h1>
 
-            <button
-              type="button"
-              aria-label="Настройки"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5]"
-            >
-              ⚙
-            </button>
+<Link
+  href="/settings"
+  aria-label="Настройки"
+  className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5]"
+>
+  ⚙
+</Link>
           </header>
 
           <section className="relative mt-6 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)]">
