@@ -157,9 +157,16 @@ export default function PlaylistsPage() {
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <h2 className="text-[18px] font-semibold leading-6">
-                        {playlist.title}
-                      </h2>
+<Link
+  href={
+    playlist.title === "Утро в ресурсе"
+      ? "/playlist/morning-energy"
+      : "#"
+  }
+  className="text-[18px] font-semibold leading-6"
+>
+  {playlist.title}
+</Link>
 
                       <p className="mt-1 text-sm text-[#7d70a2]">
                         {playlist.count} · {playlist.duration}
