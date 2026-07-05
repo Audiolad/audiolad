@@ -116,13 +116,13 @@ export default function AuthorDashboardPage() {
           </section>
 
           <section className="mt-6 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2 rounded-[22px] bg-[#7042c5] px-4 py-4 font-semibold text-white"
-            >
-              <PlusIcon />
-              Новая практика
-            </button>
+<Link
+  href="/author-dashboard/new-practice"
+  className="flex items-center justify-center gap-2 rounded-[22px] bg-[#7042c5] px-4 py-4 font-semibold text-white"
+>
+  <PlusIcon />
+  Новая практика
+</Link>
 
             <button
               type="button"
