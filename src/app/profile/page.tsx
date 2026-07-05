@@ -98,13 +98,13 @@ export default function ProfilePage() {
           </section>
 
 <section className="mt-6 grid grid-cols-4 gap-2">
-  <button
-    type="button"
-    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-  >
-    <span className="text-2xl text-[#7042c5]">▢</span>
-    <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
-  </button>
+ <Link
+  href="/purchases"
+  className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+>
+  <span className="text-2xl text-[#7042c5]">▢</span>
+  <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
+</Link>
 
   <Link
     href="/favorites"
