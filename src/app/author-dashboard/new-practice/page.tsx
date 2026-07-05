@@ -173,12 +173,12 @@ export default function NewPracticePage() {
               Отмена
             </Link>
 
-            <button
-              type="button"
-              className="rounded-[20px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-4 py-4 font-semibold text-white shadow-[0_12px_28px_rgba(96,59,168,0.22)]"
-            >
-              Продолжить
-            </button>
+<Link
+  href="/author-dashboard/new-practice/audio"
+  className="flex items-center justify-center rounded-[20px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-4 py-4 font-semibold text-white shadow-[0_12px_28px_rgba(96,59,168,0.22)]"
+>
+  Продолжить
+</Link>
           </section>
         </div>
       </div>
