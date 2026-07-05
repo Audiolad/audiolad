@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "next/image";import Link from "next/link";
 
 const categories = [
   { icon: "♡", title: "Любовь и отношения" },
@@ -163,12 +163,12 @@ function SectionHeader({
         {title}
       </h2>
 
-      <button
-        type="button"
-        className="shrink-0 text-sm font-medium text-[#7042c5]"
-      >
-        {link} ›
-      </button>
+<Link
+  href="/catalog"
+  className="shrink-0 text-sm font-medium text-[#7042c5]"
+>
+  {link} ›
+</Link>
     </div>
   );
 }
