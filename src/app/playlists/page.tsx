@@ -114,13 +114,13 @@ export default function PlaylistsPage() {
             </button>
           </header>
 
-          <button
-            type="button"
-            className="mt-6 flex w-full items-center justify-center gap-3 rounded-[22px] border border-dashed border-[#bfa8e3] bg-[#faf6ff] px-5 py-4 font-medium text-[#7042c5]"
-          >
-            <PlusIcon />
-            Создать новый плейлист
-          </button>
+<Link
+  href="/playlists/new"
+  className="mt-6 flex w-full items-center justify-center gap-3 rounded-[22px] border border-dashed border-[#bfa8e3] bg-[#faf6ff] px-5 py-4 font-medium text-[#7042c5]"
+>
+  <PlusIcon />
+  Создать новый плейлист
+</Link>
 
           <section className="mt-7">
             <div className="flex items-center justify-between">
@@ -177,15 +177,19 @@ export default function PlaylistsPage() {
                       </p>
 
                       <div className="mt-auto flex items-center justify-between pt-3">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 font-medium text-[#7042c5]"
-                        >
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
-                            <PlayIcon />
-                          </span>
-                          Слушать
-                        </button>
+<Link
+  href={
+    playlist.title === "Утро в ресурсе"
+      ? "/playlist/morning-energy"
+      : "#"
+  }
+  className="flex items-center gap-2 font-medium text-[#7042c5]"
+>
+  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
+    <PlayIcon />
+  </span>
+  Слушать
+</Link>
 
                         <button
                           type="button"
