@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "next/image"; import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
 
 const practices = [
@@ -264,47 +264,7 @@ export default function SergeyAndZoyaPage() {
           </section>
         </div>
 
-        <nav className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 justify-around border-t border-[#eadff8] bg-white/95 px-1 pb-3 pt-3 shadow-[0_-8px_30px_rgba(86,52,141,0.08)] backdrop-blur">
-          <Link
-            href="/"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
-          >
-            <span className="text-[25px] leading-none">⌂</span>
-            <span>Главная</span>
-          </Link>
-
-          <Link
-            href="/catalog"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#7042c5]"
-          >
-            <span className="text-[25px] leading-none">▦</span>
-            <span>Каталог</span>
-          </Link>
-
-          <Link
-            href="/my-practices"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
-          >
-            <span className="text-[25px] leading-none">▥</span>
-            <span>Мои практики</span>
-          </Link>
-
-          <Link
-            href="/playlists"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
-          >
-            <span className="text-[25px] leading-none">♫</span>
-            <span>Плейлисты</span>
-          </Link>
-
-          <Link
-            href="/profile"
-            className="flex min-w-[72px] flex-col items-center gap-1 text-[11px] text-[#81759f]"
-          >
-            <span className="text-[25px] leading-none">◎</span>
-            <span>Профиль</span>
-          </Link>
-        </nav>
+<BottomNav />
       </div>
     </main>
   );
