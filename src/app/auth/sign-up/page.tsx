@@ -149,7 +149,7 @@ export default function SignUpPage() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Уже есть аккаунт?{" "}
-          <Link href="/sign-in" className="font-semibold text-[#7042c5]">
+          <Link href="/auth/sign-in" className="font-semibold text-[#7042c5]">
             Войти
           </Link>
         </p>

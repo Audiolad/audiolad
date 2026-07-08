@@ -108,7 +108,7 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Нет аккаунта?{" "}
-          <Link href="/sign-up" className="font-semibold text-[#7042c5]">
+          <Link href="/auth/sign-up" className="font-semibold text-[#7042c5]">
             Зарегистрироваться
           </Link>
         </p>
