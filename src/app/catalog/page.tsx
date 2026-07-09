@@ -1,209 +1,134 @@
-import Link from "next/link";import BottomNav from "@/components/BottomNav";
+import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
+
+export const dynamic = "force-dynamic";
+
+type Practice = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  format: string | null;
+  duration_minutes: number | null;
+  price: number | null;
+  is_free: boolean | null;
+};
+
+async function getPractices(): Promise<Practice[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) return [];
+
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/practices?select=id,title,slug,description,format,duration_minutes,price,is_free,status&status=eq.published&order=created_at.desc`,
+    {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) return [];
+
+  return res.json();
+}
 
 const categories = [
-  {
-    title: "Любовь и отношения",
-    count: "142 практики",
-    icon: "♡",
-    gradient: "from-[#f9d7e8] to-[#efd6f4]",
-  },
-  {
-    title: "Деньги и изобилие",
-    count: "128 практик",
-    icon: "₽",
-    gradient: "from-[#f7dfb8] to-[#f3d4a0]",
-  },
-  {
-    title: "Спокойствие и сон",
-    count: "116 практик",
-    icon: "☾",
-    gradient: "from-[#d9def8] to-[#c7d5f2]",
-  },
-  {
-    title: "Энергия и восстановление",
-    count: "103 практики",
-    icon: "✦",
-    gradient: "from-[#d7e4f7] to-[#d8d6f3]",
-  },
-  {
-    title: "Саморазвитие и рост",
-    count: "98 практик",
-    icon: "♧",
-    gradient: "from-[#e4e0d5] to-[#e9daca]",
-  },
-  {
-    title: "Очищение и защита",
-    count: "88 практик",
-    icon: "◈",
-    gradient: "from-[#d7d8f2] to-[#e1d4ef]",
-  },
-  {
-    title: "Духовность и осознанность",
-    count: "96 практик",
-    icon: "❀",
-    gradient: "from-[#ded6ed] to-[#ece0f2]",
-  },
-  {
-    title: "Уверенность и мотивация",
-    count: "75 практик",
-    icon: "△",
-    gradient: "from-[#f2d5c8] to-[#dacceb]",
-  },
-  {
-    title: "Женские практики",
-    count: "67 практик",
-    icon: "♀",
-    gradient: "from-[#f1d6df] to-[#e9d4ec]",
-  },
-  {
-    title: "Мужские практики",
-    count: "54 практики",
-    icon: "♂",
-    gradient: "from-[#d9d6e6] to-[#ddcfdf]",
-  },
-];
-
-const formats = [
-  ["Медитации", "341 практика"],
-  ["Энергопрактики", "289 практик"],
-  ["Молитвы", "142 практики"],
-  ["Курсы и программы", "67 программ"],
-  ["Аффирмации", "218 практик"],
+  ["Любовь и отношения", "♡"],
+  ["Деньги и изобилие", "₽"],
+  ["Спокойствие и сон", "☾"],
+  ["Энергия и восстановление", "✦"],
 ];
 
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <circle
-        cx="11"
-        cy="11"
-        r="7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m16.5 16.5 4 4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m16.5 16.5 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
 
-export default function CatalogPage() {
+export default async function CatalogPage() {
+  const practices = await getPractices();
+
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
       <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
         <div className="px-5 pt-6">
           <header className="flex items-center justify-between">
-            <Link
-              href="/"
-              aria-label="Назад"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-3xl text-[#7042c5]"
-            >
+            <Link href="/" aria-label="Назад" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-3xl text-[#7042c5]">
               ‹
             </Link>
 
             <h1 className="text-[28px] font-semibold">Каталог практик</h1>
 
-            <button
-              type="button"
-              aria-label="Поиск"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
-            >
+            <button type="button" aria-label="Поиск" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]">
               <SearchIcon />
             </button>
           </header>
 
           <label className="mt-6 flex items-center gap-3 rounded-[22px] border border-[#ded1f1] bg-white px-4 py-3.5">
-            <span className="text-[#7042c5]">
-              <SearchIcon />
-            </span>
-
-            <input
-              type="search"
-              placeholder="Поиск практик, авторов и тем"
-              className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#9485b4]"
-            />
+            <span className="text-[#7042c5]"><SearchIcon /></span>
+            <input type="search" placeholder="Поиск практик, авторов и тем" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#9485b4]" />
           </label>
-
-          <div className="-mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-2">
-            {[
-              "Все",
-              "Медитации",
-              "Энергопрактики",
-              "Молитвы",
-              "Курсы",
-              "Аффирмации",
-            ].map((item, index) => (
-              <button
-                key={item}
-                type="button"
-                className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                  index === 0
-                    ? "border-[#7042c5] bg-[#7042c5] text-white"
-                    : "border-[#e2d7f2] bg-white text-[#25135c]"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
 
           <section className="mt-6">
             <h2 className="text-[22px] font-semibold">Категории</h2>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              {categories.map((category) => (
-                <button
-                  key={category.title}
-                  type="button"
-                  className={`min-h-[142px] rounded-[24px] bg-gradient-to-br ${category.gradient} p-4 text-left`}
-                >
-                  <span className="text-4xl text-[#7042c5]">
-                    {category.icon}
-                  </span>
-
-                  <span className="mt-4 block text-[16px] font-semibold leading-5">
-                    {category.title}
-                  </span>
-
-                  <span className="mt-2 block text-sm text-[#76679d]">
-                    {category.count}
-                  </span>
+              {categories.map(([title, icon]) => (
+                <button key={title} type="button" className="min-h-[120px] rounded-[24px] bg-gradient-to-br from-[#f4ddf5] to-[#dcd9f7] p-4 text-left">
+                  <span className="text-4xl text-[#7042c5]">{icon}</span>
+                  <span className="mt-4 block text-[16px] font-semibold leading-5">{title}</span>
+                  <span className="mt-2 block text-sm text-[#76679d]">Подборка практик</span>
                 </button>
               ))}
             </div>
           </section>
 
           <section className="mt-8">
-            <h2 className="text-[22px] font-semibold">Форматы</h2>
+            <h2 className="text-[22px] font-semibold">Практики из базы</h2>
 
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#e8def5] bg-white">
-              {formats.map(([title, count], index) => (
-                <button
-                  key={title}
-                  type="button"
-                  className={`flex w-full items-center justify-between px-5 py-4 text-left ${
-                    index !== formats.length - 1
-                      ? "border-b border-[#eee6f7]"
-                      : ""
-                  }`}
+            <div className="mt-4 space-y-3">
+              {practices.map((practice) => (
+                <Link
+                  key={practice.id}
+                  href={`/practice/${practice.slug}`}
+                  className="block rounded-[24px] border border-[#e8def5] bg-white p-4 shadow-sm"
                 >
-                  <span className="font-medium">{title}</span>
+                  <div className="flex gap-4">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br from-[#8d6ad8] to-[#f1c4d6] text-4xl text-white">
+                      ✦
+                    </div>
 
-                  <span className="flex items-center gap-2 text-sm text-[#8a7ca9]">
-                    {count}
-                    <span className="text-xl text-[#7042c5]">›</span>
-                  </span>
-                </button>
+                    <div className="min-w-0">
+                      <h3 className="text-[17px] font-semibold leading-5">{practice.title}</h3>
+                      <p className="mt-1 text-sm text-[#7042c5]">Сергей и Зоя</p>
+                      <p className="mt-1 text-sm text-[#7d70a2]">
+                        {practice.format} · {practice.duration_minutes} мин
+                      </p>
+                      <p className="mt-2 font-semibold text-[#7042c5]">
+                        {practice.is_free ? "Бесплатно" : `${practice.price} ₽`}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
               ))}
+
+              {practices.length === 0 && (
+                <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] p-5 text-center text-sm text-[#7d70a2]">
+                  Практики пока не загрузились из базы.
+                </div>
+              )}
             </div>
           </section>
         </div>
 
-<BottomNav />
+        <BottomNav />
       </div>
     </main>
   );
