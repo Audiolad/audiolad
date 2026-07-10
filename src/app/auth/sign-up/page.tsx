@@ -25,20 +25,24 @@ export default function SignUpPage() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
       password,
       options: {
         data: {
-          first_name: firstName,
-          last_name: lastName,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
         },
       },
     });
 
+    console.log("Sign up data:", data);
+    console.log("Sign up error:", error);
+
     if (error) {
       setIsError(true);
-      setMessage("Не удалось создать аккаунт. Проверьте данные.");
+      setMessage(error.message || "Не удалось создать аккаунт.");
       setIsLoading(false);
       return;
     }
