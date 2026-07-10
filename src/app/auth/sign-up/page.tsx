@@ -25,7 +25,7 @@ export default function SignUpPage() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
@@ -44,7 +44,13 @@ export default function SignUpPage() {
       return;
     }
 
-    router.push("/auth/sign-in?registered=1");
+    if (data.session) {
+      router.replace("/my-practices");
+      router.refresh();
+      return;
+    }
+
+    router.replace("/auth/sign-in?registered=1");
   }
 
   return (
