@@ -1,5 +1,6 @@
 "use client";
 
+import { getSafeNextPath } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,7 +39,9 @@ function SignInForm() {
       return;
     }
 
-    router.push("/profile");
+    const destination = getSafeNextPath(searchParams.get("next"));
+
+    router.replace(destination);
     router.refresh();
   }
 
