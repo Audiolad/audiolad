@@ -2,9 +2,11 @@
 
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,15 +43,7 @@ export default function SignUpPage() {
       return;
     }
 
-    setMessage(
-      "Регистрация прошла успешно. Проверьте электронную почту и подтвердите адрес.",
-    );
-
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setPassword("");
-    setIsLoading(false);
+    router.push("/auth/sign-in?registered=1");
   }
 
   return (
