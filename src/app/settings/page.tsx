@@ -1,6 +1,157 @@
 import BottomNav from "@/components/BottomNav";
 import { signOut } from "@/app/auth/sign-out/actions";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
+type UserMetadata = {
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+};
+
+type ProfileRow = {
+  full_name: string | null;
+  role: string | null;
+};
+
+function getDisplayName(
+  profile: ProfileRow | null,
+  user: { email?: string; user_metadata?: UserMetadata },
+): string {
+  const meta = user.user_metadata ?? {};
+  const profileFullName = profile?.full_name?.trim();
+
+  if (profileFullName) {
+    return profileFullName;
+  }
+
+  const metaFullName =
+    typeof meta.full_name === "string" ? meta.full_name.trim() : "";
+
+  if (metaFullName) {
+    return metaFullName;
+  }
+
+  const firstName =
+    typeof meta.first_name === "string" ? meta.first_name.trim() : "";
+  const lastName =
+    typeof meta.last_name === "string" ? meta.last_name.trim() : "";
+  const combined = `${firstName} ${lastName}`.trim();
+
+  if (combined) {
+    return combined;
+  }
+
+  const emailLocalPart = user.email?.split("@")[0]?.trim();
+
+  if (emailLocalPart) {
+    return emailLocalPart;
+  }
+
+  return "Пользователь";
+}
+
+function getInitial(displayName: string): string {
+  const char = displayName.trim().charAt(0);
+
+  return char ? char.toUpperCase() : "П";
+}
+
+function getRoleLabel(role: string | null | undefined): string {
+  if (role === "listener") {
+    return "Слушатель";
+  }
+
+  return "Пользователь АудиоЛада";
+}
+
+function getSections(emailDescription: string) {
+  return [
+    {
+      title: "Аккаунт",
+      items: [
+        {
+          icon: "◎",
+          title: "Личные данные",
+          description: "Имя, фотография и контактная информация",
+        },
+        {
+          icon: "✉",
+          title: "Электронная почта",
+          description: emailDescription,
+        },
+        {
+          icon: "⌘",
+          title: "Пароль и безопасность",
+          description: "Изменение пароля и защита аккаунта",
+        },
+      ],
+    },
+    {
+      title: "Прослушивание",
+      items: [
+        {
+          icon: "♫",
+          title: "Качество аудио",
+          description: "Высокое",
+        },
+        {
+          icon: "⇩",
+          title: "Настройки скачивания",
+          description: "Только через Wi-Fi",
+        },
+        {
+          icon: "▶",
+          title: "Автовоспроизведение",
+          description: "Продолжать следующую практику",
+        },
+      ],
+    },
+    {
+      title: "Уведомления",
+      items: [
+        {
+          icon: "◌",
+          title: "Новые практики авторов",
+          description: "Получать уведомления о новых материалах",
+        },
+        {
+          icon: "♡",
+          title: "Рекомендации",
+          description: "Персональные подборки и предложения",
+        },
+        {
+          icon: "₽",
+          title: "Покупки и платежи",
+          description: "Чеки, статусы и подтверждения оплаты",
+        },
+      ],
+    },
+    {
+      title: "Приложение",
+      items: [
+        {
+          icon: "☼",
+          title: "Оформление",
+          description: "Светлая тема",
+        },
+        {
+          icon: "Я",
+          title: "Язык",
+          description: "Русский",
+        },
+        {
+          icon: "?",
+          title: "Помощь и поддержка",
+          description: "Ответы на вопросы и связь с нами",
+        },
+      ],
+    },
+  ];
+}
 
 function BackIcon() {
   return (
@@ -16,90 +167,29 @@ function BackIcon() {
   );
 }
 
-const sections = [
-  {
-    title: "Аккаунт",
-    items: [
-      {
-        icon: "◎",
-        title: "Личные данные",
-        description: "Имя, фотография и контактная информация",
-      },
-      {
-        icon: "✉",
-        title: "Электронная почта",
-        description: "sergey@example.com",
-      },
-      {
-        icon: "⌘",
-        title: "Пароль и безопасность",
-        description: "Изменение пароля и защита аккаунта",
-      },
-    ],
-  },
-  {
-    title: "Прослушивание",
-    items: [
-      {
-        icon: "♫",
-        title: "Качество аудио",
-        description: "Высокое",
-      },
-      {
-        icon: "⇩",
-        title: "Настройки скачивания",
-        description: "Только через Wi-Fi",
-      },
-      {
-        icon: "▶",
-        title: "Автовоспроизведение",
-        description: "Продолжать следующую практику",
-      },
-    ],
-  },
-  {
-    title: "Уведомления",
-    items: [
-      {
-        icon: "◌",
-        title: "Новые практики авторов",
-        description: "Получать уведомления о новых материалах",
-      },
-      {
-        icon: "♡",
-        title: "Рекомендации",
-        description: "Персональные подборки и предложения",
-      },
-      {
-        icon: "₽",
-        title: "Покупки и платежи",
-        description: "Чеки, статусы и подтверждения оплаты",
-      },
-    ],
-  },
-  {
-    title: "Приложение",
-    items: [
-      {
-        icon: "☼",
-        title: "Оформление",
-        description: "Светлая тема",
-      },
-      {
-        icon: "Я",
-        title: "Язык",
-        description: "Русский",
-      },
-      {
-        icon: "?",
-        title: "Помощь и поддержка",
-        description: "Ответы на вопросы и связь с нами",
-      },
-    ],
-  },
-];
+export default async function SettingsPage() {
+  const supabase = await createClient();
 
-export default function SettingsPage() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/sign-in");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const displayName = getDisplayName(profile, user);
+  const initial = getInitial(displayName);
+  const roleLabel = getRoleLabel(profile?.role ?? "listener");
+  const emailDescription = user.email?.trim() || "Не указан";
+  const sections = getSections(emailDescription);
+
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
       <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
@@ -128,14 +218,12 @@ export default function SettingsPage() {
 
             <div className="mt-3 flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/15 text-2xl font-semibold">
-                С
+                {initial}
               </div>
 
               <div>
-                <p className="text-xl font-semibold">Сергей</p>
-                <p className="mt-1 text-sm text-white/70">
-                  Слушатель и автор АудиоЛада
-                </p>
+                <p className="text-xl font-semibold">{displayName}</p>
+                <p className="mt-1 text-sm text-white/70">{roleLabel}</p>
               </div>
             </div>
           </section>
