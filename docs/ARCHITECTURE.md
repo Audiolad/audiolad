@@ -6,10 +6,10 @@
 
 ```
 Браузер → Nginx (audiolad.ru) → Next.js :3000 (PM2: audiolad)
-                                      ↓
-                              proxy.ts (сессия)
-                                      ↓
-                         Self-hosted Supabase (Docker)
+              ↓                           ↓
+    /auth/v1/, /rest/v1/            proxy.ts (сессия)
+              ↓                           ↓
+         Supabase Kong              Self-hosted Supabase (Docker)
 ```
 
 ## Физическая инфраструктура
@@ -19,20 +19,26 @@
 ```
 Timeweb Cloud
 ├── Nginx
+│   ├── /auth/v1/ → Supabase Kong :8000
+│   ├── /rest/v1/ → Supabase Kong :8000
+│   └── /         → Next.js :3000
 ├── PM2
 │   └── Next.js, процесс audiolad, порт 3000
 └── Docker
     └── self-hosted Supabase
+        ├── supabase-kong (API gateway)
+        ├── supabase-rest (PostgREST)
+        ├── supabase-auth (GoTrue)
+        ├── supabase-db (Postgres)
+        └── supabase-studio
 ```
-
-Состав отдельных Docker-контейнеров Supabase в документации не фиксируется — не был отдельно проверен.
 
 ## Основной поток запроса
 
 ```
 Браузер
   → Nginx
-  → Next.js
+  → Next.js (или Supabase Kong для /auth/v1/ и /rest/v1/)
   → серверная или клиентская логика приложения
   → Supabase
   → база данных
@@ -46,6 +52,7 @@ Timeweb Cloud
 | Слой | Расположение | Назначение |
 |------|--------------|------------|
 | Страницы | `src/app/**/page.tsx` | UI и маршрутизация (App Router) |
+| Server Actions | `src/app/**/actions.ts` | Серверные мутации (профиль) |
 | Компоненты | `src/components/` | Переиспользуемые UI-блоки |
 | Supabase-клиенты | `src/lib/supabase/` | browser, server, proxy |
 | Прокси сессии | `proxy.ts` | Точка входа для обновления сессии |
@@ -59,47 +66,76 @@ Timeweb Cloud
 |---------|-----|------------|
 | `/auth/sign-up` | client | `supabase.auth.signUp()` |
 | `/auth/sign-in` | client | `supabase.auth.signInWithPassword()` |
-| `/catalog` | server | Получение опубликованных практик через Supabase |
+| `/catalog` | server | Получение опубликованных практик через Supabase REST |
+| `/profile` | server | `getUser()` + чтение `public.profiles` |
+| `/profile/edit` | server + action | Чтение профиля, сохранение через Server Action |
 
 ### Только UI (демо-данные)
 
-`/`, `/profile`, `/profile/edit`, `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases`, `/playlists`, `/playlists/new`, `/playlist/morning-energy`, `/authors`, `/authors/*`, `/author-dashboard`, `/author-dashboard/**`, `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`, `/settings`.
+`/`, `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases`, `/playlists`, `/playlists/new`, `/playlist/morning-energy`, `/authors`, `/authors/*`, `/author-dashboard`, `/author-dashboard/**`, `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`, `/settings`.
+
+На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 
 ## Поток аутентификации
 
 1. Пользователь заполняет форму на `/auth/sign-up` или `/auth/sign-in`.
-2. Браузерный клиент (`src/lib/supabase/client.ts`) вызывает Supabase Auth API.
+2. Браузерный клиент (`src/lib/supabase/client.ts`) вызывает Supabase Auth API через `/auth/v1/`.
 3. `proxy.ts` на каждый запрос вызывает `supabase.auth.getClaims()` для обновления сессии через cookies.
-4. Серверный клиент (`src/lib/supabase/server.ts`) готов, но в страницах пока не задействован.
+4. Серверный клиент (`src/lib/supabase/server.ts`) используется на страницах профиля для чтения сессии и данных.
 
-## Поток регистрации в текущем состоянии
-
-### Как работает сейчас
+## Поток регистрации
 
 ```
 Форма регистрации
   → браузерный Supabase-клиент
-  → Supabase Authentication
-  → автоматическое создание записи public.profiles
-  → текущая страница регистрации
-```
-
-### Планируемое изменение (не реализовано)
-
-```
-успешная регистрация
+  → Supabase Authentication (/auth/v1/)
+  → автоматическое создание записи public.profiles (триггер handle_new_user)
   → /auth/sign-in?registered=1
   → сообщение об успешной регистрации
   → вход пользователя
   → /profile
 ```
 
+## Поток профиля
+
+### Чтение (`/profile`)
+
+```
+Запрос /profile
+  → Server Component
+  → createClient() (server)
+  → supabase.auth.getUser()
+  → при отсутствии user → redirect /auth/sign-in
+  → supabase.from("profiles").select(...).eq("id", user.id)
+  → отображение имени (profiles.full_name → metadata → email)
+  → отображение email и инициала аватара
+```
+
+### Редактирование (`/profile/edit`)
+
+```
+Запрос /profile/edit
+  → Server Component
+  → getUser() + чтение profiles
+  → предзаполнение формы (first_name, last_name из metadata / full_name)
+  → email read-only
+
+Сохранение (Server Action updateProfile)
+  → валидация непустого имени
+  → UPDATE public.profiles SET full_name = ... WHERE id = user.id
+  → проверка возврата id (строка должна существовать)
+  → supabase.auth.updateUser({ data: { first_name, last_name, full_name } })
+  → redirect /profile?updated=1
+```
+
+Ошибки возвращаются через безопасные коды в query-параметрах (`empty_name`, `profile_not_found`, `profile_update_failed`, `metadata_update_failed`).
+
 ## Источник истины
 
 - Постоянные пользовательские и бизнес-данные должны храниться в Supabase/Postgres.
 - Демонстрационные данные являются временными.
 - Локальные массивы, JSON и состояние интерфейса не должны становиться параллельным постоянным хранилищем.
-- Актуальная схема данных будет документироваться в `docs/DATABASE.md`.
+- Актуальная схема данных документируется в `docs/DATABASE.md`.
 
 ## Архитектурные принципы
 
@@ -156,8 +192,7 @@ MAX user_id  ↔  профиль АудиоЛада  ↔  пользовател
 ## Что отсутствует в архитектуре
 
 - `src/app/api/` — API Routes не созданы.
-- Middleware для защиты маршрутов — не реализован.
-- Серверные компоненты с чтением сессии пользователя — не используются на страницах профиля.
+- Глобальная защита приватных маршрутов — не реализована (профиль проверяет сессию локально, но маршрут не защищён на уровне proxy).
 - Интеграция с MAX (бот, мини-приложение, автоматический вход) — не реализована.
 
 ## Зависимости

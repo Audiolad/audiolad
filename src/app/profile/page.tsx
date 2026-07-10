@@ -1,5 +1,63 @@
-import Image from "next/image";import BottomNav from "@/components/BottomNav";
+import Image from "next/image";
+import BottomNav from "@/components/BottomNav";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
+type UserMetadata = {
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+};
+
+type ProfileRow = {
+  full_name: string | null;
+};
+
+function getDisplayName(
+  profile: ProfileRow | null,
+  user: { email?: string; user_metadata?: UserMetadata },
+): string {
+  const meta = user.user_metadata ?? {};
+  const profileFullName = profile?.full_name?.trim();
+
+  if (profileFullName) {
+    return profileFullName;
+  }
+
+  const metaFullName =
+    typeof meta.full_name === "string" ? meta.full_name.trim() : "";
+
+  if (metaFullName) {
+    return metaFullName;
+  }
+
+  const firstName =
+    typeof meta.first_name === "string" ? meta.first_name.trim() : "";
+  const lastName =
+    typeof meta.last_name === "string" ? meta.last_name.trim() : "";
+  const combined = `${firstName} ${lastName}`.trim();
+
+  if (combined) {
+    return combined;
+  }
+
+  const emailLocalPart = user.email?.split("@")[0]?.trim();
+
+  if (emailLocalPart) {
+    return emailLocalPart;
+  }
+
+  return "Пользователь";
+}
+
+function getInitial(displayName: string): string {
+  const char = displayName.trim().charAt(0);
+
+  return char ? char.toUpperCase() : "П";
+}
 
 const favoriteAuthors = [
   {
@@ -29,7 +87,34 @@ const settings = [
   ["О приложении", "i"],
 ];
 
-export default function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ updated?: string }>;
+}) {
+  const params = await searchParams;
+  const isUpdated = params.updated === "1";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/sign-in");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const displayName = getDisplayName(profile, user);
+  const initial = getInitial(displayName);
+  const email = user.email ?? "";
+
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
       <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
@@ -45,36 +130,46 @@ export default function ProfilePage() {
 
             <h1 className="text-[28px] font-semibold">Профиль</h1>
 
-<Link
-  href="/settings"
-  aria-label="Настройки"
-  className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5]"
->
-  ⚙
-</Link>
+            <Link
+              href="/settings"
+              aria-label="Настройки"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5]"
+            >
+              ⚙
+            </Link>
           </header>
+
+          {isUpdated && (
+            <div className="mt-6 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm leading-6 text-[#3d8d65]">
+              Профиль успешно обновлён.
+            </div>
+          )}
 
           <section className="relative mt-6 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)]">
             <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#d8b8f2]/25 blur-2xl" />
 
             <div className="relative flex items-center gap-4">
               <div className="flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-[#f7effe] shadow-sm">
-                <span className="text-4xl text-[#7042c5]">С</span>
+                <span className="text-4xl text-[#7042c5]">{initial}</span>
               </div>
 
               <div className="min-w-0">
-                <h2 className="text-[25px] font-semibold">Сергей</h2>
+                <h2 className="text-[25px] font-semibold">{displayName}</h2>
+
+                {email && (
+                  <p className="mt-1 text-sm text-[#796ba0]">{email}</p>
+                )}
 
                 <p className="mt-1 text-sm text-[#796ba0]">
                   Ваш путь в АудиоЛаде
                 </p>
 
-<Link
-  href="/profile/edit"
-  className="mt-3 inline-flex rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
->
-  Редактировать профиль
-</Link>
+                <Link
+                  href="/profile/edit"
+                  className="mt-3 inline-flex rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
+                >
+                  Редактировать профиль
+                </Link>
               </div>
             </div>
 
@@ -97,39 +192,39 @@ export default function ProfilePage() {
             </div>
           </section>
 
-<section className="mt-6 grid grid-cols-4 gap-2">
- <Link
-  href="/purchases"
-  className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
->
-  <span className="text-2xl text-[#7042c5]">▢</span>
-  <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
-</Link>
+          <section className="mt-6 grid grid-cols-4 gap-2">
+            <Link
+              href="/purchases"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">▢</span>
+              <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
+            </Link>
 
-  <Link
-    href="/favorites"
-    className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-  >
-    <span className="text-2xl text-[#7042c5]">♡</span>
-    <span className="mt-2 text-[11px] leading-4">Избранное</span>
-  </Link>
+            <Link
+              href="/favorites"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">♡</span>
+              <span className="mt-2 text-[11px] leading-4">Избранное</span>
+            </Link>
 
-<Link
-  href="/downloads"
-  className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
->
-  <span className="text-2xl text-[#7042c5]">⇩</span>
-  <span className="mt-2 text-[11px] leading-4">Скачанные</span>
-</Link>
+            <Link
+              href="/downloads"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">⇩</span>
+              <span className="mt-2 text-[11px] leading-4">Скачанные</span>
+            </Link>
 
-<Link
-  href="/history"
-  className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
->
-  <span className="text-2xl text-[#7042c5]">◷</span>
-  <span className="mt-2 text-[11px] leading-4">История</span>
-</Link>
-</section>
+            <Link
+              href="/history"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">◷</span>
+              <span className="mt-2 text-[11px] leading-4">История</span>
+            </Link>
+          </section>
 
           <section className="mt-8">
             <div className="flex items-center justify-between">
@@ -149,25 +244,25 @@ export default function ProfilePage() {
                   key={author.name}
                   className="w-[154px] shrink-0 rounded-[22px] border border-[#eadff8] bg-white p-3 shadow-sm"
                 >
-<Link
-  href={author.href}
-  className="block aspect-square overflow-hidden rounded-[18px] bg-[#f7effe]"
->
-  <Image
-    src={author.image}
-    alt={author.name}
-    width={160}
-    height={160}
-    className="h-full w-full object-contain p-4"
-  />
-</Link>
+                  <Link
+                    href={author.href}
+                    className="block aspect-square overflow-hidden rounded-[18px] bg-[#f7effe]"
+                  >
+                    <Image
+                      src={author.image}
+                      alt={author.name}
+                      width={160}
+                      height={160}
+                      className="h-full w-full object-contain p-4"
+                    />
+                  </Link>
 
-<Link
-  href={author.href}
-  className="mt-3 block text-[15px] font-semibold"
->
-  {author.name}
-</Link>
+                  <Link
+                    href={author.href}
+                    className="mt-3 block text-[15px] font-semibold"
+                  >
+                    {author.name}
+                  </Link>
 
                   <p className="mt-1 line-clamp-2 min-h-[40px] text-xs leading-5 text-[#796ba0]">
                     {author.description}
@@ -263,7 +358,7 @@ export default function ProfilePage() {
           </section>
         </div>
 
-<BottomNav />
+        <BottomNav />
       </div>
     </main>
   );
