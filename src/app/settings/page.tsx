@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import { signOut } from "@/app/auth/sign-out/actions";
 import Link from "next/link";
 
 function BackIcon() {
@@ -176,12 +177,14 @@ export default function SettingsPage() {
           ))}
 
           <section className="mt-8">
-            <button
-              type="button"
-              className="w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63]"
-            >
-              Выйти из аккаунта
-            </button>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63]"
+              >
+                Выйти из аккаунта
+              </button>
+            </form>
 
             <button
               type="button"
