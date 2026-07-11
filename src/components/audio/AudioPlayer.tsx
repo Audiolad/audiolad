@@ -52,29 +52,29 @@ function PauseIcon() {
   );
 }
 
-function RewindIcon() {
+function SeekBackLabel() {
   return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" aria-hidden="true">
-      <path
-        d="M11 7 5 12l6 5V7ZM19 7l-6 5 6 5V7Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <span
+      aria-hidden="true"
+      className="flex flex-col items-center justify-center leading-none"
+    >
+      <span className="text-[15px] leading-none">↶</span>
+      <span className="mt-0.5 text-[10px] font-bold leading-none tracking-tight">
+        15
+      </span>
+    </span>
   );
 }
 
-function ForwardIcon() {
+function SeekForwardLabel() {
   return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" aria-hidden="true">
-      <path
-        d="m13 7 6 5-6 5V7ZM5 7l6 5-6 5V7Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <span
+      aria-hidden="true"
+      className="flex flex-col items-center justify-center leading-none"
+    >
+      <span className="text-[10px] font-bold leading-none tracking-tight">15</span>
+      <span className="mt-0.5 text-[15px] leading-none">↷</span>
+    </span>
   );
 }
 
@@ -341,7 +341,7 @@ export default function AudioPlayer({
                 aria-label="Назад на 15 секунд"
                 className="flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full bg-white/12 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <RewindIcon />
+                <SeekBackLabel />
               </button>
 
               <button
@@ -360,7 +360,7 @@ export default function AudioPlayer({
                 aria-label="Вперёд на 15 секунд"
                 className="flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full bg-white/12 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ForwardIcon />
+                <SeekForwardLabel />
               </button>
             </div>
 
