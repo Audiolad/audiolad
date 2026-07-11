@@ -38,7 +38,13 @@ function clamp(value: number, min: number, max: number): number {
 
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-9 w-9" fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-9 w-9 sm:h-10 sm:w-10"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
     </svg>
   );
@@ -46,35 +52,134 @@ function PlayIcon() {
 
 function PauseIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-9 w-9" fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-9 w-9 sm:h-10 sm:w-10"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path d="M7 5.5h3.5v13H7V5.5Zm6.5 0H17v13h-3.5V5.5Z" />
     </svg>
   );
 }
 
-function SeekBackLabel() {
+function PreviousTrackIcon() {
   return (
-    <span
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="currentColor"
       aria-hidden="true"
-      className="flex flex-col items-center justify-center leading-none"
+      focusable="false"
     >
-      <span className="text-[15px] leading-none">↶</span>
-      <span className="mt-0.5 text-[10px] font-bold leading-none tracking-tight">
-        15
-      </span>
-    </span>
+      <rect x="6" y="7" width="2.2" height="10" rx="0.4" />
+      <path d="M9.2 12 16.8 7.4v9.2Z" />
+    </svg>
   );
 }
 
-function SeekForwardLabel() {
+function NextTrackIcon() {
   return (
-    <span
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="currentColor"
       aria-hidden="true"
-      className="flex flex-col items-center justify-center leading-none"
+      focusable="false"
     >
-      <span className="text-[10px] font-bold leading-none tracking-tight">15</span>
-      <span className="mt-0.5 text-[15px] leading-none">↷</span>
-    </span>
+      <path d="M7.2 12 14.8 7.4v9.2Z" />
+      <rect x="15.8" y="7" width="2.2" height="10" rx="0.4" />
+    </svg>
+  );
+}
+
+function RewindFifteenIcon() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className="h-full w-full"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M33.5 14.5a15 15 0 1 0 3.2 17.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M20.5 33.5 17 36.5l3.5 2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <text
+        x="24"
+        y="27.5"
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight="700"
+        fill="currentColor"
+      >
+        15 с
+      </text>
+    </svg>
+  );
+}
+
+function ForwardFifteenIcon() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className="h-full w-full"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M14.5 14.5a15 15 0 1 1-3.2 17.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M27.5 33.5 31 36.5l-3.5 2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <text
+        x="24"
+        y="27.5"
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight="700"
+        fill="currentColor"
+      >
+        15 с
+      </text>
+    </svg>
+  );
+}
+
+function ControlCaption({
+  primary,
+  secondary,
+}: {
+  primary: string;
+  secondary: string;
+}) {
+  return (
+    <p className="mt-1.5 max-w-[4.75rem] text-center text-[10px] leading-tight text-white/55 sm:max-w-none sm:text-[11px]">
+      <span className="block">{primary}</span>
+      <span className="block">{secondary}</span>
+    </p>
   );
 }
 
@@ -333,46 +438,78 @@ export default function AudioPlayer({
               className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
             />
 
-            <div className="mt-8 flex items-center justify-center gap-6">
-              <button
-                type="button"
-                onClick={() => handleSeekOffset(-15)}
-                disabled={!hasValidDuration}
-                aria-label="Назад на 15 секунд"
-                className="flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full bg-white/12 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <SeekBackLabel />
-              </button>
+            <div className="mt-8 grid grid-cols-5 items-start gap-0.5 px-0.5 sm:gap-2 sm:px-0">
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  disabled
+                  aria-label="Предыдущая практика"
+                  title="Очередь практик скоро появится"
+                  className="flex h-10 w-10 min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 opacity-[0.55] sm:h-11 sm:w-11"
+                >
+                  <PreviousTrackIcon />
+                </button>
+                <ControlCaption primary="Предыдущая" secondary="практика" />
+              </div>
 
-              <button
-                type="button"
-                onClick={handlePlayPause}
-                aria-label={isPlaying ? "Пауза" : "Воспроизведение"}
-                className="flex h-16 min-h-16 w-16 min-w-16 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_18px_40px_rgba(0,0,0,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                {isPlaying ? <PauseIcon /> : <PlayIcon />}
-              </button>
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => handleSeekOffset(-15)}
+                  disabled={!hasValidDuration}
+                  aria-label="Назад на 15 секунд"
+                  className="flex h-12 w-12 min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 p-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-[52px] sm:w-[52px]"
+                >
+                  <RewindFifteenIcon />
+                </button>
+                <ControlCaption primary="Назад" secondary="15 секунд" />
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleSeekOffset(15)}
-                disabled={!hasValidDuration}
-                aria-label="Вперёд на 15 секунд"
-                className="flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full bg-white/12 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <SeekForwardLabel />
-              </button>
-            </div>
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={handlePlayPause}
+                  aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
+                  className="flex h-16 w-16 min-h-11 min-w-11 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_18px_40px_rgba(0,0,0,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:h-[72px] sm:w-[72px]"
+                >
+                  {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                </button>
 
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={handleSpeedChange}
-                aria-label={`Скорость воспроизведения ${PLAYBACK_RATES[playbackRateIndex]}×`}
-                className="min-h-11 rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                {PLAYBACK_RATES[playbackRateIndex]}×
-              </button>
+                <button
+                  type="button"
+                  onClick={handleSpeedChange}
+                  aria-label={`Скорость воспроизведения ${PLAYBACK_RATES[playbackRateIndex]}×`}
+                  className="mt-3 min-h-11 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                >
+                  {PLAYBACK_RATES[playbackRateIndex]}×
+                </button>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => handleSeekOffset(15)}
+                  disabled={!hasValidDuration}
+                  aria-label="Вперёд на 15 секунд"
+                  className="flex h-12 w-12 min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 p-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-[52px] sm:w-[52px]"
+                >
+                  <ForwardFifteenIcon />
+                </button>
+                <ControlCaption primary="Вперёд" secondary="15 секунд" />
+              </div>
+
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  disabled
+                  aria-label="Следующая практика"
+                  title="Очередь практик скоро появится"
+                  className="flex h-10 w-10 min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 opacity-[0.55] sm:h-11 sm:w-11"
+                >
+                  <NextTrackIcon />
+                </button>
+                <ControlCaption primary="Следующая" secondary="практика" />
+              </div>
             </div>
           </>
         )}
