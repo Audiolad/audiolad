@@ -1,6 +1,7 @@
 const PRIVATE_ROUTE_PREFIXES = [
   "/profile",
   "/my-practices",
+  "/listen",
   "/favorites",
   "/history",
   "/downloads",
