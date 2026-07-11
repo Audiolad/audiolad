@@ -73,8 +73,8 @@ function PreviousTrackIcon() {
       aria-hidden="true"
       focusable="false"
     >
-      <rect x="6" y="7" width="2.2" height="10" rx="0.4" />
-      <path d="M9.2 12 16.8 7.4v9.2Z" />
+      <rect x="5.5" y="5" width="2.5" height="14" rx="0.5" />
+      <path d="M18 5v14L8 12Z" />
     </svg>
   );
 }
@@ -88,8 +88,8 @@ function NextTrackIcon() {
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M7.2 12 14.8 7.4v9.2Z" />
-      <rect x="15.8" y="7" width="2.2" height="10" rx="0.4" />
+      <path d="M6 5v14l10-7Z" />
+      <rect x="16" y="5" width="2.5" height="14" rx="0.5" />
     </svg>
   );
 }
@@ -97,36 +97,18 @@ function NextTrackIcon() {
 function RewindFifteenIcon() {
   return (
     <svg
-      viewBox="0 0 48 48"
+      viewBox="0 0 24 24"
       className="h-full w-full"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        d="M33.5 14.5a15 15 0 1 0 3.2 17.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M20.5 33.5 17 36.5l3.5 2.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <text
-        x="24"
-        y="27.5"
-        textAnchor="middle"
-        fontSize="9.5"
-        fontWeight="700"
-        fill="currentColor"
-      >
-        15 с
-      </text>
+      <path d="M19 12H8" />
+      <path d="M12 7 7 12l5 5" />
     </svg>
   );
 }
@@ -134,36 +116,18 @@ function RewindFifteenIcon() {
 function ForwardFifteenIcon() {
   return (
     <svg
-      viewBox="0 0 48 48"
+      viewBox="0 0 24 24"
       className="h-full w-full"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        d="M14.5 14.5a15 15 0 1 1-3.2 17.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M27.5 33.5 31 36.5l-3.5 2.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <text
-        x="24"
-        y="27.5"
-        textAnchor="middle"
-        fontSize="9.5"
-        fontWeight="700"
-        fill="currentColor"
-      >
-        15 с
-      </text>
+      <path d="M5 12h11" />
+      <path d="m12 7 5 5-5 5" />
     </svg>
   );
 }
