@@ -384,7 +384,9 @@ export default async function PracticePage({ params }: PageProps) {
     activeEntitlement !== null
       ? getAccessBadgeLabel(activeEntitlement.access_source)
       : formatPriceLabel(practice.price, practice.is_free);
+  const audioReady = hasAudioReady(practice.audio_url);
   const audioLabel = getAudioButtonLabel(practice.audio_url);
+  const listenHref = `/listen/${practice.slug}`;
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
@@ -462,17 +464,29 @@ export default async function PracticePage({ params }: PageProps) {
           </section>
 
           <section className="mt-4">
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className={`flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5] ${disabledButtonClasses()}`}
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
-                <PlayIcon />
-              </span>
-              {audioLabel}
-            </button>
+            {audioReady ? (
+              <Link
+                href={listenHref}
+                className="flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
+                  <PlayIcon />
+                </span>
+                Слушать
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className={`flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5] ${disabledButtonClasses()}`}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
+                  <PlayIcon />
+                </span>
+                {audioLabel}
+              </button>
+            )}
           </section>
 
           {!hasActiveAccess && (
