@@ -2,6 +2,7 @@ import BottomNav from "@/components/BottomNav";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -175,14 +176,16 @@ function getAuthorName(practice: PracticeRow | null): string | null {
   return name ? name : null;
 }
 
-function getAudioStatusLabel(audioUrl: string | null | undefined): string {
-  const trimmedAudioUrl = typeof audioUrl === "string" ? audioUrl.trim() : "";
+function hasAudioReady(audioUrl: string | null | undefined): boolean {
+  return typeof audioUrl === "string" && audioUrl.trim().length > 0;
+}
 
-  if (trimmedAudioUrl) {
-    return "Доступно для прослушивания";
+function getAudioStatusLabel(audioUrl: string | null | undefined): string {
+  if (hasAudioReady(audioUrl)) {
+    return "Слушать";
   }
 
-  return "Аудио скоро появится";
+  return "Аудиоматериал готовится к публикации";
 }
 
 function mapActiveLibraryItems(rows: LibraryRow[] | null): ActiveLibraryItem[] {
@@ -254,7 +257,10 @@ function LibraryCard({ item, index }: LibraryCardProps) {
     ? formatPracticeMeta(practice.format, practice.duration_minutes)
     : null;
   const symbol = getCoverSymbol(practice?.slug, index);
+  const audioReady = hasAudioReady(practice?.audio_url);
   const audioStatus = getAudioStatusLabel(practice?.audio_url);
+  const listenHref =
+    practice?.slug && audioReady ? `/listen/${practice.slug}` : null;
 
   return (
     <article className="flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
@@ -294,17 +300,29 @@ function LibraryCard({ item, index }: LibraryCardProps) {
         )}
 
         <div className="mt-auto flex items-center justify-between pt-3">
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className={`flex items-center gap-2 font-medium text-[#7042c5] ${DisabledControlClasses()}`}
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
-              <PlayIcon />
-            </span>
-            {audioStatus}
-          </button>
+          {listenHref ? (
+            <Link
+              href={listenHref}
+              className="flex items-center gap-2 font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
+                <PlayIcon />
+              </span>
+              {audioStatus}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`flex items-center gap-2 font-medium text-[#7042c5] ${DisabledControlClasses()}`}
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
+                <PlayIcon />
+              </span>
+              {audioStatus}
+            </button>
+          )}
 
           <button
             type="button"
@@ -369,13 +387,15 @@ export default async function MyPracticesPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+      >
         <div className="px-5 pt-6">
           <header className="flex items-center justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold">Мои практики</h1>
+              <h1 className="text-[28px] font-semibold">Аудиотека</h1>
               <p className="mt-1 text-sm text-[#7d70a2]">
-                Всё сохранённое и приобретённое
+                Ваши бесплатные и купленные материалы
               </p>
             </div>
 

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { shouldShowBottomNav } from "@/lib/navigation/bottom-nav";
+
 const items = [
   {
     title: "Главная",
@@ -15,7 +17,7 @@ const items = [
     icon: "▦",
   },
   {
-    title: "Мои практики",
+    title: "Аудиотека",
     href: "/my-practices",
     icon: "▥",
   },
@@ -34,6 +36,10 @@ const items = [
 export default function BottomNav() {
   const pathname = usePathname();
 
+  if (!shouldShowBottomNav(pathname)) {
+    return null;
+  }
+
   function isActive(href: string) {
     if (href === "/") {
       return pathname === "/";
@@ -43,7 +49,10 @@ export default function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 justify-around border-t border-[#eadff8] bg-white/95 px-1 pb-3 pt-3 shadow-[0_-8px_30px_rgba(86,52,141,0.08)] backdrop-blur">
+    <nav
+      aria-label="Основная навигация"
+      className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 justify-around border-t border-[#eadff8] bg-white/95 px-1 pt-3 shadow-[0_-8px_30px_rgba(86,52,141,0.08)] backdrop-blur pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+    >
       {items.map((item) => {
         const active = isActive(item.href);
 

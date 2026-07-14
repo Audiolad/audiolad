@@ -1,5 +1,7 @@
 import Image from "next/image";
 import BottomNav from "@/components/BottomNav";
+import { signOut } from "@/app/auth/sign-out/actions";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -87,6 +89,14 @@ const settings = [
   ["О приложении", "i"],
 ];
 
+const legalLinks = [
+  { href: "/offer", title: "Публичная оферта" },
+  { href: "/privacy", title: "Политика обработки персональных данных" },
+  { href: "/consent", title: "Согласие на обработку персональных данных" },
+  { href: "/payment-and-refund", title: "Оплата, получение и возврат" },
+  { href: "/requisites", title: "Реквизиты" },
+] as const;
+
 export default async function ProfilePage({
   searchParams,
 }: {
@@ -117,7 +127,9 @@ export default async function ProfilePage({
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+      >
         <div className="px-5 pt-6">
           <header className="flex items-center justify-between">
             <Image
@@ -190,6 +202,24 @@ export default async function ProfilePage({
                 </div>
               ))}
             </div>
+          </section>
+
+          <section className="mt-6 grid grid-cols-2 gap-3">
+            <Link
+              href="/my-practices"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">▥</span>
+              <span className="mt-2 text-[11px] leading-4">Аудиотека</span>
+            </Link>
+
+            <Link
+              href="/playlists"
+              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
+            >
+              <span className="text-2xl text-[#7042c5]">♫</span>
+              <span className="mt-2 text-[11px] leading-4">Плейлисты</span>
+            </Link>
           </section>
 
           <section className="mt-6 grid grid-cols-4 gap-2">
@@ -313,9 +343,45 @@ export default async function ProfilePage({
           </section>
 
           <section className="mt-8">
+            <h2 className="text-[21px] font-semibold">Правовая информация</h2>
+
+            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+              {legalLinks.map((item, index) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex w-full items-center justify-between px-5 py-4 ${
+                    index !== legalLinks.length - 1
+                      ? "border-b border-[#eee6f7]"
+                      : ""
+                  }`}
+                >
+                  <span className="text-[15px] leading-6 text-[#25135c]">
+                    {item.title}
+                  </span>
+                  <span className="text-xl text-[#7042c5]">›</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-8">
             <h2 className="text-[21px] font-semibold">Настройки</h2>
 
             <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+              <Link
+                href="/settings"
+                className="flex w-full items-center justify-between border-b border-[#eee6f7] px-5 py-4"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
+                    ⚙
+                  </span>
+                  <span>Все настройки</span>
+                </span>
+                <span className="text-xl text-[#7042c5]">›</span>
+              </Link>
+
               {settings.map(([title, icon], index) => (
                 <button
                   key={title}
@@ -338,6 +404,17 @@ export default async function ProfilePage({
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="mt-8">
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63]"
+              >
+                Выйти
+              </button>
+            </form>
           </section>
 
           <section className="mt-8 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-5">

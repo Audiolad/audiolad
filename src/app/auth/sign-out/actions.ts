@@ -8,5 +8,5 @@ export async function signOut() {
 
   await supabase.auth.signOut({ scope: "local" });
 
-  redirect("/auth/sign-in");
+  redirect("/");
 }

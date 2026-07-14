@@ -1,346 +1,198 @@
-import Image from "next/image";import Link from "next/link";import BottomNav from "@/components/BottomNav";
+import Link from "next/link";
 
-const categories = [
-  { icon: "♡", title: "Любовь и отношения" },
-  { icon: "₽", title: "Деньги и изобилие" },
-  { icon: "☾", title: "Спокойствие и сон" },
-  { icon: "✦", title: "Энергия и здоровье" },
-  { icon: "◈", title: "Границы и защита" },
-];
+import BottomNav from "@/components/BottomNav";
+import LegalFooter from "@/components/LegalFooter";
+import PrimaryNav from "@/components/PrimaryNav";
+import { createClient } from "@/lib/supabase/server";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 
-const popularPractices = [
-  {
-    title: "Сила Женственности",
-    price: "199 ₽",
-    gradient: "from-[#f9d6e9] via-[#e7b9ec] to-[#9d78df]",
-    symbol: "♡",
-  },
-  {
-    title: "Проводник. Внутренний наставник",
-    price: "299 ₽",
-    gradient: "from-[#57448d] via-[#8f72cc] to-[#e2bfef]",
-    symbol: "✦",
-  },
-  {
-    title: "Мои личные границы",
-    price: "199 ₽",
-    gradient: "from-[#7d5bc5] via-[#c095df] to-[#f4d7c6]",
-    symbol: "◯",
-  },
-];
+export const dynamic = "force-dynamic";
 
-const freePractices = [
-  {
-    title: "Эликсир Молодости",
-    gradient: "from-[#a274dc] via-[#e1b4ed] to-[#f6d8ec]",
-    symbol: "❀",
-  },
-  {
-    title: "Ключ к Изобилию",
-    gradient: "from-[#e6b35b] via-[#f4dba4] to-[#b986da]",
-    symbol: "⚿",
-  },
-  {
-    title: "Код Притяжения",
-    gradient: "from-[#7a4cbf] via-[#d17ed2] to-[#f6b9d5]",
-    symbol: "♡",
-  },
-];
+const FIRST_AUDIO_COURSE_SLUG = "first-audio-course";
 
-const newPractices = [
-  {
-    title: "Связь с Душой",
-    price: "199 ₽",
-    gradient: "from-[#5851a2] via-[#8977d3] to-[#cbb6ed]",
-    symbol: "✧",
-  },
-  {
-    title: "Внутренняя опора",
-    price: "249 ₽",
-    gradient: "from-[#7a5fa8] via-[#b68bc5] to-[#e8c5d1]",
-    symbol: "♧",
-  },
-  {
-    title: "Денежный поток",
-    price: "299 ₽",
-    gradient: "from-[#e2a85d] via-[#d5b07c] to-[#926fd0]",
-    symbol: "₽",
-  },
-];
+function isAccessActive(expiresAt: string | null): boolean {
+  if (expiresAt === null) {
+    return true;
+  }
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <circle
-        cx="11"
-        cy="11"
-        r="7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m16.5 16.5 4 4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return new Date(expiresAt) > new Date();
 }
 
-function ProfileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <circle
-        cx="12"
-        cy="8"
-        r="4"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M4.5 21c.8-4.4 3.3-6.5 7.5-6.5s6.7 2.1 7.5 6.5"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+export default async function Home() {
+  const supabase = await createClient();
 
-function PracticeCard({
-  title,
-  price,
-  gradient,
-  symbol,
-  free = false,
-}: {
-  title: string;
-  price?: string;
-  gradient: string;
-  symbol: string;
-  free?: boolean;
-}) {
-  return (
-    <article className="w-[148px] shrink-0">
-      <div
-        className={`relative aspect-square overflow-hidden rounded-[22px] bg-gradient-to-br ${gradient} shadow-sm`}
-      >
-        {free && (
-          <span className="absolute left-3 top-3 rounded-full bg-[#6f3dcc] px-3 py-1 text-[11px] font-medium text-white">
-            Бесплатно
-          </span>
-        )}
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/50 bg-white/15 text-5xl text-white shadow-[0_0_30px_rgba(255,255,255,0.45)]">
-            {symbol}
-          </div>
-        </div>
-      </div>
+  let hasFirstAudioCourseAccess = false;
 
-      <h3 className="mt-3 line-clamp-2 min-h-[44px] text-[15px] font-medium leading-[22px] text-[#25135c]">
-        {title}
-      </h3>
+  if (user) {
+    const { data: practice } = await supabase
+      .from("practices")
+      .select("id")
+      .eq("slug", FIRST_AUDIO_COURSE_SLUG)
+      .maybeSingle();
 
-      {price && (
-        <p className="mt-1 font-semibold text-[#7042c5]">{price}</p>
-      )}
-    </article>
-  );
-}
+    if (practice?.id) {
+      const { data: entitlement } = await supabase
+        .from("user_practices")
+        .select("expires_at")
+        .eq("practice_id", practice.id)
+        .maybeSingle();
 
-function SectionHeader({
-  title,
-  link = "Смотреть все",
-}: {
-  title: string;
-  link?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <h2 className="text-[22px] font-semibold leading-tight text-[#25135c]">
-        {title}
-      </h2>
+      hasFirstAudioCourseAccess =
+        entitlement !== null && isAccessActive(entitlement.expires_at);
+    }
+  }
 
-<Link
-  href="/catalog"
-  className="shrink-0 text-sm font-medium text-[#7042c5]"
->
-  {link} ›
-</Link>
-    </div>
-  );
-}
-
-export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
-        <div className="px-5 pt-5">
-          <header className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <Image
-                src="/audiolad-logo.png"
-                alt="Логотип АудиоЛада"
-                width={72}
-                height={72}
-                priority
-                className="mt-1 h-[66px] w-[66px] shrink-0 object-contain"
-              />
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm lg:max-w-[1200px] ${platformNavPaddingClass}`}
+      >
+        <div className="px-5 pt-5 lg:px-10 lg:pt-8">
+          <header className="border-b border-[#eadff8] pb-5">
+            <div className="flex items-start justify-between gap-4">
+              <Link
+                href="/"
+                className="text-[28px] font-semibold leading-none text-[#6234b5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] lg:text-[30px]"
+              >
+                АудиоЛад
+              </Link>
 
-              <div className="min-w-0 pt-1">
-                <h1 className="text-[34px] font-semibold leading-none text-[#6234b5]">
-                  АудиоЛад
-                </h1>
-
-                <p className="mt-3 max-w-[230px] text-[14px] leading-[21px] text-[#6f61a3]">
-                  Медитации, энергопрактики и молитвы для любви, изобилия,
-                  счастья
-                </p>
-              </div>
+              {!user && (
+                <div className="flex shrink-0 gap-2 pt-1 text-sm">
+                  <Link
+                    href="/auth/sign-in"
+                    className="rounded-full border border-[#bda6e1] px-3 py-1.5 font-medium text-[#7042c5]"
+                  >
+                    Войти
+                  </Link>
+                  <Link
+                    href="/auth/sign-up"
+                    className="rounded-full bg-[#7042c5] px-3 py-1.5 font-medium text-white"
+                  >
+                    Регистрация
+                  </Link>
+                </div>
+              )}
             </div>
 
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                aria-label="Поиск"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
-              >
-                <SearchIcon />
-              </button>
-
-              <button
-                type="button"
-                aria-label="Профиль"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
-              >
-                <ProfileIcon />
-              </button>
-            </div>
+            <PrimaryNav className="mt-5 hidden items-center gap-8 lg:flex" />
           </header>
 
-          <section className="mt-6">
-            <label className="flex items-center gap-3 rounded-[24px] border border-[#ded1f1] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(109,70,170,0.06)]">
-              <span className="text-[#7042c5]">
-                <SearchIcon />
-              </span>
+          <section className="mt-8 lg:mt-12">
+            <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15]">
+              АудиоЛад
+            </h1>
 
-              <input
-                type="search"
-                placeholder="Найдите практику, автора или тему"
-                className="min-w-0 flex-1 bg-transparent text-[16px] text-[#25135c] outline-none placeholder:text-[#9485b4]"
-              />
-            </label>
-          </section>
+            <p className="mt-3 text-lg font-medium text-[#7042c5] lg:text-xl">
+              Авторские аудиопрактики, медитации и образовательные аудиопродукты
+            </p>
 
-          <section className="relative mt-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#5f3ba9] via-[#7950c7] to-[#b99ae5] p-6 text-white shadow-[0_16px_40px_rgba(89,50,151,0.22)]">
-            <div className="absolute -right-10 -top-8 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute -bottom-16 right-10 h-40 w-40 rounded-full bg-[#f4c2e4]/20 blur-2xl" />
+            <p className="mt-4 max-w-[720px] text-[15px] leading-6 text-[#6f61a3] lg:text-[17px] lg:leading-7">
+              Слушайте материалы в Аудиотеке, открывайте новые практики в
+              каталоге и возвращайтесь к любимым записям в любое время.
+            </p>
 
-            <div className="relative">
-              <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs">
-                Новое
-              </span>
-
-              <h2 className="mt-4 max-w-[250px] text-[32px] font-semibold leading-[1.13]">
-                Мои личные границы
-              </h2>
-
-              <p className="mt-3 max-w-[280px] text-[15px] leading-6 text-white/85">
-                Практика для внутренней свободы, уверенности и спокойной защиты
-                своего пространства.
-              </p>
-
-              <button
-                type="button"
-                className="mt-6 rounded-2xl border border-white/60 px-6 py-3 font-medium"
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/catalog"
+                className="inline-flex rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-6 py-4 text-[17px] font-semibold text-white shadow-[0_14px_34px_rgba(96,59,168,0.24)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
               >
-                Слушать
-              </button>
+                Открыть каталог
+              </Link>
 
-              <div className="mt-6 flex justify-center gap-2">
-                <span className="h-2 w-6 rounded-full bg-white" />
-                <span className="h-2 w-2 rounded-full bg-white/40" />
-                <span className="h-2 w-2 rounded-full bg-white/40" />
-                <span className="h-2 w-2 rounded-full bg-white/40" />
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-8">
-            <SectionHeader title="Подборки практик по темам" />
-
-            <div className="-mx-5 mt-4 flex gap-3 overflow-x-auto px-5 pb-2">
-              {categories.map((item) => (
-                <button
-                  key={item.title}
-                  type="button"
-                  className="min-h-[132px] w-[122px] shrink-0 rounded-[24px] border border-[#eadff8] bg-[#fcfaff] px-4 py-5 text-center shadow-sm"
+              {user ? (
+                <Link
+                  href="/my-practices"
+                  className="inline-flex rounded-[22px] border border-[#7042c5] bg-white px-6 py-4 text-[17px] font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                 >
-                  <span className="text-3xl text-[#7042c5]">{item.icon}</span>
-                  <span className="mt-3 block text-[14px] leading-5">
-                    {item.title}
-                  </span>
-                </button>
-              ))}
+                  Аудиотека
+                </Link>
+              ) : (
+                <Link
+                  href="/auth/sign-in?next=%2Fmy-practices"
+                  className="inline-flex rounded-[22px] border border-[#7042c5] bg-white px-6 py-4 text-[17px] font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
+                  Войти в Аудиотеку
+                </Link>
+              )}
             </div>
           </section>
 
-          <section className="mt-8">
-            <SectionHeader title="Популярные практики" />
+          <section className="mt-10 overflow-hidden rounded-[26px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f1e4fc] p-6 lg:mt-12 lg:p-8">
+            <span className="inline-flex rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-[#7042c5]">
+              Авторский аудиоподкаст
+            </span>
 
-            <div className="-mx-5 mt-4 flex gap-4 overflow-x-auto px-5 pb-2">
-              {popularPractices.map((practice) => (
-                <PracticeCard key={practice.title} {...practice} />
-              ))}
-            </div>
-          </section>
+            <h2 className="mt-4 text-[22px] font-semibold leading-tight text-[#25135c] lg:text-[26px]">
+              Ваш голос уже может стать цифровым продуктом
+            </h2>
 
-          <section className="mt-8">
-            <SectionHeader title="Бесплатно для знакомства" />
-
-            <div className="-mx-5 mt-4 flex gap-4 overflow-x-auto px-5 pb-2">
-              {freePractices.map((practice) => (
-                <PracticeCard
-                  key={practice.title}
-                  {...practice}
-                  free
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-8">
-            <SectionHeader title="Новинки" />
-
-            <div className="-mx-5 mt-4 flex gap-4 overflow-x-auto px-5 pb-2">
-              {newPractices.map((practice) => (
-                <PracticeCard key={practice.title} {...practice} />
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-8 rounded-[26px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f1e4fc] p-5">
-            <p className="text-xl font-semibold text-[#7042c5]">
-              Стать автором АудиоЛада
+            <p className="mt-4 text-[15px] leading-6 text-[#6f61a3]">
+              Как превратить свои знания, опыт и состояние в свой первый
+              авторский аудиопродукт – аудиопрактику, медитацию или аудиокурс,
+              чтобы помогать людям и получать достойное вознаграждение
             </p>
 
-            <p className="mt-2 max-w-[280px] text-sm leading-5 text-[#6f61a3]">
-              Создавайте медитации, энергопрактики и аудиокурсы, собирайте
-              аудиторию и получайте доход.
-            </p>
+            <dl className="mt-5 space-y-2 text-[15px]">
+              <div className="flex flex-wrap gap-x-2">
+                <dt className="text-[#8c7dab]">Формат:</dt>
+                <dd className="font-medium text-[#25135c]">
+                  Авторский аудиоподкаст, 11 мин 28 сек
+                </dd>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <dt className="text-[#8c7dab]">Цена:</dt>
+                <dd className="font-semibold text-[#7042c5]">99 ₽</dd>
+              </div>
+            </dl>
 
-            <button
-              type="button"
-              className="mt-4 rounded-xl bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white"
-            >
-              Подробнее
-            </button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {hasFirstAudioCourseAccess ? (
+                <Link
+                  href="/listen/first-audio-course"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
+                  Слушать
+                </Link>
+              ) : (
+                <Link
+                  href="/first-audio-course"
+                  className="inline-flex rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
+                  Купить за 99 ₽
+                </Link>
+              )}
+
+              <Link
+                href="/first-audio-course"
+                className="inline-flex rounded-2xl border border-[#7042c5] bg-white px-5 py-3 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              >
+                Подробнее
+              </Link>
+            </div>
+          </section>
+
+          <section className="mt-10 rounded-[26px] border border-dashed border-[#d9c9ef] bg-[#fcfaff] p-5 lg:mt-12">
+            <h2 className="text-[18px] font-semibold text-[#7042c5]">
+              Персональная главная
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+              На следующем этапе здесь появятся «Продолжить прослушивание»,
+              подборки из вашей Аудиотеки, новинки, рекомендации и раздел для
+              авторов.
+            </p>
           </section>
         </div>
 
-<BottomNav />
+        <div className="px-5 pb-6 lg:px-10">
+          <LegalFooter className="mt-6" />
+        </div>
+
+        <BottomNav />
       </div>
     </main>
   );

@@ -133,3 +133,29 @@ export function toCreateOrderSuccessBody(
     },
   };
 }
+
+export type PendingOrderRow = {
+  id: string;
+  practice_id: string;
+  practice_slug_snapshot: string;
+  status: string;
+  amount_minor: number;
+  currency: string;
+  created_at: string;
+};
+
+export function pendingOrderToSuccessBody(
+  row: PendingOrderRow,
+): CreateOrderSuccessBody {
+  return {
+    order: {
+      id: row.id,
+      practice_id: row.practice_id,
+      practice_slug: row.practice_slug_snapshot,
+      status: row.status,
+      amount_minor: row.amount_minor,
+      currency: row.currency,
+      created_at: row.created_at,
+    },
+  };
+}

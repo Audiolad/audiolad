@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,9 @@ export default async function CatalogPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+      >
         <div className="px-5 pt-6">
           <header className="flex items-center justify-between">
             <Link href="/" aria-label="Назад" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-3xl text-[#7042c5]">
