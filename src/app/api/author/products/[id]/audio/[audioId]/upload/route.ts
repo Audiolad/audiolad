@@ -10,7 +10,7 @@ import {
   MAX_AUDIO_BYTES,
 } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
-import { syncSingleAudioCompatibility } from "@/lib/author-products/publish";
+import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import { buildAudioItemStoragePath } from "@/lib/author-products/utils";
 
 type RouteContext = {
@@ -97,7 +97,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

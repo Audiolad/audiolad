@@ -9,7 +9,7 @@ import {
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
-import { syncSingleAudioCompatibility } from "@/lib/author-products/publish";
+import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -84,7 +84,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 
@@ -173,7 +173,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
         .eq("id", item.id);
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

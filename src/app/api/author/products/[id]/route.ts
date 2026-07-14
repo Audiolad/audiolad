@@ -14,7 +14,7 @@ import {
   getAuthorProductDetail,
   isPracticeSlugTaken,
 } from "@/lib/author-products/products";
-import { syncSingleAudioCompatibility } from "@/lib/author-products/publish";
+import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import { PAID_PRICE_OPTIONS } from "@/lib/author-products/types";
 import { slugifyTitle } from "@/lib/author-products/utils";
 
@@ -200,7 +200,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

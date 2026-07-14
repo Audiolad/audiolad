@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
+import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import type {
   AuthorProductDetail,
   AuthorWorkspace,
@@ -372,6 +374,23 @@ export default function AuthorProductForm({
     null,
   );
   const audioPreviewRequestIds = useRef<Record<string, number>>({});
+
+  const {
+    moveAudioItem,
+    reorderNotice,
+    reorderBusy,
+    draggingAudioId,
+    dragOverIndex,
+    setItemElement,
+    handleDragPointerDown,
+    handleDragPointerMove,
+    handleDragPointerUp,
+    handleDragPointerCancel,
+  } = useAudioItemsReorder({
+    practiceId,
+    audioItems,
+    setAudioItems,
+  });
 
   const loadAudioPreview = useCallback(
     async (targetPracticeId: string, audioId: string) => {
@@ -859,48 +878,6 @@ export default function AuthorProductForm({
       setError("Не удалось добавить аудио.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function moveAudioItem(audioId: string, direction: "up" | "down") {
-    const index = audioItems.findIndex((item) => item.id === audioId);
-
-    if (index < 0) {
-      return;
-    }
-
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-
-    if (targetIndex < 0 || targetIndex >= audioItems.length) {
-      return;
-    }
-
-    const nextOrder = [...audioItems];
-    const [moved] = nextOrder.splice(index, 1);
-    nextOrder.splice(targetIndex, 0, moved);
-
-    setAudioItems(
-      nextOrder.map((item, position) => ({ ...item, position: position + 1 })),
-    );
-
-    if (!practiceId) {
-      return;
-    }
-
-    const response = await fetch(`/api/author/products/${practiceId}/audio/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        order: nextOrder.map((item) => item.id),
-      }),
-    });
-
-    const payload = (await response.json()) as {
-      product?: AuthorProductDetail;
-    };
-
-    if (response.ok && payload.product) {
-      setAudioItems(payload.product.audio_items);
     }
   }
 
@@ -1565,18 +1542,41 @@ export default function AuthorProductForm({
           </button>
         </div>
 
+        {reorderNotice ? (
+          <p className="text-sm text-[#9b3d3d]">{reorderNotice}</p>
+        ) : null}
+
         <div className="space-y-4">
           {audioItems.map((audioItem, index) => (
             <article
               key={audioItem.id}
-              className="rounded-[20px] border border-[#eee6f7] bg-[#fbf8ff] p-4"
+              ref={(element) => setItemElement(audioItem.id, element)}
+              className={`rounded-[20px] border bg-[#fbf8ff] p-4 transition ${
+                draggingAudioId === audioItem.id
+                  ? "border-[#9a74d8] opacity-70 shadow-sm"
+                  : dragOverIndex === index && draggingAudioId
+                    ? "border-[#9a74d8] ring-2 ring-[#d9c9ef]"
+                    : "border-[#eee6f7]"
+              }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <h3 className="font-semibold">Аудио {index + 1}</h3>
+                <div className="flex min-w-0 items-center gap-3">
+                  <AudioDragHandle
+                    disabled={reorderBusy}
+                    isDragging={draggingAudioId === audioItem.id}
+                    onPointerDown={(event) =>
+                      handleDragPointerDown(audioItem.id, event)
+                    }
+                    onPointerMove={handleDragPointerMove}
+                    onPointerUp={handleDragPointerUp}
+                    onPointerCancel={handleDragPointerCancel}
+                  />
+                  <h3 className="font-semibold">Аудио {index + 1}</h3>
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={index === 0}
+                    disabled={index === 0 || reorderBusy}
                     onClick={() => void moveAudioItem(audioItem.id, "up")}
                     className="rounded-full border border-[#d9c9ef] px-3 py-1 text-sm disabled:opacity-40"
                   >
@@ -1584,7 +1584,9 @@ export default function AuthorProductForm({
                   </button>
                   <button
                     type="button"
-                    disabled={index === audioItems.length - 1}
+                    disabled={
+                      index === audioItems.length - 1 || reorderBusy
+                    }
                     onClick={() => void moveAudioItem(audioItem.id, "down")}
                     className="rounded-full border border-[#d9c9ef] px-3 py-1 text-sm disabled:opacity-40"
                   >

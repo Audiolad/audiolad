@@ -6,7 +6,7 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
-  syncSingleAudioCompatibility,
+  syncPracticeAudioCompatibility,
   validatePublishRequirements,
 } from "@/lib/author-products/publish";
 
@@ -71,7 +71,7 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

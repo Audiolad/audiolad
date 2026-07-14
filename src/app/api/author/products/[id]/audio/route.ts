@@ -11,7 +11,7 @@ import {
   AUDIO_ITEM_DETAIL_SELECT,
   getAuthorProductDetail,
 } from "@/lib/author-products/products";
-import { syncSingleAudioCompatibility } from "@/lib/author-products/publish";
+import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -75,7 +75,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
-    await syncSingleAudioCompatibility(supabase, id);
+    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

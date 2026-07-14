@@ -10,6 +10,82 @@ type PublishValidationResult =
   | { ok: true }
   | { ok: false; code: string; message: string };
 
+function sortAudioItemsByPosition(audioItems: AudioItemRow[]): AudioItemRow[] {
+  return [...audioItems].sort((left, right) => left.position - right.position);
+}
+
+export function validateAudioItemsStructure(
+  practice: PracticeRow,
+  audioItems: AudioItemRow[],
+): PublishValidationResult {
+  if (audioItems.length === 0) {
+    return {
+      ok: false,
+      code: "missing_audio",
+      message: "Добавьте хотя бы одно аудио.",
+    };
+  }
+
+  const sorted = sortAudioItemsByPosition(audioItems);
+  const positions = sorted.map((item) => item.position);
+
+  if (new Set(positions).size !== positions.length) {
+    return {
+      ok: false,
+      code: "invalid_audio_positions",
+      message: "Порядок аудио настроен некорректно. Проверьте позиции треков.",
+    };
+  }
+
+  for (const [index, item] of sorted.entries()) {
+    const expectedPosition = index + 1;
+
+    if (item.position !== expectedPosition) {
+      return {
+        ok: false,
+        code: "invalid_audio_positions",
+        message: "Порядок аудио настроен некорректно. Проверьте позиции треков.",
+      };
+    }
+
+    if (item.practice_id !== practice.id) {
+      return {
+        ok: false,
+        code: "audio_item_mismatch",
+        message: "Не удалось подтвердить принадлежность аудио к этому продукту.",
+      };
+    }
+
+    const audioNumber = index + 1;
+
+    if (!item.title?.trim()) {
+      return {
+        ok: false,
+        code: "missing_audio_title",
+        message: `Укажите название для аудио ${audioNumber}.`,
+      };
+    }
+
+    if (!item.audio_path?.trim()) {
+      return {
+        ok: false,
+        code: "missing_audio_file",
+        message: `Загрузите MP3-файл для аудио ${audioNumber}.`,
+      };
+    }
+
+    if (!item.duration_seconds || item.duration_seconds <= 0) {
+      return {
+        ok: false,
+        code: "missing_audio_duration",
+        message: `Не удалось определить длительность аудио ${audioNumber}.`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 export function validatePublishRequirements(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
@@ -72,12 +148,10 @@ export function validatePublishRequirements(
     };
   }
 
-  if (audioItems.length === 0) {
-    return {
-      ok: false,
-      code: "missing_audio",
-      message: "Добавьте хотя бы одно аудио.",
-    };
+  const structureValidation = validateAudioItemsStructure(practice, audioItems);
+
+  if (!structureValidation.ok) {
+    return structureValidation;
   }
 
   if (audioItems.length > 1) {
@@ -85,25 +159,6 @@ export function validatePublishRequirements(
       ok: false,
       code: "multi_audio_not_supported",
       message: MULTI_AUDIO_PUBLISH_MESSAGE,
-    };
-  }
-
-  const audio = audioItems[0];
-  const audioPath = audio.audio_path?.trim();
-
-  if (!audioPath) {
-    return {
-      ok: false,
-      code: "missing_audio_file",
-      message: "Загрузите MP3-файл для аудио.",
-    };
-  }
-
-  if (!audio.duration_seconds || audio.duration_seconds <= 0) {
-    return {
-      ok: false,
-      code: "missing_duration",
-      message: "Не удалось определить длительность аудио.",
     };
   }
 
@@ -126,7 +181,27 @@ export function validatePublishRequirements(
   return { ok: true };
 }
 
-export async function syncSingleAudioCompatibility(
+export async function publishAllAudioItems(
+  supabase: SupabaseClient,
+  practiceId: string,
+  timestamp?: string,
+): Promise<void> {
+  const now = timestamp ?? new Date().toISOString();
+
+  const { error } = await supabase
+    .from("audio_items")
+    .update({
+      status: "published",
+      updated_at: now,
+    })
+    .eq("practice_id", practiceId);
+
+  if (error) {
+    throw new Error("audio_items_publish_failed");
+  }
+}
+
+export async function syncPracticeAudioCompatibility(
   supabase: SupabaseClient,
   practiceId: string,
 ) {
@@ -150,17 +225,26 @@ export async function syncSingleAudioCompatibility(
     throw new Error("audio_items_lookup_failed");
   }
 
-  const firstAudio = audioItems?.[0];
-  const firstPath = firstAudio?.audio_path?.trim() || null;
+  const sortedItems = [...(audioItems ?? [])].sort(
+    (left, right) => left.position - right.position,
+  );
+
+  const itemsWithMp3 = sortedItems.filter((item) => item.audio_path?.trim());
+
+  const firstAudioPath = itemsWithMp3[0]?.audio_path?.trim() ?? null;
+  const totalDurationSeconds = itemsWithMp3.reduce(
+    (sum, item) => sum + (item.duration_seconds ?? 0),
+    0,
+  );
   const durationMinutes =
-    firstAudio?.duration_seconds && firstAudio.duration_seconds > 0
-      ? minutesFromSeconds(firstAudio.duration_seconds)
+    totalDurationSeconds > 0
+      ? minutesFromSeconds(totalDurationSeconds)
       : null;
 
   const { error: updateError } = await supabase
     .from("practices")
     .update({
-      audio_url: firstPath,
+      audio_url: firstAudioPath,
       duration_minutes: durationMinutes,
       updated_at: new Date().toISOString(),
     })
@@ -170,3 +254,6 @@ export async function syncSingleAudioCompatibility(
     throw new Error("practice_sync_failed");
   }
 }
+
+/** @deprecated Use syncPracticeAudioCompatibility */
+export const syncSingleAudioCompatibility = syncPracticeAudioCompatibility;
