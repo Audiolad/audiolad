@@ -84,6 +84,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.format = parseOptionalString(body.format)?.trim() || null;
     }
 
+    const settingFree =
+      "is_free" in body &&
+      typeof body.is_free === "boolean" &&
+      body.is_free;
+
     if ("is_free" in body && typeof body.is_free === "boolean") {
       updates.is_free = body.is_free;
 
@@ -93,6 +98,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (
+      !settingFree &&
       "price" in body &&
       typeof body.price === "number" &&
       Number.isInteger(body.price)

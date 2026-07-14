@@ -172,7 +172,7 @@ export default function AuthorProductForm({
     return created.practice.id;
   }
 
-  async function saveProduct() {
+  async function saveProduct(): Promise<boolean> {
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -181,7 +181,7 @@ export default function AuthorProductForm({
       const id = await ensurePracticeId();
 
       if (!id) {
-        return;
+        return false;
       }
 
       const response = await fetch(`/api/author/products/${id}`, {
@@ -206,22 +206,28 @@ export default function AuthorProductForm({
 
       if (!response.ok || !payload.product) {
         setError("Не удалось сохранить аудиопродукт.");
-        return;
+        return false;
       }
 
       setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
       setAudioItems(payload.product.audio_items);
       setMessage("Изменения сохранены.");
+      return true;
     } catch {
       setError("Не удалось сохранить аудиопродукт.");
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
   async function saveDraft() {
-    await saveProduct();
-    if (!error) {
+    setError(null);
+    setMessage(null);
+
+    const saved = await saveProduct();
+
+    if (saved) {
       setMessage("Черновик сохранён.");
     }
   }
