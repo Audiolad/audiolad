@@ -20,6 +20,45 @@ type RouteContext = {
 
 const COVER_EXTENSIONS = ["jpg", "png", "webp"] as const;
 
+async function removePracticeCoverFiles(
+  supabase: Awaited<ReturnType<typeof requirePracticeAccess>>["supabase"],
+  practiceId: string,
+) {
+  const paths = COVER_EXTENSIONS.map((extension) =>
+    buildCoverStoragePath(practiceId, extension),
+  );
+
+  await supabase.storage.from("practice-covers").remove(paths);
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const { supabase } = await requirePracticeAccess(id);
+
+    await removePracticeCoverFiles(supabase, id);
+
+    const { error: updateError } = await supabase
+      .from("practices")
+      .update({
+        cover_url: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      console.error("author_cover_delete_error", updateError.message);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    const product = await getAuthorProductDetail(supabase, id);
+
+    return NextResponse.json({ product, cover_url: null });
+  } catch (error) {
+    return handleAuthorRouteError(error);
+  }
+}
+
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;

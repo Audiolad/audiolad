@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { MAX_COVER_BYTES } from "./limits";
+
 const execFileAsync = promisify(execFile);
 
 export async function getMp3DurationSeconds(buffer: Buffer): Promise<number | null> {
@@ -50,7 +52,7 @@ export function isAllowedMp3File(file: File): boolean {
 
 export const MAX_AUDIO_BYTES = 104857600;
 
-export const MAX_COVER_BYTES = 10485760;
+export { MAX_COVER_BYTES };
 
 const COVER_MIME_TO_EXT: Record<string, "jpg" | "png" | "webp"> = {
   "image/jpeg": "jpg",

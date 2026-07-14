@@ -15,13 +15,13 @@ import {
   PRODUCT_FORMATS,
 } from "@/lib/author-products/types";
 import {
+  MAX_COVER_BYTES,
   PRODUCT_CONTENT_LIMITS,
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
 } from "@/lib/author-products/limits";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 
-const MAX_COVER_BYTES = 10 * 1024 * 1024;
 const MIN_COVER_DIMENSION = 1000;
 const ALLOWED_COVER_MIME_TYPES = new Set([
   "image/jpeg",
@@ -121,7 +121,7 @@ async function validateCoverFile(file: File): Promise<string | null> {
   }
 
   if (file.size > MAX_COVER_BYTES) {
-    return "Размер обложки не должен превышать 10 МБ.";
+    return "Размер обложки не должен превышать 3 МБ.";
   }
 
   try {
@@ -266,6 +266,7 @@ export default function AuthorProductForm({
   const [busy, setBusy] = useState(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [deletingCover, setDeletingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   const [coverDisplayError, setCoverDisplayError] = useState<string | null>(
     null,
@@ -735,7 +736,7 @@ export default function AuthorProductForm({
 
       if (response.status === 413) {
         setCoverError(
-          "Файл слишком большой. Максимальный размер обложки — 10 МБ.",
+          "Файл слишком большой. Максимальный размер обложки — 3 МБ.",
         );
         return;
       }
@@ -780,6 +781,79 @@ export default function AuthorProductForm({
       setCoverError("Не удалось загрузить обложку.");
     } finally {
       setUploadingCover(false);
+    }
+  }
+
+  async function deleteCover() {
+    if (!form.coverUrl) {
+      return;
+    }
+
+    if (!window.confirm("Удалить обложку?")) {
+      return;
+    }
+
+    setDeletingCover(true);
+    setCoverError(null);
+    setCoverDisplayError(null);
+
+    try {
+      const id = practiceId || (await ensurePracticeId());
+
+      if (!id) {
+        setCoverError("Не удалось удалить обложку.");
+        return;
+      }
+
+      const response = await fetch(`/api/author/products/${id}/cover`, {
+        method: "DELETE",
+      });
+
+      let payload: {
+        product?: AuthorProductDetail;
+        cover_url?: string | null;
+      } | null = null;
+
+      const responseText = await response.text();
+
+      if (responseText) {
+        try {
+          payload = JSON.parse(responseText) as {
+            product?: AuthorProductDetail;
+            cover_url?: string | null;
+          };
+        } catch {
+          if (!response.ok) {
+            setCoverError("Не удалось удалить обложку.");
+            return;
+          }
+        }
+      }
+
+      if (!response.ok) {
+        setCoverError("Не удалось удалить обложку.");
+        return;
+      }
+
+      if (payload?.product) {
+        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
+        setAudioItems(payload.product.audio_items);
+      } else {
+        setForm((current) => ({
+          ...current,
+          coverUrl: null,
+          coverVersion: null,
+        }));
+      }
+
+      setCoverPreviewFailureKey(null);
+      setCoverDisplayError(null);
+      setCoverError(null);
+      setMessage("Обложка удалена.");
+    } catch {
+      setCoverError("Не удалось удалить обложку.");
+    } finally {
+      setDeletingCover(false);
     }
   }
 
@@ -992,23 +1066,35 @@ export default function AuthorProductForm({
             </div>
 
             <div className="min-w-0 flex-1">
-              <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
-                {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void uploadCover(file);
-                    }
-                  }}
-                />
-              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
+                  {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void uploadCover(file);
+                      }
+                    }}
+                  />
+                </label>
+                {form.coverUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => void deleteCover()}
+                    disabled={deletingCover || uploadingCover}
+                    className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2] disabled:opacity-60"
+                  >
+                    {deletingCover ? "Удаление…" : "Удалить обложку"}
+                  </button>
+                ) : null}
+              </div>
               <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
                 Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до
-                10 МБ
+                3 МБ
               </p>
             </div>
           </div>

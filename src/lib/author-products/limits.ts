@@ -1,3 +1,5 @@
+export const MAX_COVER_BYTES = 3 * 1024 * 1024;
+
 export const PRODUCT_CONTENT_LIMITS = {
   title: 70,
   subtitle: 120,
