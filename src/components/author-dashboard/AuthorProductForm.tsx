@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   AuthorProductDetail,
@@ -17,7 +17,6 @@ import {
 import {
   MAX_COVER_BYTES,
   PRODUCT_CONTENT_LIMITS,
-  getAudioPreviewErrorMessage,
   getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
@@ -214,92 +213,8 @@ type AudioFileMeta = {
   fileSizeBytes: number;
 };
 
-function AudioPreviewPlayer({
-  practiceId,
-  audioId,
-  refreshKey,
-}: {
-  practiceId: string;
-  audioId: string;
-  refreshKey: number;
-}) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPreview() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `/api/author/products/${practiceId}/audio/${audioId}/preview`,
-        );
-        const text = await response.text();
-        let payload: { url?: string; error?: string } | null = null;
-
-        if (text) {
-          try {
-            payload = JSON.parse(text) as { url?: string; error?: string };
-          } catch {
-            if (!cancelled) {
-              setPreviewUrl(null);
-              setError(getAudioPreviewErrorMessage(undefined));
-            }
-            return;
-          }
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        if (!response.ok || !payload?.url) {
-          setPreviewUrl(null);
-          setError(getAudioPreviewErrorMessage(payload?.error));
-          return;
-        }
-
-        setPreviewUrl(payload.url);
-        setError(null);
-      } catch {
-        if (!cancelled) {
-          setPreviewUrl(null);
-          setError(getAudioPreviewErrorMessage(undefined));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadPreview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [practiceId, audioId, refreshKey]);
-
-  return (
-    <div className="mt-3">
-      {loading ? (
-        <p className="text-sm text-[#7d70a2]">Подготовка прослушивания…</p>
-      ) : null}
-      {error ? (
-        <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-          {error}
-        </p>
-      ) : null}
-      {previewUrl ? (
-        <audio controls preload="none" src={previewUrl} className="mt-2 w-full" />
-      ) : null}
-    </div>
-  );
-}
+const AUDIO_PREVIEW_SOFT_ERROR =
+  "Аудиофайл загружен, но предпрослушивание пока недоступно. Обновите страницу.";
 
 function buildInitialForm(
   authors: AuthorWorkspace[],
@@ -399,12 +314,124 @@ export default function AuthorProductForm({
   const [audioFileMeta, setAudioFileMeta] = useState<
     Record<string, AudioFileMeta>
   >({});
+  const [audioPreviewUrls, setAudioPreviewUrls] = useState<
+    Record<string, string>
+  >({});
+  const [audioPreviewLoading, setAudioPreviewLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const [audioPreviewErrors, setAudioPreviewErrors] = useState<
+    Record<string, string>
+  >({});
   const [audioPreviewVersions, setAudioPreviewVersions] = useState<
     Record<string, number>
   >({});
   const [deletingAudioFileId, setDeletingAudioFileId] = useState<string | null>(
     null,
   );
+  const audioPreviewRequestIds = useRef<Record<string, number>>({});
+
+  const loadAudioPreview = useCallback(
+    async (targetPracticeId: string, audioId: string) => {
+      const requestId = (audioPreviewRequestIds.current[audioId] ?? 0) + 1;
+      audioPreviewRequestIds.current[audioId] = requestId;
+
+      setAudioPreviewLoading((current) => ({ ...current, [audioId]: true }));
+      setAudioPreviewErrors((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewUrls((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+
+      try {
+        const response = await fetch(
+          `/api/author/products/${targetPracticeId}/audio/${audioId}/preview`,
+        );
+        const text = await response.text();
+        let payload: { url?: string; error?: string } | null = null;
+
+        if (text) {
+          try {
+            payload = JSON.parse(text) as { url?: string; error?: string };
+          } catch {
+            if (audioPreviewRequestIds.current[audioId] === requestId) {
+              setAudioPreviewErrors((current) => ({
+                ...current,
+                [audioId]: AUDIO_PREVIEW_SOFT_ERROR,
+              }));
+            }
+            return;
+          }
+        }
+
+        if (audioPreviewRequestIds.current[audioId] !== requestId) {
+          return;
+        }
+
+        if (!response.ok || !payload?.url) {
+          setAudioPreviewErrors((current) => ({
+            ...current,
+            [audioId]: AUDIO_PREVIEW_SOFT_ERROR,
+          }));
+          return;
+        }
+
+        setAudioPreviewUrls((current) => ({
+          ...current,
+          [audioId]: payload.url!,
+        }));
+      } catch {
+        if (audioPreviewRequestIds.current[audioId] === requestId) {
+          setAudioPreviewErrors((current) => ({
+            ...current,
+            [audioId]: AUDIO_PREVIEW_SOFT_ERROR,
+          }));
+        }
+      } finally {
+        if (audioPreviewRequestIds.current[audioId] === requestId) {
+          setAudioPreviewLoading((current) => ({ ...current, [audioId]: false }));
+        }
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!practiceId) {
+      return;
+    }
+
+    const itemsToPreview = audioItems.filter(
+      (item) => item.audio_path && !item.id.startsWith("temp-"),
+    );
+
+    if (itemsToPreview.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
+
+      for (const item of itemsToPreview) {
+        void loadAudioPreview(practiceId, item.id);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // Initial preview load for existing MP3 on page open; upload/replace calls loadAudioPreview directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [practiceId]);
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
   const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
@@ -997,6 +1024,16 @@ export default function AuthorProductForm({
       delete next[audioId];
       return next;
     });
+    setAudioPreviewUrls((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
+    setAudioPreviewErrors((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
 
     try {
       const id = await ensurePracticeId();
@@ -1063,6 +1100,7 @@ export default function AuthorProductForm({
         [audioId]: (current[audioId] ?? 0) + 1,
       }));
       setMessage("Аудио загружено.");
+      void loadAudioPreview(id, audioId);
     } catch {
       setAudioUploadErrors((current) => ({
         ...current,
@@ -1137,10 +1175,22 @@ export default function AuthorProductForm({
         delete next[audioId];
         return next;
       });
-      setAudioPreviewVersions((current) => ({
-        ...current,
-        [audioId]: (current[audioId] ?? 0) + 1,
-      }));
+      setAudioPreviewUrls((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewErrors((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewVersions((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      delete audioPreviewRequestIds.current[audioId];
       setMessage("MP3 удалён.");
     } catch {
       setAudioUploadErrors((current) => ({
@@ -1556,11 +1606,27 @@ export default function AuthorProductForm({
                 <p className="text-sm leading-5 text-[#7d70a2]">MP3 · до 50 МБ</p>
 
                 {audioItem.audio_path && practiceId && !audioItem.id.startsWith("temp-") ? (
-                  <AudioPreviewPlayer
-                    practiceId={practiceId}
-                    audioId={audioItem.id}
-                    refreshKey={audioPreviewVersions[audioItem.id] ?? 0}
-                  />
+                  <div className="mt-3">
+                    {audioPreviewLoading[audioItem.id] ? (
+                      <p className="text-sm text-[#7d70a2]">
+                        Подготавливаем предпрослушивание…
+                      </p>
+                    ) : null}
+                    {audioPreviewErrors[audioItem.id] ? (
+                      <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+                        {audioPreviewErrors[audioItem.id]}
+                      </p>
+                    ) : null}
+                    {audioPreviewUrls[audioItem.id] ? (
+                      <audio
+                        key={`${audioItem.id}-${audioPreviewVersions[audioItem.id] ?? 0}`}
+                        controls
+                        preload="none"
+                        src={audioPreviewUrls[audioItem.id]}
+                        className="mt-2 w-full"
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">
