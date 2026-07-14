@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
+import { useSequentialPlayer } from "@/components/audio/useSequentialPlayer";
+import type { ListenProgressEntry, ListenTrack } from "@/lib/listen/types";
 
 type AudioPlayerProps = {
-  src: string;
-  title: string;
-  authorName: string;
+  practiceId: string;
   slug: string;
+  practiceTitle: string;
+  authorName: string;
   format: string | null;
-  expectedDurationSeconds: number | null;
+  tracks: ListenTrack[];
+  initialProgress: ListenProgressEntry[];
   coverSymbol: string;
   coverGradient: string;
+  isAuthorPreview?: boolean;
 };
 
 function formatTime(seconds: number): string {
@@ -30,10 +31,6 @@ function formatTime(seconds: number): string {
   }
 
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
 }
 
 function PlayIcon() {
@@ -132,6 +129,22 @@ function ForwardFifteenIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="m4 10 4 4 8-8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ControlCaption({
   primary,
   secondary,
@@ -148,197 +161,69 @@ function ControlCaption({
 }
 
 export default function AudioPlayer({
-  src,
-  title,
+  practiceId,
+  slug,
+  practiceTitle,
   authorName,
   format,
-  expectedDurationSeconds,
+  tracks,
+  initialProgress,
   coverSymbol,
   coverGradient,
+  isAuthorPreview = false,
 }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [playerError, setPlayerError] = useState<string | null>(null);
-  const [playbackRateIndex, setPlaybackRateIndex] = useState(1);
-  const [statusMessage, setStatusMessage] = useState("Подготавливаем аудио…");
-
-  const hasValidDuration = Number.isFinite(duration) && duration > 0;
-  const displayDuration = hasValidDuration
-    ? duration
-    : expectedDurationSeconds && expectedDurationSeconds > 0
-      ? expectedDurationSeconds
-      : 0;
-
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    const updateDuration = () => {
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-        setIsLoading(false);
-        setStatusMessage("");
-      }
-    };
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const handlePlay = () => {
-      setIsPlaying(true);
-      setPlayerError(null);
-      setStatusMessage("");
-    };
-
-    const handlePause = () => {
-      setIsPlaying(false);
-    };
-
-    const handleWaiting = () => {
-      if (hasValidDuration || (Number.isFinite(audio.duration) && audio.duration > 0)) {
-        setStatusMessage("Загрузка…");
-      }
-    };
-
-    const handleCanPlay = () => {
-      setIsLoading(false);
-      if (!playerError) {
-        setStatusMessage("");
-      }
-    };
-
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(audio.duration || 0);
-    };
-
-    const handleError = () => {
-      setIsPlaying(false);
-      setIsLoading(false);
-
-      const mediaError = audio.error;
-
-      if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-        setPlayerError("Формат аудио не поддерживается на этом устройстве.");
-      } else {
-        setPlayerError(
-          "Не удалось загрузить аудио. Проверьте соединение и попробуйте ещё раз.",
-        );
-      }
-
-      setStatusMessage("");
-    };
-
-    audio.addEventListener("loadedmetadata", updateDuration);
-    audio.addEventListener("durationchange", updateDuration);
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("play", handlePlay);
-    audio.addEventListener("pause", handlePause);
-    audio.addEventListener("waiting", handleWaiting);
-    audio.addEventListener("canplay", handleCanPlay);
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("error", handleError);
-
-    audio.playbackRate = PLAYBACK_RATES[playbackRateIndex];
-
-    return () => {
-      audio.removeEventListener("loadedmetadata", updateDuration);
-      audio.removeEventListener("durationchange", updateDuration);
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("play", handlePlay);
-      audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("waiting", handleWaiting);
-      audio.removeEventListener("canplay", handleCanPlay);
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("error", handleError);
-    };
-  }, [hasValidDuration, playbackRateIndex, playerError, src]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    if (audio) {
-      audio.playbackRate = PLAYBACK_RATES[playbackRateIndex];
-    }
-  }, [playbackRateIndex]);
-
-  const handlePlayPause = async () => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    if (audio.ended) {
-      audio.currentTime = 0;
-      setCurrentTime(0);
-    }
-
-    if (isPlaying) {
-      audio.pause();
-      return;
-    }
-
-    try {
-      await audio.play();
-      setPlayerError(null);
-    } catch {
-      setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
-    }
-  };
-
-  const handleSeekOffset = (offsetSeconds: number) => {
-    const audio = audioRef.current;
-
-    if (!audio || !hasValidDuration) {
-      return;
-    }
-
-    const nextTime = clamp(audio.currentTime + offsetSeconds, 0, duration);
-    audio.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  };
-
-  const handleRangeChange = (value: number) => {
-    const audio = audioRef.current;
-
-    if (!audio || !hasValidDuration) {
-      return;
-    }
-
-    audio.currentTime = value;
-    setCurrentTime(value);
-  };
-
-  const handleRetry = () => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    setPlayerError(null);
-    setIsLoading(true);
-    setStatusMessage("Подготавливаем аудио…");
-    audio.load();
-  };
-
-  const handleSpeedChange = () => {
-    setPlaybackRateIndex((current) => (current + 1) % PLAYBACK_RATES.length);
-  };
+  const {
+    audioRef,
+    src,
+    isMultiTrack,
+    currentTrack,
+    currentTrackIndex,
+    isPlaying,
+    isLoading,
+    hasValidDuration,
+    displayDuration,
+    currentTime,
+    playerError,
+    progressError,
+    playbackRate,
+    statusMessage,
+    programProgressPercent,
+    programCompleted,
+    isPreviousTrackDisabled,
+    isNextTrackDisabled,
+    handlePlayPause,
+    handleSeekOffset,
+    handleRangeChange,
+    handlePreviousTrack,
+    handleNextTrack,
+    handleSelectTrack,
+    handleRetry,
+    handleSpeedChange,
+    handleStartOver,
+    isTrackDone,
+  } = useSequentialPlayer({
+    slug,
+    practiceId,
+    tracks,
+    initialProgress,
+  });
 
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
+  const currentTrackTitle = currentTrack?.title?.trim() || practiceTitle;
+  const showTrackTitle =
+    isMultiTrack &&
+    currentTrackTitle.toLowerCase() !== practiceTitle.trim().toLowerCase();
+  const currentDescription = currentTrack?.description?.trim() || "";
 
   return (
     <div className="relative z-10">
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src ?? undefined} preload="metadata" />
+
+      {isAuthorPreview ? (
+        <p className="mt-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-center text-xs text-white/75">
+          Режим предпросмотра автора
+        </p>
+      ) : null}
 
       <section className="mt-6 motion-reduce:transition-none">
         <div
@@ -356,14 +241,53 @@ export default function AudioPlayer({
       </section>
 
       <section className="mt-7 text-center">
-        <h1 className="text-[29px] font-semibold leading-tight">{title}</h1>
+        <h1 className="text-[29px] font-semibold leading-tight">{practiceTitle}</h1>
+        {showTrackTitle ? (
+          <p className="mt-2 text-[18px] font-medium leading-snug text-white/90">
+            {currentTrackTitle}
+          </p>
+        ) : null}
+        {isMultiTrack ? (
+          <p className="mt-2 text-sm text-white/65">
+            Аудио {currentTrackIndex + 1} из {tracks.length}
+          </p>
+        ) : null}
         <p className="mt-2 text-sm font-medium text-white/70">{authorName}</p>
-        {trimmedFormat && (
+        {trimmedFormat ? (
           <p className="mt-2 text-xs uppercase tracking-[0.14em] text-white/50">
             {trimmedFormat}
           </p>
-        )}
+        ) : null}
+        {currentDescription ? (
+          <p className="mx-auto mt-3 max-w-[28rem] text-sm leading-6 text-white/70">
+            {currentDescription}
+          </p>
+        ) : null}
       </section>
+
+      {isMultiTrack ? (
+        <section className="mt-6" aria-label="Общий прогресс программы">
+          <div className="flex items-center justify-between text-xs text-white/65">
+            <span>Пройдено {programProgressPercent}%</span>
+            {programCompleted ? (
+              <span className="text-white/80">Программа завершена</span>
+            ) : null}
+          </div>
+          <div
+            className="mt-2 h-2 overflow-hidden rounded-full bg-white/20"
+            role="progressbar"
+            aria-valuenow={programProgressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Общий прогресс программы"
+          >
+            <div
+              className="h-full rounded-full bg-white transition-[width] duration-300 motion-reduce:transition-none"
+              style={{ width: `${programProgressPercent}%` }}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-8" aria-live="polite">
         {playerError ? (
@@ -393,11 +317,13 @@ export default function AudioPlayer({
             <input
               type="range"
               min={0}
-              max={hasValidDuration ? duration : 0}
+              max={hasValidDuration ? displayDuration : 0}
               step={0.1}
               value={hasValidDuration ? currentTime : 0}
               disabled={!hasValidDuration}
-              onChange={(event) => handleRangeChange(Number(event.target.value))}
+              onChange={(event) =>
+                handleRangeChange(Number(event.target.value))
+              }
               aria-label="Прогресс воспроизведения"
               className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
             />
@@ -406,14 +332,25 @@ export default function AudioPlayer({
               <div className="flex flex-col items-center">
                 <button
                   type="button"
-                  disabled
-                  aria-label="Предыдущая практика"
-                  title="Очередь практик скоро появится"
-                  className="flex h-10 w-10 min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 opacity-[0.55] sm:h-11 sm:w-11"
+                  onClick={() => void handlePreviousTrack()}
+                  disabled={
+                    isPreviousTrackDisabled ||
+                    isLoading ||
+                    !src
+                  }
+                  aria-label={
+                    isMultiTrack
+                      ? "Предыдущее аудио"
+                      : "В начало текущего аудио"
+                  }
+                  className="flex h-10 w-10 min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11"
                 >
                   <PreviousTrackIcon />
                 </button>
-                <ControlCaption primary="Предыдущая" secondary="практика" />
+                <ControlCaption
+                  primary="Предыдущее"
+                  secondary={isMultiTrack ? "аудио" : "в начало"}
+                />
               </div>
 
               <div className="flex flex-col items-center">
@@ -432,9 +369,10 @@ export default function AudioPlayer({
               <div className="flex flex-col items-center">
                 <button
                   type="button"
-                  onClick={handlePlayPause}
+                  onClick={() => void handlePlayPause()}
+                  disabled={!src || isLoading}
                   aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
-                  className="flex h-16 w-16 min-h-11 min-w-11 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_18px_40px_rgba(0,0,0,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:h-[72px] sm:w-[72px]"
+                  className="flex h-16 w-16 min-h-11 min-w-11 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_18px_40px_rgba(0,0,0,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
                 >
                   {isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </button>
@@ -442,10 +380,10 @@ export default function AudioPlayer({
                 <button
                   type="button"
                   onClick={handleSpeedChange}
-                  aria-label={`Скорость воспроизведения ${PLAYBACK_RATES[playbackRateIndex]}×`}
+                  aria-label={`Скорость воспроизведения ${playbackRate}×`}
                   className="mt-3 min-h-11 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {PLAYBACK_RATES[playbackRateIndex]}×
+                  {playbackRate}×
                 </button>
               </div>
 
@@ -465,19 +403,90 @@ export default function AudioPlayer({
               <div className="flex flex-col items-center">
                 <button
                   type="button"
-                  disabled
-                  aria-label="Следующая практика"
-                  title="Очередь практик скоро появится"
-                  className="flex h-10 w-10 min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 opacity-[0.55] sm:h-11 sm:w-11"
+                  onClick={() => void handleNextTrack()}
+                  disabled={
+                    isNextTrackDisabled || isLoading || !src
+                  }
+                  aria-label="Следующее аудио"
+                  className="flex h-10 w-10 min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11"
                 >
                   <NextTrackIcon />
                 </button>
-                <ControlCaption primary="Следующая" secondary="практика" />
+                <ControlCaption primary="Следующее" secondary="аудио" />
               </div>
             </div>
           </>
         )}
+
+        {progressError ? (
+          <p className="mt-4 text-center text-xs text-white/55">
+            {progressError}
+          </p>
+        ) : null}
       </section>
+
+      {isMultiTrack ? (
+        <section className="mt-8" aria-label="Содержание программы">
+          <h2 className="text-[17px] font-semibold">Содержание</h2>
+          <ol className="mt-3 max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto pr-1">
+            {tracks.map((track, index) => {
+              const isCurrent = index === currentTrackIndex;
+              const isDone = isTrackDone(track.id, track.durationSeconds);
+
+              return (
+                <li key={track.id}>
+                  <button
+                    type="button"
+                    onClick={() => void handleSelectTrack(index)}
+                    aria-label={`Открыть аудио ${track.position}: ${track.title}`}
+                    aria-current={isCurrent ? "true" : undefined}
+                    className={`flex w-full items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                      isCurrent
+                        ? "border-white/35 bg-white/15"
+                        : "border-white/12 bg-white/8 hover:bg-white/12"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        isDone
+                          ? "bg-white text-[#4b2f86]"
+                          : "bg-white/15 text-white/85"
+                      }`}
+                    >
+                      {isDone ? <CheckIcon /> : track.position}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-white">
+                        {track.title}
+                      </span>
+                      {track.description?.trim() ? (
+                        <span className="mt-1 block line-clamp-2 text-xs leading-5 text-white/65">
+                          {track.description.trim()}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-xs text-white/60">
+                      {formatTime(track.durationSeconds ?? 0)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : null}
+
+      {programCompleted ? (
+        <section className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => void handleStartOver()}
+            className="min-h-11 rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            Начать заново
+          </button>
+        </section>
+      ) : null}
 
       <section className="mt-8 rounded-[24px] border border-white/12 bg-white/8 px-5 py-5">
         <h2 className="text-[17px] font-semibold">Перед прослушиванием</h2>

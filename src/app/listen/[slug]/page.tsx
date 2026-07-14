@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AudioPlayer from "@/components/audio/AudioPlayer";
+import { resolveListenAccess } from "@/lib/listen/access";
+import { listPracticeProgress } from "@/lib/listen/progress";
+import type { ListenTrack } from "@/lib/listen/types";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +22,7 @@ type AuthorRow = {
 
 type PracticeRow = {
   id: string;
+  author_id: string;
   title: string;
   slug: string;
   description: string | null;
@@ -29,12 +33,15 @@ type PracticeRow = {
   authors: AuthorRow | AuthorRow[] | null;
 };
 
-type EntitlementRow = {
-  access_source: string;
-  expires_at: string | null;
+type AudioItemRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  position: number;
+  duration_seconds: number | null;
+  audio_path: string | null;
+  status: string;
 };
-
-const APP_ORIGIN = "https://audiolad.ru";
 
 const coverGradients = [
   "from-[#7652bc] via-[#bd8fd7] to-[#f1c5d3]",
@@ -87,121 +94,11 @@ function getCoverSymbol(slug: string): string {
   return fallbackSymbols[stableHash(slug) % fallbackSymbols.length];
 }
 
-function isAccessActive(expiresAt: string | null): boolean {
-  if (expiresAt === null) {
-    return true;
-  }
-
-  const expiresDate = new Date(expiresAt);
-
-  if (Number.isNaN(expiresDate.getTime())) {
-    return false;
-  }
-
-  return expiresDate > new Date();
-}
-
-function isValidPracticeAudioPath(path: string, practiceId: string): boolean {
-  const trimmed = path.trim();
-
-  if (!trimmed) {
-    return false;
-  }
-
-  if (trimmed.startsWith("/")) {
-    return false;
-  }
-
-  if (trimmed.includes("?")) {
-    return false;
-  }
-
-  if (trimmed.includes("..")) {
-    return false;
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return false;
-  }
-
-  const segments = trimmed.split("/");
-
-  if (segments.length < 3) {
-    return false;
-  }
-
-  if (segments[0] !== "practices") {
-    return false;
-  }
-
-  if (segments[1] !== practiceId) {
-    return false;
-  }
-
-  if (!segments[2]?.trim()) {
-    return false;
-  }
-
-  return true;
-}
-
-function normalizeStorageSignedUrl(signedUrl: string): string | null {
-  const trimmed = signedUrl.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  let pathAndQuery = trimmed;
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    try {
-      const url = new URL(trimmed);
-
-      if (url.origin !== APP_ORIGIN) {
-        return null;
-      }
-
-      pathAndQuery = `${url.pathname}${url.search}`;
-    } catch {
-      return null;
-    }
-  }
-
-  if (pathAndQuery.startsWith("/storage/v1/")) {
-    return `${APP_ORIGIN}${pathAndQuery}`;
-  }
-
-  if (pathAndQuery.startsWith("/object/sign/")) {
-    return `${APP_ORIGIN}/storage/v1${pathAndQuery}`;
-  }
-
-  if (pathAndQuery.startsWith("object/sign/")) {
-    return `${APP_ORIGIN}/storage/v1/${pathAndQuery}`;
-  }
-
-  return null;
-}
-
 function getAuthorName(authors: PracticeRow["authors"]): string {
   const author = normalizeOne(authors);
   const name = author?.name?.trim();
 
   return name || "Автор не указан";
-}
-
-function getExpectedDurationSeconds(
-  durationMinutes: number | null | undefined,
-): number | null {
-  if (
-    typeof durationMinutes === "number" &&
-    Number.isFinite(durationMinutes) &&
-    durationMinutes > 0
-  ) {
-    return Math.round(durationMinutes * 60);
-  }
-
-  return null;
 }
 
 function ListenShell({
@@ -261,6 +158,63 @@ function ListenMessageState({
   );
 }
 
+async function loadListenTracks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  practice: PracticeRow,
+  accessMode: "entitled" | "author_preview",
+): Promise<ListenTrack[]> {
+  let query = supabase
+    .from("audio_items")
+    .select("id, title, description, position, duration_seconds, audio_path, status")
+    .eq("practice_id", practice.id)
+    .order("position", { ascending: true });
+
+  if (accessMode === "entitled" && practice.status === "published") {
+    query = query.eq("status", "published");
+  }
+
+  const { data: audioItems, error } = await query;
+
+  if (error) {
+    throw new Error("audio_items_lookup_failed");
+  }
+
+  const tracks = ((audioItems ?? []) as AudioItemRow[])
+    .filter((item) => item.audio_path?.trim())
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      position: item.position,
+      durationSeconds: item.duration_seconds,
+    }));
+
+  if (tracks.length > 0) {
+    return tracks;
+  }
+
+  const legacyPath =
+    typeof practice.audio_url === "string" ? practice.audio_url.trim() : "";
+
+  if (!legacyPath) {
+    return [];
+  }
+
+  return [
+    {
+      id: `legacy-${practice.id}`,
+      title: practice.title,
+      description: practice.description,
+      position: 1,
+      durationSeconds:
+        typeof practice.duration_minutes === "number" &&
+        practice.duration_minutes > 0
+          ? Math.round(practice.duration_minutes * 60)
+          : null,
+    },
+  ];
+}
+
 export default async function ListenPage({ params }: PageProps) {
   const { slug } = await params;
   const practiceHref = `/practice/${slug}`;
@@ -284,6 +238,7 @@ export default async function ListenPage({ params }: PageProps) {
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       description,
@@ -317,27 +272,12 @@ export default async function ListenPage({ params }: PageProps) {
   }
 
   const practiceRow = practice as PracticeRow;
-  const audioPath =
-    typeof practiceRow.audio_url === "string" ? practiceRow.audio_url.trim() : "";
 
-  if (!audioPath || !isValidPracticeAudioPath(audioPath, practiceRow.id)) {
-    return (
-      <ListenMessageState
-        title="Аудио пока недоступно"
-        description="Файл практики ещё не подготовлен к прослушиванию."
-        backHref={practiceHref}
-        backLabel="Вернуться к практике"
-      />
-    );
-  }
+  let access;
 
-  const { data: entitlement, error: entitlementError } = await supabase
-    .from("user_practices")
-    .select("access_source, expires_at")
-    .eq("practice_id", practiceRow.id)
-    .maybeSingle();
-
-  if (entitlementError) {
+  try {
+    access = await resolveListenAccess(supabase, user.id, practiceRow);
+  } catch {
     return (
       <ListenMessageState
         title="Не удалось проверить доступ"
@@ -348,9 +288,7 @@ export default async function ListenPage({ params }: PageProps) {
     );
   }
 
-  const entitlementRow = entitlement as EntitlementRow | null;
-
-  if (!entitlementRow || !isAccessActive(entitlementRow.expires_at)) {
+  if (!access) {
     return (
       <ListenMessageState
         title="Доступ к прослушиванию не открыт"
@@ -361,14 +299,25 @@ export default async function ListenPage({ params }: PageProps) {
     );
   }
 
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from("practice-audio")
-    .createSignedUrl(audioPath, 3600);
-
-  if (signedError || !signedData?.signedUrl) {
+  if (access.mode === "entitled" && practiceRow.status !== "published") {
     return (
       <ListenMessageState
-        title="Не удалось подготовить аудио"
+        title="Практика пока недоступна"
+        description="Материал ещё не опубликован для прослушивания."
+        backHref={practiceHref}
+        backLabel="К странице практики"
+      />
+    );
+  }
+
+  let tracks: ListenTrack[] = [];
+
+  try {
+    tracks = await loadListenTracks(supabase, practiceRow, access.mode);
+  } catch {
+    return (
+      <ListenMessageState
+        title="Не удалось загрузить аудио"
         description="Попробуйте открыть страницу ещё раз через несколько секунд."
         backHref={practiceHref}
         backLabel="К странице практики"
@@ -376,25 +325,32 @@ export default async function ListenPage({ params }: PageProps) {
     );
   }
 
-  const normalizedSignedUrl = normalizeStorageSignedUrl(signedData.signedUrl);
-
-  if (!normalizedSignedUrl) {
+  if (tracks.length === 0) {
     return (
       <ListenMessageState
-        title="Не удалось подготовить аудио"
-        description="Попробуйте открыть страницу ещё раз через несколько секунд."
+        title="Аудио пока недоступно"
+        description="Файлы практики ещё не подготовлены к прослушиванию."
         backHref={practiceHref}
-        backLabel="К странице практики"
+        backLabel="Вернуться к практике"
       />
     );
+  }
+
+  let initialProgress: Awaited<ReturnType<typeof listPracticeProgress>> = [];
+
+  try {
+    initialProgress = await listPracticeProgress(
+      supabase,
+      user.id,
+      practiceRow.id,
+    );
+  } catch {
+    initialProgress = [];
   }
 
   const authorName = getAuthorName(practiceRow.authors);
   const coverGradient = getCoverGradient(practiceRow.slug);
   const coverSymbol = getCoverSymbol(practiceRow.slug);
-  const expectedDurationSeconds = getExpectedDurationSeconds(
-    practiceRow.duration_minutes,
-  );
   const trimmedFormat =
     typeof practiceRow.format === "string" ? practiceRow.format.trim() : null;
 
@@ -407,14 +363,16 @@ export default async function ListenPage({ params }: PageProps) {
       </div>
 
       <AudioPlayer
-        src={normalizedSignedUrl}
-        title={practiceRow.title}
-        authorName={authorName}
+        practiceId={practiceRow.id}
         slug={practiceRow.slug}
+        practiceTitle={practiceRow.title}
+        authorName={authorName}
         format={trimmedFormat}
-        expectedDurationSeconds={expectedDurationSeconds}
+        tracks={tracks}
+        initialProgress={initialProgress}
         coverSymbol={coverSymbol}
         coverGradient={coverGradient}
+        isAuthorPreview={access.mode === "author_preview"}
       />
     </ListenShell>
   );
