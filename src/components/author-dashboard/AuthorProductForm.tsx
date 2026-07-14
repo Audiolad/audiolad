@@ -216,6 +216,51 @@ type AudioFileMeta = {
 const AUDIO_PREVIEW_SOFT_ERROR =
   "Аудиофайл загружен, но предпрослушивание пока недоступно. Обновите страницу.";
 
+const AUDIO_TITLE_SAVE_ERROR =
+  "MP3 загружен, но название аудио не удалось сохранить. Введите его вручную.";
+
+const AUDIO_TITLE_TRUNCATED_NOTICE =
+  "Название аудио сокращено до 100 символов. Вы можете отредактировать его вручную.";
+
+function isDefaultAudioTitle(title: string, slotNumber: number): boolean {
+  const trimmed = title.trim();
+
+  if (!trimmed) {
+    return true;
+  }
+
+  return trimmed === `Аудио ${slotNumber}`;
+}
+
+function deriveTitleFromFilename(fileName: string): {
+  title: string;
+  truncated: boolean;
+} {
+  const withoutExtension = fileName.trim().replace(/\.mp3$/i, "").trim();
+
+  if (!withoutExtension) {
+    return { title: "", truncated: false };
+  }
+
+  const limit = PRODUCT_CONTENT_LIMITS.audioTitle;
+
+  if (withoutExtension.length <= limit) {
+    return { title: withoutExtension, truncated: false };
+  }
+
+  const slice = withoutExtension.slice(0, limit);
+  const lastSpace = slice.lastIndexOf(" ");
+  const title =
+    lastSpace > 0
+      ? slice.slice(0, lastSpace).trimEnd()
+      : slice;
+
+  return {
+    title: title || slice,
+    truncated: true,
+  };
+}
+
 function buildInitialForm(
   authors: AuthorWorkspace[],
   initialAuthorSlug: string | undefined,
@@ -309,6 +354,9 @@ export default function AuthorProductForm({
     Record<string, { title?: string; description?: string }>
   >({});
   const [audioUploadErrors, setAudioUploadErrors] = useState<
+    Record<string, string>
+  >({});
+  const [audioTitleNotices, setAudioTitleNotices] = useState<
     Record<string, string>
   >({});
   const [audioFileMeta, setAudioFileMeta] = useState<
@@ -657,7 +705,7 @@ export default function AuthorProductForm({
   async function updateAudioItem(
     audioId: string,
     updates: { title?: string; description?: string },
-  ) {
+  ): Promise<boolean> {
     if (!practiceId || audioId.startsWith("temp-")) {
       setAudioItems((items) =>
         items.map((item) =>
@@ -673,7 +721,7 @@ export default function AuthorProductForm({
             : item,
         ),
       );
-      return;
+      return true;
     }
 
     const response = await fetch(
@@ -716,7 +764,7 @@ export default function AuthorProductForm({
         }
       }
 
-      return;
+      return false;
     }
 
     if (payload.product) {
@@ -726,6 +774,61 @@ export default function AuthorProductForm({
         delete next[audioId];
         return next;
       });
+      return true;
+    }
+
+    return false;
+  }
+
+  async function autofillAudioTitleFromFile(
+    audioId: string,
+    file: File,
+    currentTitle: string,
+    slotNumber: number,
+  ) {
+    if (!isDefaultAudioTitle(currentTitle, slotNumber)) {
+      return;
+    }
+
+    const derived = deriveTitleFromFilename(file.name);
+
+    if (!derived.title) {
+      return;
+    }
+
+    setAudioTitleNotices((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
+    setAudioItems((items) =>
+      items.map((item) =>
+        item.id === audioId ? { ...item, title: derived.title } : item,
+      ),
+    );
+
+    try {
+      const saved = await updateAudioItem(audioId, { title: derived.title });
+
+      if (!saved) {
+        setAudioTitleNotices((current) => ({
+          ...current,
+          [audioId]: AUDIO_TITLE_SAVE_ERROR,
+        }));
+        return;
+      }
+
+      if (derived.truncated) {
+        setAudioTitleNotices((current) => ({
+          ...current,
+          [audioId]: AUDIO_TITLE_TRUNCATED_NOTICE,
+        }));
+      }
+    } catch {
+      setAudioTitleNotices((current) => ({
+        ...current,
+        [audioId]: AUDIO_TITLE_SAVE_ERROR,
+      }));
     }
   }
 
@@ -1035,6 +1138,9 @@ export default function AuthorProductForm({
       return next;
     });
 
+    const slotNumber = audioItems.findIndex((item) => item.id === audioId) + 1;
+    const currentTitle = audioItems.find((item) => item.id === audioId)?.title ?? "";
+
     try {
       const id = await ensurePracticeId();
 
@@ -1101,6 +1207,7 @@ export default function AuthorProductForm({
       }));
       setMessage("Аудио загружено.");
       void loadAudioPreview(id, audioId);
+      await autofillAudioTitleFromFile(audioId, file, currentTitle, slotNumber);
     } catch {
       setAudioUploadErrors((current) => ({
         ...current,
@@ -1518,6 +1625,11 @@ export default function AuthorProductForm({
                         title: undefined,
                       },
                     }));
+                    setAudioTitleNotices((current) => {
+                      const next = { ...current };
+                      delete next[audioItem.id];
+                      return next;
+                    });
                     setAudioItems((items) =>
                       items.map((item) =>
                         item.id === audioItem.id ? { ...item, title } : item,
@@ -1536,6 +1648,17 @@ export default function AuthorProductForm({
                 {audioFieldErrors[audioItem.id]?.title ? (
                   <p className="mt-2 text-sm text-[#9b3d3d]">
                     {audioFieldErrors[audioItem.id]?.title}
+                  </p>
+                ) : null}
+                {audioTitleNotices[audioItem.id] ? (
+                  <p
+                    className={`mt-2 text-sm ${
+                      audioTitleNotices[audioItem.id] === AUDIO_TITLE_SAVE_ERROR
+                        ? "text-[#9b3d3d]"
+                        : "text-[#7d70a2]"
+                    }`}
+                  >
+                    {audioTitleNotices[audioItem.id]}
                   </p>
                 ) : null}
               </label>
