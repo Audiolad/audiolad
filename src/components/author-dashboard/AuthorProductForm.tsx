@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   AuthorProductDetail,
@@ -17,8 +17,11 @@ import {
 import {
   MAX_COVER_BYTES,
   PRODUCT_CONTENT_LIMITS,
+  getAudioPreviewErrorMessage,
+  getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
+  validateMp3FileClient,
 } from "@/lib/author-products/limits";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 
@@ -180,14 +183,122 @@ type FormState = {
   publishedAt: string | null;
 };
 
-function formatDuration(seconds: number | null): string {
+function formatDurationLong(seconds: number | null): string {
   if (!seconds || seconds <= 0) {
     return "—";
   }
 
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  return `${minutes} мин ${secs} сек`;
+}
+
+function formatFileSize(bytes: number): string {
+  const megabytes = bytes / (1024 * 1024);
+
+  if (megabytes >= 0.1) {
+    return `${megabytes.toLocaleString("ru-RU", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} МБ`;
+  }
+
+  const kilobytes = bytes / 1024;
+  return `${kilobytes.toLocaleString("ru-RU", {
+    maximumFractionDigits: 0,
+  })} КБ`;
+}
+
+type AudioFileMeta = {
+  fileName: string;
+  fileSizeBytes: number;
+};
+
+function AudioPreviewPlayer({
+  practiceId,
+  audioId,
+  refreshKey,
+}: {
+  practiceId: string;
+  audioId: string;
+  refreshKey: number;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPreview() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(
+          `/api/author/products/${practiceId}/audio/${audioId}/preview`,
+        );
+        const text = await response.text();
+        let payload: { url?: string; error?: string } | null = null;
+
+        if (text) {
+          try {
+            payload = JSON.parse(text) as { url?: string; error?: string };
+          } catch {
+            if (!cancelled) {
+              setPreviewUrl(null);
+              setError(getAudioPreviewErrorMessage(undefined));
+            }
+            return;
+          }
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok || !payload?.url) {
+          setPreviewUrl(null);
+          setError(getAudioPreviewErrorMessage(payload?.error));
+          return;
+        }
+
+        setPreviewUrl(payload.url);
+        setError(null);
+      } catch {
+        if (!cancelled) {
+          setPreviewUrl(null);
+          setError(getAudioPreviewErrorMessage(undefined));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [practiceId, audioId, refreshKey]);
+
+  return (
+    <div className="mt-3">
+      {loading ? (
+        <p className="text-sm text-[#7d70a2]">Подготовка прослушивания…</p>
+      ) : null}
+      {error ? (
+        <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+          {error}
+        </p>
+      ) : null}
+      {previewUrl ? (
+        <audio controls preload="none" src={previewUrl} className="mt-2 w-full" />
+      ) : null}
+    </div>
+  );
 }
 
 function buildInitialForm(
@@ -282,6 +393,18 @@ export default function AuthorProductForm({
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
   >({});
+  const [audioUploadErrors, setAudioUploadErrors] = useState<
+    Record<string, string>
+  >({});
+  const [audioFileMeta, setAudioFileMeta] = useState<
+    Record<string, AudioFileMeta>
+  >({});
+  const [audioPreviewVersions, setAudioPreviewVersions] = useState<
+    Record<string, number>
+  >({});
+  const [deletingAudioFileId, setDeletingAudioFileId] = useState<string | null>(
+    null,
+  );
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
   const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
@@ -858,13 +981,31 @@ export default function AuthorProductForm({
   }
 
   async function uploadAudio(audioId: string, file: File) {
+    const validationError = validateMp3FileClient(file);
+
+    if (validationError) {
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: validationError,
+      }));
+      return;
+    }
+
     setUploadingAudioId(audioId);
-    setError(null);
+    setAudioUploadErrors((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
 
     try {
       const id = await ensurePracticeId();
 
       if (!id) {
+        setAudioUploadErrors((current) => ({
+          ...current,
+          [audioId]: "Не удалось загрузить MP3.",
+        }));
         return;
       }
 
@@ -879,22 +1020,135 @@ export default function AuthorProductForm({
         },
       );
 
-      const payload = (await response.json()) as {
+      const text = await response.text();
+      let payload: {
         product?: AuthorProductDetail;
-      };
+        error?: string;
+      } | null = null;
 
-      if (!response.ok || !payload.product) {
-        setError("Не удалось загрузить MP3.");
+      if (text) {
+        try {
+          payload = JSON.parse(text) as {
+            product?: AuthorProductDetail;
+            error?: string;
+          };
+        } catch {
+          setAudioUploadErrors((current) => ({
+            ...current,
+            [audioId]: getAudioUploadErrorMessage(undefined, response.status),
+          }));
+          return;
+        }
+      }
+
+      if (!response.ok || !payload?.product) {
+        setAudioUploadErrors((current) => ({
+          ...current,
+          [audioId]: getAudioUploadErrorMessage(payload?.error, response.status),
+        }));
         return;
       }
 
       setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
       setAudioItems(payload.product.audio_items);
+      setAudioFileMeta((current) => ({
+        ...current,
+        [audioId]: {
+          fileName: file.name,
+          fileSizeBytes: file.size,
+        },
+      }));
+      setAudioPreviewVersions((current) => ({
+        ...current,
+        [audioId]: (current[audioId] ?? 0) + 1,
+      }));
       setMessage("Аудио загружено.");
     } catch {
-      setError("Не удалось загрузить MP3.");
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: "Не удалось загрузить MP3.",
+      }));
     } finally {
       setUploadingAudioId(null);
+    }
+  }
+
+  async function deleteAudioFile(audioId: string) {
+    if (!window.confirm("Удалить MP3?")) {
+      return;
+    }
+
+    setDeletingAudioFileId(audioId);
+    setAudioUploadErrors((current) => {
+      const next = { ...current };
+      delete next[audioId];
+      return next;
+    });
+
+    try {
+      const id = practiceId || (await ensurePracticeId());
+
+      if (!id) {
+        setAudioUploadErrors((current) => ({
+          ...current,
+          [audioId]: "Не удалось удалить MP3.",
+        }));
+        return;
+      }
+
+      const response = await fetch(
+        `/api/author/products/${id}/audio/${audioId}/file`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const text = await response.text();
+      let payload: { product?: AuthorProductDetail; error?: string } | null =
+        null;
+
+      if (text) {
+        try {
+          payload = JSON.parse(text) as {
+            product?: AuthorProductDetail;
+            error?: string;
+          };
+        } catch {
+          setAudioUploadErrors((current) => ({
+            ...current,
+            [audioId]: "Не удалось удалить MP3.",
+          }));
+          return;
+        }
+      }
+
+      if (!response.ok || !payload?.product) {
+        setAudioUploadErrors((current) => ({
+          ...current,
+          [audioId]: "Не удалось удалить MP3.",
+        }));
+        return;
+      }
+
+      setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
+      setAudioItems(payload.product.audio_items);
+      setAudioFileMeta((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
+      setAudioPreviewVersions((current) => ({
+        ...current,
+        [audioId]: (current[audioId] ?? 0) + 1,
+      }));
+      setMessage("MP3 удалён.");
+    } catch {
+      setAudioUploadErrors((current) => ({
+        ...current,
+        [audioId]: "Не удалось удалить MP3.",
+      }));
+    } finally {
+      setDeletingAudioFileId(null);
     }
   }
 
@@ -1279,23 +1533,61 @@ export default function AuthorProductForm({
                 ) : null}
               </label>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-4 space-y-3">
                 <div className="text-sm text-[#5f5484]">
-                  {audioItem.audio_path ? "MP3 загружен" : "MP3 ещё не загружен"}
-                  <span className="ml-2">
-                    Продолжительность: {formatDuration(audioItem.duration_seconds)}
-                  </span>
+                  <p className="font-medium text-[#3f3560]">
+                    {audioItem.audio_path ? "MP3 загружен" : "MP3 ещё не загружен"}
+                  </p>
+                  {audioItem.audio_path ? (
+                    <div className="mt-2 space-y-1">
+                      {audioFileMeta[audioItem.id] ? (
+                        <p>{audioFileMeta[audioItem.id].fileName}</p>
+                      ) : null}
+                      <p>{formatDurationLong(audioItem.duration_seconds)}</p>
+                      {audioFileMeta[audioItem.id] ? (
+                        <p>
+                          {formatFileSize(audioFileMeta[audioItem.id].fileSizeBytes)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
+                <p className="text-sm leading-5 text-[#7d70a2]">MP3 · до 50 МБ</p>
+
+                {audioItem.audio_path && practiceId && !audioItem.id.startsWith("temp-") ? (
+                  <AudioPreviewPlayer
+                    practiceId={practiceId}
+                    audioId={audioItem.id}
+                    refreshKey={audioPreviewVersions[audioItem.id] ?? 0}
+                  />
+                ) : null}
+
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">
-                    {uploadingAudioId === audioItem.id ? "Загрузка…" : "Загрузить MP3"}
+                  <label
+                    className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
+                      uploadingAudioId === audioItem.id ||
+                      deletingAudioFileId === audioItem.id
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer"
+                    }`}
+                  >
+                    {uploadingAudioId === audioItem.id
+                      ? "Загрузка…"
+                      : audioItem.audio_path
+                        ? "Заменить MP3"
+                        : "Загрузить MP3"}
                     <input
                       type="file"
                       accept="audio/mpeg,.mp3"
                       className="hidden"
+                      disabled={
+                        uploadingAudioId === audioItem.id ||
+                        deletingAudioFileId === audioItem.id
+                      }
                       onChange={(event) => {
                         const file = event.target.files?.[0];
+                        event.target.value = "";
                         if (file) {
                           void uploadAudio(audioItem.id, file);
                         }
@@ -1303,16 +1595,47 @@ export default function AuthorProductForm({
                     />
                   </label>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void deleteAudioItem(audioItem.id, Boolean(audioItem.audio_path))
-                    }
-                    className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d]"
-                  >
-                    Удалить
-                  </button>
+                  {audioItem.audio_path ? (
+                    <button
+                      type="button"
+                      disabled={
+                        uploadingAudioId === audioItem.id ||
+                        deletingAudioFileId === audioItem.id
+                      }
+                      onClick={() => void deleteAudioFile(audioItem.id)}
+                      className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2] disabled:opacity-60"
+                    >
+                      {deletingAudioFileId === audioItem.id
+                        ? "Удаление…"
+                        : "Удалить MP3"}
+                    </button>
+                  ) : null}
+
+                  {audioItems.length > 1 ? (
+                    <button
+                      type="button"
+                      disabled={
+                        uploadingAudioId === audioItem.id ||
+                        deletingAudioFileId === audioItem.id
+                      }
+                      onClick={() =>
+                        void deleteAudioItem(
+                          audioItem.id,
+                          Boolean(audioItem.audio_path),
+                        )
+                      }
+                      className="rounded-full border border-[#ebc9c9] px-4 py-2 text-sm font-semibold text-[#9b3d3d] disabled:opacity-60"
+                    >
+                      Удалить
+                    </button>
+                  ) : null}
                 </div>
+
+                {audioUploadErrors[audioItem.id] ? (
+                  <p className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+                    {audioUploadErrors[audioItem.id]}
+                  </p>
+                ) : null}
               </div>
             </article>
           ))}

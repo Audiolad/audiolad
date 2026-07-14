@@ -1,4 +1,53 @@
 export const MAX_COVER_BYTES = 3 * 1024 * 1024;
+export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+
+const ALLOWED_MP3_MIME_TYPES = new Set(["audio/mpeg", "audio/mp3"]);
+
+export function validateMp3FileClient(file: File): string | null {
+  const fileName = file.name.trim().toLowerCase();
+  const mime = file.type.trim().toLowerCase();
+
+  if (!fileName.endsWith(".mp3") || !ALLOWED_MP3_MIME_TYPES.has(mime)) {
+    return "Загрузите аудиофайл в формате MP3.";
+  }
+
+  if (file.size > MAX_AUDIO_BYTES) {
+    return "Размер аудиофайла не должен превышать 50 МБ.";
+  }
+
+  return null;
+}
+
+export function getAudioUploadErrorMessage(
+  code: string | undefined,
+  status: number,
+): string {
+  switch (code) {
+    case "invalid_file_type":
+      return "Загрузите аудиофайл в формате MP3.";
+    case "invalid_file_size":
+      return "Размер аудиофайла не должен превышать 50 МБ.";
+    case "invalid_audio_duration":
+      return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
+    default:
+      if (status === 413) {
+        return "Размер аудиофайла не должен превышать 50 МБ.";
+      }
+
+      return "Не удалось загрузить MP3.";
+  }
+}
+
+export function getAudioPreviewErrorMessage(code: string | undefined): string {
+  switch (code) {
+    case "not_found":
+      return "Файл для прослушивания не найден.";
+    case "preview_failed":
+      return "Не удалось подготовить прослушивание. Попробуйте ещё раз.";
+    default:
+      return "Не удалось подготовить прослушивание.";
+  }
+}
 
 export const PRODUCT_CONTENT_LIMITS = {
   title: 70,
