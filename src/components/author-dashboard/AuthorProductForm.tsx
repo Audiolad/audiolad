@@ -18,6 +18,23 @@ import { buildPracticePublicPath } from "@/lib/author-products/utils";
 
 const MAX_COVER_BYTES = 10 * 1024 * 1024;
 
+function buildCoverDisplayUrl(
+  coverUrl: string | null,
+  version: string | null,
+): string | null {
+  if (!coverUrl) {
+    return null;
+  }
+
+  if (!version) {
+    return coverUrl;
+  }
+
+  const separator = coverUrl.includes("?") ? "&" : "?";
+
+  return `${coverUrl}${separator}v=${encodeURIComponent(version)}`;
+}
+
 type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
   initialAuthorSlug?: string;
@@ -35,6 +52,7 @@ type FormState = {
   isFree: boolean;
   price: number;
   coverUrl: string | null;
+  coverVersion: string | null;
   status: string;
   publishedAt: string | null;
 };
@@ -67,6 +85,7 @@ function buildInitialForm(
       isFree: practice.is_free,
       price: practice.is_free ? 99 : practice.price,
       coverUrl: practice.cover_url,
+      coverVersion: practice.cover_url ? practice.updated_at : null,
       status: practice.status,
       publishedAt: practice.published_at,
     };
@@ -85,6 +104,7 @@ function buildInitialForm(
     isFree: true,
     price: 99,
     coverUrl: null,
+    coverVersion: null,
     status: "draft",
     publishedAt: null,
   };
@@ -124,9 +144,25 @@ export default function AuthorProductForm({
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [coverDisplayError, setCoverDisplayError] = useState<string | null>(
+    null,
+  );
+  const [coverPreviewFailureKey, setCoverPreviewFailureKey] = useState<
+    string | null
+  >(null);
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
   const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
+
+  const coverDisplaySrc = useMemo(
+    () => buildCoverDisplayUrl(form.coverUrl, form.coverVersion),
+    [form.coverUrl, form.coverVersion],
+  );
+
+  const coverPreviewKey = `${form.coverUrl ?? ""}:${form.coverVersion ?? ""}`;
+  const coverPreviewFailed = coverPreviewFailureKey === coverPreviewKey;
+
+  const showCoverPreview = Boolean(coverDisplaySrc) && !coverPreviewFailed;
 
   const selectedAuthor = useMemo(
     () => authors.find((author) => author.id === form.authorId) ?? null,
@@ -474,6 +510,8 @@ export default function AuthorProductForm({
   async function uploadCover(file: File) {
     setUploadingCover(true);
     setCoverError(null);
+    setCoverDisplayError(null);
+    setCoverPreviewFailureKey(null);
 
     if (file.size > MAX_COVER_BYTES) {
       setCoverError("Размер обложки не должен превышать 10 МБ.");
@@ -537,10 +575,13 @@ export default function AuthorProductForm({
         setForm((current) => ({
           ...current,
           coverUrl: payload.cover_url ?? null,
+          coverVersion: String(Date.now()),
         }));
       }
 
       setCoverError(null);
+      setCoverDisplayError(null);
+      setCoverPreviewFailureKey(null);
       setMessage("Обложка загружена.");
     } catch {
       setCoverError("Не удалось загрузить обложку.");
@@ -705,13 +746,23 @@ export default function AuthorProductForm({
         <div>
           <span className="mb-2 block text-sm font-medium">Обложка</span>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="h-28 w-28 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
-              {form.coverUrl ? (
+            <div className="aspect-square h-28 w-28 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+              {showCoverPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={form.coverUrl}
+                  src={coverDisplaySrc ?? undefined}
                   alt=""
-                  className="h-full w-full object-cover"
+                  className="block h-full w-full object-contain"
+                  onLoad={() => {
+                    setCoverPreviewFailureKey(null);
+                    setCoverDisplayError(null);
+                  }}
+                  onError={() => {
+                    setCoverPreviewFailureKey(coverPreviewKey);
+                    setCoverDisplayError(
+                      "Не удалось отобразить обложку. Попробуйте загрузить файл ещё раз.",
+                    );
+                  }}
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm text-[#7d70a2]">
@@ -735,6 +786,11 @@ export default function AuthorProductForm({
               />
             </label>
           </div>
+          {coverDisplayError ? (
+            <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+              {coverDisplayError}
+            </p>
+          ) : null}
           {coverError ? (
             <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
               {coverError}
