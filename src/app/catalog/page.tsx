@@ -8,6 +8,7 @@ type Practice = {
   id: string;
   title: string;
   slug: string;
+  subtitle: string | null;
   description: string | null;
   format: string | null;
   duration_minutes: number | null;
@@ -22,7 +23,7 @@ async function getPractices(): Promise<Practice[]> {
   if (!supabaseUrl || !supabaseKey) return [];
 
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/practices?select=id,title,slug,description,format,duration_minutes,price,is_free,status&status=eq.published&order=created_at.desc`,
+    `${supabaseUrl}/rest/v1/practices?select=id,title,slug,subtitle,description,format,duration_minutes,price,is_free,status&status=eq.published&order=created_at.desc`,
     {
       headers: {
         apikey: supabaseKey,
@@ -109,11 +110,23 @@ export default async function CatalogPage() {
                     </div>
 
                     <div className="min-w-0">
-                      <h3 className="text-[17px] font-semibold leading-5">{practice.title}</h3>
+                      <h3 className="line-clamp-2 text-[17px] font-semibold leading-5">
+                        {practice.title}
+                      </h3>
+                      {practice.subtitle ? (
+                        <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#7d70a2]">
+                          {practice.subtitle}
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-sm text-[#7042c5]">Сергей и Зоя</p>
                       <p className="mt-1 text-sm text-[#7d70a2]">
                         {practice.format} · {practice.duration_minutes} мин
                       </p>
+                      {practice.description ? (
+                        <p className="mt-2 line-clamp-3 text-sm leading-5 text-[#7d70a2]">
+                          {practice.description}
+                        </p>
+                      ) : null}
                       <p className="mt-2 font-semibold text-[#7042c5]">
                         {practice.is_free ? "Бесплатно" : `${practice.price} ₽`}
                       </p>

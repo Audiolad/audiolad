@@ -5,6 +5,11 @@ import {
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
 import {
+  validateDescriptionLength,
+  validateSubtitleLength,
+  validateTitleLength,
+} from "@/lib/author-products/limits";
+import {
   generateUniqueSlug,
   getAuthorProductDetail,
   isPracticeSlugTaken,
@@ -69,15 +74,37 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "invalid_request" }, { status: 400 });
       }
 
+      const titleError = validateTitleLength(title);
+
+      if (titleError) {
+        return NextResponse.json({ error: titleError }, { status: 400 });
+      }
+
       updates.title = title;
     }
 
     if ("subtitle" in body) {
-      updates.subtitle = parseOptionalString(body.subtitle)?.trim() || null;
+      const subtitle = parseOptionalString(body.subtitle)?.trim() || "";
+
+      const subtitleError = validateSubtitleLength(subtitle);
+
+      if (subtitleError) {
+        return NextResponse.json({ error: subtitleError }, { status: 400 });
+      }
+
+      updates.subtitle = subtitle || null;
     }
 
     if ("description" in body) {
-      updates.description = parseOptionalString(body.description)?.trim() || null;
+      const description = parseOptionalString(body.description)?.trim() || "";
+
+      const descriptionError = validateDescriptionLength(description);
+
+      if (descriptionError) {
+        return NextResponse.json({ error: descriptionError }, { status: 400 });
+      }
+
+      updates.description = description || null;
     }
 
     if ("format" in body) {

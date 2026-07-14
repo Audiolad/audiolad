@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import {
+  validateAudioTitleLength,
+} from "@/lib/author-products/limits";
+import {
   handleAuthorRouteError,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
@@ -45,12 +48,19 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const nextPosition = (existingItems?.[0]?.position ?? 0) + 1;
+    const resolvedTitle = title || `Аудио ${nextPosition}`;
+
+    const titleError = validateAudioTitleLength(resolvedTitle);
+
+    if (titleError) {
+      return NextResponse.json({ error: titleError }, { status: 400 });
+    }
 
     const { data: audioItem, error: insertError } = await supabase
       .from("audio_items")
       .insert({
         practice_id: id,
-        title: title || `Аудио ${nextPosition}`,
+        title: resolvedTitle,
         position: nextPosition,
         status: "draft",
       })

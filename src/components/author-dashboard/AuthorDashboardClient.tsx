@@ -192,7 +192,7 @@ export default function AuthorDashboardClient({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-[17px] font-semibold leading-5">
+                      <h3 className="line-clamp-2 text-[17px] font-semibold leading-5">
                         {product.title}
                       </h3>
                       <p className="mt-1 text-sm text-[#7d70a2]">

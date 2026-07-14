@@ -14,9 +14,132 @@ import {
   PAID_PRICE_OPTIONS,
   PRODUCT_FORMATS,
 } from "@/lib/author-products/types";
+import {
+  PRODUCT_CONTENT_LIMITS,
+  getProductFieldErrorMessage,
+  getProductFieldKeyForError,
+} from "@/lib/author-products/limits";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 
 const MAX_COVER_BYTES = 10 * 1024 * 1024;
+const MIN_COVER_DIMENSION = 1000;
+const ALLOWED_COVER_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+function CharCounter({ value, max }: { value: string; max: number }) {
+  return (
+    <p className="mt-1 text-right text-xs text-[#7d70a2]">
+      {value.length} / {max}
+    </p>
+  );
+}
+
+function CoverPlaceholderIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-7 w-7"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="4"
+        y="5"
+        width="16"
+        height="14"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle cx="9" cy="10" r="1.5" fill="currentColor" />
+      <path
+        d="m5 17 4.5-4.5a1 1 0 0 1 1.4 0L15 17"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 14.5 15.5 12a1 1 0 0 1 1.4 0L19 14"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CoverPlaceholder() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[18px] border border-[#d9c9ef] bg-[#f8f4fc] px-2 text-center">
+      <span className="text-[#9a86c4]">
+        <CoverPlaceholderIcon />
+      </span>
+      <span className="text-xs text-[#8c79b6]">Нет обложки</span>
+    </div>
+  );
+}
+
+function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("image_decode_failed"));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function validateCoverFile(file: File): Promise<string | null> {
+  const fileName = file.name.trim().toLowerCase();
+  const hasAllowedExtension =
+    fileName.endsWith(".jpg") ||
+    fileName.endsWith(".jpeg") ||
+    fileName.endsWith(".png") ||
+    fileName.endsWith(".webp");
+
+  if (!ALLOWED_COVER_MIME_TYPES.has(file.type.trim().toLowerCase()) || !hasAllowedExtension) {
+    return "Загрузите обложку в формате JPG, PNG или WebP.";
+  }
+
+  if (file.size > MAX_COVER_BYTES) {
+    return "Размер обложки не должен превышать 10 МБ.";
+  }
+
+  try {
+    const { width, height } = await readImageDimensions(file);
+
+    if (width < MIN_COVER_DIMENSION || height < MIN_COVER_DIMENSION) {
+      return "Минимальный размер обложки — 1000 × 1000 пикселей.";
+    }
+
+    if (width !== height) {
+      return "Обложка должна быть квадратной — соотношение сторон 1:1.";
+    }
+  } catch {
+    return "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.";
+  }
+
+  return null;
+}
 
 function buildCoverDisplayUrl(
   coverUrl: string | null,
@@ -150,6 +273,14 @@ export default function AuthorProductForm({
   const [coverPreviewFailureKey, setCoverPreviewFailureKey] = useState<
     string | null
   >(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    title?: string;
+    subtitle?: string;
+    description?: string;
+  }>({});
+  const [audioFieldErrors, setAudioFieldErrors] = useState<
+    Record<string, { title?: string; description?: string }>
+  >({});
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
   const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
@@ -215,6 +346,7 @@ export default function AuthorProductForm({
     setBusy(true);
     setError(null);
     setMessage(null);
+    setFieldErrors({});
 
     try {
       const id = await ensurePracticeId();
@@ -244,6 +376,30 @@ export default function AuthorProductForm({
       };
 
       if (!response.ok || !payload.product) {
+        const fieldMessage = payload.error
+          ? getProductFieldErrorMessage(payload.error)
+          : null;
+
+        if (fieldMessage && payload.error) {
+          const fieldKey = getProductFieldKeyForError(
+            payload.error as
+              | "title_too_long"
+              | "subtitle_too_long"
+              | "description_too_long"
+              | "audio_title_too_long"
+              | "audio_description_too_long",
+          );
+
+          if (
+            fieldKey === "title" ||
+            fieldKey === "subtitle" ||
+            fieldKey === "description"
+          ) {
+            setFieldErrors({ [fieldKey]: fieldMessage });
+            return false;
+          }
+        }
+
         setError("Не удалось сохранить аудиопродукт.");
         return false;
       }
@@ -380,10 +536,45 @@ export default function AuthorProductForm({
 
     const payload = (await response.json()) as {
       product?: AuthorProductDetail;
+      error?: string;
     };
 
-    if (response.ok && payload.product) {
+    if (!response.ok) {
+      const fieldMessage = payload.error
+        ? getProductFieldErrorMessage(payload.error)
+        : null;
+
+      if (fieldMessage && payload.error) {
+        const fieldKey = getProductFieldKeyForError(
+          payload.error as
+            | "title_too_long"
+            | "subtitle_too_long"
+            | "description_too_long"
+            | "audio_title_too_long"
+            | "audio_description_too_long",
+        );
+
+        if (fieldKey === "audioTitle" || fieldKey === "audioDescription") {
+          setAudioFieldErrors((current) => ({
+            ...current,
+            [audioId]: {
+              ...current[audioId],
+              [fieldKey === "audioTitle" ? "title" : "description"]: fieldMessage,
+            },
+          }));
+        }
+      }
+
+      return;
+    }
+
+    if (payload.product) {
       setAudioItems(payload.product.audio_items);
+      setAudioFieldErrors((current) => {
+        const next = { ...current };
+        delete next[audioId];
+        return next;
+      });
     }
   }
 
@@ -513,8 +704,10 @@ export default function AuthorProductForm({
     setCoverDisplayError(null);
     setCoverPreviewFailureKey(null);
 
-    if (file.size > MAX_COVER_BYTES) {
-      setCoverError("Размер обложки не должен превышать 10 МБ.");
+    const validationError = await validateCoverFile(file);
+
+    if (validationError) {
+      setCoverError(validationError);
       setUploadingCover(false);
       return;
     }
@@ -670,38 +863,67 @@ export default function AuthorProductForm({
           <span className="mb-2 block text-sm font-medium">Название</span>
           <input
             value={form.title}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, title: event.target.value }))
-            }
+            maxLength={PRODUCT_CONTENT_LIMITS.title}
+            onChange={(event) => {
+              setFieldErrors((current) => ({ ...current, title: undefined }));
+              setForm((current) => ({ ...current, title: event.target.value }));
+            }}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
             placeholder="Название аудиопродукта"
           />
+          <CharCounter value={form.title} max={PRODUCT_CONTENT_LIMITS.title} />
+          {fieldErrors.title ? (
+            <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.title}</p>
+          ) : null}
         </label>
 
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Подзаголовок</span>
           <input
             value={form.subtitle}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, subtitle: event.target.value }))
-            }
+            maxLength={PRODUCT_CONTENT_LIMITS.subtitle}
+            onChange={(event) => {
+              setFieldErrors((current) => ({ ...current, subtitle: undefined }));
+              setForm((current) => ({ ...current, subtitle: event.target.value }));
+            }}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           />
+          <CharCounter
+            value={form.subtitle}
+            max={PRODUCT_CONTENT_LIMITS.subtitle}
+          />
+          {fieldErrors.subtitle ? (
+            <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.subtitle}</p>
+          ) : null}
         </label>
 
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Описание</span>
           <textarea
             value={form.description}
-            onChange={(event) =>
+            maxLength={PRODUCT_CONTENT_LIMITS.description}
+            onChange={(event) => {
+              setFieldErrors((current) => ({
+                ...current,
+                description: undefined,
+              }));
               setForm((current) => ({
                 ...current,
                 description: event.target.value,
-              }))
-            }
+              }));
+            }}
             rows={5}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           />
+          <CharCounter
+            value={form.description}
+            max={PRODUCT_CONTENT_LIMITS.description}
+          />
+          {fieldErrors.description ? (
+            <p className="mt-2 text-sm text-[#9b3d3d]">
+              {fieldErrors.description}
+            </p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -745,8 +967,8 @@ export default function AuthorProductForm({
 
         <div>
           <span className="mb-2 block text-sm font-medium">Обложка</span>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="aspect-square h-28 w-28 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="aspect-square h-28 w-28 shrink-0 overflow-hidden rounded-[18px]">
               {showCoverPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -765,26 +987,30 @@ export default function AuthorProductForm({
                   }}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-[#7d70a2]">
-                  Нет обложки
-                </div>
+                <CoverPlaceholder />
               )}
             </div>
 
-            <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
-              {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void uploadCover(file);
-                  }
-                }}
-              />
-            </label>
+            <div className="min-w-0 flex-1">
+              <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
+                {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void uploadCover(file);
+                    }
+                  }}
+                />
+              </label>
+              <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
+                Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до
+                10 МБ
+              </p>
+            </div>
           </div>
           {coverDisplayError ? (
             <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
@@ -892,8 +1118,16 @@ export default function AuthorProductForm({
                 <span className="mb-2 block text-sm font-medium">Название</span>
                 <input
                   value={audioItem.title}
+                  maxLength={PRODUCT_CONTENT_LIMITS.audioTitle}
                   onChange={(event) => {
                     const title = event.target.value;
+                    setAudioFieldErrors((current) => ({
+                      ...current,
+                      [audioItem.id]: {
+                        ...current[audioItem.id],
+                        title: undefined,
+                      },
+                    }));
                     setAudioItems((items) =>
                       items.map((item) =>
                         item.id === audioItem.id ? { ...item, title } : item,
@@ -905,6 +1139,15 @@ export default function AuthorProductForm({
                   }
                   className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
                 />
+                <CharCounter
+                  value={audioItem.title}
+                  max={PRODUCT_CONTENT_LIMITS.audioTitle}
+                />
+                {audioFieldErrors[audioItem.id]?.title ? (
+                  <p className="mt-2 text-sm text-[#9b3d3d]">
+                    {audioFieldErrors[audioItem.id]?.title}
+                  </p>
+                ) : null}
               </label>
 
               <label className="mt-4 block">
@@ -913,8 +1156,16 @@ export default function AuthorProductForm({
                 </span>
                 <textarea
                   value={audioItem.description ?? ""}
+                  maxLength={PRODUCT_CONTENT_LIMITS.audioDescription}
                   onChange={(event) => {
                     const description = event.target.value;
+                    setAudioFieldErrors((current) => ({
+                      ...current,
+                      [audioItem.id]: {
+                        ...current[audioItem.id],
+                        description: undefined,
+                      },
+                    }));
                     setAudioItems((items) =>
                       items.map((item) =>
                         item.id === audioItem.id
@@ -931,6 +1182,15 @@ export default function AuthorProductForm({
                   rows={3}
                   className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
                 />
+                <CharCounter
+                  value={audioItem.description ?? ""}
+                  max={PRODUCT_CONTENT_LIMITS.audioDescription}
+                />
+                {audioFieldErrors[audioItem.id]?.description ? (
+                  <p className="mt-2 text-sm text-[#9b3d3d]">
+                    {audioFieldErrors[audioItem.id]?.description}
+                  </p>
+                ) : null}
               </label>
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

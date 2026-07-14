@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import {
+  validateTitleLength,
+} from "@/lib/author-products/limits";
+import {
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
@@ -56,6 +59,12 @@ export async function POST(request: Request) {
 
     if (!authorId || !title) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const titleError = validateTitleLength(title);
+
+    if (titleError) {
+      return NextResponse.json({ error: titleError }, { status: 400 });
     }
 
     const { supabase } = await requireAuthorMembership(authorId);

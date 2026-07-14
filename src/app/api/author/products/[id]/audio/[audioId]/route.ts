@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  validateAudioDescriptionLength,
+  validateAudioTitleLength,
+} from "@/lib/author-products/limits";
+import {
   handleAuthorRouteError,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
@@ -39,14 +43,28 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "invalid_request" }, { status: 400 });
       }
 
+      const titleError = validateAudioTitleLength(title);
+
+      if (titleError) {
+        return NextResponse.json({ error: titleError }, { status: 400 });
+      }
+
       updates.title = title;
     }
 
     if ("description" in body) {
-      updates.description =
+      const description =
         typeof body.description === "string"
-          ? body.description.trim() || null
-          : null;
+          ? body.description.trim()
+          : "";
+
+      const descriptionError = validateAudioDescriptionLength(description);
+
+      if (descriptionError) {
+        return NextResponse.json({ error: descriptionError }, { status: 400 });
+      }
+
+      updates.description = description || null;
     }
 
     const { data: audioItem, error: updateError } = await supabase
