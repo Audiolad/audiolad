@@ -16,6 +16,8 @@ import {
 } from "@/lib/author-products/types";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 
+const MAX_COVER_BYTES = 10 * 1024 * 1024;
+
 type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
   initialAuthorSlug?: string;
@@ -121,6 +123,7 @@ export default function AuthorProductForm({
   const [busy, setBusy] = useState(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
   const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
@@ -470,12 +473,19 @@ export default function AuthorProductForm({
 
   async function uploadCover(file: File) {
     setUploadingCover(true);
-    setError(null);
+    setCoverError(null);
+
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverError("Размер обложки не должен превышать 10 МБ.");
+      setUploadingCover(false);
+      return;
+    }
 
     try {
       const id = await ensurePracticeId();
 
       if (!id) {
+        setCoverError("Не удалось загрузить обложку.");
         return;
       }
 
@@ -487,26 +497,53 @@ export default function AuthorProductForm({
         body: formData,
       });
 
-      const payload = (await response.json()) as {
+      let payload: {
         product?: AuthorProductDetail;
         cover_url?: string;
-      };
+      } | null = null;
 
-      if (!response.ok) {
-        setError("Не удалось загрузить обложку.");
+      if (response.status === 413) {
+        setCoverError(
+          "Файл слишком большой. Максимальный размер обложки — 10 МБ.",
+        );
         return;
       }
 
-      if (payload.product) {
-        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-        setAudioItems(payload.product.audio_items);
-      } else if (payload.cover_url) {
-        setForm((current) => ({ ...current, coverUrl: payload.cover_url ?? null }));
+      const responseText = await response.text();
+
+      if (responseText) {
+        try {
+          payload = JSON.parse(responseText) as {
+            product?: AuthorProductDetail;
+            cover_url?: string;
+          };
+        } catch {
+          if (!response.ok) {
+            setCoverError("Не удалось загрузить обложку.");
+            return;
+          }
+        }
       }
 
+      if (!response.ok) {
+        setCoverError("Не удалось загрузить обложку.");
+        return;
+      }
+
+      if (payload?.product) {
+        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
+        setAudioItems(payload.product.audio_items);
+      } else if (payload?.cover_url) {
+        setForm((current) => ({
+          ...current,
+          coverUrl: payload.cover_url ?? null,
+        }));
+      }
+
+      setCoverError(null);
       setMessage("Обложка загружена.");
     } catch {
-      setError("Не удалось загрузить обложку.");
+      setCoverError("Не удалось загрузить обложку.");
     } finally {
       setUploadingCover(false);
     }
@@ -698,6 +735,11 @@ export default function AuthorProductForm({
               />
             </label>
           </div>
+          {coverError ? (
+            <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+              {coverError}
+            </p>
+          ) : null}
         </div>
 
         <div>
