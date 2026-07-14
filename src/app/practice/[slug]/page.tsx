@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
+import ProductContentsSection from "@/components/products/ProductContentsSection";
+import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
+import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +33,7 @@ type AuthorRow = {
 
 type PracticeRow = {
   id: string;
+  author_id: string;
   title: string;
   slug: string;
   subtitle: string | null;
@@ -164,33 +168,6 @@ function getAccessBadgeLabel(accessSource: AccessSource | string): string {
   }
 }
 
-function formatPracticeMeta(
-  format: string | null | undefined,
-  durationMinutes: number | null | undefined,
-): string | null {
-  const trimmedFormat = typeof format === "string" ? format.trim() : "";
-  const duration =
-    typeof durationMinutes === "number" &&
-    Number.isFinite(durationMinutes) &&
-    durationMinutes > 0
-      ? `${durationMinutes} мин`
-      : "";
-
-  if (trimmedFormat && duration) {
-    return `${trimmedFormat} · ${duration}`;
-  }
-
-  if (trimmedFormat) {
-    return trimmedFormat;
-  }
-
-  if (duration) {
-    return duration;
-  }
-
-  return null;
-}
-
 function getAuthorName(practice: PracticeRow): string | null {
   const author = normalizeOne(practice.authors);
   const name = author?.name?.trim();
@@ -254,6 +231,7 @@ async function getPracticeBySlug(slug: string): Promise<PracticeQueryResult> {
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       subtitle,
@@ -286,6 +264,25 @@ async function getPracticeBySlug(slug: string): Promise<PracticeQueryResult> {
     practice: (data as PracticeRow | null) ?? null,
     error: false,
   };
+}
+
+async function isAuthorMemberOfPractice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  authorId: string,
+): Promise<boolean> {
+  const { data: membership, error } = await supabase
+    .from("author_members")
+    .select("id")
+    .eq("author_id", authorId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return false;
+  }
+
+  return Boolean(membership?.id);
 }
 
 function PlayIcon() {
@@ -397,8 +394,31 @@ export default async function PracticePage({ params }: PageProps) {
     }
   }
 
+  const authorPreview =
+    practice.status !== "published" &&
+    user !== null &&
+    (await isAuthorMemberOfPractice(supabase, user.id, practice.author_id));
+
+  let publicAudioItems: Awaited<ReturnType<typeof loadPublicAudioItems>> = [];
+
+  try {
+    publicAudioItems = await loadPublicAudioItems(supabase, {
+      practiceId: practice.id,
+      practiceStatus: practice.status,
+      authorPreview,
+    });
+  } catch {
+    return <PracticeErrorState />;
+  }
+
+  const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
   const authorName = getAuthorName(practice);
-  const meta = formatPracticeMeta(practice.format, practice.duration_minutes);
+  const meta = formatProductMeta({
+    format: practice.format,
+    audioCount: publicAudioItems.length,
+    totalDurationSeconds,
+    durationMinutesFallback: practice.duration_minutes,
+  });
   const description = getPracticeDescription(practice.description);
   const gradient = getCoverGradient(practice.slug);
   const symbol = getCoverSymbol(practice.slug);
@@ -486,6 +506,12 @@ export default async function PracticePage({ params }: PageProps) {
               {description}
             </p>
           </section>
+
+          <ProductContentsSection
+            items={publicAudioItems}
+            durationMinutesFallback={practice.duration_minutes}
+            productTitle={practice.title}
+          />
 
           <section className="mt-6 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-5">
             <p className="text-sm text-[#8a7ca9]">Статус доступа</p>

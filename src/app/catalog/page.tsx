@@ -1,5 +1,11 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import { formatProductMeta } from "@/lib/products/duration";
+import {
+  groupAudioSummariesByPractice,
+  loadPublishedAudioSummaries,
+} from "@/lib/products/public-audio-items";
+import { createClient } from "@/lib/supabase/server";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 
 export const dynamic = "force-dynamic";
@@ -16,26 +22,59 @@ type Practice = {
   is_free: boolean | null;
 };
 
-async function getPractices(): Promise<Practice[]> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+type CatalogPractice = Practice & {
+  meta: string | null;
+};
 
-  if (!supabaseUrl || !supabaseKey) return [];
+async function getCatalogPractices(): Promise<CatalogPractice[]> {
+  const supabase = await createClient();
 
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/practices?select=id,title,slug,subtitle,description,format,duration_minutes,price,is_free,status&status=eq.published&order=created_at.desc`,
-    {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      cache: "no-store",
-    },
-  );
+  const { data: practices, error } = await supabase
+    .from("practices")
+    .select(
+      "id, title, slug, subtitle, description, format, duration_minutes, price, is_free",
+    )
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
 
-  if (!res.ok) return [];
+  if (error) {
+    return [];
+  }
 
-  return res.json();
+  const practiceRows = (practices ?? []) as Practice[];
+
+  if (practiceRows.length === 0) {
+    return [];
+  }
+
+  let audioSummaryMap = new Map<
+    string,
+    { audioCount: number; totalDurationSeconds: number }
+  >();
+
+  try {
+    const summaries = await loadPublishedAudioSummaries(
+      supabase,
+      practiceRows.map((practice) => practice.id),
+    );
+    audioSummaryMap = groupAudioSummariesByPractice(summaries);
+  } catch {
+    audioSummaryMap = new Map();
+  }
+
+  return practiceRows.map((practice) => {
+    const audioSummary = audioSummaryMap.get(practice.id);
+
+    return {
+      ...practice,
+      meta: formatProductMeta({
+        format: practice.format,
+        audioCount: audioSummary?.audioCount ?? 0,
+        totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
+        durationMinutesFallback: practice.duration_minutes,
+      }),
+    };
+  });
 }
 
 const categories = [
@@ -55,7 +94,7 @@ function SearchIcon() {
 }
 
 export default async function CatalogPage() {
-  const practices = await getPractices();
+  const practices = await getCatalogPractices();
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
@@ -119,9 +158,9 @@ export default async function CatalogPage() {
                         </p>
                       ) : null}
                       <p className="mt-1 text-sm text-[#7042c5]">Сергей и Зоя</p>
-                      <p className="mt-1 text-sm text-[#7d70a2]">
-                        {practice.format} · {practice.duration_minutes} мин
-                      </p>
+                      {practice.meta ? (
+                        <p className="mt-1 text-sm text-[#7d70a2]">{practice.meta}</p>
+                      ) : null}
                       {practice.description ? (
                         <p className="mt-2 line-clamp-3 text-sm leading-5 text-[#7d70a2]">
                           {practice.description}
