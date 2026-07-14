@@ -1,0 +1,23 @@
+-- Safe template: assign an owner to an author workspace.
+-- Run manually via Supabase SQL editor or psql as postgres/service role.
+-- Replace placeholders before execution. Do not commit real user IDs into Git.
+
+-- Example: make a user the owner of "Сергей Петров"
+--
+-- INSERT INTO public.author_members (author_id, user_id, role)
+-- SELECT a.id, :target_user_id::uuid, 'owner'
+-- FROM public.authors AS a
+-- WHERE a.slug = 'sergey-petrov'
+-- ON CONFLICT (author_id, user_id) DO UPDATE
+-- SET role = EXCLUDED.role,
+--     updated_at = now();
+
+-- Example: one account managing all three workspaces
+--
+-- INSERT INTO public.author_members (author_id, user_id, role)
+-- SELECT a.id, :target_user_id::uuid, 'owner'
+-- FROM public.authors AS a
+-- WHERE a.slug IN ('sergey-petrov', 'zoya-petrova', 'sergey-and-zoya')
+-- ON CONFLICT (author_id, user_id) DO UPDATE
+-- SET role = EXCLUDED.role,
+--     updated_at = now();
