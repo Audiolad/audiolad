@@ -8,6 +8,22 @@ import type {
 } from "./types";
 import { slugifyTitle } from "./utils";
 
+export const AUDIO_ITEM_DETAIL_SELECT = `
+  id,
+  practice_id,
+  title,
+  description,
+  audio_path,
+  duration_seconds,
+  original_file_name,
+  file_size_bytes,
+  position,
+  is_preview,
+  status,
+  created_at,
+  updated_at
+`;
+
 export async function listAuthorProducts(
   supabase: SupabaseClient,
   authorId: string,
@@ -96,21 +112,7 @@ export async function getAuthorProductDetail(
 
   const { data: audioItems, error: audioError } = await supabase
     .from("audio_items")
-    .select(
-      `
-      id,
-      practice_id,
-      title,
-      description,
-      audio_path,
-      duration_seconds,
-      position,
-      is_preview,
-      status,
-      created_at,
-      updated_at
-    `,
-    )
+    .select(AUDIO_ITEM_DETAIL_SELECT)
     .eq("practice_id", practiceId)
     .order("position", { ascending: true });
 
@@ -225,21 +227,7 @@ export async function createDraftProduct(
       position: 1,
       status: "draft",
     })
-    .select(
-      `
-      id,
-      practice_id,
-      title,
-      description,
-      audio_path,
-      duration_seconds,
-      position,
-      is_preview,
-      status,
-      created_at,
-      updated_at
-    `,
-    )
+    .select(AUDIO_ITEM_DETAIL_SELECT)
     .single();
 
   if (audioError || !audioItem?.id) {

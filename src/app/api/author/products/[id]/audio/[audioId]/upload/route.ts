@@ -85,6 +85,8 @@ export async function POST(request: Request, context: RouteContext) {
       .update({
         audio_path: storagePath,
         duration_seconds: durationSeconds,
+        original_file_name: file.name,
+        file_size_bytes: file.size,
         updated_at: now,
       })
       .eq("id", audioId)

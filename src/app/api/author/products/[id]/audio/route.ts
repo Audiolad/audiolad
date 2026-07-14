@@ -7,7 +7,10 @@ import {
   handleAuthorRouteError,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
-import { getAuthorProductDetail } from "@/lib/author-products/products";
+import {
+  AUDIO_ITEM_DETAIL_SELECT,
+  getAuthorProductDetail,
+} from "@/lib/author-products/products";
 import { syncSingleAudioCompatibility } from "@/lib/author-products/publish";
 
 type RouteContext = {
@@ -64,21 +67,7 @@ export async function POST(request: Request, context: RouteContext) {
         position: nextPosition,
         status: "draft",
       })
-      .select(
-        `
-        id,
-        practice_id,
-        title,
-        description,
-        audio_path,
-        duration_seconds,
-        position,
-        is_preview,
-        status,
-        created_at,
-        updated_at
-      `,
-      )
+      .select(AUDIO_ITEM_DETAIL_SELECT)
       .single();
 
     if (insertError || !audioItem?.id) {

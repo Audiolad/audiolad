@@ -208,11 +208,6 @@ function formatFileSize(bytes: number): string {
   })} КБ`;
 }
 
-type AudioFileMeta = {
-  fileName: string;
-  fileSizeBytes: number;
-};
-
 const AUDIO_PREVIEW_SOFT_ERROR =
   "Аудиофайл загружен, но предпрослушивание пока недоступно. Обновите страницу.";
 
@@ -323,6 +318,8 @@ export default function AuthorProductForm({
         description: null,
         audio_path: null,
         duration_seconds: null,
+        original_file_name: null,
+        file_size_bytes: null,
         position: 1,
         is_preview: false,
         status: "draft",
@@ -358,9 +355,6 @@ export default function AuthorProductForm({
   >({});
   const [audioTitleNotices, setAudioTitleNotices] = useState<
     Record<string, string>
-  >({});
-  const [audioFileMeta, setAudioFileMeta] = useState<
-    Record<string, AudioFileMeta>
   >({});
   const [audioPreviewUrls, setAudioPreviewUrls] = useState<
     Record<string, string>
@@ -1194,13 +1188,6 @@ export default function AuthorProductForm({
 
       setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
       setAudioItems(payload.product.audio_items);
-      setAudioFileMeta((current) => ({
-        ...current,
-        [audioId]: {
-          fileName: file.name,
-          fileSizeBytes: file.size,
-        },
-      }));
       setAudioPreviewVersions((current) => ({
         ...current,
         [audioId]: (current[audioId] ?? 0) + 1,
@@ -1277,11 +1264,6 @@ export default function AuthorProductForm({
 
       setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
       setAudioItems(payload.product.audio_items);
-      setAudioFileMeta((current) => {
-        const next = { ...current };
-        delete next[audioId];
-        return next;
-      });
       setAudioPreviewUrls((current) => {
         const next = { ...current };
         delete next[audioId];
@@ -1713,14 +1695,12 @@ export default function AuthorProductForm({
                   </p>
                   {audioItem.audio_path ? (
                     <div className="mt-2 space-y-1">
-                      {audioFileMeta[audioItem.id] ? (
-                        <p>{audioFileMeta[audioItem.id].fileName}</p>
+                      {audioItem.original_file_name ? (
+                        <p>{audioItem.original_file_name}</p>
                       ) : null}
                       <p>{formatDurationLong(audioItem.duration_seconds)}</p>
-                      {audioFileMeta[audioItem.id] ? (
-                        <p>
-                          {formatFileSize(audioFileMeta[audioItem.id].fileSizeBytes)}
-                        </p>
+                      {audioItem.file_size_bytes != null ? (
+                        <p>{formatFileSize(audioItem.file_size_bytes)}</p>
                       ) : null}
                     </div>
                   ) : null}

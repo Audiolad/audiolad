@@ -45,6 +45,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .update({
         audio_path: null,
         duration_seconds: null,
+        original_file_name: null,
+        file_size_bytes: null,
         updated_at: now,
       })
       .eq("id", audioId)

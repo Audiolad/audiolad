@@ -38,6 +38,8 @@ export type AudioItemRow = {
   description: string | null;
   audio_path: string | null;
   duration_seconds: number | null;
+  original_file_name: string | null;
+  file_size_bytes: number | null;
   position: number;
   is_preview: boolean;
   status: string;
