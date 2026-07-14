@@ -32,6 +32,7 @@ type PracticeRow = {
   id: string;
   title: string;
   slug: string;
+  subtitle: string | null;
   description: string | null;
   format: string | null;
   duration_minutes: number | null;
@@ -40,6 +41,7 @@ type PracticeRow = {
   cover_url: string | null;
   audio_url: string | null;
   status: string | null;
+  updated_at: string | null;
   authors: AuthorRow | AuthorRow[] | null;
 };
 
@@ -106,6 +108,25 @@ function getCoverSymbol(slug: string): string {
   }
 
   return fallbackSymbols[stableHash(slug) % fallbackSymbols.length];
+}
+
+function buildCoverDisplayUrl(
+  coverUrl: string | null,
+  updatedAt: string | null,
+): string | null {
+  if (!coverUrl?.trim()) {
+    return null;
+  }
+
+  const trimmed = coverUrl.trim();
+
+  if (!updatedAt?.trim()) {
+    return trimmed;
+  }
+
+  const separator = trimmed.includes("?") ? "&" : "?";
+
+  return `${trimmed}${separator}v=${encodeURIComponent(updatedAt.trim())}`;
 }
 
 function isAccessActive(expiresAt: string | null): boolean {
@@ -235,6 +256,7 @@ async function getPracticeBySlug(slug: string): Promise<PracticeQueryResult> {
       id,
       title,
       slug,
+      subtitle,
       description,
       format,
       duration_minutes,
@@ -243,6 +265,7 @@ async function getPracticeBySlug(slug: string): Promise<PracticeQueryResult> {
       cover_url,
       audio_url,
       status,
+      updated_at,
       authors (
         id,
         name,
@@ -379,6 +402,11 @@ export default async function PracticePage({ params }: PageProps) {
   const description = getPracticeDescription(practice.description);
   const gradient = getCoverGradient(practice.slug);
   const symbol = getCoverSymbol(practice.slug);
+  const coverDisplayUrl = buildCoverDisplayUrl(
+    practice.cover_url,
+    practice.updated_at,
+  );
+  const subtitle = practice.subtitle?.trim() || null;
   const hasActiveAccess = activeEntitlement !== null;
   const primaryStatusLabel =
     activeEntitlement !== null
@@ -401,16 +429,29 @@ export default async function PracticePage({ params }: PageProps) {
 
           <section className="mt-6">
             <div
-              className={`relative aspect-square overflow-hidden rounded-[32px] bg-gradient-to-br ${gradient} shadow-[0_22px_48px_rgba(99,61,163,0.22)]`}
+              className={`relative aspect-square overflow-hidden rounded-[32px] shadow-[0_22px_48px_rgba(99,61,163,0.22)] ${
+                coverDisplayUrl ? "bg-[#f4ecfb]" : `bg-gradient-to-br ${gradient}`
+              }`}
             >
-              <div className="absolute -left-12 -top-10 h-56 w-56 rounded-full bg-white/15 blur-2xl" />
-              <div className="absolute -bottom-14 -right-12 h-60 w-60 rounded-full bg-[#f8d8c9]/30 blur-2xl" />
+              {coverDisplayUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverDisplayUrl}
+                  alt={practice.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <>
+                  <div className="absolute -left-12 -top-10 h-56 w-56 rounded-full bg-white/15 blur-2xl" />
+                  <div className="absolute -bottom-14 -right-12 h-60 w-60 rounded-full bg-[#f8d8c9]/30 blur-2xl" />
 
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex h-40 w-40 items-center justify-center rounded-full border border-white/45 bg-white/10 text-[90px] text-white shadow-[0_0_50px_rgba(255,255,255,0.32)]">
-                  {symbol}
-                </div>
-              </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex h-40 w-40 items-center justify-center rounded-full border border-white/45 bg-white/10 text-[90px] text-white shadow-[0_0_50px_rgba(255,255,255,0.32)]">
+                      {symbol}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -422,6 +463,12 @@ export default async function PracticePage({ params }: PageProps) {
             <h1 className="mt-4 text-[32px] font-semibold leading-[1.15]">
               {practice.title}
             </h1>
+
+            {subtitle ? (
+              <p className="mt-2 line-clamp-2 text-base leading-6 text-[#7d70a2]">
+                {subtitle}
+              </p>
+            ) : null}
 
             {authorName && (
               <p className="mt-3 text-base font-medium text-[#7042c5]">
