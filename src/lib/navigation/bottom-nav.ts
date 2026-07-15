@@ -5,10 +5,11 @@ const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/consent",
   "/payment-and-refund",
   "/requisites",
+  "/auth/sign-in",
+  "/auth/sign-up",
 ]);
 
 const BOTTOM_NAV_HIDDEN_PREFIXES = [
-  "/auth/",
   "/checkout/",
   "/author-dashboard/",
 ] as const;

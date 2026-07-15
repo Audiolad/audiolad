@@ -1,7 +1,9 @@
 "use client";
 
+import BottomNav from "@/components/BottomNav";
 import { getSafeNextPath } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/client";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
@@ -49,7 +51,9 @@ function SignInForm() {
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pb-10 pt-8">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
+      >
         <header className="text-center">
           <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
             АудиоЛад
@@ -127,6 +131,8 @@ function SignInForm() {
             Зарегистрироваться
           </Link>
         </p>
+
+        <BottomNav />
       </div>
     </main>
   );
