@@ -129,9 +129,14 @@ export async function getAuthorProductDetail(
 export async function isPracticeSlugTaken(
   supabase: SupabaseClient,
   slug: string,
+  authorId: string,
   excludePracticeId?: string,
 ): Promise<boolean> {
-  let query = supabase.from("practices").select("id").eq("slug", slug);
+  let query = supabase
+    .from("practices")
+    .select("id")
+    .eq("slug", slug)
+    .eq("author_id", authorId);
 
   if (excludePracticeId) {
     query = query.neq("id", excludePracticeId);
@@ -149,13 +154,16 @@ export async function isPracticeSlugTaken(
 export async function generateUniqueSlug(
   supabase: SupabaseClient,
   title: string,
+  authorId: string,
   excludePracticeId?: string,
 ): Promise<string> {
   const baseSlug = slugifyTitle(title) || "audio-product";
   let candidate = baseSlug;
   let suffix = 2;
 
-  while (await isPracticeSlugTaken(supabase, candidate, excludePracticeId)) {
+  while (
+    await isPracticeSlugTaken(supabase, candidate, authorId, excludePracticeId)
+  ) {
     candidate = `${baseSlug}-${suffix}`;
     suffix += 1;
   }
@@ -179,7 +187,7 @@ export async function createDraftProduct(
 
   const slug =
     input.slug?.trim() ||
-    (await generateUniqueSlug(supabase, title, undefined));
+    (await generateUniqueSlug(supabase, title, input.authorId, undefined));
 
   const { data: practice, error: practiceError } = await supabase
     .from("practices")

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { buildPracticePublicPath } from "@/lib/products/paths";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import {
   formatPriceLabel,
@@ -223,7 +224,10 @@ export default function AuthorDashboardClient({
 
                     {product.status === "published" ? (
                       <Link
-                        href={`/practice/${product.slug}`}
+                        href={buildPracticePublicPath(
+                          selectedAuthor.slug,
+                          product.slug,
+                        )}
                         className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
                       >
                         Открыть

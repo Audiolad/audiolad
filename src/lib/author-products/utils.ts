@@ -78,9 +78,10 @@ export async function ensureUniquePracticeSlug(
   return candidate;
 }
 
-export function buildPracticePublicPath(slug: string): string {
-  return `/practice/${slug}`;
-}
+export {
+  buildListenPath,
+  buildPracticePublicPath,
+} from "@/lib/products/paths";
 
 export function buildAudioItemStoragePath(
   practiceId: string,
@@ -104,6 +105,25 @@ export function getCoverPublicUrl(storagePath: string): string {
   }
 
   return `${baseUrl}/storage/v1/object/public/practice-covers/${storagePath}`;
+}
+
+export function buildCoverDisplayUrl(
+  coverUrl: string | null | undefined,
+  version: string | null | undefined,
+): string | null {
+  if (!coverUrl?.trim()) {
+    return null;
+  }
+
+  const trimmed = coverUrl.trim();
+
+  if (!version?.trim()) {
+    return trimmed;
+  }
+
+  const separator = trimmed.includes("?") ? "&" : "?";
+
+  return `${trimmed}${separator}v=${encodeURIComponent(version.trim())}`;
 }
 
 export function minutesFromSeconds(durationSeconds: number): number {

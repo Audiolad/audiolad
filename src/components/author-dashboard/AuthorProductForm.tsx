@@ -494,7 +494,16 @@ export default function AuthorProductForm({
   }, [practiceId]);
 
   const slugLocked = form.status === "published" || Boolean(form.publishedAt);
-  const publicPath = form.slug ? buildPracticePublicPath(form.slug) : "";
+
+  const selectedAuthor = useMemo(
+    () => authors.find((author) => author.id === form.authorId) ?? null,
+    [authors, form.authorId],
+  );
+
+  const publicPath =
+    form.slug && selectedAuthor?.slug
+      ? buildPracticePublicPath(selectedAuthor.slug, form.slug)
+      : "";
 
   const coverDisplaySrc = useMemo(
     () => buildCoverDisplayUrl(form.coverUrl, form.coverVersion),
@@ -505,11 +514,6 @@ export default function AuthorProductForm({
   const coverPreviewFailed = coverPreviewFailureKey === coverPreviewKey;
 
   const showCoverPreview = Boolean(coverDisplaySrc) && !coverPreviewFailed;
-
-  const selectedAuthor = useMemo(
-    () => authors.find((author) => author.id === form.authorId) ?? null,
-    [authors, form.authorId],
-  );
 
   async function ensurePracticeId(): Promise<string | null> {
     if (practiceId) {
@@ -1842,9 +1846,9 @@ export default function AuthorProductForm({
           </button>
         )}
 
-        {form.status === "published" && form.slug ? (
+        {form.status === "published" && publicPath ? (
           <Link
-            href={`/practice/${form.slug}`}
+            href={publicPath}
             className="rounded-[22px] border border-[#c6afe6] px-5 py-4 text-center font-semibold text-[#7042c5]"
           >
             Открыть публичную карточку

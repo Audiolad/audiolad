@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import { buildListenPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -244,6 +245,13 @@ type LibraryCardProps = {
   index: number;
 };
 
+function getAuthorSlug(practice: PracticeRow | null): string | null {
+  const author = normalizeOne(practice?.authors ?? null);
+  const slug = author?.slug?.trim();
+
+  return slug || null;
+}
+
 function LibraryCard({ item, index }: LibraryCardProps) {
   const badge = getAccessBadgeLabel(item.accessSource);
   const gradient = coverGradients[index % coverGradients.length];
@@ -259,8 +267,13 @@ function LibraryCard({ item, index }: LibraryCardProps) {
   const symbol = getCoverSymbol(practice?.slug, index);
   const audioReady = hasAudioReady(practice?.audio_url);
   const audioStatus = getAudioStatusLabel(practice?.audio_url);
+  const authorSlug = getAuthorSlug(practice);
   const listenHref =
-    practice?.slug && audioReady ? `/listen/${practice.slug}` : null;
+    practice?.slug && audioReady
+      ? authorSlug
+        ? buildListenPath(authorSlug, practice.slug)
+        : `/listen/${practice.slug}`
+      : null;
 
   return (
     <article className="flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">

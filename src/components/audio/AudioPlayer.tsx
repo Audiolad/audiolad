@@ -5,7 +5,8 @@ import type { ListenProgressEntry, ListenTrack } from "@/lib/listen/types";
 
 type AudioPlayerProps = {
   practiceId: string;
-  slug: string;
+  authorSlug: string;
+  productSlug: string;
   practiceTitle: string;
   authorName: string;
   format: string | null;
@@ -162,7 +163,8 @@ function ControlCaption({
 
 export default function AudioPlayer({
   practiceId,
-  slug,
+  authorSlug,
+  productSlug,
   practiceTitle,
   authorName,
   format,
@@ -202,7 +204,8 @@ export default function AudioPlayer({
     handleStartOver,
     isTrackDone,
   } = useSequentialPlayer({
-    slug,
+    authorSlug,
+    productSlug,
     practiceId,
     tracks,
     initialProgress,

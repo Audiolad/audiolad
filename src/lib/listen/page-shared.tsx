@@ -6,32 +6,16 @@ import AudioPlayer from "@/components/audio/AudioPlayer";
 import { resolveListenAccess } from "@/lib/listen/access";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import type { ListenTrack } from "@/lib/listen/types";
+import { resolveProductAccess } from "@/lib/products/access";
+import {
+  getPracticeAuthorSlug,
+  type PublicPracticeRow,
+} from "@/lib/products/lookup";
+import { buildPracticePublicPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 
-export const dynamic = "force-dynamic";
+type PracticeRow = PublicPracticeRow;
 
-type PageProps = {
-  params: Promise<{ slug: string }>;
-};
-
-type AuthorRow = {
-  id: string;
-  name: string;
-  slug: string;
-};
-
-type PracticeRow = {
-  id: string;
-  author_id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  format: string | null;
-  duration_minutes: number | null;
-  audio_url: string | null;
-  status: string | null;
-  authors: AuthorRow | AuthorRow[] | null;
-};
 
 type AudioItemRow = {
   id: string;
@@ -165,7 +149,9 @@ async function loadListenTracks(
 ): Promise<ListenTrack[]> {
   let query = supabase
     .from("audio_items")
-    .select("id, title, description, position, duration_seconds, audio_path, status")
+    .select(
+      "id, title, description, position, duration_seconds, audio_path, status",
+    )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
 
@@ -215,23 +201,17 @@ async function loadListenTracks(
   ];
 }
 
-export default async function ListenPage({ params }: PageProps) {
-  const { slug } = await params;
-  const practiceHref = `/practice/${slug}`;
-  const signInHref = `/auth/sign-in?${new URLSearchParams({
-    next: `/listen/${slug}`,
-  }).toString()}`;
-
+export async function renderListenPage(
+  authorSlug: string,
+  productSlug: string,
+  options?: { accessDenied?: boolean },
+) {
+  const practiceHref = buildPracticePublicPath(authorSlug, productSlug);
   const supabase = await createClient();
 
   const {
     data: { user },
-    error: authError,
   } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    redirect(signInHref);
-  }
 
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
@@ -245,15 +225,19 @@ export default async function ListenPage({ params }: PageProps) {
       format,
       duration_minutes,
       audio_url,
+      cover_url,
+      updated_at,
       status,
-      authors (
+      is_free,
+      authors!inner (
         id,
         name,
         slug
       )
     `,
     )
-    .eq("slug", slug)
+    .eq("slug", productSlug)
+    .eq("authors.slug", authorSlug)
     .maybeSingle();
 
   if (practiceError) {
@@ -272,11 +256,47 @@ export default async function ListenPage({ params }: PageProps) {
   }
 
   const practiceRow = practice as PracticeRow;
+  const resolvedAuthorSlug = getPracticeAuthorSlug(practiceRow) ?? authorSlug;
+
+  let productAccess;
+
+  try {
+    productAccess = await resolveProductAccess(
+      supabase,
+      practiceRow,
+      user?.id ?? null,
+    );
+  } catch {
+    return (
+      <ListenMessageState
+        title="Не удалось проверить доступ"
+        description="Попробуйте открыть практику ещё раз."
+        backHref={practiceHref}
+        backLabel="К странице практики"
+      />
+    );
+  }
+
+  if (!productAccess.canListen || options?.accessDenied) {
+    const deniedHref = `${practiceHref}?listen=required`;
+    return (
+      <ListenMessageState
+        title="Доступ к прослушиванию не открыт"
+        description="Для прослушивания необходимо приобрести доступ."
+        backHref={deniedHref}
+        backLabel="К странице практики"
+      />
+    );
+  }
 
   let access;
 
   try {
-    access = await resolveListenAccess(supabase, user.id, practiceRow);
+    access = await resolveListenAccess(
+      supabase,
+      user?.id ?? null,
+      practiceRow,
+    );
   } catch {
     return (
       <ListenMessageState
@@ -289,14 +309,7 @@ export default async function ListenPage({ params }: PageProps) {
   }
 
   if (!access) {
-    return (
-      <ListenMessageState
-        title="Доступ к прослушиванию не открыт"
-        description="Откройте страницу практики, чтобы посмотреть доступные варианты."
-        backHref={practiceHref}
-        backLabel="К странице практики"
-      />
-    );
+    redirect(`${practiceHref}?listen=required`);
   }
 
   if (access.mode === "entitled" && practiceRow.status !== "published") {
@@ -338,14 +351,16 @@ export default async function ListenPage({ params }: PageProps) {
 
   let initialProgress: Awaited<ReturnType<typeof listPracticeProgress>> = [];
 
-  try {
-    initialProgress = await listPracticeProgress(
-      supabase,
-      user.id,
-      practiceRow.id,
-    );
-  } catch {
-    initialProgress = [];
+  if (user) {
+    try {
+      initialProgress = await listPracticeProgress(
+        supabase,
+        user.id,
+        practiceRow.id,
+      );
+    } catch {
+      initialProgress = [];
+    }
   }
 
   const authorName = getAuthorName(practiceRow.authors);
@@ -364,7 +379,8 @@ export default async function ListenPage({ params }: PageProps) {
 
       <AudioPlayer
         practiceId={practiceRow.id}
-        slug={practiceRow.slug}
+        authorSlug={resolvedAuthorSlug}
+        productSlug={practiceRow.slug}
         practiceTitle={practiceRow.title}
         authorName={authorName}
         format={trimmedFormat}

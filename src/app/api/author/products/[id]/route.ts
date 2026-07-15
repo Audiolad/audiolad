@@ -139,28 +139,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if ("slug" in body && typeof body.slug === "string") {
-      if (practice.status === "published" || practice.published_at) {
-        return NextResponse.json({ error: "slug_locked" }, { status: 400 });
+      if (practice.status !== "published" && !practice.published_at) {
+        const requestedSlug = slugifyTitle(body.slug) || slugifyTitle(String(updates.title ?? ""));
+
+        if (!requestedSlug) {
+          return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+        }
+
+        if (
+          await isPracticeSlugTaken(
+            supabase,
+            requestedSlug,
+            practice.author_id,
+            id,
+          )
+        ) {
+          return NextResponse.json({ error: "slug_taken" }, { status: 409 });
+        }
+
+        updates.slug = requestedSlug;
       }
-
-      const requestedSlug = slugifyTitle(body.slug) || slugifyTitle(String(updates.title ?? ""));
-
-      if (!requestedSlug) {
-        return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-      }
-
-      if (await isPracticeSlugTaken(supabase, requestedSlug, id)) {
-        return NextResponse.json({ error: "slug_taken" }, { status: 409 });
-      }
-
-      updates.slug = requestedSlug;
     } else if (
       "title" in body &&
       typeof body.title === "string" &&
       practice.status !== "published" &&
       !practice.published_at
     ) {
-      updates.slug = await generateUniqueSlug(supabase, body.title.trim(), id);
+      updates.slug = await generateUniqueSlug(
+        supabase,
+        body.title.trim(),
+        practice.author_id,
+        id,
+      );
     }
 
     if (
@@ -168,26 +178,24 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.author_id === "string" &&
       body.author_id.trim()
     ) {
-      if (practice.status === "published" || practice.published_at) {
-        return NextResponse.json({ error: "author_locked" }, { status: 400 });
+      if (practice.status !== "published" && !practice.published_at) {
+        const nextAuthorId = body.author_id.trim();
+        const { data: membership } = await supabase
+          .from("author_members")
+          .select("role")
+          .eq("author_id", nextAuthorId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (
+          !membership ||
+          (membership.role !== "owner" && membership.role !== "editor")
+        ) {
+          return NextResponse.json({ error: "forbidden" }, { status: 403 });
+        }
+
+        updates.author_id = nextAuthorId;
       }
-
-      const nextAuthorId = body.author_id.trim();
-      const { data: membership } = await supabase
-        .from("author_members")
-        .select("role")
-        .eq("author_id", nextAuthorId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (
-        !membership ||
-        (membership.role !== "owner" && membership.role !== "editor")
-      ) {
-        return NextResponse.json({ error: "forbidden" }, { status: 403 });
-      }
-
-      updates.author_id = nextAuthorId;
     }
 
     const { error: updateError } = await supabase

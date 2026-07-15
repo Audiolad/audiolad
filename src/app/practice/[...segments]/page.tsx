@@ -1,62 +1,35 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
+import BuyPracticeButton from "@/components/BuyPracticeButton";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
+import {
+  buildPracticeAccessPresentation,
+  buildAuthorDashboardEditPath,
+} from "@/lib/products/practice-access-ui";
+import { resolveProductAccess } from "@/lib/products/access";
+import {
+  getPracticeAuthorSlug,
+  getPracticeByAuthorAndSlug,
+  resolveLegacyPracticePath,
+  type PublicPracticeRow,
+} from "@/lib/products/lookup";
+import {
+  buildPracticeCanonicalUrl,
+  buildPracticePublicPath,
+} from "@/lib/products/paths";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  params: Promise<{ slug: string }>;
-};
-
-type AccessSource =
-  | "starter"
-  | "free_claim"
-  | "purchase"
-  | "gift"
-  | "subscription"
-  | "program"
-  | "admin";
-
-type AuthorRow = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  avatar_url: string | null;
-};
-
-type PracticeRow = {
-  id: string;
-  author_id: string;
-  title: string;
-  slug: string;
-  subtitle: string | null;
-  description: string | null;
-  format: string | null;
-  duration_minutes: number | null;
-  price: number | null;
-  is_free: boolean | null;
-  cover_url: string | null;
-  audio_url: string | null;
-  status: string | null;
-  updated_at: string | null;
-  authors: AuthorRow | AuthorRow[] | null;
-};
-
-type EntitlementRow = {
-  access_source: AccessSource | string;
-  expires_at: string | null;
-};
-
-type PracticeQueryResult = {
-  practice: PracticeRow | null;
-  error: boolean;
+  params: Promise<{ segments: string[] }>;
+  searchParams: Promise<{ listen?: string }>;
 };
 
 const coverGradients = [
@@ -133,42 +106,7 @@ function buildCoverDisplayUrl(
   return `${trimmed}${separator}v=${encodeURIComponent(updatedAt.trim())}`;
 }
 
-function isAccessActive(expiresAt: string | null): boolean {
-  if (expiresAt === null) {
-    return true;
-  }
-
-  const expiresDate = new Date(expiresAt);
-
-  if (Number.isNaN(expiresDate.getTime())) {
-    return false;
-  }
-
-  return expiresDate > new Date();
-}
-
-function getAccessBadgeLabel(accessSource: AccessSource | string): string {
-  switch (accessSource) {
-    case "starter":
-      return "Стартовая практика";
-    case "free_claim":
-      return "Получено бесплатно";
-    case "purchase":
-      return "Куплено";
-    case "gift":
-      return "Подарок";
-    case "subscription":
-      return "По подписке";
-    case "program":
-      return "В программе";
-    case "admin":
-      return "Доступ открыт";
-    default:
-      return "Доступ открыт";
-  }
-}
-
-function getAuthorName(practice: PracticeRow): string | null {
+function getAuthorName(practice: PublicPracticeRow): string | null {
   const author = normalizeOne(practice.authors);
   const name = author?.name?.trim();
 
@@ -179,34 +117,6 @@ function getPracticeDescription(description: string | null): string {
   const trimmed = typeof description === "string" ? description.trim() : "";
 
   return trimmed || PAGE_DESCRIPTION_FALLBACK;
-}
-
-function formatPriceLabel(price: number | null, isFree: boolean | null): string {
-  if (isFree === true) {
-    return "Бесплатная практика";
-  }
-
-  if (
-    typeof price === "number" &&
-    Number.isFinite(price) &&
-    price >= 0
-  ) {
-    return `${price} ₽`;
-  }
-
-  return "Стоимость уточняется";
-}
-
-function hasAudioReady(audioUrl: string | null | undefined): boolean {
-  return typeof audioUrl === "string" && audioUrl.trim().length > 0;
-}
-
-function getAudioButtonLabel(audioUrl: string | null | undefined): string {
-  if (hasAudioReady(audioUrl)) {
-    return "Аудио готовится к запуску";
-  }
-
-  return "Аудио скоро появится";
 }
 
 function truncateDescription(text: string, maxLength = 160): string {
@@ -221,68 +131,6 @@ function truncateDescription(text: string, maxLength = 160): string {
 
 function disabledButtonClasses(): string {
   return "disabled:cursor-not-allowed disabled:opacity-60";
-}
-
-async function getPracticeBySlug(slug: string): Promise<PracticeQueryResult> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("practices")
-    .select(
-      `
-      id,
-      author_id,
-      title,
-      slug,
-      subtitle,
-      description,
-      format,
-      duration_minutes,
-      price,
-      is_free,
-      cover_url,
-      audio_url,
-      status,
-      updated_at,
-      authors (
-        id,
-        name,
-        slug,
-        description,
-        avatar_url
-      )
-    `,
-    )
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) {
-    return { practice: null, error: true };
-  }
-
-  return {
-    practice: (data as PracticeRow | null) ?? null,
-    error: false,
-  };
-}
-
-async function isAuthorMemberOfPractice(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  authorId: string,
-): Promise<boolean> {
-  const { data: membership, error } = await supabase
-    .from("author_members")
-    .select("id")
-    .eq("author_id", authorId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    return false;
-  }
-
-  return Boolean(membership?.id);
 }
 
 function PlayIcon() {
@@ -327,11 +175,76 @@ function PracticeErrorState() {
   );
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const { practice, error } = await getPracticeBySlug(slug);
+async function resolvePracticeRoute(segments: string[]) {
+  if (segments.length === 2) {
+    return {
+      authorSlug: segments[0],
+      productSlug: segments[1],
+    };
+  }
+
+  if (segments.length === 1) {
+    const supabase = await createClient();
+
+    const resolved = await resolveLegacyPracticePath(supabase, segments[0]);
+
+    if (!resolved) {
+      return null;
+    }
+
+    permanentRedirect(
+      buildPracticePublicPath(resolved.authorSlug, resolved.productSlug),
+    );
+  }
+
+  return null;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { segments } = await params;
+
+  if (segments.length === 1) {
+    const supabase = await createClient();
+
+    try {
+      const resolved = await resolveLegacyPracticePath(supabase, segments[0]);
+
+      if (!resolved) {
+        return {
+          robots: { index: false, follow: false },
+        };
+      }
+
+      return {
+        alternates: {
+          canonical: buildPracticeCanonicalUrl(
+            resolved.authorSlug,
+            resolved.productSlug,
+          ),
+        },
+        robots: { index: false, follow: true },
+      };
+    } catch {
+      return {
+        robots: { index: false, follow: false },
+      };
+    }
+  }
+
+  if (segments.length !== 2) {
+    return {
+      title: "Практика – АудиоЛад",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const [authorSlug, productSlug] = segments;
+  const supabase = await createClient();
+  const { practice, error } = await getPracticeByAuthorAndSlug(
+    supabase,
+    authorSlug,
+    productSlug,
+  );
 
   if (error || !practice) {
     return {
@@ -354,14 +267,30 @@ export async function generateMetadata({
       ? truncateDescription(trimmedDescription)
       : METADATA_DESCRIPTION_FALLBACK,
     alternates: {
-      canonical: `https://audiolad.ru/practice/${slug}`,
+      canonical: buildPracticeCanonicalUrl(authorSlug, productSlug),
+    },
+    openGraph: {
+      url: buildPracticeCanonicalUrl(authorSlug, productSlug),
     },
   };
 }
 
-export default async function PracticePage({ params }: PageProps) {
-  const { slug } = await params;
-  const { practice, error } = await getPracticeBySlug(slug);
+export default async function PracticePage({ params, searchParams }: PageProps) {
+  const { segments } = await params;
+  const { listen: listenParam } = await searchParams;
+  const route = await resolvePracticeRoute(segments);
+
+  if (!route) {
+    notFound();
+  }
+
+  const { authorSlug, productSlug } = route;
+  const supabase = await createClient();
+  const { practice, error } = await getPracticeByAuthorAndSlug(
+    supabase,
+    authorSlug,
+    productSlug,
+  );
 
   if (error) {
     return <PracticeErrorState />;
@@ -371,33 +300,22 @@ export default async function PracticePage({ params }: PageProps) {
     notFound();
   }
 
-  const supabase = await createClient();
+  const resolvedAuthorSlug = getPracticeAuthorSlug(practice) ?? authorSlug;
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let activeEntitlement: EntitlementRow | null = null;
+  let access;
 
-  if (user) {
-    const { data: entitlement } = await supabase
-      .from("user_practices")
-      .select("access_source, expires_at")
-      .eq("practice_id", practice.id)
-      .maybeSingle();
-
-    if (
-      entitlement &&
-      isAccessActive((entitlement as EntitlementRow).expires_at)
-    ) {
-      activeEntitlement = entitlement as EntitlementRow;
-    }
+  try {
+    access = await resolveProductAccess(supabase, practice, user?.id ?? null);
+  } catch {
+    return <PracticeErrorState />;
   }
 
   const authorPreview =
-    practice.status !== "published" &&
-    user !== null &&
-    (await isAuthorMemberOfPractice(supabase, user.id, practice.author_id));
+    access.reason === "author_owner" && practice.status !== "published";
 
   let publicAudioItems: Awaited<ReturnType<typeof loadPublicAudioItems>> = [];
 
@@ -410,6 +328,13 @@ export default async function PracticePage({ params }: PageProps) {
   } catch {
     return <PracticeErrorState />;
   }
+
+  const presentation = buildPracticeAccessPresentation({
+    access,
+    practice,
+    authorSlug: resolvedAuthorSlug,
+    paymentsConfigured: isPaymentsConfigured(),
+  });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
   const authorName = getAuthorName(practice);
@@ -427,14 +352,11 @@ export default async function PracticePage({ params }: PageProps) {
     practice.updated_at,
   );
   const subtitle = practice.subtitle?.trim() || null;
-  const hasActiveAccess = activeEntitlement !== null;
-  const primaryStatusLabel =
-    activeEntitlement !== null
-      ? getAccessBadgeLabel(activeEntitlement.access_source)
-      : formatPriceLabel(practice.price, practice.is_free);
-  const audioReady = hasAudioReady(practice.audio_url);
-  const audioLabel = getAudioButtonLabel(practice.audio_url);
-  const listenHref = `/listen/${practice.slug}`;
+  const editHref = buildAuthorDashboardEditPath(practice.id);
+  const listenDeniedMessage =
+    listenParam === "required"
+      ? "Для прослушивания необходимо приобрести доступ."
+      : null;
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
@@ -446,6 +368,42 @@ export default async function PracticePage({ params }: PageProps) {
           >
             ← Назад в каталог
           </Link>
+
+          {presentation.showAuthorPreview ? (
+            <section className="mt-4 rounded-[20px] border border-[#d9c8f4] bg-[#f8f3ff] px-4 py-4">
+              <p className="text-sm font-semibold text-[#5f3f9d]">
+                Предпросмотр для автора
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
+                Так эту страницу увидят слушатели
+              </p>
+              <Link
+                href={editHref}
+                className="mt-3 inline-flex text-sm font-semibold text-[#7042c5]"
+              >
+                Редактировать продукт
+              </Link>
+            </section>
+          ) : null}
+
+          {presentation.showAdminPreview ? (
+            <section className="mt-4 rounded-[20px] border border-[#d9c8f4] bg-[#f8f3ff] px-4 py-4">
+              <p className="text-sm font-semibold text-[#5f3f9d]">
+                Технический просмотр
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
+                Доступ открыт для сотрудника платформы
+              </p>
+            </section>
+          ) : null}
+
+          {listenDeniedMessage ? (
+            <section className="mt-4 rounded-[20px] border border-[#f2d4d8] bg-[#fff7f8] px-4 py-4">
+              <p className="text-sm leading-6 text-[#8d4d57]">
+                {listenDeniedMessage}
+              </p>
+            </section>
+          ) : null}
 
           <section className="mt-6">
             <div
@@ -477,15 +435,21 @@ export default async function PracticePage({ params }: PageProps) {
 
           <section className="mt-6">
             <span className="inline-flex rounded-full bg-[#f4ecfb] px-4 py-2 text-xs font-semibold text-[#7042c5]">
-              {primaryStatusLabel}
+              {presentation.statusBadge}
             </span>
+
+            {presentation.statusDetail ? (
+              <p className="mt-2 text-sm text-[#7d70a2]">
+                {presentation.statusDetail}
+              </p>
+            ) : null}
 
             <h1 className="mt-4 text-[32px] font-semibold leading-[1.15]">
               {practice.title}
             </h1>
 
             {subtitle ? (
-              <p className="mt-2 line-clamp-2 text-base leading-6 text-[#7d70a2]">
+              <p className="mt-2 line-clamp-3 text-base leading-6 text-[#7d70a2]">
                 {subtitle}
               </p>
             ) : null}
@@ -502,7 +466,7 @@ export default async function PracticePage({ params }: PageProps) {
           </section>
 
           <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="text-[15px] leading-7 text-[#65577f]">
+            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
               {description}
             </p>
           </section>
@@ -513,40 +477,39 @@ export default async function PracticePage({ params }: PageProps) {
             productTitle={practice.title}
           />
 
-          <section className="mt-6 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-5">
-            <p className="text-sm text-[#8a7ca9]">Статус доступа</p>
-
-            {activeEntitlement !== null ? (
-              <div className="mt-2">
-                <p className="text-[18px] font-semibold text-[#7042c5]">
-                  Доступ открыт
-                </p>
-                <p className="mt-1 text-sm text-[#7d70a2]">
-                  {getAccessBadgeLabel(activeEntitlement.access_source)}
-                </p>
-              </div>
-            ) : practice.is_free === true ? (
-              <p className="mt-2 text-[18px] font-semibold text-[#7042c5]">
-                Бесплатная практика
-              </p>
-            ) : (
-              <p className="mt-2 text-[18px] font-semibold text-[#7042c5]">
-                {formatPriceLabel(practice.price, practice.is_free)}
-              </p>
-            )}
-          </section>
-
-          <section className="mt-4">
-            {audioReady ? (
+          <section className="mt-6">
+            {presentation.primaryAction.kind === "listen" ||
+            presentation.primaryAction.kind === "author_listen" ? (
               <Link
-                href={listenHref}
+                href={presentation.primaryAction.href}
                 className="flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]"
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
                   <PlayIcon />
                 </span>
-                Слушать
+                {presentation.primaryAction.label}
               </Link>
+            ) : presentation.primaryAction.kind === "buy" ? (
+              presentation.primaryAction.disabled ? (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className={`w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white opacity-80 ${disabledButtonClasses()}`}
+                >
+                  {presentation.primaryAction.label}
+                </button>
+              ) : (
+                <BuyPracticeButton
+                  practiceSlug={presentation.primaryAction.practiceSlug}
+                  label={presentation.primaryAction.label}
+                  className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white"
+                  signInReturnPath={buildPracticePublicPath(
+                    resolvedAuthorSlug,
+                    practice.slug,
+                  )}
+                />
+              )
             ) : (
               <button
                 type="button"
@@ -557,41 +520,28 @@ export default async function PracticePage({ params }: PageProps) {
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
                   <PlayIcon />
                 </span>
-                {audioLabel}
+                {presentation.primaryAction.label}
               </button>
             )}
           </section>
 
-          {!hasActiveAccess && (
+          {presentation.showSecondaryLibraryHint ? (
             <section className="mt-4">
-              {practice.is_free === true ? (
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  className={`w-full rounded-[22px] border border-[#e2d7f2] bg-[#faf6ff] px-5 py-4 text-sm font-semibold text-[#7d70a2] ${disabledButtonClasses()}`}
-                >
-                  Добавление в библиотеку скоро появится
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  aria-disabled="true"
-                  className={`w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white opacity-80 ${disabledButtonClasses()}`}
-                >
-                  Покупка скоро появится
-                </button>
-              )}
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className={`w-full rounded-[22px] border border-[#e2d7f2] bg-[#faf6ff] px-5 py-4 text-sm font-semibold text-[#7d70a2] ${disabledButtonClasses()}`}
+              >
+                Добавление в библиотеку скоро появится
+              </button>
             </section>
-          )}
+          ) : null}
 
           <section className="mt-6 rounded-[24px] border border-[#eadff8] bg-white p-5">
             <h2 className="text-[17px] font-semibold">Перед прослушиванием</h2>
-            <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-              Выберите спокойное и безопасное место для прослушивания. Не
-              включайте практику во время управления транспортом или работы,
-              требующей постоянной концентрации.
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#7d70a2]">
+              {`Выберите спокойное и безопасное место для прослушивания.\n\nНе включайте практику во время управления транспортом или работы, требующей постоянной концентрации.`}
             </p>
           </section>
         </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import { buildPracticePublicPath } from "@/lib/products/paths";
 import { formatProductMeta } from "@/lib/products/duration";
 import {
   groupAudioSummariesByPractice,
@@ -20,10 +21,13 @@ type Practice = {
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
+  authors: { name: string; slug: string } | { name: string; slug: string }[] | null;
 };
 
 type CatalogPractice = Practice & {
   meta: string | null;
+  authorName: string | null;
+  authorSlug: string | null;
 };
 
 async function getCatalogPractices(): Promise<CatalogPractice[]> {
@@ -32,7 +36,21 @@ async function getCatalogPractices(): Promise<CatalogPractice[]> {
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, subtitle, description, format, duration_minutes, price, is_free",
+      `
+      id,
+      title,
+      slug,
+      subtitle,
+      description,
+      format,
+      duration_minutes,
+      price,
+      is_free,
+      authors (
+        name,
+        slug
+      )
+    `,
     )
     .eq("status", "published")
     .order("created_at", { ascending: false });
@@ -64,9 +82,14 @@ async function getCatalogPractices(): Promise<CatalogPractice[]> {
 
   return practiceRows.map((practice) => {
     const audioSummary = audioSummaryMap.get(practice.id);
+    const author = Array.isArray(practice.authors)
+      ? practice.authors[0]
+      : practice.authors;
 
     return {
       ...practice,
+      authorName: author?.name?.trim() ?? null,
+      authorSlug: author?.slug?.trim() ?? null,
       meta: formatProductMeta({
         format: practice.format,
         audioCount: audioSummary?.audioCount ?? 0,
@@ -140,7 +163,14 @@ export default async function CatalogPage() {
               {practices.map((practice) => (
                 <Link
                   key={practice.id}
-                  href={`/practice/${practice.slug}`}
+                  href={
+                    practice.authorSlug
+                      ? buildPracticePublicPath(
+                          practice.authorSlug,
+                          practice.slug,
+                        )
+                      : `/practice/${practice.slug}`
+                  }
                   className="block rounded-[24px] border border-[#e8def5] bg-white p-4 shadow-sm"
                 >
                   <div className="flex gap-4">
@@ -157,12 +187,14 @@ export default async function CatalogPage() {
                           {practice.subtitle}
                         </p>
                       ) : null}
-                      <p className="mt-1 text-sm text-[#7042c5]">Сергей и Зоя</p>
+                      <p className="mt-1 text-sm text-[#7042c5]">
+                        {practice.authorName ?? "Автор"}
+                      </p>
                       {practice.meta ? (
                         <p className="mt-1 text-sm text-[#7d70a2]">{practice.meta}</p>
                       ) : null}
                       {practice.description ? (
-                        <p className="mt-2 line-clamp-3 text-sm leading-5 text-[#7d70a2]">
+                        <p className="mt-2 line-clamp-3 whitespace-pre-line text-sm leading-5 text-[#7d70a2]">
                           {practice.description}
                         </p>
                       ) : null}

@@ -38,8 +38,11 @@ function drainPendingSave(
   saver(next.audioItemId, next.positionSeconds, next.completed, { force: true });
 }
 
+import { buildListenApiBase } from "@/lib/products/paths";
+
 type UseSequentialPlayerOptions = {
-  slug: string;
+  authorSlug: string;
+  productSlug: string;
   practiceId: string;
   tracks: ListenTrack[];
   initialProgress: ListenProgressEntry[];
@@ -55,7 +58,8 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function useSequentialPlayer({
-  slug,
+  authorSlug,
+  productSlug,
   practiceId,
   tracks,
   initialProgress,
@@ -122,7 +126,8 @@ export function useSequentialPlayer({
     [],
   );
 
-  const slugRef = useRef(slug);
+  const listenApiBase = buildListenApiBase(authorSlug, productSlug);
+  const listenApiBaseRef = useRef(listenApiBase);
   const saveProgressRef = useRef<
     (
       audioItemId: string,
@@ -133,8 +138,8 @@ export function useSequentialPlayer({
   >(async () => {});
 
   useEffect(() => {
-    slugRef.current = slug;
-  }, [slug]);
+    listenApiBaseRef.current = listenApiBase;
+  }, [listenApiBase]);
 
   const saveProgress = useCallback(
     async (
@@ -173,7 +178,7 @@ export function useSequentialPlayer({
       saveInFlightRef.current = true;
 
       try {
-        const response = await fetch(`/api/listen/${slugRef.current}/progress`, {
+        const response = await fetch(`${listenApiBaseRef.current}/progress`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -234,7 +239,7 @@ export function useSequentialPlayer({
 
       try {
         const response = await fetch(
-          `/api/listen/${slug}/audio/${audioItemId}`,
+          `${listenApiBase}/audio/${audioItemId}`,
         );
 
         if (requestId !== urlRequestRef.current) {
@@ -271,7 +276,7 @@ export function useSequentialPlayer({
         setIsLoading(false);
       }
     },
-    [slug],
+    [listenApiBase],
   );
 
   const switchToTrack = useCallback(
@@ -658,7 +663,7 @@ export function useSequentialPlayer({
 
   const handleStartOver = async () => {
     try {
-      const response = await fetch(`/api/listen/${slug}/progress`, {
+      const response = await fetch(`${listenApiBase}/progress`, {
         method: "DELETE",
       });
 

@@ -1,61 +1,34 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  resolveProductAccess,
+  type ProductAccessResult,
+} from "@/lib/products/access";
 import type { ListenAccess } from "./types";
 
 type PracticeAccessRow = {
   id: string;
   author_id: string;
+  is_free: boolean | null;
   status: string | null;
 };
 
-function isAccessActive(expiresAt: string | null): boolean {
-  if (expiresAt === null) {
-    return true;
-  }
-
-  const expiresDate = new Date(expiresAt);
-
-  if (Number.isNaN(expiresDate.getTime())) {
-    return false;
-  }
-
-  return expiresDate > new Date();
-}
-
 export async function resolveListenAccess(
   supabase: SupabaseClient,
-  userId: string,
+  userId: string | null,
   practice: PracticeAccessRow,
 ): Promise<ListenAccess | null> {
-  const { data: entitlement, error: entitlementError } = await supabase
-    .from("user_practices")
-    .select("expires_at")
-    .eq("user_id", userId)
-    .eq("practice_id", practice.id)
-    .maybeSingle();
+  const access = await resolveProductAccess(supabase, practice, userId);
 
-  if (entitlementError) {
-    throw new Error("entitlement_lookup_failed");
+  if (!access.canListen) {
+    return null;
   }
 
-  if (entitlement && isAccessActive(entitlement.expires_at)) {
-    return { mode: "entitled" };
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("author_members")
-    .select("id")
-    .eq("author_id", practice.author_id)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (membershipError) {
-    throw new Error("author_membership_lookup_failed");
-  }
-
-  if (membership?.id) {
+  if (access.reason === "author_owner") {
     return { mode: "author_preview" };
   }
 
-  return null;
+  return { mode: "entitled" };
 }
+
+export type { ProductAccessResult };
