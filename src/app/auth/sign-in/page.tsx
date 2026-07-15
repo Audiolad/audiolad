@@ -1,7 +1,7 @@
 "use client";
 
 import BottomNav from "@/components/BottomNav";
-import { getSafeNextPath } from "@/lib/auth/routes";
+import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
@@ -127,7 +127,10 @@ function SignInForm() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Нет аккаунта?{" "}
-          <Link href="/auth/sign-up" className="font-semibold text-[#7042c5]">
+          <Link
+            href={buildAuthRouteHref("/auth/sign-up", searchParams.get("next"))}
+            className="font-semibold text-[#7042c5]"
+          >
             Зарегистрироваться
           </Link>
         </p>

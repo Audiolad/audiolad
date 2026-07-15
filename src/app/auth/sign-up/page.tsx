@@ -1,14 +1,20 @@
 "use client";
 
 import BottomNav from "@/components/BottomNav";
+import {
+  SIGN_UP_DEFAULT_REDIRECT,
+  buildAuthRouteHref,
+  getSafeNextPath,
+} from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,6 +38,8 @@ export default function SignUpPage() {
     setIsError(false);
 
     const supabase = createClient();
+    const nextParam = searchParams.get("next");
+    const destination = getSafeNextPath(nextParam, SIGN_UP_DEFAULT_REDIRECT);
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -53,12 +61,14 @@ export default function SignUpPage() {
     }
 
     if (data.session) {
-      router.replace("/my-practices");
+      router.replace(destination);
       router.refresh();
       return;
     }
 
-    router.replace("/auth/sign-in?registered=1");
+    router.replace(
+      buildAuthRouteHref("/auth/sign-in", nextParam, { registered: "1" }),
+    );
   }
 
   return (
@@ -160,7 +170,10 @@ export default function SignUpPage() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Уже есть аккаунт?{" "}
-          <Link href="/auth/sign-in" className="font-semibold text-[#7042c5]">
+          <Link
+            href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"))}
+            className="font-semibold text-[#7042c5]"
+          >
             Войти
           </Link>
         </p>
@@ -173,5 +186,13 @@ export default function SignUpPage() {
         <BottomNav />
       </div>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense>
+      <SignUpForm />
+    </Suspense>
   );
 }

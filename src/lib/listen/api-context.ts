@@ -3,7 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { ListenAccess } from "@/lib/listen/types";
-import { resolveProductAccess } from "@/lib/products/access";
+import {
+  resolveProductAccess,
+  type ProductAccessReason,
+} from "@/lib/products/access";
 import {
   getPracticeByAuthorAndSlug,
   type PublicPracticeRow,
@@ -30,6 +33,12 @@ export type ListenApiContext = {
 export type ListenApiLoadResult =
   | { ok: true; context: ListenApiContext }
   | { ok: false; response: NextResponse };
+
+export function shouldUseServiceRoleStorageForProductAccess(
+  reason: ProductAccessReason,
+): boolean {
+  return reason === "free";
+}
 
 export async function loadListenApiContext(
   request: Request,
@@ -115,7 +124,7 @@ export async function loadListenApiContext(
 
   let storageClient = supabase;
 
-  if (!user && productAccess.reason === "free") {
+  if (shouldUseServiceRoleStorageForProductAccess(productAccess.reason)) {
     try {
       storageClient = createServiceRoleClient();
     } catch {

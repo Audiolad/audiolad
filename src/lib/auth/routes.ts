@@ -14,6 +14,8 @@ const AUTH_ROUTES = ["/auth/sign-in", "/auth/sign-up"] as const;
 
 const DEFAULT_AUTHENTICATED_REDIRECT = "/profile";
 
+export const SIGN_UP_DEFAULT_REDIRECT = "/my-practices";
+
 const DISALLOWED_NEXT_SCHEMES = [
   "http:",
   "https:",
@@ -86,16 +88,51 @@ function isUnsafeNextPath(trimmed: string): boolean {
   return isAuthRoute(pathname);
 }
 
-export function getSafeNextPath(next: string | null | undefined): string {
+export function resolveValidatedNextPath(
+  next: string | null | undefined,
+): string | null {
   if (!next || typeof next !== "string") {
-    return DEFAULT_AUTHENTICATED_REDIRECT;
+    return null;
   }
 
   const trimmed = next.trim();
 
   if (isUnsafeNextPath(trimmed)) {
-    return DEFAULT_AUTHENTICATED_REDIRECT;
+    return null;
   }
 
   return trimmed;
+}
+
+export function getSafeNextPath(
+  next: string | null | undefined,
+  fallback: string = DEFAULT_AUTHENTICATED_REDIRECT,
+): string {
+  return resolveValidatedNextPath(next) ?? fallback;
+}
+
+export function buildAuthRouteHref(
+  route: "/auth/sign-in" | "/auth/sign-up",
+  next: string | null | undefined,
+  extraParams?: Record<string, string>,
+): string {
+  const params = new URLSearchParams();
+
+  if (extraParams) {
+    for (const [key, value] of Object.entries(extraParams)) {
+      if (value) {
+        params.set(key, value);
+      }
+    }
+  }
+
+  const validatedNext = resolveValidatedNextPath(next);
+
+  if (validatedNext) {
+    params.set("next", validatedNext);
+  }
+
+  const query = params.toString();
+
+  return query ? `${route}?${query}` : route;
 }
