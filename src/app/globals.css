@@ -7,6 +7,7 @@
   --bottom-nav-main-height: 68px;
   --bottom-nav-content-gap: 28px;
   --global-mini-player-height: 0px;
+  --home-page-gutter: 1.25rem;
 }
 
 .platform-top-safe-padding {
@@ -123,6 +124,73 @@ html:has(.player-shell) body {
 .catalog-carousel__item {
   flex: 0 0 calc(100% - 32px);
   scroll-snap-align: start;
+}
+
+.home-section-carousel {
+  overflow: hidden;
+}
+
+.home-carousel-track {
+  margin-right: calc(-1 * var(--home-page-gutter));
+  padding-right: var(--home-page-gutter);
+  scroll-padding-right: var(--home-page-gutter);
+}
+
+@media (min-width: 1024px) {
+  .home-carousel-track {
+    margin-right: 0;
+    padding-right: 0;
+    scroll-padding-right: 0;
+  }
+}
+
+.featured-card {
+  border: 1px solid #eadff8;
+  background-color: #ffffff;
+  box-shadow: 0 12px 30px rgba(91, 62, 145, 0.08);
+}
+
+.featured-card__cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background-color: #f4ecfb;
+}
+
+.featured-card__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.featured-card__content {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .featured-card {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .featured-card__cover {
+    width: 200px;
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    align-self: auto;
+  }
+
+  .featured-card__content {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1.25rem;
+  }
 }
 
 .primary-cta,

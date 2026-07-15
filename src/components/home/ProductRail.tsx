@@ -23,10 +23,10 @@ export default function ProductRail({
   }
 
   return (
-    <section className="mt-8" aria-label={ariaLabel}>
+    <section className="home-section-carousel mt-8" aria-label={ariaLabel}>
       <HomeSectionHeader title={title} href={href} linkLabel={linkLabel} />
 
-      <div className="catalog-carousel -mx-5 mt-4 flex gap-3 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
+      <div className="home-carousel-track catalog-carousel mt-4 flex gap-3 overflow-x-auto pb-1">
         {products.map((product) => (
           <div key={product.id} data-catalog-carousel-item>
             <HomeProductCard product={product} />
