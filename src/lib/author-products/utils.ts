@@ -79,6 +79,7 @@ export async function ensureUniquePracticeSlug(
 }
 
 export {
+  buildAuthorPublicPath,
   buildListenPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";

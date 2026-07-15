@@ -1,8 +1,20 @@
+export function buildAuthorPublicPath(authorSlug: string): string {
+  return `/authors/${authorSlug}`;
+}
+
 export function buildPracticePublicPath(
   authorSlug: string,
   productSlug: string,
 ): string {
   return `/practice/${authorSlug}/${productSlug}`;
+}
+
+export function buildPracticeBuyerPreviewPath(
+  authorSlug: string,
+  productSlug: string,
+): string {
+  const base = buildPracticePublicPath(authorSlug, productSlug);
+  return `${base}?preview=buyer`;
 }
 
 export function buildListenPath(

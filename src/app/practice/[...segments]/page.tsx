@@ -4,12 +4,13 @@ import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
+import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import {
   buildPracticeAccessPresentation,
-  buildAuthorDashboardEditPath,
+  canUseBuyerPreviewMode,
 } from "@/lib/products/practice-access-ui";
 import { resolveProductAccess } from "@/lib/products/access";
 import {
@@ -19,17 +20,19 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import {
+  buildAuthorPublicPath,
   buildPracticeCanonicalUrl,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ listen?: string }>;
+  searchParams: Promise<{ listen?: string; preview?: string }>;
 };
 
 const coverGradients = [
@@ -133,6 +136,131 @@ function disabledButtonClasses(): string {
   return "disabled:cursor-not-allowed disabled:opacity-60";
 }
 
+function toolbarActionClassName(kind: "primary" | "secondary"): string {
+  if (kind === "primary") {
+    return "inline-flex min-h-11 items-center justify-center rounded-[16px] bg-[#7042c5] px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+  }
+
+  return "inline-flex min-h-11 items-center justify-center rounded-[16px] border border-[#bda6e1] bg-white px-4 py-2.5 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+}
+
+function AuthorPreviewToolbar({
+  message,
+  actions,
+}: {
+  message: string | null;
+  actions: Array<{
+    kind: "buyer_preview" | "author_listen" | "edit";
+    href: string;
+    label: string;
+    disabled?: boolean;
+  }>;
+}) {
+  return (
+    <section className="mt-4 rounded-[20px] border border-[#d9c8f4] bg-[#f8f3ff] px-4 py-4">
+      <p className="text-sm font-semibold text-[#5f3f9d]">
+        Предпросмотр для автора
+      </p>
+      {message ? (
+        <p className="mt-1 text-sm leading-6 text-[#7d70a2]">{message}</p>
+      ) : null}
+      <div className="mt-4 flex flex-col gap-2">
+        {actions.map((action) =>
+          action.disabled ? (
+            <button
+              key={action.label}
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`${toolbarActionClassName("secondary")} disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {action.label}
+            </button>
+          ) : (
+            <Link
+              key={action.label}
+              href={action.href}
+              className={toolbarActionClassName(
+                action.kind === "author_listen" ? "primary" : "secondary",
+              )}
+            >
+              {action.label}
+            </Link>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BuyerPreviewBanner({
+  authorModeHref,
+  actions,
+}: {
+  authorModeHref: string;
+  actions: Array<{
+    kind: "buyer_preview" | "author_listen" | "edit";
+    href: string;
+    label: string;
+    disabled?: boolean;
+  }>;
+}) {
+  return (
+    <section className="mt-4 rounded-[20px] border border-dashed border-[#c9b6e8] bg-[#fcf8ff] px-4 py-4">
+      <p className="text-sm font-semibold text-[#5f3f9d]">
+        Предпросмотр глазами покупателя
+      </p>
+      <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
+        Так страницу увидит пользователь без доступа к продукту.
+      </p>
+      <div className="mt-4 flex flex-col gap-2">
+        <Link href={authorModeHref} className={toolbarActionClassName("secondary")}>
+          Вернуться в режим автора
+        </Link>
+        {actions.map((action) =>
+          action.disabled ? (
+            <button
+              key={action.label}
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`${toolbarActionClassName("primary")} disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              {action.label}
+            </button>
+          ) : (
+            <Link
+              key={action.label}
+              href={action.href}
+              className={toolbarActionClassName("primary")}
+            >
+              {action.label}
+            </Link>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PaymentLegalNote() {
+  const linkClassName =
+    "text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+  return (
+    <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+      Нажимая кнопку оплаты, вы соглашаетесь с условиями{" "}
+      <Link href="/offer" className={linkClassName}>
+        публичной оферты
+      </Link>{" "}
+      и{" "}
+      <Link href="/payment-and-refund" className={linkClassName}>
+        правилами оплаты и возврата
+      </Link>
+      .
+    </p>
+  );
+}
 function PlayIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
@@ -144,7 +272,9 @@ function PlayIcon() {
 function PracticeErrorState() {
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+      >
         <div className="px-5 pt-6">
           <Link
             href="/catalog"
@@ -277,7 +407,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
-  const { listen: listenParam } = await searchParams;
+  const { listen: listenParam, preview: previewParam } = await searchParams;
   const route = await resolvePracticeRoute(segments);
 
   if (!route) {
@@ -329,11 +459,19 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     return <PracticeErrorState />;
   }
 
+  const buyerPreviewMode =
+    previewParam === "buyer" && canUseBuyerPreviewMode(access);
+  const practicePagePath = buildPracticePublicPath(
+    resolvedAuthorSlug,
+    practice.slug,
+  );
+
   const presentation = buildPracticeAccessPresentation({
     access,
     practice,
     authorSlug: resolvedAuthorSlug,
     paymentsConfigured: isPaymentsConfigured(),
+    buyerPreviewMode,
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
@@ -352,7 +490,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.updated_at,
   );
   const subtitle = practice.subtitle?.trim() || null;
-  const editHref = buildAuthorDashboardEditPath(practice.id);
+  const authorPublicPath = buildAuthorPublicPath(resolvedAuthorSlug);
   const listenDeniedMessage =
     listenParam === "required"
       ? "Для прослушивания необходимо приобрести доступ."
@@ -360,7 +498,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   return (
     <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+      >
         <div className="px-5 pt-6">
           <Link
             href="/catalog"
@@ -369,21 +509,18 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             ← Назад в каталог
           </Link>
 
-          {presentation.showAuthorPreview ? (
-            <section className="mt-4 rounded-[20px] border border-[#d9c8f4] bg-[#f8f3ff] px-4 py-4">
-              <p className="text-sm font-semibold text-[#5f3f9d]">
-                Предпросмотр для автора
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
-                Так эту страницу увидят слушатели
-              </p>
-              <Link
-                href={editHref}
-                className="mt-3 inline-flex text-sm font-semibold text-[#7042c5]"
-              >
-                Редактировать продукт
-              </Link>
-            </section>
+          {presentation.showBuyerPreviewBanner ? (
+            <BuyerPreviewBanner
+              authorModeHref={practicePagePath}
+              actions={presentation.authorToolbarActions}
+            />
+          ) : null}
+
+          {presentation.showAuthorToolbar ? (
+            <AuthorPreviewToolbar
+              message={presentation.authorToolbarMessage}
+              actions={presentation.authorToolbarActions}
+            />
           ) : null}
 
           {presentation.showAdminPreview ? (
@@ -454,11 +591,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
               </p>
             ) : null}
 
-            {authorName && (
-              <p className="mt-3 text-base font-medium text-[#7042c5]">
+            {authorName ? (
+              <Link
+                href={authorPublicPath}
+                className="mt-3 inline-flex min-h-11 items-center text-base font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                aria-label={`Страница автора ${authorName}`}
+              >
                 {authorName}
-              </p>
-            )}
+              </Link>
+            ) : null}
 
             {meta && (
               <p className="mt-3 text-sm text-[#7d70a2]">{meta}</p>
@@ -478,8 +619,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
           />
 
           <section className="mt-6">
-            {presentation.primaryAction.kind === "listen" ||
-            presentation.primaryAction.kind === "author_listen" ? (
+            {presentation.primaryAction.kind === "listen" ? (
               <Link
                 href={presentation.primaryAction.href}
                 className="flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]"
@@ -500,15 +640,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
                   {presentation.primaryAction.label}
                 </button>
               ) : (
-                <BuyPracticeButton
-                  practiceSlug={presentation.primaryAction.practiceSlug}
-                  label={presentation.primaryAction.label}
-                  className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white"
-                  signInReturnPath={buildPracticePublicPath(
-                    resolvedAuthorSlug,
-                    practice.slug,
-                  )}
-                />
+                <>
+                  <BuyPracticeButton
+                    practiceSlug={presentation.primaryAction.practiceSlug}
+                    label={presentation.primaryAction.label}
+                    className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white"
+                    signInReturnPath={practicePagePath}
+                  />
+                  {presentation.showPaymentLegalNote ? <PaymentLegalNote /> : null}
+                </>
               )
             ) : (
               <button
@@ -544,6 +684,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
               {`Выберите спокойное и безопасное место для прослушивания.\n\nНе включайте практику во время управления транспортом или работы, требующей постоянной концентрации.`}
             </p>
           </section>
+        </div>
+
+        <div className="px-5 pb-6">
+          <LegalFooter className="mt-8" />
         </div>
 
         <BottomNav />

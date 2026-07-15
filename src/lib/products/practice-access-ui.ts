@@ -1,6 +1,7 @@
 import type { ProductAccessResult } from "@/lib/products/access";
 import {
   buildListenPath,
+  buildPracticeBuyerPreviewPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 
@@ -8,6 +9,7 @@ type PracticePricing = {
   price: number | null;
   is_free: boolean | null;
   format: string | null;
+  status: string | null;
 };
 
 export function isProgramFormat(format: string | null): boolean {
@@ -74,11 +76,6 @@ export type PracticePrimaryAction =
       label: string;
     }
   | {
-      kind: "author_listen";
-      href: string;
-      label: string;
-    }
-  | {
       kind: "buy";
       label: string;
       disabled: boolean;
@@ -89,16 +86,85 @@ export type PracticePrimaryAction =
       label: string;
     };
 
+export type PracticeAuthorToolbarAction =
+  | {
+      kind: "buyer_preview";
+      href: string;
+      label: string;
+    }
+  | {
+      kind: "author_listen";
+      href: string;
+      label: string;
+      disabled?: boolean;
+    }
+  | {
+      kind: "edit";
+      href: string;
+      label: string;
+    };
+
 export type PracticeAccessPresentation = {
   statusBadge: string;
   statusDetail: string | null;
-  showAuthorPreview: boolean;
+  showAuthorToolbar: boolean;
+  showBuyerPreviewBanner: boolean;
+  authorToolbarMessage: string | null;
+  authorToolbarActions: PracticeAuthorToolbarAction[];
   showAdminPreview: boolean;
   primaryAction: PracticePrimaryAction;
   showSecondaryLibraryHint: boolean;
+  showPaymentLegalNote: boolean;
 };
 
-export function buildPracticeAccessPresentation(input: {
+function resolveCommercialAccess(
+  access: ProductAccessResult,
+  practice: PracticePricing,
+  buyerPreviewMode: boolean,
+): ProductAccessResult {
+  const canUseBuyerPreview =
+    access.reason === "author_owner" || access.reason === "admin";
+
+  if (buyerPreviewMode && canUseBuyerPreview) {
+    if (practice.is_free === true && practice.status === "published") {
+      return {
+        canListen: true,
+        reason: "free",
+        isAuthorMember: access.isAuthorMember,
+        accessSource: null,
+      };
+    }
+
+    return {
+      canListen: false,
+      reason: "not_authenticated",
+      isAuthorMember: access.isAuthorMember,
+      accessSource: null,
+    };
+  }
+
+  if (access.reason === "author_owner") {
+    if (practice.is_free === true) {
+      return {
+        canListen: true,
+        reason: "free",
+        isAuthorMember: true,
+        accessSource: null,
+      };
+    }
+
+    return {
+      canListen: false,
+      reason: "not_authenticated",
+      isAuthorMember: true,
+      accessSource: null,
+    };
+  }
+
+  return access;
+}
+
+function buildCommercialPresentation(input: {
   access: ProductAccessResult;
   practice: PracticePricing & {
     slug: string;
@@ -106,38 +172,23 @@ export function buildPracticeAccessPresentation(input: {
   };
   authorSlug: string;
   paymentsConfigured: boolean;
-}): PracticeAccessPresentation {
+}): Pick<
+  PracticeAccessPresentation,
+  | "statusBadge"
+  | "statusDetail"
+  | "primaryAction"
+  | "showSecondaryLibraryHint"
+  | "showPaymentLegalNote"
+> {
   const { access, practice, authorSlug, paymentsConfigured } = input;
   const priceLabel = formatPracticePrice(practice.price);
   const listenHref = buildListenPath(authorSlug, practice.slug);
   const audioReady = hasAudioReady(practice.audio_url);
 
-  if (access.reason === "author_owner") {
-    return {
-      statusBadge: priceLabel ?? getFreeStatusLabel(practice.format),
-      statusDetail: null,
-      showAuthorPreview: true,
-      showAdminPreview: false,
-      primaryAction: audioReady
-        ? {
-            kind: "author_listen",
-            href: listenHref,
-            label: "Прослушать как автор",
-          }
-        : {
-            kind: "audio_pending",
-            label: getAudioPendingLabel(practice.audio_url),
-          },
-      showSecondaryLibraryHint: false,
-    };
-  }
-
   if (access.reason === "admin") {
     return {
       statusBadge: "Доступ открыт",
       statusDetail: "Технический просмотр",
-      showAuthorPreview: false,
-      showAdminPreview: true,
       primaryAction: audioReady
         ? {
             kind: "listen",
@@ -149,6 +200,7 @@ export function buildPracticeAccessPresentation(input: {
             label: getAudioPendingLabel(practice.audio_url),
           },
       showSecondaryLibraryHint: false,
+      showPaymentLegalNote: false,
     };
   }
 
@@ -156,8 +208,6 @@ export function buildPracticeAccessPresentation(input: {
     return {
       statusBadge: getFreeStatusLabel(practice.format),
       statusDetail: null,
-      showAuthorPreview: false,
-      showAdminPreview: false,
       primaryAction: audioReady
         ? {
             kind: "listen",
@@ -169,6 +219,7 @@ export function buildPracticeAccessPresentation(input: {
             label: getAudioPendingLabel(practice.audio_url),
           },
       showSecondaryLibraryHint: true,
+      showPaymentLegalNote: false,
     };
   }
 
@@ -179,8 +230,6 @@ export function buildPracticeAccessPresentation(input: {
     return {
       statusBadge: "Доступ открыт",
       statusDetail: getEntitlementStatusLabel(access.accessSource),
-      showAuthorPreview: false,
-      showAdminPreview: false,
       primaryAction: audioReady
         ? {
             kind: "listen",
@@ -192,6 +241,7 @@ export function buildPracticeAccessPresentation(input: {
             label: getAudioPendingLabel(practice.audio_url),
           },
       showSecondaryLibraryHint: false,
+      showPaymentLegalNote: false,
     };
   }
 
@@ -201,8 +251,6 @@ export function buildPracticeAccessPresentation(input: {
   return {
     statusBadge: priceLabel ?? "Стоимость уточняется",
     statusDetail: null,
-    showAuthorPreview: false,
-    showAdminPreview: false,
     primaryAction: {
       kind: "buy",
       label: paymentsConfigured ? buyLabel : "Продажи скоро откроются",
@@ -210,6 +258,138 @@ export function buildPracticeAccessPresentation(input: {
       practiceSlug: practice.slug,
     },
     showSecondaryLibraryHint: false,
+    showPaymentLegalNote: paymentsConfigured,
+  };
+}
+
+function buildAuthorToolbarActions(input: {
+  authorSlug: string;
+  productSlug: string;
+  practiceId: string;
+  audioReady: boolean;
+  listenHref: string;
+  buyerPreviewMode: boolean;
+}): PracticeAuthorToolbarAction[] {
+  const {
+    authorSlug,
+    productSlug,
+    practiceId,
+    audioReady,
+    listenHref,
+    buyerPreviewMode,
+  } = input;
+
+  if (buyerPreviewMode) {
+    return [
+      {
+        kind: "author_listen",
+        href: listenHref,
+        label: "Прослушать как автор",
+        disabled: !audioReady,
+      },
+    ];
+  }
+
+  return [
+    {
+      kind: "buyer_preview",
+      href: buildPracticeBuyerPreviewPath(authorSlug, productSlug),
+      label: "Посмотреть глазами покупателя",
+    },
+    {
+      kind: "author_listen",
+      href: listenHref,
+      label: "Прослушать как автор",
+      disabled: !audioReady,
+    },
+    {
+      kind: "edit",
+      href: buildAuthorDashboardEditPath(practiceId),
+      label: "Редактировать продукт",
+    },
+  ];
+}
+
+export function buildPracticeAccessPresentation(input: {
+  access: ProductAccessResult;
+  practice: PracticePricing & {
+    id: string;
+    slug: string;
+    audio_url: string | null;
+  };
+  authorSlug: string;
+  paymentsConfigured: boolean;
+  buyerPreviewMode?: boolean;
+}): PracticeAccessPresentation {
+  const {
+    access,
+    practice,
+    authorSlug,
+    paymentsConfigured,
+    buyerPreviewMode = false,
+  } = input;
+  const audioReady = hasAudioReady(practice.audio_url);
+  const listenHref = buildListenPath(authorSlug, practice.slug);
+  const commercialAccess = resolveCommercialAccess(
+    access,
+    practice,
+    buyerPreviewMode,
+  );
+  const commercial = buildCommercialPresentation({
+    access: commercialAccess,
+    practice,
+    authorSlug,
+    paymentsConfigured,
+  });
+
+  const isAuthorOwner = access.reason === "author_owner";
+  const isPrivilegedPreview =
+    isAuthorOwner || access.reason === "admin";
+  const effectiveBuyerPreview = buyerPreviewMode && isPrivilegedPreview;
+
+  if (effectiveBuyerPreview) {
+    return {
+      ...commercial,
+      showAuthorToolbar: false,
+      showBuyerPreviewBanner: true,
+      authorToolbarMessage: null,
+      authorToolbarActions: buildAuthorToolbarActions({
+        authorSlug,
+        productSlug: practice.slug,
+        practiceId: practice.id,
+        audioReady,
+        listenHref,
+        buyerPreviewMode: true,
+      }),
+      showAdminPreview: false,
+    };
+  }
+
+  if (isAuthorOwner) {
+    return {
+      ...commercial,
+      showAuthorToolbar: true,
+      showBuyerPreviewBanner: false,
+      authorToolbarMessage: "Вы вошли как владелец этого продукта",
+      authorToolbarActions: buildAuthorToolbarActions({
+        authorSlug,
+        productSlug: practice.slug,
+        practiceId: practice.id,
+        audioReady,
+        listenHref,
+        buyerPreviewMode: false,
+      }),
+      showAdminPreview: false,
+    };
+  }
+
+  return {
+    ...commercial,
+    showAuthorToolbar: false,
+    showBuyerPreviewBanner: false,
+    authorToolbarMessage: null,
+    authorToolbarActions: [],
+    showAdminPreview: access.reason === "admin",
   };
 }
 
@@ -222,4 +402,8 @@ export function buildPracticePagePath(
   productSlug: string,
 ): string {
   return buildPracticePublicPath(authorSlug, productSlug);
+}
+
+export function canUseBuyerPreviewMode(access: ProductAccessResult): boolean {
+  return access.reason === "author_owner" || access.reason === "admin";
 }
