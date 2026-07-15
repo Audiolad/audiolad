@@ -38,7 +38,6 @@ export function getEntitlementStatusLabel(accessSource: string | null): string {
     case "gift":
       return "Подарок";
     case "starter":
-      return "Стартовая практика";
     case "free_claim":
       return "Получено бесплатно";
     case "subscription":

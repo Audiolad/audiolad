@@ -1,5 +1,7 @@
 import BottomNav from "@/components/BottomNav";
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { getDisplayFormat } from "@/lib/author-products/format";
+import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { buildListenPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -34,6 +36,7 @@ type PracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  updated_at: string | null;
   audio_url: string | null;
   status: string | null;
   authors: AuthorRow | AuthorRow[] | null;
@@ -52,22 +55,6 @@ type ActiveLibraryItem = {
   accessSource: AccessSource | string;
   practice: PracticeRow | null;
 };
-
-const coverGradients = [
-  "from-[#f0d9ff] via-[#dec4ff] to-[#c9b6f4]",
-  "from-[#ffe0ed] via-[#f4c7e3] to-[#d7b9ef]",
-  "from-[#dff4eb] via-[#ccebdc] to-[#b9ddcf]",
-  "from-[#fff0d2] via-[#f5dfbb] to-[#e4cfa8]",
-  "from-[#e8f0ff] via-[#d4e2ff] to-[#b8c9ef]",
-];
-
-const starterSymbols: Record<string, string> = {
-  "elixir-molodosti": "❀",
-  "klyuch-k-izobiliyu": "⚿",
-  "kod-prityazheniya": "✦",
-};
-
-const defaultSymbols = ["❀", "⚿", "♡", "✦", "◯", "☼"];
 
 const filterLabels = [
   "Все",
@@ -100,7 +87,6 @@ function isAccessActive(expiresAt: string | null): boolean {
 function getAccessBadgeLabel(accessSource: AccessSource | string): string {
   switch (accessSource) {
     case "starter":
-      return "Стартовая";
     case "free_claim":
       return "Бесплатно";
     case "purchase":
@@ -157,14 +143,6 @@ function formatPracticeMeta(
   }
 
   return null;
-}
-
-function getCoverSymbol(slug: string | undefined, index: number): string {
-  if (slug && starterSymbols[slug]) {
-    return starterSymbols[slug];
-  }
-
-  return defaultSymbols[index % defaultSymbols.length];
 }
 
 function getAuthorName(practice: PracticeRow | null): string | null {
@@ -255,7 +233,6 @@ function getAuthorSlug(practice: PracticeRow | null): string | null {
 
 function LibraryCard({ item, index }: LibraryCardProps) {
   const badge = getAccessBadgeLabel(item.accessSource);
-  const gradient = coverGradients[index % coverGradients.length];
   const practice = item.practice;
   const isUnavailable = practice === null;
   const title = isUnavailable
@@ -265,7 +242,9 @@ function LibraryCard({ item, index }: LibraryCardProps) {
   const meta = practice
     ? formatPracticeMeta(practice.format, practice.duration_minutes)
     : null;
-  const symbol = getCoverSymbol(practice?.slug, index);
+  const coverDisplayUrl = practice
+    ? getProductCoverDisplayUrl(practice.cover_url, practice.updated_at)
+    : null;
   const audioReady = hasAudioReady(practice?.audio_url);
   const audioStatus = getAudioStatusLabel(practice?.audio_url);
   const authorSlug = getAuthorSlug(practice);
@@ -278,18 +257,17 @@ function LibraryCard({ item, index }: LibraryCardProps) {
 
   return (
     <article className="flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
-      <div
-        className={`relative aspect-square w-[112px] shrink-0 overflow-hidden rounded-[20px] bg-gradient-to-br ${gradient}`}
-      >
+      <div className="relative aspect-square w-[112px] shrink-0">
+        <ProductCoverThumbnail
+          slug={practice?.slug ?? `library-item-${index}`}
+          title={title}
+          coverUrl={coverDisplayUrl}
+          className="aspect-square h-full w-full rounded-[20px]"
+        />
+
         <span className="absolute left-2 top-2 rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium text-[#7042c5]">
           {badge}
         </span>
-
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/50 bg-white/15 text-4xl text-white">
-            {symbol}
-          </div>
-        </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -382,6 +360,7 @@ export default async function MyPracticesPage() {
         price,
         is_free,
         cover_url,
+        updated_at,
         audio_url,
         status,
         authors (
