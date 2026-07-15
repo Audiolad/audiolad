@@ -6,6 +6,7 @@ import {
   resetPracticeProgress,
   upsertPracticeProgress,
 } from "@/lib/listen/progress";
+import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 
 type RouteContext = {
   params: Promise<{ slug: string; productSlug: string }>;
@@ -104,7 +105,10 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     if (access.mode === "entitled") {
-      if (practice.status !== "published" || audioItem.status !== "published") {
+      if (
+        !canEntitledUserAccessPracticeStatus(practice.status) ||
+        audioItem.status !== "published"
+      ) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
       }
     }

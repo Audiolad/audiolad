@@ -4,7 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import LegalFooter from "@/components/LegalFooter";
 import PrimaryNav from "@/components/PrimaryNav";
 import { createClient } from "@/lib/supabase/server";
-import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
+import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +47,9 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm lg:max-w-[1200px] ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass}`}
       >
         <div className="px-5 pt-5 lg:px-10 lg:pt-8">
           <header className="border-b border-[#eadff8] pb-5">

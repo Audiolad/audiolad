@@ -25,7 +25,7 @@ import {
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
-import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
+import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -271,9 +271,9 @@ function PlayIcon() {
 
 function PracticeErrorState() {
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
         <div className="px-5 pt-6">
           <Link
@@ -454,6 +454,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       practiceId: practice.id,
       practiceStatus: practice.status,
       authorPreview,
+      entitledAccess:
+        access.canListen &&
+        !authorPreview &&
+        practice.status !== "published",
     });
   } catch {
     return <PracticeErrorState />;
@@ -497,9 +501,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       : null;
 
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
         <div className="px-5 pt-6">
           <Link

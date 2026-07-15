@@ -6,7 +6,7 @@ import BottomNav from "@/components/BottomNav";
 import LegalFooter from "@/components/LegalFooter";
 import PrimaryNav from "@/components/PrimaryNav";
 import PurchaseConsent from "@/components/PurchaseConsent";
-import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
+import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 const FIRST_AUDIO_COURSE_SLUG = "first-audio-course";
 
@@ -56,9 +56,9 @@ const cardClassName =
 
 export default function FirstAudioCoursePage() {
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm lg:max-w-[1180px] ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1180px] ${platformMobileShellClass}`}
       >
         <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-8">
           <header className="mb-1 hidden items-center justify-between border-b border-[#eadff8] pb-5 lg:flex">

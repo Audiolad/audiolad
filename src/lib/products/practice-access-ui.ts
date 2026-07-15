@@ -1,4 +1,5 @@
 import type { ProductAccessResult } from "@/lib/products/access";
+import { isPracticeCatalogListed } from "@/lib/products/access";
 import {
   buildListenPath,
   buildPracticeBuyerPreviewPath,
@@ -10,6 +11,7 @@ type PracticePricing = {
   is_free: boolean | null;
   format: string | null;
   status: string | null;
+  is_catalog_listed?: boolean | null;
 };
 
 export function isProgramFormat(format: string | null): boolean {
@@ -126,20 +128,26 @@ function resolveCommercialAccess(
     access.reason === "author_owner" || access.reason === "admin";
 
   if (buyerPreviewMode && canUseBuyerPreview) {
-    if (practice.is_free === true && practice.status === "published") {
+    if (practice.is_free === true && isPracticeCatalogListed(practice)) {
       return {
         canListen: true,
+        canAcquire: false,
+        isPubliclyListed: true,
         reason: "free",
         isAuthorMember: access.isAuthorMember,
         accessSource: null,
+        hasEntitlement: false,
       };
     }
 
     return {
       canListen: false,
+      canAcquire: false,
+      isPubliclyListed: isPracticeCatalogListed(practice),
       reason: "not_authenticated",
       isAuthorMember: access.isAuthorMember,
       accessSource: null,
+      hasEntitlement: false,
     };
   }
 
@@ -147,17 +155,23 @@ function resolveCommercialAccess(
     if (practice.is_free === true) {
       return {
         canListen: true,
+        canAcquire: practice.status === "published",
+        isPubliclyListed: isPracticeCatalogListed(practice),
         reason: "free",
         isAuthorMember: true,
         accessSource: null,
+        hasEntitlement: false,
       };
     }
 
     return {
       canListen: false,
+      canAcquire: practice.status === "published",
+      isPubliclyListed: isPracticeCatalogListed(practice),
       reason: "not_authenticated",
       isAuthorMember: true,
       accessSource: null,
+      hasEntitlement: false,
     };
   }
 
@@ -247,6 +261,24 @@ function buildCommercialPresentation(input: {
 
   const buyLabel =
     priceLabel !== null ? `Купить за ${priceLabel}` : "Купить доступ";
+
+  if (access.reason === "unavailable" || !access.canAcquire) {
+    const unavailableDetail =
+      practice.status === "archived"
+        ? "Этот аудиопродукт больше не доступен для новых пользователей."
+        : null;
+
+    return {
+      statusBadge: "Недоступно",
+      statusDetail: unavailableDetail,
+      primaryAction: {
+        kind: "audio_pending",
+        label: unavailableDetail ?? "Продукт недоступен",
+      },
+      showSecondaryLibraryHint: false,
+      showPaymentLegalNote: false,
+    };
+  }
 
   return {
     statusBadge: priceLabel ?? "Стоимость уточняется",

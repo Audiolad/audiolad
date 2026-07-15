@@ -23,6 +23,7 @@ export type PublicPracticeRow = {
   audio_url: string | null;
   status: string | null;
   updated_at: string | null;
+  is_catalog_listed: boolean | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -70,6 +71,7 @@ export async function getPracticeByAuthorAndSlug(
       audio_url,
       status,
       updated_at,
+      is_catalog_listed,
       authors!inner (
         id,
         name,

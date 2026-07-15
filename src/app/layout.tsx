@@ -1,5 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+import {
+  PLATFORM_LIGHT_THEME_COLOR,
+} from "@/lib/navigation/bottom-nav";
+
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: PLATFORM_LIGHT_THEME_COLOR,
+};
 
 export const metadata: Metadata = {
   title: "АудиоЛад",
@@ -10,27 +22,32 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.ico" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" }
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
-    ]
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   appleWebApp: {
     capable: true,
     title: "АудиоЛад",
-    statusBarStyle: "default"
-  }
+    statusBarStyle: "default",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
-  children
+  children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
-      <body>{children}</body>
+    <html lang="ru" className="bg-platform-surface">
+      <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
+        {children}
+      </body>
     </html>
   );
 }

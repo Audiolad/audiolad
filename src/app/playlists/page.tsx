@@ -1,5 +1,5 @@
 import Link from "next/link";import BottomNav from "@/components/BottomNav";
-import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
+import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 const playlists = [
   {
@@ -95,9 +95,9 @@ function PlayIcon() {
 
 export default function PlaylistsPage() {
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] shadow-sm ${platformNavPaddingClass}`}
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
         <div className="px-5 pt-6">
           <header className="flex items-center justify-between">

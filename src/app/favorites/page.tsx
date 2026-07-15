@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 
 const favoritePractices = [
@@ -55,8 +56,8 @@ function PlayIcon() {
 
 export default function FavoritesPage() {
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] pb-28 shadow-sm">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}>
         <div className="px-5 pt-5">
           <header className="flex items-center justify-between">
             <Link

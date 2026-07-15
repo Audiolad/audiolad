@@ -3,10 +3,15 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AudioPlayer from "@/components/audio/AudioPlayer";
+import BottomNav from "@/components/BottomNav";
+import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
 import { resolveListenAccess } from "@/lib/listen/access";
+import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import type { ListenTrack } from "@/lib/listen/types";
-import { resolveProductAccess } from "@/lib/products/access";
+import {
+  resolveProductAccess,
+} from "@/lib/products/access";
 import {
   getPracticeAuthorSlug,
   type PublicPracticeRow,
@@ -95,8 +100,10 @@ function ListenShell({
   backLabel: string;
 }) {
   return (
-    <main className="min-h-screen bg-[#24133f] text-white">
-      <div className="relative mx-auto min-h-screen w-full max-w-[480px] overflow-hidden bg-gradient-to-b from-[#6f4bbb] via-[#8e68c9] to-[#2b1749] px-5 pb-10 pt-5 motion-reduce:transition-none">
+    <main className="min-h-dvh bg-[#24133f] text-white">
+      <div
+        className={`relative mx-auto min-h-dvh w-full max-w-[480px] overflow-hidden bg-gradient-to-b from-[#6f4bbb] via-[#8e68c9] to-[#2b1749] px-5 pt-[max(1.25rem,env(safe-area-inset-top,0px))] motion-reduce:transition-none ${platformNavPaddingClass}`}
+      >
         <div className="pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-[#e5b5df]/20 blur-3xl motion-reduce:blur-none" />
         <div className="pointer-events-none absolute -right-24 bottom-20 h-72 w-72 rounded-full bg-[#e9c3b5]/15 blur-3xl motion-reduce:blur-none" />
 
@@ -111,6 +118,8 @@ function ListenShell({
 
         <div className="relative z-10">{children}</div>
       </div>
+
+      <BottomNav />
     </main>
   );
 }
@@ -155,7 +164,7 @@ async function loadListenTracks(
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
 
-  if (accessMode === "entitled" && practice.status === "published") {
+  if (accessMode === "entitled") {
     query = query.eq("status", "published");
   }
 
@@ -229,6 +238,7 @@ export async function renderListenPage(
       updated_at,
       status,
       is_free,
+      is_catalog_listed,
       authors!inner (
         id,
         name,
@@ -312,17 +322,6 @@ export async function renderListenPage(
     redirect(`${practiceHref}?listen=required`);
   }
 
-  if (access.mode === "entitled" && practiceRow.status !== "published") {
-    return (
-      <ListenMessageState
-        title="Практика пока недоступна"
-        description="Материал ещё не опубликован для прослушивания."
-        backHref={practiceHref}
-        backLabel="К странице практики"
-      />
-    );
-  }
-
   let tracks: ListenTrack[] = [];
 
   try {
@@ -366,6 +365,10 @@ export async function renderListenPage(
   const authorName = getAuthorName(practiceRow.authors);
   const coverGradient = getCoverGradient(practiceRow.slug);
   const coverSymbol = getCoverSymbol(practiceRow.slug);
+  const coverImageUrl = buildCoverDisplayUrl(
+    practiceRow.cover_url,
+    practiceRow.updated_at,
+  );
   const trimmedFormat =
     typeof practiceRow.format === "string" ? practiceRow.format.trim() : null;
 
@@ -388,6 +391,7 @@ export async function renderListenPage(
         initialProgress={initialProgress}
         coverSymbol={coverSymbol}
         coverGradient={coverGradient}
+        coverImageUrl={coverImageUrl}
         isAuthorPreview={access.mode === "author_preview"}
       />
     </ListenShell>

@@ -5,6 +5,7 @@ import {
   LISTEN_SIGNED_URL_TTL_SECONDS,
   normalizeStorageSignedUrl,
 } from "@/lib/listen/signed-url";
+import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 
 export async function serveListenSignedAudio(
   request: Request,
@@ -61,7 +62,7 @@ export async function serveListenSignedAudio(
   }
 
   if (access.mode === "entitled") {
-    if (practice.status !== "published") {
+    if (!canEntitledUserAccessPracticeStatus(practice.status)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 

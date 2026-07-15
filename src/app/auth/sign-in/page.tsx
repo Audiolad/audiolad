@@ -46,8 +46,8 @@ function SignInForm() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#fffdfd] px-5 pb-10 pt-8 shadow-sm">
+    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pb-10 pt-8">
         <header className="text-center">
           <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
             АудиоЛад

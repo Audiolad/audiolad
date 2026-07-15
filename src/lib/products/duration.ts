@@ -90,6 +90,28 @@ type FormatProductMetaInput = {
   durationMinutesFallback?: number | null;
 };
 
+/** Catalog card stats under cover: 7 аудио · 29 мин or 12 мин (no format prefix). */
+export function formatCatalogProductStats(
+  input: FormatProductMetaInput,
+): string | null {
+  const duration = formatProductDuration(
+    input.totalDurationSeconds,
+    input.durationMinutesFallback,
+  );
+
+  if (isMultiAudioProduct(input.audioCount)) {
+    const parts = [formatAudioCountLabel(input.audioCount)];
+
+    if (duration) {
+      parts.push(duration);
+    }
+
+    return parts.join(" · ");
+  }
+
+  return duration;
+}
+
 /** Catalog and practice meta: format · 3 аудио · 29 мин or format · 12 мин */
 export function formatProductMeta(input: FormatProductMetaInput): string | null {
   const trimmedFormat =

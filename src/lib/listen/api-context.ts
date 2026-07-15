@@ -16,6 +16,7 @@ type PracticeAccessRow = {
   author_id: string;
   is_free: boolean | null;
   status: string | null;
+  is_catalog_listed?: boolean | null;
 };
 
 export type ListenApiContext = {

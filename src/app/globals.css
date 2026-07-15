@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --platform-surface-background: #f7f2fc;
+  --platform-elevated-surface-background: #fffdfd;
+  --foreground: #25135c;
+  --bottom-nav-main-height: 68px;
+  --bottom-nav-content-gap: 28px;
+}
+
+.platform-top-safe-padding {
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+}
+
+.platform-bottom-nav-padding {
+  padding-bottom: calc(
+    var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
+      var(--bottom-nav-content-gap)
+  );
+}
+
+.platform-mobile-shell {
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(
+    var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
+      var(--bottom-nav-content-gap)
+  );
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --color-background: var(--platform-surface-background);
+  --color-platform-surface: var(--platform-surface-background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background-color: var(--platform-surface-background);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--platform-surface-background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+html:has(.player-shell) {
+  background-color: #24133f;
+}
+
+html:has(.player-shell) body {
+  background-color: #24133f;
 }

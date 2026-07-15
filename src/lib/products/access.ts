@@ -7,21 +7,62 @@ export type ProductAccessReason =
   | "author_owner"
   | "admin"
   | "not_authenticated"
-  | "payment_required";
+  | "payment_required"
+  | "unavailable";
 
-export type ProductAccessResult = {
-  canListen: boolean;
-  reason: ProductAccessReason;
-  isAuthorMember: boolean;
-  accessSource: string | null;
-};
-
-type PracticeAccessInput = {
+export type ProductAccessInput = {
   id: string;
   author_id: string;
   is_free: boolean | null;
   status: string | null;
+  is_catalog_listed?: boolean | null;
 };
+
+export type ProductAccessResult = {
+  canListen: boolean;
+  canAcquire: boolean;
+  isPubliclyListed: boolean;
+  reason: ProductAccessReason;
+  isAuthorMember: boolean;
+  accessSource: string | null;
+  hasEntitlement: boolean;
+};
+
+export function isPracticePublished(status: string | null | undefined): boolean {
+  return status === "published";
+}
+
+export function isPracticeArchived(status: string | null | undefined): boolean {
+  return status === "archived";
+}
+
+export function isPracticeCatalogListed(practice: {
+  status: string | null | undefined;
+  is_catalog_listed?: boolean | null;
+}): boolean {
+  return (
+    isPracticePublished(practice.status) && practice.is_catalog_listed !== false
+  );
+}
+
+/** Entitled users may listen to products that were taken off sale but not deleted. */
+export function canEntitledUserAccessPracticeStatus(
+  status: string | null | undefined,
+): boolean {
+  return isPracticePublished(status) || isPracticeArchived(status);
+}
+
+export function canAcquirePractice(practice: ProductAccessInput): boolean {
+  if (!isPracticePublished(practice.status)) {
+    return false;
+  }
+
+  if (practice.is_catalog_listed === false) {
+    return false;
+  }
+
+  return true;
+}
 
 function isEntitlementActive(expiresAt: string | null): boolean {
   if (expiresAt === null) {
@@ -39,7 +80,14 @@ function isEntitlementActive(expiresAt: string | null): boolean {
 
 function mapAccessSourceToReason(
   accessSource: string,
-): Exclude<ProductAccessReason, "free" | "author_owner" | "not_authenticated" | "payment_required"> {
+): Exclude<
+  ProductAccessReason,
+  | "free"
+  | "author_owner"
+  | "not_authenticated"
+  | "payment_required"
+  | "unavailable"
+> {
   switch (accessSource) {
     case "purchase":
       return "purchased";
@@ -52,10 +100,11 @@ function mapAccessSourceToReason(
 
 export async function resolveProductAccess(
   supabase: SupabaseClient,
-  practice: PracticeAccessInput,
+  practice: ProductAccessInput,
   userId: string | null,
 ): Promise<ProductAccessResult> {
-  const isPublished = practice.status === "published";
+  const isPubliclyListed = isPracticeCatalogListed(practice);
+  const canAcquire = canAcquirePractice(practice);
   let isAuthorMember = false;
 
   if (userId) {
@@ -75,9 +124,12 @@ export async function resolveProductAccess(
     if (isAuthorMember) {
       return {
         canListen: true,
+        canAcquire,
+        isPubliclyListed,
         reason: "author_owner",
         isAuthorMember: true,
         accessSource: null,
+        hasEntitlement: false,
       };
     }
 
@@ -102,27 +154,48 @@ export async function resolveProductAccess(
           : "granted";
 
       return {
-        canListen: true,
+        canListen: canEntitledUserAccessPracticeStatus(practice.status),
+        canAcquire: false,
+        isPubliclyListed,
         reason: mapAccessSourceToReason(accessSource),
         isAuthorMember: false,
         accessSource,
+        hasEntitlement: true,
       };
     }
   }
 
-  if (practice.is_free === true && isPublished) {
+  if (practice.is_free === true && isPracticePublished(practice.status) && isPubliclyListed) {
     return {
       canListen: true,
+      canAcquire: false,
+      isPubliclyListed,
       reason: "free",
       isAuthorMember: false,
       accessSource: null,
+      hasEntitlement: false,
+    };
+  }
+
+  if (!isPracticePublished(practice.status) && isPracticeArchived(practice.status)) {
+    return {
+      canListen: false,
+      canAcquire: false,
+      isPubliclyListed: false,
+      reason: "unavailable",
+      isAuthorMember: false,
+      accessSource: null,
+      hasEntitlement: false,
     };
   }
 
   return {
     canListen: false,
+    canAcquire,
+    isPubliclyListed,
     reason: userId ? "payment_required" : "not_authenticated",
     isAuthorMember: false,
     accessSource: null,
+    hasEntitlement: false,
   };
 }

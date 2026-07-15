@@ -21,6 +21,7 @@ type LoadPublicAudioItemsInput = {
   practiceId: string;
   practiceStatus: string | null;
   authorPreview: boolean;
+  entitledAccess?: boolean;
 };
 
 export async function loadPublicAudioItems(
@@ -33,11 +34,13 @@ export async function loadPublicAudioItems(
     .eq("practice_id", input.practiceId)
     .order("position", { ascending: true });
 
-  if (!input.authorPreview) {
+  if (!input.authorPreview && !input.entitledAccess) {
     if (input.practiceStatus !== "published") {
       return [];
     }
 
+    query = query.eq("status", "published");
+  } else if (!input.authorPreview) {
     query = query.eq("status", "published");
   }
 
