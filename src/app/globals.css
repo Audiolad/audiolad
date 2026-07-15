@@ -144,6 +144,114 @@ html:has(.player-shell) body {
   }
 }
 
+.home-needs-track {
+  -ms-overflow-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  margin-right: calc(-1 * var(--home-page-gutter));
+  padding-right: var(--home-page-gutter);
+  scroll-padding-right: var(--home-page-gutter);
+}
+
+.home-needs-track::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-needs-track {
+    scroll-behavior: smooth;
+  }
+}
+
+.home-needs-rows {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.home-needs-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.home-need-chip {
+  display: inline-flex;
+  min-height: 3rem;
+  max-height: 3.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e7daf7;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.625rem 1.125rem;
+  color: #25135c;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(68, 38, 123, 0.06);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-need-chip--wrap {
+  max-width: 9.5rem;
+  white-space: normal;
+}
+
+.home-need-chip:hover {
+  border-color: #d9c9ef;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 14px rgba(68, 38, 123, 0.08);
+}
+
+.home-need-chip:active {
+  transform: scale(0.98);
+}
+
+.home-need-chip:focus-visible {
+  outline: 2px solid #7042c5;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .home-needs-track {
+    overflow: visible;
+    margin-right: 0;
+    padding-right: 0;
+    scroll-padding-right: 0;
+  }
+
+  .home-needs-rows {
+    width: auto;
+    min-width: 0;
+    flex-flow: row wrap;
+    gap: 0.625rem;
+  }
+
+  .home-needs-row {
+    display: contents;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-need-chip:active {
+    transform: none;
+  }
+}
+
 .featured-card {
   border: 1px solid #eadff8;
   background-color: #ffffff;

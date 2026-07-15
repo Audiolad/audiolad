@@ -4,21 +4,41 @@ import { HOME_NEED_ITEMS } from "@/lib/home/needs-navigation";
 
 import HomeSectionHeader from "./HomeSectionHeader";
 
+const NEEDS_FIRST_ROW = HOME_NEED_ITEMS.slice(0, 4);
+const NEEDS_SECOND_ROW = HOME_NEED_ITEMS.slice(4, 8);
+
+function NeedChip({ id, title, href }: (typeof HOME_NEED_ITEMS)[number]) {
+  const wrapClass = id === "programs" ? " home-need-chip--wrap" : "";
+
+  return (
+    <Link href={href} className={`home-need-chip${wrapClass}`}>
+      {title}
+    </Link>
+  );
+}
+
 export default function NeedsNavigation() {
   return (
-    <section className="mt-8" aria-label="Выберите, что вам сейчас нужно">
+    <section
+      className="home-needs-strip home-section-carousel mt-8"
+      aria-label="Выберите, что вам сейчас нужно"
+    >
       <HomeSectionHeader title="Выберите, что вам сейчас нужно" href="/catalog" />
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {HOME_NEED_ITEMS.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            className="flex min-h-[88px] items-center justify-center rounded-[22px] border border-[#eadff8] bg-[#fcfaff] px-3 py-4 text-center text-[14px] font-medium leading-5 text-[#25135c] shadow-sm transition hover:border-[#d9c9ef] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            {item.title}
-          </Link>
-        ))}
+      <div className="home-needs-track mt-4">
+        <div className="home-needs-rows">
+          <div className="home-needs-row">
+            {NEEDS_FIRST_ROW.map((item) => (
+              <NeedChip key={item.id} {...item} />
+            ))}
+          </div>
+
+          <div className="home-needs-row">
+            {NEEDS_SECOND_ROW.map((item) => (
+              <NeedChip key={item.id} {...item} />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
