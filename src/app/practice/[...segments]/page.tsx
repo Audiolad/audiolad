@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
+import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -468,6 +469,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice,
     authorSlug: resolvedAuthorSlug,
     paymentsConfigured: isPaymentsConfigured(),
+    isAuthenticated: Boolean(user),
     buyerPreviewMode,
   });
 
@@ -664,16 +666,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             )}
           </section>
 
-          {presentation.showSecondaryLibraryHint ? (
+          {presentation.libraryAction !== "hidden" ? (
             <section className="mt-4">
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                className={`w-full rounded-[22px] border border-[#e2d7f2] bg-[#faf6ff] px-5 py-4 text-sm font-semibold text-[#7d70a2] ${disabledButtonClasses()}`}
-              >
-                Добавление в библиотеку скоро появится
-              </button>
+              <LibraryAddButton
+                practiceSlug={practice.slug}
+                signInReturnPath={practicePagePath}
+                action={presentation.libraryAction}
+                className={`w-full rounded-[22px] border border-[#e2d7f2] bg-[#faf6ff] px-5 py-4 text-sm font-semibold text-[#7d70a2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-80 ${disabledButtonClasses()}`}
+              />
             </section>
           ) : null}
 

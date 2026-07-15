@@ -1,5 +1,8 @@
 import type { ProductAccessResult } from "@/lib/products/access";
-import { isPracticeCatalogListed } from "@/lib/products/access";
+import {
+  isPracticeCatalogListed,
+  isPracticePublished,
+} from "@/lib/products/access";
 import {
   buildListenPath,
   buildPracticeBuyerPreviewPath,
@@ -98,6 +101,12 @@ export type PracticeAuthorToolbarAction =
       label: string;
     };
 
+export type PracticeLibraryAction =
+  | "hidden"
+  | "sign_in"
+  | "add"
+  | "in_library";
+
 export type PracticeAccessPresentation = {
   statusBadge: string;
   statusDetail: string | null;
@@ -107,9 +116,68 @@ export type PracticeAccessPresentation = {
   authorToolbarActions: PracticeAuthorToolbarAction[];
   showAdminPreview: boolean;
   primaryAction: PracticePrimaryAction;
-  showSecondaryLibraryHint: boolean;
+  libraryAction: PracticeLibraryAction;
   showPaymentLegalNote: boolean;
 };
+
+export function resolveLibraryAction(input: {
+  access: ProductAccessResult;
+  practice: PracticePricing;
+  isAuthenticated: boolean;
+  buyerPreviewMode: boolean;
+}): PracticeLibraryAction {
+  const { access, practice, isAuthenticated, buyerPreviewMode } = input;
+
+  if (buyerPreviewMode) {
+    return "hidden";
+  }
+
+  if (access.reason === "admin" || access.reason === "author_owner") {
+    return "hidden";
+  }
+
+  const isPublicFreeProduct =
+    practice.is_free === true &&
+    isPracticeCatalogListed(practice) &&
+    isPracticePublished(practice.status);
+
+  if (!isPublicFreeProduct) {
+    return "hidden";
+  }
+
+  if (access.hasEntitlement) {
+    return "in_library";
+  }
+
+  if (!isAuthenticated) {
+    return "sign_in";
+  }
+
+  return "add";
+}
+
+export function mapLibraryClaimButtonError(
+  status: number,
+  errorCode: string | undefined,
+): string {
+  if (status === 404 || errorCode === "practice_not_found") {
+    return "Материал сейчас недоступен";
+  }
+
+  if (status === 409 || errorCode === "practice_not_free") {
+    return "Этот материал нельзя добавить бесплатно";
+  }
+
+  if (status === 400 || errorCode === "invalid_request") {
+    return "Не удалось добавить. Проверьте данные и попробуйте ещё раз.";
+  }
+
+  return "Не удалось добавить. Попробуйте ещё раз.";
+}
+
+export function resolveLibraryActionAfterClaimSuccess(): "in_library" {
+  return "in_library";
+}
 
 function resolveCommercialAccess(
   access: ProductAccessResult,
@@ -183,7 +251,6 @@ function buildCommercialPresentation(input: {
   | "statusBadge"
   | "statusDetail"
   | "primaryAction"
-  | "showSecondaryLibraryHint"
   | "showPaymentLegalNote"
 > {
   const { access, practice, authorSlug, paymentsConfigured } = input;
@@ -207,7 +274,6 @@ function buildCommercialPresentation(input: {
             kind: "audio_pending",
             label: getAudioPendingLabel(practice.audio_url),
           },
-      showSecondaryLibraryHint: false,
       showPaymentLegalNote: false,
     };
   }
@@ -226,7 +292,6 @@ function buildCommercialPresentation(input: {
             kind: "audio_pending",
             label: getAudioPendingLabel(practice.audio_url),
           },
-      showSecondaryLibraryHint: true,
       showPaymentLegalNote: false,
     };
   }
@@ -248,7 +313,6 @@ function buildCommercialPresentation(input: {
             kind: "audio_pending",
             label: getAudioPendingLabel(practice.audio_url),
           },
-      showSecondaryLibraryHint: false,
       showPaymentLegalNote: false,
     };
   }
@@ -271,7 +335,6 @@ function buildCommercialPresentation(input: {
         kind: "audio_pending",
         label: unavailableDetail ?? "Продукт недоступен",
       },
-      showSecondaryLibraryHint: false,
       showPaymentLegalNote: false,
     };
   }
@@ -285,7 +348,6 @@ function buildCommercialPresentation(input: {
       disabled: !paymentsConfigured,
       practiceSlug: practice.slug,
     },
-    showSecondaryLibraryHint: false,
     showPaymentLegalNote: paymentsConfigured,
   };
 }
@@ -347,6 +409,7 @@ export function buildPracticeAccessPresentation(input: {
   };
   authorSlug: string;
   paymentsConfigured: boolean;
+  isAuthenticated: boolean;
   buyerPreviewMode?: boolean;
 }): PracticeAccessPresentation {
   const {
@@ -354,11 +417,18 @@ export function buildPracticeAccessPresentation(input: {
     practice,
     authorSlug,
     paymentsConfigured,
+    isAuthenticated,
     buyerPreviewMode = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
   const listenHref = buildListenPath(authorSlug, practice.slug, {
     autoplay: true,
+  });
+  const libraryAction = resolveLibraryAction({
+    access,
+    practice,
+    isAuthenticated,
+    buyerPreviewMode,
   });
   const commercialAccess = resolveCommercialAccess(
     access,
@@ -380,6 +450,7 @@ export function buildPracticeAccessPresentation(input: {
   if (effectiveBuyerPreview) {
     return {
       ...commercial,
+      libraryAction,
       showAuthorToolbar: false,
       showBuyerPreviewBanner: true,
       authorToolbarMessage: null,
@@ -398,6 +469,7 @@ export function buildPracticeAccessPresentation(input: {
   if (isAuthorOwner) {
     return {
       ...commercial,
+      libraryAction,
       showAuthorToolbar: true,
       showBuyerPreviewBanner: false,
       authorToolbarMessage: "Вы вошли как владелец этого продукта",
@@ -415,6 +487,7 @@ export function buildPracticeAccessPresentation(input: {
 
   return {
     ...commercial,
+    libraryAction,
     showAuthorToolbar: false,
     showBuyerPreviewBanner: false,
     authorToolbarMessage: null,
