@@ -11,7 +11,6 @@ import type {
   AuthorWorkspace,
   AudioItemRow,
 } from "@/lib/author-products/types";
-import { MULTI_AUDIO_PUBLISH_MESSAGE } from "@/lib/author-products/publish";
 import {
   PAID_PRICE_OPTIONS,
   PRODUCT_FORMATS,
@@ -664,7 +663,7 @@ export default function AuthorProductForm({
       };
 
       if (!response.ok) {
-        setError(payload.message ?? MULTI_AUDIO_PUBLISH_MESSAGE);
+        setError(payload.message ?? "Не удалось опубликовать аудиопродукт.");
         return;
       }
 

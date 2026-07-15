@@ -3,9 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AudioItemRow, PracticeRow } from "./types";
 import { minutesFromSeconds } from "./utils";
 
-export const MULTI_AUDIO_PUBLISH_MESSAGE =
-  "Продукт сохранён как черновик. Публикация аудиопродуктов с несколькими аудио будет доступна после подключения последовательного прослушивания.";
-
 type PublishValidationResult =
   | { ok: true }
   | { ok: false; code: string; message: string };
@@ -154,14 +151,6 @@ export function validatePublishRequirements(
     return structureValidation;
   }
 
-  if (audioItems.length > 1) {
-    return {
-      ok: false,
-      code: "multi_audio_not_supported",
-      message: MULTI_AUDIO_PUBLISH_MESSAGE,
-    };
-  }
-
   if (practice.is_free) {
     if (practice.price !== 0) {
       return {
@@ -179,6 +168,34 @@ export function validatePublishRequirements(
   }
 
   return { ok: true };
+}
+
+export async function publishPracticeProduct(
+  supabase: SupabaseClient,
+  practiceId: string,
+  publishedAt: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("publish_audio_product", {
+    p_practice_id: practiceId,
+    p_published_at: publishedAt,
+  });
+
+  if (error) {
+    throw new Error("practice_publish_failed");
+  }
+}
+
+export async function unpublishPracticeProduct(
+  supabase: SupabaseClient,
+  practiceId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("unpublish_audio_product", {
+    p_practice_id: practiceId,
+  });
+
+  if (error) {
+    throw new Error("practice_unpublish_failed");
+  }
 }
 
 export async function publishAllAudioItems(

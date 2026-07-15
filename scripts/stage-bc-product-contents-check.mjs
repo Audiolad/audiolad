@@ -218,7 +218,7 @@ async function main() {
     .eq("id", PROGRAM_ID)
     .maybeSingle();
 
-  assert(programPractice?.status === "draft", "program remains draft");
+  assert(programPractice?.status === "published", "program is published");
   assert(programPractice?.slug === PROGRAM_SLUG, "program slug");
 
   const { data: audioItems } = await admin
@@ -250,7 +250,7 @@ async function main() {
     .eq("slug", PROGRAM_SLUG)
     .maybeSingle();
 
-  assert(anonProgram === null, "draft program hidden from public");
+  assert(anonProgram?.id === PROGRAM_ID, "published program visible to public");
 
   const { data: authorProgram } = await authorClient
     .from("practices")
@@ -258,7 +258,7 @@ async function main() {
     .eq("slug", PROGRAM_SLUG)
     .maybeSingle();
 
-  assert(authorProgram?.id === PROGRAM_ID, "author can read draft program");
+  assert(authorProgram?.id === PROGRAM_ID, "author can read published program");
 
   const { data: authorAudioItems } = await authorClient
     .from("audio_items")
@@ -266,7 +266,7 @@ async function main() {
     .eq("practice_id", PROGRAM_ID)
     .order("position", { ascending: true });
 
-  assert(authorAudioItems?.length === 3, "author can read draft audio items");
+  assert(authorAudioItems?.length === 3, "author can read published audio items");
 
   const { data: singlePractice } = await admin
     .from("practices")
@@ -300,9 +300,13 @@ async function main() {
   });
 
   assert(
-    [404, 307, 308].includes(programPracticePage.status),
-    "draft program hidden on public practice page",
+    [200, 307, 308].includes(programPracticePage.status),
+    "published program visible on public practice page",
   );
+
+  const programHtml = await programPracticePage.text();
+  assert(programHtml.includes("Содержание"), "program shows contents block");
+  assert(programHtml.includes("3 аудио"), "program shows audio count meta");
 
   console.log("stage-bc checks passed");
 }

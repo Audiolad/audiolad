@@ -6,7 +6,7 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
-  syncPracticeAudioCompatibility,
+  publishPracticeProduct,
   validatePublishRequirements,
 } from "@/lib/author-products/publish";
 
@@ -42,36 +42,12 @@ export async function POST(_request: Request, context: RouteContext) {
     const now = new Date().toISOString();
     const publishedAt = practice.published_at ?? now;
 
-    const { error: practiceError } = await supabase
-      .from("practices")
-      .update({
-        status: "published",
-        published_at: publishedAt,
-        updated_at: now,
-      })
-      .eq("id", id);
-
-    if (practiceError) {
-      console.error("author_publish_practice_error", practiceError.message);
+    try {
+      await publishPracticeProduct(supabase, id, publishedAt);
+    } catch {
+      console.error("author_publish_atomic_error", id);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
-
-    const audioItem = detail.audio_items[0];
-
-    const { error: audioError } = await supabase
-      .from("audio_items")
-      .update({
-        status: "published",
-        updated_at: now,
-      })
-      .eq("id", audioItem.id);
-
-    if (audioError) {
-      console.error("author_publish_audio_error", audioError.message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
-
-    await syncPracticeAudioCompatibility(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
 

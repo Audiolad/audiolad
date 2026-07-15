@@ -10,10 +10,10 @@ import {
   type CreateOrderRpcRow,
   type PendingOrderRow,
 } from "@/lib/orders/create-order-api";
-import { createClient } from "@/lib/supabase/server";
+import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const supabase = await createClientFromRequest(request);
 
   const {
     data: { user },
