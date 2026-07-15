@@ -4,24 +4,31 @@ import { UserIcon } from "./HomeIcons";
 
 export default function SignUpInvitation() {
   return (
-    <section className="mt-8 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f1e4fc] p-6 lg:p-8">
-      <h2 className="text-[22px] font-semibold leading-tight text-[#25135c] lg:text-[24px]">
-        Сохраните своё пространство в АудиоЛаде
-      </h2>
+    <section
+      className="signup-invitation-banner mt-8"
+      aria-label="Приглашение создать аккаунт"
+    >
+      <div className="signup-invitation-banner__visual" aria-hidden="true" />
 
-      <p className="mt-3 max-w-[640px] text-[15px] leading-6 text-[#6f61a3]">
-        Создайте бесплатный аккаунт, чтобы продолжать с того места, где
-        остановились, сохранять практики и получать новые материалы любимых
-        авторов.
-      </p>
+      <div className="signup-invitation-banner__content">
+        <h2 className="signup-invitation-banner__title">
+          Сохраните своё пространство в АудиоЛаде
+        </h2>
 
-      <Link
-        href="/auth/sign-up"
-        className="home-primary-cta home-primary-cta--compact mt-5"
-      >
-        <UserIcon />
-        Создать Аудиотеку
-      </Link>
+        <p className="signup-invitation-banner__description">
+          Создайте бесплатный аккаунт, чтобы продолжать с того места, где
+          остановились, сохранять практики и получать новые материалы любимых
+          авторов.
+        </p>
+
+        <Link
+          href="/auth/sign-up"
+          className="home-primary-cta home-primary-cta--compact signup-invitation-banner__cta"
+        >
+          <UserIcon />
+          Создать Аудиотеку
+        </Link>
+      </div>
     </section>
   );
 }
