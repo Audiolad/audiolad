@@ -2,7 +2,7 @@
 
 Описание текущего фактического состояния проекта «АудиоЛад».
 
-Последнее обновление: 2026-07-10
+Последнее обновление: 2026-07-15
 
 ## Сводный статус
 
@@ -81,19 +81,28 @@
 
 - `/profile` — статистика, любимые авторы, блоки настроек и приглашения (имя и email — реальные).
 - `/profile/edit` — телефон, bio, аватар, интересы, публичность (disabled, не сохраняются).
-- `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases`.
-- `/playlists`, `/playlists/new`, `/playlist/morning-energy`.
+- `/favorites`, `/history`, `/downloads`, `/purchases`.
+- `/playlists`, `/playlists/new`, `/playlist/morning-energy` — UI всё ещё демо; **модель БД** `playlists` / `playlist_items` добавлена миграцией PR1 (на production не применена).
 - `/authors` и страницы авторов.
 - `/author-dashboard` и все подстраницы кабинета автора.
 - `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`.
 - `/settings`.
 
+## Плейлисты (состояние на 2026-07-15)
+
+- Есть миграция схемы + RLS: `supabase/migrations/20260715270000_create_playlists.sql`.
+- Элемент = `practice_id`; режимы `private` / `public` (`unlisted` не в схеме, зарезервирован на будущее).
+- `private`: всегда `slug` и `published_at` NULL; `public`: обязательный уникальный slug, `published_at` опционален до серверного publish.
+- UI страниц `/playlists*` пока mock; API/RPC, публикация, добавление из Аудиотеки, Play All между продуктами — не реализованы.
+- Будущие маршруты: `/playlists/[id]`, публичный `/p/[slug]`.
+
 ## Что ещё не реализовано
 
-- Глобальная защита приватных маршрутов.
-- Ссылки на вход/регистрацию в основном UI (есть только между auth-страницами).
-- API Routes (`src/app/api/`) — отсутствуют.
-- Автотесты — отсутствуют.
+- CRUD/UI плейлистов на реальных данных и API/RPC мутаций.
+- Публичный каталог подборок и проверка publish-правил.
+- Play All между разными продуктами в плеере.
+- Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
+- Автотесты приложения — отсутствуют (есть SQL smoke для плейлистов в `supabase/tests/`).
 
 ## Незакоммиченные изменения в рабочей копии
 

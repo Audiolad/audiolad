@@ -4,6 +4,22 @@
 
 ---
 
+## Сессия — 15 июля 2026 (плейлисты PR1)
+
+**Сделано:**
+
+- Диагностический аудит раздела «Плейлисты» (ранее в чате).
+- Подготовлена миграция `supabase/migrations/20260715270000_create_playlists.sql` (таблицы, constraints, indexes, RLS private/public).
+- Усилены CHECK: `playlists_visibility_slug_consistency_check`, `playlists_visibility_published_at_consistency_check`; smoke-тесты расширены.
+- Smoke-тест RLS: `supabase/tests/playlists_pr1_rls_smoke.sql` на изолированной БД.
+- Точечно обновлены `docs/DATABASE.md`, `DECISIONS.md`, `PROJECT_STATE.md`, `ARCHITECTURE.md`, `NEXT_STEPS.md`.
+- Production БД и плеер не изменялись; коммит не создавался.
+- `unlisted` зафиксирован в документации как будущее расширение, в SQL не добавлен.
+
+**Следующий шаг:** ревью миграции → применение к production по отдельному подтверждению → PR2 CRUD UI/API.
+
+---
+
 ## Сессия 1 — 10 июля 2026
 
 **Участники:** Сергей (владелец), Орий / ChatGPT (архитектор), Cursor (исполнитель).

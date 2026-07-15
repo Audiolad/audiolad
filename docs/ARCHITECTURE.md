@@ -74,6 +74,14 @@ Timeweb Cloud
 
 `/`, `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases`, `/playlists`, `/playlists/new`, `/playlist/morning-energy`, `/authors`, `/authors/*`, `/author-dashboard`, `/author-dashboard/**`, `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`, `/settings`.
 
+### Плейлисты (схема есть, UI пока демо)
+
+- Модель: `playlists`, `playlist_items` (`practice_id`), `visibility` private|public. См. `docs/DATABASE.md`.
+- `unlisted` зарезервирован на будущее (доступ по ссылке без каталога); в схеме/маршрутах/UI не реализован.
+- Будущие маршруты: `/playlists`, `/playlists/[id]` (владелец); `/p/[slug]` (публичный просмотр).
+- Демо `/playlist/morning-energy` не использовать для реальных данных.
+- Плейлист не даёт entitlement; Play All между продуктами пока не реализуется.
+
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 
 ## Поток аутентификации
