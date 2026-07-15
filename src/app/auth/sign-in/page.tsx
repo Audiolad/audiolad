@@ -18,6 +18,8 @@ function SignInForm() {
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const isFormReady = email.trim().length > 0 && password.length > 0;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -112,8 +114,8 @@ function SignInForm() {
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-5 py-4 text-[17px] font-semibold text-white shadow-[0_14px_34px_rgba(96,59,168,0.24)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isLoading || !isFormReady}
+            className="primary-cta primary-cta--form"
           >
             {isLoading ? "Входим…" : "Войти"}
           </button>
