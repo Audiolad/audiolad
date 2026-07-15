@@ -46,7 +46,7 @@ export default function GuestHome({ data }: GuestHomeProps) {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href={primaryListenHref}
-            className="inline-flex min-h-[52px] items-center gap-2.5 rounded-[22px] bg-gradient-to-r from-[#6234b5] via-[#7042c5] to-[#9872d8] px-7 py-[18px] text-[17px] font-semibold text-white shadow-[0_16px_40px_rgba(96,59,168,0.32)] transition-[box-shadow,transform] duration-200 hover:shadow-[0_18px_44px_rgba(96,59,168,0.36)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] active:scale-[0.99]"
+            className="home-primary-cta home-primary-cta--hero"
           >
             <PlayIcon />
             Начать слушать бесплатно
