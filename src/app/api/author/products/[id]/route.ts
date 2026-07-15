@@ -6,15 +6,27 @@ import {
 } from "@/lib/author-products/auth";
 import {
   validateDescriptionLength,
+  validateStoredFormatLength,
   validateSubtitleLength,
   validateTitleLength,
 } from "@/lib/author-products/limits";
+import {
+  deletePracticeProduct,
+  getDeleteBlockerMessage,
+  getDeleteBlockers,
+  getProductLifecycleBlockers,
+} from "@/lib/author-products/lifecycle";
 import {
   generateUniqueSlug,
   getAuthorProductDetail,
   isPracticeSlugTaken,
 } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
+import {
+  isClearableTextFieldProvided,
+  normalizeClearableTextField,
+} from "@/lib/author-products/text-fields";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PAID_PRICE_OPTIONS } from "@/lib/author-products/types";
 import { slugifyTitle } from "@/lib/author-products/utils";
 
@@ -38,12 +50,35 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-function parseOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
+function applyClearableTextField(
+  body: object,
+  key: "subtitle" | "description" | "format",
+  updates: Record<string, unknown>,
+  validate?: (value: string) => string | null,
+) {
+  if (!isClearableTextFieldProvided(body, key)) {
+    return null;
   }
 
-  return value;
+  try {
+    const normalized = normalizeClearableTextField(
+      (body as Record<string, unknown>)[key],
+    );
+    const valueForValidation = normalized ?? "";
+
+    if (validate) {
+      const validationError = validate(valueForValidation);
+
+      if (validationError) {
+        return validationError;
+      }
+    }
+
+    updates[key] = normalized;
+    return null;
+  } catch {
+    return "invalid_request";
+  }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -84,31 +119,42 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if ("subtitle" in body) {
-      const subtitle = parseOptionalString(body.subtitle)?.trim() || "";
-
-      const subtitleError = validateSubtitleLength(subtitle);
+      const subtitleError = applyClearableTextField(
+        body,
+        "subtitle",
+        updates,
+        validateSubtitleLength,
+      );
 
       if (subtitleError) {
         return NextResponse.json({ error: subtitleError }, { status: 400 });
       }
-
-      updates.subtitle = subtitle || null;
     }
 
     if ("description" in body) {
-      const description = parseOptionalString(body.description)?.trim() || "";
-
-      const descriptionError = validateDescriptionLength(description);
+      const descriptionError = applyClearableTextField(
+        body,
+        "description",
+        updates,
+        validateDescriptionLength,
+      );
 
       if (descriptionError) {
         return NextResponse.json({ error: descriptionError }, { status: 400 });
       }
-
-      updates.description = description || null;
     }
 
     if ("format" in body) {
-      updates.format = parseOptionalString(body.format)?.trim() || null;
+      const formatError = applyClearableTextField(
+        body,
+        "format",
+        updates,
+        validateStoredFormatLength,
+      );
+
+      if (formatError) {
+        return NextResponse.json({ error: formatError }, { status: 400 });
+      }
     }
 
     const settingFree =
@@ -198,14 +244,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const { error: updateError } = await supabase
+    const { data: updatedPractice, error: updateError } = await supabase
       .from("practices")
       .update(updates)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id, title, subtitle, description, format, updated_at")
+      .maybeSingle();
 
     if (updateError) {
       console.error("author_product_update_error", updateError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    if (!updatedPractice?.id) {
+      return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
     await syncPracticeAudioCompatibility(supabase, id);
@@ -217,6 +269,57 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     return NextResponse.json({ product });
+  } catch (error) {
+    return handleAuthorRouteError(error);
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    await requirePracticeAccess(id);
+    const serviceSupabase = createServiceRoleClient();
+
+    const blockers = getDeleteBlockers(
+      await getProductLifecycleBlockers(serviceSupabase, id),
+    );
+
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        {
+          error: blockers[0],
+          message: getDeleteBlockerMessage(blockers),
+        },
+        { status: 409 },
+      );
+    }
+
+    try {
+      await deletePracticeProduct(serviceSupabase, id);
+    } catch (error) {
+      const code =
+        error instanceof Error ? error.message : "practice_delete_failed";
+
+      if (
+        code === "published" ||
+        code === "starter_bundle" ||
+        code === "has_entitlements" ||
+        code === "has_orders"
+      ) {
+        return NextResponse.json(
+          {
+            error: code,
+            message: getDeleteBlockerMessage([code]),
+          },
+          { status: 409 },
+        );
+      }
+
+      console.error("author_product_delete_error", id, code);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return handleAuthorRouteError(error);
   }

@@ -54,7 +54,6 @@ const fallbackSymbols = ["♡", "☼", "✧", "❈"];
 
 const METADATA_DESCRIPTION_FALLBACK =
   "Аудиопрактика на платформе АудиоЛад.";
-const PAGE_DESCRIPTION_FALLBACK = "Описание практики скоро появится.";
 
 function normalizeOne<T>(value: T | T[] | null | undefined): T | null {
   if (value == null) {
@@ -114,12 +113,6 @@ function getAuthorName(practice: PublicPracticeRow): string | null {
   const name = author?.name?.trim();
 
   return name ? name : null;
-}
-
-function getPracticeDescription(description: string | null): string {
-  const trimmed = typeof description === "string" ? description.trim() : "";
-
-  return trimmed || PAGE_DESCRIPTION_FALLBACK;
 }
 
 function truncateDescription(text: string, maxLength = 160): string {
@@ -486,7 +479,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
   });
-  const description = getPracticeDescription(practice.description);
+  const description = practice.description?.trim() || null;
   const gradient = getCoverGradient(practice.slug);
   const symbol = getCoverSymbol(practice.slug);
   const coverDisplayUrl = buildCoverDisplayUrl(
@@ -610,11 +603,13 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             )}
           </section>
 
-          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
+          {description ? (
+            <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+              <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
+                {description}
+              </p>
+            </section>
+          ) : null}
 
           <ProductContentsSection
             items={publicAudioItems}

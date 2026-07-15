@@ -55,6 +55,7 @@ export const PRODUCT_CONTENT_LIMITS = {
   description: 1000,
   audioTitle: 100,
   audioDescription: 500,
+  customFormat: 60,
 } as const;
 
 export type ProductFieldErrorCode =
@@ -62,7 +63,9 @@ export type ProductFieldErrorCode =
   | "subtitle_too_long"
   | "description_too_long"
   | "audio_title_too_long"
-  | "audio_description_too_long";
+  | "audio_description_too_long"
+  | "custom_format_too_long"
+  | "missing_custom_format";
 
 export function validateTitleLength(value: string): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.title) {
@@ -112,6 +115,16 @@ export function validateAudioDescriptionLength(
   return null;
 }
 
+export function validateStoredFormatLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.customFormat) {
+    return "custom_format_too_long";
+  }
+
+  return null;
+}
+
 export function getProductFieldErrorMessage(code: string): string | null {
   switch (code) {
     case "title_too_long":
@@ -124,6 +137,10 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Название аудио не должно превышать 100 символов.";
     case "audio_description_too_long":
       return "Краткое описание аудио не должно превышать 500 символов.";
+    case "custom_format_too_long":
+      return "Название формата не должно превышать 60 символов.";
+    case "missing_custom_format":
+      return "Укажите название своего формата";
     default:
       return null;
   }
@@ -131,7 +148,13 @@ export function getProductFieldErrorMessage(code: string): string | null {
 
 export function getProductFieldKeyForError(
   code: ProductFieldErrorCode,
-): "title" | "subtitle" | "description" | "audioTitle" | "audioDescription" {
+):
+  | "title"
+  | "subtitle"
+  | "description"
+  | "audioTitle"
+  | "audioDescription"
+  | "formatCustom" {
   switch (code) {
     case "title_too_long":
       return "title";
@@ -143,5 +166,8 @@ export function getProductFieldKeyForError(
       return "audioTitle";
     case "audio_description_too_long":
       return "audioDescription";
+    case "custom_format_too_long":
+    case "missing_custom_format":
+      return "formatCustom";
   }
 }

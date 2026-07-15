@@ -5,16 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import {
   formatPriceLabel,
   formatUpdatedAt,
+  getStatusClassName,
   getStatusLabel,
 } from "@/lib/author-products/types";
 
 type AuthorDashboardClientProps = {
   authors: AuthorWorkspace[];
 };
+
+type ProductListView = "active" | "archive";
 
 function PlusIcon() {
   return (
@@ -29,15 +33,76 @@ function PlusIcon() {
   );
 }
 
-function getStatusClassName(status: string): string {
-  switch (status) {
-    case "published":
-      return "bg-[#eaf7ef] text-[#3d8d65]";
-    case "archived":
-      return "bg-[#f2f2f7] text-[#6d6d80]";
-    default:
-      return "bg-[#fff4df] text-[#b67a1d]";
-  }
+function ProductCard({
+  product,
+  authorSlug,
+}: {
+  product: AuthorProductListItem;
+  authorSlug: string;
+}) {
+  return (
+    <article className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+          {product.cover_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.cover_url}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl text-[#9a74d8]">
+              ♪
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="line-clamp-2 text-[17px] font-semibold leading-5">
+                {product.title}
+              </h3>
+              <p className="mt-1 text-sm text-[#7d70a2]">
+                {getDisplayFormat(product.format) || "Формат не указан"}
+              </p>
+            </div>
+
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClassName(product.status)}`}
+            >
+              {getStatusLabel(product.status)}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-3 text-sm text-[#5f5484]">
+            <span>{product.audio_count} аудио</span>
+            <span>{formatPriceLabel(product.price, product.is_free)}</span>
+            <span>Обновлён {formatUpdatedAt(product.updated_at)}</span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href={`/author-dashboard/products/${product.id}`}
+              className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Редактировать
+            </Link>
+
+            {product.status === "published" ? (
+              <Link
+                href={buildPracticePublicPath(authorSlug, product.slug)}
+                className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
+              >
+                Открыть
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function AuthorDashboardClient({
@@ -48,6 +113,7 @@ export default function AuthorDashboardClient({
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [listView, setListView] = useState<ProductListView>("active");
 
   const selectedAuthor = useMemo(() => {
     const slug = searchParams.get("author");
@@ -113,6 +179,9 @@ export default function AuthorDashboardClient({
   }
 
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(selectedAuthor.slug)}`;
+  const activeProducts = products.filter((product) => product.status !== "archived");
+  const archivedProducts = products.filter((product) => product.status === "archived");
+  const visibleProducts = listView === "archive" ? archivedProducts : activeProducts;
 
   return (
     <div>
@@ -150,7 +219,34 @@ export default function AuthorDashboardClient({
       </div>
 
       <section className="mt-8">
-        <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
+
+          <div className="inline-flex rounded-full border border-[#e4d7f4] bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setListView("active")}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                listView === "active"
+                  ? "bg-[#7042c5] text-white"
+                  : "text-[#7042c5]"
+              }`}
+            >
+              Основной список
+            </button>
+            <button
+              type="button"
+              onClick={() => setListView("archive")}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                listView === "archive"
+                  ? "bg-[#7042c5] text-white"
+                  : "text-[#7042c5]"
+              }`}
+            >
+              Архив{archivedProducts.length > 0 ? ` (${archivedProducts.length})` : ""}
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <p className="mt-4 text-sm text-[#7d70a2]">Загрузка списка…</p>
@@ -162,81 +258,21 @@ export default function AuthorDashboardClient({
           </p>
         ) : null}
 
-        {!loading && !error && products.length === 0 ? (
+        {!loading && !error && visibleProducts.length === 0 ? (
           <p className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6 text-sm text-[#7d70a2]">
-            Пока нет аудиопродуктов. Создайте первый черновик.
+            {listView === "archive"
+              ? "В архиве пока нет аудиопродуктов."
+              : "Пока нет аудиопродуктов. Создайте первый черновик."}
           </p>
         ) : null}
 
         <div className="mt-4 space-y-4">
-          {products.map((product) => (
-            <article
+          {visibleProducts.map((product) => (
+            <ProductCard
               key={product.id}
-              className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
-                  {product.cover_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={product.cover_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-3xl text-[#9a74d8]">
-                      ♪
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="line-clamp-2 text-[17px] font-semibold leading-5">
-                        {product.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-[#7d70a2]">
-                        {product.format || "Формат не указан"}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClassName(product.status)}`}
-                    >
-                      {getStatusLabel(product.status)}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-3 text-sm text-[#5f5484]">
-                    <span>{product.audio_count} аудио</span>
-                    <span>{formatPriceLabel(product.price, product.is_free)}</span>
-                    <span>Обновлён {formatUpdatedAt(product.updated_at)}</span>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href={`/author-dashboard/products/${product.id}`}
-                      className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
-                    >
-                      Редактировать
-                    </Link>
-
-                    {product.status === "published" ? (
-                      <Link
-                        href={buildPracticePublicPath(
-                          selectedAuthor.slug,
-                          product.slug,
-                        )}
-                        className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
-                      >
-                        Открыть
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </article>
+              product={product}
+              authorSlug={selectedAuthor.slug}
+            />
           ))}
         </div>
       </section>

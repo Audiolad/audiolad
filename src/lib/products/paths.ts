@@ -20,8 +20,15 @@ export function buildPracticeBuyerPreviewPath(
 export function buildListenPath(
   authorSlug: string,
   productSlug: string,
+  options?: { autoplay?: boolean },
 ): string {
-  return `/listen/${authorSlug}/${productSlug}`;
+  const base = `/listen/${authorSlug}/${productSlug}`;
+
+  if (options?.autoplay) {
+    return `${base}?autoplay=1`;
+  }
+
+  return base;
 }
 
 export function buildListenApiBase(

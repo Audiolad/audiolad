@@ -32,6 +32,10 @@ export function isPracticePublished(status: string | null | undefined): boolean 
   return status === "published";
 }
 
+export function isPracticeUnpublished(status: string | null | undefined): boolean {
+  return status === "unpublished";
+}
+
 export function isPracticeArchived(status: string | null | undefined): boolean {
   return status === "archived";
 }
@@ -45,11 +49,15 @@ export function isPracticeCatalogListed(practice: {
   );
 }
 
-/** Entitled users may listen to products that were taken off sale but not deleted. */
+/** Entitled users may listen to products taken off sale but not deleted. */
 export function canEntitledUserAccessPracticeStatus(
   status: string | null | undefined,
 ): boolean {
-  return isPracticePublished(status) || isPracticeArchived(status);
+  return (
+    isPracticePublished(status) ||
+    isPracticeUnpublished(status) ||
+    isPracticeArchived(status)
+  );
 }
 
 export function canAcquirePractice(practice: ProductAccessInput): boolean {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AudioItemRow, PracticeRow } from "./types";
+import { LEGACY_OTHER_FORMAT } from "./format";
 import { minutesFromSeconds } from "./utils";
 
 type PublishValidationResult =
@@ -127,11 +128,14 @@ export function validatePublishRequirements(
 
   const format = practice.format?.trim();
 
-  if (!format) {
+  if (!format || format === LEGACY_OTHER_FORMAT) {
     return {
       ok: false,
-      code: "missing_format",
-      message: "Выберите публичный формат.",
+      code: format === LEGACY_OTHER_FORMAT ? "missing_custom_format" : "missing_format",
+      message:
+        format === LEGACY_OTHER_FORMAT
+          ? "Укажите название своего формата"
+          : "Выберите публичный формат.",
     };
   }
 
@@ -195,6 +199,19 @@ export async function unpublishPracticeProduct(
 
   if (error) {
     throw new Error("practice_unpublish_failed");
+  }
+}
+
+export async function archivePracticeProduct(
+  supabase: SupabaseClient,
+  practiceId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("archive_audio_product", {
+    p_practice_id: practiceId,
+  });
+
+  if (error) {
+    throw new Error("practice_archive_failed");
   }
 }
 

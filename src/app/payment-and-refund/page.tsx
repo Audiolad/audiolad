@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import LegalPageShell from "@/components/legal/LegalPageShell";
+
 export const metadata: Metadata = {
   title: "Оплата, получение и возврат – АудиоЛад",
   description:
@@ -75,9 +77,8 @@ function OrderedList({ items }: { items: string[] }) {
 
 export default function PaymentAndRefundPage() {
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface pb-10 lg:max-w-[820px]">
-        <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-10">
+    <LegalPageShell>
+      <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-10">
           <header className="border-b border-[#eadff8] pb-5">
             <Link
               href="/"
@@ -436,7 +437,6 @@ export default function PaymentAndRefundPage() {
             </p>
           </div>
         </div>
-      </div>
-    </main>
+    </LegalPageShell>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import LegalPageShell from "@/components/legal/LegalPageShell";
+
 export const metadata: Metadata = {
   title: "Реквизиты – АудиоЛад",
   description: "Официальные реквизиты платформы АудиоЛад.",
@@ -27,9 +29,8 @@ const linkClassName =
 
 export default function RequisitesPage() {
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface pb-10 lg:max-w-[820px]">
-        <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-10">
+    <LegalPageShell>
+      <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-10">
           <header className="border-b border-[#eadff8] pb-5">
             <Link
               href="/"
@@ -119,7 +120,6 @@ export default function RequisitesPage() {
             </p>
           </section>
         </div>
-      </div>
-    </main>
+    </LegalPageShell>
   );
 }

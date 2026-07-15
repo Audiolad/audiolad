@@ -39,6 +39,12 @@ function drainPendingSave(
 }
 
 import { buildListenApiBase } from "@/lib/products/paths";
+import {
+  syncMediaSessionPlaybackState,
+  verifyRealPlayback,
+  waitForPlayingEvent,
+} from "@/lib/audio/playback-recovery";
+import { logPlayerDebug } from "@/lib/audio/player-debug";
 
 type UseSequentialPlayerOptions = {
   authorSlug: string;
@@ -46,6 +52,10 @@ type UseSequentialPlayerOptions = {
   practiceId: string;
   tracks: ListenTrack[];
   initialProgress: ListenProgressEntry[];
+  requestInitialAutoplay?: boolean;
+  onInitialAutoplayAttempted?: () => void;
+  getSessionGeneration?: () => number;
+  registerCleanup?: (cleanup: () => void) => void;
 };
 
 type SwitchTrackOptions = {
@@ -63,6 +73,10 @@ export function useSequentialPlayer({
   practiceId,
   tracks,
   initialProgress,
+  requestInitialAutoplay = false,
+  onInitialAutoplayAttempted,
+  getSessionGeneration,
+  registerCleanup,
 }: UseSequentialPlayerOptions) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const urlRequestRef = useRef(0);
@@ -71,6 +85,21 @@ export function useSequentialPlayer({
   const lastSaveAtRef = useRef(0);
   const progressRef = useRef<ListenProgressEntry[]>(initialProgress);
   const wasPlayingBeforeSwitchRef = useRef(false);
+  const initialAutoplayPendingRef = useRef(requestInitialAutoplay);
+  const initialAutoplayAttemptedRef = useRef(false);
+  const userWantsPlaybackRef = useRef(false);
+  const userInitiatedPauseRef = useRef(false);
+  const lastRecoveryAttemptRef = useRef(0);
+  const recoveryUrlAttemptedRef = useRef(false);
+  const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
+  const recoveryAttemptIdRef = useRef(0);
+  const resumePositionRef = useRef(0);
+  const isPlayingRef = useRef(false);
+  const getSessionGenerationRef = useRef(getSessionGeneration);
+
+  useEffect(() => {
+    getSessionGenerationRef.current = getSessionGeneration;
+  }, [getSessionGeneration]);
 
   const initialPlayback = useMemo(
     () => resolveInitialPlayback(tracks, initialProgress),
@@ -82,6 +111,7 @@ export function useSequentialPlayer({
   );
   const [src, setSrc] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUrlLoading, setIsUrlLoading] = useState(true);
   const [duration, setDuration] = useState(0);
@@ -91,6 +121,7 @@ export function useSequentialPlayer({
   const [progressError, setProgressError] = useState<string | null>(null);
   const [playbackRateIndex, setPlaybackRateIndex] = useState(1);
   const [statusMessage, setStatusMessage] = useState("Подготавливаем аудио…");
+  const [autoplayHint, setAutoplayHint] = useState<string | null>(null);
   const [progress, setProgress] = useState<ListenProgressEntry[]>(
     initialProgress,
   );
@@ -103,6 +134,25 @@ export function useSequentialPlayer({
 
   const isMultiTrack = tracks.length > 1;
   const currentTrack = tracks[currentTrackIndex] ?? null;
+
+  const debugSnapshot = useCallback(
+    (source: string, event: string) => {
+      logPlayerDebug(source, event, {
+        audio: audioRef.current,
+        isPlaying: isPlayingRef.current,
+        isRecovering,
+        userWantsPlayback: userWantsPlaybackRef.current,
+        sessionGeneration: getSessionGenerationRef.current?.() ?? 0,
+      });
+    },
+    [isRecovering],
+  );
+
+  const setPlayingState = useCallback((next: boolean) => {
+    isPlayingRef.current = next;
+    setIsPlaying(next);
+    syncMediaSessionPlaybackState(next);
+  }, []);
 
   useEffect(() => {
     progressRef.current = progress;
@@ -232,6 +282,7 @@ export function useSequentialPlayer({
   const loadSignedUrl = useCallback(
     async (audioItemId: string) => {
       const requestId = urlRequestRef.current + 1;
+      const sessionGeneration = getSessionGenerationRef.current?.() ?? 0;
       urlRequestRef.current = requestId;
       setIsUrlLoading(true);
       setUrlError(null);
@@ -242,11 +293,21 @@ export function useSequentialPlayer({
           `${listenApiBase}/audio/${audioItemId}`,
         );
 
-        if (requestId !== urlRequestRef.current) {
+        if (
+          requestId !== urlRequestRef.current ||
+          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
+        ) {
           return;
         }
 
         const payload = (await response.json()) as { url?: string; error?: string };
+
+        if (
+          requestId !== urlRequestRef.current ||
+          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
+        ) {
+          return;
+        }
 
         if (!response.ok || !payload.url) {
           if (response.status === 403) {
@@ -266,7 +327,10 @@ export function useSequentialPlayer({
         setSrc(payload.url);
         setIsUrlLoading(false);
       } catch {
-        if (requestId !== urlRequestRef.current) {
+        if (
+          requestId !== urlRequestRef.current ||
+          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
+        ) {
           return;
         }
 
@@ -373,19 +437,31 @@ export function useSequentialPlayer({
     };
 
     const handlePlay = () => {
-      setIsPlaying(true);
       setPlayerError(null);
       setStatusMessage("");
     };
 
+    const handlePlaying = () => {
+      setPlayingState(true);
+      setIsRecovering(false);
+      setPlayerError(null);
+      setStatusMessage("");
+      setAutoplayHint(null);
+      recoveryUrlAttemptedRef.current = false;
+      debugSnapshot("audio-event", "playing");
+    };
+
     const handlePause = () => {
-      setIsPlaying(false);
+      setPlayingState(false);
+      debugSnapshot("audio-event", "pause");
     };
 
     const handleWaiting = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setStatusMessage("Загрузка…");
       }
+
+      debugSnapshot("audio-event", "waiting");
     };
 
     const handleCanPlay = () => {
@@ -402,7 +478,28 @@ export function useSequentialPlayer({
         void audio.play().catch(() => {
           setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
         });
+        return;
       }
+
+      if (
+        initialAutoplayPendingRef.current &&
+        !initialAutoplayAttemptedRef.current
+      ) {
+        initialAutoplayPendingRef.current = false;
+        initialAutoplayAttemptedRef.current = true;
+        onInitialAutoplayAttempted?.();
+        userWantsPlaybackRef.current = true;
+
+        void audio.play().catch(() => {
+          userWantsPlaybackRef.current = false;
+          setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+        });
+      }
+    };
+
+    const handleStalled = () => {
+      setPlayingState(false);
+      debugSnapshot("audio-event", "stalled");
     };
 
     const handleEnded = async () => {
@@ -410,7 +507,7 @@ export function useSequentialPlayer({
         return;
       }
 
-      setIsPlaying(false);
+      setPlayingState(false);
       setCurrentTime(audio.duration || 0);
 
       await saveProgress(currentTrack.id, audio.duration || 0, true, {
@@ -425,11 +522,18 @@ export function useSequentialPlayer({
         return;
       }
 
+      userWantsPlaybackRef.current = false;
       setProgramCompleted(true);
     };
 
     const handleError = () => {
-      setIsPlaying(false);
+      setPlayingState(false);
+      setIsRecovering(false);
+
+      if (!userInitiatedPauseRef.current) {
+        // Keep user intent — they may want to retry after foreground recovery.
+      }
+
       setIsLoading(false);
 
       const mediaError = audio.error;
@@ -449,8 +553,10 @@ export function useSequentialPlayer({
     audio.addEventListener("durationchange", updateDuration);
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("play", handlePlay);
+    audio.addEventListener("playing", handlePlaying);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("waiting", handleWaiting);
+    audio.addEventListener("stalled", handleStalled);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("error", handleError);
@@ -462,8 +568,10 @@ export function useSequentialPlayer({
       audio.removeEventListener("durationchange", updateDuration);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("waiting", handleWaiting);
+      audio.removeEventListener("stalled", handleStalled);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("error", handleError);
@@ -478,6 +586,9 @@ export function useSequentialPlayer({
     tracks.length,
     saveProgress,
     src,
+    onInitialAutoplayAttempted,
+    debugSnapshot,
+    setPlayingState,
   ]);
 
   useEffect(() => {
@@ -561,16 +672,25 @@ export function useSequentialPlayer({
       setCurrentTime(0);
     }
 
-    if (isPlaying) {
+    if (!audio.paused) {
+      userWantsPlaybackRef.current = false;
+      userInitiatedPauseRef.current = true;
       audio.pause();
+      userInitiatedPauseRef.current = false;
       await flushProgress();
       return;
     }
 
+    userWantsPlaybackRef.current = true;
+    recoveryUrlAttemptedRef.current = false;
+
     try {
       await audio.play();
       setPlayerError(null);
+      setAutoplayHint(null);
     } catch {
+      userWantsPlaybackRef.current = false;
+      setPlayingState(false);
       setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
     }
   };
@@ -654,6 +774,7 @@ export function useSequentialPlayer({
     setUrlError(null);
     setIsLoading(true);
     setStatusMessage("Подготавливаем аудио…");
+    setPendingStartPosition(currentTime);
     void loadSignedUrl(currentTrack.id);
   };
 
@@ -692,6 +813,354 @@ export function useSequentialPlayer({
     [progress],
   );
 
+  const performStopAndClear = useCallback(() => {
+    recoveryAttemptIdRef.current += 1;
+    recoveryPromiseRef.current = null;
+    lastRecoveryAttemptRef.current = 0;
+    recoveryUrlAttemptedRef.current = false;
+    userWantsPlaybackRef.current = false;
+    initialAutoplayPendingRef.current = false;
+    wasPlayingBeforeSwitchRef.current = false;
+    urlRequestRef.current += 1;
+
+    void flushProgress();
+
+    const audio = audioRef.current;
+
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+
+    setSrc(null);
+    setPlayingState(false);
+    setIsRecovering(false);
+    setIsLoading(false);
+    setIsUrlLoading(false);
+    setPlayerError(null);
+    setUrlError(null);
+    setAutoplayHint(null);
+    setStatusMessage("");
+    debugSnapshot("stop-and-clear", "cleared");
+  }, [debugSnapshot, flushProgress, setPlayingState]);
+
+  useEffect(() => {
+    registerCleanup?.(performStopAndClear);
+
+    return () => {
+      registerCleanup?.(() => {});
+    };
+  }, [performStopAndClear, registerCleanup]);
+
+  const recoverPlaybackWhenVisible = useCallback(async (): Promise<boolean> => {
+    if (document.visibilityState !== "visible") {
+      return false;
+    }
+
+    if (!userWantsPlaybackRef.current) {
+      return false;
+    }
+
+    if (recoveryPromiseRef.current) {
+      return recoveryPromiseRef.current;
+    }
+
+    const attemptId = recoveryAttemptIdRef.current + 1;
+    recoveryAttemptIdRef.current = attemptId;
+    const generationAtStart = getSessionGenerationRef.current?.() ?? 0;
+
+    const run = async (): Promise<boolean> => {
+      const audio = audioRef.current;
+
+      if (
+        !audio?.src ||
+        audio.ended ||
+        attemptId !== recoveryAttemptIdRef.current ||
+        generationAtStart !== (getSessionGenerationRef.current?.() ?? 0)
+      ) {
+        return false;
+      }
+
+      const now = Date.now();
+
+      if (now - lastRecoveryAttemptRef.current < 1200) {
+        return false;
+      }
+
+      lastRecoveryAttemptRef.current = now;
+      setIsRecovering(true);
+      debugSnapshot("foreground-recovery", "start");
+
+      try {
+        if (audio.muted) {
+          audio.muted = false;
+        }
+
+        if (audio.volume === 0) {
+          audio.volume = 1;
+        }
+
+        resumePositionRef.current = audio.currentTime;
+        setCurrentTime(audio.currentTime);
+
+        if (!audio.paused) {
+          const alreadyPlaying = await verifyRealPlayback(audio, 600);
+
+          if (alreadyPlaying) {
+            debugSnapshot("foreground-recovery", "already-playing");
+            return true;
+          }
+
+          audio.pause();
+          setPlayingState(false);
+        }
+
+        try {
+          await audio.play();
+          const gotPlaying = await waitForPlayingEvent(audio, 2500);
+
+          if (gotPlaying || (await verifyRealPlayback(audio, 600))) {
+            debugSnapshot("foreground-recovery", "play-ok");
+            return true;
+          }
+
+          if (!audio.paused) {
+            audio.pause();
+          }
+
+          setPlayingState(false);
+        } catch {
+          setPlayingState(false);
+        }
+
+        if (
+          recoveryUrlAttemptedRef.current ||
+          !currentTrack ||
+          generationAtStart !== (getSessionGenerationRef.current?.() ?? 0)
+        ) {
+          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          syncMediaSessionPlaybackState(false);
+          debugSnapshot("foreground-recovery", "failed-no-retry");
+          return false;
+        }
+
+        recoveryUrlAttemptedRef.current = true;
+        const position = resumePositionRef.current;
+        const rate = audio.playbackRate;
+
+        audio.pause();
+        setPlayingState(false);
+        setPendingStartPosition(position);
+        debugSnapshot("foreground-recovery", "refresh-signed-url");
+
+        await loadSignedUrl(currentTrack.id);
+
+        if (
+          attemptId !== recoveryAttemptIdRef.current ||
+          generationAtStart !== (getSessionGenerationRef.current?.() ?? 0)
+        ) {
+          return false;
+        }
+
+        const refreshedAudio = audioRef.current;
+
+        if (!refreshedAudio?.src) {
+          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          return false;
+        }
+
+        refreshedAudio.playbackRate = rate;
+
+        await new Promise<void>((resolve) => {
+          const timeoutId = window.setTimeout(resolve, 4000);
+
+          const applyAndPlay = async () => {
+            if (
+              position > 0 &&
+              Number.isFinite(refreshedAudio.duration) &&
+              refreshedAudio.duration > 0
+            ) {
+              refreshedAudio.currentTime = clamp(
+                position,
+                0,
+                refreshedAudio.duration,
+              );
+              setCurrentTime(refreshedAudio.currentTime);
+              setPendingStartPosition(0);
+            }
+
+            try {
+              await refreshedAudio.play();
+              const ok =
+                (await waitForPlayingEvent(refreshedAudio, 3000)) ||
+                (await verifyRealPlayback(refreshedAudio, 600));
+
+              if (!ok && !refreshedAudio.paused) {
+                refreshedAudio.pause();
+                setPlayingState(false);
+              }
+
+              window.clearTimeout(timeoutId);
+              resolve();
+            } catch {
+              setPlayingState(false);
+              window.clearTimeout(timeoutId);
+              resolve();
+            }
+          };
+
+          if (
+            refreshedAudio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+          ) {
+            void applyAndPlay();
+            return;
+          }
+
+          refreshedAudio.addEventListener(
+            "canplay",
+            () => {
+              void applyAndPlay();
+            },
+            { once: true },
+          );
+        });
+
+        const success = isPlayingRef.current;
+
+        if (!success) {
+          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          syncMediaSessionPlaybackState(false);
+        }
+
+        debugSnapshot("foreground-recovery", success ? "url-refresh-ok" : "url-refresh-failed");
+        return success;
+      } finally {
+        setIsRecovering(false);
+      }
+    };
+
+    const promise = run();
+    recoveryPromiseRef.current = promise;
+
+    try {
+      return await promise;
+    } finally {
+      if (recoveryPromiseRef.current === promise) {
+        recoveryPromiseRef.current = null;
+      }
+    }
+  }, [currentTrack, debugSnapshot, loadSignedUrl, setPlayingState]);
+
+  const handleMediaSessionPlay = useCallback(async () => {
+    const audio = audioRef.current;
+
+    if (!audio?.src || audio.ended) {
+      syncMediaSessionPlaybackState(false);
+      debugSnapshot("media-session", "play-no-src");
+      return;
+    }
+
+    userWantsPlaybackRef.current = true;
+    debugSnapshot("media-session", "play-requested");
+
+    if (document.visibilityState === "visible") {
+      await recoverPlaybackWhenVisible();
+      return;
+    }
+
+    if (!audio.paused) {
+      const alreadyPlaying = await verifyRealPlayback(audio, 500);
+
+      if (alreadyPlaying) {
+        debugSnapshot("media-session", "play-already-active");
+        return;
+      }
+
+      audio.pause();
+      setPlayingState(false);
+    }
+
+    setIsRecovering(true);
+
+    try {
+      await audio.play();
+      const gotPlaying = await waitForPlayingEvent(audio, 2000);
+
+      if (!gotPlaying) {
+        if (!audio.paused) {
+          audio.pause();
+        }
+
+        setPlayingState(false);
+        syncMediaSessionPlaybackState(false);
+        debugSnapshot("media-session", "play-hidden-failed");
+      } else {
+        debugSnapshot("media-session", "play-hidden-ok");
+      }
+    } catch {
+      setPlayingState(false);
+      syncMediaSessionPlaybackState(false);
+      debugSnapshot("media-session", "play-hidden-error");
+    } finally {
+      setIsRecovering(false);
+    }
+  }, [debugSnapshot, recoverPlaybackWhenVisible, setPlayingState]);
+
+  const handleMediaSessionPause = useCallback(async () => {
+    recoveryAttemptIdRef.current += 1;
+    recoveryPromiseRef.current = null;
+    userWantsPlaybackRef.current = false;
+    setIsRecovering(false);
+
+    const audio = audioRef.current;
+
+    if (!audio) {
+      syncMediaSessionPlaybackState(false);
+      return;
+    }
+
+    resumePositionRef.current = audio.currentTime;
+
+    if (!audio.paused) {
+      userInitiatedPauseRef.current = true;
+      audio.pause();
+      userInitiatedPauseRef.current = false;
+      await flushProgress();
+    }
+
+    setPlayingState(false);
+    debugSnapshot("media-session", "pause");
+  }, [debugSnapshot, flushProgress, setPlayingState]);
+
+  const recoverPlaybackAfterForeground = useCallback(async () => {
+    if (!userWantsPlaybackRef.current) {
+      return;
+    }
+
+    const audio = audioRef.current;
+
+    if (!audio?.src || audio.ended) {
+      return;
+    }
+
+    if (isPlayingRef.current) {
+      const ok = await verifyRealPlayback(audio, 600);
+
+      if (ok) {
+        return;
+      }
+
+      if (!audio.paused) {
+        audio.pause();
+      }
+
+      setPlayingState(false);
+    }
+
+    await recoverPlaybackWhenVisible();
+  }, [recoverPlaybackWhenVisible, setPlayingState]);
+
   return {
     audioRef,
     src,
@@ -700,14 +1169,15 @@ export function useSequentialPlayer({
     currentTrackIndex,
     tracks,
     isPlaying,
-    isLoading: isLoading || isUrlLoading,
+    isRecovering,
+    isLoading: isLoading || isUrlLoading || isRecovering,
     hasValidDuration,
     displayDuration,
     currentTime,
     playerError: playerError ?? urlError,
     progressError,
     playbackRate: PLAYBACK_RATES[playbackRateIndex],
-    statusMessage,
+    statusMessage: autoplayHint ?? statusMessage,
     programProgressPercent,
     programCompleted,
     isPreviousTrackDisabled:
@@ -724,6 +1194,11 @@ export function useSequentialPlayer({
     handleStartOver,
     isTrackDone,
     practiceId,
+    recoverPlaybackAfterForeground,
+    performStopAndClear,
+    handleMediaSessionPlay,
+    handleMediaSessionPause,
+    userWantsPlaybackRef,
   };
 }
 

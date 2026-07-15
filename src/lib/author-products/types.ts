@@ -1,21 +1,11 @@
-export const PRODUCT_FORMATS = [
-  "Аудиопрактика",
-  "Медитация",
-  "Авторский аудиоподкаст",
-  "Лекция",
-  "Программа аудиопрактик",
-  "Аудиокурс",
-  "Цикл практик",
-  "Сборник",
-  "Аудиокнига",
-  "Другое",
-] as const;
+import { getProductPriceLabel } from "@/lib/products/price-format";
 
 export const PAID_PRICE_OPTIONS = [99, 199, 299, 444, 888, 1888, 2888] as const;
 
 export const PRACTICE_STATUS = {
   DRAFT: "draft",
   PUBLISHED: "published",
+  UNPUBLISHED: "unpublished",
   ARCHIVED: "archived",
 } as const;
 
@@ -89,20 +79,31 @@ export function getStatusLabel(status: string): string {
   switch (status) {
     case "published":
       return "Опубликован";
-    case "archived":
+    case "unpublished":
       return "Снят с публикации";
+    case "archived":
+      return "В архиве";
     case "draft":
     default:
       return "Черновик";
   }
 }
 
-export function formatPriceLabel(price: number, isFree: boolean): string {
-  if (isFree || price <= 0) {
-    return "Бесплатно";
+export function getStatusClassName(status: string): string {
+  switch (status) {
+    case "published":
+      return "bg-[#eaf7ef] text-[#3d8d65]";
+    case "unpublished":
+      return "bg-[#eef3ff] text-[#4f6db8]";
+    case "archived":
+      return "bg-[#f2f2f7] text-[#6d6d80]";
+    default:
+      return "bg-[#fff4df] text-[#b67a1d]";
   }
+}
 
-  return `${price.toLocaleString("ru-RU")} ₽`;
+export function formatPriceLabel(price: number, isFree: boolean): string {
+  return getProductPriceLabel(price, isFree);
 }
 
 export function formatUpdatedAt(value: string): string {

@@ -5,6 +5,7 @@ import {
   buildPracticeBuyerPreviewPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
+import { formatPracticePrice } from "@/lib/products/price-format";
 
 type PracticePricing = {
   price: number | null;
@@ -22,14 +23,6 @@ export function isProgramFormat(format: string | null): boolean {
     normalized.includes("курс") ||
     normalized === "цикл практик"
   );
-}
-
-export function formatPracticePrice(price: number | null): string | null {
-  if (typeof price === "number" && Number.isFinite(price) && price >= 0) {
-    return `${price} ₽`;
-  }
-
-  return null;
 }
 
 export function getFreeStatusLabel(format: string | null): string {
@@ -196,7 +189,9 @@ function buildCommercialPresentation(input: {
 > {
   const { access, practice, authorSlug, paymentsConfigured } = input;
   const priceLabel = formatPracticePrice(practice.price);
-  const listenHref = buildListenPath(authorSlug, practice.slug);
+  const listenHref = buildListenPath(authorSlug, practice.slug, {
+    autoplay: true,
+  });
   const audioReady = hasAudioReady(practice.audio_url);
 
   if (access.reason === "admin") {
@@ -266,7 +261,9 @@ function buildCommercialPresentation(input: {
     const unavailableDetail =
       practice.status === "archived"
         ? "Этот аудиопродукт больше не доступен для новых пользователей."
-        : null;
+        : practice.status === "unpublished"
+          ? "Этот аудиопродукт снят с публикации и недоступен для новых пользователей."
+          : null;
 
     return {
       statusBadge: "Недоступно",
@@ -361,7 +358,9 @@ export function buildPracticeAccessPresentation(input: {
     buyerPreviewMode = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
-  const listenHref = buildListenPath(authorSlug, practice.slug);
+  const listenHref = buildListenPath(authorSlug, practice.slug, {
+    autoplay: true,
+  });
   const commercialAccess = resolveCommercialAccess(
     access,
     practice,

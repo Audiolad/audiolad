@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
+import { getDisplayFormat } from "@/lib/author-products/format";
 import {
   getAuthorBySlug,
   getAuthorPublishedPractices,
@@ -123,7 +124,10 @@ export default async function AuthorPublicPage({ params }: PageProps) {
               </p>
             ) : (
               <div className="mt-4 space-y-3">
-                {practices.map((practice) => (
+                {practices.map((practice) => {
+                  const formatLabel = getDisplayFormat(practice.format);
+
+                  return (
                   <Link
                     key={practice.id}
                     href={practice.href}
@@ -139,9 +143,9 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                             {practice.subtitle}
                           </p>
                         ) : null}
-                        {practice.format ? (
+                        {formatLabel ? (
                           <p className="mt-2 text-sm text-[#7d70a2]">
-                            {practice.format}
+                            {formatLabel}
                             {practice.duration_minutes
                               ? ` · ${practice.duration_minutes} мин`
                               : ""}
@@ -153,7 +157,8 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                       </span>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

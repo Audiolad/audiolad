@@ -10,6 +10,7 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
+import { normalizeClearableTextField } from "@/lib/author-products/text-fields";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -53,18 +54,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if ("description" in body) {
-      const description =
-        typeof body.description === "string"
-          ? body.description.trim()
-          : "";
+      let description: string | null;
 
-      const descriptionError = validateAudioDescriptionLength(description);
+      try {
+        description = normalizeClearableTextField(body.description);
+      } catch {
+        return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+      }
+
+      const descriptionError = validateAudioDescriptionLength(description ?? "");
 
       if (descriptionError) {
         return NextResponse.json({ error: descriptionError }, { status: 400 });
       }
 
-      updates.description = description || null;
+      updates.description = description;
     }
 
     const { data: audioItem, error: updateError } = await supabase
@@ -72,7 +76,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       .update(updates)
       .eq("id", audioId)
       .eq("practice_id", id)
-      .select("id")
+      .select("id, title, description, updated_at")
       .maybeSingle();
 
     if (updateError) {
@@ -81,7 +85,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (!audioItem?.id) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
+      return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
     await syncPracticeAudioCompatibility(supabase, id);

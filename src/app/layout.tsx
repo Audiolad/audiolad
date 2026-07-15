@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
+import AppProviders from "@/components/AppProviders";
 import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
@@ -46,7 +47,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="bg-platform-surface">
       <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

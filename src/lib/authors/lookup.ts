@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { getProductPriceLabel } from "@/lib/products/price-format";
 
 export type PublicAuthorRow = {
   id: string;
@@ -44,15 +45,7 @@ function formatPracticePriceLabel(
   price: number | null,
   isFree: boolean | null,
 ): string {
-  if (isFree === true) {
-    return "Бесплатно";
-  }
-
-  if (typeof price === "number" && Number.isFinite(price) && price >= 0) {
-    return `${price} ₽`;
-  }
-
-  return "Цена уточняется";
+  return getProductPriceLabel(price, isFree);
 }
 
 export async function getAuthorPublishedPractices(

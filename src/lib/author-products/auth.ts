@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,8 +21,34 @@ export function jsonError(code: string, status: number) {
   return NextResponse.json({ error: code }, { status });
 }
 
+function createAuthedSupabaseClient(accessToken: string) {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
+}
+
 export async function requireAuthenticatedUser() {
-  const supabase = await createClient();
+  const headerStore = await headers();
+  const authorization = headerStore.get("authorization");
+  const bearerToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : null;
+
+  const supabase = bearerToken
+    ? createAuthedSupabaseClient(bearerToken)
+    : await createClient();
 
   const {
     data: { user },

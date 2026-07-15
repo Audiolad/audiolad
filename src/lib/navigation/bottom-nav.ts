@@ -1,4 +1,5 @@
-const BOTTOM_NAV_HIDDEN_EXACT = new Set([
+/** Маршруты без подсветки активной вкладки (юридические и информационные). */
+const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/offer",
   "/privacy",
   "/consent",
@@ -9,6 +10,7 @@ const BOTTOM_NAV_HIDDEN_EXACT = new Set([
 const BOTTOM_NAV_HIDDEN_PREFIXES = [
   "/auth/",
   "/checkout/",
+  "/author-dashboard/",
 ] as const;
 
 /** Основная зона меню без нижнего safe area (иконки + подписи). */
@@ -18,13 +20,13 @@ export const BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
 export const BOTTOM_NAV_CONTENT_GAP_PX = 28;
 
 export function shouldShowBottomNav(pathname: string): boolean {
-  if (BOTTOM_NAV_HIDDEN_EXACT.has(pathname)) {
-    return false;
-  }
-
   return !BOTTOM_NAV_HIDDEN_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
   );
+}
+
+export function isBottomNavNeutralPathname(pathname: string): boolean {
+  return BOTTOM_NAV_NEUTRAL_EXACT.has(pathname);
 }
 
 export const platformTopSafePaddingClass = "platform-top-safe-padding";
@@ -45,3 +47,9 @@ export const PLATFORM_ELEVATED_SURFACE_BACKGROUND = "#fffdfd";
 export const PLATFORM_LIGHT_SURFACE_COLOR = PLATFORM_ELEVATED_SURFACE_BACKGROUND;
 export const PLATFORM_PLAYER_THEME_COLOR = "#6f4bbb";
 export const PLATFORM_PLAYER_SURFACE_COLOR = "#24133f";
+
+export type BottomNavVariant = "default" | "player";
+
+export function isListenPlayerPathname(pathname: string): boolean {
+  return pathname === "/listen" || pathname.startsWith("/listen/");
+}

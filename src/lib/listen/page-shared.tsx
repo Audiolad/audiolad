@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AudioPlayer from "@/components/audio/AudioPlayer";
+import ListenPageClient from "@/components/audio/ListenPageClient";
 import BottomNav from "@/components/BottomNav";
+import { getDisplayFormat } from "@/lib/author-products/format";
 import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
 import { resolveListenAccess } from "@/lib/listen/access";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
@@ -119,7 +121,7 @@ function ListenShell({
         <div className="relative z-10">{children}</div>
       </div>
 
-      <BottomNav />
+      <BottomNav variant="player" />
     </main>
   );
 }
@@ -213,7 +215,7 @@ async function loadListenTracks(
 export async function renderListenPage(
   authorSlug: string,
   productSlug: string,
-  options?: { accessDenied?: boolean },
+  options?: { accessDenied?: boolean; autoplay?: boolean },
 ) {
   const practiceHref = buildPracticePublicPath(authorSlug, productSlug);
   const supabase = await createClient();
@@ -369,8 +371,7 @@ export async function renderListenPage(
     practiceRow.cover_url,
     practiceRow.updated_at,
   );
-  const trimmedFormat =
-    typeof practiceRow.format === "string" ? practiceRow.format.trim() : null;
+  const trimmedFormat = getDisplayFormat(practiceRow.format);
 
   return (
     <ListenShell backHref={practiceHref} backLabel="← К практике">
@@ -380,7 +381,7 @@ export async function renderListenPage(
         </p>
       </div>
 
-      <AudioPlayer
+      <ListenPageClient
         practiceId={practiceRow.id}
         authorSlug={resolvedAuthorSlug}
         productSlug={practiceRow.slug}
@@ -393,6 +394,33 @@ export async function renderListenPage(
         coverGradient={coverGradient}
         coverImageUrl={coverImageUrl}
         isAuthorPreview={access.mode === "author_preview"}
+        autoplay={options?.autoplay === true}
+      />
+
+      <AudioPlayer
+        practiceId={practiceRow.id}
+        practiceTitle={practiceRow.title}
+        authorName={authorName}
+        format={trimmedFormat}
+        tracks={tracks}
+        coverSymbol={coverSymbol}
+        coverGradient={coverGradient}
+        coverImageUrl={coverImageUrl}
+        isAuthorPreview={access.mode === "author_preview"}
+        sessionPayload={{
+          practiceId: practiceRow.id,
+          authorSlug: resolvedAuthorSlug,
+          productSlug: practiceRow.slug,
+          practiceTitle: practiceRow.title,
+          authorName,
+          format: trimmedFormat,
+          tracks,
+          initialProgress,
+          coverSymbol,
+          coverGradient,
+          coverImageUrl,
+          isAuthorPreview: access.mode === "author_preview",
+        }}
       />
     </ListenShell>
   );

@@ -6,6 +6,7 @@
   --foreground: #25135c;
   --bottom-nav-main-height: 68px;
   --bottom-nav-content-gap: 28px;
+  --global-mini-player-height: 0px;
 }
 
 .platform-top-safe-padding {
@@ -15,7 +16,7 @@
 .platform-bottom-nav-padding {
   padding-bottom: calc(
     var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
-      var(--bottom-nav-content-gap)
+      var(--bottom-nav-content-gap) + var(--global-mini-player-height)
   );
 }
 
@@ -23,8 +24,18 @@
   padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
   padding-bottom: calc(
     var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
-      var(--bottom-nav-content-gap)
+      var(--bottom-nav-content-gap) + var(--global-mini-player-height)
   );
+}
+
+.global-audio-element {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  left: -9999px;
+  top: 0;
 }
 
 @theme inline {
@@ -49,4 +60,79 @@ html:has(.player-shell) {
 
 html:has(.player-shell) body {
   background-color: #24133f;
+}
+
+.bottom-nav--player {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(111, 75, 187, 0.94) 0%,
+    rgba(43, 23, 73, 0.98) 55%,
+    rgba(36, 19, 63, 1) 100%
+  );
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: none;
+}
+
+.bottom-nav--player .bottom-nav__inner {
+  max-width: 430px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bottom-nav--player {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: #2b1749;
+  }
+}
+
+.catalog-product-card__description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+}
+
+@media (min-width: 640px) {
+  .catalog-product-card__description {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+}
+
+.catalog-carousel {
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.catalog-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .catalog-carousel {
+    scroll-behavior: smooth;
+  }
+}
+
+.catalog-carousel__item {
+  flex: 0 0 calc(100% - 32px);
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .catalog-carousel__item {
+    flex-basis: calc(50% - 6px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .catalog-carousel__item {
+    flex-basis: calc(33.333% - 8px);
+  }
 }

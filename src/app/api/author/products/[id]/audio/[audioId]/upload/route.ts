@@ -20,7 +20,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase, practice } = await requirePracticeAccess(id);
 
     const { data: audioItem, error: audioLookupError } = await supabase
       .from("audio_items")
@@ -80,21 +80,28 @@ export async function POST(request: Request, context: RouteContext) {
 
     const now = new Date().toISOString();
 
-    const { error: updateError } = await supabase
+    const { data: updatedAudioItem, error: updateError } = await supabase
       .from("audio_items")
       .update({
         audio_path: storagePath,
         duration_seconds: durationSeconds,
         original_file_name: file.name,
         file_size_bytes: file.size,
+        status: practice.status === "published" ? "published" : "draft",
         updated_at: now,
       })
       .eq("id", audioId)
-      .eq("practice_id", id);
+      .eq("practice_id", id)
+      .select("id")
+      .maybeSingle();
 
     if (updateError) {
       console.error("author_audio_path_update_error", updateError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    if (!updatedAudioItem?.id) {
+      return NextResponse.json({ error: "update_failed" }, { status: 500 });
     }
 
     await syncPracticeAudioCompatibility(supabase, id);

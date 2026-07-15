@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import { getDisplayFormat } from "@/lib/author-products/format";
 import { buildListenPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -137,7 +138,7 @@ function formatPracticeMeta(
   format: string | null | undefined,
   durationMinutes: number | null | undefined,
 ): string | null {
-  const trimmedFormat = typeof format === "string" ? format.trim() : "";
+  const trimmedFormat = getDisplayFormat(format) ?? "";
   const duration =
     typeof durationMinutes === "number" && durationMinutes > 0
       ? `${durationMinutes} мин`
@@ -271,7 +272,7 @@ function LibraryCard({ item, index }: LibraryCardProps) {
   const listenHref =
     practice?.slug && audioReady
       ? authorSlug
-        ? buildListenPath(authorSlug, practice.slug)
+        ? buildListenPath(authorSlug, practice.slug, { autoplay: true })
         : `/listen/${practice.slug}`
       : null;
 

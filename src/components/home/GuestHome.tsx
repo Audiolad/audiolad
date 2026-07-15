@@ -1,0 +1,96 @@
+import Link from "next/link";
+
+import type { GuestHomeData } from "@/lib/home/types";
+
+import AuthorsRail from "./AuthorsRail";
+import HeroFeaturedProduct from "./HeroFeaturedProduct";
+import HowItWorks from "./HowItWorks";
+import NeedsNavigation from "./NeedsNavigation";
+import ProductRail from "./ProductRail";
+import SignUpInvitation from "./SignUpInvitation";
+
+type GuestHomeProps = {
+  data: GuestHomeData;
+};
+
+function getPrimaryListenHref(data: GuestHomeData): string {
+  if (data.featuredFreeProduct?.listenHref) {
+    return data.featuredFreeProduct.listenHref;
+  }
+
+  const firstFree = data.freeProducts[0];
+
+  if (firstFree?.listenHref) {
+    return firstFree.listenHref;
+  }
+
+  return "/catalog";
+}
+
+export default function GuestHome({ data }: GuestHomeProps) {
+  const primaryListenHref = getPrimaryListenHref(data);
+
+  return (
+    <>
+      <section className="mt-8 lg:mt-12">
+        <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15]">
+          Аудио, которое помогает вернуться к себе
+        </h1>
+
+        <p className="mt-3 max-w-[720px] text-lg font-medium leading-7 text-[#7042c5] lg:text-xl">
+          Авторские аудиопрактики, медитации, лекции, подкасты и программы в
+          одном спокойном пространстве.
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href={primaryListenHref}
+            className="inline-flex min-h-11 rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-6 py-4 text-[17px] font-semibold text-white shadow-[0_14px_34px_rgba(96,59,168,0.24)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Начать слушать бесплатно
+          </Link>
+
+          <Link
+            href="/catalog"
+            className="inline-flex min-h-11 rounded-[22px] border border-[#7042c5] bg-white px-6 py-4 text-[17px] font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Открыть каталог
+          </Link>
+        </div>
+      </section>
+
+      {data.featuredFreeProduct ? (
+        <HeroFeaturedProduct product={data.featuredFreeProduct} />
+      ) : null}
+
+      <ProductRail
+        title="Попробуйте бесплатно"
+        products={data.freeProducts}
+        ariaLabel="Попробуйте бесплатно"
+        href="/catalog"
+      />
+
+      <NeedsNavigation />
+
+      <ProductRail
+        title="Новое в АудиоЛаде"
+        products={data.newProducts}
+        ariaLabel="Новое в АудиоЛаде"
+        href="/catalog"
+      />
+
+      <ProductRail
+        title="Аудиопрограммы"
+        products={data.programProducts}
+        ariaLabel="Аудиопрограммы"
+        href="/catalog"
+      />
+
+      <AuthorsRail authors={data.authors} />
+
+      <HowItWorks />
+
+      <SignUpInvitation />
+    </>
+  );
+}

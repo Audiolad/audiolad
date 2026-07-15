@@ -1,3 +1,5 @@
+import { getDisplayFormat } from "@/lib/author-products/format";
+
 export function normalizeDurationSeconds(
   value: number | null | undefined,
 ): number | null {
@@ -114,8 +116,7 @@ export function formatCatalogProductStats(
 
 /** Catalog and practice meta: format · 3 аудио · 29 мин or format · 12 мин */
 export function formatProductMeta(input: FormatProductMetaInput): string | null {
-  const trimmedFormat =
-    typeof input.format === "string" ? input.format.trim() : "";
+  const trimmedFormat = getDisplayFormat(input.format) ?? "";
   const duration = formatProductDuration(
     input.totalDurationSeconds,
     input.durationMinutesFallback,

@@ -33,6 +33,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local backups, diagnostics, and runtime artifacts
+/backups/
+/screenshots/
+/test-results/
+/audiolad/tmp/
+*.mp3
+public/audiolad_brand_icons.zip
+
 # vercel
 .vercel
 

@@ -13,7 +13,9 @@ import {
 } from "@/components/BottomNavIcons";
 import {
   BOTTOM_NAV_MAIN_HEIGHT_PX,
+  isBottomNavNeutralPathname,
   shouldShowBottomNav,
+  type BottomNavVariant,
 } from "@/lib/navigation/bottom-nav";
 
 type NavItem = {
@@ -30,14 +32,24 @@ const items: NavItem[] = [
   { title: "Профиль", href: "/profile", Icon: ProfileNavIcon },
 ];
 
-export default function BottomNav() {
+type BottomNavProps = {
+  variant?: BottomNavVariant;
+};
+
+export default function BottomNav({ variant = "default" }: BottomNavProps) {
   const pathname = usePathname();
+  const isPlayerVariant = variant === "player";
+  const isNeutralPath = isBottomNavNeutralPathname(pathname);
 
   if (!shouldShowBottomNav(pathname)) {
     return null;
   }
 
   function isActive(href: string) {
+    if (isNeutralPath) {
+      return false;
+    }
+
     if (href === "/") {
       return pathname === "/";
     }
@@ -48,13 +60,21 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Основная навигация"
-      className="fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)]"
+      className={
+        isPlayerVariant
+          ? "bottom-nav bottom-nav--player fixed inset-x-0 bottom-0 z-20 w-full"
+          : "bottom-nav fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)]"
+      }
       style={{
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       <div
-        className="grid grid-cols-5 items-stretch px-1"
+        className={
+          isPlayerVariant
+            ? "bottom-nav__inner mx-auto grid w-full max-w-[430px] grid-cols-5 items-stretch px-4"
+            : "grid grid-cols-5 items-stretch px-1"
+        }
         style={{ height: `${BOTTOM_NAV_MAIN_HEIGHT_PX}px` }}
       >
         {items.map((item) => {
@@ -67,10 +87,14 @@ export default function BottomNav() {
               href={item.href}
               aria-label={item.title}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5] ${
-                active
-                  ? "font-semibold text-[#7042c5]"
-                  : "font-medium text-[#81759f] hover:text-[#6f5f92]"
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${
+                isPlayerVariant
+                  ? active
+                    ? "font-semibold text-white focus-visible:outline-white"
+                    : "font-medium text-white/65 hover:text-white/85 focus-visible:outline-white/80"
+                  : active
+                    ? "font-semibold text-[#7042c5] focus-visible:outline-[#7042c5]"
+                    : "font-medium text-[#81759f] hover:text-[#6f5f92] focus-visible:outline-[#7042c5]"
               }`}
             >
               <Icon active={active} />

@@ -13,8 +13,18 @@ import type {
 } from "@/lib/author-products/types";
 import {
   PAID_PRICE_OPTIONS,
-  PRODUCT_FORMATS,
+  getStatusLabel,
+  getStatusClassName,
 } from "@/lib/author-products/types";
+import {
+  CUSTOM_FORMAT_LABEL,
+  CUSTOM_FORMAT_VALUE,
+  PRODUCT_PRESET_FORMATS,
+  isCustomFormatSelection,
+  parsePracticeFormat,
+  resolveFormatForStorage,
+  validateCustomFormatForPublish,
+} from "@/lib/author-products/format";
 import {
   MAX_COVER_BYTES,
   PRODUCT_CONTENT_LIMITS,
@@ -22,8 +32,21 @@ import {
   getProductFieldErrorMessage,
   getProductFieldKeyForError,
   validateMp3FileClient,
+  validateStoredFormatLength,
+  type ProductFieldErrorCode,
 } from "@/lib/author-products/limits";
+import {
+  mergeServerAudioItems,
+  mergeServerProductIntoForm,
+  resolveAudioItemIdAfterDraftCreate,
+} from "@/lib/author-products/form-merge";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
+import { formatRubles } from "@/lib/products/price-format";
+
+type PracticeContext = {
+  practiceId: string;
+  audioItems: AudioItemRow[];
+};
 
 const MIN_COVER_DIMENSION = 1000;
 const ALLOWED_COVER_MIME_TYPES = new Set([
@@ -76,13 +99,17 @@ function CoverPlaceholderIcon() {
   );
 }
 
-function CoverPlaceholder() {
+function CoverPlaceholder({ className = "" }: { className?: string }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[18px] border border-[#d9c9ef] bg-[#f8f4fc] px-2 text-center">
-      <span className="text-[#9a86c4]">
+    <div
+      className={`pointer-events-none flex h-full w-full flex-col items-center justify-center gap-2 px-2 text-center ${className}`}
+    >
+      <span className="text-[#9a86c4] transition-colors group-hover:text-[#8569b3] group-focus-visible:text-[#8569b3]">
         <CoverPlaceholderIcon />
       </span>
-      <span className="text-xs text-[#8c79b6]">Нет обложки</span>
+      <span className="text-xs text-[#8c79b6] transition-colors group-hover:text-[#7058a0] group-focus-visible:text-[#7058a0]">
+        Нет обложки
+      </span>
     </div>
   );
 }
@@ -173,7 +200,8 @@ type FormState = {
   title: string;
   subtitle: string;
   description: string;
-  format: string;
+  formatPreset: string;
+  customFormat: string;
   slug: string;
   isFree: boolean;
   price: number;
@@ -264,16 +292,18 @@ function buildInitialForm(
 ): FormState {
   if (initialProduct) {
     const practice = initialProduct.practice;
+    const { preset, customFormat } = parsePracticeFormat(practice.format);
 
     return {
       authorId: practice.author_id,
       title: practice.title,
       subtitle: practice.subtitle ?? "",
       description: practice.description ?? "",
-      format: practice.format ?? "",
+      formatPreset: preset,
+      customFormat,
       slug: practice.slug,
-      isFree: practice.is_free,
-      price: practice.is_free ? 99 : practice.price,
+      isFree: practice.is_free === true,
+      price: practice.is_free === true ? 99 : practice.price,
       coverUrl: practice.cover_url,
       coverVersion: practice.cover_url ? practice.updated_at : null,
       status: practice.status,
@@ -289,7 +319,8 @@ function buildInitialForm(
     title: "",
     subtitle: "",
     description: "",
-    format: "",
+    formatPreset: "",
+    customFormat: "",
     slug: "",
     isFree: true,
     price: 99,
@@ -297,6 +328,21 @@ function buildInitialForm(
     coverVersion: null,
     status: "draft",
     publishedAt: null,
+  };
+}
+
+function buildProductSavePayload(
+  form: FormState,
+  slugLocked: boolean,
+) {
+  return {
+    ...(slugLocked ? {} : { author_id: form.authorId, slug: form.slug }),
+    title: form.title.trim(),
+    subtitle: form.subtitle.trim() || null,
+    description: form.description.trim() || null,
+    format: resolveFormatForStorage(form.formatPreset, form.customFormat),
+    is_free: form.isFree,
+    price: form.isFree ? 0 : form.price,
   };
 }
 
@@ -330,6 +376,7 @@ export default function AuthorProductForm({
     ],
   );
   const [practiceId, setPracticeId] = useState(initialProduct?.practice.id ?? "");
+  const practiceIdRef = useRef(initialProduct?.practice.id ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -343,10 +390,12 @@ export default function AuthorProductForm({
   const [coverPreviewFailureKey, setCoverPreviewFailureKey] = useState<
     string | null
   >(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     title?: string;
     subtitle?: string;
     description?: string;
+    formatCustom?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -373,6 +422,47 @@ export default function AuthorProductForm({
     null,
   );
   const audioPreviewRequestIds = useRef<Record<string, number>>({});
+  const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const pendingFocusAudioIdRef = useRef<string | null>(null);
+  const addAudioInFlightRef = useRef(false);
+
+  const setTitleInputRef = useCallback(
+    (audioId: string, element: HTMLInputElement | null) => {
+      if (!element) {
+        titleInputRefs.current.delete(audioId);
+        return;
+      }
+
+      titleInputRefs.current.set(audioId, element);
+    },
+    [],
+  );
+
+  const focusNewAudioCard = useCallback((audioId: string) => {
+    const titleInput = titleInputRefs.current.get(audioId);
+
+    if (!titleInput) {
+      return;
+    }
+
+    titleInput.scrollIntoView({ behavior: "smooth", block: "center" });
+    requestAnimationFrame(() => {
+      titleInput.focus({ preventScroll: true });
+    });
+  }, []);
+
+  useEffect(() => {
+    const audioId = pendingFocusAudioIdRef.current;
+
+    if (!audioId) {
+      return;
+    }
+
+    pendingFocusAudioIdRef.current = null;
+    requestAnimationFrame(() => {
+      focusNewAudioCard(audioId);
+    });
+  }, [audioItems, focusNewAudioCard]);
 
   const {
     moveAudioItem,
@@ -493,7 +583,15 @@ export default function AuthorProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practiceId]);
 
-  const slugLocked = form.status === "published" || Boolean(form.publishedAt);
+  const slugLocked =
+    form.status === "published" ||
+    form.status === "unpublished" ||
+    form.status === "archived" ||
+    Boolean(form.publishedAt);
+  const isPublished = form.status === "published";
+  const isUnpublished = form.status === "unpublished";
+  const isArchived = form.status === "archived";
+  const isDraft = form.status === "draft";
 
   const selectedAuthor = useMemo(
     () => authors.find((author) => author.id === form.authorId) ?? null,
@@ -515,15 +613,24 @@ export default function AuthorProductForm({
 
   const showCoverPreview = Boolean(coverDisplaySrc) && !coverPreviewFailed;
 
-  async function ensurePracticeId(): Promise<string | null> {
-    if (practiceId) {
-      return practiceId;
+  async function ensurePracticeId(
+    localItemsSnapshot?: AudioItemRow[],
+  ): Promise<PracticeContext | null> {
+    const existingPracticeId = practiceIdRef.current || practiceId;
+
+    if (existingPracticeId) {
+      return {
+        practiceId: existingPracticeId,
+        audioItems: localItemsSnapshot ?? audioItems,
+      };
     }
 
     if (!form.authorId || !form.title.trim()) {
       setError("Укажите автора и название, чтобы сохранить черновик.");
       return null;
     }
+
+    const itemsBeforeCreate = localItemsSnapshot ?? audioItems;
 
     const response = await fetch("/api/author/products", {
       method: "POST",
@@ -545,16 +652,112 @@ export default function AuthorProductForm({
     }
 
     const created = payload.product;
+    const mergedAudioItems = mergeServerAudioItems(
+      itemsBeforeCreate,
+      created.audio_items,
+    );
+
+    practiceIdRef.current = created.practice.id;
     setPracticeId(created.practice.id);
-    setAudioItems(created.audio_items);
+    setAudioItems(mergedAudioItems);
     setForm((current) => ({
       ...current,
       slug: created.practice.slug,
       status: created.practice.status,
     }));
-    router.replace(`/author-dashboard/products/${created.practice.id}`);
 
-    return created.practice.id;
+    if (mode === "create" && typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        `/author-dashboard/products/${created.practice.id}`,
+      );
+    }
+
+    return {
+      practiceId: created.practice.id,
+      audioItems: mergedAudioItems,
+    };
+  }
+
+  function applyServerProductPreservingDraft(product: AuthorProductDetail) {
+    setForm((current) => mergeServerProductIntoForm(current, product));
+    setAudioItems((current) =>
+      mergeServerAudioItems(current, product.audio_items),
+    );
+  }
+
+  async function saveAllAudioItemsFromState(
+    targetPracticeId: string,
+    items: AudioItemRow[],
+  ): Promise<{ ok: true } | { ok: false; message: string; audioId?: string }> {
+    for (const item of items) {
+      if (item.id.startsWith("temp-")) {
+        continue;
+      }
+
+      const title = item.title.trim();
+
+      if (!title) {
+        return {
+          ok: false,
+          message: `Укажите название для аудио ${item.position}.`,
+          audioId: item.id,
+        };
+      }
+
+      const response = await fetch(
+        `/api/author/products/${targetPracticeId}/audio/${item.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            description: item.description?.trim() || null,
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        const fieldMessage = payload.error
+          ? getProductFieldErrorMessage(payload.error)
+          : null;
+
+        return {
+          ok: false,
+          message:
+            fieldMessage ??
+            `Не удалось сохранить аудио «${title}».`,
+          audioId: item.id,
+        };
+      }
+    }
+
+    return { ok: true };
+  }
+
+  async function reloadSavedProduct(targetPracticeId: string): Promise<boolean> {
+    const response = await fetch(`/api/author/products/${targetPracticeId}`, {
+      cache: "no-store",
+    });
+
+    const payload = (await response.json()) as {
+      product?: AuthorProductDetail;
+      error?: string;
+    };
+
+    if (!response.ok || !payload.product) {
+      return false;
+    }
+
+    setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
+    setAudioItems(payload.product.audio_items);
+    return true;
   }
 
   async function saveProduct(): Promise<boolean> {
@@ -564,25 +767,18 @@ export default function AuthorProductForm({
     setFieldErrors({});
 
     try {
-      const id = await ensurePracticeId();
+      const ensured = await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         return false;
       }
+
+      const id = ensured.practiceId;
 
       const response = await fetch(`/api/author/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          author_id: form.authorId,
-          title: form.title,
-          subtitle: form.subtitle,
-          description: form.description,
-          format: form.format,
-          slug: form.slug,
-          is_free: form.isFree,
-          price: form.isFree ? 0 : form.price,
-        }),
+        body: JSON.stringify(buildProductSavePayload(form, slugLocked)),
       });
 
       const payload = (await response.json()) as {
@@ -597,31 +793,58 @@ export default function AuthorProductForm({
 
         if (fieldMessage && payload.error) {
           const fieldKey = getProductFieldKeyForError(
-            payload.error as
-              | "title_too_long"
-              | "subtitle_too_long"
-              | "description_too_long"
-              | "audio_title_too_long"
-              | "audio_description_too_long",
+            payload.error as ProductFieldErrorCode,
           );
 
           if (
             fieldKey === "title" ||
             fieldKey === "subtitle" ||
-            fieldKey === "description"
+            fieldKey === "description" ||
+            fieldKey === "formatCustom"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
           }
         }
 
-        setError("Не удалось сохранить аудиопродукт.");
+        setError(
+          payload.error === "update_failed"
+            ? "Не удалось сохранить изменения продукта. Обновите страницу и попробуйте снова."
+            : "Не удалось сохранить аудиопродукт.",
+        );
         return false;
       }
 
-      setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-      setAudioItems(payload.product.audio_items);
-      setMessage("Изменения сохранены.");
+      const audioSaveResult = await saveAllAudioItemsFromState(
+        id,
+        ensured.audioItems,
+      );
+
+      if (!audioSaveResult.ok) {
+        if (audioSaveResult.audioId) {
+          setAudioFieldErrors((current) => ({
+            ...current,
+            [audioSaveResult.audioId!]: {
+              title: audioSaveResult.message,
+            },
+          }));
+        }
+
+        setError(audioSaveResult.message);
+        await reloadSavedProduct(id);
+        return false;
+      }
+
+      const reloaded = await reloadSavedProduct(id);
+
+      if (!reloaded) {
+        setError(
+          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.",
+        );
+        return false;
+      }
+
+      router.refresh();
       return true;
     } catch {
       setError("Не удалось сохранить аудиопродукт.");
@@ -638,7 +861,11 @@ export default function AuthorProductForm({
     const saved = await saveProduct();
 
     if (saved) {
-      setMessage("Черновик сохранён.");
+      setMessage(
+        isPublished || isArchived || form.publishedAt
+          ? "Изменения сохранены."
+          : "Черновик сохранён.",
+      );
     }
   }
 
@@ -646,15 +873,42 @@ export default function AuthorProductForm({
     setBusy(true);
     setError(null);
     setMessage(null);
+    setFieldErrors({});
+
+    if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
+      setFieldErrors({
+        formatCustom: "Укажите название своего формата",
+      });
+      setBusy(false);
+      return;
+    }
+
+    if (isCustomFormatSelection(form.formatPreset)) {
+      const lengthError = validateStoredFormatLength(form.customFormat);
+
+      if (lengthError) {
+        setFieldErrors({
+          formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
+        });
+        setBusy(false);
+        return;
+      }
+    }
 
     try {
-      const id = await ensurePracticeId();
+      const ensured = await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         return;
       }
 
-      await saveProduct();
+      const id = ensured.practiceId;
+
+      const saved = await saveProduct();
+
+      if (!saved) {
+        return;
+      }
 
       const response = await fetch(`/api/author/products/${id}/publish`, {
         method: "POST",
@@ -667,13 +921,19 @@ export default function AuthorProductForm({
       };
 
       if (!response.ok) {
-        setError(payload.message ?? "Не удалось опубликовать аудиопродукт.");
+        if (payload.error === "missing_custom_format") {
+          setFieldErrors({
+            formatCustom:
+              payload.message ?? "Укажите название своего формата",
+          });
+        } else {
+          setError(payload.message ?? "Не удалось опубликовать аудиопродукт.");
+        }
         return;
       }
 
       if (payload.product) {
-        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-        setAudioItems(payload.product.audio_items);
+        applyServerProductPreservingDraft(payload.product);
       }
 
       setMessage(payload.message ?? "Аудиопродукт опубликован.");
@@ -689,6 +949,14 @@ export default function AuthorProductForm({
       return;
     }
 
+    if (
+      !window.confirm(
+        "Снять аудиопродукт с публикации? Он исчезнет из каталога, но останется в вашем списке и будет доступен пользователям с уже выданным доступом.",
+      )
+    ) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -701,18 +969,146 @@ export default function AuthorProductForm({
       const payload = (await response.json()) as {
         product?: AuthorProductDetail;
         message?: string;
+        error?: string;
       };
 
       if (!response.ok || !payload.product) {
-        setError("Не удалось снять аудиопродукт с публикации.");
+        setError(
+          payload.message ?? "Не удалось снять аудиопродукт с публикации.",
+        );
         return;
       }
 
-      setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-      setAudioItems(payload.product.audio_items);
+      applyServerProductPreservingDraft(payload.product);
       setMessage(payload.message ?? "Аудиопродукт снят с публикации.");
     } catch {
       setError("Не удалось снять аудиопродукт с публикации.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function archiveProduct() {
+    if (!practiceId) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Переместить аудиопродукт в архив? Он исчезнет из основного списка, но останется доступен пользователям с уже выданным доступом.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/author/products/${practiceId}/archive`, {
+        method: "POST",
+      });
+
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.product) {
+        setError(payload.message ?? "Не удалось переместить аудиопродукт в архив.");
+        return;
+      }
+
+      applyServerProductPreservingDraft(payload.product);
+      setMessage(payload.message ?? "Аудиопродукт перемещён в архив.");
+    } catch {
+      setError("Не удалось переместить аудиопродукт в архив.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreFromArchiveProduct() {
+    if (!practiceId) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Вернуть аудиопродукт из архива? Он появится в основном списке со статусом «Снят с публикации» и не будет автоматически опубликован в каталоге.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/author/products/${practiceId}/restore-from-archive`,
+        { method: "POST" },
+      );
+
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        message?: string;
+      };
+
+      if (!response.ok || !payload.product) {
+        setError("Не удалось вернуть аудиопродукт из архива.");
+        return;
+      }
+
+      applyServerProductPreservingDraft(payload.product);
+      setMessage(payload.message ?? "Аудиопродукт возвращён из архива.");
+    } catch {
+      setError("Не удалось вернуть аудиопродукт из архива.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteProduct() {
+    if (!practiceId) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Удалить аудиопродукт без возможности восстановления? Это действие необратимо.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/author/products/${practiceId}`, {
+        method: "DELETE",
+      });
+
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setError(payload.message ?? "Не удалось удалить аудиопродукт.");
+        return;
+      }
+
+      router.push("/author-dashboard");
+      router.refresh();
+    } catch {
+      setError("Не удалось удалить аудиопродукт.");
     } finally {
       setBusy(false);
     }
@@ -784,7 +1180,9 @@ export default function AuthorProductForm({
     }
 
     if (payload.product) {
-      setAudioItems(payload.product.audio_items);
+      setAudioItems((current) =>
+        mergeServerAudioItems(current, payload.product!.audio_items),
+      );
       setAudioFieldErrors((current) => {
         const next = { ...current };
         delete next[audioId];
@@ -849,15 +1247,22 @@ export default function AuthorProductForm({
   }
 
   async function addAudioItem() {
+    if (addAudioInFlightRef.current || busy) {
+      return;
+    }
+
+    addAudioInFlightRef.current = true;
     setBusy(true);
     setError(null);
 
     try {
-      const id = await ensurePracticeId();
+      const ensured = await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         return;
       }
+
+      const id = ensured.practiceId;
 
       const response = await fetch(`/api/author/products/${id}/audio`, {
         method: "POST",
@@ -869,6 +1274,7 @@ export default function AuthorProductForm({
 
       const payload = (await response.json()) as {
         product?: AuthorProductDetail;
+        audio_item?: AudioItemRow;
       };
 
       if (!response.ok || !payload.product) {
@@ -876,10 +1282,21 @@ export default function AuthorProductForm({
         return;
       }
 
-      setAudioItems(payload.product.audio_items);
+      const newAudioId =
+        payload.audio_item?.id ??
+        payload.product.audio_items[payload.product.audio_items.length - 1]?.id;
+
+      if (newAudioId) {
+        pendingFocusAudioIdRef.current = newAudioId;
+      }
+
+      setAudioItems((current) =>
+        mergeServerAudioItems(current, payload.product!.audio_items),
+      );
     } catch {
       setError("Не удалось добавить аудио.");
     } finally {
+      addAudioInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -922,7 +1339,9 @@ export default function AuthorProductForm({
     }
 
     if (payload.product) {
-      setAudioItems(payload.product.audio_items);
+      setAudioItems((current) =>
+        mergeServerAudioItems(current, payload.product!.audio_items),
+      );
     }
   }
 
@@ -941,12 +1360,14 @@ export default function AuthorProductForm({
     }
 
     try {
-      const id = await ensurePracticeId();
+      const ensured = await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         setCoverError("Не удалось загрузить обложку.");
         return;
       }
+
+      const id = ensured.practiceId;
 
       const formData = new FormData();
       formData.set("file", file);
@@ -990,8 +1411,7 @@ export default function AuthorProductForm({
       }
 
       if (payload?.product) {
-        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-        setAudioItems(payload.product.audio_items);
+        applyServerProductPreservingDraft(payload.product);
       } else if (payload?.cover_url) {
         setForm((current) => ({
           ...current,
@@ -1011,6 +1431,25 @@ export default function AuthorProductForm({
     }
   }
 
+  function openCoverPicker() {
+    if (uploadingCover || deletingCover) {
+      return;
+    }
+
+    coverFileInputRef.current?.click();
+  }
+
+  function handleCoverFileChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (file) {
+      void uploadCover(file);
+    }
+  }
+
   async function deleteCover() {
     if (!form.coverUrl) {
       return;
@@ -1025,12 +1464,16 @@ export default function AuthorProductForm({
     setCoverDisplayError(null);
 
     try {
-      const id = practiceId || (await ensurePracticeId());
+      const ensured = practiceId
+        ? { practiceId, audioItems }
+        : await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         setCoverError("Не удалось удалить обложку.");
         return;
       }
+
+      const id = ensured.practiceId;
 
       const response = await fetch(`/api/author/products/${id}/cover`, {
         method: "DELETE",
@@ -1063,8 +1506,7 @@ export default function AuthorProductForm({
       }
 
       if (payload?.product) {
-        setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-        setAudioItems(payload.product.audio_items);
+        applyServerProductPreservingDraft(payload.product);
       } else {
         setForm((current) => ({
           ...current,
@@ -1114,11 +1556,12 @@ export default function AuthorProductForm({
 
     const slotNumber = audioItems.findIndex((item) => item.id === audioId) + 1;
     const currentTitle = audioItems.find((item) => item.id === audioId)?.title ?? "";
+    const localItemsBeforeCreate = audioItems;
 
     try {
-      const id = await ensurePracticeId();
+      const ensured = await ensurePracticeId(localItemsBeforeCreate);
 
-      if (!id) {
+      if (!ensured) {
         setAudioUploadErrors((current) => ({
           ...current,
           [audioId]: "Не удалось загрузить MP3.",
@@ -1126,11 +1569,18 @@ export default function AuthorProductForm({
         return;
       }
 
+      const id = ensured.practiceId;
+      const targetAudioId = resolveAudioItemIdAfterDraftCreate(
+        audioId,
+        localItemsBeforeCreate,
+        ensured.audioItems,
+      );
+
       const formData = new FormData();
       formData.set("file", file);
 
       const response = await fetch(
-        `/api/author/products/${id}/audio/${audioId}/upload`,
+        `/api/author/products/${id}/audio/${targetAudioId}/upload`,
         {
           method: "POST",
           body: formData,
@@ -1166,15 +1616,19 @@ export default function AuthorProductForm({
         return;
       }
 
-      setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-      setAudioItems(payload.product.audio_items);
+      applyServerProductPreservingDraft(payload.product);
       setAudioPreviewVersions((current) => ({
         ...current,
-        [audioId]: (current[audioId] ?? 0) + 1,
+        [targetAudioId]: (current[targetAudioId] ?? 0) + 1,
       }));
       setMessage("Аудио загружено.");
-      void loadAudioPreview(id, audioId);
-      await autofillAudioTitleFromFile(audioId, file, currentTitle, slotNumber);
+      void loadAudioPreview(id, targetAudioId);
+      await autofillAudioTitleFromFile(
+        targetAudioId,
+        file,
+        currentTitle,
+        slotNumber,
+      );
     } catch {
       setAudioUploadErrors((current) => ({
         ...current,
@@ -1198,9 +1652,11 @@ export default function AuthorProductForm({
     });
 
     try {
-      const id = practiceId || (await ensurePracticeId());
+      const ensured = practiceId
+        ? { practiceId, audioItems }
+        : await ensurePracticeId();
 
-      if (!id) {
+      if (!ensured) {
         setAudioUploadErrors((current) => ({
           ...current,
           [audioId]: "Не удалось удалить MP3.",
@@ -1208,8 +1664,15 @@ export default function AuthorProductForm({
         return;
       }
 
+      const id = ensured.practiceId;
+      const targetAudioId = resolveAudioItemIdAfterDraftCreate(
+        audioId,
+        audioItems,
+        ensured.audioItems,
+      );
+
       const response = await fetch(
-        `/api/author/products/${id}/audio/${audioId}/file`,
+        `/api/author/products/${id}/audio/${targetAudioId}/file`,
         {
           method: "DELETE",
         },
@@ -1242,24 +1705,23 @@ export default function AuthorProductForm({
         return;
       }
 
-      setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-      setAudioItems(payload.product.audio_items);
+      applyServerProductPreservingDraft(payload.product);
       setAudioPreviewUrls((current) => {
         const next = { ...current };
-        delete next[audioId];
+        delete next[targetAudioId];
         return next;
       });
       setAudioPreviewErrors((current) => {
         const next = { ...current };
-        delete next[audioId];
+        delete next[targetAudioId];
         return next;
       });
       setAudioPreviewVersions((current) => {
         const next = { ...current };
-        delete next[audioId];
+        delete next[targetAudioId];
         return next;
       });
-      delete audioPreviewRequestIds.current[audioId];
+      delete audioPreviewRequestIds.current[targetAudioId];
       setMessage("MP3 удалён.");
     } catch {
       setAudioUploadErrors((current) => ({
@@ -1286,7 +1748,16 @@ export default function AuthorProductForm({
       ) : null}
 
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
-        <h2 className="text-[20px] font-semibold">Основная информация</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[20px] font-semibold">Основная информация</h2>
+          {mode === "edit" ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(form.status)}`}
+            >
+              {getStatusLabel(form.status)}
+            </span>
+          ) : null}
+        </div>
 
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Автор</span>
@@ -1296,7 +1767,7 @@ export default function AuthorProductForm({
             onChange={(event) =>
               setForm((current) => ({ ...current, authorId: event.target.value }))
             }
-            className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#f7f2fc]"
+            className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
           >
             {authors.map((author) => (
               <option key={author.id} value={author.id}>
@@ -1376,20 +1847,73 @@ export default function AuthorProductForm({
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Публичный формат</span>
           <select
-            value={form.format}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, format: event.target.value }))
-            }
+            value={form.formatPreset}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              setFieldErrors((current) => ({
+                ...current,
+                formatCustom: undefined,
+              }));
+              setForm((current) => ({
+                ...current,
+                formatPreset: value,
+                customFormat:
+                  value === CUSTOM_FORMAT_VALUE ? current.customFormat : "",
+              }));
+            }}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           >
             <option value="">Выберите формат</option>
-            {PRODUCT_FORMATS.map((format) => (
+            {PRODUCT_PRESET_FORMATS.map((format) => (
               <option key={format} value={format}>
                 {format}
               </option>
             ))}
+            <option value={CUSTOM_FORMAT_VALUE}>{CUSTOM_FORMAT_LABEL}</option>
           </select>
         </label>
+
+        <div
+          className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
+            isCustomFormatSelection(form.formatPreset)
+              ? "mt-3 grid-rows-[1fr] opacity-100"
+              : "mt-0 grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">
+                Название формата
+              </span>
+              <input
+                value={form.customFormat}
+                maxLength={PRODUCT_CONTENT_LIMITS.customFormat}
+                onChange={(event) => {
+                  setFieldErrors((current) => ({
+                    ...current,
+                    formatCustom: undefined,
+                  }));
+                  setForm((current) => ({
+                    ...current,
+                    customFormat: event.target.value,
+                  }));
+                }}
+                placeholder="Например: молитва, настрой, звуковая практика"
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+              />
+              <CharCounter
+                value={form.customFormat}
+                max={PRODUCT_CONTENT_LIMITS.customFormat}
+              />
+              {fieldErrors.formatCustom ? (
+                <p className="mt-2 text-sm text-[#9b3d3d]">
+                  {fieldErrors.formatCustom}
+                </p>
+              ) : null}
+            </label>
+          </div>
+        </div>
 
         <div>
           <span className="mb-2 block text-sm font-medium">Адрес продукта</span>
@@ -1414,46 +1938,57 @@ export default function AuthorProductForm({
 
         <div>
           <span className="mb-2 block text-sm font-medium">Обложка</span>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="aspect-square h-28 w-28 shrink-0 overflow-hidden rounded-[18px]">
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
+            <button
+              type="button"
+              onClick={openCoverPicker}
+              disabled={uploadingCover || deletingCover}
+              aria-label={
+                showCoverPreview ? "Заменить обложку" : "Загрузить обложку"
+              }
+              className={`group relative z-10 block aspect-square h-28 w-28 shrink-0 cursor-pointer overflow-hidden rounded-[18px] border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60 ${
+                showCoverPreview
+                  ? "border-transparent bg-transparent hover:border-white/20 focus-visible:ring-2 focus-visible:ring-[#9a74d8]/50"
+                  : "border-[#d9c9ef] bg-[#f8f4fc] hover:border-[#9a74d8] hover:bg-[#f4ecfb] focus-visible:ring-2 focus-visible:ring-[#9a74d8]/50"
+              }`}
+            >
               {showCoverPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={coverDisplaySrc ?? undefined}
-                  alt=""
-                  className="block h-full w-full object-contain"
-                  onLoad={() => {
-                    setCoverPreviewFailureKey(null);
-                    setCoverDisplayError(null);
-                  }}
-                  onError={() => {
-                    setCoverPreviewFailureKey(coverPreviewKey);
-                    setCoverDisplayError(
-                      "Не удалось отобразить обложку. Попробуйте загрузить файл ещё раз.",
-                    );
-                  }}
-                />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={coverDisplaySrc ?? undefined}
+                    alt=""
+                    className="pointer-events-none block h-full w-full object-contain"
+                    onLoad={() => {
+                      setCoverPreviewFailureKey(null);
+                      setCoverDisplayError(null);
+                    }}
+                    onError={() => {
+                      setCoverPreviewFailureKey(coverPreviewKey);
+                      setCoverDisplayError(
+                        "Не удалось отобразить обложку. Попробуйте загрузить файл ещё раз.",
+                      );
+                    }}
+                  />
+                  <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-2 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100 group-focus-visible:bg-[#25135c]/35 group-focus-visible:opacity-100">
+                    Заменить обложку
+                  </span>
+                </>
               ) : (
                 <CoverPlaceholder />
               )}
-            </div>
+            </button>
 
-            <div className="min-w-0 flex-1">
+            <div className="relative z-0 min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
+                <button
+                  type="button"
+                  onClick={openCoverPicker}
+                  disabled={uploadingCover || deletingCover}
+                  className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition-colors hover:border-[#bda6e1] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) {
-                        void uploadCover(file);
-                      }
-                    }}
-                  />
-                </label>
+                </button>
                 {form.coverUrl ? (
                   <button
                     type="button"
@@ -1471,6 +2006,13 @@ export default function AuthorProductForm({
               </p>
             </div>
           </div>
+          <input
+            ref={coverFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={handleCoverFileChange}
+          />
           {coverDisplayError ? (
             <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
               {coverDisplayError}
@@ -1525,7 +2067,7 @@ export default function AuthorProductForm({
             >
               {PAID_PRICE_OPTIONS.map((price) => (
                 <option key={price} value={price}>
-                  {price.toLocaleString("ru-RU")} ₽
+                  {formatRubles(price)}
                 </option>
               ))}
             </select>
@@ -1534,16 +2076,7 @@ export default function AuthorProductForm({
       </section>
 
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[20px] font-semibold">Содержание аудиопродукта</h2>
-          <button
-            type="button"
-            onClick={() => void addAudioItem()}
-            className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
-          >
-            Добавить аудио
-          </button>
-        </div>
+        <h2 className="text-[20px] font-semibold">Содержание аудиопродукта</h2>
 
         {reorderNotice ? (
           <p className="text-sm text-[#9b3d3d]">{reorderNotice}</p>
@@ -1601,6 +2134,7 @@ export default function AuthorProductForm({
               <label className="mt-4 block">
                 <span className="mb-2 block text-sm font-medium">Название</span>
                 <input
+                  ref={(element) => setTitleInputRef(audioItem.id, element)}
                   value={audioItem.title}
                   maxLength={PRODUCT_CONTENT_LIMITS.audioTitle}
                   onChange={(event) => {
@@ -1623,8 +2157,10 @@ export default function AuthorProductForm({
                       ),
                     );
                   }}
-                  onBlur={() =>
-                    void updateAudioItem(audioItem.id, { title: audioItem.title })
+                  onBlur={(event) =>
+                    void updateAudioItem(audioItem.id, {
+                      title: event.currentTarget.value.trim(),
+                    })
                   }
                   className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
                 />
@@ -1674,9 +2210,9 @@ export default function AuthorProductForm({
                       ),
                     );
                   }}
-                  onBlur={() =>
+                  onBlur={(event) =>
                     void updateAudioItem(audioItem.id, {
-                      description: audioItem.description ?? "",
+                      description: event.currentTarget.value,
                     })
                   }
                   rows={3}
@@ -1813,6 +2349,15 @@ export default function AuthorProductForm({
               </div>
             </article>
           ))}
+
+          <button
+            type="button"
+            disabled={busy || reorderBusy}
+            onClick={() => void addAudioItem()}
+            className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+          >
+            Добавить аудио
+          </button>
         </div>
       </section>
 
@@ -1823,19 +2368,54 @@ export default function AuthorProductForm({
           onClick={() => void saveDraft()}
           className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
         >
-          Сохранить черновик
+          {isPublished || isUnpublished || isArchived || form.publishedAt
+            ? "Сохранить изменения"
+            : "Сохранить черновик"}
         </button>
 
-        {form.status === "published" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void unpublishProduct()}
-            className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
-          >
-            Снять с публикации
-          </button>
-        ) : (
+        {isPublished ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void unpublishProduct()}
+              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+            >
+              Снять с публикации
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void archiveProduct()}
+              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+            >
+              Переместить в архив
+            </button>
+          </>
+        ) : null}
+
+        {isUnpublished ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void publishProduct()}
+              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
+            >
+              Опубликовать
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void archiveProduct()}
+              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+            >
+              Переместить в архив
+            </button>
+          </>
+        ) : null}
+
+        {isDraft ? (
           <button
             type="button"
             disabled={busy}
@@ -1844,15 +2424,37 @@ export default function AuthorProductForm({
           >
             Опубликовать
           </button>
-        )}
+        ) : null}
 
-        {form.status === "published" && publicPath ? (
+        {isArchived ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void restoreFromArchiveProduct()}
+            className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+          >
+            Вернуть из архива
+          </button>
+        ) : null}
+
+        {isPublished && publicPath ? (
           <Link
             href={publicPath}
             className="rounded-[22px] border border-[#c6afe6] px-5 py-4 text-center font-semibold text-[#7042c5]"
           >
             Открыть публичную карточку
           </Link>
+        ) : null}
+
+        {mode === "edit" && practiceId && isDraft ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void deleteProduct()}
+            className="rounded-[22px] border border-[#f2c7c7] px-5 py-4 font-semibold text-[#9b3d3d] disabled:opacity-60"
+          >
+            Удалить продукт
+          </button>
         ) : null}
       </div>
 

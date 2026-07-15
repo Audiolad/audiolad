@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ access?: string }>;
+  searchParams: Promise<{ access?: string; autoplay?: string }>;
 };
 
 async function resolveListenRoute(segments: string[]) {
@@ -38,7 +38,7 @@ async function resolveListenRoute(segments: string[]) {
 
 export default async function ListenPage({ params, searchParams }: PageProps) {
   const { segments } = await params;
-  const { access } = await searchParams;
+  const { access, autoplay } = await searchParams;
   const route = await resolveListenRoute(segments);
 
   if (!route) {
@@ -47,5 +47,6 @@ export default async function ListenPage({ params, searchParams }: PageProps) {
 
   return renderListenPage(route.authorSlug, route.productSlug, {
     accessDenied: access === "denied",
+    autoplay: autoplay === "1",
   });
 }

@@ -1,3 +1,4 @@
+import FormattedPlainText from "@/components/FormattedPlainText";
 import {
   formatAudioDuration,
   formatAudioCountLabel,
@@ -78,9 +79,10 @@ export default function ProductContentsSection({
 
                   {shouldShowItemDescription(item.description) &&
                   !showDuplicateTitle ? (
-                    <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
-                      {item.description}
-                    </p>
+                    <FormattedPlainText
+                      text={item.description}
+                      className="mt-1 text-sm leading-6 text-[#7d70a2]"
+                    />
                   ) : null}
                 </div>
               </div>

@@ -20,9 +20,6 @@ export default function LegalFooter({ className }: { className?: string }) {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
         <div className="lg:max-w-[280px]">
           <p className="text-lg font-semibold text-[#6234b5]">АудиоЛад</p>
-          <p className="mt-2 text-sm leading-6 text-[#6f61a3]">
-            Сайт авторских образовательных аудиолекций Сергея Петрова.
-          </p>
         </div>
 
         <nav aria-label="Юридические документы">

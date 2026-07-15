@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 import BottomNav from "@/components/BottomNav";
-import CatalogProductCard from "@/components/products/CatalogProductCard";
-import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import CatalogProductCarousel from "@/components/products/CatalogProductCarousel";
+import { getPublishedCatalogSections } from "@/lib/products/catalog";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,7 +19,8 @@ function SearchIcon() {
 
 export default async function CatalogPage() {
   const supabase = await createClient();
-  const products = await getPublishedCatalogProducts(supabase);
+  const { freeProducts, paidProducts } = await getPublishedCatalogSections(supabase);
+  const hasAnyProducts = freeProducts.length > 0 || paidProducts.length > 0;
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
@@ -62,26 +63,38 @@ export default async function CatalogPage() {
             </span>
           </div>
 
-          <section className="mt-8">
-            <h2 className="text-[22px] font-semibold">Аудиопрактики и программы</h2>
+          {freeProducts.length > 0 ? (
+            <CatalogProductCarousel
+              title="Слушать бесплатно"
+              products={freeProducts}
+              ariaLabel="Слушать бесплатно"
+              prevAriaLabel="Предыдущие бесплатные практики"
+              nextAriaLabel="Следующие бесплатные практики"
+            />
+          ) : null}
 
-            <div className="mt-4 space-y-3">
-              {products.map((product) => (
-                <CatalogProductCard key={product.id} product={product} />
-              ))}
+          {paidProducts.length > 0 ? (
+            <CatalogProductCarousel
+              title="Аудиопрактики и программы"
+              products={paidProducts}
+              ariaLabel="Аудиопрактики и программы"
+              prevAriaLabel="Предыдущие аудиопрактики и программы"
+              nextAriaLabel="Следующие аудиопрактики и программы"
+            />
+          ) : null}
 
-              {products.length === 0 ? (
-                <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
-                  <p className="text-[15px] font-medium text-[#5f3f9d]">
-                    В каталоге пока нет опубликованных аудиопродуктов.
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                    Новые практики и программы скоро появятся.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </section>
+          {!hasAnyProducts ? (
+            <section className="mt-8">
+              <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
+                <p className="text-[15px] font-medium text-[#5f3f9d]">
+                  В каталоге пока нет опубликованных аудиопродуктов.
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                  Новые практики и программы скоро появятся.
+                </p>
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <BottomNav />

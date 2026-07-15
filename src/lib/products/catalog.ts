@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getDisplayFormat } from "@/lib/author-products/format";
+import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
@@ -45,6 +47,11 @@ export type CatalogProduct = {
   sortTimestamp: number;
 };
 
+export type CatalogSections = {
+  freeProducts: CatalogProduct[];
+  paidProducts: CatalogProduct[];
+};
+
 function normalizeAuthor(
   authors: CatalogPracticeRow["authors"],
 ): { name: string; slug: string } | null {
@@ -58,21 +65,6 @@ function normalizeAuthor(
     name: author.name.trim(),
     slug: author.slug.trim(),
   };
-}
-
-function formatCatalogPriceLabel(
-  price: number | null,
-  isFree: boolean | null,
-): string {
-  if (isFree === true) {
-    return "Бесплатно";
-  }
-
-  if (typeof price === "number" && Number.isFinite(price) && price >= 0) {
-    return `${price} ₽`;
-  }
-
-  return "Цена уточняется";
 }
 
 function getProductTypeLabel(
@@ -186,7 +178,7 @@ export async function getPublishedCatalogProducts(
         description: practice.description?.trim() || null,
         format: practice.format?.trim() || null,
         price: practice.price,
-        isFree: practice.is_free === true,
+        isFree: isProductFree(practice.is_free, practice.price),
         coverUrl: getProductCoverDisplayUrl(
           practice.cover_url,
           practice.updated_at,
@@ -205,8 +197,10 @@ export async function getPublishedCatalogProducts(
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
         }),
-        productTypeLabel: getProductTypeLabel(audioCount, practice.format),
-        priceLabel: formatCatalogPriceLabel(practice.price, practice.is_free),
+        productTypeLabel:
+          getDisplayFormat(practice.format) ??
+          getProductTypeLabel(audioCount, practice.format),
+        priceLabel: getProductPriceLabel(practice.price, practice.is_free),
         sortTimestamp: getSortTimestamp(
           practice.published_at,
           practice.created_at,
@@ -216,4 +210,26 @@ export async function getPublishedCatalogProducts(
   });
 
   return products.sort((left, right) => right.sortTimestamp - left.sortTimestamp);
+}
+
+export function splitCatalogProducts(products: CatalogProduct[]): CatalogSections {
+  const freeProducts: CatalogProduct[] = [];
+  const paidProducts: CatalogProduct[] = [];
+
+  for (const product of products) {
+    if (product.isFree) {
+      freeProducts.push(product);
+    } else if (typeof product.price === "number" && product.price > 0) {
+      paidProducts.push(product);
+    }
+  }
+
+  return { freeProducts, paidProducts };
+}
+
+export async function getPublishedCatalogSections(
+  supabase: SupabaseClient,
+): Promise<CatalogSections> {
+  const products = await getPublishedCatalogProducts(supabase);
+  return splitCatalogProducts(products);
 }
