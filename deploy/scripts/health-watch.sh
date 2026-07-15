@@ -16,6 +16,11 @@ FAIL_THRESHOLD="${HEALTH_WATCH_FAIL_THRESHOLD:-3}"
 failures=0
 expected_build_id=""
 watch_log="$DEPLOY_LOG_DIR/health-watch-$(date -u +"%Y%m%d-%H%M%S").log"
+error_log_path="/root/.pm2/logs/audiolad-error.log"
+error_log_offset=0
+if [[ -f "$error_log_path" ]]; then
+  error_log_offset="$(wc -c < "$error_log_path" | tr -d ' ')"
+fi
 
 exec > >(tee -a "$watch_log") 2>&1
 
@@ -57,21 +62,26 @@ PY
   fi
 
   local restarts
-  restarts="$(pm2 jlist 2>/dev/null | python3 - <<'PY'
-import json,sys
-apps=json.load(sys.stdin)
+  restarts="$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys
+raw=sys.stdin.read().strip()
+if not raw:
+    print(0); raise SystemExit
+apps=json.loads(raw)
 for app in apps:
     if app.get("name")=="audiolad":
         print(app.get("pm2_env",{}).get("restart_time",0))
         break
-PY
-)"
+else:
+    print(0)
+' 2>/dev/null || echo 0)"
   if [[ -n "$restarts" && "$restarts" -gt 3 ]]; then
     issues+=("pm2_restart_loop:${restarts}")
   fi
 
-  if tail -n 100 /root/.pm2/logs/audiolad-error.log 2>/dev/null | grep -Eqi "ChunkLoadError|Maximum update depth exceeded"; then
-    issues+=("critical_runtime_error_in_logs")
+  if [[ -f "$error_log_path" && "$error_log_offset" -ge 0 ]]; then
+    if tail -c +"$((error_log_offset + 1))" "$error_log_path" 2>/dev/null | grep -Eqi "ChunkLoadError|Maximum update depth exceeded"; then
+      issues+=("critical_runtime_error_since_watch_start")
+    fi
   fi
 
   if ((${#issues[@]} > 0)); then

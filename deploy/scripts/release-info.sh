@@ -36,34 +36,37 @@ if git -C "$GIT_WORKDIR" describe --tags --exact-match >/dev/null 2>&1; then
 fi
 
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-  pm2_status="$(pm2 jlist | python3 - <<'PY'
-import json,sys
-apps=json.load(sys.stdin)
+  pm2_status="$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys
+raw=sys.stdin.read().strip()
+apps=json.loads(raw) if raw else []
 for app in apps:
     if app.get("name")=="audiolad":
         print(app.get("pm2_env",{}).get("status","unknown"))
         break
-PY
-)"
+else:
+    print("unknown")
+' 2>/dev/null || echo unknown)"
   pm2_pid="$(pm2 pid "$PM2_APP_NAME" 2>/dev/null || echo unknown)"
-  pm2_cwd="$(pm2 jlist | python3 - <<'PY'
-import json,sys
-apps=json.load(sys.stdin)
+  pm2_cwd="$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys
+raw=sys.stdin.read().strip()
+apps=json.loads(raw) if raw else []
 for app in apps:
     if app.get("name")=="audiolad":
         print(app.get("pm2_env",{}).get("pm_cwd","unknown"))
         break
-PY
-)"
-  pm2_uptime="$(pm2 jlist | python3 - <<'PY'
-import json,sys
-apps=json.load(sys.stdin)
+else:
+    print("unknown")
+' 2>/dev/null || echo unknown)"
+  pm2_uptime="$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys
+raw=sys.stdin.read().strip()
+apps=json.loads(raw) if raw else []
 for app in apps:
     if app.get("name")=="audiolad":
         print(app.get("pm2_env",{}).get("pm_uptime",0))
         break
-PY
-)"
+else:
+    print(0)
+' 2>/dev/null || echo 0)"
 fi
 
 cat <<EOF
