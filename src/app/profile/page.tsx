@@ -121,8 +121,20 @@ export default async function ProfilePage({
     .eq("id", user.id)
     .maybeSingle();
 
+  const { count: playlistsCount, error: playlistsCountError } = await supabase
+    .from("playlists")
+    .select("id", { count: "exact", head: true });
+
+  if (playlistsCountError) {
+    console.error("profile_playlists_count_error", playlistsCountError.message);
+  }
+
   const displayName = getDisplayName(profile, user);
   const initial = getInitial(displayName);
+  const playlistsCountLabel =
+    playlistsCountError || playlistsCount === null || playlistsCount === undefined
+      ? "—"
+      : String(playlistsCount);
   const email = user.email ?? "";
 
   return (
@@ -188,7 +200,7 @@ export default async function ProfilePage({
             <div className="relative mt-5 grid grid-cols-3 gap-3">
               {[
                 ["24", "практики"],
-                ["5", "плейлистов"],
+                [playlistsCountLabel, "плейлистов"],
                 ["3", "автора"],
               ].map(([value, label]) => (
                 <div

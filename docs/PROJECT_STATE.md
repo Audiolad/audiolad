@@ -82,7 +82,7 @@
 - `/profile` — статистика, любимые авторы, блоки настроек и приглашения (имя и email — реальные).
 - `/profile/edit` — телефон, bio, аватар, интересы, публичность (disabled, не сохраняются).
 - `/favorites`, `/history`, `/downloads`, `/purchases`.
-- `/playlists`, `/playlists/new`, `/playlist/morning-energy` — UI всё ещё демо; **модель БД** `playlists` / `playlist_items` добавлена миграцией PR1 (на production не применена).
+- `/playlist/morning-energy` — демо-деталь (не для реальных данных).
 - `/authors` и страницы авторов.
 - `/author-dashboard` и все подстраницы кабинета автора.
 - `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`.
@@ -90,11 +90,12 @@
 
 ## Плейлисты (состояние на 2026-07-15)
 
-- Есть миграция схемы + RLS: `supabase/migrations/20260715270000_create_playlists.sql`.
-- Элемент = `practice_id`; режимы `private` / `public` (`unlisted` не в схеме, зарезервирован на будущее).
-- `private`: всегда `slug` и `published_at` NULL; `public`: обязательный уникальный slug, `published_at` опционален до серверного publish.
-- UI страниц `/playlists*` пока mock; API/RPC, публикация, добавление из Аудиотеки, Play All между продуктами — не реализованы.
-- Будущие маршруты: `/playlists/[id]`, публичный `/p/[slug]`.
+- PR1 схема + RLS закоммичены: `20260715270000_create_playlists.sql` (**на production не применена**).
+- PR2: `/playlists` читает реальные плейлисты владельца (Server Component + RLS); create/rename/delete/visibility через `/api/playlists`.
+- Создание — modal/bottom sheet (страница `/playlists/new` редиректит на `/playlists`).
+- Public slug генерируется сервером; публичная страница `/p/[slug]` ещё не реализована.
+- Добавление практик — PR3; страница содержимого — PR4; плеер не менялся.
+- Счётчик плейлистов в профиле — реальный count (если таблицы ещё нет на prod — «—»).
 
 ## Что ещё не реализовано
 

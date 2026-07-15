@@ -74,13 +74,14 @@ Timeweb Cloud
 
 `/`, `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases`, `/playlists`, `/playlists/new`, `/playlist/morning-energy`, `/authors`, `/authors/*`, `/author-dashboard`, `/author-dashboard/**`, `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`, `/settings`.
 
-### Плейлисты (схема есть, UI пока демо)
+### Плейлисты
 
-- Модель: `playlists`, `playlist_items` (`practice_id`), `visibility` private|public. См. `docs/DATABASE.md`.
-- `unlisted` зарезервирован на будущее (доступ по ссылке без каталога); в схеме/маршрутах/UI не реализован.
-- Будущие маршруты: `/playlists`, `/playlists/[id]` (владелец); `/p/[slug]` (публичный просмотр).
-- Демо `/playlist/morning-energy` не использовать для реальных данных.
-- Плейлист не даёт entitlement; Play All между продуктами пока не реализуется.
+- Схема PR1 + CRUD PR2: list/create/rename/delete/visibility.
+- Чтение: Server Component + user session + RLS.
+- Мутации: `POST/PATCH/DELETE /api/playlists` (не прямой клиентский CRUD).
+- Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
+- `/playlists/new` → redirect `/playlists`.
+- Добавление практик — PR3; деталь `/playlists/[id]` — PR4.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 
