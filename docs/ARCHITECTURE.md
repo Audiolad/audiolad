@@ -78,10 +78,14 @@ Timeweb Cloud
 
 - Схема PR1 + CRUD PR2: list/create/rename/delete/visibility.
 - Чтение: Server Component + user session + RLS.
-- Мутации: `POST/PATCH/DELETE /api/playlists` (не прямой клиентский CRUD).
+- Мутации CRUD: `POST/PATCH/DELETE /api/playlists` (не прямой клиентский CRUD).
+- Membership PR3.1: `GET/PUT /api/playlists/membership` + RPC `set_practice_playlist_membership`.
+- Entry point добавления: меню `···` в Аудиотеке (`/my-practices`) → `AddToPlaylistSheet`.
+- Private add требует entitlement (`resolveProductAccess`); public add — free catalog rules; плейлист не даёт listen-доступ.
 - Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
 - `/playlists/new` → redirect `/playlists`.
-- Добавление практик — PR3; деталь `/playlists/[id]` — PR4.
+- Деталь `/playlists/[id]`, reorder и Play All — ещё не реализованы.
+- Миграция/deploy PR3.1 на production — ещё нет.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 

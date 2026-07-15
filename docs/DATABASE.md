@@ -129,21 +129,33 @@ CHECK согласованности:
 
 UNIQUE `(playlist_id, practice_id)` — один продукт один раз в плейлисте.
 
-### Лимиты MVP (серверная проверка в будущем API/RPC)
+### Лимиты MVP (API + RPC)
 
-- максимум **50** плейлистов на пользователя;
-- максимум **100** продуктов в одном плейлисте;
-- длина названия **1–80** (частично в CHECK).
+- максимум **50** плейлистов на пользователя (`POST /api/playlists`);
+- максимум **100** продуктов в одном плейлисте (`set_practice_playlist_membership`);
+- длина названия **1–80** (CHECK + API).
+
+### Membership (PR3.1)
+
+- Элемент плейлиста = `practice_id` (целый продукт).
+- `playlist_items` **не** выдаёт entitlement / listen-доступ.
+- Атомарная смена набора плейлистов: RPC `public.set_practice_playlist_membership(uuid, uuid[])`
+  (`supabase/migrations/20260715280000_playlist_membership_rpc.sql`).
+- Private add: действующий доступ как у `resolveProductAccess` (author_members / active `user_practices` / free published catalog listen).
+- Public add: те же условия, что `claim_free_practice` / `isPracticeEligibleForPublicPlaylist`.
+- Position нового элемента: `MAX(position)+1` под `FOR UPDATE` родительского плейлиста.
+- API: `GET/PUT /api/playlists/membership`.
+- Миграция PR3.1 на production **ещё не применена**.
 
 ### Будущие маршруты
 
-- владелец: `/playlists`, `/playlists/[id]`;
-- публичный просмотр: `/p/[slug]`;
+- владелец: `/playlists`, `/playlists/[id]` (контент — ещё не реализован);
+- публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
 ### Мутации
 
-Чтение своих/публичных строк возможно через RLS. Безопасные мутации с entitlement и правилами публикации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`).
+Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`) и SECURITY DEFINER RPC membership.
 
 Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы по той же модели, что `claim_free_practice`: `status=published`, `is_catalog_listed IS TRUE`, `is_free IS TRUE`, `price` null или не `> 0`.
 

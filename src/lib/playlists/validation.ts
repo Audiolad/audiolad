@@ -189,3 +189,69 @@ export function isUuid(value: string): boolean {
     value,
   );
 }
+
+export type MembershipPutInput =
+  | {
+      ok: true;
+      practiceId: string;
+      playlistIds: string[];
+    }
+  | { ok: false; error: "invalid_request" };
+
+/**
+ * PUT /api/playlists/membership body:
+ * { practiceId: uuid, playlistIds: uuid[] } — unique, max 50, no unknown keys.
+ */
+export function parseMembershipPutBody(body: unknown): MembershipPutInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["practiceId", "playlistIds"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (!("practiceId" in parsed) || !("playlistIds" in parsed)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (typeof parsed.practiceId !== "string" || !isUuid(parsed.practiceId)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (!Array.isArray(parsed.playlistIds)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (parsed.playlistIds.length > 50) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const playlistIds: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of parsed.playlistIds) {
+    if (typeof value !== "string" || !isUuid(value)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    if (seen.has(value)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    seen.add(value);
+    playlistIds.push(value);
+  }
+
+  return {
+    ok: true,
+    practiceId: parsed.practiceId,
+    playlistIds,
+  };
+}

@@ -4,6 +4,22 @@
 
 ---
 
+## Сессия — 15 июля 2026 (плейлисты PR3.1 + закрытие PR2 docs)
+
+**Сделано:**
+
+- Этап A: docs commit `c508080` (`docs: record playlists PR2 production deploy`); smoke helper commit `10171f3` (`test: add playlists production CRUD smoke helper`).
+- PR3.1 в рабочей копии (без commit/push/deploy/prod migrate):
+  - migration `20260715280000_playlist_membership_rpc.sql` (`set_practice_playlist_membership`);
+  - `GET/PUT /api/playlists/membership`;
+  - `AddToPlaylistSheet` + меню `···` в Аудиотеке;
+  - SQL smoke на `audiolad_playlists_pr3_test`; validation smoke.
+- Production не изменялся (RPC на prod отсутствует).
+
+**Следующий шаг:** review → commit PR3.1 → apply migration на test/prod → deploy → затем `/playlists/[id]`.
+
+---
+
 ## Сессия — 15 июля 2026 (плейлисты PR2 deploy)
 
 **Сделано:**

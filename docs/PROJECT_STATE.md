@@ -95,18 +95,18 @@
 - `/playlists` работает с реальными данными владельца; create/rename/delete/change visibility через API.
 - `/playlists/new` → redirect `/playlists` (для гостя сначала auth с `next`).
 - Профиль показывает реальный count плейлистов.
-- Публичная страница `/p/[slug]` ещё не реализована; плейлисты пока без элементов.
-- Добавление из Аудиотеки — PR3; Play All между продуктами не реализован.
+- PR3.1 (код в рабочей копии, **не закоммичен / не на production**): добавление из Аудиотеки в один или несколько плейлистов; atomic RPC membership; лимит 100.
+- Публичная страница `/p/[slug]` ещё не реализована; страница содержимого `/playlists/[id]`, reorder и Play All — нет.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`; previous = `20260715-190051-35f01ac`.
-- Backup перед миграцией: `/var/www/audiolad/backups/postgres-pre-playlists-20260715-200359.dump`.
+- Backup перед миграцией PR1: `/var/www/audiolad/backups/postgres-pre-playlists-20260715-200359.dump`.
 
 ## Что ещё не реализовано
 
-- CRUD/UI плейлистов на реальных данных и API/RPC мутаций.
-- Публичный каталог подборок и проверка publish-правил.
-- Play All между разными продуктами в плеере.
+- Страница содержимого плейлиста `/playlists/[id]`, reorder, Play All.
+- Публичный каталог подборок `/p/[slug]`.
+- Применение/deploy PR3.1 на production.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
-- Автотесты приложения — отсутствуют (есть SQL smoke для плейлистов в `supabase/tests/`).
+- Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).
 
 ## Незакоммиченные изменения в рабочей копии
 

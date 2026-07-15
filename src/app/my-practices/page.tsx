@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import LibraryPracticeMenu from "@/components/playlists/LibraryPracticeMenu";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
@@ -291,15 +292,22 @@ function LibraryCard({ item, index }: LibraryCardProps) {
             </button>
           )}
 
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            aria-label="Дополнительное меню"
-            className={`px-2 text-2xl leading-none text-[#8f82ad] ${DisabledControlClasses()}`}
-          >
-            ···
-          </button>
+          {practice?.id ? (
+            <LibraryPracticeMenu
+              practiceId={practice.id}
+              practiceTitle={title}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              aria-label="Дополнительное меню"
+              className={`px-2 text-2xl leading-none text-[#8f82ad] ${DisabledControlClasses()}`}
+            >
+              ···
+            </button>
+          )}
         </div>
       </div>
     </article>
