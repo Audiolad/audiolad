@@ -4,6 +4,7 @@ import type { GuestHomeData } from "@/lib/home/types";
 
 import AuthorsRail from "./AuthorsRail";
 import HeroFeaturedProduct from "./HeroFeaturedProduct";
+import { PlayIcon } from "./HomeIcons";
 import HowItWorks from "./HowItWorks";
 import NeedsNavigation from "./NeedsNavigation";
 import ProductRail from "./ProductRail";
@@ -42,17 +43,18 @@ export default function GuestHome({ data }: GuestHomeProps) {
           одном спокойном пространстве.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href={primaryListenHref}
-            className="inline-flex min-h-11 rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-6 py-4 text-[17px] font-semibold text-white shadow-[0_14px_34px_rgba(96,59,168,0.24)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            className="inline-flex min-h-[52px] items-center gap-2.5 rounded-[22px] bg-gradient-to-r from-[#6234b5] via-[#7042c5] to-[#9872d8] px-7 py-[18px] text-[17px] font-semibold text-white shadow-[0_16px_40px_rgba(96,59,168,0.32)] transition-[box-shadow,transform] duration-200 hover:shadow-[0_18px_44px_rgba(96,59,168,0.36)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] active:scale-[0.99]"
           >
+            <PlayIcon />
             Начать слушать бесплатно
           </Link>
 
           <Link
             href="/catalog"
-            className="inline-flex min-h-11 rounded-[22px] border border-[#7042c5] bg-white px-6 py-4 text-[17px] font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            className="inline-flex min-h-11 items-center rounded-[22px] border border-[#c9b5e8] bg-white px-5 py-3.5 text-[16px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
           >
             Открыть каталог
           </Link>

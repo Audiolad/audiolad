@@ -10,7 +10,19 @@ export default function DailyGreeting({ title, phrase }: DailyGreetingProps) {
       aria-label="Персональное приветствие"
     >
       <h1 className="text-[22px] font-semibold leading-tight text-[#25135c] lg:text-[24px]">
-        {title}
+        {title.endsWith("💜") ? (
+          <>
+            {title.slice(0, -2).trimEnd()}
+            <span
+              aria-hidden="true"
+              className="ml-1 inline-block text-[0.92em] leading-none"
+            >
+              💜
+            </span>
+          </>
+        ) : (
+          title
+        )}
       </h1>
       <p className="mt-2 text-[15px] leading-6 text-[#6f61a3]">
         <em>{phrase}</em>
