@@ -84,26 +84,6 @@ function isAccessActive(expiresAt: string | null): boolean {
   return new Date(expiresAt) > new Date();
 }
 
-function getAccessBadgeLabel(accessSource: AccessSource | string): string {
-  switch (accessSource) {
-    case "starter":
-    case "free_claim":
-      return "Бесплатно";
-    case "purchase":
-      return "Куплено";
-    case "gift":
-      return "Подарок";
-    case "subscription":
-      return "По подписке";
-    case "program":
-      return "В программе";
-    case "admin":
-      return "Доступ открыт";
-    default:
-      return "Доступ открыт";
-  }
-}
-
 function formatPracticesCount(count: number): string {
   const abs = Math.abs(count);
   const mod10 = abs % 10;
@@ -204,7 +184,7 @@ function SearchIcon() {
 
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="currentColor">
       <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
     </svg>
   );
@@ -232,7 +212,6 @@ function getAuthorSlug(practice: PracticeRow | null): string | null {
 }
 
 function LibraryCard({ item, index }: LibraryCardProps) {
-  const badge = getAccessBadgeLabel(item.accessSource);
   const practice = item.practice;
   const isUnavailable = practice === null;
   const title = isUnavailable
@@ -257,17 +236,13 @@ function LibraryCard({ item, index }: LibraryCardProps) {
 
   return (
     <article className="flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
-      <div className="relative aspect-square w-[112px] shrink-0">
+      <div className="aspect-square w-[116px] shrink-0 min-[390px]:w-[124px]">
         <ProductCoverThumbnail
           slug={practice?.slug ?? `library-item-${index}`}
           title={title}
           coverUrl={coverDisplayUrl}
           className="aspect-square h-full w-full rounded-[20px]"
         />
-
-        <span className="absolute left-2 top-2 rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium text-[#7042c5]">
-          {badge}
-        </span>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -297,7 +272,7 @@ function LibraryCard({ item, index }: LibraryCardProps) {
               href={listenHref}
               className="flex items-center gap-2 font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white">
                 <PlayIcon />
               </span>
               {audioStatus}
@@ -309,7 +284,7 @@ function LibraryCard({ item, index }: LibraryCardProps) {
               aria-disabled="true"
               className={`flex items-center gap-2 font-medium text-[#7042c5] ${DisabledControlClasses()}`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
                 <PlayIcon />
               </span>
               {audioStatus}
