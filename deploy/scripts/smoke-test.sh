@@ -18,5 +18,6 @@ export AUDIOLAD_SMOKE_BASE_URL="$BASE_URL"
 export AUDIOLAD_SMOKE_AUTH_MODE="$AUTH_MODE"
 export AUDIOLAD_SMOKE_SCREENSHOT_DIR="$DEPLOY_LOG_DIR/smoke-screenshots"
 
-node "$SCRIPT_DIR/production-smoke.mjs"
+cd "$GIT_WORKDIR"
+node "$GIT_WORKDIR/scripts/production-smoke.mjs"
 exit $?
