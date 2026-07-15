@@ -145,7 +145,7 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 
 Чтение своих/публичных строк возможно через RLS. Безопасные мутации с entitlement и правилами публикации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`).
 
-Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы плейлиста на бесплатность и публичную доступность продукта.
+Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы по той же модели, что `claim_free_practice`: `status=published`, `is_catalog_listed IS TRUE`, `is_free IS TRUE`, `price` null или не `> 0`.
 
 ## Схема, триггеры, RLS
 

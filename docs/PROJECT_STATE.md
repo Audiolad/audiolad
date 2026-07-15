@@ -90,12 +90,15 @@
 
 ## Плейлисты (состояние на 2026-07-15)
 
-- PR1 схема + RLS закоммичены: `20260715270000_create_playlists.sql` (**на production не применена**).
-- PR2: `/playlists` читает реальные плейлисты владельца (Server Component + RLS); create/rename/delete/visibility через `/api/playlists`.
-- Создание — modal/bottom sheet (страница `/playlists/new` редиректит на `/playlists`).
-- Public slug генерируется сервером; публичная страница `/p/[slug]` ещё не реализована.
-- Добавление практик — PR3; страница содержимого — PR4; плеер не менялся.
-- Счётчик плейлистов в профиле — реальный count (если таблицы ещё нет на prod — «—»).
+- PR1 миграция `20260715270000_create_playlists.sql` **применена к production**.
+- PR2 развёрнут: release `20260715-200910-c470e23`, commit `c470e23`.
+- `/playlists` работает с реальными данными владельца; create/rename/delete/change visibility через API.
+- `/playlists/new` → redirect `/playlists` (для гостя сначала auth с `next`).
+- Профиль показывает реальный count плейлистов.
+- Публичная страница `/p/[slug]` ещё не реализована; плейлисты пока без элементов.
+- Добавление из Аудиотеки — PR3; Play All между продуктами не реализован.
+- Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`; previous = `20260715-190051-35f01ac`.
+- Backup перед миграцией: `/var/www/audiolad/backups/postgres-pre-playlists-20260715-200359.dump`.
 
 ## Что ещё не реализовано
 
