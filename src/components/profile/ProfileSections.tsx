@@ -301,6 +301,30 @@ function getProfileApplicationCopy(variant: ProfileApplicationVariant): {
   }
 }
 
+export function ProfileAdminPanelSection() {
+  return (
+    <section className="mt-8 min-w-0" aria-labelledby="profile-admin-heading">
+      <h2 id="profile-admin-heading" className="text-[21px] font-semibold">
+        Платформа
+      </h2>
+
+      <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+        <Link
+          href="/admin"
+          className="flex min-h-[56px] w-full items-center justify-between px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+        >
+          <span className="text-[15px] leading-6 text-[#25135c]">
+            Панель управления
+          </span>
+          <span className="text-xl text-[#7042c5]" aria-hidden="true">
+            ›
+          </span>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 export function ProfileAccountSection() {
   return (
     <section className="mt-8 min-w-0" aria-labelledby="profile-account-heading">

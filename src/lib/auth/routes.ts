@@ -8,6 +8,7 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/playlists",
   "/settings",
   "/author-dashboard",
+  "/admin",
 ] as const;
 
 const AUTH_ROUTES = ["/auth/sign-in", "/auth/sign-up"] as const;

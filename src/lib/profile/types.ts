@@ -38,4 +38,5 @@ export type ProfilePageData = {
   continueState: ProfileContinueState;
   counters: ProfileCounter[];
   authorSection: ProfileAuthorSection;
+  showAdminPanel: boolean;
 };

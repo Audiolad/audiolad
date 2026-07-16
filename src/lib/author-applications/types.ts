@@ -29,6 +29,7 @@ export type AuthorApplicationRow = {
   reviewed_at: string | null;
   reviewed_by: string | null;
   review_comment: string | null;
+  admin_note: string | null;
   created_at: string;
   updated_at: string;
 };

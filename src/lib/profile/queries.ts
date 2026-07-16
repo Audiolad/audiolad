@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { hasAdminPanelAccess } from "@/lib/auth/platform-admin";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import {
@@ -294,6 +295,7 @@ export async function getProfilePageData(
     continueResult,
     authorWorkspaces,
     authorApplication,
+    showAdminPanel,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -311,6 +313,10 @@ export async function getProfilePageData(
     getCurrentAuthorApplication(supabase, user.id).catch((error) => {
       console.error("profile_author_application_error", error);
       return null;
+    }),
+    hasAdminPanelAccess(supabase, user.id).catch((error) => {
+      console.error("profile_admin_access_error", error);
+      return false;
     }),
   ]);
 
@@ -345,6 +351,7 @@ export async function getProfilePageData(
       }),
       authorApplication?.review_comment ?? null,
     ),
+    showAdminPanel,
   };
 }
 

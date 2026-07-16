@@ -3,6 +3,7 @@ import ProfilePageHeader from "@/components/profile/ProfilePageHeader";
 import ProfilePageShell from "@/components/profile/ProfilePageShell";
 import {
   ProfileAccountSection,
+  ProfileAdminPanelSection,
   ProfileAuthorBlock,
   ProfileCounters,
   ProfileQuickLinks,
@@ -54,6 +55,7 @@ export default async function ProfilePage({
       <ProfileCounters counters={profileData.counters} />
       <ProfileQuickLinks />
       <ProfileAuthorBlock section={profileData.authorSection} />
+      {profileData.showAdminPanel ? <ProfileAdminPanelSection /> : null}
       <ProfileAccountSection />
       <ProfileSignOutSection signOutAction={signOut} />
     </ProfilePageShell>
