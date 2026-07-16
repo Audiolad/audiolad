@@ -555,7 +555,11 @@ export function useSequentialPlayer({
       return;
     }
 
-    void loadSignedUrl(currentTrack.id);
+    const trackId = currentTrack.id;
+
+    queueMicrotask(() => {
+      void loadSignedUrl(trackId);
+    });
   }, [currentTrack?.id, sessionGeneration, loadSignedUrl]);
 
   const applySrcToAudioElement = useCallback(() => {
