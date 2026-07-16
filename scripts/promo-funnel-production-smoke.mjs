@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Production smoke for promo guest funnel on elixir-molodosti.
  * Requires: PLAYWRIGHT_BROWSERS_PATH or installed chromium.

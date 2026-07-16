@@ -56,7 +56,7 @@ main() {
   fi
 
   if ! "$SCRIPT_DIR/smoke-test.sh" "https://audiolad.ru"; then
-    log_error "Rollback browser smoke test failed"
+    log_error "Rollback HTTP smoke test failed"
     send_deploy_alert "rollback_failed" "Smoke failed after rollback to $previous_dir"
     exit 1
   fi

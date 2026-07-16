@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import "../../scripts/lib/assert-playwright-allowed.mjs";
 /**
- * Production browser smoke tests for deploy pipeline.
+ * Production browser smoke tests (local/CI only — blocked on production server).
  *
  * Env:
  *   AUDIOLAD_SMOKE_BASE_URL

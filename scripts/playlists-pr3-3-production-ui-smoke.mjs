@@ -1,3 +1,4 @@
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Playlists PR3.3 — production UI smoke (called from production-smoke.sh).
  *

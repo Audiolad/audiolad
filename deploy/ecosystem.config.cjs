@@ -8,6 +8,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: "3000",
+        AUDIOLAD_PRODUCTION_SERVER: "1",
       },
       instances: 1,
       exec_mode: "fork",

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Production-like authenticated home smoke for local or remote base URL.
  *

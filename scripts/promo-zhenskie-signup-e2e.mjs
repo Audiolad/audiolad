@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Production E2E: promo signup funnel on «Женские деньги».
  *

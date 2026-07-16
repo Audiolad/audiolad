@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Smoke E2E for global mini-player continuity.
  * Usage: node scripts/global-mini-player-e2e.mjs [baseUrl]

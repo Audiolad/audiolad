@@ -12,12 +12,10 @@ if [[ "$BASE_URL" == "http://127.0.0.1:"* || "$BASE_URL" == "http://localhost:"*
   AUTH_MODE="guest-only"
 fi
 
-log_info "Running smoke tests against $BASE_URL (auth mode: $AUTH_MODE)"
+log_info "Running HTTP smoke tests against $BASE_URL (no browser)"
 
 export AUDIOLAD_SMOKE_BASE_URL="$BASE_URL"
-export AUDIOLAD_SMOKE_AUTH_MODE="$AUTH_MODE"
-export AUDIOLAD_SMOKE_SCREENSHOT_DIR="$DEPLOY_LOG_DIR/smoke-screenshots"
 
 cd "$GIT_WORKDIR"
-node "$GIT_WORKDIR/scripts/production-smoke.mjs"
+node "$GIT_WORKDIR/scripts/production-smoke-http.mjs"
 exit $?

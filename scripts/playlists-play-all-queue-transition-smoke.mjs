@@ -1,3 +1,4 @@
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Real queue transition smoke (Playwright).
  * Requires env: API, EMAIL, PASS, OWNER_PL, PUBLIC_SLUG

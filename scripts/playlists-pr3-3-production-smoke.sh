@@ -22,6 +22,9 @@
 # Exit: 0 on ALL_PR3_3_PRODUCTION_SMOKE_PASS, non-zero on failure.
 set -euo pipefail
 
+# shellcheck source=lib/guard-playwright.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/guard-playwright.sh"
+
 ENV_FILE=/var/www/audiolad-deploy/shared/.env.production
 ANON=$(grep -E '^NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
 EMAIL="playlists.pr33.smoke.$(openssl rand -hex 5)@example.com"

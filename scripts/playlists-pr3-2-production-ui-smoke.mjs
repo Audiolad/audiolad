@@ -1,3 +1,4 @@
+import "./lib/assert-playwright-allowed.mjs";
 /**
  * Playlists PR3.2 production UI smoke (called from bash wrapper).
  * Env: SMOKE_EMAIL, SMOKE_PASS, SMOKE_PL_ID, SMOKE_API
