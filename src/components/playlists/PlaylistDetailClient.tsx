@@ -3,6 +3,10 @@
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import {
+  buildPublicPlaylistCanonicalUrl,
+  copyTextToClipboard,
+} from "@/lib/playlists/public-url";
 import type { PlaylistVisibility } from "@/lib/playlists/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -477,6 +481,28 @@ export default function PlaylistDetailClient({
           >
             Изменить обложку
           </button>
+          {detail.playlist.visibility === "public" &&
+          detail.playlist.slug ? (
+            <button
+              type="button"
+              className="mt-2 block text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              onClick={() => {
+                void (async () => {
+                  const url = buildPublicPlaylistCanonicalUrl(
+                    detail.playlist.slug as string,
+                  );
+                  const ok = await copyTextToClipboard(url);
+                  setToast(
+                    ok
+                      ? "Ссылка скопирована."
+                      : "Не удалось скопировать ссылку.",
+                  );
+                })();
+              }}
+            >
+              Скопировать ссылку
+            </button>
+          ) : null}
         </div>
       </header>
 

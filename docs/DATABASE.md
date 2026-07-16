@@ -152,8 +152,8 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 
 ### Будущие маршруты
 
-- владелец: `/playlists`, `/playlists/[id]` (PR3.2+ на production: просмотр + delete item + covers; **PR4 reorder ↑↓ — в рабочей копии, не на production**);
-- публичный просмотр: `/p/[slug]` (ещё не реализован);
+- владелец: `/playlists`, `/playlists/[id]` (PR3.2+ на production: просмотр + delete item + covers + reorder);
+- публичный просмотр: `/p/[slug]` (PR5 в рабочей копии);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
 ### Covers (PR3.3) — на production
@@ -178,7 +178,8 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Недоступный материал можно перемещать.
 - API: `POST /api/playlists/[id]/items/[practiceId]/move` (session client, без service role).
 - Migration: `20260716140000_move_playlist_item.sql` (применена к production).
-- Drag-and-drop, Play All, `/p/[slug]` — нет.
+- Drag-and-drop, Play All — нет.
+- Публичная страница `/p/[slug]` — PR5 (рабочая копия): загрузка через RLS + `loadPublicPlaylistBySlug`; только public + `published_at IS NOT NULL`; без новой RPC; entitlement не выдаётся.
 
 ### Мутации
 

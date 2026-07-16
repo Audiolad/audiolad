@@ -94,14 +94,15 @@
 - Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
 - `/playlists/[id]`: items, listen, delete item, edit cover, **reorder ↑↓**.
 - PR4: RPC `move_playlist_item` (атомарный swap соседей, gaps OK, temp=`max(position)+1`); API `POST .../items/[practiceId]/move`; entitlement/`user_practices`/`audio_items` не меняются; unavailable можно двигать.
-- Play All и `/p/[slug]` ещё не реализованы; drag-and-drop нет.
+- Play All ещё не реализован; drag-and-drop нет.
+- **PR5 `/p/[slug]`** — в рабочей копии (не на production): публичный просмотр public+published; без entitlement.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
 - Backup перед PR4: `/var/www/audiolad/backups/postgres-pre-playlists-pr4-20260716-044937.dump`.
 
 ## Что ещё не реализовано
 
 - Drag-and-drop reorder, Play All.
-- Публичный каталог подборок `/p/[slug]`.
+- Публичный каталог подборок (список); сохранение чужих плейлистов.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
 - Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).
 

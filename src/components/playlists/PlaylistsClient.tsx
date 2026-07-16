@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import {
+  buildPublicPlaylistCanonicalUrl,
+  copyTextToClipboard,
+} from "@/lib/playlists/public-url";
+import {
   PLAYLIST_MAX_PER_USER,
   PLAYLIST_TITLE_MAX_LENGTH,
   type PlaylistListItem,
@@ -122,6 +126,7 @@ export default function PlaylistsClient({
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<PlaylistVisibility>("private");
   const [formError, setFormError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -129,6 +134,26 @@ export default function PlaylistsClient({
 
   const atLimit = playlists.length >= PLAYLIST_MAX_PER_USER;
   const busy = submitting || isPending;
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  async function copyPublicLink(playlist: PlaylistListItem) {
+    if (playlist.visibility !== "public" || !playlist.slug) {
+      return;
+    }
+
+    setMenuId(null);
+    const url = buildPublicPlaylistCanonicalUrl(playlist.slug);
+    const ok = await copyTextToClipboard(url);
+    setToast(ok ? "Ссылка скопирована." : "Не удалось скопировать ссылку.");
+  }
 
   useEffect(() => {
     if (dialog.type === "closed" && !menuId) {
@@ -488,6 +513,17 @@ export default function PlaylistsClient({
                                 Сделать приватным
                               </button>
                             )}
+                            {playlist.visibility === "public" &&
+                            playlist.slug ? (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="block w-full px-4 py-3 text-left text-sm text-[#25135c] hover:bg-[#faf6ff]"
+                                onClick={() => void copyPublicLink(playlist)}
+                              >
+                                Скопировать ссылку
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               role="menuitem"
@@ -706,6 +742,17 @@ export default function PlaylistsClient({
               </>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4"
+          role="status"
+        >
+          <p className="rounded-full bg-[#25135c] px-4 py-2 text-sm text-white shadow-lg">
+            {toast}
+          </p>
         </div>
       ) : null}
     </>

@@ -4,6 +4,25 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR5 `/p/[slug]` + docs PR4)
+
+**Этап A:**
+
+- Post-deploy docs PR4: `5225b27d9e091dbc541cd859502fd6d152beb04c`
+
+**Этап B PR5 (рабочая копия, не закоммичено):**
+
+- Публичная страница `/p/[slug]` (Variant A: RLS + server loader).
+- Gate: `visibility=public` + `published_at IS NOT NULL` + slug validation.
+- Drift items: остаются в списке, недоступные без listen.
+- Signed custom cover (service role, private bucket); mosaic из public-compatible.
+- Owner copy-link на list + detail.
+- Production не менялся.
+
+**Следующий шаг:** review → commit PR5 → deploy → public smoke. Не Play All / DnD.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR4 reorder ↑↓ deploy)
 
 **Сделано:**
