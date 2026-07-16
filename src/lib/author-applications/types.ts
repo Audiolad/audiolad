@@ -23,6 +23,7 @@ export type AuthorApplicationRow = {
   links: string | null;
   has_ready_materials: boolean;
   wants_training: boolean;
+  interested_in_school: boolean;
   consent_personal_data: boolean;
   submitted_at: string | null;
   reviewed_at: string | null;
@@ -34,11 +35,14 @@ export type AuthorApplicationRow = {
 
 export type AuthorApplicationFormValues = {
   displayName: string;
+  selectedDirections: string[];
+  directionOther: string;
   direction: string;
   about: string;
   contact: string;
   hasReadyMaterials: boolean;
   wantsTraining: boolean;
+  interestedInSchool: boolean;
   consentPersonalData: boolean;
 };
 

@@ -18,6 +18,7 @@ import type {
 } from "@/lib/author-applications/types";
 import { AUTHOR_APPLICATION_LIMITS } from "@/lib/author-applications/validation";
 
+import AuthorApplicationDirectionPicker from "@/components/become-author/AuthorApplicationDirectionPicker";
 import {
   becomeAuthorBodyClass,
   becomeAuthorCheckboxCardClass,
@@ -94,30 +95,16 @@ function AuthorApplicationForm({
         <FieldError id="displayName-error" message={errors.displayName} />
       </div>
 
-      <div>
-        <label htmlFor="direction" className={becomeAuthorLabelClass}>
-          В каком направлении вы работаете?{" "}
-          <span className="text-[#b34f63]">*</span>
-        </label>
-        <input
-          id="direction"
-          name="direction"
-          type="text"
-          required
-          minLength={AUTHOR_APPLICATION_LIMITS.directionMin}
-          maxLength={AUTHOR_APPLICATION_LIMITS.directionMax}
-          placeholder="Психология, медитации, телесные практики, молитвы, наставничество…"
-          defaultValue={values.direction}
-          aria-invalid={Boolean(errors.direction)}
-          aria-describedby={errors.direction ? "direction-error" : undefined}
-          className={becomeAuthorInputClass}
-        />
-        <FieldError id="direction-error" message={errors.direction} />
-      </div>
+      <AuthorApplicationDirectionPicker
+        selectedDirections={values.selectedDirections}
+        directionOther={values.directionOther}
+        directionError={errors.direction}
+        directionOtherError={errors.directionOther}
+      />
 
       <div>
         <label htmlFor="about" className={becomeAuthorLabelClass}>
-          Расскажите о себе и своём опыте{" "}
+          Расскажите немного о себе и о том, чем занимаетесь{" "}
           <span className="text-[#b34f63]">*</span>
         </label>
         <textarea
@@ -160,7 +147,7 @@ function AuthorApplicationForm({
         aria-describedby={errors.readiness ? "readiness-error" : undefined}
       >
         <legend className={becomeAuthorLabelClass}>
-          Готовность материалов <span className="text-[#b34f63]">*</span>
+          Ваш опыт с аудиопрактиками <span className="text-[#b34f63]">*</span>
         </legend>
 
         <label className={becomeAuthorCheckboxCardClass}>
@@ -171,7 +158,7 @@ function AuthorApplicationForm({
             className="mt-1 h-5 w-5 shrink-0 accent-[#7042c5]"
           />
           <span className={`${becomeAuthorBodyClass} text-[#25135c]`}>
-            У меня уже есть готовые аудиоматериалы
+            Я уже записываю свои аудиопрактики
           </span>
         </label>
 
@@ -183,12 +170,24 @@ function AuthorApplicationForm({
             className="mt-1 h-5 w-5 shrink-0 accent-[#7042c5]"
           />
           <span className={`${becomeAuthorBodyClass} text-[#25135c]`}>
-            Готовых материалов пока нет, но я хочу обучиться и создать их
+            Хочу научиться создавать аудиопрактики
           </span>
         </label>
 
         <FieldError id="readiness-error" message={errors.readiness} />
       </fieldset>
+
+      <label className={becomeAuthorCheckboxCardClass}>
+        <input
+          type="checkbox"
+          name="interestedInSchool"
+          defaultChecked={values.interestedInSchool}
+          className="mt-1 h-5 w-5 shrink-0 accent-[#7042c5]"
+        />
+        <span className={`${becomeAuthorBodyClass} text-[#25135c]`}>
+          Мне интересно обучение в Школе аудиопрактик
+        </span>
+      </label>
 
       <div>
         <label className={becomeAuthorCheckboxCardClass}>
@@ -221,7 +220,7 @@ function AuthorApplicationForm({
         type="submit"
         className="flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        Отправить заявку
+        Стать автором
       </button>
     </form>
   );

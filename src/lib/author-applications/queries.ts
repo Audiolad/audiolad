@@ -29,6 +29,7 @@ export async function getCurrentAuthorApplication(
       links,
       has_ready_materials,
       wants_training,
+      interested_in_school,
       consent_personal_data,
       submitted_at,
       reviewed_at,
@@ -109,6 +110,7 @@ export function mapApplicationInsertPayload(
     contact: values.contact,
     has_ready_materials: values.hasReadyMaterials,
     wants_training: values.wantsTraining,
+    interested_in_school: values.interestedInSchool,
     consent_personal_data: values.consentPersonalData,
     submitted_at: status === "submitted" ? new Date().toISOString() : null,
   };
@@ -129,6 +131,7 @@ export function mapApplicationUpdatePayload(
     contact: values.contact,
     has_ready_materials: values.hasReadyMaterials,
     wants_training: values.wantsTraining,
+    interested_in_school: values.interestedInSchool,
     consent_personal_data: values.consentPersonalData,
     ...(status
       ? {

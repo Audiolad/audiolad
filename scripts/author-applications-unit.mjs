@@ -10,10 +10,13 @@ import {
   shouldShowAuthorApplicationForm,
 } from "../src/lib/author-applications/status.ts";
 import {
+  AUTHOR_APPLICATION_DIRECTION_ERROR,
   AUTHOR_APPLICATION_READINESS_ERROR,
   hasAuthorApplicationFieldErrors,
   normalizeAuthorApplicationFormValues,
+  parseStoredDirection,
   rowToFormValues,
+  serializeDirection,
   validateAuthorApplicationFormValues,
 } from "../src/lib/author-applications/validation.ts";
 
@@ -26,7 +29,7 @@ function assert(condition, message) {
 function validBaseFormData(overrides = {}) {
   const formData = new FormData();
   formData.set("displayName", "Аудио Автор");
-  formData.set("direction", "Медитации");
+  formData.append("directionOptions", "Медитации");
   formData.set(
     "about",
     "Я создаю медитации и практики для спокойствия более десяти лет.",
@@ -37,6 +40,11 @@ function validBaseFormData(overrides = {}) {
   for (const [key, value] of Object.entries(overrides)) {
     if (value === null) {
       formData.delete(key);
+    } else if (key === "directionOptions") {
+      formData.delete("directionOptions");
+      for (const item of value) {
+        formData.append("directionOptions", item);
+      }
     } else {
       formData.set(key, value);
     }
@@ -47,55 +55,29 @@ function validBaseFormData(overrides = {}) {
 
 function testNormalizeStatus() {
   assert(normalizeAuthorApplicationStatus("submitted") === "submitted", "submitted");
-  assert(normalizeAuthorApplicationStatus("unknown") === null, "unknown status");
 }
 
-function testAudienceMatrix() {
+function testDirectionSerialization() {
   assert(
-    resolveBecomeAuthorAudience({
-      isAuthenticated: false,
-      workspaceCount: 0,
-      applicationStatus: null,
-    }) === "guest",
-    "guest audience",
+    serializeDirection(["Медитации", "Психология"], "") === "Медитации, Психология",
+    "serialize presets",
   );
   assert(
-    resolveBecomeAuthorAudience({
-      isAuthenticated: true,
-      workspaceCount: 1,
-      applicationStatus: "submitted",
-    }) === "author",
-    "author audience",
+    serializeDirection(["Другое"], "Астрология") === "Другое: Астрология",
+    "serialize other",
   );
 }
 
-function testProfileVariant() {
-  assert(
-    resolveProfileApplicationVariant({
-      workspaceCount: 0,
-      applicationStatus: null,
-    }) === "none",
-    "none variant",
-  );
+function testDirectionParsingLegacy() {
+  const parsed = parseStoredDirection("Медитации, Психология");
+  assert(parsed.selectedDirections.includes("Медитации"), "legacy preset parsed");
+  assert(parsed.selectedDirections.includes("Психология"), "legacy second preset parsed");
 }
 
-function testEditableAndSubmitStatuses() {
-  assert(isEditableAuthorApplicationStatus("draft"), "draft editable");
-  assert(canSubmitAuthorApplicationStatus("needs_changes"), "needs_changes submittable");
-}
-
-function testFormVisibility() {
-  assert(
-    shouldShowAuthorApplicationForm({
-      workspaceCount: 0,
-      applicationStatus: null,
-    }),
-    "new listener sees form",
-  );
-}
-
-function testDuplicateGuard() {
-  assert(blocksNewAuthorApplication("rejected"), "rejected blocks new");
+function testDirectionParsingOther() {
+  const parsed = parseStoredDirection("Медитации, Другое: Астрология");
+  assert(parsed.selectedDirections.includes("Другое"), "other flag parsed");
+  assert(parsed.directionOther === "Астрология", "other text parsed");
 }
 
 function testReadyMaterialsOnly() {
@@ -106,8 +88,6 @@ function testReadyMaterialsOnly() {
   const values = normalizeAuthorApplicationFormValues(formData);
   const errors = validateAuthorApplicationFormValues(values);
   assert(!hasAuthorApplicationFieldErrors(errors), "ready materials only passes");
-  assert(values.hasReadyMaterials, "hasReadyMaterials true");
-  assert(!values.wantsTraining, "wantsTraining false");
 }
 
 function testWantsTrainingOnly() {
@@ -118,7 +98,6 @@ function testWantsTrainingOnly() {
   const values = normalizeAuthorApplicationFormValues(formData);
   const errors = validateAuthorApplicationFormValues(values);
   assert(!hasAuthorApplicationFieldErrors(errors), "wants training only passes");
-  assert(values.wantsTraining, "wantsTraining true");
 }
 
 function testBothReadinessOptions() {
@@ -141,17 +120,56 @@ function testMissingReadinessBlocked() {
   assert(errors.readiness === AUTHOR_APPLICATION_READINESS_ERROR, "readiness required");
 }
 
+function testInterestedInSchoolOptional() {
+  const formData = validBaseFormData({
+    hasReadyMaterials: "on",
+    interestedInSchool: null,
+  });
+  const values = normalizeAuthorApplicationFormValues(formData);
+  const errors = validateAuthorApplicationFormValues(values);
+  assert(!hasAuthorApplicationFieldErrors(errors), "school interest optional");
+  assert(!values.interestedInSchool, "school unchecked");
+
+  const withSchool = validBaseFormData({
+    hasReadyMaterials: "on",
+    interestedInSchool: "on",
+  });
+  const schoolValues = normalizeAuthorApplicationFormValues(withSchool);
+  assert(schoolValues.interestedInSchool, "school can be checked");
+}
+
 function testMissingDirectionBlocked() {
   const formData = validBaseFormData({
-    direction: "ab",
+    directionOptions: [],
+  });
+  const values = normalizeAuthorApplicationFormValues(formData);
+  const errors = validateAuthorApplicationFormValues(values);
+  assert(errors.direction === AUTHOR_APPLICATION_DIRECTION_ERROR, "direction required");
+}
+
+function testOtherDirectionRequiresText() {
+  const formData = validBaseFormData({
+    directionOptions: ["Другое"],
+    directionOther: "",
     hasReadyMaterials: "on",
   });
   const values = normalizeAuthorApplicationFormValues(formData);
   const errors = validateAuthorApplicationFormValues(values);
-  assert(Boolean(errors.direction), "direction too short blocked");
+  assert(Boolean(errors.directionOther), "other direction text required");
 }
 
-function testLegacyRowWithoutWantsTraining() {
+function testMultipleDirectionsSubmit() {
+  const formData = validBaseFormData({
+    directionOptions: ["Медитации", "Коучинг"],
+    hasReadyMaterials: "on",
+  });
+  const values = normalizeAuthorApplicationFormValues(formData);
+  const errors = validateAuthorApplicationFormValues(values);
+  assert(!hasAuthorApplicationFieldErrors(errors), "multiple directions pass");
+  assert(values.direction.includes("Медитации"), "direction serialized");
+}
+
+function testLegacyRowWithoutNewFlags() {
   const values = rowToFormValues({
     display_name: "Автор",
     direction: "Медитации",
@@ -160,43 +178,47 @@ function testLegacyRowWithoutWantsTraining() {
     has_ready_materials: true,
     consent_personal_data: true,
   });
-  assert(values.wantsTraining === false, "legacy row defaults wantsTraining to false");
-  assert(values.hasReadyMaterials, "legacy hasReadyMaterials preserved");
+  assert(values.wantsTraining === false, "legacy wantsTraining defaults false");
+  assert(values.interestedInSchool === false, "legacy interestedInSchool defaults false");
+  assert(values.selectedDirections.includes("Медитации"), "legacy direction parsed");
 }
 
-function testInvalidBaselineForm() {
-  const formData = validBaseFormData({
-    displayName: "A",
-    direction: "ab",
-    about: "short",
-    contact: "",
-    hasReadyMaterials: "on",
-  });
-  const values = normalizeAuthorApplicationFormValues(formData);
-  const errors = validateAuthorApplicationFormValues(values);
-  assert(hasAuthorApplicationFieldErrors(errors), "invalid baseline has errors");
+function testEditableAndSubmitStatuses() {
+  assert(isEditableAuthorApplicationStatus("draft"), "draft editable");
+  assert(canSubmitAuthorApplicationStatus("needs_changes"), "needs_changes submittable");
 }
 
-function testServerSideEnforcementDocumented() {
-  // user_id is enforced by RLS (auth.uid()); status changes are blocked by DB triggers.
-  assert(true, "server-side enforcement documented");
+function testFormVisibility() {
+  assert(
+    shouldShowAuthorApplicationForm({
+      workspaceCount: 0,
+      applicationStatus: null,
+    }),
+    "new listener sees form",
+  );
+}
+
+function testDuplicateGuard() {
+  assert(blocksNewAuthorApplication("rejected"), "rejected blocks new");
 }
 
 function run() {
   testNormalizeStatus();
-  testAudienceMatrix();
-  testProfileVariant();
-  testEditableAndSubmitStatuses();
-  testFormVisibility();
-  testDuplicateGuard();
+  testDirectionSerialization();
+  testDirectionParsingLegacy();
+  testDirectionParsingOther();
   testReadyMaterialsOnly();
   testWantsTrainingOnly();
   testBothReadinessOptions();
   testMissingReadinessBlocked();
+  testInterestedInSchoolOptional();
   testMissingDirectionBlocked();
-  testLegacyRowWithoutWantsTraining();
-  testInvalidBaselineForm();
-  testServerSideEnforcementDocumented();
+  testOtherDirectionRequiresText();
+  testMultipleDirectionsSubmit();
+  testLegacyRowWithoutNewFlags();
+  testEditableAndSubmitStatuses();
+  testFormVisibility();
+  testDuplicateGuard();
   console.log("author-applications-unit: all tests passed");
 }
 

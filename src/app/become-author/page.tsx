@@ -13,11 +13,14 @@ export const dynamic = "force-dynamic";
 
 const EMPTY_FORM_VALUES = {
   displayName: "",
+  selectedDirections: [],
+  directionOther: "",
   direction: "",
   about: "",
   contact: "",
   hasReadyMaterials: false,
   wantsTraining: false,
+  interestedInSchool: false,
   consentPersonalData: false,
 };
 
