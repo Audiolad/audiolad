@@ -49,7 +49,9 @@ import {
 } from "@/lib/pwa/use-pwa-storage";
 import { createClient } from "@/lib/supabase/client";
 
-const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
+export const PwaInstallContext = createContext<PwaInstallContextValue | null>(
+  null,
+);
 
 export function usePwaInstall(): PwaInstallContextValue {
   const context = useContext(PwaInstallContext);

@@ -1,0 +1,24 @@
+import type { PwaInstallContextValue } from "@/lib/pwa/types";
+
+const noop = () => {};
+const noopAsync = async () => {};
+
+/**
+ * Safe PWA context used when the install provider subtree fails.
+ * Must not touch browser APIs or trigger side effects.
+ */
+export const PWA_INSTALL_FALLBACK_CONTEXT: PwaInstallContextValue = {
+  installState: "unsupported",
+  isStandalone: false,
+  isAuthenticated: false,
+  canShowBanner: false,
+  uiVariant: "desktop",
+  dialogMode: null,
+  isBannerVisible: false,
+  isMenuDialogOpen: false,
+  remindLater: noop,
+  openInstallFlow: noopAsync,
+  openMenuInstall: noop,
+  closeDialog: noop,
+  dismissBannerForSession: noop,
+};

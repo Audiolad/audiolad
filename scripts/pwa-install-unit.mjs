@@ -367,10 +367,97 @@ function testPwaProviderErrorBoundary() {
     "/var/www/audiolad/src/components/AppProviders.tsx",
     "utf8",
   );
+  const fallback = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
+    "utf8",
+  );
+  const settingsError = readFileSync(
+    "/var/www/audiolad/src/app/settings/error.tsx",
+    "utf8",
+  );
 
   assert(boundary.includes("componentDidCatch"), "pwa boundary catches errors");
-  assert(boundary.includes("appChildren"), "pwa boundary can fall back to app");
+  assert(
+    boundary.includes("PwaInstallContext.Provider"),
+    "pwa boundary keeps install context on fallback",
+  );
+  assert(
+    boundary.includes("PWA_INSTALL_FALLBACK_CONTEXT"),
+    "pwa boundary uses safe fallback context",
+  );
+  assert(
+    !boundary.match(/hasError[\s\S]{0,220}return this\.props\.appChildren;/),
+    "pwa boundary no longer renders app without provider",
+  );
+  assert(providers.includes("PwaInstallProvider"), "normal provider still wired");
   assert(providers.includes("PwaInstallErrorBoundary"), "app providers wrap pwa layer");
+  assert(
+    fallback.includes('installState: "unsupported"'),
+    "fallback marks install as unavailable",
+  );
+  assert(
+    !fallback.includes("window") &&
+      !fallback.includes("navigator") &&
+      !fallback.includes("localStorage"),
+    "fallback context avoids browser APIs",
+  );
+  assert(
+    fallback.includes("canShowBanner: false"),
+    "fallback hides banner",
+  );
+  assert(
+    settingsError.includes("Не удалось загрузить настройки"),
+    "settings route has localized error boundary",
+  );
+  assert(settingsError.includes("Обновить страницу"), "settings error has retry");
+}
+
+function testPwaFallbackContextContract() {
+  const fallback = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
+    "utf8",
+  );
+  const menuItem = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
+    "utf8",
+  );
+
+  const requiredFields = [
+    "installState",
+    "isStandalone",
+    "isAuthenticated",
+    "canShowBanner",
+    "uiVariant",
+    "dialogMode",
+    "isBannerVisible",
+    "isMenuDialogOpen",
+    "remindLater",
+    "openInstallFlow",
+    "openMenuInstall",
+    "closeDialog",
+    "dismissBannerForSession",
+  ];
+
+  for (const field of requiredFields) {
+    assert(fallback.includes(`${field}:`), `fallback defines ${field}`);
+  }
+
+  assert(menuItem.includes("usePwaInstall"), "settings menu item consumes pwa context");
+  assert(
+    !boundaryRendersProviderlessFallback(),
+    "boundary fallback always supplies provider",
+  );
+}
+
+function boundaryRendersProviderlessFallback() {
+  const boundary = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallErrorBoundary.tsx",
+    "utf8",
+  );
+
+  return /if \(this\.state\.hasError\)[\s\S]*return this\.props\.appChildren;/.test(
+    boundary,
+  );
 }
 
 function testClientErrorReporterWiring() {
@@ -518,6 +605,7 @@ const tests = [
   ["service worker cache version bumped", testServiceWorkerCacheVersionBumped],
   ["pwa browser environment hook", testPwaBrowserEnvironmentHook],
   ["pwa provider error boundary", testPwaProviderErrorBoundary],
+  ["pwa fallback context contract", testPwaFallbackContextContract],
   ["client error reporter wiring", testClientErrorReporterWiring],
   ["manifest contract", testManifestContract],
   ["accepted does not confirm install", testAcceptedDoesNotConfirmInstall],

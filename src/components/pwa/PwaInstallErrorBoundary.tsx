@@ -2,6 +2,9 @@
 
 import { Component, type ReactNode } from "react";
 
+import { PwaInstallContext } from "@/components/pwa/PwaInstallProvider";
+import { PWA_INSTALL_FALLBACK_CONTEXT } from "@/lib/pwa/fallback-context";
+
 type PwaInstallErrorBoundaryProps = {
   children: ReactNode;
   appChildren: ReactNode;
@@ -36,7 +39,11 @@ export default class PwaInstallErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
-      return this.props.appChildren;
+      return (
+        <PwaInstallContext.Provider value={PWA_INSTALL_FALLBACK_CONTEXT}>
+          {this.props.appChildren}
+        </PwaInstallContext.Provider>
+      );
     }
 
     return this.props.children;
