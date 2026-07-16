@@ -48,6 +48,7 @@ function drainPendingSave(
 import { buildListenApiBase } from "@/lib/products/paths";
 import {
   buildGuestProgressPayload,
+  clearGuestPracticeProgress,
   saveGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
 import {
@@ -226,6 +227,12 @@ export function useSequentialPlayer({
     setIsPlaying(next);
     syncMediaSessionPlaybackState(next);
   }, []);
+
+  useEffect(() => {
+    if (requestInitialAutoplay && !initialAutoplayAttemptedRef.current) {
+      initialAutoplayPendingRef.current = true;
+    }
+  }, [requestInitialAutoplay]);
 
   useEffect(() => {
     progressRef.current = progress;
@@ -990,22 +997,75 @@ export function useSequentialPlayer({
     setPlaybackRateIndex((current) => (current + 1) % PLAYBACK_RATES.length);
   };
 
-  const handleStartOver = async () => {
-    try {
-      const response = await fetch(`${listenApiBase}/progress`, {
-        method: "DELETE",
-      });
+  const restartPlaybackFromBeginning = useCallback(
+    async (options: { autoPlay: boolean }) => {
+      userInitiatedPauseRef.current = false;
+      userWantsPlaybackRef.current = options.autoPlay;
+      setProgressError(null);
+      setProgramCompleted(false);
+      setProgress([]);
+      progressRef.current = [];
+      lastIntervalSavedPositionRef.current = -1;
 
-      if (!response.ok) {
-        setProgressError("Не удалось сбросить прогресс.");
+      if (currentTrackIndex !== 0) {
+        await switchToTrack(0, {
+          autoPlay: options.autoPlay,
+          startPosition: 0,
+        });
         return;
       }
 
-      setProgress([]);
-      progressRef.current = [];
-      setProgramCompleted(false);
-      setProgressError(null);
-      await switchToTrack(0, { autoPlay: false, startPosition: 0 });
+      const track = currentTrackRef.current;
+
+      if (!track) {
+        return;
+      }
+
+      setPendingStartPosition(0);
+      setCurrentTime(0);
+
+      const audio = audioRef.current;
+
+      if (audio && src) {
+        audio.currentTime = 0;
+
+        if (options.autoPlay) {
+          try {
+            await audio.play();
+          } catch {
+            userWantsPlaybackRef.current = false;
+            setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+          }
+        }
+      } else {
+        await switchToTrack(0, {
+          autoPlay: options.autoPlay,
+          startPosition: 0,
+        });
+        return;
+      }
+
+      await saveProgress(track.id, 0, false, { force: true });
+    },
+    [currentTrackIndex, saveProgress, src, switchToTrack],
+  );
+
+  const handleStartOver = async () => {
+    try {
+      if (guestProgressModeRef.current) {
+        clearGuestPracticeProgress(practiceIdRef.current);
+      } else {
+        const response = await fetch(`${listenApiBase}/progress`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) {
+          setProgressError("Не удалось сбросить прогресс.");
+          return;
+        }
+      }
+
+      await restartPlaybackFromBeginning({ autoPlay: true });
     } catch {
       setProgressError("Не удалось сбросить прогресс.");
     }

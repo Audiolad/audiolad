@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/promo-guest-funnel-unit.mjs && node scripts/guest-progress-interval-unit.mjs && node scripts/per-track-cover-unit.mjs && node scripts/author-promotion-unit.mjs"
+    "test": "node scripts/promo-guest-funnel-unit.mjs && node scripts/guest-progress-interval-unit.mjs && node scripts/per-track-cover-unit.mjs && node scripts/author-promotion-unit.mjs && node scripts/listen-autoplay-unit.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

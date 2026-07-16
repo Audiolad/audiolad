@@ -24,8 +24,8 @@ export function buildListenPath(
 ): string {
   const base = `/listen/${authorSlug}/${productSlug}`;
 
-  if (options?.autoplay) {
-    return `${base}?autoplay=1`;
+  if (shouldRequestListenAutoplay(options)) {
+    return `${base}?${LISTEN_AUTOPLAY_QUERY_PARAM}=${LISTEN_AUTOPLAY_QUERY_VALUE}`;
   }
 
   return base;
@@ -39,6 +39,11 @@ export function buildListenApiBase(
 }
 
 import { getAppOrigin } from "@/lib/seo/app-origin";
+import {
+  LISTEN_AUTOPLAY_QUERY_PARAM,
+  LISTEN_AUTOPLAY_QUERY_VALUE,
+  shouldRequestListenAutoplay,
+} from "@/lib/listen/autoplay-intent";
 
 export function buildPracticeCanonicalUrl(
   authorSlug: string,

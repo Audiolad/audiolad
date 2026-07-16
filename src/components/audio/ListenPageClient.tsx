@@ -134,7 +134,7 @@ export default function ListenPageClient({
       coverGradient,
       coverImageUrl,
       isAuthorPreview,
-      requestAutoplay: autoplay && activeSession?.practiceId !== practiceId,
+      requestAutoplay: autoplay,
       guestProgressMode,
       guestProgressMeta,
       promoConversionMode,

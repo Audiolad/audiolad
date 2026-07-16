@@ -72,7 +72,7 @@ function testPracticeAccessUi() {
   );
 
   assert(source.includes("Начать слушать"), "guest listen label");
-  assert(source.includes("autoplay: !guestListenWithoutAutoplay"), "no autoplay for guests");
+  assert(source.includes("autoplay: true"), "guest CTA includes autoplay intent");
   assert(source.includes("guest_promo"), "guest promo badge path");
 }
 

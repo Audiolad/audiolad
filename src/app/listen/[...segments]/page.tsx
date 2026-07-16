@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { renderListenPage } from "@/lib/listen/page-shared";
+import { parseListenAutoplayIntent } from "@/lib/listen/autoplay-intent";
 import { resolveLegacyPracticePath } from "@/lib/products/lookup";
 import { buildListenPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +48,6 @@ export default async function ListenPage({ params, searchParams }: PageProps) {
 
   return renderListenPage(route.authorSlug, route.productSlug, {
     accessDenied: access === "denied",
-    autoplay: autoplay === "1",
+    autoplay: parseListenAutoplayIntent(autoplay),
   });
 }

@@ -399,14 +399,21 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     sessionGenerationRef.current += 1;
 
     setSession((current) => {
+      const requestAutoplay = input.requestAutoplay ?? false;
+
       if (current?.practiceId === input.practiceId) {
+        if (requestAutoplay && !current.requestAutoplay) {
+          setPlaybackInstanceId((value) => value + 1);
+        }
+
         return {
           ...current,
           ...input,
-          requestAutoplay: input.requestAutoplay ?? false,
+          requestAutoplay,
         };
       }
 
+      setPlaybackInstanceId((value) => value + 1);
       return input;
     });
   }, []);

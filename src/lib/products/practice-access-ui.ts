@@ -262,14 +262,14 @@ function buildCommercialPresentation(input: {
   const { access, practice, authorSlug, paymentsConfigured, isAuthenticated } =
     input;
   const priceLabel = formatPracticePrice(practice.price);
-  const guestListenWithoutAutoplay =
+  const isGuestListenEntry =
     !isAuthenticated &&
     (access.reason === "free" || access.reason === "guest_promo");
   const listenHref = buildListenPath(authorSlug, practice.slug, {
-    autoplay: !guestListenWithoutAutoplay,
+    autoplay: true,
   });
   const audioReady = hasAudioReady(practice.audio_url);
-  const listenLabel = guestListenWithoutAutoplay ? "Начать слушать" : "Слушать";
+  const listenLabel = isGuestListenEntry ? "Начать слушать" : "Слушать";
 
   if (access.reason === "admin") {
     return {
@@ -310,7 +310,7 @@ function buildCommercialPresentation(input: {
   if (access.canListen && access.reason === "free") {
     return {
       statusBadge: getFreeStatusLabel(practice.format),
-      statusDetail: guestListenWithoutAutoplay
+      statusDetail: isGuestListenEntry
         ? "Можно слушать без регистрации"
         : null,
       primaryAction: audioReady
