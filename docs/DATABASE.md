@@ -156,15 +156,16 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
-### Covers (PR3.3)
+### Covers (PR3.3) — на production
 
 - Поля: `cover_path`, `cover_updated_at` (nullable).
 - Private bucket `playlist-covers` (JPEG/PNG/WebP, max 5 MB); path `{user_id}/{playlist_id}/{uuid}.webp`.
 - Нет browser Storage policies — upload/delete/signed URL только через server API после ownership.
-- CAS RPC `replace_playlist_cover_path(uuid, text, text)` (SECURITY DEFINER, `FOR UPDATE`).
-- Mosaic RPC `get_owned_playlist_mosaic_covers()` (SECURITY DEFINER, owner-only).
+- CAS RPC `replace_playlist_cover_path(uuid, text, text)` (SECURITY DEFINER, `FOR UPDATE`); EXECUTE: authenticated + service_role; anon denied.
+- Mosaic RPC `get_owned_playlist_mosaic_covers()` (SECURITY DEFINER, owner-only); anon denied.
 - Custom cover приоритетнее automatic mosaic (0/1/2/3/4+ на UI).
 - Удаление плейлиста очищает storage object после успешного DELETE строки.
+- Migrations: `20260716120000_playlist_covers.sql`, `20260716121000_playlist_cover_path_cas.sql`.
 
 ### Мутации
 

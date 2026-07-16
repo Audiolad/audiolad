@@ -4,7 +4,7 @@
 
 ## 0. Плейлисты — после PR3.3 (приоритет: высокий)
 
-PR1–PR3.3 на ветке `chore/database-baseline` (после deploy PR3.3 — на production).
+PR1–PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`).
 
 Далее:
 

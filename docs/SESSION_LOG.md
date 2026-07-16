@@ -4,6 +4,23 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR3.3 covers deploy)
+
+**Сделано:**
+
+- Post-deploy docs PR3.2: `d79c96b`.
+- Commit PR3.3: `2ae47d6`; anon EXECUTE fix: `cbd4db1`.
+- Backup: `postgres-pre-playlists-pr3-3-20260716-042158.dump`.
+- Migrations applied: `20260716120000_playlist_covers.sql`, `20260716121000_playlist_cover_path_cas.sql`.
+- Private bucket `playlist-covers` создан; browser Storage policies отсутствуют.
+- Deploy release `20260716-042225-cbd4db1` (previous `20260716-035511-fafe6a5`).
+- Production SQL/API/UI smoke PASS; тестовые данные/objects очищены.
+- Push не выполнялся.
+
+**Следующий шаг:** reorder кнопками ↑↓.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR3.3 covers — commit pending deploy)
 
 **Сделано (до deploy):**

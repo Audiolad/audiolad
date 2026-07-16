@@ -90,12 +90,12 @@
 
 ## Плейлисты (состояние на 2026-07-16)
 
-- PR1–PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`).
-- PR3.3 (covers) закоммичен; migration/bucket/deploy — по факту после этой сессии (см. SESSION_LOG).
-- `/playlists/[id]`: items по `position`; listen; delete item; custom/auto covers.
+- PR1–PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`; previous `20260716-035511-fafe6a5`).
+- Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
+- `/playlists/[id]`: items, listen, delete item, edit cover.
 - Reorder, Play All и `/p/[slug]` ещё не реализованы.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
-- Backup перед PR3.2: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-2-20260716-035511.dump`.
+- Backup перед PR3.3: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-3-20260716-042158.dump`.
 
 ## Что ещё не реализовано
 
