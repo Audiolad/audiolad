@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
 import {
   formatCounterDisplay,
   getAuthorMemberRoleLabel,
@@ -158,76 +159,145 @@ type ProfileAuthorSectionProps = {
 };
 
 export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
-  if (section.kind === "hidden") {
-    return null;
-  }
+  if (section.kind === "member") {
+    const { workspaces } = section;
+    const dashboardHref =
+      workspaces.length === 1
+        ? `/author-dashboard?author=${encodeURIComponent(workspaces[0]!.slug)}`
+        : "/author-dashboard";
 
-  if (section.kind === "prospect") {
     return (
       <section className="mt-8 min-w-0" aria-labelledby="profile-author-heading">
         <h2 id="profile-author-heading" className="text-[21px] font-semibold">
-          Стать автором АудиоЛада
+          Для авторов
         </h2>
 
-        <p className="mt-3 text-sm leading-6 text-[#796ba0]">
-          Создавайте аудиопрактики и программы, находите слушателей и развивайте
-          своё авторское направление.
-        </p>
+        <div className="mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5">
+          {workspaces.length === 1 ? (
+            <>
+              <p className="text-[17px] font-semibold text-[#25135c]">
+                {workspaces[0]!.name}
+              </p>
+              <p className="mt-1 text-sm text-[#796ba0]">
+                {getAuthorMemberRoleLabel(workspaces[0]!.role)}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-[#7042c5]">
+                {workspaces.length} авторских пространства
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-[#796ba0]">
+                {workspaces.slice(0, 2).map((workspace) => (
+                  <li key={workspace.id}>{workspace.name}</li>
+                ))}
+              </ul>
+            </>
+          )}
 
-        <Link
-          href={BECOME_AUTHOR_HREF}
-          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          Узнать, как стать автором
-        </Link>
+          <Link
+            href={dashboardHref}
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Открыть кабинет автора
+          </Link>
+        </div>
       </section>
     );
   }
 
-  const { workspaces } = section;
-  const dashboardHref =
-    workspaces.length === 1
-      ? `/author-dashboard?author=${encodeURIComponent(workspaces[0]!.slug)}`
-      : "/author-dashboard";
+  const { variant, reviewComment } = section;
+
+  const copy = getProfileApplicationCopy(variant);
 
   return (
     <section className="mt-8 min-w-0" aria-labelledby="profile-author-heading">
       <h2 id="profile-author-heading" className="text-[21px] font-semibold">
-        Для авторов
+        {copy.heading}
       </h2>
 
       <div className="mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5">
-        {workspaces.length === 1 ? (
-          <>
-            <p className="text-[17px] font-semibold text-[#25135c]">
-              {workspaces[0]!.name}
-            </p>
-            <p className="mt-1 text-sm text-[#796ba0]">
-              {getAuthorMemberRoleLabel(workspaces[0]!.role)}
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="text-sm font-medium text-[#7042c5]">
-              {workspaces.length} авторских пространства
-            </p>
-            <ul className="mt-3 space-y-1 text-sm text-[#796ba0]">
-              {workspaces.slice(0, 2).map((workspace) => (
-                <li key={workspace.id}>{workspace.name}</li>
-              ))}
-            </ul>
-          </>
-        )}
+        <p className="text-sm leading-6 text-[#796ba0]">{copy.description}</p>
 
-        <Link
-          href={dashboardHref}
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          Открыть кабинет автора
-        </Link>
+        {reviewComment &&
+        (variant === "needs_changes" || variant === "rejected") ? (
+          <div className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#796ba0]">
+            <p className="font-medium text-[#7042c5]">Комментарий команды</p>
+            <p className="mt-2">{reviewComment}</p>
+          </div>
+        ) : null}
+
+        {copy.ctaLabel && copy.ctaHref ? (
+          <Link
+            href={copy.ctaHref}
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            {copy.ctaLabel}
+          </Link>
+        ) : null}
       </div>
     </section>
   );
+}
+
+function getProfileApplicationCopy(variant: ProfileApplicationVariant): {
+  heading: string;
+  description: string;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+} {
+  switch (variant) {
+    case "draft":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Заявка автора не отправлена. Вы начали заполнять заявку.",
+        ctaLabel: "Продолжить",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+    case "submitted":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Заявка автора отправлена.",
+        ctaLabel: "Посмотреть заявку",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+    case "in_review":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Заявка автора рассматривается.",
+        ctaLabel: "Посмотреть статус",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+    case "needs_changes":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Нужно уточнить заявку автора.",
+        ctaLabel: "Дополнить заявку",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+    case "approved_pending_access":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Заявка автора одобрена. Мы готовим доступ к кабинету.",
+        ctaLabel: null,
+        ctaHref: null,
+      };
+    case "rejected":
+      return {
+        heading: "Стать автором АудиоЛада",
+        description: "Статус заявки автора.",
+        ctaLabel: "Посмотреть решение",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+    default:
+      return {
+        heading: "Стать автором АудиоЛада",
+        description:
+          "Создавайте аудиопрактики и программы, находите слушателей и развивайте своё авторское направление.",
+        ctaLabel: "Узнать, как стать автором",
+        ctaHref: BECOME_AUTHOR_HREF,
+      };
+  }
 }
 
 export function ProfileAccountSection() {

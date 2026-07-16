@@ -12,7 +12,9 @@ import { resolveInitialPlayback } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 
-import { BECOME_AUTHOR_ROUTE_ENABLED } from "./constants";
+import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
+import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
+import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
 import {
   getAuthorWorkspaceCountLabel,
   getDisplayName,
@@ -228,16 +230,25 @@ function buildContinueState(
 
 function buildAuthorSection(
   workspaces: AuthorWorkspace[],
+  applicationVariant: ProfileApplicationVariant | null,
+  reviewComment: string | null,
 ): ProfileAuthorSection {
   if (workspaces.length > 0) {
     return { kind: "member", workspaces };
   }
 
-  if (BECOME_AUTHOR_ROUTE_ENABLED) {
-    return { kind: "prospect" };
+  if (applicationVariant) {
+    return {
+      kind: "application",
+      variant: applicationVariant,
+      reviewComment,
+    };
   }
 
-  return { kind: "hidden" };
+  return {
+    kind: "application",
+    variant: "none",
+  };
 }
 
 function buildCounters(
@@ -282,6 +293,7 @@ export async function getProfilePageData(
     completedCount,
     continueResult,
     authorWorkspaces,
+    authorApplication,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -295,6 +307,10 @@ export async function getProfilePageData(
     listAuthorWorkspacesForUser(user.id).catch((error) => {
       console.error("profile_author_workspaces_error", error);
       return [] as Awaited<ReturnType<typeof listAuthorWorkspacesForUser>>;
+    }),
+    getCurrentAuthorApplication(supabase, user.id).catch((error) => {
+      console.error("profile_author_application_error", error);
+      return null;
     }),
   ]);
 
@@ -321,7 +337,14 @@ export async function getProfilePageData(
       continueResult.error,
     ),
     counters: buildCounters(libraryCount, playlistsCount, completedCount),
-    authorSection: buildAuthorSection(authorWorkspaces),
+    authorSection: buildAuthorSection(
+      authorWorkspaces,
+      resolveProfileApplicationVariant({
+        workspaceCount: authorWorkspaces.length,
+        applicationStatus: authorApplication?.status ?? null,
+      }),
+      authorApplication?.review_comment ?? null,
+    ),
   };
 }
 

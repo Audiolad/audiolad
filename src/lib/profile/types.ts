@@ -1,5 +1,6 @@
 import type { ContinueListeningItem } from "@/lib/home/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
 
 export type ProfileCounterKey = "library" | "playlists" | "completed";
 
@@ -26,8 +27,11 @@ export type ProfileContinueState =
 
 export type ProfileAuthorSection =
   | { kind: "member"; workspaces: AuthorWorkspace[] }
-  | { kind: "prospect" }
-  | { kind: "hidden" };
+  | {
+      kind: "application";
+      variant: ProfileApplicationVariant;
+      reviewComment?: string | null;
+    };
 
 export type ProfilePageData = {
   card: ProfileCardData;

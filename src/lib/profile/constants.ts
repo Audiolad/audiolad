@@ -1,6 +1,3 @@
-/** Set to true when /become-author route is production-ready. */
-export const BECOME_AUTHOR_ROUTE_ENABLED = false;
-
 export const BECOME_AUTHOR_HREF = "/become-author";
 
 export const PROFILE_LEGAL_LINKS = [
