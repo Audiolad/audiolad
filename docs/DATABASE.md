@@ -167,16 +167,17 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Удаление плейлиста очищает storage object после успешного DELETE строки.
 - Migrations: `20260716120000_playlist_covers.sql`, `20260716121000_playlist_cover_path_cas.sql`.
 
-### Reorder (PR4) — рабочая копия, не production
+### Reorder (PR4) — на production
 
 - RPC `public.move_playlist_item(p_playlist_id uuid, p_practice_id uuid, p_direction text)` → `(moved, from_position, to_position)`.
 - Клиент шлёт только `direction: "up" | "down"`; не принимает массив positions / произвольную позицию / `user_id`.
-- Swap: temp = `max(position)+1` под lock; при `max >= 2147483647` → `reorder_conflict` без частичного изменения.
+- Ownership через `auth.uid()`; playlist row `FOR UPDATE`; swap двух соседей по `position ASC`.
+- Temp = `max(position)+1` под lock; при `max >= 2147483647` → `reorder_conflict` без частичного изменения.
 - `playlists.updated_at` только при фактическом move; no-op на границе → `moved=false`, `updated_at` не трогается.
 - Не пишет в `user_practices`, не меняет entitlement / progress / `audio_items.position`.
 - Недоступный материал можно перемещать.
 - API: `POST /api/playlists/[id]/items/[practiceId]/move` (session client, без service role).
-- Migration: `20260716140000_move_playlist_item.sql` (не применена к production).
+- Migration: `20260716140000_move_playlist_item.sql` (применена к production).
 - Drag-and-drop, Play All, `/p/[slug]` — нет.
 
 ### Мутации

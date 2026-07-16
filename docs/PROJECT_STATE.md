@@ -90,17 +90,17 @@
 
 ## Плейлисты (состояние на 2026-07-16)
 
-- PR1–PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`; previous `20260716-035511-fafe6a5`).
+- PR1–PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`; previous `20260716-042225-cbd4db1`).
 - Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
-- `/playlists/[id]`: items, listen, delete item, edit cover.
-- **PR4 reorder ↑↓** реализован в рабочей копии (не закоммичен / не на production): RPC `move_playlist_item`, API `/move`, кнопки на detail.
-- Play All и `/p/[slug]` ещё не реализованы.
+- `/playlists/[id]`: items, listen, delete item, edit cover, **reorder ↑↓**.
+- PR4: RPC `move_playlist_item` (атомарный swap соседей, gaps OK, temp=`max(position)+1`); API `POST .../items/[practiceId]/move`; entitlement/`user_practices`/`audio_items` не меняются; unavailable можно двигать.
+- Play All и `/p/[slug]` ещё не реализованы; drag-and-drop нет.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
-- Backup перед PR3.3: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-3-20260716-042158.dump`.
+- Backup перед PR4: `/var/www/audiolad/backups/postgres-pre-playlists-pr4-20260716-044937.dump`.
 
 ## Что ещё не реализовано
 
-- Reorder элементов плейлиста, Play All.
+- Drag-and-drop reorder, Play All.
 - Публичный каталог подборок `/p/[slug]`.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
 - Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).

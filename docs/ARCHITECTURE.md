@@ -86,7 +86,7 @@ Timeweb Cloud
 - `/playlists/new` → redirect `/playlists`.
 - PR3.2 на production (`fafe6a5`): `/playlists/[id]` — items, listen, delete item.
 - PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`): custom cover + automatic mosaic; CAS `replace_playlist_cover_path`; private `playlist-covers`; sharp 1200×1200 WebP; signed URLs.
-- PR4 (рабочая копия, не production): `POST /api/playlists/[id]/items/[practiceId]/move` + RPC `move_playlist_item` — атомарный ↑↓ swap соседних `playlist_items.position` по `practice_id`; без DnD / полного массива positions.
+- PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`): `POST /api/playlists/[id]/items/[practiceId]/move` + RPC `move_playlist_item` — атомарный ↑↓ swap соседних `playlist_items.position` по `practice_id`; без DnD / полного массива positions.
 - Play All и `/p/[slug]` — ещё нет.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
