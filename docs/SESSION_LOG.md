@@ -4,6 +4,18 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR3.2 detail + закрытие PR3.1 docs)
+
+**Сделано:**
+
+- Этап A: docs `11eb5c0`, production SQL smoke `1daa7d2`.
+- PR3.2 в рабочей копии (без commit/push/deploy): `/playlists/[id]`, delete item API, кликабельные карточки списка.
+- Production не менялся.
+
+**Следующий шаг:** review → commit PR3.2 → deploy → затем reorder.
+
+---
+
 ## Сессия — 15 июля 2026 (плейлисты PR3.1 review → deploy)
 
 **Сделано:**

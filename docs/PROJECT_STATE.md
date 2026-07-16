@@ -88,27 +88,20 @@
 - `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`.
 - `/settings`.
 
-## Плейлисты (состояние на 2026-07-15)
+## Плейлисты (состояние на 2026-07-16)
 
-- PR1 миграция `20260715270000_create_playlists.sql` **применена к production**.
-- PR2 развёрнут ранее: commit `c470e23`.
-- PR3.1 развёрнут: commit `24616e7`, release `20260715-204408-24616e7`, previous `20260715-200910-c470e23`.
-- Миграция RPC `20260715280000_playlist_membership_rpc.sql` **применена к production**.
-- Добавление из Аудиотеки: меню `···` → multi-select sheet → `GET/PUT /api/playlists/membership`.
-- Inline создание private-плейлиста внутри sheet работает.
-- Private add требует entitlement; public add — free catalog rules; remove без gate.
-- `playlist_items` не создаёт entitlement / не меняет `user_practices`.
-- Лимит 100 элементов на плейлист.
-- `/playlists/new` → redirect `/playlists` (для гостя сначала auth с `next`).
-- Публичная страница `/p/[slug]` ещё не реализована.
-- Страница содержимого `/playlists/[id]`, reorder и Play All — нет.
+- PR1–PR3.1 на production (`24616e7`, release `20260715-204408-24616e7`).
+- PR3.2 в рабочей копии (**не закоммичен / не на production**): `/playlists/[id]` показывает реальные `playlist_items` по `position`; listen через существующий route; удаление item без entitlement; недоступные материалы остаются видимыми.
+- Карточки на `/playlists` ведут на `/playlists/[id]`; меню `···` не навигирует.
+- Reorder, Play All и `/p/[slug]` ещё не реализованы.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
 - Backup перед PR3.1: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-20260715-204130.dump`.
 
 ## Что ещё не реализовано
 
-- Страница содержимого плейлиста `/playlists/[id]`, reorder, Play All.
+- Reorder элементов плейлиста, Play All.
 - Публичный каталог подборок `/p/[slug]`.
+- Deploy PR3.2 на production.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
 - Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).
 

@@ -150,13 +150,15 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 
 ### Будущие маршруты
 
-- владелец: `/playlists`, `/playlists/[id]` (контент — ещё не реализован);
+- владелец: `/playlists`, `/playlists/[id]` (PR3.2 в рабочей копии: просмотр + delete item; без reorder);
 - публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
 ### Мутации
 
-Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`) и SECURITY DEFINER RPC membership.
+Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`, `DELETE /api/playlists/[id]/items/[practiceId]`) и SECURITY DEFINER RPC membership.
+
+Delete одного item: ownership через `getOwnedPlaylistById` + RLS; не требует entitlement; не пишет в `user_practices`; gaps в `position` допустимы до reorder; `updated_at` обновляется при реальном удалении.
 
 Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы по той же модели, что `claim_free_practice`: `status=published`, `is_catalog_listed IS TRUE`, `is_free IS TRUE`, `price` null или не `> 0`.
 

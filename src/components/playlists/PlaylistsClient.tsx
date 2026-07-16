@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -403,23 +404,29 @@ export default function PlaylistsClient({
                 className="rounded-[26px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"
               >
                 <div className="flex gap-4">
-                  <div
-                    className={`flex h-[118px] w-[118px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br ${coverGradientForId(playlist.id)} text-4xl text-white`}
-                    aria-hidden
+                  <Link
+                    href={`/playlists/${playlist.id}`}
+                    className={`flex h-[118px] w-[118px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br ${coverGradientForId(playlist.id)} text-4xl text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]`}
+                    aria-label={`Открыть плейлист ${playlist.title}`}
                   >
                     ♫
-                  </div>
+                  </Link>
 
                   <div className="relative flex min-w-0 flex-1 flex-col">
-                    <p className="text-[18px] font-semibold leading-6">
-                      {playlist.title}
-                    </p>
-                    <p className="mt-1 text-sm text-[#7d70a2]">
-                      {visibilityLabel(playlist.visibility)}
-                    </p>
-                    <p className="mt-1 text-sm text-[#7d70a2]">
-                      {formatItemsCount(playlist.items_count)}
-                    </p>
+                    <Link
+                      href={`/playlists/${playlist.id}`}
+                      className="min-w-0 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    >
+                      <p className="text-[18px] font-semibold leading-6">
+                        {playlist.title}
+                      </p>
+                      <p className="mt-1 text-sm text-[#7d70a2]">
+                        {visibilityLabel(playlist.visibility)}
+                      </p>
+                      <p className="mt-1 text-sm text-[#7d70a2]">
+                        {formatItemsCount(playlist.items_count)}
+                      </p>
+                    </Link>
 
                     <div className="mt-auto flex items-center justify-end pt-3">
                       <div className="relative" ref={menuId === playlist.id ? menuRef : null}>
