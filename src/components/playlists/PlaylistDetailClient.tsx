@@ -482,7 +482,8 @@ export default function PlaylistDetailClient({
             Изменить обложку
           </button>
           {detail.playlist.visibility === "public" &&
-          detail.playlist.slug ? (
+          detail.playlist.slug &&
+          detail.playlist.published_at ? (
             <button
               type="button"
               className="mt-2 block text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"

@@ -514,7 +514,8 @@ export default function PlaylistsClient({
                               </button>
                             )}
                             {playlist.visibility === "public" &&
-                            playlist.slug ? (
+                            playlist.slug &&
+                            playlist.published_at ? (
                               <button
                                 type="button"
                                 role="menuitem"

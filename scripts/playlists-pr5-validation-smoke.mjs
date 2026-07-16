@@ -123,9 +123,11 @@ assert(routes.includes('"/playlists"'), "playlists still private");
 
 const detailUi = read("src/components/playlists/PlaylistDetailClient.tsx");
 assert(detailUi.includes("Скопировать ссылку"), "detail copy link");
+assert(detailUi.includes("published_at"), "detail requires published_at");
 
 const listUi = read("src/components/playlists/PlaylistsClient.tsx");
 assert(listUi.includes("Скопировать ссылку"), "list copy link");
+assert(listUi.includes("published_at"), "list requires published_at");
 
 assert(existsSync("src/components/playlists/PublicPlaylistPageView.tsx"), "view");
 assert(
