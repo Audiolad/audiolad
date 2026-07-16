@@ -8,6 +8,7 @@ import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
+import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import PromoPostSignupHandler from "@/components/promo/PromoPostSignupHandler";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -527,6 +528,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
           practiceSlug={practice.slug}
         />
       ) : null}
+      <PracticeViewTracker
+        practiceId={practice.id}
+        path={`/practice/${resolvedAuthorSlug}/${practice.slug}`}
+      />
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >

@@ -7,8 +7,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 
+import {
+  getCachedAnalyticsSessionId,
+  trackPlatformEvent,
+} from "@/lib/analytics/client";
 import { submitAuthorApplication } from "@/app/become-author/actions";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
@@ -70,10 +75,21 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-function AuthorApplicationSuccessScreen({ contact }: { contact: string }) {
+const AUTHOR_APPLICATION_SUCCESS_SCROLL_MARGIN_CLASS =
+  "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
+
+function AuthorApplicationSuccessScreen({
+  contact,
+  sectionRef,
+}: {
+  contact: string;
+  sectionRef?: RefObject<HTMLElement | null>;
+}) {
   return (
     <section
-      className="rounded-[24px] border border-[#cfe8d9] bg-[#f3fbf6] p-5 lg:p-6"
+      ref={sectionRef}
+      id="author-application-success"
+      className={`${AUTHOR_APPLICATION_SUCCESS_SCROLL_MARGIN_CLASS} rounded-[24px] border border-[#cfe8d9] bg-[#f3fbf6] p-5 lg:p-6`}
       aria-live="polite"
     >
       <h2 className="text-[21px] font-semibold text-[#25135c]">
@@ -116,6 +132,7 @@ function AuthorApplicationForm({
   restoredDraftNotice,
   onValuesChange,
   onSubmit,
+  onInteractionStart,
 }: {
   values: AuthorApplicationFormValues;
   errors: AuthorApplicationFormState["errors"];
@@ -123,10 +140,12 @@ function AuthorApplicationForm({
   restoredDraftNotice: boolean;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
+  onInteractionStart?: () => void;
 }) {
   const contactInputRef = useRef<HTMLInputElement>(null);
 
   function patchValues(patch: Partial<AuthorApplicationFormValues>) {
+    onInteractionStart?.();
     onValuesChange({ ...values, ...patch });
   }
 
@@ -376,6 +395,29 @@ export default function AuthorApplicationPanel({
   const [restoredDraftNotice, setRestoredDraftNotice] = useState(false);
   const draftHydratedRef = useRef(false);
   const submitInFlightRef = useRef(false);
+  const successSectionRef = useRef<HTMLElement>(null);
+  const applicationStartedRef = useRef(false);
+  const applicationSubmittedRef = useRef(false);
+
+  function trackAuthorApplicationStartedOnce() {
+    if (applicationStartedRef.current) {
+      return;
+    }
+
+    applicationStartedRef.current = true;
+
+    const sessionId = getCachedAnalyticsSessionId();
+
+    if (!sessionId) {
+      return;
+    }
+
+    void trackPlatformEvent({
+      sessionId,
+      event_name: "author_application_started",
+      path: "/become-author",
+    });
+  }
 
   useEffect(() => {
     if (draftHydratedRef.current) {
@@ -415,9 +457,38 @@ export default function AuthorApplicationPanel({
   }, [formValues, showSubmittedBanner, state.submitted]);
 
   useEffect(() => {
-    if (state.submitted && state.submittedContact) {
-      clearAuthorApplicationDraft(window.localStorage);
+    if (!state.submitted || !state.submittedContact || applicationSubmittedRef.current) {
+      return;
     }
+
+    applicationSubmittedRef.current = true;
+
+    const sessionId = getCachedAnalyticsSessionId();
+
+    if (sessionId) {
+      void trackPlatformEvent({
+        sessionId,
+        event_name: "author_application_submitted",
+        path: "/become-author",
+      });
+    }
+
+    clearAuthorApplicationDraft(window.localStorage);
+  }, [state.submitted, state.submittedContact]);
+
+  useEffect(() => {
+    if (!state.submitted || !state.submittedContact) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      successSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [state.submitted, state.submittedContact]);
 
   function handleSubmit() {
@@ -507,7 +578,12 @@ export default function AuthorApplicationPanel({
     (showSubmittedBanner ? defaultValues.contact.trim() || null : null);
 
   if (resolvedSuccessContact) {
-    return <AuthorApplicationSuccessScreen contact={resolvedSuccessContact} />;
+    return (
+      <AuthorApplicationSuccessScreen
+        contact={resolvedSuccessContact}
+        sectionRef={successSectionRef}
+      />
+    );
   }
 
   if (showForm) {
@@ -541,6 +617,7 @@ export default function AuthorApplicationPanel({
             restoredDraftNotice={restoredDraftNotice}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
+            onInteractionStart={trackAuthorApplicationStartedOnce}
           />
         </div>
       </section>

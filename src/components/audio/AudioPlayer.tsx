@@ -8,6 +8,8 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import PromoPlaybackPrompts from "@/components/promo/PromoPlaybackPrompts";
+import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracker";
+import ListenPageViewTracker from "@/components/analytics/ListenPageViewTracker";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
 
@@ -599,6 +601,24 @@ export default function AudioPlayer({
           attribution={session?.promoAttribution ?? null}
           onReplay={() => void handleStartOver()}
         />
+      ) : null}
+
+      {isEngineReady && !isAuthorPreview && authorSlug && productSlug ? (
+        <>
+          <ListenPageViewTracker
+            practiceId={practiceId}
+            path={`/listen/${authorSlug}/${productSlug}`}
+          />
+          <ListenAnalyticsTracker
+            practiceId={practiceId}
+            trackId={currentTrack?.id ?? null}
+            path={`/listen/${authorSlug}/${productSlug}`}
+            currentTime={currentTime}
+            duration={displayDuration}
+            isPlaying={isPlaying}
+            programCompleted={programCompleted}
+          />
+        </>
       ) : null}
 
       {isEngineReady && isMultiTrack ? (

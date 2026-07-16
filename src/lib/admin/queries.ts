@@ -202,7 +202,7 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     {
       kind: "value",
       key: "completions",
-      label: "Дослушиваний",
+      label: "Дослушиваний (progress DB)",
       value: completedListens.count ?? 0,
     },
     {

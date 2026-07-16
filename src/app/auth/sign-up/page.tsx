@@ -10,7 +10,14 @@ import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useRef, useState } from "react";
+
+import {
+  getCachedAnalyticsSessionId,
+  linkAnalyticsSessionUser,
+  recordPlatformSignupCompleted,
+  trackPlatformEvent,
+} from "@/lib/analytics/client";
 
 function SignUpForm() {
   const router = useRouter();
@@ -23,6 +30,27 @@ function SignUpForm() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const signupStartedRef = useRef(false);
+
+  function trackSignupStartedOnce() {
+    if (signupStartedRef.current) {
+      return;
+    }
+
+    signupStartedRef.current = true;
+
+    const sessionId = getCachedAnalyticsSessionId();
+
+    if (!sessionId) {
+      return;
+    }
+
+    void trackPlatformEvent({
+      sessionId,
+      event_name: "signup_started",
+      path: "/auth/sign-up",
+    });
+  }
 
   const isFormReady =
     firstName.trim().length > 0 &&
@@ -61,6 +89,13 @@ function SignUpForm() {
     }
 
     if (data.session) {
+      const sessionId = getCachedAnalyticsSessionId();
+
+      if (sessionId) {
+        await linkAnalyticsSessionUser();
+        await recordPlatformSignupCompleted();
+      }
+
       router.replace(destination);
       router.refresh();
       return;
@@ -96,7 +131,11 @@ function SignUpForm() {
             <input
               type="text"
               value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
+              onFocus={trackSignupStartedOnce}
+              onChange={(event) => {
+                trackSignupStartedOnce();
+                setFirstName(event.target.value);
+              }}
               required
               autoComplete="given-name"
               placeholder="Ваше имя"
