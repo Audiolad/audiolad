@@ -54,6 +54,8 @@ export default function ContinueListening({
               slug={product.slug}
               title={product.title}
               coverUrl={product.coverUrl}
+              authorName={product.authorName}
+              format={product.format}
               className="aspect-square w-full rounded-[24px]"
             />
           </Link>

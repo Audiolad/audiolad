@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
+
 type PlaylistCoverProps = {
   title: string;
   customCoverUrl?: string | null;
@@ -9,6 +11,7 @@ type PlaylistCoverProps = {
   className?: string;
   gradientClassName?: string;
   decorative?: boolean;
+  coverAlt?: string;
 };
 
 const FALLBACK_GRADIENTS = [
@@ -80,11 +83,12 @@ export default function PlaylistCover({
   className = "",
   gradientClassName,
   decorative = true,
+  coverAlt,
 }: PlaylistCoverProps) {
   const gradient =
     gradientClassName ?? `bg-gradient-to-br ${gradientForTitle(title)}`;
   const urls = mosaicCoverUrls.filter((url): url is string => Boolean(url));
-  const label = decorative ? "" : title;
+  const resolvedAlt = coverAlt?.trim() || buildPlaylistCoverAlt(title);
   const ariaHidden = decorative ? true : undefined;
 
   if (customCoverUrl) {
@@ -92,10 +96,11 @@ export default function PlaylistCover({
       <div
         className={`relative aspect-square overflow-hidden ${className}`}
         aria-hidden={ariaHidden}
+        aria-label={decorative ? undefined : resolvedAlt}
       >
         <CoverImage
           src={customCoverUrl}
-          alt={decorative ? "" : `Обложка плейлиста ${title}`}
+          alt={decorative ? "" : resolvedAlt}
           className="absolute inset-0"
         />
       </div>
@@ -107,7 +112,7 @@ export default function PlaylistCover({
       <div
         className={`relative flex aspect-square items-center justify-center overflow-hidden text-4xl text-white ${gradient} ${className}`}
         aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : label}
+        aria-label={decorative ? undefined : resolvedAlt}
       >
         ♫
       </div>
@@ -119,6 +124,7 @@ export default function PlaylistCover({
       <div
         className={`relative aspect-square overflow-hidden ${className}`}
         aria-hidden={ariaHidden}
+        aria-label={decorative ? undefined : resolvedAlt}
       >
         <MosaicTile url={urls[0]} alt="" className="absolute inset-0" />
       </div>
@@ -130,6 +136,7 @@ export default function PlaylistCover({
       <div
         className={`relative grid aspect-square grid-cols-2 overflow-hidden ${className}`}
         aria-hidden={ariaHidden}
+        aria-label={decorative ? undefined : resolvedAlt}
       >
         <MosaicTile url={urls[0]} alt="" />
         <MosaicTile url={urls[1]} alt="" />
@@ -142,6 +149,7 @@ export default function PlaylistCover({
       <div
         className={`relative grid aspect-square grid-cols-2 grid-rows-2 overflow-hidden ${className}`}
         aria-hidden={ariaHidden}
+        aria-label={decorative ? undefined : resolvedAlt}
       >
         <MosaicTile url={urls[0]} alt="" className="row-span-2" />
         <MosaicTile url={urls[1]} alt="" />
@@ -154,6 +162,7 @@ export default function PlaylistCover({
     <div
       className={`relative grid aspect-square grid-cols-2 grid-rows-2 overflow-hidden ${className}`}
       aria-hidden={ariaHidden}
+      aria-label={decorative ? undefined : resolvedAlt}
     >
       <MosaicTile url={urls[0]} alt="" />
       <MosaicTile url={urls[1]} alt="" />

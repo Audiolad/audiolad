@@ -7,6 +7,7 @@ import BuyPracticeButton from "@/components/BuyPracticeButton";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import {
@@ -488,6 +489,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.cover_url,
     practice.updated_at,
   );
+  const coverAlt = buildProductCoverAlt({
+    title: practice.title,
+    authorName,
+    format: practice.format,
+  });
   const subtitle = practice.subtitle?.trim() || null;
   const authorPublicPath = buildAuthorPublicPath(resolvedAuthorSlug);
   const listenDeniedMessage =
@@ -551,7 +557,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={coverDisplayUrl}
-                  alt={practice.title}
+                  alt={coverAlt}
                   className="h-full w-full object-cover"
                 />
               ) : (

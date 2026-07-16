@@ -1,3 +1,5 @@
+import { getAppOrigin } from "@/lib/seo/app-origin";
+
 /**
  * Public playlist URL helpers (owner copy-link + canonical).
  */
@@ -7,9 +9,7 @@ export function buildPublicPlaylistPath(slug: string): string {
 }
 
 export function buildPublicPlaylistCanonicalUrl(slug: string): string {
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://audiolad.ru";
-  return `${origin}${buildPublicPlaylistPath(slug)}`;
+  return `${getAppOrigin()}${buildPublicPlaylistPath(slug)}`;
 }
 
 /**

@@ -35,6 +35,8 @@ export default function ActiveProgramsSection({
                 slug={program.product.slug}
                 title={program.product.title}
                 coverUrl={program.product.coverUrl}
+                authorName={program.product.authorName}
+                format={program.product.format}
                 className="aspect-square w-full rounded-[20px]"
               />
             </Link>

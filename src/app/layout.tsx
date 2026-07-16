@@ -4,6 +4,7 @@ import AppProviders from "@/components/AppProviders";
 import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
+import { getAppOriginUrl } from "@/lib/seo/app-origin";
 
 import "./globals.css";
 
@@ -15,6 +16,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: getAppOriginUrl(),
   title: "АудиоЛад",
   description: "Платформа аудиопрактик, медитаций и энергетических программ",
   applicationName: "АудиоЛад",

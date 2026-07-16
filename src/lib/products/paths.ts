@@ -38,9 +38,11 @@ export function buildListenApiBase(
   return `/api/listen/product/${authorSlug}/${productSlug}`;
 }
 
+import { getAppOrigin } from "@/lib/seo/app-origin";
+
 export function buildPracticeCanonicalUrl(
   authorSlug: string,
   productSlug: string,
 ): string {
-  return `https://audiolad.ru${buildPracticePublicPath(authorSlug, productSlug)}`;
+  return `${getAppOrigin()}${buildPracticePublicPath(authorSlug, productSlug)}`;
 }

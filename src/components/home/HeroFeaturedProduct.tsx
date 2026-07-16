@@ -22,6 +22,8 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
           slug={product.slug}
           title={product.title}
           coverUrl={product.coverUrl}
+          authorName={product.authorName}
+          format={product.format}
           className="h-full w-full rounded-none"
         />
       </Link>

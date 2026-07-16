@@ -8,6 +8,7 @@ import {
   getAuthorBySlug,
   getAuthorPublishedPractices,
 } from "@/lib/authors/lookup";
+import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 
@@ -86,7 +87,7 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={avatarUrl}
-                    alt={author.name}
+                    alt={buildAuthorAvatarAlt(author.name)}
                     className="h-full w-full object-cover"
                   />
                 ) : (

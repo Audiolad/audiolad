@@ -27,6 +27,8 @@ export default function HomeProductCard({
             slug={product.slug}
             title={product.title}
             coverUrl={product.coverUrl}
+            authorName={product.authorName}
+            format={product.format}
             className="aspect-square w-full rounded-[22px]"
           />
         </Link>

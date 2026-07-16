@@ -8,6 +8,10 @@ import CheckoutResultClient from "@/app/checkout/result/CheckoutResultClient";
 export const metadata: Metadata = {
   title: "Результат оплаты – АудиоЛад",
   description: "Проверка статуса оплаты и открытие доступа к аудиолекции.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function CheckoutResultPage() {

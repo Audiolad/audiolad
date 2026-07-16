@@ -4,6 +4,7 @@ import PlaylistCover from "@/components/playlists/PlaylistCover";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import type { PublicPlaylistView } from "@/lib/playlists/public-detail";
+import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
 
 type PublicPlaylistPageViewProps = {
   detail: PublicPlaylistView;
@@ -18,6 +19,7 @@ export default function PublicPlaylistPageView({
   const returnPath = `/p/${playlist.slug}`;
   const signInHref = buildAuthRouteHref("/auth/sign-in", returnPath);
   const signUpHref = buildAuthRouteHref("/auth/sign-up", returnPath);
+  const playlistCoverAlt = buildPlaylistCoverAlt(playlist.title);
 
   return (
     <div className="px-5 pt-6 pb-8">
@@ -28,6 +30,7 @@ export default function PublicPlaylistPageView({
           title={playlist.title}
           customCoverUrl={detail.coverUrl}
           mosaicCoverUrls={detail.mosaicCoverUrls}
+          coverAlt={playlistCoverAlt}
           className="w-full rounded-[28px] shadow-[0_16px_40px_rgba(91,62,145,0.14)]"
           decorative={false}
         />
@@ -130,6 +133,8 @@ export default function PublicPlaylistPageView({
                   slug={item.practiceId}
                   title={item.title}
                   coverUrl={item.coverDisplayUrl}
+                  authorName={item.authorName}
+                  format={item.formatLabel}
                   className="h-full w-full rounded-[18px]"
                 />
               </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { HomeAuthor } from "@/lib/home/types";
+import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 
 import HomeSectionHeader from "./HomeSectionHeader";
 
@@ -50,7 +51,7 @@ export default function AuthorsRail({ authors }: AuthorsRailProps) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={author.avatarUrl}
-                    alt=""
+                    alt={buildAuthorAvatarAlt(author.name)}
                     className="h-full w-full object-cover"
                   />
                 ) : (
