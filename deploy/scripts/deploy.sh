@@ -105,6 +105,14 @@ main() {
 
   printf '%s\n' "$FULL_COMMIT" > "$RELEASE_DIR/.deploy-commit"
 
+  log_info "Capturing PM2 baseline before production reload"
+  if ! pm2 jlist 2>/dev/null | node "$SCRIPT_DIR/lib/pm2-health.mjs" snapshot --app "$PM2_APP_NAME" >"$RELEASE_DIR/.pm2-health-baseline.json"; then
+    log_error "Failed to capture PM2 baseline before reload"
+    "$SCRIPT_DIR/rollback.sh" "failed to capture pm2 baseline before reload"
+    exit 1
+  fi
+  cat "$RELEASE_DIR/.pm2-health-baseline.json"
+
   if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
     pm2 startOrReload "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
   else
@@ -126,6 +134,7 @@ main() {
   fi
 
   log_info "Starting post-deploy health watch"
+  export PM2_HEALTH_BASELINE_FILE="$RELEASE_DIR/.pm2-health-baseline.json"
   if ! "$SCRIPT_DIR/health-watch.sh" --post-deploy; then
     log_error "Post-deploy health watch failed"
     "$SCRIPT_DIR/rollback.sh" "health watch failed after deploy"
