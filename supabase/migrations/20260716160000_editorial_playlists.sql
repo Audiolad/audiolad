@@ -68,12 +68,57 @@ BEGIN
     UPDATE public.profiles
     SET role = 'platform_admin'
     WHERE id = v_user_id
-      AND role IS DISTINCT FROM 'platform_admin';
+      AND (role IS NULL OR role = 'listener');
   ELSE
     RAISE NOTICE 'platform_admin_role_skipped: expected exactly one user for platform owner email, found %', v_user_count;
   END IF;
 END;
 $$;
+
+-- Prevent authenticated clients from self-assigning profiles.role.
+CREATE OR REPLACE FUNCTION public.protect_profiles_role_column()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_jwt_sub text;
+BEGIN
+  v_jwt_sub := nullif(current_setting('request.jwt.claim.sub', true), '');
+
+  IF TG_OP = 'INSERT' THEN
+    IF v_jwt_sub IS NOT NULL AND NEW.role IS DISTINCT FROM 'listener' THEN
+      NEW.role := 'listener';
+    END IF;
+
+    RETURN NEW;
+  END IF;
+
+  IF NEW.role IS DISTINCT FROM OLD.role THEN
+    IF v_jwt_sub IS NOT NULL THEN
+      NEW.role := OLD.role;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_protect_role_on_insert ON public.profiles;
+CREATE TRIGGER profiles_protect_role_on_insert
+  BEFORE INSERT ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_profiles_role_column();
+
+DROP TRIGGER IF EXISTS profiles_protect_role_on_update ON public.profiles;
+CREATE TRIGGER profiles_protect_role_on_update
+  BEFORE UPDATE OF role ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_profiles_role_column();
+
+COMMENT ON FUNCTION public.protect_profiles_role_column() IS
+  'Blocks profiles.role changes from authenticated JWT sessions; migrations/service SQL without JWT may assign roles.';
 
 -- ---------------------------------------------------------------------------
 -- RPC: bulk-add published catalog practices to an editorial playlist
@@ -136,9 +181,9 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  SELECT COALESCE(array_agg(x.id ORDER BY x.id), ARRAY[]::uuid[])
+  SELECT COALESCE(array_agg(x.id ORDER BY x.ord), ARRAY[]::uuid[])
   INTO v_ids
-  FROM unnest(p_practice_ids) AS x(id);
+  FROM unnest(p_practice_ids) WITH ORDINALITY AS x(id, ord);
 
   SELECT pl.*
   INTO v_playlist
