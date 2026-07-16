@@ -155,8 +155,14 @@ async function measureCompactRows(page) {
     console.log("OWNER_NEXT_A_TO_B", pathB);
     await waitForAudioReady(page);
 
-    // Previous B → A (track 0 of previous product)
-    const prevBtn = page.getByRole("button", { name: /Предыдущ/i }).first();
+    // Previous B → A (track 0 of previous product).
+    // Single-track products may label this "В начало…" when disabled; with queue
+    // it should be enabled as "Предыдущее аудио".
+    const prevBtn = page
+      .getByRole("button", { name: /Предыдущее аудио|В начало текущего аудио/i })
+      .first();
+    await prevBtn.waitFor({ state: "visible", timeout: 15000 });
+    assert(!(await prevBtn.isDisabled()), "previous should be enabled in queue");
     await prevBtn.click();
     await page.waitForFunction(
       (prev) => location.pathname !== prev,

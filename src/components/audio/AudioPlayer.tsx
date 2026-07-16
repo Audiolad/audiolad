@@ -476,7 +476,7 @@ export default function AudioPlayer({
                     !src
                   }
                   aria-label={
-                    isMultiTrack
+                    isMultiTrack || Boolean(activeQueue && !queueCompleted)
                       ? "Предыдущее аудио"
                       : "В начало текущего аудио"
                   }
