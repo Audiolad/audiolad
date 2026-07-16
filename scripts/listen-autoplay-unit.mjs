@@ -101,6 +101,44 @@ function testPlayRejectionHandling() {
   assert(player.includes("userWantsPlaybackRef.current = false"), "clears playback intent on rejection");
 }
 
+function testSignedUrlRaceHandling() {
+  const player = readFileSync(
+    "/var/www/audiolad/src/components/audio/useSequentialPlayer.ts",
+    "utf8",
+  );
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/audio/GlobalAudioPlayerProvider.tsx",
+    "utf8",
+  );
+
+  assert(player.includes("loadSignedUrlRef"), "signed url loader supports self-retry");
+  assert(player.includes("finally {"), "signed url loader always settles in finally");
+  assert(
+    player.includes("void loadSignedUrlRef.current(audioItemId)"),
+    "stale signed url fetch retries automatically",
+  );
+  assert(
+    player.includes("sessionGeneration"),
+    "player reacts to session generation changes",
+  );
+  assert(
+    player.includes("requestAnimationFrame(tryApply)"),
+    "audio src retries when media element mounts later",
+  );
+  assert(
+    player.includes("Не удалось подготовить аудио."),
+    "prepare failure shows user-facing message",
+  );
+  assert(
+    provider.includes("setSessionGeneration"),
+    "provider exposes reactive session generation",
+  );
+  assert(
+    provider.includes("shouldBumpGeneration = shouldBumpPlaybackInstance"),
+    "same-practice refresh does not invalidate signed url fetch",
+  );
+}
+
 function main() {
   testAutoplayIntentModule();
   testBuildListenPath();
@@ -110,6 +148,7 @@ function main() {
   testSequentialPlayerAutoplayOnce();
   testStartOverFromClick();
   testPlayRejectionHandling();
+  testSignedUrlRaceHandling();
   console.log("listen-autoplay-unit: ok");
 }
 

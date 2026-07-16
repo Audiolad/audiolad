@@ -81,6 +81,7 @@ const PlayerEngineContext = createContext<PlayerEngineApi | null>(null);
 
 function GlobalPlayerEngine({
   session,
+  sessionGeneration,
   sessionGenerationRef,
   stopEngineRef,
   persistentAudioRef,
@@ -92,6 +93,7 @@ function GlobalPlayerEngine({
   children,
 }: {
   session: LoadSessionInput;
+  sessionGeneration: number;
   sessionGenerationRef: MutableRefObject<number>;
   stopEngineRef: MutableRefObject<(() => void) | null>;
   persistentAudioRef: MutableRefObject<HTMLAudioElement | null>;
@@ -152,6 +154,7 @@ function GlobalPlayerEngine({
     onRequestPreviousProduct,
     onInitialAutoplayAttempted: handleInitialAutoplayAttempted,
     getSessionGeneration: () => sessionGenerationRef.current,
+    sessionGeneration,
     registerCleanup,
     guestProgressMode: Boolean(session.guestProgressMode),
     guestProgressMeta: session.guestProgressMeta,
@@ -350,6 +353,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const [queueCompleted, setQueueCompleted] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [playbackInstanceId, setPlaybackInstanceId] = useState(0);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
   const sessionGenerationRef = useRef(0);
   const stopEngineRef = useRef<(() => void) | null>(null);
   /** Survives engine remounts so iOS keeps the unlocked media element. */
@@ -396,18 +400,31 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const loadSession = useCallback((input: LoadSessionInput) => {
     setDismissedPracticeId(null);
-    sessionGenerationRef.current += 1;
 
-    setSession((current) => {
-      const requestAutoplay = input.requestAutoplay ?? false;
+    const requestAutoplay = input.requestAutoplay ?? false;
+    const current = sessionRef.current;
+    let shouldBumpGeneration = true;
+    let shouldBumpPlaybackInstance = true;
 
-      if (current?.practiceId === input.practiceId) {
-        if (requestAutoplay && !current.requestAutoplay) {
+    if (current?.practiceId === input.practiceId) {
+      shouldBumpPlaybackInstance =
+        requestAutoplay && !current.requestAutoplay;
+      shouldBumpGeneration = shouldBumpPlaybackInstance;
+    }
+
+    if (shouldBumpGeneration) {
+      sessionGenerationRef.current += 1;
+      setSessionGeneration(sessionGenerationRef.current);
+    }
+
+    setSession((previous) => {
+      if (previous?.practiceId === input.practiceId) {
+        if (shouldBumpPlaybackInstance) {
           setPlaybackInstanceId((value) => value + 1);
         }
 
         return {
-          ...current,
+          ...previous,
           ...input,
           requestAutoplay,
         };
@@ -420,6 +437,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const stopAndClear = useCallback(() => {
     sessionGenerationRef.current += 1;
+    setSessionGeneration(sessionGenerationRef.current);
     setDismissedPracticeId(sessionRef.current?.practiceId ?? null);
     stopEngineRef.current?.();
     stopEngineRef.current = null;
@@ -878,6 +896,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         <GlobalPlayerEngine
           key={`${session.practiceId}:${playbackInstanceId}`}
           session={session}
+          sessionGeneration={sessionGeneration}
           sessionGenerationRef={sessionGenerationRef}
           stopEngineRef={stopEngineRef}
           persistentAudioRef={persistentAudioRef}

@@ -86,6 +86,8 @@ type UseSequentialPlayerOptions = {
   /** Called when Previous is pressed on the first track (after restart threshold). */
   onRequestPreviousProduct?: () => Promise<boolean>;
   getSessionGeneration?: () => number;
+  /** Reactive session generation — retriggers signed URL load when session is refreshed. */
+  sessionGeneration?: number;
   registerCleanup?: (cleanup: () => void) => void;
   guestProgressMode?: boolean;
   guestProgressMeta?: {
@@ -123,6 +125,7 @@ export function useSequentialPlayer({
   onTracksExhausted,
   onRequestPreviousProduct,
   getSessionGeneration,
+  sessionGeneration = 0,
   registerCleanup,
   guestProgressMode = false,
   guestProgressMeta,
@@ -155,6 +158,12 @@ export function useSequentialPlayer({
   const practiceIdRef = useRef(practiceId);
   const lastIntervalSavedPositionRef = useRef(-1);
   const flushProgressRef = useRef<() => Promise<void>>(async () => {});
+  const loadSignedUrlRef = useRef<(audioItemId: string) => Promise<void>>(
+    async () => {},
+  );
+
+  const PREPARE_AUDIO_MESSAGE = "Подготавливаем аудио…";
+  const PREPARE_AUDIO_ERROR = "Не удалось подготовить аудио.";
 
   useEffect(() => {
     getSessionGenerationRef.current = getSessionGeneration;
@@ -423,30 +432,34 @@ export function useSequentialPlayer({
   const loadSignedUrl = useCallback(
     async (audioItemId: string) => {
       const requestId = urlRequestRef.current + 1;
-      const sessionGeneration = getSessionGenerationRef.current?.() ?? 0;
+      const capturedGeneration = getSessionGenerationRef.current?.() ?? 0;
       urlRequestRef.current = requestId;
+
+      const isStale = () =>
+        requestId !== urlRequestRef.current ||
+        capturedGeneration !== (getSessionGenerationRef.current?.() ?? 0);
+
       setIsUrlLoading(true);
       setUrlError(null);
-      setStatusMessage("Подготавливаем аудио…");
+      setStatusMessage(PREPARE_AUDIO_MESSAGE);
+
+      let settled = false;
 
       try {
         const response = await fetch(
           `${listenApiBase}/audio/${audioItemId}`,
         );
 
-        if (
-          requestId !== urlRequestRef.current ||
-          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
-        ) {
+        if (isStale()) {
           return;
         }
 
-        const payload = (await response.json()) as { url?: string; error?: string };
+        const payload = (await response.json()) as {
+          url?: string;
+          error?: string;
+        };
 
-        if (
-          requestId !== urlRequestRef.current ||
-          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
-        ) {
+        if (isStale()) {
           return;
         }
 
@@ -456,33 +469,45 @@ export function useSequentialPlayer({
           } else if (response.status === 404) {
             setUrlError("Аудиофайл не найден.");
           } else {
-            setUrlError("Не удалось получить ссылку на аудио.");
+            setUrlError(PREPARE_AUDIO_ERROR);
           }
 
           setSrc(null);
-          setIsUrlLoading(false);
           setIsLoading(false);
+          settled = true;
           return;
         }
 
         setSrc(payload.url);
-        setIsUrlLoading(false);
+        settled = true;
       } catch {
-        if (
-          requestId !== urlRequestRef.current ||
-          sessionGeneration !== (getSessionGenerationRef.current?.() ?? 0)
-        ) {
+        if (isStale()) {
           return;
         }
 
-        setUrlError("Не удалось получить ссылку на аудио.");
+        setUrlError(PREPARE_AUDIO_ERROR);
         setSrc(null);
-        setIsUrlLoading(false);
         setIsLoading(false);
+        settled = true;
+      } finally {
+        if (isStale()) {
+          if (requestId === urlRequestRef.current) {
+            void loadSignedUrlRef.current(audioItemId);
+          }
+          return;
+        }
+
+        if (settled) {
+          setIsUrlLoading(false);
+        }
       }
     },
     [listenApiBase],
   );
+
+  useEffect(() => {
+    loadSignedUrlRef.current = loadSignedUrl;
+  }, [loadSignedUrl]);
 
   const switchToTrack = useCallback(
     async (nextIndex: number, options?: SwitchTrackOptions) => {
@@ -525,22 +550,19 @@ export function useSequentialPlayer({
     [currentTrackIndex, isPlaying, loadSignedUrl, saveProgress, tracks],
   );
 
-  const initializedRef = useRef(false);
-
   useEffect(() => {
-    if (initializedRef.current || !currentTrack?.id) {
+    if (!currentTrack?.id) {
       return;
     }
 
-    initializedRef.current = true;
     void loadSignedUrl(currentTrack.id);
-  }, [currentTrack?.id, loadSignedUrl]);
+  }, [currentTrack?.id, sessionGeneration, loadSignedUrl]);
 
-  useEffect(() => {
+  const applySrcToAudioElement = useCallback(() => {
     const audio = audioRef.current;
 
     if (!audio || !src) {
-      return;
+      return false;
     }
 
     // Imperative src — required when <audio> lives outside this component.
@@ -550,8 +572,51 @@ export function useSequentialPlayer({
 
     audio.load();
     setIsLoading(true);
-    setStatusMessage("Подготавливаем аудио…");
-  }, [src]);
+    setStatusMessage(PREPARE_AUDIO_MESSAGE);
+    return true;
+  }, [audioRef, src]);
+
+  useEffect(() => {
+    if (!src) {
+      return;
+    }
+
+    if (applySrcToAudioElement()) {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const tryApply = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (applySrcToAudioElement()) {
+        return;
+      }
+
+      attempts += 1;
+
+      if (attempts < maxAttempts) {
+        requestAnimationFrame(tryApply);
+        return;
+      }
+
+      setUrlError(PREPARE_AUDIO_ERROR);
+      setIsUrlLoading(false);
+      setIsLoading(false);
+      setStatusMessage("");
+    };
+
+    requestAnimationFrame(tryApply);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applySrcToAudioElement, src]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -988,7 +1053,8 @@ export function useSequentialPlayer({
     setPlayerError(null);
     setUrlError(null);
     setIsLoading(true);
-    setStatusMessage("Подготавливаем аудио…");
+    setIsUrlLoading(true);
+    setStatusMessage(PREPARE_AUDIO_MESSAGE);
     setPendingStartPosition(currentTime);
     void loadSignedUrl(currentTrack.id);
   };
