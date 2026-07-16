@@ -51,6 +51,9 @@ import {
   saveGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
 import {
+  shouldSkipIntervalProgressSave,
+} from "@/lib/promo/progress-interval";
+import {
   syncMediaSessionPlaybackState,
   verifyRealPlayback,
   waitForPlayingEvent,
@@ -143,6 +146,14 @@ export function useSequentialPlayer({
   const getSessionGenerationRef = useRef(getSessionGeneration);
   const onTracksExhaustedRef = useRef(onTracksExhausted);
   const onRequestPreviousProductRef = useRef(onRequestPreviousProduct);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const currentTrackRef = useRef<ListenTrack | null>(null);
+  const guestProgressModeRef = useRef(guestProgressMode);
+  const guestProgressMetaRef = useRef(guestProgressMeta);
+  const practiceIdRef = useRef(practiceId);
+  const lastIntervalSavedPositionRef = useRef(-1);
+  const flushProgressRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     getSessionGenerationRef.current = getSessionGeneration;
@@ -219,6 +230,34 @@ export function useSequentialPlayer({
   useEffect(() => {
     progressRef.current = progress;
   }, [progress]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    guestProgressModeRef.current = guestProgressMode;
+  }, [guestProgressMode]);
+
+  useEffect(() => {
+    guestProgressMetaRef.current = guestProgressMeta;
+  }, [guestProgressMeta]);
+
+  useEffect(() => {
+    practiceIdRef.current = practiceId;
+  }, [practiceId]);
+
+  useEffect(() => {
+    lastIntervalSavedPositionRef.current = -1;
+  }, [currentTrack?.id, practiceId]);
 
   const updateProgressEntry = useCallback(
     (audioItemId: string, positionSeconds: number, completed: boolean) => {
@@ -344,22 +383,35 @@ export function useSequentialPlayer({
   }, [saveProgress]);
 
   const flushProgress = useCallback(async () => {
-    if (!currentTrack) {
+    const track = currentTrackRef.current;
+
+    if (!track) {
       return;
     }
 
+    const audio = audioRef.current;
+    const position = audio?.currentTime ?? currentTimeRef.current;
+    const trackDuration =
+      durationRef.current > 0 ? durationRef.current : track.durationSeconds;
+
     await saveProgress(
-      currentTrack.id,
-      currentTime,
+      track.id,
+      position,
       isTrackCompleted(
-        currentTrack.durationSeconds,
-        currentTime,
-        progressRef.current.find((entry) => entry.audioItemId === currentTrack.id)
+        trackDuration,
+        position,
+        progressRef.current.find((entry) => entry.audioItemId === track.id)
           ?.completed ?? false,
       ),
       { force: true },
     );
-  }, [currentTime, currentTrack, saveProgress]);
+
+    lastIntervalSavedPositionRef.current = position;
+  }, [saveProgress]);
+
+  useEffect(() => {
+    flushProgressRef.current = flushProgress;
+  }, [flushProgress]);
 
   const loadSignedUrl = useCallback(
     async (audioItemId: string) => {
@@ -434,12 +486,15 @@ export function useSequentialPlayer({
       const previousTrack = tracks[currentTrackIndex];
 
       if (previousTrack) {
+        const previousPosition =
+          audioRef.current?.currentTime ?? currentTimeRef.current;
+
         await saveProgress(
           previousTrack.id,
-          currentTime,
+          previousPosition,
           isTrackCompleted(
             previousTrack.durationSeconds,
-            currentTime,
+            previousPosition,
             progressRef.current.find(
               (entry) => entry.audioItemId === previousTrack.id,
             )?.completed ?? false,
@@ -460,7 +515,7 @@ export function useSequentialPlayer({
       const nextTrack = tracks[nextIndex];
       await loadSignedUrl(nextTrack.id);
     },
-    [currentTime, currentTrackIndex, isPlaying, loadSignedUrl, saveProgress, tracks],
+    [currentTrackIndex, isPlaying, loadSignedUrl, saveProgress, tracks],
   );
 
   const initializedRef = useRef(false);
@@ -520,6 +575,7 @@ export function useSequentialPlayer({
     };
 
     const handleTimeUpdate = () => {
+      currentTimeRef.current = audio.currentTime;
       setCurrentTime(audio.currentTime);
     };
 
@@ -701,33 +757,72 @@ export function useSequentialPlayer({
     }
   }, [playbackRateIndex]);
 
+  const runIntervalProgressSave = useCallback(() => {
+    const track = currentTrackRef.current;
+
+    if (!track || !practiceIdRef.current) {
+      return;
+    }
+
+    const audio = audioRef.current;
+    const position = audio?.currentTime ?? currentTimeRef.current;
+    const trackDuration =
+      durationRef.current > 0
+        ? durationRef.current
+        : track.durationSeconds ?? null;
+
+    if (
+      shouldSkipIntervalProgressSave(
+        {
+          practiceId: practiceIdRef.current,
+          trackId: track.id,
+          positionSeconds: position,
+          durationSeconds: trackDuration,
+          isPlaying: isPlayingRef.current,
+        },
+        lastIntervalSavedPositionRef.current,
+      )
+    ) {
+      return;
+    }
+
+    void saveProgressRef.current(
+      track.id,
+      position,
+      isTrackCompleted(
+        trackDuration,
+        position,
+        progressRef.current.find((entry) => entry.audioItemId === track.id)
+          ?.completed ?? false,
+      ),
+    );
+
+    lastIntervalSavedPositionRef.current = position;
+  }, []);
+
   useEffect(() => {
-    if (!isPlaying || !currentTrack) {
+    if (!isPlaying || !currentTrack?.id) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      void saveProgress(
-        currentTrack.id,
-        audioRef.current?.currentTime ?? currentTime,
-        false,
-      );
+      runIntervalProgressSave();
     }, PROGRESS_SAVE_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [currentTime, currentTrack, isPlaying, saveProgress]);
+  }, [currentTrack?.id, isPlaying, practiceId, runIntervalProgressSave]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        void flushProgress();
+        void flushProgressRef.current();
       }
     };
 
     const handlePageHide = () => {
-      void flushProgress();
+      void flushProgressRef.current();
     };
 
     window.addEventListener("visibilitychange", handleVisibilityChange);
@@ -737,7 +832,7 @@ export function useSequentialPlayer({
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [flushProgress]);
+  }, []);
 
   const hasValidDuration = Number.isFinite(duration) && duration > 0;
   const displayDuration = hasValidDuration
