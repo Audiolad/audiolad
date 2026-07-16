@@ -44,19 +44,34 @@ async function main() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  const signedUrls = [];
-  page.on("response", async (response) => {
+  const practicePageSignedUrls = [];
+
+  function trackPracticeSignedUrl(response) {
     const url = response.url();
 
     if (url.includes("/storage/v1/object/sign/practice-audio")) {
-      signedUrls.push(url);
+      practicePageSignedUrls.push(url);
     }
-  });
+  }
 
   if (LISTEN_URL) {
     await page.goto(LISTEN_URL, { waitUntil: "networkidle" });
   } else {
+    page.on("response", trackPracticeSignedUrl);
+
     await page.goto(PRACTICE_URL, { waitUntil: "networkidle" });
+
+    const practiceHtml = await page.content();
+    assert(
+      !practiceHtml.includes("/storage/v1/object/sign/practice-audio"),
+      "practice page HTML must not embed signed audio URLs",
+    );
+    assert(
+      practicePageSignedUrls.length === 0,
+      "practice page must not fetch signed audio URLs before listen",
+    );
+
+    page.off("response", trackPracticeSignedUrl);
 
     const bodyText = await page.locator("body").innerText();
     assert(bodyText.includes("Начать слушать"), "practice page shows Начать слушать");
@@ -135,10 +150,6 @@ async function main() {
     assert(
       attribution && attribution.includes(EXPECTED_UTM_SOURCE),
       "UTM attribution persisted",
-    );
-    assert(
-      signedUrls.length === 0,
-      "practice page HTML should not embed signed audio URLs",
     );
   }
 
