@@ -239,14 +239,15 @@ function testSsrSafeProvider() {
     "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
     "utf8",
   );
+  const browserEnv = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/browser-environment.ts",
+    "utf8",
+  );
 
   assert(provider.startsWith('"use client"'), "provider is client-only");
-  assert(
-    provider.includes("useSyncExternalStore") ||
-      provider.includes("typeof window") ||
-      provider.includes("typeof navigator"),
-    "guards browser access",
-  );
+  assert(provider.includes("usePwaBrowserEnvironment"), "provider uses browser env hook");
+  assert(browserEnv.includes("useSyncExternalStore"), "browser env is hydration-safe");
+  assert(browserEnv.includes("SERVER_SNAPSHOT"), "browser env has server snapshot");
 }
 
 function testListenerCleanup() {
@@ -289,7 +290,110 @@ function testServiceWorkerSafety() {
   assert(sw.includes("/api/"), "skips api caching");
   assert(sw.includes("range"), "skips range requests");
   assert(sw.includes("/listen/"), "skips listen routes");
-  assert(sw.includes("navigate"), "network-only navigations");
+  assert(sw.includes("navigate"), "bypasses navigation requests");
+  assert(sw.includes("/_next/static/"), "documents next static bypass");
+  assert(sw.includes("/_next/data/"), "bypasses next data requests");
+  assert(sw.includes("text/x-component"), "bypasses rsc accept header");
+  assert(sw.includes('headers.get("RSC")'), "bypasses rsc header");
+  assert(sw.includes('headers.get("Next-Action")'), "bypasses server actions");
+  assert(
+    !sw.includes("isHashedStaticAsset"),
+    "does not implement hashed static sw caching",
+  );
+  assert(
+    !sw.includes("stale-while-revalidate"),
+    "does not use stale-while-revalidate",
+  );
+  assert(
+    sw.includes('key.startsWith("audiolad-pwa-")'),
+    "deletes all app cache versions on activate",
+  );
+}
+
+function testServiceWorkerStaleChunkPolicy() {
+  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
+
+  assert(
+    /if \(url\.pathname\.startsWith\("\/_next\/static\/"\)\) \{\s*return true;\s*\}/s.test(
+      sw,
+    ),
+    "next static assets bypass service worker entirely",
+  );
+  assert(
+    !sw.match(/isHashedStaticAsset[\s\S]{0,200}caches\.open/),
+    "next static assets are not stored in cache storage",
+  );
+}
+
+function testServiceWorkerCacheVersionBumped() {
+  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
+  const constants = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/constants.ts",
+    "utf8",
+  );
+
+  assert(sw.includes("audiolad-pwa-v3"), "service worker cache version bumped");
+  assert(
+    constants.includes("audiolad-pwa-v3"),
+    "constants track service worker cache version",
+  );
+}
+
+function testPwaBrowserEnvironmentHook() {
+  const hook = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/browser-environment.ts",
+    "utf8",
+  );
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+
+  assert(hook.includes("useSyncExternalStore"), "browser env uses external store");
+  assert(hook.includes("SERVER_SNAPSHOT"), "stable server snapshot exists");
+  assert(provider.includes("usePwaBrowserEnvironment"), "provider uses browser hook");
+  assert(
+    !provider.includes("navigator.userAgent"),
+    "provider no longer reads navigator during render",
+  );
+}
+
+function testPwaProviderErrorBoundary() {
+  const boundary = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallErrorBoundary.tsx",
+    "utf8",
+  );
+  const providers = readFileSync(
+    "/var/www/audiolad/src/components/AppProviders.tsx",
+    "utf8",
+  );
+
+  assert(boundary.includes("componentDidCatch"), "pwa boundary catches errors");
+  assert(boundary.includes("appChildren"), "pwa boundary can fall back to app");
+  assert(providers.includes("PwaInstallErrorBoundary"), "app providers wrap pwa layer");
+}
+
+function testClientErrorReporterWiring() {
+  const providers = readFileSync(
+    "/var/www/audiolad/src/components/AppProviders.tsx",
+    "utf8",
+  );
+  const reporter = readFileSync(
+    "/var/www/audiolad/src/lib/client-errors/reporter.ts",
+    "utf8",
+  );
+  const route = readFileSync(
+    "/var/www/audiolad/src/app/api/client-errors/route.ts",
+    "utf8",
+  );
+
+  assert(providers.includes("ClientErrorReporter"), "client reporter is mounted");
+  assert(reporter.includes('addEventListener("error"'), "window error listener");
+  assert(
+    reporter.includes('addEventListener("unhandledrejection"'),
+    "unhandled rejection listener",
+  );
+  assert(route.includes("client_error_report"), "server logs structured client errors");
 }
 
 function testManifestContract() {
@@ -410,6 +514,11 @@ const tests = [
   ["analytics dedupe", testAnalyticsDedupe],
   ["pwa migration contract", testPwaMigrationContract],
   ["service worker safety", testServiceWorkerSafety],
+  ["service worker stale chunk policy", testServiceWorkerStaleChunkPolicy],
+  ["service worker cache version bumped", testServiceWorkerCacheVersionBumped],
+  ["pwa browser environment hook", testPwaBrowserEnvironmentHook],
+  ["pwa provider error boundary", testPwaProviderErrorBoundary],
+  ["client error reporter wiring", testClientErrorReporterWiring],
   ["manifest contract", testManifestContract],
   ["accepted does not confirm install", testAcceptedDoesNotConfirmInstall],
   ["prompt accepted hides banner", testPromptAcceptedHidesBanner],

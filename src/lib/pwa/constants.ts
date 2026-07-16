@@ -33,6 +33,9 @@ export const PWA_EXCLUDED_ROUTE_PREFIXES = [
 
 export const PWA_SW_PATH = "/sw.js";
 
+/** Must match CACHE_VERSION in public/sw.js */
+export const PWA_SW_CACHE_VERSION = "audiolad-pwa-v3";
+
 export const PWA_ANALYTICS_SESSION_KEY = `${PWA_STORAGE_PREFIX}analytics_session`;
 
 export const PWA_PLATFORM_VALUES = [

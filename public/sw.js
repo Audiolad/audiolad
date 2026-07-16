@@ -1,17 +1,26 @@
 /* eslint-disable no-restricted-globals */
 /**
- * Audiolad PWA service worker.
- * - Navigations and private pages: network-only (no HTML cache).
- * - Hashed Next.js assets: stale-while-revalidate.
- * - Explicit public PWA assets only: cache-first with background refresh.
+ * Audiolad PWA service worker — deploy-safe caching policy.
+ *
+ * Network-only (SW does not intercept):
+ * - HTML navigation
+ * - RSC / flight data
+ * - Server Actions
+ * - /_next/static/* (browser HTTP cache only; no SW stale chunks)
+ * - /api/*, auth, Supabase, personalized routes
+ *
+ * Cache-first (public immutable assets only):
+ * - manifest, icons, favicons
  */
 
-const CACHE_VERSION = "audiolad-pwa-v2";
-const STATIC_CACHE = `${CACHE_VERSION}-static`;
+const CACHE_VERSION = "audiolad-pwa-v3";
+const STATIC_CACHE = `${CACHE_VERSION}-public`;
 
 const NEVER_CACHE_PREFIXES = [
   "/api/",
   "/auth/",
+  "/rest/v1/",
+  "/storage/v1/",
   "/listen/",
   "/profile",
   "/my-practices",
@@ -24,7 +33,6 @@ const NEVER_CACHE_PREFIXES = [
 
 const CACHEABLE_PUBLIC_PATHS = new Set([
   "/manifest.webmanifest",
-  "/sw.js",
   "/icon-192.png",
   "/icon-512.png",
   "/icon-1024.png",
@@ -36,7 +44,25 @@ const CACHEABLE_PUBLIC_PATHS = new Set([
   "/favicon-64x64.png",
 ]);
 
-function shouldSkipCaching(url, request) {
+function isRscRequest(request) {
+  if (request.headers.get("RSC") === "1") {
+    return true;
+  }
+
+  if (request.headers.get("Next-Router-State-Tree")) {
+    return true;
+  }
+
+  if (request.headers.get("Next-Action")) {
+    return true;
+  }
+
+  const accept = request.headers.get("Accept") ?? "";
+
+  return accept.includes("text/x-component");
+}
+
+function shouldBypassServiceWorker(url, request) {
   if (request.method !== "GET") {
     return true;
   }
@@ -49,7 +75,19 @@ function shouldSkipCaching(url, request) {
     return true;
   }
 
-  if (request.credentials === "include" && request.mode === "navigate") {
+  if (request.mode === "navigate") {
+    return true;
+  }
+
+  if (isRscRequest(request)) {
+    return true;
+  }
+
+  if (url.pathname.startsWith("/_next/static/")) {
+    return true;
+  }
+
+  if (url.pathname.startsWith("/_next/data/")) {
     return true;
   }
 
@@ -58,10 +96,6 @@ function shouldSkipCaching(url, request) {
   }
 
   return false;
-}
-
-function isHashedStaticAsset(pathname) {
-  return pathname.startsWith("/_next/static/");
 }
 
 function isCacheablePublicAsset(pathname) {
@@ -79,7 +113,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith("audiolad-pwa-") && key !== STATIC_CACHE)
+            .filter((key) => key.startsWith("audiolad-pwa-"))
             .map((key) => caches.delete(key)),
         ),
       )
@@ -97,60 +131,37 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (shouldSkipCaching(url, request)) {
+  if (shouldBypassServiceWorker(url, request)) {
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request));
+  if (!isCacheablePublicAsset(url.pathname)) {
     return;
   }
 
-  if (isHashedStaticAsset(url.pathname)) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
+  event.respondWith(
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      const cached = await cache.match(request);
 
-        const networkFetch = fetch(request)
+      if (cached) {
+        void fetch(request)
           .then((response) => {
             if (response.ok && response.type === "basic") {
               void cache.put(request, response.clone());
             }
-            return response;
           })
-          .catch(() => cached);
+          .catch(() => undefined);
 
-        return cached || networkFetch;
-      }),
-    );
-    return;
-  }
+        return cached;
+      }
 
-  if (isCacheablePublicAsset(url.pathname)) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
+      const response = await fetch(request);
 
-        if (cached) {
-          void fetch(request)
-            .then((response) => {
-              if (response.ok && response.type === "basic") {
-                void cache.put(request, response.clone());
-              }
-            })
-            .catch(() => undefined);
+      if (response.ok && response.type === "basic") {
+        void cache.put(request, response.clone());
+      }
 
-          return cached;
-        }
-
-        const response = await fetch(request);
-
-        if (response.ok && response.type === "basic") {
-          void cache.put(request, response.clone());
-        }
-
-        return response;
-      }),
-    );
-  }
+      return response;
+    }),
+  );
 });

@@ -26,27 +26,31 @@ export function registerPwaServiceWorker(): void {
     return;
   }
 
-  void navigator.serviceWorker
-    .register("/sw.js", { scope: "/" })
-    .then((registration) => {
-      registration.addEventListener("updatefound", () => {
-        const installing = registration.installing;
+  try {
+    void navigator.serviceWorker
+      .register("/sw.js", { scope: "/" })
+      .then((registration) => {
+        registration.addEventListener("updatefound", () => {
+          const installing = registration.installing;
 
-        if (!installing) {
-          return;
-        }
-
-        installing.addEventListener("statechange", () => {
-          if (
-            installing.state === "installed" &&
-            navigator.serviceWorker.controller
-          ) {
-            installing.postMessage({ type: "SKIP_WAITING" });
+          if (!installing) {
+            return;
           }
+
+          installing.addEventListener("statechange", () => {
+            if (
+              installing.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              installing.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
         });
+      })
+      .catch(() => {
+        // SW registration failure must not break the app
       });
-    })
-    .catch(() => {
-      // SW registration failure must not break the app
-    });
+  } catch {
+    // SW registration failure must not break the app
+  }
 }

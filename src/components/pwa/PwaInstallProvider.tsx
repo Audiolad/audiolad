@@ -20,13 +20,10 @@ import {
   type PwaInstallState,
 } from "@/lib/pwa/constants";
 import {
-  detectPwaPlatform,
-  isInAppBrowser,
-  isStandaloneMode,
-  isValueMomentRoute,
-  resolveInstallCapability,
-  resolveUiVariant,
-} from "@/lib/pwa/platform";
+  resolveInstallCapabilityForEnvironment,
+  usePwaBrowserEnvironment,
+} from "@/lib/pwa/browser-environment";
+import { isValueMomentRoute } from "@/lib/pwa/platform";
 import { registerPwaServiceWorker, syncPwaProfileState } from "@/lib/pwa/register-sw";
 import { shouldShowPwaBanner } from "@/lib/pwa/state-machine";
 import {
@@ -87,17 +84,13 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   const localState = usePwaDeviceLocalState();
   const hasValueMoment = usePwaValueMomentReached();
   const bannerShownThisSession = usePwaBannerShownThisSession();
+  const browserEnvironment = usePwaBrowserEnvironment();
 
-  const userAgent =
-    typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const platform = detectPwaPlatform(userAgent);
-  const isStandalone = isStandaloneMode();
-  const uiVariant = resolveUiVariant(userAgent);
-  const isInApp = isInAppBrowser(userAgent);
-  const installCapability = resolveInstallCapability({
-    userAgent,
+  const { platform, isStandalone, uiVariant, isInApp } = browserEnvironment;
+  const installCapability = resolveInstallCapabilityForEnvironment(
+    browserEnvironment,
     hasDeferredPrompt,
-  });
+  );
 
   const installState: PwaInstallState = resolveEffectiveInstallState({
     localState,
