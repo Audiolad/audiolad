@@ -6,12 +6,15 @@ import {
   BOTTOM_NAV_CONTENT_GAP_PX,
   BOTTOM_NAV_MAIN_HEIGHT_PX,
 } from "@/lib/navigation/bottom-nav";
+import { usePwaBrowserEnvironment } from "@/lib/pwa/browser-environment";
+import { getMobileInstallBannerHint } from "@/lib/pwa/platform";
 
 import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 
 export default function PwaInstallBanner() {
   const { isBannerVisible, uiVariant, openInstallFlow, remindLater } =
     usePwaInstall();
+  const { platform, isInApp } = usePwaBrowserEnvironment();
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -25,6 +28,7 @@ export default function PwaInstallBanner() {
   }
 
   const isMobile = uiVariant === "mobile";
+  const mobileHint = getMobileInstallBannerHint({ platform, isInApp });
 
   const bottomOffset =
     "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px))";
@@ -45,7 +49,7 @@ export default function PwaInstallBanner() {
 
         <p className="mt-2 text-sm leading-6 text-[#796ba0]">
           {isMobile
-            ? "Добавьте АудиоЛад на экран телефона и открывайте свои практики одним касанием."
+            ? mobileHint
             : "Установите приложение или сохраните страницу, чтобы открывать аудиотеку в один клик."}
         </p>
 

@@ -69,7 +69,21 @@ export default function DailyGreeting({ firstName }: DailyGreetingProps) {
       aria-label="Персональное приветствие"
     >
       <h1 className="text-[22px] font-semibold leading-tight text-[#25135c] lg:text-[24px]">
-        {greetingTitle}
+        {greetingTitle.endsWith("💜") ? (
+          <>
+            <span className="whitespace-nowrap">
+              {greetingTitle.slice(0, -2).trimEnd()}
+            </span>
+            <span
+              aria-hidden="true"
+              className="ml-1 inline-block text-[0.92em] leading-none"
+            >
+              💜
+            </span>
+          </>
+        ) : (
+          greetingTitle
+        )}
       </h1>
       <p className="mt-2 min-h-[3rem] text-[15px] leading-6 text-[#6f61a3] sm:min-h-[4.5rem]">
         <em>{wisdomPhrase}</em>

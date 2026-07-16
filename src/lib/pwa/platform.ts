@@ -115,10 +115,81 @@ export function resolveInstallCapability(input: {
   }
 
   if (isAndroidDevice(input.userAgent)) {
-    return "unsupported";
+    return "instructions_only";
   }
 
   return "unsupported";
+}
+
+export function isDesktopSafari(userAgent: string): boolean {
+  return (
+    isDesktopEnvironment(userAgent) &&
+    /Safari/.test(userAgent) &&
+    !isChromiumBrowser(userAgent)
+  );
+}
+
+export function isDesktopEdge(userAgent: string): boolean {
+  return isDesktopEnvironment(userAgent) && /Edg\//.test(userAgent);
+}
+
+export function isDesktopChrome(userAgent: string): boolean {
+  return (
+    isDesktopEnvironment(userAgent) &&
+    /Chrome\//.test(userAgent) &&
+    !/Edg\//.test(userAgent)
+  );
+}
+
+export function resolveInstallDialogMode(input: {
+  userAgent: string;
+  platform: import("@/lib/pwa/constants").PwaPlatform;
+  isInApp: boolean;
+}): import("@/lib/pwa/types").PwaInstallDialogMode {
+  if (input.isInApp) {
+    return "in_app_browser";
+  }
+
+  if (input.platform === "ios") {
+    return "ios";
+  }
+
+  if (input.platform === "android") {
+    return "android";
+  }
+
+  if (isDesktopSafari(input.userAgent)) {
+    return "desktop_safari";
+  }
+
+  if (isDesktopEdge(input.userAgent)) {
+    return "desktop_edge";
+  }
+
+  if (isDesktopChrome(input.userAgent)) {
+    return "desktop_chrome";
+  }
+
+  return "desktop_bookmark";
+}
+
+export function getMobileInstallBannerHint(input: {
+  platform: import("@/lib/pwa/constants").PwaPlatform;
+  isInApp: boolean;
+}): string {
+  if (input.isInApp) {
+    return "Для установки откройте АудиоЛад во внешнем браузере.";
+  }
+
+  if (input.platform === "ios") {
+    return "Откройте АудиоЛад в Safari, нажмите «Поделиться» и выберите «На экран Домой».";
+  }
+
+  if (input.platform === "android") {
+    return "Откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».";
+  }
+
+  return "Добавьте АудиоЛад на экран телефона и открывайте свои практики одним касанием.";
 }
 
 export function resolveUiVariant(userAgent: string): "mobile" | "desktop" {

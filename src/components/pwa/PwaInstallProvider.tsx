@@ -23,7 +23,10 @@ import {
   resolveInstallCapabilityForEnvironment,
   usePwaBrowserEnvironment,
 } from "@/lib/pwa/browser-environment";
-import { isValueMomentRoute } from "@/lib/pwa/platform";
+import {
+  isValueMomentRoute,
+  resolveInstallDialogMode,
+} from "@/lib/pwa/platform";
 import { registerPwaServiceWorker, syncPwaProfileState } from "@/lib/pwa/register-sw";
 import { shouldShowPwaBanner } from "@/lib/pwa/state-machine";
 import {
@@ -236,10 +239,17 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       setDialogMode(mode);
       setIsMenuDialogOpen(source === "menu");
 
-      if (mode === "ios") {
+      if (
+        mode === "ios" ||
+        mode === "android" ||
+        mode === "in_app_browser" ||
+        mode.startsWith("desktop_")
+      ) {
         trackPwaEventOnce(
-          `${analyticsSessionRef.current}:ios-instructions:${source}`,
-          "pwa_ios_instructions_opened",
+          `${analyticsSessionRef.current}:instructions:${mode}:${source}`,
+          mode === "ios"
+            ? "pwa_ios_instructions_opened"
+            : "pwa_install_clicked",
           { platform, source },
         );
 
@@ -251,16 +261,33 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
     [dismissBannerForSession, platform],
   );
 
+  const openInstructionFallback = useCallback(
+    (source: "banner" | "menu") => {
+      openInstructions(
+        resolveInstallDialogMode({
+          userAgent: browserEnvironment.userAgent,
+          platform,
+          isInApp,
+        }),
+        source,
+      );
+    },
+    [browserEnvironment.userAgent, isInApp, openInstructions, platform],
+  );
+
   const runNativeInstallPrompt = useCallback(
     async (source: "banner" | "menu") => {
       const promptEvent = deferredPromptRef.current;
 
       if (!promptEvent) {
-        if (platform === "ios") {
-          openInstructions("ios", source);
-        } else if (uiVariant === "desktop") {
-          openInstructions("desktop_bookmark", source);
-        }
+        openInstructionFallback(source);
+        return;
+      }
+
+      try {
+        await promptEvent.prompt();
+      } catch {
+        openInstructionFallback(source);
         return;
       }
 
@@ -275,8 +302,6 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
         "pwa_install_prompt_shown",
         { platform, source },
       );
-
-      await promptEvent.prompt();
 
       const choice = await promptEvent.userChoice;
 
@@ -300,7 +325,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       deferredPromptRef.current = null;
       setHasDeferredPrompt(false);
     },
-    [openInstructions, platform, uiVariant],
+    [openInstructionFallback, platform],
   );
 
   const openInstallFlow = useCallback(
@@ -311,11 +336,12 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       }
 
       if (installCapability === "instructions_only") {
-        if (isInApp) {
-          openInstructions("in_app_browser", source);
-        } else {
-          openInstructions(platform === "ios" ? "ios" : "desktop_bookmark", source);
-        }
+        openInstructionFallback(source);
+        return;
+      }
+
+      if (installCapability === "unsupported") {
+        openInstructionFallback(source);
         return;
       }
 
@@ -324,27 +350,16 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
     [
       installCapability,
       installState,
-      isInApp,
       isStandalone,
+      openInstructionFallback,
       openInstructions,
-      platform,
       runNativeInstallPrompt,
     ],
   );
 
   const openMenuInstall = useCallback(() => {
-    if (installState === "installed_confirmed" || isStandalone) {
-      openInstructions("installed", "menu");
-      return;
-    }
-
-    if (installCapability === "unsupported") {
-      openInstructions("unsupported", "menu");
-      return;
-    }
-
     void openInstallFlow("menu");
-  }, [installCapability, installState, isStandalone, openInstallFlow, openInstructions]);
+  }, [openInstallFlow]);
 
   const contextValue = useMemo<PwaInstallContextValue>(
     () => ({

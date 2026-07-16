@@ -1,6 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
+
 import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
+import type { PwaInstallDialogMode } from "@/lib/pwa/types";
 
 function CloseIcon() {
   return (
@@ -29,34 +32,105 @@ function ShareIcon() {
   );
 }
 
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M14 5h5v5M10 14 19 5M15 5h4v4M5 19h14"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+type DialogCopy = {
+  title: string;
+  description: string;
+};
+
+function getDialogCopy(mode: PwaInstallDialogMode): DialogCopy {
+  switch (mode) {
+    case "ios":
+      return {
+        title: "Добавьте АудиоЛад на экран «Домой»",
+        description:
+          "Safari не показывает системное окно установки, но вы можете добавить приложение вручную:",
+      };
+    case "android":
+      return {
+        title: "Установите АудиоЛад на телефон",
+        description:
+          "Откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».",
+      };
+    case "in_app_browser":
+      return {
+        title: "Откройте АудиоЛад во внешнем браузере",
+        description:
+          "Во встроенном браузере MAX, Telegram и других приложений установка обычно недоступна. Продолжите установку в Safari или Chrome.",
+      };
+    case "desktop_chrome":
+      return {
+        title: "Установите АудиоЛад в Chrome",
+        description:
+          "Если системное окно не открылось, установите приложение через меню браузера или сохраните страницу в закладки.",
+      };
+    case "desktop_edge":
+      return {
+        title: "Установите АудиоЛад в Edge",
+        description:
+          "Если системное окно не открылось, установите приложение через меню браузера или сохраните страницу в закладки.",
+      };
+    case "desktop_safari":
+      return {
+        title: "Сохраните АудиоЛад в Safari",
+        description:
+          "В Safari на Mac можно добавить сайт в Dock или сохранить его в закладки.",
+      };
+    case "desktop_bookmark":
+      return {
+        title: "Сохраните АудиоЛад в браузере",
+        description:
+          "В этом браузере установка как приложение может быть недоступна. Сохраните страницу в закладки или используйте Chrome / Edge.",
+      };
+    case "installed":
+      return {
+        title: "АудиоЛад уже добавлен",
+        description:
+          "АудиоЛад уже добавлен на это устройство. Открывайте его с домашнего экрана или из списка приложений.",
+      };
+    default:
+      return {
+        title: "Установка недоступна",
+        description:
+          "Попробуйте открыть АудиоЛад в Chrome, Edge или Safari на поддерживаемом устройстве.",
+      };
+  }
+}
+
 export default function PwaInstallDialog() {
   const { dialogMode, closeDialog } = usePwaInstall();
+
+  const openInExternalBrowser = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const url = window.location.href;
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+
+    if (!opened) {
+      window.location.assign(url);
+    }
+  }, []);
 
   if (!dialogMode) {
     return null;
   }
 
-  const title =
-    dialogMode === "ios"
-      ? "Добавьте АудиоЛад на экран «Домой»"
-      : dialogMode === "in_app_browser"
-        ? "Откройте АудиоЛад в Safari или Chrome"
-        : dialogMode === "desktop_bookmark"
-          ? "Сохраните АудиоЛад в браузере"
-          : dialogMode === "installed"
-            ? "АудиоЛад уже добавлен"
-            : "Установка недоступна";
-
-  const description =
-    dialogMode === "ios"
-      ? "Safari не позволяет показать системное окно установки, но вы можете добавить приложение вручную:"
-      : dialogMode === "in_app_browser"
-        ? "Во встроенном браузере MAX, Telegram и других приложений установка PWA обычно недоступна. Откройте audiolad.ru в Safari (iPhone) или Chrome (Android), войдите в аккаунт и добавьте приложение оттуда."
-        : dialogMode === "desktop_bookmark"
-          ? "В этом браузере установка как приложение может быть недоступна. Сохраните страницу в закладки или используйте Chrome / Edge для установки."
-          : dialogMode === "installed"
-            ? "АудиоЛад уже добавлен на это устройство. Открывайте его с домашнего экрана или из списка приложений."
-            : "Попробуйте открыть АудиоЛад в Chrome, Edge или Safari на поддерживаемом устройстве.";
+  const { title, description } = getDialogCopy(dialogMode);
 
   return (
     <div
@@ -93,15 +167,26 @@ export default function PwaInstallDialog() {
         </div>
 
         {dialogMode === "in_app_browser" ? (
-          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Нажмите «Поделиться» или «⋯» и выберите «Открыть в Safari» / «Открыть в
-              браузере».
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Если пункта нет — скопируйте ссылку и вставьте её в Safari или Chrome.
-            </li>
-          </ul>
+          <>
+            <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+              <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+                Нажмите «Поделиться» или «⋯» и выберите «Открыть в Safari» / «Открыть в
+                браузере».
+              </li>
+              <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+                Если пункта нет — скопируйте ссылку и вставьте её в Safari или Chrome.
+              </li>
+            </ul>
+
+            <button
+              type="button"
+              onClick={openInExternalBrowser}
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              <ExternalLinkIcon />
+              Открыть в браузере
+            </button>
+          </>
         ) : null}
 
         {dialogMode === "ios" ? (
@@ -122,6 +207,52 @@ export default function PwaInstallDialog() {
               <strong className="font-medium">3.</strong> Подтвердите добавление.
             </li>
           </ol>
+        ) : null}
+
+        {dialogMode === "android" ? (
+          <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              <strong className="font-medium">1.</strong> Откройте меню браузера (обычно «⋮» или
+              «⋯»).
+            </li>
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              <strong className="font-medium">2.</strong> Выберите «Установить приложение» или
+              «Добавить на главный экран».
+            </li>
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              <strong className="font-medium">3.</strong> Подтвердите установку.
+            </li>
+          </ol>
+        ) : null}
+
+        {dialogMode === "desktop_chrome" || dialogMode === "desktop_edge" ? (
+          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              Откройте меню браузера и выберите «Установить АудиоЛад» или «Установить
+              приложение», если пункт доступен.
+            </li>
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              Нажмите <strong className="font-medium">Ctrl+D</strong> (или{" "}
+              <strong className="font-medium">Cmd+D</strong> на Mac), чтобы добавить страницу в
+              закладки.
+            </li>
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              Создайте ярлык на рабочем столе через меню браузера, если такой пункт есть.
+            </li>
+          </ul>
+        ) : null}
+
+        {dialogMode === "desktop_safari" ? (
+          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              В меню «Файл» выберите «Добавить в Dock», чтобы закрепить АудиоЛад на панели
+              Dock.
+            </li>
+            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+              Нажмите <strong className="font-medium">Cmd+D</strong>, чтобы добавить страницу в
+              закладки.
+            </li>
+          </ul>
         ) : null}
 
         {dialogMode === "desktop_bookmark" ? (

@@ -53,7 +53,7 @@ function testInvalidStoredIndex() {
 
 function testGreetingWithName() {
   const text = getPersonalGreetingAtIndex(0, "Сергей");
-  assert(text === "Сергей, привет!", "named greeting is formatted");
+  assert(text === "Сергей, привет! 💜", "named greeting is formatted with heart");
   assert(
     formatPersonalGreeting("{name}, добро пожаловать", "Сергей") ===
       "Сергей, добро пожаловать",
@@ -74,6 +74,7 @@ function testNoBrokenPlaceholders() {
   for (let index = 0; index < 5; index += 1) {
     const named = getPersonalGreetingAtIndex(index, "Сергей");
     assert(!named.includes("{name}"), "named greeting has no placeholder");
+    assert(named.endsWith("💜"), "named greeting includes heart");
     assert(!named.includes("undefined"), "named greeting has no undefined");
     assert(!named.includes("null"), "named greeting has no null");
   }

@@ -210,6 +210,71 @@ function testAndroidUsesPromptCapability() {
   assert(provider.includes("promptEvent.prompt()"), "calls native prompt on click");
 }
 
+function testAndroidInstructionsOnly() {
+  const platform = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/platform.ts",
+    "utf8",
+  );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(
+    platform.includes('return "instructions_only"') &&
+      platform.includes("isAndroidDevice"),
+    "android without prompt uses instructions_only",
+  );
+  assert(dialog.includes('"android"'), "android dialog mode exists");
+  assert(
+    dialog.includes("Установить приложение"),
+    "android instructions mention install",
+  );
+}
+
+function testDesktopInstallFallback() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(provider.includes("openInstructionFallback"), "install fallback helper exists");
+  assert(provider.includes("catch"), "native prompt errors fall back to instructions");
+  assert(dialog.includes("desktop_chrome"), "chrome desktop instructions");
+  assert(dialog.includes("desktop_safari"), "safari desktop instructions");
+}
+
+function testMobileBannerPlatformHint() {
+  const banner = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallBanner.tsx",
+    "utf8",
+  );
+  const platform = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/platform.ts",
+    "utf8",
+  );
+
+  assert(banner.includes("getMobileInstallBannerHint"), "banner uses platform hint");
+  assert(platform.includes("На экран Домой"), "ios hint mentions Add to Home Screen");
+  assert(
+    platform.includes("Установить приложение"),
+    "android hint mentions install",
+  );
+}
+
+function testAppleMobileWebAppCapableMeta() {
+  const layout = readFileSync("/var/www/audiolad/src/app/layout.tsx", "utf8");
+
+  assert(
+    layout.includes('"apple-mobile-web-app-capable": "yes"'),
+    "layout declares apple-mobile-web-app-capable",
+  );
+}
+
 function testIosInstructionsOnly() {
   const dialog = readFileSync(
     "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
@@ -492,6 +557,7 @@ function testManifestContract() {
 
   assert(parsed.display === "standalone", "standalone display");
   assert(parsed.scope === "/", "scope is root");
+  assert(parsed.id === "/", "manifest id is root");
   assert(parsed.icons.some((icon) => icon.sizes === "192x192"), "192 icon");
   assert(parsed.icons.some((icon) => icon.sizes === "512x512"), "512 icon");
   assert(
@@ -594,7 +660,11 @@ const tests = [
   ["dismiss hides for period", testDismissHidesForPeriod],
   ["dismiss expires", testDismissExpires],
   ["android beforeinstallprompt", testAndroidUsesPromptCapability],
+  ["android instructions only", testAndroidInstructionsOnly],
   ["ios instructions", testIosInstructionsOnly],
+  ["desktop install fallback", testDesktopInstallFallback],
+  ["mobile banner platform hint", testMobileBannerPlatformHint],
+  ["apple mobile web app capable meta", testAppleMobileWebAppCapableMeta],
   ["menu item available", testMenuItemAlwaysAvailable],
   ["ssr safe provider", testSsrSafeProvider],
   ["listener cleanup", testListenerCleanup],

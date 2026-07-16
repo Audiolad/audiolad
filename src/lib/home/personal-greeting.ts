@@ -118,8 +118,9 @@ export function getPersonalGreetingAtIndex(
     : PERSONAL_HOME_GREETINGS_ANONYMOUS;
   const safeIndex = normalizeStoredIndex(index, templates.length) ?? 0;
   const template = templates[safeIndex];
+  const greeting = trimmed ? formatPersonalGreeting(template, trimmed) : template;
 
-  return trimmed ? formatPersonalGreeting(template, trimmed) : template;
+  return trimmed ? `${greeting} 💜` : greeting;
 }
 
 export function getPersonalHomeWisdomAtIndex(index: number): string {

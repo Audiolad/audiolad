@@ -12,6 +12,10 @@ export type PwaInstallUiVariant = "mobile" | "desktop";
 
 export type PwaInstallDialogMode =
   | "ios"
+  | "android"
+  | "desktop_chrome"
+  | "desktop_edge"
+  | "desktop_safari"
   | "desktop_bookmark"
   | "installed"
   | "unsupported"
