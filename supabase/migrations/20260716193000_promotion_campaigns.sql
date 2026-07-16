@@ -1,6 +1,6 @@
--- LEGACY: timestamp collision with 20260716180000_per_track_covers.sql (already applied).
--- Canonical migration: supabase/migrations/20260716193000_promotion_campaigns.sql
--- Do not apply this file on production; kept for git history only.
+-- Canonical promotion campaigns migration.
+-- Supersedes 20260716180000_promotion_campaigns.sql (timestamp collision with per_track_covers).
+-- Applied to production separately; do not run migrations directory wholesale.
 
 BEGIN;
 
