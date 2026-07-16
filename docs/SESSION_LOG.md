@@ -4,6 +4,25 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR4 reorder ↑↓ + закрытие PR3.3 docs)
+
+**Этап A (закоммичено, push нет):**
+
+- Post-deploy docs PR3.3: `8301c0304621fb3d46ad1b0d8a74235a7ae80265`
+- Production smoke helpers PR3.3: `4f49a8b29c810e08d1dd28d6c4cd818a8fd3f52e`
+
+**Этап B PR4 (рабочая копия, не закоммичено):**
+
+- Migration `20260716140000_move_playlist_item.sql` — RPC `move_playlist_item` (swap соседей, gaps OK).
+- API `POST /api/playlists/[id]/items/[practiceId]/move`.
+- UI ↑↓ на `PlaylistDetailClient`; без optimistic reorder.
+- SQL/validation smokes + UI checklist.
+- Production не менялся; migration к production не применялась.
+
+**Следующий шаг:** review → commit PR4 → backup → production migration → deploy → smoke. Не DnD / Play All / `/p/[slug]`.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR3.3 covers deploy)
 
 **Сделано:**

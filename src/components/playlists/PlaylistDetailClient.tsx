@@ -86,13 +86,16 @@ export default function PlaylistDetailClient({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [movingPracticeId, setMovingPracticeId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const coverTriggerRef = useRef<HTMLButtonElement | null>(null);
   const coverDialogRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const moveInFlightRef = useRef(false);
   const dialogTitleId = useId();
   const coverDialogTitleId = useId();
 
@@ -101,6 +104,7 @@ export default function PlaylistDetailClient({
   const mosaicCoverUrls = items
     .slice(0, 4)
     .map((item) => item.coverDisplayUrl);
+  const reorderBusy = movingPracticeId !== null || submitting;
 
   useEffect(() => {
     if (!menuId && !pendingDelete && !coverDialogOpen) {
@@ -338,7 +342,7 @@ export default function PlaylistDetailClient({
   }
 
   async function confirmDelete() {
-    if (!pendingDelete || submitting) {
+    if (!pendingDelete || submitting || moveInFlightRef.current) {
       return;
     }
 
@@ -369,6 +373,66 @@ export default function PlaylistDetailClient({
       setFormError("Не удалось удалить материал. Попробуйте ещё раз.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function moveItem(
+    practiceId: string,
+    direction: "up" | "down",
+  ) {
+    if (moveInFlightRef.current || submitting) {
+      return;
+    }
+
+    moveInFlightRef.current = true;
+    setMovingPracticeId(practiceId);
+    setListError(null);
+    setMenuId(null);
+
+    try {
+      const response = await fetch(
+        `/api/playlists/${detail.playlist.id}/items/${practiceId}/move`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ direction }),
+        },
+      );
+
+      const data = (await response.json().catch(() => ({}))) as {
+        moved?: boolean;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setListError("Материал не найден в этом плейлисте.");
+        } else if (response.status === 409) {
+          setListError(
+            data.message ||
+              "Порядок уже изменился. Обновите страницу и попробуйте ещё раз.",
+          );
+        } else {
+          setListError(
+            data.message ||
+              "Не удалось изменить порядок. Попробуйте ещё раз.",
+          );
+        }
+        return;
+      }
+
+      if (data.moved) {
+        startTransition(() => {
+          router.refresh();
+        });
+      }
+    } catch {
+      setListError("Не удалось изменить порядок. Попробуйте ещё раз.");
+    } finally {
+      moveInFlightRef.current = false;
+      setMovingPracticeId(null);
     }
   }
 
@@ -437,13 +501,23 @@ export default function PlaylistDetailClient({
         </section>
       ) : (
         <section className="mt-7 space-y-3">
-          {items.map((item) => (
+          {listError ? (
+            <p className="rounded-[18px] border border-[#f0d0d8] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]" role="alert">
+              {listError}
+            </p>
+          ) : null}
+          {items.map((item, index) => {
+            const isFirst = index === 0;
+            const isLast = index === items.length - 1;
+            const rowMoving = movingPracticeId === item.practiceId;
+
+            return (
             <article
               key={item.practiceId}
               className="flex gap-3 rounded-[22px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.05)]"
             >
               <div className="flex w-7 shrink-0 items-start justify-center pt-3 text-sm font-medium text-[#8f82ad]">
-                {item.position}
+                {index + 1}
               </div>
 
               <div className="h-[84px] w-[84px] shrink-0">
@@ -473,7 +547,7 @@ export default function PlaylistDetailClient({
                   </p>
                 ) : null}
 
-                <div className="mt-auto flex items-center justify-between pt-2">
+                <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                   {item.listenHref ? (
                     <Link
                       href={item.listenHref}
@@ -497,52 +571,77 @@ export default function PlaylistDetailClient({
                     </button>
                   )}
 
-                  <div
-                    className="relative"
-                    ref={menuId === item.practiceId ? menuRef : null}
-                  >
-                    <button
-                      type="button"
-                      aria-label={`Меню материала ${item.title}`}
-                      aria-expanded={menuId === item.practiceId}
-                      aria-haspopup="menu"
-                      className="px-2 text-2xl leading-none text-[#8f82ad]"
-                      onClick={() =>
-                        setMenuId((current) =>
-                          current === item.practiceId ? null : item.practiceId,
-                        )
-                      }
-                    >
-                      ···
-                    </button>
-
-                    {menuId === item.practiceId ? (
-                      <div
-                        role="menu"
-                        className="absolute bottom-full right-0 z-20 mb-2 min-w-[200px] overflow-hidden rounded-[16px] border border-[#eadff8] bg-white shadow-[0_12px_28px_rgba(91,62,145,0.16)]"
+                  <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        aria-label={`Переместить выше: ${item.title}`}
+                        disabled={isFirst || reorderBusy}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        onClick={() => void moveItem(item.practiceId, "up")}
                       >
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="block w-full px-4 py-3 text-left text-sm text-[#b34f63] hover:bg-[#fff8f9]"
-                          onClick={() => {
-                            setMenuId(null);
-                            setFormError(null);
-                            setPendingDelete({
-                              practiceId: item.practiceId,
-                              title: item.title,
-                            });
-                          }}
+                        {rowMoving ? "…" : "↑"}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Переместить ниже: ${item.title}`}
+                        disabled={isLast || reorderBusy}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        onClick={() => void moveItem(item.practiceId, "down")}
+                      >
+                        ↓
+                      </button>
+                    </div>
+
+                    <div
+                      className="relative"
+                      ref={menuId === item.practiceId ? menuRef : null}
+                    >
+                      <button
+                        type="button"
+                        aria-label={`Меню материала ${item.title}`}
+                        aria-expanded={menuId === item.practiceId}
+                        aria-haspopup="menu"
+                        disabled={reorderBusy}
+                        className="flex h-10 w-10 items-center justify-center text-2xl leading-none text-[#8f82ad] disabled:opacity-40"
+                        onClick={() =>
+                          setMenuId((current) =>
+                            current === item.practiceId ? null : item.practiceId,
+                          )
+                        }
+                      >
+                        ···
+                      </button>
+
+                      {menuId === item.practiceId ? (
+                        <div
+                          role="menu"
+                          className="absolute bottom-full right-0 z-20 mb-2 min-w-[200px] overflow-hidden rounded-[16px] border border-[#eadff8] bg-white shadow-[0_12px_28px_rgba(91,62,145,0.16)]"
                         >
-                          Удалить из плейлиста
-                        </button>
-                      </div>
-                    ) : null}
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full px-4 py-3 text-left text-sm text-[#b34f63] hover:bg-[#fff8f9]"
+                            onClick={() => {
+                              setMenuId(null);
+                              setFormError(null);
+                              setPendingDelete({
+                                practiceId: item.practiceId,
+                                title: item.title,
+                              });
+                            }}
+                          >
+                            Удалить из плейлиста
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </section>
       )}
 

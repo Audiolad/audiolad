@@ -93,7 +93,8 @@
 - PR1–PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`; previous `20260716-035511-fafe6a5`).
 - Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
 - `/playlists/[id]`: items, listen, delete item, edit cover.
-- Reorder, Play All и `/p/[slug]` ещё не реализованы.
+- **PR4 reorder ↑↓** реализован в рабочей копии (не закоммичен / не на production): RPC `move_playlist_item`, API `/move`, кнопки на detail.
+- Play All и `/p/[slug]` ещё не реализованы.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
 - Backup перед PR3.3: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-3-20260716-042158.dump`.
 

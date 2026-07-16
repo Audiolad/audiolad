@@ -152,7 +152,7 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 
 ### Будущие маршруты
 
-- владелец: `/playlists`, `/playlists/[id]` (PR3.2 на production: просмотр + delete item; без reorder);
+- владелец: `/playlists`, `/playlists/[id]` (PR3.2+ на production: просмотр + delete item + covers; **PR4 reorder ↑↓ — в рабочей копии, не на production**);
 - публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
@@ -167,11 +167,25 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Удаление плейлиста очищает storage object после успешного DELETE строки.
 - Migrations: `20260716120000_playlist_covers.sql`, `20260716121000_playlist_cover_path_cas.sql`.
 
+### Reorder (PR4) — рабочая копия, не production
+
+- RPC `public.move_playlist_item(p_playlist_id uuid, p_practice_id uuid, p_direction text)` → `(moved, from_position, to_position)`.
+- Клиент шлёт только `direction: "up" | "down"`; не принимает массив positions / произвольную позицию / `user_id`.
+- Swap: temp = `max(position)+1` под lock; при `max >= 2147483647` → `reorder_conflict` без частичного изменения.
+- `playlists.updated_at` только при фактическом move; no-op на границе → `moved=false`, `updated_at` не трогается.
+- Не пишет в `user_practices`, не меняет entitlement / progress / `audio_items.position`.
+- Недоступный материал можно перемещать.
+- API: `POST /api/playlists/[id]/items/[practiceId]/move` (session client, без service role).
+- Migration: `20260716140000_move_playlist_item.sql` (не применена к production).
+- Drag-and-drop, Play All, `/p/[slug]` — нет.
+
 ### Мутации
 
-Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`, `DELETE /api/playlists/[id]/items/[practiceId]`) и SECURITY DEFINER RPC membership.
+Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`, `DELETE /api/playlists/[id]/items/[practiceId]`, `POST .../items/[practiceId]/move`) и SECURITY DEFINER RPC (membership, covers CAS/mosaic, move).
 
-Delete одного item: ownership через `getOwnedPlaylistById` + RLS; не требует entitlement; не пишет в `user_practices`; gaps в `position` допустимы до reorder; `updated_at` обновляется при реальном удалении.
+Delete одного item: ownership через `getOwnedPlaylistById` + RLS; не требует entitlement; не пишет в `user_practices`; gaps в `position` допустимы; `updated_at` обновляется при реальном удалении.
+
+Reorder (PR4): атомарный swap соседних `playlist_items.position` по `practice_id`; mosaic после refresh отражает новый top-4.
 
 Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы по той же модели, что `claim_free_practice`: `status=published`, `is_catalog_listed IS TRUE`, `is_free IS TRUE`, `price` null или не `> 0`.
 

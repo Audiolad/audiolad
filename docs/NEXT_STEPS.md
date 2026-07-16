@@ -2,14 +2,19 @@
 
 Ближайшие технические задачи «АудиоЛад».
 
-## 0. Плейлисты — после PR3.3 (приоритет: высокий)
+## 0. Плейлисты — после PR3.3 / PR4 (приоритет: высокий)
 
 PR1–PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`).
 
+Post-deploy docs PR3.3 + smoke helpers зафиксированы (`8301c03`, `4f49a8b`).
+
+**PR4 reorder ↑↓** — в рабочей копии (не commit / не production migration / не deploy).
+
 Далее:
 
-1. Reorder ↑↓ (отдельный PR).
+1. Review → commit PR4 → backup → production migration → deploy → smoke.
 2. Позже — `/p/[slug]`; Play All между продуктами только отдельным этапом плеера.
+3. Drag-and-drop — не ближайший шаг.
 
 ## 1. Добавить защиту приватных маршрутов (приоритет: высокий)
 

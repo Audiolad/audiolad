@@ -255,3 +255,41 @@ export function parseMembershipPutBody(body: unknown): MembershipPutInput {
     playlistIds,
   };
 }
+
+export type MovePlaylistItemDirection = "up" | "down";
+
+export type MovePlaylistItemInput =
+  | { ok: true; direction: MovePlaylistItemDirection }
+  | { ok: false; error: "invalid_request" };
+
+/**
+ * POST /api/playlists/[id]/items/[practiceId]/move body:
+ * { direction: "up" | "down" } — no unknown keys.
+ */
+export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["direction"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (!("direction" in parsed) || typeof parsed.direction !== "string") {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const direction = parsed.direction.trim().toLowerCase();
+
+  if (direction !== "up" && direction !== "down") {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, direction };
+}
