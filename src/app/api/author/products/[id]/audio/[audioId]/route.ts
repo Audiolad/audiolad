@@ -11,6 +11,7 @@ import {
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
 import { normalizeClearableTextField } from "@/lib/author-products/text-fields";
+import { removeTrackCoverFiles } from "@/lib/author-products/utils";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -141,6 +142,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
         .from("practice-audio")
         .remove([audioItem.audio_path]);
     }
+
+    await removeTrackCoverFiles(supabase, id, audioId);
 
     const { error: deleteError } = await supabase
       .from("audio_items")

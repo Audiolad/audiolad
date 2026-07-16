@@ -88,7 +88,7 @@ Timeweb Cloud
 - PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`): custom cover + automatic mosaic; CAS `replace_playlist_cover_path`; private `playlist-covers`; sharp 1200×1200 WebP; signed URLs.
 - PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`): `POST /api/playlists/[id]/items/[practiceId]/move` + RPC `move_playlist_item` — атомарный ↑↓ swap соседних `playlist_items.position` по `practice_id`; без DnD / полного массива positions.
 - PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`): публичная страница `/p/[slug]` — только `visibility=public` + `published_at IS NOT NULL`; RLS+server loader (`cache()`); signed custom cover после gate; auto mosaic; unavailable drift; copy link (public+slug+published_at); без entitlement / save-чужой.
-- Play All (рабочая копия): тонкий queue controller поверх `GlobalAudioPlayerProvider` + `useSequentialPlayer`; `PlaylistQueueEntry` (`kind=product` в MVP); builders owner/public; GET `/api/listen/product/.../session` для re-check; cross-product remount; in-memory queue; standalone listen очищает queue.
+- Play All на production (`768a80d`, release `20260716-082442-768a80d`; feature `cf8b947` + corrective `93fc9c6`/`7212af9`/`768a80d`): queue controller поверх `GlobalAudioPlayerProvider` + `useSequentialPlayer`; `PlaylistQueueEntry` (`kind=product`); builders owner/public; GET `/api/listen/product/.../session`; **`pendingQueueNavigationRef` (from→to) + `confirmInternalQueueNavigation`** — ListenPageClient не чистит queue на ещё смонтированной странице A; **persistent `<audio>`** вне keyed engine remount; exhaust dedupe сброс при возврате на продукт; in-memory queue; standalone clears queue; Previous → track 0 предыдущего продукта; compact `PlaylistItemRow` на owner/public.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 
@@ -172,6 +172,14 @@ Timeweb Cloud
 - создавать новые таблицы без изучения существующей схемы;
 - связывать MAX user_id с аккаунтом без серверной проверки данных MAX;
 - доверять данным запуска мини-приложения только на клиентской стороне.
+
+## Обложки аудиопродукта (per-track covers)
+
+- Общая обложка: `practices.cover_url` (обязательна для публикации), bucket `practice-covers`, path `practices/{id}/cover.{ext}`.
+- Режим: `practices.use_shared_cover` (default `true`). При `false` — необязательные обложки треков в `audio_items.cover_url`, path `practices/{id}/track-covers/{audioItemId}.{ext}`.
+- Резолв для плеера: `resolvePlaybackCoverUrl()` в `src/lib/products/cover-display.ts` → `ListenTrack.coverImageUrl` (сервер).
+- Каталог и карточки продукта — только общая обложка.
+- Author UI: `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API `POST/DELETE .../audio/[audioId]/cover`.
 
 ## Планируемая интеграция с MAX (не реализована)
 

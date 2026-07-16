@@ -45,3 +45,28 @@ export function getProductCoverDisplayUrl(
 ): string | null {
   return buildCoverDisplayUrl(coverUrl, updatedAt);
 }
+
+export type PlaybackCoverPractice = {
+  cover_url: string | null | undefined;
+  updated_at: string | null | undefined;
+  use_shared_cover: boolean | null | undefined;
+};
+
+export type PlaybackCoverTrack = {
+  cover_url: string | null | undefined;
+  updated_at: string | null | undefined;
+};
+
+export function resolvePlaybackCoverUrl(
+  practice: PlaybackCoverPractice,
+  track: PlaybackCoverTrack | null | undefined,
+): string | null {
+  if (
+    practice.use_shared_cover === false &&
+    track?.cover_url?.trim()
+  ) {
+    return buildCoverDisplayUrl(track.cover_url, track.updated_at);
+  }
+
+  return buildCoverDisplayUrl(practice.cover_url, practice.updated_at);
+}

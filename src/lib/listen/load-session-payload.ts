@@ -5,6 +5,10 @@ import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { listPracticeProgress } from "@/lib/listen/progress";
+import {
+  mapLegacyPracticeToListenTrack,
+  mapRowToListenTrack,
+} from "@/lib/listen/track-cover";
 import type { ListenTrack } from "@/lib/listen/types";
 import { resolveProductAccess } from "@/lib/products/access";
 import {
@@ -12,7 +16,9 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 
-type PracticeRow = PublicPracticeRow;
+type PracticeRow = PublicPracticeRow & {
+  use_shared_cover?: boolean | null;
+};
 
 type AudioItemRow = {
   id: string;
@@ -21,6 +27,8 @@ type AudioItemRow = {
   position: number;
   duration_seconds: number | null;
   audio_path: string | null;
+  cover_url: string | null;
+  updated_at: string | null;
   status: string;
 };
 
@@ -90,7 +98,7 @@ async function loadListenTracks(
   let query = supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, audio_path, status",
+      "id, title, description, position, duration_seconds, audio_path, cover_url, updated_at, status",
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
@@ -105,15 +113,15 @@ async function loadListenTracks(
     throw new Error("audio_items_lookup_failed");
   }
 
+  const practiceContext = {
+    cover_url: practice.cover_url,
+    updated_at: practice.updated_at,
+    use_shared_cover: practice.use_shared_cover ?? true,
+  };
+
   const tracks = ((audioItems ?? []) as AudioItemRow[])
     .filter((item) => item.audio_path?.trim())
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      position: item.position,
-      durationSeconds: item.duration_seconds,
-    }));
+    .map((item) => mapRowToListenTrack(item, practiceContext));
 
   if (tracks.length > 0) {
     return tracks;
@@ -126,19 +134,15 @@ async function loadListenTracks(
     return [];
   }
 
-  return [
-    {
-      id: `legacy-${practice.id}`,
-      title: practice.title,
-      description: practice.description,
-      position: 1,
-      durationSeconds:
-        typeof practice.duration_minutes === "number" &&
-        practice.duration_minutes > 0
-          ? Math.round(practice.duration_minutes * 60)
-          : null,
-    },
-  ];
+  return [mapLegacyPracticeToListenTrack({
+    id: practice.id,
+    title: practice.title,
+    description: practice.description,
+    duration_minutes: practice.duration_minutes,
+    cover_url: practice.cover_url,
+    updated_at: practice.updated_at,
+    use_shared_cover: practice.use_shared_cover ?? true,
+  })];
 }
 
 export type LoadSessionPayloadResult =
@@ -170,6 +174,7 @@ export async function loadListenSessionPayload(
       duration_minutes,
       audio_url,
       cover_url,
+      use_shared_cover,
       updated_at,
       status,
       is_free,

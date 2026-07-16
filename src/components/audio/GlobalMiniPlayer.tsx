@@ -99,6 +99,9 @@ export default function GlobalMiniPlayer() {
       ? Math.min(100, (engine.currentTime / engine.displayDuration) * 100)
       : 0;
 
+  const activeCoverUrl =
+    engine.currentTrack?.coverImageUrl ?? activeSession.coverImageUrl;
+
   const title =
     engine.currentTrack?.title?.trim() || activeSession.practiceTitle;
   const subtitle = activeSession.authorName;
@@ -139,10 +142,10 @@ export default function GlobalMiniPlayer() {
             <div
               className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${activeSession.coverGradient} text-xl text-white shadow-inner`}
             >
-              {activeSession.coverImageUrl ? (
+              {activeCoverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={activeSession.coverImageUrl}
+                  src={activeCoverUrl}
                   alt=""
                   className="h-full w-full object-cover"
                 />

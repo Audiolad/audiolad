@@ -10,42 +10,55 @@ import {
 } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
-  buildCoverStoragePath,
+  buildTrackCoverStoragePath,
   COVER_EXTENSIONS,
   getCoverPublicUrl,
-  removePracticeCoverFiles,
+  removeTrackCoverFiles,
 } from "@/lib/author-products/utils";
 
 type RouteContext = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; audioId: string }>;
 };
 
-const COVER_EXTENSIONS_LIST = COVER_EXTENSIONS;
-
-async function removePracticeCoverFilesFromBucket(
-  supabase: Awaited<ReturnType<typeof requirePracticeAccess>>["supabase"],
-  practiceId: string,
-) {
-  await removePracticeCoverFiles(supabase, practiceId);
-}
+const SHARED_COVER_ENABLED_MESSAGE =
+  "Сначала отключите использование общей обложки для всех треков.";
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const { id } = await context.params;
+    const { id, audioId } = await context.params;
     const { supabase } = await requirePracticeAccess(id);
 
-    await removePracticeCoverFilesFromBucket(supabase, id);
+    const { data: audioItem, error: lookupError } = await supabase
+      .from("audio_items")
+      .select("id")
+      .eq("id", audioId)
+      .eq("practice_id", id)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error("author_track_cover_lookup_error", lookupError.message);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    if (!audioItem?.id) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    await removeTrackCoverFiles(supabase, id, audioId);
+
+    const now = new Date().toISOString();
 
     const { error: updateError } = await supabase
-      .from("practices")
+      .from("audio_items")
       .update({
         cover_url: null,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
-      .eq("id", id);
+      .eq("id", audioId)
+      .eq("practice_id", id);
 
     if (updateError) {
-      console.error("author_cover_delete_error", updateError.message);
+      console.error("author_track_cover_delete_error", updateError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
@@ -59,8 +72,34 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const { id } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { id, audioId } = await context.params;
+    const { supabase, practice } = await requirePracticeAccess(id);
+
+    if (practice.use_shared_cover !== false) {
+      return NextResponse.json(
+        {
+          error: "shared_cover_enabled",
+          message: SHARED_COVER_ENABLED_MESSAGE,
+        },
+        { status: 409 },
+      );
+    }
+
+    const { data: audioItem, error: lookupError } = await supabase
+      .from("audio_items")
+      .select("id")
+      .eq("id", audioId)
+      .eq("practice_id", id)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error("author_track_cover_lookup_error", lookupError.message);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    if (!audioItem?.id) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -79,7 +118,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_file_type" }, { status: 400 });
     }
 
-    const storagePath = buildCoverStoragePath(id, extension);
+    const storagePath = buildTrackCoverStoragePath(id, audioId, extension);
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
@@ -90,31 +129,33 @@ export async function POST(request: Request, context: RouteContext) {
       });
 
     if (uploadError) {
-      console.error("author_cover_upload_error", uploadError.message);
+      console.error("author_track_cover_upload_error", uploadError.message);
       return NextResponse.json({ error: "upload_failed" }, { status: 500 });
     }
 
-    for (const oldExtension of COVER_EXTENSIONS_LIST) {
+    for (const oldExtension of COVER_EXTENSIONS) {
       if (oldExtension === extension) {
         continue;
       }
 
-      const oldPath = buildCoverStoragePath(id, oldExtension);
+      const oldPath = buildTrackCoverStoragePath(id, audioId, oldExtension);
       await supabase.storage.from("practice-covers").remove([oldPath]);
     }
 
     const coverUrl = getCoverPublicUrl(storagePath);
+    const now = new Date().toISOString();
 
     const { error: updateError } = await supabase
-      .from("practices")
+      .from("audio_items")
       .update({
         cover_url: coverUrl,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
-      .eq("id", id);
+      .eq("id", audioId)
+      .eq("practice_id", id);
 
     if (updateError) {
-      console.error("author_cover_update_error", updateError.message);
+      console.error("author_track_cover_update_error", updateError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 

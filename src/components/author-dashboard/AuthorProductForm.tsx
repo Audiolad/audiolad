@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
+import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import type {
   AuthorProductDetail,
@@ -26,7 +27,6 @@ import {
   validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
 import {
-  MAX_COVER_BYTES,
   PRODUCT_CONTENT_LIMITS,
   getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
@@ -48,144 +48,12 @@ type PracticeContext = {
   audioItems: AudioItemRow[];
 };
 
-const MIN_COVER_DIMENSION = 1000;
-const ALLOWED_COVER_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-
 function CharCounter({ value, max }: { value: string; max: number }) {
   return (
     <p className="mt-1 text-right text-xs text-[#7d70a2]">
       {value.length} / {max}
     </p>
   );
-}
-
-function CoverPlaceholderIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-7 w-7"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect
-        x="4"
-        y="5"
-        width="16"
-        height="14"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <circle cx="9" cy="10" r="1.5" fill="currentColor" />
-      <path
-        d="m5 17 4.5-4.5a1 1 0 0 1 1.4 0L15 17"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13 14.5 15.5 12a1 1 0 0 1 1.4 0L19 14"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CoverPlaceholder({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`pointer-events-none flex h-full w-full flex-col items-center justify-center gap-2 px-2 text-center ${className}`}
-    >
-      <span className="text-[#9a86c4] transition-colors group-hover:text-[#8569b3] group-focus-visible:text-[#8569b3]">
-        <CoverPlaceholderIcon />
-      </span>
-      <span className="text-xs text-[#8c79b6] transition-colors group-hover:text-[#7058a0] group-focus-visible:text-[#7058a0]">
-        Нет обложки
-      </span>
-    </div>
-  );
-}
-
-function readImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve({
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-      });
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("image_decode_failed"));
-    };
-
-    image.src = objectUrl;
-  });
-}
-
-async function validateCoverFile(file: File): Promise<string | null> {
-  const fileName = file.name.trim().toLowerCase();
-  const hasAllowedExtension =
-    fileName.endsWith(".jpg") ||
-    fileName.endsWith(".jpeg") ||
-    fileName.endsWith(".png") ||
-    fileName.endsWith(".webp");
-
-  if (!ALLOWED_COVER_MIME_TYPES.has(file.type.trim().toLowerCase()) || !hasAllowedExtension) {
-    return "Загрузите обложку в формате JPG, PNG или WebP.";
-  }
-
-  if (file.size > MAX_COVER_BYTES) {
-    return "Размер обложки не должен превышать 3 МБ.";
-  }
-
-  try {
-    const { width, height } = await readImageDimensions(file);
-
-    if (width < MIN_COVER_DIMENSION || height < MIN_COVER_DIMENSION) {
-      return "Минимальный размер обложки — 1000 × 1000 пикселей.";
-    }
-
-    if (width !== height) {
-      return "Обложка должна быть квадратной — соотношение сторон 1:1.";
-    }
-  } catch {
-    return "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.";
-  }
-
-  return null;
-}
-
-function buildCoverDisplayUrl(
-  coverUrl: string | null,
-  version: string | null,
-): string | null {
-  if (!coverUrl) {
-    return null;
-  }
-
-  if (!version) {
-    return coverUrl;
-  }
-
-  const separator = coverUrl.includes("?") ? "&" : "?";
-
-  return `${coverUrl}${separator}v=${encodeURIComponent(version)}`;
 }
 
 type AuthorProductFormProps = {
@@ -207,6 +75,7 @@ type FormState = {
   price: number;
   coverUrl: string | null;
   coverVersion: string | null;
+  useSharedCover: boolean;
   status: string;
   publishedAt: string | null;
 };
@@ -306,6 +175,7 @@ function buildInitialForm(
       price: practice.is_free === true ? 99 : practice.price,
       coverUrl: practice.cover_url,
       coverVersion: practice.cover_url ? practice.updated_at : null,
+      useSharedCover: practice.use_shared_cover !== false,
       status: practice.status,
       publishedAt: practice.published_at,
     };
@@ -326,6 +196,7 @@ function buildInitialForm(
     price: 99,
     coverUrl: null,
     coverVersion: null,
+    useSharedCover: true,
     status: "draft",
     publishedAt: null,
   };
@@ -343,6 +214,7 @@ function buildProductSavePayload(
     format: resolveFormatForStorage(form.formatPreset, form.customFormat),
     is_free: form.isFree,
     price: form.isFree ? 0 : form.price,
+    use_shared_cover: form.useSharedCover,
   };
 }
 
@@ -364,6 +236,7 @@ export default function AuthorProductForm({
         title: "Аудио 1",
         description: null,
         audio_path: null,
+        cover_url: null,
         duration_seconds: null,
         original_file_name: null,
         file_size_bytes: null,
@@ -381,16 +254,7 @@ export default function AuthorProductForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [deletingCover, setDeletingCover] = useState(false);
-  const [coverError, setCoverError] = useState<string | null>(null);
-  const [coverDisplayError, setCoverDisplayError] = useState<string | null>(
-    null,
-  );
-  const [coverPreviewFailureKey, setCoverPreviewFailureKey] = useState<
-    string | null
-  >(null);
-  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const [savingSharedCover, setSavingSharedCover] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     title?: string;
     subtitle?: string;
@@ -603,15 +467,17 @@ export default function AuthorProductForm({
       ? buildPracticePublicPath(selectedAuthor.slug, form.slug)
       : "";
 
-  const coverDisplaySrc = useMemo(
-    () => buildCoverDisplayUrl(form.coverUrl, form.coverVersion),
-    [form.coverUrl, form.coverVersion],
-  );
+  async function getPracticeIdForCoverUpload(): Promise<string | null> {
+    const existingPracticeId = practiceIdRef.current || practiceId;
 
-  const coverPreviewKey = `${form.coverUrl ?? ""}:${form.coverVersion ?? ""}`;
-  const coverPreviewFailed = coverPreviewFailureKey === coverPreviewKey;
+    if (existingPracticeId) {
+      return existingPracticeId;
+    }
 
-  const showCoverPreview = Boolean(coverDisplaySrc) && !coverPreviewFailed;
+    const ensured = await ensurePracticeId();
+
+    return ensured?.practiceId ?? null;
+  }
 
   async function ensurePracticeId(
     localItemsSnapshot?: AudioItemRow[],
@@ -685,6 +551,69 @@ export default function AuthorProductForm({
     setAudioItems((current) =>
       mergeServerAudioItems(current, product.audio_items),
     );
+  }
+
+  function handleProductCoverUpdated({
+    coverUrl,
+    product,
+  }: {
+    coverUrl: string | null;
+    product?: AuthorProductDetail;
+  }) {
+    if (product) {
+      applyServerProductPreservingDraft(product);
+    } else {
+      setForm((current) => ({
+        ...current,
+        coverUrl,
+        coverVersion: coverUrl ? String(Date.now()) : null,
+      }));
+    }
+
+    setMessage(coverUrl ? "Обложка загружена." : "Обложка удалена.");
+  }
+
+  async function handleUseSharedCoverChange(nextValue: boolean) {
+    const previousValue = form.useSharedCover;
+    setForm((current) => ({ ...current, useSharedCover: nextValue }));
+    setSavingSharedCover(true);
+    setError(null);
+
+    try {
+      const ensured = await ensurePracticeId();
+
+      if (!ensured) {
+        setForm((current) => ({ ...current, useSharedCover: previousValue }));
+        return;
+      }
+
+      const response = await fetch(
+        `/api/author/products/${ensured.practiceId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ use_shared_cover: nextValue }),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.product) {
+        setForm((current) => ({ ...current, useSharedCover: previousValue }));
+        setError("Не удалось сохранить настройку обложек.");
+        return;
+      }
+
+      applyServerProductPreservingDraft(payload.product);
+    } catch {
+      setForm((current) => ({ ...current, useSharedCover: previousValue }));
+      setError("Не удалось сохранить настройку обложек.");
+    } finally {
+      setSavingSharedCover(false);
+    }
   }
 
   async function saveAllAudioItemsFromState(
@@ -1345,187 +1274,6 @@ export default function AuthorProductForm({
     }
   }
 
-  async function uploadCover(file: File) {
-    setUploadingCover(true);
-    setCoverError(null);
-    setCoverDisplayError(null);
-    setCoverPreviewFailureKey(null);
-
-    const validationError = await validateCoverFile(file);
-
-    if (validationError) {
-      setCoverError(validationError);
-      setUploadingCover(false);
-      return;
-    }
-
-    try {
-      const ensured = await ensurePracticeId();
-
-      if (!ensured) {
-        setCoverError("Не удалось загрузить обложку.");
-        return;
-      }
-
-      const id = ensured.practiceId;
-
-      const formData = new FormData();
-      formData.set("file", file);
-
-      const response = await fetch(`/api/author/products/${id}/cover`, {
-        method: "POST",
-        body: formData,
-      });
-
-      let payload: {
-        product?: AuthorProductDetail;
-        cover_url?: string;
-      } | null = null;
-
-      if (response.status === 413) {
-        setCoverError(
-          "Файл слишком большой. Максимальный размер обложки — 3 МБ.",
-        );
-        return;
-      }
-
-      const responseText = await response.text();
-
-      if (responseText) {
-        try {
-          payload = JSON.parse(responseText) as {
-            product?: AuthorProductDetail;
-            cover_url?: string;
-          };
-        } catch {
-          if (!response.ok) {
-            setCoverError("Не удалось загрузить обложку.");
-            return;
-          }
-        }
-      }
-
-      if (!response.ok) {
-        setCoverError("Не удалось загрузить обложку.");
-        return;
-      }
-
-      if (payload?.product) {
-        applyServerProductPreservingDraft(payload.product);
-      } else if (payload?.cover_url) {
-        setForm((current) => ({
-          ...current,
-          coverUrl: payload.cover_url ?? null,
-          coverVersion: String(Date.now()),
-        }));
-      }
-
-      setCoverError(null);
-      setCoverDisplayError(null);
-      setCoverPreviewFailureKey(null);
-      setMessage("Обложка загружена.");
-    } catch {
-      setCoverError("Не удалось загрузить обложку.");
-    } finally {
-      setUploadingCover(false);
-    }
-  }
-
-  function openCoverPicker() {
-    if (uploadingCover || deletingCover) {
-      return;
-    }
-
-    coverFileInputRef.current?.click();
-  }
-
-  function handleCoverFileChange(
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (file) {
-      void uploadCover(file);
-    }
-  }
-
-  async function deleteCover() {
-    if (!form.coverUrl) {
-      return;
-    }
-
-    if (!window.confirm("Удалить обложку?")) {
-      return;
-    }
-
-    setDeletingCover(true);
-    setCoverError(null);
-    setCoverDisplayError(null);
-
-    try {
-      const ensured = practiceId
-        ? { practiceId, audioItems }
-        : await ensurePracticeId();
-
-      if (!ensured) {
-        setCoverError("Не удалось удалить обложку.");
-        return;
-      }
-
-      const id = ensured.practiceId;
-
-      const response = await fetch(`/api/author/products/${id}/cover`, {
-        method: "DELETE",
-      });
-
-      let payload: {
-        product?: AuthorProductDetail;
-        cover_url?: string | null;
-      } | null = null;
-
-      const responseText = await response.text();
-
-      if (responseText) {
-        try {
-          payload = JSON.parse(responseText) as {
-            product?: AuthorProductDetail;
-            cover_url?: string | null;
-          };
-        } catch {
-          if (!response.ok) {
-            setCoverError("Не удалось удалить обложку.");
-            return;
-          }
-        }
-      }
-
-      if (!response.ok) {
-        setCoverError("Не удалось удалить обложку.");
-        return;
-      }
-
-      if (payload?.product) {
-        applyServerProductPreservingDraft(payload.product);
-      } else {
-        setForm((current) => ({
-          ...current,
-          coverUrl: null,
-          coverVersion: null,
-        }));
-      }
-
-      setCoverPreviewFailureKey(null);
-      setCoverDisplayError(null);
-      setCoverError(null);
-      setMessage("Обложка удалена.");
-    } catch {
-      setCoverError("Не удалось удалить обложку.");
-    } finally {
-      setDeletingCover(false);
-    }
-  }
-
   async function uploadAudio(audioId: string, file: File) {
     const validationError = validateMp3FileClient(file);
 
@@ -1936,93 +1684,40 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
-        <div>
-          <span className="mb-2 block text-sm font-medium">Обложка</span>
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
-            <button
-              type="button"
-              onClick={openCoverPicker}
-              disabled={uploadingCover || deletingCover}
-              aria-label={
-                showCoverPreview ? "Заменить обложку" : "Загрузить обложку"
-              }
-              className={`group relative z-10 block aspect-square h-28 w-28 shrink-0 cursor-pointer overflow-hidden rounded-[18px] border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60 ${
-                showCoverPreview
-                  ? "border-transparent bg-transparent hover:border-white/20 focus-visible:ring-2 focus-visible:ring-[#9a74d8]/50"
-                  : "border-[#d9c9ef] bg-[#f8f4fc] hover:border-[#9a74d8] hover:bg-[#f4ecfb] focus-visible:ring-2 focus-visible:ring-[#9a74d8]/50"
-              }`}
-            >
-              {showCoverPreview ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={coverDisplaySrc ?? undefined}
-                    alt=""
-                    className="pointer-events-none block h-full w-full object-contain"
-                    onLoad={() => {
-                      setCoverPreviewFailureKey(null);
-                      setCoverDisplayError(null);
-                    }}
-                    onError={() => {
-                      setCoverPreviewFailureKey(coverPreviewKey);
-                      setCoverDisplayError(
-                        "Не удалось отобразить обложку. Попробуйте загрузить файл ещё раз.",
-                      );
-                    }}
-                  />
-                  <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-2 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100 group-focus-visible:bg-[#25135c]/35 group-focus-visible:opacity-100">
-                    Заменить обложку
-                  </span>
-                </>
-              ) : (
-                <CoverPlaceholder />
-              )}
-            </button>
+        <CoverUploadBlock
+          label="Обложка"
+          coverUrl={form.coverUrl}
+          coverVersion={form.coverVersion}
+          buildUploadUrl={(id) => `/api/author/products/${id}/cover`}
+          buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
+          getPracticeId={getPracticeIdForCoverUpload}
+          onUpdated={handleProductCoverUpdated}
+          hint="Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до 3 МБ"
+          uploadLabel="Загрузить обложку"
+          replaceLabel="Заменить обложку"
+        />
 
-            <div className="relative z-0 min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={openCoverPicker}
-                  disabled={uploadingCover || deletingCover}
-                  className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] transition-colors hover:border-[#bda6e1] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {uploadingCover ? "Загрузка…" : "Загрузить обложку"}
-                </button>
-                {form.coverUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => void deleteCover()}
-                    disabled={deletingCover || uploadingCover}
-                    className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2] disabled:opacity-60"
-                  >
-                    {deletingCover ? "Удаление…" : "Удалить обложку"}
-                  </button>
-                ) : null}
-              </div>
-              <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
-                Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до
-                3 МБ
-              </p>
-            </div>
-          </div>
-          <input
-            ref={coverFileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={handleCoverFileChange}
-          />
-          {coverDisplayError ? (
-            <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-              {coverDisplayError}
-            </p>
-          ) : null}
-          {coverError ? (
-            <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-              {coverError}
-            </p>
-          ) : null}
+        <div className="mt-4 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={form.useSharedCover}
+              disabled={savingSharedCover || busy}
+              onChange={(event) =>
+                void handleUseSharedCoverChange(event.target.checked)
+              }
+              className="mt-1 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-[#3f3560]">
+                Использовать общую обложку для всех треков
+              </span>
+              <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                Отключите, если каждому треку нужна собственная обложка —
+                например, для историй, сказок, лекций, глав или выпусков.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div>
@@ -2228,6 +1923,45 @@ export default function AuthorProductForm({
                   </p>
                 ) : null}
               </label>
+
+              {!form.useSharedCover ? (
+                <div className="mt-4">
+                  <CoverUploadBlock
+                    label="Обложка трека"
+                    coverUrl={audioItem.cover_url}
+                    coverVersion={
+                      audioItem.cover_url ? audioItem.updated_at : null
+                    }
+                    buildUploadUrl={(id) =>
+                      `/api/author/products/${id}/audio/${audioItem.id}/cover`
+                    }
+                    buildDeleteUrl={(id) =>
+                      `/api/author/products/${id}/audio/${audioItem.id}/cover`
+                    }
+                    getPracticeId={getPracticeIdForCoverUpload}
+                    disabled={
+                      audioItem.id.startsWith("temp-") ||
+                      !practiceId ||
+                      savingSharedCover
+                    }
+                    onUpdated={({ coverUrl, product }) => {
+                      if (product) {
+                        applyServerProductPreservingDraft(product);
+                        setMessage(
+                          coverUrl
+                            ? "Обложка трека загружена."
+                            : "Обложка трека удалена.",
+                        );
+                      }
+                    }}
+                    deleteConfirmMessage="Удалить обложку трека?"
+                    hint="Если обложка не загружена, используется общая обложка продукта. · JPG, PNG или WebP · от 1000 × 1000 px · до 3 МБ"
+                    previewSize="compact"
+                    uploadLabel="Загрузить обложку трека"
+                    replaceLabel="Заменить обложку трека"
+                  />
+                </div>
+              ) : null}
 
               <div className="mt-4 space-y-3">
                 <div className="text-sm text-[#5f5484]">

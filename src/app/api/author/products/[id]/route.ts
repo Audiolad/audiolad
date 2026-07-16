@@ -220,6 +220,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (
+      "use_shared_cover" in body &&
+      typeof body.use_shared_cover === "boolean"
+    ) {
+      updates.use_shared_cover = body.use_shared_cover;
+    }
+
+    if (
       "author_id" in body &&
       typeof body.author_id === "string" &&
       body.author_id.trim()

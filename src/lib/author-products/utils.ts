@@ -91,11 +91,58 @@ export function buildAudioItemStoragePath(
   return `practices/${practiceId}/audio/${audioItemId}.mp3`;
 }
 
+export const COVER_EXTENSIONS = ["jpg", "png", "webp"] as const;
+
+export type CoverExtension = (typeof COVER_EXTENSIONS)[number];
+
 export function buildCoverStoragePath(
   practiceId: string,
-  extension: "jpg" | "png" | "webp",
+  extension: CoverExtension,
 ): string {
   return `practices/${practiceId}/cover.${extension}`;
+}
+
+export function buildTrackCoverStoragePath(
+  practiceId: string,
+  audioItemId: string,
+  extension: CoverExtension,
+): string {
+  return `practices/${practiceId}/track-covers/${audioItemId}.${extension}`;
+}
+
+export async function removePracticeCoverFiles(
+  supabase: {
+    storage: {
+      from: (bucket: string) => {
+        remove: (paths: string[]) => Promise<unknown>;
+      };
+    };
+  },
+  practiceId: string,
+): Promise<void> {
+  const paths = COVER_EXTENSIONS.map((extension) =>
+    buildCoverStoragePath(practiceId, extension),
+  );
+
+  await supabase.storage.from("practice-covers").remove(paths).catch(() => undefined);
+}
+
+export async function removeTrackCoverFiles(
+  supabase: {
+    storage: {
+      from: (bucket: string) => {
+        remove: (paths: string[]) => Promise<unknown>;
+      };
+    };
+  },
+  practiceId: string,
+  audioItemId: string,
+): Promise<void> {
+  const paths = COVER_EXTENSIONS.map((extension) =>
+    buildTrackCoverStoragePath(practiceId, audioItemId, extension),
+  );
+
+  await supabase.storage.from("practice-covers").remove(paths).catch(() => undefined);
 }
 
 export function getCoverPublicUrl(storagePath: string): string {

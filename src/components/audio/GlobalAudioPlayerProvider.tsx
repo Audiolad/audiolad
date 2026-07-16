@@ -291,10 +291,12 @@ function GlobalPlayerEngine({
     const audio = audioRef.current;
     const trackTitle =
       currentTrack?.title?.trim() || session.practiceTitle;
-    const artwork = session.coverImageUrl
+    const activeCoverUrl =
+      currentTrack?.coverImageUrl ?? session.coverImageUrl;
+    const artwork = activeCoverUrl
       ? [
           {
-            src: session.coverImageUrl,
+            src: activeCoverUrl,
             sizes: "512x512",
             type: "image/png",
           },
@@ -319,6 +321,7 @@ function GlobalPlayerEngine({
     currentTime,
     currentTrack?.id,
     currentTrack?.title,
+    currentTrack?.coverImageUrl,
     displayDuration,
     isPlaying,
     playbackRate,

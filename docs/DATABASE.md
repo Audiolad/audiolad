@@ -204,6 +204,44 @@ Reorder (PR4): атомарный swap соседних `playlist_items.position
 
 Public slug генерируется только сервером (транслит названия + короткий hex-suffix). При `private → public` сервер проверяет элементы по той же модели, что `claim_free_practice`: `status=published`, `is_catalog_listed IS TRUE`, `is_free IS TRUE`, `price` null или не `> 0`.
 
+## practices / audio_items — обложки (per-track covers)
+
+Миграция: `supabase/migrations/20260716180000_per_track_covers.sql`.  
+**На production пока не применялась.**
+
+### practices (дополнительно)
+
+| Колонка | Тип | Default | Назначение |
+|---------|-----|---------|------------|
+| `use_shared_cover` | boolean NOT NULL | `true` | При `true` плеер использует `cover_url` продукта для всех треков. При `false` допускается override через `audio_items.cover_url`. |
+| `cover_url` | text | — | Обязательная общая обложка продукта (public URL, bucket `practice-covers`). |
+
+### audio_items (дополнительно)
+
+| Колонка | Тип | Default | Назначение |
+|---------|-----|---------|------------|
+| `cover_url` | text NULL | — | Необязательная обложка трека. Используется только при `practices.use_shared_cover = false`. |
+
+### Storage paths (`practice-covers`, public)
+
+- Общая обложка: `practices/{practiceId}/cover.{jpg|png|webp}`
+- Обложка трека: `practices/{practiceId}/track-covers/{audioItemId}.{jpg|png|webp}`
+
+RLS: существующие политики author members на `practices/{practiceId}/...` — без новой Storage-миграции.
+
+### Fallback при воспроизведении
+
+1. Если `use_shared_cover = false` и у трека есть `cover_url` → обложка трека (cache-bust: `audio_items.updated_at`).
+2. Иначе → `practices.cover_url` (cache-bust: `practices.updated_at`).
+3. Иначе → gradient + symbol в UI.
+
+Каталог, карточки продукта и список содержания используют только `practices.cover_url`.
+
+### API
+
+- `POST/DELETE /api/author/products/[id]/audio/[audioId]/cover` — upload/delete обложки трека (только при `use_shared_cover = false`).
+- `PATCH /api/author/products/[id]` — поле `use_shared_cover`.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

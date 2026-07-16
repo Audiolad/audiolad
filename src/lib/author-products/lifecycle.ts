@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  removePracticeCoverFiles,
+  removeTrackCoverFiles,
+} from "@/lib/author-products/utils";
+
 export const STARTER_BUNDLE_BLOCKER_MESSAGE =
   "Этот продукт входит в стартовый набор для новых слушателей. Сначала замените или исключите его из стартового набора, после чего продукт можно будет снять с публикации или архивировать.";
 
@@ -204,13 +209,13 @@ export async function deletePracticeProduct(
     await supabase.storage.from("practice-audio").remove(audioPaths);
   }
 
-  if (practice.cover_url?.trim()) {
-    const coverPath = practice.cover_url.trim();
-
-    if (!coverPath.startsWith("http://") && !coverPath.startsWith("https://")) {
-      await supabase.storage.from("practice-covers").remove([coverPath]);
+  for (const item of audioItems ?? []) {
+    if (item.id) {
+      await removeTrackCoverFiles(supabase, practiceId, item.id);
     }
   }
+
+  await removePracticeCoverFiles(supabase, practiceId);
 
   const { data: deletedPractice, error: deleteError } = await supabase
     .from("practices")

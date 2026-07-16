@@ -27,6 +27,7 @@ export type AudioItemRow = {
   title: string;
   description: string | null;
   audio_path: string | null;
+  cover_url: string | null;
   duration_seconds: number | null;
   original_file_name: string | null;
   file_size_bytes: number | null;
@@ -49,6 +50,7 @@ export type PracticeRow = {
   price: number;
   is_free: boolean;
   cover_url: string | null;
+  use_shared_cover: boolean;
   audio_url: string | null;
   status: string;
   currency: string;

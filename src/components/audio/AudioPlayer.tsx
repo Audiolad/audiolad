@@ -219,9 +219,10 @@ export default function AudioPlayer({
   const isDismissedIdle =
     dismissedPracticeId === practiceId && !isEngineReady;
 
-  const [coverImageFailed, setCoverImageFailed] = useState(false);
+  const [coverImageFailedUrl, setCoverImageFailedUrl] = useState<string | null>(
+    null,
+  );
   const [restartingQueue, setRestartingQueue] = useState(false);
-  const showCoverImage = Boolean(coverImageUrl) && !coverImageFailed;
   const queueLabel =
     activeQueue && !queueCompleted
       ? `Плейлист: ${activeQueue.currentIndex + 1} из ${activeQueue.entries.length}`
@@ -258,6 +259,12 @@ export default function AudioPlayer({
   } = isEngineReady && engine
     ? engine
     : {};
+
+  const activeCoverUrl =
+    currentTrack?.coverImageUrl ?? coverImageUrl ?? null;
+
+  const showCoverImage =
+    Boolean(activeCoverUrl) && coverImageFailedUrl !== activeCoverUrl;
 
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
   const currentTrackTitle = currentTrack?.title?.trim() || practiceTitle;
@@ -307,10 +314,14 @@ export default function AudioPlayer({
           {showCoverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={coverImageUrl ?? undefined}
+              src={activeCoverUrl ?? undefined}
               alt=""
               className="absolute inset-0 h-full w-full object-cover"
-              onError={() => setCoverImageFailed(true)}
+              onError={() => {
+                if (activeCoverUrl) {
+                  setCoverImageFailedUrl(activeCoverUrl);
+                }
+              }}
             />
           ) : (
             <>

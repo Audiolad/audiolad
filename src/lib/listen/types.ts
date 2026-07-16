@@ -4,6 +4,7 @@ export type ListenTrack = {
   description: string | null;
   position: number;
   durationSeconds: number | null;
+  coverImageUrl: string | null;
 };
 
 export type ListenProgressEntry = {
