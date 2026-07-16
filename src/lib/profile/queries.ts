@@ -262,7 +262,7 @@ function buildCounters(
       key: "completed",
       value: formatCounterValue(completed.count, completed.error),
       label: "завершено",
-      href: null,
+      href: completed.error ? null : "/history?filter=completed",
     },
   ];
 }

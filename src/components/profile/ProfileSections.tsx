@@ -135,6 +135,16 @@ export function ProfileQuickLinks() {
           </span>
           <span className="mt-2 text-[11px] leading-4">Плейлисты</span>
         </Link>
+
+        <Link
+          href="/history"
+          className="col-span-2 flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          <span className="text-2xl text-[#7042c5]" aria-hidden="true">
+            ◷
+          </span>
+          <span className="mt-2 text-[11px] leading-4">История</span>
+        </Link>
       </div>
     </section>
   );
