@@ -1,54 +1,45 @@
 "use client";
 
-import { useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 
 import {
-  getPersonalGreetingAtIndex,
-  getPersonalHomeVisitContentFromStorage,
-  getPersonalHomeWisdomAtIndex,
-} from "@/lib/home/personal-greeting";
+  createDailyGreetingFallback,
+  readDailyGreetingVisitContent,
+  shouldUpdateDailyGreetingContent,
+  type DailyGreetingContent,
+} from "@/lib/home/daily-greeting-display";
 
 type DailyGreetingProps = {
   firstName: string | null;
 };
 
-type DailyGreetingContent = {
-  greetingTitle: string;
-  wisdomPhrase: string;
-};
-
-function createFallbackContent(firstName: string | null): DailyGreetingContent {
-  return {
-    greetingTitle: getPersonalGreetingAtIndex(0, firstName),
-    wisdomPhrase: getPersonalHomeWisdomAtIndex(0),
-  };
-}
-
-function readVisitContent(firstName: string | null): DailyGreetingContent {
-  const visit = getPersonalHomeVisitContentFromStorage(
-    window.localStorage,
-    firstName,
-  );
-
-  return {
-    greetingTitle: visit.greetingTitle,
-    wisdomPhrase: visit.wisdomPhrase,
-  };
-}
-
 function usePersonalHomeVisitContent(
   firstName: string | null,
 ): DailyGreetingContent {
   const serverSnapshot = useMemo(
-    () => createFallbackContent(firstName),
+    () => createDailyGreetingFallback(firstName),
     [firstName],
   );
   const clientSnapshotRef = useRef(serverSnapshot);
 
-  return useSyncExternalStore(
-    (onStoreChange) => {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
       queueMicrotask(() => {
-        clientSnapshotRef.current = readVisitContent(firstName);
+        let next: DailyGreetingContent;
+
+        try {
+          next = readDailyGreetingVisitContent(firstName);
+        } catch {
+          return;
+        }
+
+        if (
+          !shouldUpdateDailyGreetingContent(clientSnapshotRef.current, next)
+        ) {
+          return;
+        }
+
+        clientSnapshotRef.current = next;
         onStoreChange();
       });
 
@@ -56,9 +47,16 @@ function usePersonalHomeVisitContent(
         clientSnapshotRef.current = serverSnapshot;
       };
     },
-    () => clientSnapshotRef.current,
-    () => serverSnapshot,
+    [firstName, serverSnapshot],
   );
+
+  const getSnapshot = useCallback(() => clientSnapshotRef.current, []);
+  const getServerSnapshot = useCallback(
+    () => serverSnapshot,
+    [serverSnapshot],
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
 export default function DailyGreeting({ firstName }: DailyGreetingProps) {
