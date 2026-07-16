@@ -75,21 +75,12 @@ export async function submitAuthorApplication(
     );
   }
 
-  const payloadValues = {
-    displayName: values.displayName,
-    direction: values.direction,
-    about: values.about,
-    plannedContent: values.plannedContent,
-    links: values.links || null,
-    contact: values.contact || null,
-    hasReadyMaterials: values.hasReadyMaterials,
-    consentPersonalData: values.consentPersonalData,
-  };
+  const payloadValues = values;
 
   if (existing && isEditableAuthorApplicationStatus(existing.status)) {
     const { error } = await supabase
       .from("author_applications")
-      .update(mapApplicationUpdatePayload(payloadValues, "submitted"))
+      .update(mapApplicationUpdatePayload(payloadValues, existing, "submitted"))
       .eq("id", existing.id)
       .eq("user_id", user.id);
 

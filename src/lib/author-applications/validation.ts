@@ -11,11 +11,16 @@ export const AUTHOR_APPLICATION_LIMITS = {
   directionMax: 200,
   aboutMin: 20,
   aboutMax: 3000,
-  plannedContentMin: 20,
-  plannedContentMax: 3000,
-  linksMax: 2000,
+  contactMin: 1,
   contactMax: 300,
 } as const;
+
+/** Used when the simplified form no longer collects planned content. */
+export const AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT =
+  "Подробности о планируемых материалах будут уточнены при рассмотрении заявки.";
+
+export const AUTHOR_APPLICATION_READINESS_ERROR =
+  "Выберите, есть ли у вас готовые материалы или вы хотите обучиться их созданию.";
 
 function trimValue(value: FormDataEntryValue | null | undefined): string {
   return String(value ?? "").trim();
@@ -28,10 +33,9 @@ export function normalizeAuthorApplicationFormValues(
     displayName: trimValue(formData.get("displayName")),
     direction: trimValue(formData.get("direction")),
     about: trimValue(formData.get("about")),
-    plannedContent: trimValue(formData.get("plannedContent")),
-    links: trimValue(formData.get("links")),
     contact: trimValue(formData.get("contact")),
     hasReadyMaterials: formData.get("hasReadyMaterials") === "on",
+    wantsTraining: formData.get("wantsTraining") === "on",
     consentPersonalData: formData.get("consentPersonalData") === "on",
   };
 }
@@ -65,18 +69,17 @@ export function validateAuthorApplicationFormValues(
   }
 
   if (
-    values.plannedContent.length < AUTHOR_APPLICATION_LIMITS.plannedContentMin ||
-    values.plannedContent.length > AUTHOR_APPLICATION_LIMITS.plannedContentMax
+    values.contact.length < AUTHOR_APPLICATION_LIMITS.contactMin ||
+    values.contact.length > AUTHOR_APPLICATION_LIMITS.contactMax
   ) {
-    errors.plannedContent = `Опишите планируемые материалы (${AUTHOR_APPLICATION_LIMITS.plannedContentMin}–${AUTHOR_APPLICATION_LIMITS.plannedContentMax} символов).`;
+    errors.contact =
+      values.contact.length === 0
+        ? "Укажите телефон, MAX или другой способ связи."
+        : `Контакт слишком длинный (до ${AUTHOR_APPLICATION_LIMITS.contactMax} символов).`;
   }
 
-  if (values.links.length > AUTHOR_APPLICATION_LIMITS.linksMax) {
-    errors.links = `Ссылки слишком длинные (до ${AUTHOR_APPLICATION_LIMITS.linksMax} символов).`;
-  }
-
-  if (values.contact.length > AUTHOR_APPLICATION_LIMITS.contactMax) {
-    errors.contact = `Контакт слишком длинный (до ${AUTHOR_APPLICATION_LIMITS.contactMax} символов).`;
+  if (!values.hasReadyMaterials && !values.wantsTraining) {
+    errors.readiness = AUTHOR_APPLICATION_READINESS_ERROR;
   }
 
   if (requireConsent && !values.consentPersonalData) {
@@ -99,22 +102,20 @@ export function rowToFormValues(
     | "display_name"
     | "direction"
     | "about"
-    | "planned_content"
-    | "links"
     | "contact"
     | "has_ready_materials"
     | "consent_personal_data"
-  >,
+  > & {
+    wants_training?: boolean;
+  },
 ): AuthorApplicationFormValues {
   return {
     displayName: row.display_name,
     direction: row.direction,
     about: row.about,
-    plannedContent: row.planned_content,
-    links: row.links ?? "",
     contact: row.contact ?? "",
     hasReadyMaterials: row.has_ready_materials,
+    wantsTraining: row.wants_training ?? false,
     consentPersonalData: row.consent_personal_data,
   };
 }
-

@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
+  AuthorApplicationFormValues,
   AuthorApplicationRow,
   AuthorApplicationStatus,
   BecomeAuthorPageView,
 } from "./types";
+import { AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT } from "./validation";
 import { resolveBecomeAuthorAudience } from "./status";
 
 export async function getCurrentAuthorApplication(
@@ -26,6 +28,7 @@ export async function getCurrentAuthorApplication(
       planned_content,
       links,
       has_ready_materials,
+      wants_training,
       consent_personal_data,
       submitted_at,
       reviewed_at,
@@ -74,18 +77,24 @@ export async function getBecomeAuthorPageView(
   };
 }
 
+function resolvePlannedContentForSubmit(
+  existing: AuthorApplicationRow | null,
+): string {
+  const existingContent = existing?.planned_content?.trim() ?? "";
+  if (existingContent.length >= 20) {
+    return existingContent;
+  }
+
+  return AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT;
+}
+
+function resolveLinksForSubmit(existing: AuthorApplicationRow | null): string | null {
+  return existing?.links?.trim() ? existing.links : null;
+}
+
 export function mapApplicationInsertPayload(
   userId: string,
-  values: {
-    displayName: string;
-    direction: string;
-    about: string;
-    plannedContent: string;
-    links: string | null;
-    contact: string | null;
-    hasReadyMaterials: boolean;
-    consentPersonalData: boolean;
-  },
+  values: AuthorApplicationFormValues,
   status: Extract<AuthorApplicationStatus, "draft" | "submitted">,
 ) {
   return {
@@ -95,26 +104,19 @@ export function mapApplicationInsertPayload(
     direction: values.direction,
     about: values.about,
     experience: null,
-    planned_content: values.plannedContent,
-    links: values.links,
+    planned_content: AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT,
+    links: null,
     contact: values.contact,
     has_ready_materials: values.hasReadyMaterials,
+    wants_training: values.wantsTraining,
     consent_personal_data: values.consentPersonalData,
     submitted_at: status === "submitted" ? new Date().toISOString() : null,
   };
 }
 
 export function mapApplicationUpdatePayload(
-  values: {
-    displayName: string;
-    direction: string;
-    about: string;
-    plannedContent: string;
-    links: string | null;
-    contact: string | null;
-    hasReadyMaterials: boolean;
-    consentPersonalData: boolean;
-  },
+  values: AuthorApplicationFormValues,
+  existing: AuthorApplicationRow | null,
   status?: Extract<AuthorApplicationStatus, "draft" | "submitted">,
 ) {
   return {
@@ -122,10 +124,11 @@ export function mapApplicationUpdatePayload(
     direction: values.direction,
     about: values.about,
     experience: null,
-    planned_content: values.plannedContent,
-    links: values.links,
+    planned_content: resolvePlannedContentForSubmit(existing),
+    links: resolveLinksForSubmit(existing),
     contact: values.contact,
     has_ready_materials: values.hasReadyMaterials,
+    wants_training: values.wantsTraining,
     consent_personal_data: values.consentPersonalData,
     ...(status
       ? {

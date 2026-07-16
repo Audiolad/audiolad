@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { becomeAuthorBodyClass } from "@/components/become-author/typography";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import type { BecomeAuthorAudience } from "@/lib/author-applications/types";
 
@@ -70,12 +71,12 @@ export function BecomeAuthorHero() {
         Стать автором АудиоЛада
       </h2>
 
-      <p className="mt-3 text-sm leading-6 text-[#796ba0] lg:text-[15px]">
+      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
         Создавайте аудиопрактики и программы, находите слушателей и развивайте
         своё авторское направление.
       </p>
 
-      <p className="mt-3 text-sm leading-6 text-[#796ba0] lg:text-[15px]">
+      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
         АудиоЛад помогает авторам публиковать материалы живым голосом,
         оформлять продукты, собирать аудиторию и подключать продажи.
       </p>
@@ -91,7 +92,7 @@ export function BecomeAuthorInfoSections() {
           Кому подходит
         </h2>
 
-        <div className="mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 text-sm leading-6 text-[#796ba0]">
+        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
           <p>Авторство подойдёт вам, если вы:</p>
           <ul className="mt-3 list-disc space-y-2 pl-5">
             <li>создаёте медитации и аудиопрактики;</li>
@@ -116,7 +117,7 @@ export function BecomeAuthorInfoSections() {
           Что можно размещать
         </h2>
 
-        <div className="mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 text-sm leading-6 text-[#796ba0]">
+        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
           <ul className="list-disc space-y-2 pl-5">
             <li>одиночные аудиопрактики;</li>
             <li>программы из нескольких аудио;</li>
@@ -138,7 +139,7 @@ export function BecomeAuthorInfoSections() {
           Что получает автор
         </h2>
 
-        <div className="mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 text-sm leading-6 text-[#796ba0]">
+        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
           <ul className="list-disc space-y-2 pl-5">
             <li>страницу автора и авторский кабинет;</li>
             <li>публикацию бесплатных и платных продуктов;</li>
@@ -165,7 +166,7 @@ export function BecomeAuthorInfoSections() {
             },
             {
               title: "Подать заявку",
-              text: "Расскажите о себе, своём опыте, направлении и материалах, которые планируете размещать.",
+              text: "Расскажите о себе, своём опыте и направлении — это займёт несколько минут.",
             },
             {
               title: "Подготовить профиль и бесплатные материалы",
@@ -191,7 +192,7 @@ export function BecomeAuthorInfoSections() {
               <p className="text-sm font-medium text-[#7042c5]">
                 Шаг {index + 1}. {step.title}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[#796ba0]">{step.text}</p>
+              <p className={`mt-2 ${becomeAuthorBodyClass}`}>{step.text}</p>
             </li>
           ))}
         </ol>
@@ -205,7 +206,7 @@ export function BecomeAuthorInfoSections() {
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <article className="rounded-[22px] border border-[#eadff8] bg-white p-5">
             <h3 className="text-[17px] font-semibold">Бесплатные публикации</h3>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[#796ba0]">
+            <ul className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}>
               <li>оформить авторский профиль;</li>
               <li>размещать согласованные бесплатные материалы;</li>
               <li>знакомить слушателей со своим подходом;</li>
@@ -215,7 +216,7 @@ export function BecomeAuthorInfoSections() {
 
           <article className="rounded-[22px] border border-[#eadff8] bg-white p-5">
             <h3 className="text-[17px] font-semibold">Коммерческий автор</h3>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[#796ba0]">
+            <ul className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}>
               <li>размещать платные продукты;</li>
               <li>получать выплаты;</li>
               <li>видеть коммерческую статистику;</li>
@@ -232,12 +233,12 @@ export function BecomeAuthorInfoSections() {
         <h2 id="become-author-training-heading" className="text-[17px] font-semibold">
           Нужна помощь с созданием аудиопрактик?
         </h2>
-        <p className="mt-3 text-sm leading-6 text-[#796ba0]">
+        <p className={`mt-3 ${becomeAuthorBodyClass}`}>
           Мы развиваем отдельное обучение для авторов: от выбора темы и
           подготовки сценария до записи, оформления и монетизации
           аудиопродуктов.
         </p>
-        <p className="mt-3 text-sm text-[#9485b4]">
+        <p className="mt-3 text-[15px] leading-snug text-[#9485b4]">
           Информация о первых программах появится позже.
         </p>
       </section>

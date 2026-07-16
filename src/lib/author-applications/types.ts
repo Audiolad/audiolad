@@ -22,6 +22,7 @@ export type AuthorApplicationRow = {
   planned_content: string;
   links: string | null;
   has_ready_materials: boolean;
+  wants_training: boolean;
   consent_personal_data: boolean;
   submitted_at: string | null;
   reviewed_at: string | null;
@@ -35,16 +36,16 @@ export type AuthorApplicationFormValues = {
   displayName: string;
   direction: string;
   about: string;
-  plannedContent: string;
-  links: string;
   contact: string;
   hasReadyMaterials: boolean;
+  wantsTraining: boolean;
   consentPersonalData: boolean;
 };
 
 export type AuthorApplicationFieldErrors = Partial<
   Record<
     | keyof AuthorApplicationFormValues
+    | "readiness"
     | "form"
     | "auth"
     | "conflict"

@@ -15,10 +15,9 @@ const EMPTY_FORM_VALUES = {
   displayName: "",
   direction: "",
   about: "",
-  plannedContent: "",
-  links: "",
   contact: "",
   hasReadyMaterials: false,
+  wantsTraining: false,
   consentPersonalData: false,
 };
 
