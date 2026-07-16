@@ -28,8 +28,14 @@ type MosaicItemRow = {
 
 export async function listOwnedPlaylists(
   supabase: SupabaseClient,
-  options?: { userId?: string },
+  options: { userId: string },
 ): Promise<{ playlists: PlaylistListItem[]; error: string | null }> {
+  const userId = options.userId.trim();
+
+  if (!userId) {
+    return { playlists: [], error: "playlist_list_user_required" };
+  }
+
   const { data, error } = await supabase
     .from("playlists")
     .select(
@@ -46,6 +52,7 @@ export async function listOwnedPlaylists(
       playlist_items(count)
     `,
     )
+    .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -91,7 +98,7 @@ export async function listOwnedPlaylists(
       signedByPath = await createPlaylistCoverSignedUrlsBatch(
         storage,
         coverPaths,
-        { userId: options?.userId },
+        { userId },
       );
     } catch (signedError) {
       console.error(
