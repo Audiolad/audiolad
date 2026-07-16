@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  assertPlaylistCoverPathForOwner,
+  removePlaylistCoverObject,
+} from "@/lib/playlists/covers";
 import { PUBLIC_PLAYLIST_CONTENT_ERROR_MESSAGE } from "@/lib/playlists/public-content";
 import {
   assertPlaylistPublicContentAllowed,
@@ -13,6 +17,7 @@ import {
   parsePatchPlaylistBody,
 } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -153,7 +158,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(updates)
     .eq("id", id)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
     )
     .maybeSingle();
 
@@ -212,11 +217,50 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
+  const coverPathToRemove = playlist.cover_path;
+
+  if (
+    coverPathToRemove &&
+    !assertPlaylistCoverPathForOwner(coverPathToRemove, user.id, id)
+  ) {
+    console.error("playlist_delete_invalid_cover_path");
+    // Still allow playlist delete; skip unsafe storage cleanup.
+  }
+
   const { error } = await supabase.from("playlists").delete().eq("id", id);
 
   if (error) {
     console.error("playlists_delete_error", error.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (
+    coverPathToRemove &&
+    assertPlaylistCoverPathForOwner(coverPathToRemove, user.id, id)
+  ) {
+    try {
+      const storage = createServiceRoleClient();
+      const removed = await removePlaylistCoverObject(
+        storage,
+        coverPathToRemove,
+        user.id,
+        id,
+      );
+
+      if (!removed.ok) {
+        console.error(
+          "playlist_delete_cover_cleanup_error",
+          removed.error,
+        );
+      }
+    } catch (cleanupError) {
+      console.error(
+        "playlist_delete_cover_cleanup_exception",
+        cleanupError instanceof Error
+          ? cleanupError.message
+          : cleanupError,
+      );
+    }
   }
 
   return new NextResponse(null, { status: 204 });

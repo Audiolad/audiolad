@@ -109,6 +109,8 @@ values (new.id, new.email, 'listener');
 | `slug` | text NULL | `private` → всегда NULL; `public` → непустой; UNIQUE среди NOT NULL |
 | `published_at` | timestamptz NULL | `private` → всегда NULL; `public` → NULL или timestamp до/после publish |
 | `created_at` / `updated_at` | timestamptz NOT NULL | DEFAULT `now()` (общей trigger-функции в проекте нет) |
+| `cover_path` | text NULL | PR3.3: storage path в private bucket `playlist-covers`; NULL = automatic mosaic |
+| `cover_updated_at` | timestamptz NULL | PR3.3: время последней загрузки/замены custom cover |
 
 CHECK согласованности:
 
@@ -153,6 +155,16 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - владелец: `/playlists`, `/playlists/[id]` (PR3.2 на production: просмотр + delete item; без reorder);
 - публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
+
+### Covers (PR3.3)
+
+- Поля: `cover_path`, `cover_updated_at` (nullable).
+- Private bucket `playlist-covers` (JPEG/PNG/WebP, max 5 MB); path `{user_id}/{playlist_id}/{uuid}.webp`.
+- Нет browser Storage policies — upload/delete/signed URL только через server API после ownership.
+- CAS RPC `replace_playlist_cover_path(uuid, text, text)` (SECURITY DEFINER, `FOR UPDATE`).
+- Mosaic RPC `get_owned_playlist_mosaic_covers()` (SECURITY DEFINER, owner-only).
+- Custom cover приоритетнее automatic mosaic (0/1/2/3/4+ на UI).
+- Удаление плейлиста очищает storage object после успешного DELETE строки.
 
 ### Мутации
 

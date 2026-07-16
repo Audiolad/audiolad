@@ -85,8 +85,9 @@ Timeweb Cloud
 - Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
 - `/playlists/new` → redirect `/playlists`.
 - PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`): `/playlists/[id]` — items по `position`, listen через существующий route, `DELETE /api/playlists/[id]/items/[practiceId]`; недоступные items остаются видимыми.
+- PR3.3: custom cover (`cover_path` + private `playlist-covers` + signed URL, sharp → 1200×1200 WebP, CAS `replace_playlist_cover_path`) и automatic mosaic 0/1/2/3/4+; `POST/DELETE /api/playlists/[id]/cover`; cleanup при удалении плейлиста; mosaic RPC без N+1.
 - Reorder и Play All — ещё не реализованы.
-- Следующий этап после PR3.2: custom и automatic covers (PR3.3).
+- `/p/[slug]` ещё отсутствует.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 

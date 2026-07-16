@@ -15,10 +15,14 @@ export type PlaylistRow = {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  cover_path: string | null;
+  cover_updated_at: string | null;
 };
 
 export type PlaylistListItem = PlaylistRow & {
   items_count: number;
+  coverUrl: string | null;
+  mosaicCoverUrls: Array<string | null>;
 };
 
 export type PlaylistMembershipReason =

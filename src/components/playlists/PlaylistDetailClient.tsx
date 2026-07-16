@@ -1,11 +1,19 @@
 "use client";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import PlaylistCover from "@/components/playlists/PlaylistCover";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
 import type { PlaylistVisibility } from "@/lib/playlists/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+} from "react";
 
 type PlaylistDetailClientProps = {
   detail: PlaylistDetailView;
@@ -54,28 +62,48 @@ function coverGradientForId(id: string): string {
   return gradients[hash] ?? gradients[0];
 }
 
+const COVER_ACCEPT = "image/jpeg,image/png,image/webp";
+const COVER_MAX_BYTES = 5 * 1024 * 1024;
+
 export default function PlaylistDetailClient({
   detail,
 }: PlaylistDetailClientProps) {
   const router = useRouter();
   const [items, setItems] = useState(detail.items);
+  const [coverUrl, setCoverUrl] = useState(detail.coverUrl);
+  const [hasCustomCover, setHasCustomCover] = useState(
+    Boolean(detail.coverUrl || detail.playlist.cover_path),
+  );
   const [menuId, setMenuId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{
     practiceId: string;
     title: string;
   } | null>(null);
+  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+  const [coverMode, setCoverMode] = useState<"upload" | "replace" | "clear">(
+    "upload",
+  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const coverTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const coverDialogRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dialogTitleId = useId();
+  const coverDialogTitleId = useId();
 
   const itemsCount = items.length;
   const hasUnavailable = items.some((item) => !item.available);
+  const mosaicCoverUrls = items
+    .slice(0, 4)
+    .map((item) => item.coverDisplayUrl);
 
   useEffect(() => {
-    if (!menuId && !pendingDelete) {
+    if (!menuId && !pendingDelete && !coverDialogOpen) {
       return;
     }
 
@@ -85,6 +113,14 @@ export default function PlaylistDetailClient({
         if (!submitting) {
           setPendingDelete(null);
           setFormError(null);
+          if (!submitting) {
+            setCoverDialogOpen(false);
+            setSelectedFile(null);
+            setCoverMode("upload");
+            if (fileInputRef.current) {
+              fileInputRef.current.value = "";
+            }
+          }
         }
       }
     }
@@ -106,7 +142,7 @@ export default function PlaylistDetailClient({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("touchstart", onPointerDown);
     };
-  }, [menuId, pendingDelete, submitting]);
+  }, [menuId, pendingDelete, coverDialogOpen, submitting]);
 
   useEffect(() => {
     if (!toast) {
@@ -116,6 +152,190 @@ export default function PlaylistDetailClient({
     const timer = window.setTimeout(() => setToast(null), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!coverDialogOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const trigger = coverTriggerRef.current;
+
+    const focusables = coverDialogRef.current?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusables?.[0]?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      trigger?.focus();
+    };
+  }, [coverDialogOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  function closeCoverDialog() {
+    if (submitting) {
+      return;
+    }
+
+    setCoverDialogOpen(false);
+    setSelectedFile(null);
+    setFormError(null);
+    setCoverMode("upload");
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function openCoverDialog() {
+    setFormError(null);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setCoverMode(hasCustomCover ? "replace" : "upload");
+    setCoverDialogOpen(true);
+  }
+
+  function onFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setFormError(null);
+
+    if (!file) {
+      setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      return;
+    }
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowed.includes(file.type)) {
+      setFormError("Можно загрузить изображение JPG, PNG или WebP.");
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > COVER_MAX_BYTES) {
+      setFormError("Размер изображения не должен превышать 5 МБ.");
+      setSelectedFile(null);
+      return;
+    }
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function saveCover() {
+    if (!selectedFile || submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const body = new FormData();
+      body.append("file", selectedFile);
+
+      const response = await fetch(
+        `/api/playlists/${detail.playlist.id}/cover`,
+        {
+          method: "POST",
+          body,
+          credentials: "same-origin",
+        },
+      );
+
+      const data = (await response.json().catch(() => ({}))) as {
+        coverUrl?: string | null;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        setFormError(
+          data.message ||
+            "Не удалось сохранить обложку. Попробуйте ещё раз.",
+        );
+        return;
+      }
+
+      setCoverUrl(data.coverUrl ?? null);
+      setHasCustomCover(true);
+      setCoverDialogOpen(false);
+      setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setToast("Обложка сохранена.");
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setFormError("Не удалось сохранить обложку. Попробуйте ещё раз.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function clearCustomCover() {
+    if (submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const response = await fetch(
+        `/api/playlists/${detail.playlist.id}/cover`,
+        {
+          method: "DELETE",
+          credentials: "same-origin",
+        },
+      );
+
+      if (!response.ok && response.status !== 204) {
+        setFormError(
+          "Не удалось вернуть автоматическую обложку. Попробуйте ещё раз.",
+        );
+        return;
+      }
+
+      setCoverUrl(null);
+      setHasCustomCover(false);
+      setCoverDialogOpen(false);
+      setToast("Возвращена автоматическая обложка.");
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setFormError(
+        "Не удалось вернуть автоматическую обложку. Попробуйте ещё раз.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function confirmDelete() {
     if (!pendingDelete || submitting) {
@@ -162,22 +382,14 @@ export default function PlaylistDetailClient({
       </Link>
 
       <header className="mt-5 flex gap-4">
-        <div className="h-[112px] w-[112px] shrink-0 overflow-hidden rounded-[22px]">
-          {detail.coverDisplayUrl ? (
-            <ProductCoverThumbnail
-              slug={detail.playlist.id}
-              title={detail.playlist.title}
-              coverUrl={detail.coverDisplayUrl}
-              className="h-full w-full rounded-[22px]"
-            />
-          ) : (
-            <div
-              className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${coverGradientForId(detail.playlist.id)} text-3xl text-white`}
-              aria-hidden
-            >
-              ♫
-            </div>
-          )}
+        <div className="relative h-[112px] w-[112px] shrink-0">
+          <PlaylistCover
+            title={detail.playlist.title}
+            customCoverUrl={coverUrl}
+            mosaicCoverUrls={mosaicCoverUrls}
+            gradientClassName={`bg-gradient-to-br ${coverGradientForId(detail.playlist.id)}`}
+            className="h-full w-full rounded-[22px]"
+          />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -193,6 +405,14 @@ export default function PlaylistDetailClient({
               ? ` · ${detail.totalDurationLabel}`
               : ""}
           </p>
+          <button
+            ref={coverTriggerRef}
+            type="button"
+            className="mt-3 text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            onClick={openCoverDialog}
+          >
+            Изменить обложку
+          </button>
         </div>
       </header>
 
@@ -325,6 +545,115 @@ export default function PlaylistDetailClient({
           ))}
         </section>
       )}
+
+      {coverDialogOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0 pb-[env(safe-area-inset-bottom)] sm:items-center sm:px-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !submitting) {
+              closeCoverDialog();
+            }
+          }}
+        >
+          <div
+            ref={coverDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={coverDialogTitleId}
+            className="w-full max-w-[430px] rounded-t-[28px] border border-[#eadff8] bg-white p-5 shadow-[0_-12px_40px_rgba(91,62,145,0.18)] sm:rounded-[28px]"
+          >
+            <h2 id={coverDialogTitleId} className="text-[20px] font-semibold">
+              {hasCustomCover ? "Изменить обложку" : "Загрузить обложку"}
+            </h2>
+            <p className="mt-2 text-sm text-[#7d70a2]">
+              JPG, PNG или WebP, до 5 МБ
+            </p>
+
+            <div className="mt-4 flex gap-4">
+              <div className="h-28 w-28 overflow-hidden rounded-[20px] border border-[#eadff8]">
+                {previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl}
+                    alt="Предпросмотр обложки"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <PlaylistCover
+                    title={detail.playlist.title}
+                    customCoverUrl={coverUrl}
+                    mosaicCoverUrls={mosaicCoverUrls}
+                    gradientClassName={`bg-gradient-to-br ${coverGradientForId(detail.playlist.id)}`}
+                    className="h-full w-full"
+                  />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={COVER_ACCEPT}
+                  className="sr-only"
+                  id="playlist-cover-file"
+                  onChange={onFileChange}
+                />
+                <label
+                  htmlFor="playlist-cover-file"
+                  className="inline-flex cursor-pointer rounded-full border border-[#ddcfef] px-4 py-2 text-sm font-medium text-[#7042c5]"
+                >
+                  {hasCustomCover
+                    ? "Заменить изображение"
+                    : "Загрузить изображение"}
+                </label>
+                {selectedFile ? (
+                  <p className="mt-2 truncate text-xs text-[#7d70a2]">
+                    {selectedFile.name}
+                  </p>
+                ) : null}
+                {hasCustomCover ? (
+                  <button
+                    type="button"
+                    className="mt-3 block text-sm text-[#b34f63]"
+                    disabled={submitting}
+                    onClick={() => {
+                      setCoverMode("clear");
+                      void clearCustomCover();
+                    }}
+                  >
+                    Вернуть автоматическую обложку
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {formError ? (
+              <p className="mt-3 text-sm text-[#b34f63]" role="alert">
+                {formError}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                className="flex-1 rounded-full border border-[#ddcfef] px-4 py-3 text-sm"
+                disabled={submitting}
+                onClick={closeCoverDialog}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-full bg-[#7042c5] px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
+                disabled={submitting || !selectedFile || coverMode === "clear"}
+                onClick={() => void saveCover()}
+              >
+                {submitting ? "Сохранение…" : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pendingDelete ? (
         <div

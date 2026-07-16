@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  createPlaylistCoverSignedUrlsBatch,
+} from "@/lib/playlists/covers";
+import {
   arePracticesEligibleForPublicPlaylist,
   type PlaylistPublishPractice,
 } from "@/lib/playlists/public-content";
 import type { PlaylistListItem, PlaylistRow } from "@/lib/playlists/types";
+import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type PlaylistCountEmbed = {
   count: number;
@@ -14,8 +19,16 @@ type PlaylistListRow = PlaylistRow & {
   playlist_items?: PlaylistCountEmbed | null;
 };
 
+type MosaicItemRow = {
+  playlist_id: string;
+  item_position: number;
+  cover_url: string | null;
+  practice_updated_at: string | null;
+};
+
 export async function listOwnedPlaylists(
   supabase: SupabaseClient,
+  options?: { userId?: string },
 ): Promise<{ playlists: PlaylistListItem[]; error: string | null }> {
   const { data, error } = await supabase
     .from("playlists")
@@ -28,6 +41,8 @@ export async function listOwnedPlaylists(
       published_at,
       created_at,
       updated_at,
+      cover_path,
+      cover_updated_at,
       playlist_items(count)
     `,
     )
@@ -38,7 +53,55 @@ export async function listOwnedPlaylists(
     return { playlists: [], error: error.message };
   }
 
-  const playlists = ((data as PlaylistListRow[] | null) ?? []).map((row) => ({
+  const rows = (data as PlaylistListRow[] | null) ?? [];
+  const mosaicByPlaylist = new Map<string, Array<string | null>>();
+
+  if (rows.length > 0) {
+    const { data: mosaicRows, error: mosaicError } = await supabase.rpc(
+      "get_owned_playlist_mosaic_covers",
+    );
+
+    if (mosaicError) {
+      return { playlists: [], error: mosaicError.message };
+    }
+
+    for (const row of (mosaicRows as MosaicItemRow[] | null) ?? []) {
+      const current = mosaicByPlaylist.get(row.playlist_id) ?? [];
+
+      if (current.length >= 4) {
+        continue;
+      }
+
+      current.push(
+        getProductCoverDisplayUrl(row.cover_url, row.practice_updated_at),
+      );
+      mosaicByPlaylist.set(row.playlist_id, current);
+    }
+  }
+
+  const coverPaths = rows
+    .map((row) => row.cover_path)
+    .filter((path): path is string => typeof path === "string" && path.length > 0);
+
+  let signedByPath = new Map<string, string | null>();
+
+  if (coverPaths.length > 0) {
+    try {
+      const storage = createServiceRoleClient();
+      signedByPath = await createPlaylistCoverSignedUrlsBatch(
+        storage,
+        coverPaths,
+        { userId: options?.userId },
+      );
+    } catch (signedError) {
+      console.error(
+        "playlist_list_cover_signed_batch_error",
+        signedError instanceof Error ? signedError.message : signedError,
+      );
+    }
+  }
+
+  const playlists = rows.map((row) => ({
     id: row.id,
     title: row.title,
     visibility: row.visibility,
@@ -46,7 +109,13 @@ export async function listOwnedPlaylists(
     published_at: row.published_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    cover_path: row.cover_path ?? null,
+    cover_updated_at: row.cover_updated_at ?? null,
     items_count: row.playlist_items?.[0]?.count ?? 0,
+    coverUrl: row.cover_path
+      ? (signedByPath.get(row.cover_path) ?? null)
+      : null,
+    mosaicCoverUrls: mosaicByPlaylist.get(row.id) ?? [],
   }));
 
   return { playlists, error: null };
@@ -73,7 +142,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
     )
     .eq("id", playlistId)
     .maybeSingle();
@@ -82,7 +151,20 @@ export async function getOwnedPlaylistById(
     return { playlist: null, error: error.message };
   }
 
-  return { playlist: (data as PlaylistRow | null) ?? null, error: null };
+  if (!data) {
+    return { playlist: null, error: null };
+  }
+
+  const row = data as PlaylistRow;
+
+  return {
+    playlist: {
+      ...row,
+      cover_path: row.cover_path ?? null,
+      cover_updated_at: row.cover_updated_at ?? null,
+    },
+    error: null,
+  };
 }
 
 export async function playlistSlugExists(

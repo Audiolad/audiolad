@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     .from("playlists")
     .insert(insertPayload)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
     )
     .single();
 

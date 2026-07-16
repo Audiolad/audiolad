@@ -4,6 +4,18 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR3.3 covers — commit pending deploy)
+
+**Сделано (до deploy):**
+
+- Security review: mosaic RPC → SECURITY DEFINER; CAS `replace_playlist_cover_path`; убран browser Storage SELECT; path validation; sharp limits.
+- Migrations: `20260716120000_playlist_covers.sql`, `20260716121000_playlist_cover_path_cas.sql`.
+- Test smokes PASS на `audiolad_playlists_pr3_test` + `playlist-covers-test`.
+
+**Следующий шаг после commit:** backup → production migration/bucket → deploy → smoke.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR3.2 production deploy)
 
 **Сделано:**

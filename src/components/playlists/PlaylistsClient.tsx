@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import PlaylistCover from "@/components/playlists/PlaylistCover";
 import {
   PLAYLIST_MAX_PER_USER,
   PLAYLIST_TITLE_MAX_LENGTH,
@@ -406,10 +407,16 @@ export default function PlaylistsClient({
                 <div className="flex gap-4">
                   <Link
                     href={`/playlists/${playlist.id}`}
-                    className={`flex h-[118px] w-[118px] shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br ${coverGradientForId(playlist.id)} text-4xl text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]`}
+                    className="block h-[118px] w-[118px] shrink-0 overflow-hidden rounded-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                     aria-label={`Открыть плейлист ${playlist.title}`}
                   >
-                    ♫
+                    <PlaylistCover
+                      title={playlist.title}
+                      customCoverUrl={playlist.coverUrl}
+                      mosaicCoverUrls={playlist.mosaicCoverUrls}
+                      gradientClassName={`bg-gradient-to-br ${coverGradientForId(playlist.id)}`}
+                      className="h-full w-full rounded-[22px]"
+                    />
                   </Link>
 
                   <div className="relative flex min-w-0 flex-1 flex-col">

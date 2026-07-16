@@ -18,7 +18,9 @@ export default async function PlaylistsPage() {
     redirect("/auth/sign-in");
   }
 
-  const { playlists, error } = await listOwnedPlaylists(supabase);
+  const { playlists, error } = await listOwnedPlaylists(supabase, {
+    userId: user.id,
+  });
 
   if (error) {
     console.error("playlists_page_load_error", error);

@@ -90,16 +90,15 @@
 
 ## Плейлисты (состояние на 2026-07-16)
 
-- PR1–PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`; previous `20260715-204408-24616e7`).
-- `/playlists/[id]`: items по `position`; listen через существующий route; удаление item без entitlement; недоступные остаются видимыми.
-- Карточки на `/playlists` ведут на `/playlists/[id]`; меню `···` не навигирует.
-- Reorder, Play All, covers и `/p/[slug]` ещё не реализованы.
+- PR1–PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`).
+- PR3.3 (covers) закоммичен; migration/bucket/deploy — по факту после этой сессии (см. SESSION_LOG).
+- `/playlists/[id]`: items по `position`; listen; delete item; custom/auto covers.
+- Reorder, Play All и `/p/[slug]` ещё не реализованы.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
 - Backup перед PR3.2: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-2-20260716-035511.dump`.
 
 ## Что ещё не реализовано
 
-- Custom и automatic covers плейлистов (PR3.3).
 - Reorder элементов плейлиста, Play All.
 - Публичный каталог подборок `/p/[slug]`.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
