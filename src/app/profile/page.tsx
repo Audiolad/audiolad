@@ -1,101 +1,21 @@
 import Image from "next/image";
 import BottomNav from "@/components/BottomNav";
+import ProfileContinueSection from "@/components/profile/ProfileContinueSection";
+import {
+  ProfileAccountSection,
+  ProfileAuthorBlock,
+  ProfileCounters,
+  ProfileQuickLinks,
+  ProfileUserCard,
+} from "@/components/profile/ProfileSections";
 import { signOut } from "@/app/auth/sign-out/actions";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { getProfilePageData } from "@/lib/profile/queries";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-type UserMetadata = {
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-};
-
-type ProfileRow = {
-  full_name: string | null;
-};
-
-function getDisplayName(
-  profile: ProfileRow | null,
-  user: { email?: string; user_metadata?: UserMetadata },
-): string {
-  const meta = user.user_metadata ?? {};
-  const profileFullName = profile?.full_name?.trim();
-
-  if (profileFullName) {
-    return profileFullName;
-  }
-
-  const metaFullName =
-    typeof meta.full_name === "string" ? meta.full_name.trim() : "";
-
-  if (metaFullName) {
-    return metaFullName;
-  }
-
-  const firstName =
-    typeof meta.first_name === "string" ? meta.first_name.trim() : "";
-  const lastName =
-    typeof meta.last_name === "string" ? meta.last_name.trim() : "";
-  const combined = `${firstName} ${lastName}`.trim();
-
-  if (combined) {
-    return combined;
-  }
-
-  const emailLocalPart = user.email?.split("@")[0]?.trim();
-
-  if (emailLocalPart) {
-    return emailLocalPart;
-  }
-
-  return "Пользователь";
-}
-
-function getInitial(displayName: string): string {
-  const char = displayName.trim().charAt(0);
-
-  return char ? char.toUpperCase() : "П";
-}
-
-const favoriteAuthors = [
-  {
-    name: "Сергей и Зоя",
-    description: "Совместные медитации и программы",
-    image: "/audiolad-logo.png",
-    href: "/authors/sergey-and-zoya",
-  },
-  {
-    name: "Зоя Петрова",
-    description: "Женские практики и медитации",
-    image: "/audiolad-logo.png",
-    href: "/authors/zoya-petrova",
-  },
-  {
-    name: "Сергей Петров",
-    description: "Энергопотоки и внутренняя сила",
-    image: "/audiolad-logo.png",
-    href: "/authors/sergey-petrov",
-  },
-];
-
-const settings = [
-  ["Уведомления", "◌"],
-  ["Способы оплаты", "▭"],
-  ["Помощь", "?"],
-  ["О приложении", "i"],
-];
-
-const legalLinks = [
-  { href: "/offer", title: "Публичная оферта" },
-  { href: "/privacy", title: "Политика обработки персональных данных" },
-  { href: "/consent", title: "Согласие на обработку персональных данных" },
-  { href: "/payment-and-refund", title: "Оплата, получение и возврат" },
-  { href: "/requisites", title: "Реквизиты" },
-] as const;
 
 export default async function ProfilePage({
   searchParams,
@@ -115,27 +35,7 @@ export default async function ProfilePage({
     redirect("/auth/sign-in");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const { count: playlistsCount, error: playlistsCountError } = await supabase
-    .from("playlists")
-    .select("id", { count: "exact", head: true });
-
-  if (playlistsCountError) {
-    console.error("profile_playlists_count_error", playlistsCountError.message);
-  }
-
-  const displayName = getDisplayName(profile, user);
-  const initial = getInitial(displayName);
-  const playlistsCountLabel =
-    playlistsCountError || playlistsCount === null || playlistsCount === undefined
-      ? "—"
-      : String(playlistsCount);
-  const email = user.email ?? "";
+  const profileData = await getProfilePageData(supabase, user);
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
@@ -157,293 +57,35 @@ export default async function ProfilePage({
             <Link
               href="/settings"
               aria-label="Настройки"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-2xl text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               ⚙
             </Link>
           </header>
 
-          {isUpdated && (
+          {isUpdated ? (
             <div className="mt-6 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm leading-6 text-[#3d8d65]">
               Профиль успешно обновлён.
             </div>
-          )}
+          ) : null}
 
-          <section className="relative mt-6 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)]">
-            <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#d8b8f2]/25 blur-2xl" />
+          <ProfileUserCard card={profileData.card} />
 
-            <div className="relative flex items-center gap-4">
-              <div className="flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-[#f7effe] shadow-sm">
-                <span className="text-4xl text-[#7042c5]">{initial}</span>
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="text-[25px] font-semibold">{displayName}</h2>
-
-                {email && (
-                  <p className="mt-1 text-sm text-[#796ba0]">{email}</p>
-                )}
-
-                <p className="mt-1 text-sm text-[#796ba0]">
-                  Ваш путь в АудиоЛаде
-                </p>
-
-                <Link
-                  href="/profile/edit"
-                  className="mt-3 inline-flex rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
-                >
-                  Редактировать профиль
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative mt-5 grid grid-cols-3 gap-3">
-              {[
-                ["24", "практики"],
-                [playlistsCountLabel, "плейлистов"],
-                ["3", "автора"],
-              ].map(([value, label]) => (
-                <div
-                  key={label}
-                  className="rounded-[18px] border border-white/80 bg-white/65 px-2 py-3 text-center"
-                >
-                  <p className="text-xl font-semibold text-[#7042c5]">
-                    {value}
-                  </p>
-                  <p className="mt-1 text-xs text-[#796ba0]">{label}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-6 grid grid-cols-2 gap-3">
-            <Link
-              href="/my-practices"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">▥</span>
-              <span className="mt-2 text-[11px] leading-4">Аудиотека</span>
-            </Link>
-
-            <Link
-              href="/playlists"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">♫</span>
-              <span className="mt-2 text-[11px] leading-4">Плейлисты</span>
-            </Link>
-          </section>
-
-          <section className="mt-6 grid grid-cols-4 gap-2">
-            <Link
-              href="/purchases"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">▢</span>
-              <span className="mt-2 text-[11px] leading-4">Мои покупки</span>
-            </Link>
-
-            <Link
-              href="/favorites"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">♡</span>
-              <span className="mt-2 text-[11px] leading-4">Избранное</span>
-            </Link>
-
-            <Link
-              href="/downloads"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">⇩</span>
-              <span className="mt-2 text-[11px] leading-4">Скачанные</span>
-            </Link>
-
-            <Link
-              href="/history"
-              className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm"
-            >
-              <span className="text-2xl text-[#7042c5]">◷</span>
-              <span className="mt-2 text-[11px] leading-4">История</span>
-            </Link>
-          </section>
-
-          <section className="mt-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[21px] font-semibold">Любимые авторы</h2>
-
-              <button
-                type="button"
-                className="text-sm font-medium text-[#7042c5]"
-              >
-                Смотреть все ›
-              </button>
-            </div>
-
-            <div className="-mx-5 mt-4 flex gap-3 overflow-x-auto px-5 pb-2">
-              {favoriteAuthors.map((author) => (
-                <article
-                  key={author.name}
-                  className="w-[154px] shrink-0 rounded-[22px] border border-[#eadff8] bg-white p-3 shadow-sm"
-                >
-                  <Link
-                    href={author.href}
-                    className="block aspect-square overflow-hidden rounded-[18px] bg-[#f7effe]"
-                  >
-                    <Image
-                      src={author.image}
-                      alt={author.name}
-                      width={160}
-                      height={160}
-                      className="h-full w-full object-contain p-4"
-                    />
-                  </Link>
-
-                  <Link
-                    href={author.href}
-                    className="mt-3 block text-[15px] font-semibold"
-                  >
-                    {author.name}
-                  </Link>
-
-                  <p className="mt-1 line-clamp-2 min-h-[40px] text-xs leading-5 text-[#796ba0]">
-                    {author.description}
-                  </p>
-
-                  <button
-                    type="button"
-                    aria-label="Убрать из любимых"
-                    className="mt-2 text-xl text-[#7042c5]"
-                  >
-                    ♥
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-8">
-            <h2 className="text-[21px] font-semibold">Для авторов</h2>
-
-            <Link
-              href="/author-dashboard"
-              className="mt-4 flex items-center justify-between rounded-[24px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] p-5 text-white shadow-[0_12px_30px_rgba(96,59,168,0.22)]"
-            >
-              <div>
-                <p className="text-lg font-semibold">Кабинет автора</p>
-                <p className="mt-1 max-w-[250px] text-sm leading-5 text-white/80">
-                  Практики, продажи, статистика и выплаты
-                </p>
-              </div>
-
-              <span className="text-3xl">›</span>
-            </Link>
-
-            <button
-              type="button"
-              className="mt-3 flex w-full items-center justify-between rounded-[22px] border border-[#eadff8] bg-white px-5 py-4 text-left"
-            >
-              <div>
-                <p className="font-semibold">Стать автором</p>
-                <p className="mt-1 text-sm text-[#796ba0]">
-                  Размещайте свои аудиопрактики
-                </p>
-              </div>
-
-              <span className="text-2xl text-[#7042c5]">›</span>
-            </button>
-          </section>
-
-          <section className="mt-8">
-            <h2 className="text-[21px] font-semibold">Правовая информация</h2>
-
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
-              {legalLinks.map((item, index) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex w-full items-center justify-between px-5 py-4 ${
-                    index !== legalLinks.length - 1
-                      ? "border-b border-[#eee6f7]"
-                      : ""
-                  }`}
-                >
-                  <span className="text-[15px] leading-6 text-[#25135c]">
-                    {item.title}
-                  </span>
-                  <span className="text-xl text-[#7042c5]">›</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-8">
-            <h2 className="text-[21px] font-semibold">Настройки</h2>
-
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
-              <Link
-                href="/settings"
-                className="flex w-full items-center justify-between border-b border-[#eee6f7] px-5 py-4"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
-                    ⚙
-                  </span>
-                  <span>Все настройки</span>
-                </span>
-                <span className="text-xl text-[#7042c5]">›</span>
-              </Link>
-
-              {settings.map(([title, icon], index) => (
-                <button
-                  key={title}
-                  type="button"
-                  className={`flex w-full items-center justify-between px-5 py-4 ${
-                    index !== settings.length - 1
-                      ? "border-b border-[#eee6f7]"
-                      : ""
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
-                      {icon}
-                    </span>
-
-                    <span>{title}</span>
-                  </span>
-
-                  <span className="text-xl text-[#7042c5]">›</span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <ProfileContinueSection state={profileData.continueState} />
+          <ProfileCounters counters={profileData.counters} />
+          <ProfileQuickLinks />
+          <ProfileAuthorBlock section={profileData.authorSection} />
+          <ProfileAccountSection />
 
           <section className="mt-8">
             <form action={signOut}>
               <button
                 type="submit"
-                className="w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63]"
+                className="min-h-11 w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b34f63]"
               >
                 Выйти
               </button>
             </form>
-          </section>
-
-          <section className="mt-8 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-5">
-            <h2 className="text-lg font-semibold text-[#7042c5]">
-              Пригласите друга
-            </h2>
-
-            <p className="mt-2 text-sm leading-5 text-[#796ba0]">
-              Поделитесь АудиоЛадом и подарите другу 7 дней премиум-доступа.
-            </p>
-
-            <button
-              type="button"
-              className="mt-4 rounded-xl bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white"
-            >
-              Пригласить
-            </button>
           </section>
         </div>
 

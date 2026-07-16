@@ -1,73 +1,21 @@
 import BottomNav from "@/components/BottomNav";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { signOut } from "@/app/auth/sign-out/actions";
+import {
+  getDisplayName,
+  getInitial,
+  getProfileRolePrimaryLabel,
+} from "@/lib/profile/display-name";
+import {
+  PROFILE_LEGAL_LINKS,
+  SETTINGS_LEGAL_SECTION_ID,
+} from "@/lib/profile/constants";
+import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-type UserMetadata = {
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-};
-
-type ProfileRow = {
-  full_name: string | null;
-  role: string | null;
-};
-
-function getDisplayName(
-  profile: ProfileRow | null,
-  user: { email?: string; user_metadata?: UserMetadata },
-): string {
-  const meta = user.user_metadata ?? {};
-  const profileFullName = profile?.full_name?.trim();
-
-  if (profileFullName) {
-    return profileFullName;
-  }
-
-  const metaFullName =
-    typeof meta.full_name === "string" ? meta.full_name.trim() : "";
-
-  if (metaFullName) {
-    return metaFullName;
-  }
-
-  const firstName =
-    typeof meta.first_name === "string" ? meta.first_name.trim() : "";
-  const lastName =
-    typeof meta.last_name === "string" ? meta.last_name.trim() : "";
-  const combined = `${firstName} ${lastName}`.trim();
-
-  if (combined) {
-    return combined;
-  }
-
-  const emailLocalPart = user.email?.split("@")[0]?.trim();
-
-  if (emailLocalPart) {
-    return emailLocalPart;
-  }
-
-  return "Пользователь";
-}
-
-function getInitial(displayName: string): string {
-  const char = displayName.trim().charAt(0);
-
-  return char ? char.toUpperCase() : "П";
-}
-
-function getRoleLabel(role: string | null | undefined): string {
-  if (role === "listener") {
-    return "Слушатель";
-  }
-
-  return "Пользователь АудиоЛада";
-}
 
 function getSections(emailDescription: string) {
   return [
@@ -185,9 +133,13 @@ export default async function SettingsPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  const authorWorkspaces = await listAuthorWorkspacesForUser(user.id).catch(
+    () => [],
+  );
+
   const displayName = getDisplayName(profile, user);
   const initial = getInitial(displayName);
-  const roleLabel = getRoleLabel(profile?.role ?? "listener");
+  const roleLabel = getProfileRolePrimaryLabel(authorWorkspaces.length);
   const emailDescription = user.email?.trim() || "Не указан";
   const sections = getSections(emailDescription);
 
@@ -264,6 +216,37 @@ export default async function SettingsPage() {
               </div>
             </section>
           ))}
+
+          <section
+            id={SETTINGS_LEGAL_SECTION_ID}
+            className="mt-8 scroll-mt-6"
+            aria-labelledby="settings-legal-heading"
+          >
+            <h2 id="settings-legal-heading" className="text-[20px] font-semibold">
+              Правовая информация
+            </h2>
+
+            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+              {PROFILE_LEGAL_LINKS.map((item, index) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex min-h-[56px] w-full items-center justify-between px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5] ${
+                    index !== PROFILE_LEGAL_LINKS.length - 1
+                      ? "border-b border-[#eee6f7]"
+                      : ""
+                  }`}
+                >
+                  <span className="text-[15px] leading-6 text-[#25135c]">
+                    {item.title}
+                  </span>
+                  <span className="text-xl text-[#7042c5]" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           <section className="mt-8">
             <form action={signOut}>
