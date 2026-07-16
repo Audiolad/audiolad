@@ -28,13 +28,24 @@ const SERVER_SNAPSHOT: PwaBrowserEnvironment = {
   isInApp: false,
 };
 
-function readBrowserEnvironment(): PwaBrowserEnvironment {
-  if (typeof window === "undefined") {
-    return SERVER_SNAPSHOT;
-  }
+let cachedClientSnapshot: PwaBrowserEnvironment | null = null;
 
-  const userAgent = navigator.userAgent;
+export function browserEnvironmentEquals(
+  left: PwaBrowserEnvironment,
+  right: PwaBrowserEnvironment,
+): boolean {
+  return (
+    left.userAgent === right.userAgent &&
+    left.platform === right.platform &&
+    left.isStandalone === right.isStandalone &&
+    left.uiVariant === right.uiVariant &&
+    left.isInApp === right.isInApp
+  );
+}
 
+export function createBrowserEnvironmentSnapshot(
+  userAgent: string,
+): PwaBrowserEnvironment {
   return {
     userAgent,
     platform: detectPwaPlatform(userAgent),
@@ -42,6 +53,21 @@ function readBrowserEnvironment(): PwaBrowserEnvironment {
     uiVariant: resolveUiVariant(userAgent),
     isInApp: isInAppBrowser(userAgent),
   };
+}
+
+function readBrowserEnvironment(): PwaBrowserEnvironment {
+  if (typeof window === "undefined") {
+    return SERVER_SNAPSHOT;
+  }
+
+  const next = createBrowserEnvironmentSnapshot(navigator.userAgent);
+
+  if (cachedClientSnapshot && browserEnvironmentEquals(cachedClientSnapshot, next)) {
+    return cachedClientSnapshot;
+  }
+
+  cachedClientSnapshot = next;
+  return cachedClientSnapshot;
 }
 
 function subscribeToBrowserEnvironment(onStoreChange: () => void): () => void {
@@ -52,6 +78,7 @@ function subscribeToBrowserEnvironment(onStoreChange: () => void): () => void {
   const media = window.matchMedia("(display-mode: standalone)");
 
   const handleChange = () => {
+    cachedClientSnapshot = null;
     onStoreChange();
   };
 

@@ -245,13 +245,15 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
         mode === "in_app_browser" ||
         mode.startsWith("desktop_")
       ) {
-        trackPwaEventOnce(
-          `${analyticsSessionRef.current}:instructions:${mode}:${source}`,
-          mode === "ios"
-            ? "pwa_ios_instructions_opened"
-            : "pwa_install_clicked",
-          { platform, source },
-        );
+        queueMicrotask(() => {
+          trackPwaEventOnce(
+            `${analyticsSessionRef.current}:instructions:${mode}:${source}`,
+            mode === "ios"
+              ? "pwa_ios_instructions_opened"
+              : "pwa_install_clicked",
+            { platform, source },
+          );
+        });
 
         if (source === "banner") {
           dismissBannerForSession();

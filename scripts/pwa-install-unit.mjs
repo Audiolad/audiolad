@@ -416,11 +416,55 @@ function testPwaBrowserEnvironmentHook() {
 
   assert(hook.includes("useSyncExternalStore"), "browser env uses external store");
   assert(hook.includes("SERVER_SNAPSHOT"), "stable server snapshot exists");
+  assert(hook.includes("cachedClientSnapshot"), "client snapshot is cached");
+  assert(
+    hook.includes("browserEnvironmentEquals"),
+    "browser env compares snapshot values",
+  );
   assert(provider.includes("usePwaBrowserEnvironment"), "provider uses browser hook");
   assert(
     !provider.includes("navigator.userAgent"),
     "provider no longer reads navigator during render",
   );
+}
+
+function testBrowserEnvironmentSnapshotStability() {
+  const source = readFileSync("src/lib/pwa/browser-environment.ts", "utf8");
+
+  assert(
+    source.includes("let cachedClientSnapshot"),
+    "browser env keeps cached client snapshot",
+  );
+  assert(
+    source.includes("browserEnvironmentEquals"),
+    "browser env compares snapshots for stability",
+  );
+  assert(
+    source.includes("cachedClientSnapshot = null"),
+    "browser env invalidates cached snapshot on environment changes",
+  );
+}
+
+function testMenuInstallUsesSharedFlow() {
+  const menuItem = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
+    "utf8",
+  );
+  const profile = readFileSync(
+    "/var/www/audiolad/src/components/profile/ProfileSections.tsx",
+    "utf8",
+  );
+  const settings = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsSection.tsx",
+    "utf8",
+  );
+
+  assert(menuItem.includes('openInstallFlow("menu")'), "menu item calls shared install flow");
+  assert(menuItem.includes("type=\"button\""), "menu item uses semantic button");
+  assert(menuItem.includes("aria-label"), "menu item has accessible label");
+  assert(menuItem.includes("cursor-pointer"), "menu item shows pointer cursor");
+  assert(profile.includes("PwaSettingsMenuItem"), "profile renders install menu item");
+  assert(settings.includes("PwaSettingsMenuItem"), "settings renders install menu item");
 }
 
 function testPwaProviderErrorBoundary() {
@@ -508,6 +552,7 @@ function testPwaFallbackContextContract() {
   }
 
   assert(menuItem.includes("usePwaInstall"), "settings menu item consumes pwa context");
+  assert(menuItem.includes("openInstallFlow"), "menu item uses install flow from context");
   assert(
     !boundaryRendersProviderlessFallback(),
     "boundary fallback always supplies provider",
@@ -674,6 +719,8 @@ const tests = [
   ["service worker stale chunk policy", testServiceWorkerStaleChunkPolicy],
   ["service worker cache version bumped", testServiceWorkerCacheVersionBumped],
   ["pwa browser environment hook", testPwaBrowserEnvironmentHook],
+  ["browser environment snapshot stability", testBrowserEnvironmentSnapshotStability],
+  ["menu install uses shared flow", testMenuInstallUsesSharedFlow],
   ["pwa provider error boundary", testPwaProviderErrorBoundary],
   ["pwa fallback context contract", testPwaFallbackContextContract],
   ["client error reporter wiring", testClientErrorReporterWiring],
