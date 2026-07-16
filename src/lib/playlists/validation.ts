@@ -76,6 +76,7 @@ export type CreatePlaylistInput =
       ok: true;
       title: string;
       visibility: PlaylistVisibility;
+      isEditorial: boolean;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -90,7 +91,7 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["title", "visibility"]);
+  const allowedKeys = new Set(["title", "visibility", "is_editorial"]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -116,10 +117,18 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     return visibilityResult;
   }
 
+  const isEditorial =
+    "is_editorial" in parsed && parsed.is_editorial === true;
+
+  if (isEditorial && visibilityResult.visibility !== "public") {
+    return { ok: false, error: "invalid_request" };
+  }
+
   return {
     ok: true,
     title: titleResult.title,
     visibility: visibilityResult.visibility,
+    isEditorial,
   };
 }
 
@@ -128,6 +137,7 @@ export type PatchPlaylistInput =
       ok: true;
       title?: string;
       visibility?: PlaylistVisibility;
+      isEditorial?: boolean;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -142,7 +152,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["title", "visibility"]);
+  const allowedKeys = new Set(["title", "visibility", "is_editorial"]);
   const keys = Object.keys(parsed);
 
   if (keys.length === 0) {
@@ -155,7 +165,11 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     }
   }
 
-  const result: { title?: string; visibility?: PlaylistVisibility } = {};
+  const result: {
+    title?: string;
+    visibility?: PlaylistVisibility;
+    isEditorial?: boolean;
+  } = {};
 
   if ("title" in parsed) {
     const titleResult = validatePlaylistTitle(parsed.title);
@@ -177,11 +191,78 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     result.visibility = visibilityResult.visibility;
   }
 
-  if (result.title === undefined && result.visibility === undefined) {
+  if ("is_editorial" in parsed) {
+    if (typeof parsed.is_editorial !== "boolean") {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    result.isEditorial = parsed.is_editorial;
+  }
+
+  if (
+    result.isEditorial === true &&
+    result.visibility === "private"
+  ) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (
+    result.title === undefined &&
+    result.visibility === undefined &&
+    result.isEditorial === undefined
+  ) {
     return { ok: false, error: "invalid_request" };
   }
 
   return { ok: true, ...result };
+}
+
+export type EditorialPracticesPostInput =
+  | { ok: true; practiceIds: string[] }
+  | { ok: false; error: "invalid_request" };
+
+export function parseEditorialPracticesPostBody(
+  body: unknown,
+): EditorialPracticesPostInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["practiceIds"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (!("practiceIds" in parsed) || !Array.isArray(parsed.practiceIds)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (parsed.practiceIds.length === 0 || parsed.practiceIds.length > 50) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const practiceIds: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of parsed.practiceIds) {
+    if (typeof value !== "string" || !isUuid(value)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    if (seen.has(value)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    seen.add(value);
+    practiceIds.push(value);
+  }
+
+  return { ok: true, practiceIds };
 }
 
 export function isUuid(value: string): boolean {

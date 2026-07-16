@@ -22,6 +22,11 @@ import {
   loadPublishedAudioSummaries,
 } from "@/lib/products/public-audio-items";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  canUserEditEditorialPlaylist,
+  canUserEditPlaylist,
+  loadPlaylistForAccessCheck,
+} from "@/lib/playlists/playlist-access";
 
 type AuthorEmbed = {
   id: string;
@@ -74,6 +79,8 @@ export type PlaylistDetailView = {
   hasUnavailable: boolean;
   coverUrl: string | null;
   mosaicCoverUrls: Array<string | null>;
+  canEdit: boolean;
+  canManageEditorialPractices: boolean;
 };
 
 function normalizeOne<T>(value: T | T[] | null | undefined): T | null {
@@ -202,15 +209,38 @@ export async function loadOwnedPlaylistDetail(
   playlistId: string,
 ): Promise<
   | { ok: true; detail: PlaylistDetailView }
-  | { ok: false; reason: "not_found" | "error" }
+  | { ok: false; reason: "not_found" | "forbidden" | "error" }
 > {
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, playlistId);
+
+  if (accessError) {
+    console.error("playlist_detail_access_error", accessError);
+    return { ok: false, reason: "error" };
+  }
+
+  if (!accessRow) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const canEdit = await canUserEditPlaylist(supabase, userId, accessRow);
+
+  if (!canEdit) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  const canManageEditorialPractices = await canUserEditEditorialPlaylist(
+    supabase,
+    userId,
+    accessRow,
+  );
+
   const { data: playlistRow, error: playlistError } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, user_id, cover_path, cover_updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, user_id, cover_path, cover_updated_at, is_editorial",
     )
     .eq("id", playlistId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (playlistError) {
@@ -232,6 +262,7 @@ export async function loadOwnedPlaylistDetail(
     updated_at: playlistRow.updated_at as string,
     cover_path: (playlistRow.cover_path as string | null) ?? null,
     cover_updated_at: (playlistRow.cover_updated_at as string | null) ?? null,
+    is_editorial: playlistRow.is_editorial === true,
   };
 
   const { data: itemRows, error: itemsError } = await supabase
@@ -430,6 +461,8 @@ export async function loadOwnedPlaylistDetail(
       hasUnavailable,
       coverUrl,
       mosaicCoverUrls,
+      canEdit,
+      canManageEditorialPractices,
     },
   };
 }

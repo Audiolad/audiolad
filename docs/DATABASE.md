@@ -111,11 +111,15 @@ values (new.id, new.email, 'listener');
 | `created_at` / `updated_at` | timestamptz NOT NULL | DEFAULT `now()` (общей trigger-функции в проекте нет) |
 | `cover_path` | text NULL | PR3.3: storage path в private bucket `playlist-covers`; NULL = automatic mosaic |
 | `cover_updated_at` | timestamptz NULL | PR3.3: время последней загрузки/замены custom cover |
+| `is_editorial` | boolean NOT NULL DEFAULT false | PR editorial: `true` только для публичных плейлистов АудиоЛада; наполнение через RPC `add_editorial_playlist_practices` (platform admin) |
 
 CHECK согласованности:
 
 - `playlists_visibility_slug_consistency_check` — private↔slug NULL, public↔непустой slug;
-- `playlists_visibility_published_at_consistency_check` — private → `published_at IS NULL` (у public `published_at` может быть NULL).
+- `playlists_visibility_published_at_consistency_check` — private → `published_at IS NULL` (у public `published_at` может быть NULL);
+- `playlists_editorial_requires_public_check` — `is_editorial = true` → `visibility = public`.
+
+**Редакционные плейлисты:** `profiles.role = platform_admin` (функция `is_platform_admin()`). Обычные личные плейлисты по-прежнему наполняются только из Аудиотеки / entitlement. Редакционный плейлист не выдаёт доступ к платным материалам.
 
 Одинаковые `title` у одного пользователя разрешены.
 
@@ -178,7 +182,7 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Недоступный материал можно перемещать.
 - API: `POST /api/playlists/[id]/items/[practiceId]/move` (session client, без service role).
 - Migration: `20260716140000_move_playlist_item.sql` (применена к production).
-- Drag-and-drop, Play All — нет.
+- Drag-and-drop — нет. Play All / queue corrective — только app-layer (без миграции / без изменений entitlement / `user_practices` / progress schema).
 
 ### Public page (PR5) — на production
 

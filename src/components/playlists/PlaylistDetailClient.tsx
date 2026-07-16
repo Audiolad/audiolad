@@ -1,9 +1,11 @@
 "use client";
 
+import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracticePickerSheet";
 import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
 import {
   buildPublicPlaylistCanonicalUrl,
   copyTextToClipboard,
@@ -87,6 +89,7 @@ export default function PlaylistDetailClient({
   const [submitting, setSubmitting] = useState(false);
   const [movingPracticeId, setMovingPracticeId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [editorialPickerOpen, setEditorialPickerOpen] = useState(false);
   const [, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const coverTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -458,7 +461,9 @@ export default function PlaylistDetailClient({
             {detail.playlist.title}
           </h1>
           <p className="mt-2 text-sm text-[#7d70a2]">
-            {visibilityLabel(detail.playlist.visibility)}
+            {detail.playlist.is_editorial
+              ? EDITORIAL_PLAYLIST_LABEL
+              : visibilityLabel(detail.playlist.visibility)}
           </p>
           <p className="mt-1 text-sm text-[#7d70a2]">
             {formatItemsCount(itemsCount)}
@@ -516,16 +521,40 @@ export default function PlaylistDetailClient({
         <section className="mt-8 rounded-[24px] border border-dashed border-[#ddcfef] bg-white px-5 py-8 text-center">
           <p className="text-[18px] font-semibold">В этом плейлисте пока пусто</p>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            Добавьте материалы из Аудиотеки.
+            {detail.canManageEditorialPractices
+              ? "Добавьте опубликованные практики из каталога."
+              : "Добавьте материалы из Аудиотеки."}
           </p>
-          <Link
-            href="/my-practices"
-            className="mt-6 inline-flex rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white"
-          >
-            Перейти в Аудиотеку
-          </Link>
+          {detail.canManageEditorialPractices ? (
+            <button
+              type="button"
+              onClick={() => setEditorialPickerOpen(true)}
+              className="mt-6 inline-flex rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white"
+            >
+              Добавить практики
+            </button>
+          ) : (
+            <Link
+              href="/my-practices"
+              className="mt-6 inline-flex rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white"
+            >
+              Перейти в Аудиотеку
+            </Link>
+          )}
         </section>
       ) : (
+        <>
+          {detail.canManageEditorialPractices ? (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setEditorialPickerOpen(true)}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 py-3 text-sm font-medium text-[#7042c5]"
+              >
+                Добавить практики
+              </button>
+            </div>
+          ) : null}
         <section className="mt-5 space-y-1.5 pb-[calc(var(--global-mini-player-height,0px)+5.5rem)]">
           {listError ? (
             <p className="rounded-[18px] border border-[#f0d0d8] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]" role="alert">
@@ -623,6 +652,7 @@ export default function PlaylistDetailClient({
             );
           })}
         </section>
+        </>
       )}
 
       {coverDialogOpen ? (
@@ -797,6 +827,17 @@ export default function PlaylistDetailClient({
           </p>
         </div>
       ) : null}
+
+      <EditorialPracticePickerSheet
+        playlistId={detail.playlist.id}
+        open={editorialPickerOpen}
+        onClose={() => setEditorialPickerOpen(false)}
+        onAdded={() => {
+          startTransition(() => {
+            router.refresh();
+          });
+        }}
+      />
     </>
   );
 }

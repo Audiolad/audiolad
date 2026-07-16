@@ -1,7 +1,8 @@
 import BottomNav from "@/components/BottomNav";
 import PlaylistsClient from "@/components/playlists/PlaylistsClient";
+import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
-import { listOwnedPlaylists } from "@/lib/playlists/queries";
+import { listEditorialPlaylists, listOwnedPlaylists } from "@/lib/playlists/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -22,6 +23,21 @@ export default async function PlaylistsPage() {
     userId: user.id,
   });
 
+  const { playlists: editorialPlaylists, error: editorialError } =
+    await listEditorialPlaylists(supabase);
+
+  if (editorialError) {
+    console.error("playlists_page_editorial_load_error", editorialError);
+  }
+
+  let canCreateEditorial = false;
+
+  try {
+    canCreateEditorial = await isPlatformAdmin(supabase, user.id);
+  } catch (adminError) {
+    console.error("playlists_page_admin_check_error", adminError);
+  }
+
   if (error) {
     console.error("playlists_page_load_error", error);
   }
@@ -32,7 +48,12 @@ export default async function PlaylistsPage() {
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
         <div className="px-5 pt-6 pb-4">
-          <PlaylistsClient playlists={playlists} loadError={Boolean(error)} />
+          <PlaylistsClient
+            playlists={playlists}
+            editorialPlaylists={editorialPlaylists}
+            canCreateEditorial={canCreateEditorial}
+            loadError={Boolean(error)}
+          />
         </div>
 
         <BottomNav />

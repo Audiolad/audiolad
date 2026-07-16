@@ -7,7 +7,7 @@ import {
   arePracticesEligibleForPublicPlaylist,
   type PlaylistPublishPractice,
 } from "@/lib/playlists/public-content";
-import type { PlaylistListItem, PlaylistRow } from "@/lib/playlists/types";
+import type { PlaylistListItem, PlaylistRow, EditorialPlaylistListItem } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -49,6 +49,7 @@ export async function listOwnedPlaylists(
       updated_at,
       cover_path,
       cover_updated_at,
+      is_editorial,
       playlist_items(count)
     `,
     )
@@ -118,6 +119,7 @@ export async function listOwnedPlaylists(
     updated_at: row.updated_at,
     cover_path: row.cover_path ?? null,
     cover_updated_at: row.cover_updated_at ?? null,
+    is_editorial: row.is_editorial === true,
     items_count: row.playlist_items?.[0]?.count ?? 0,
     coverUrl: row.cover_path
       ? (signedByPath.get(row.cover_path) ?? null)
@@ -149,7 +151,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial",
     )
     .eq("id", playlistId)
     .maybeSingle();
@@ -169,9 +171,153 @@ export async function getOwnedPlaylistById(
       ...row,
       cover_path: row.cover_path ?? null,
       cover_updated_at: row.cover_updated_at ?? null,
+      is_editorial: row.is_editorial === true,
     },
     error: null,
   };
+}
+
+export async function listEditorialPlaylists(
+  supabase: SupabaseClient,
+): Promise<{ playlists: EditorialPlaylistListItem[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("playlists")
+    .select(
+      `
+      id,
+      title,
+      slug,
+      published_at,
+      updated_at,
+      cover_path,
+      user_id,
+      playlist_items(count)
+    `,
+    )
+    .eq("is_editorial", true)
+    .eq("visibility", "public")
+    .not("published_at", "is", null)
+    .not("slug", "is", null)
+    .order("published_at", { ascending: false });
+
+  if (error) {
+    return { playlists: [], error: error.message };
+  }
+
+  type EditorialRow = {
+    id: string;
+    title: string;
+    slug: string | null;
+    published_at: string | null;
+    updated_at: string;
+    cover_path: string | null;
+    user_id: string;
+    playlist_items?: PlaylistCountEmbed | null;
+  };
+
+  const rows = (data as EditorialRow[] | null) ?? [];
+  const mosaicByPlaylist = new Map<string, Array<string | null>>();
+
+  if (rows.length > 0) {
+    const { data: mosaicRows, error: mosaicError } = await supabase
+      .from("playlist_items")
+      .select(
+        `
+        playlist_id,
+        position,
+        practices (
+          cover_url,
+          updated_at
+        )
+      `,
+      )
+      .in(
+        "playlist_id",
+        rows.map((row) => row.id),
+      )
+      .order("position", { ascending: true });
+
+    if (mosaicError) {
+      return { playlists: [], error: mosaicError.message };
+    }
+
+    for (const row of mosaicRows ?? []) {
+      const playlistId =
+        typeof row.playlist_id === "string" ? row.playlist_id : null;
+
+      if (!playlistId) {
+        continue;
+      }
+
+      const current = mosaicByPlaylist.get(playlistId) ?? [];
+
+      if (current.length >= 4) {
+        continue;
+      }
+
+      const practice = Array.isArray(row.practices)
+        ? row.practices[0]
+        : row.practices;
+
+      if (practice && typeof practice === "object") {
+        current.push(
+          getProductCoverDisplayUrl(
+            (practice as { cover_url?: string | null }).cover_url ?? null,
+            (practice as { updated_at?: string | null }).updated_at ?? null,
+          ),
+        );
+      } else {
+        current.push(null);
+      }
+
+      mosaicByPlaylist.set(playlistId, current);
+    }
+  }
+
+  const coverPaths = rows
+    .map((row) => row.cover_path)
+    .filter((path): path is string => typeof path === "string" && path.length > 0);
+
+  let signedByPath = new Map<string, string | null>();
+
+  if (coverPaths.length > 0) {
+    try {
+      const storage = createServiceRoleClient();
+      signedByPath = await createPlaylistCoverSignedUrlsBatch(
+        storage,
+        coverPaths,
+        { userId: rows[0]?.user_id ?? "" },
+      );
+    } catch (signedError) {
+      console.error(
+        "editorial_playlist_list_cover_signed_batch_error",
+        signedError instanceof Error ? signedError.message : signedError,
+      );
+    }
+  }
+
+  const playlists: EditorialPlaylistListItem[] = rows.flatMap((row) => {
+    if (!row.slug || !row.published_at) {
+      return [];
+    }
+
+    return [
+      {
+        id: row.id,
+        title: row.title,
+        slug: row.slug,
+        published_at: row.published_at,
+        updated_at: row.updated_at,
+        items_count: row.playlist_items?.[0]?.count ?? 0,
+        coverUrl: row.cover_path
+          ? (signedByPath.get(row.cover_path) ?? null)
+          : null,
+        mosaicCoverUrls: mosaicByPlaylist.get(row.id) ?? [],
+      },
+    ];
+  });
+
+  return { playlists, error: null };
 }
 
 export async function playlistSlugExists(

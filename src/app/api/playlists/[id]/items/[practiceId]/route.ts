@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getOwnedPlaylistById } from "@/lib/playlists/queries";
+import {
+  canUserEditPlaylist,
+  loadPlaylistForAccessCheck,
+} from "@/lib/playlists/playlist-access";
 import { isUuid } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
@@ -49,6 +53,19 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, id);
+
+  if (accessError || !accessRow) {
+    return notFoundResponse();
+  }
+
+  const canEdit = await canUserEditPlaylist(supabase, user.id, accessRow);
+
+  if (!canEdit) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("playlist_items")
     .select("id")
@@ -79,8 +96,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   const { error: touchError } = await supabase
     .from("playlists")
     .update({ updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("id", id);
 
   if (touchError) {
     console.error("playlist_item_delete_touch_error", touchError.message);

@@ -12,12 +12,17 @@ import {
 import {
   PLAYLIST_MAX_PER_USER,
   PLAYLIST_TITLE_MAX_LENGTH,
+  type EditorialPlaylistListItem,
   type PlaylistListItem,
   type PlaylistVisibility,
 } from "@/lib/playlists/types";
+import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
+import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
 
 type PlaylistsClientProps = {
   playlists: PlaylistListItem[];
+  editorialPlaylists: EditorialPlaylistListItem[];
+  canCreateEditorial: boolean;
   loadError: boolean;
 };
 
@@ -118,6 +123,8 @@ function PlusIcon() {
 
 export default function PlaylistsClient({
   playlists,
+  editorialPlaylists,
+  canCreateEditorial,
   loadError,
 }: PlaylistsClientProps) {
   const router = useRouter();
@@ -125,6 +132,7 @@ export default function PlaylistsClient({
   const [menuId, setMenuId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<PlaylistVisibility>("private");
+  const [createEditorial, setCreateEditorial] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -196,10 +204,11 @@ export default function PlaylistsClient({
     };
   }, [menuId]);
 
-  function openCreate() {
+  function openCreate(editorial = false) {
     setMenuId(null);
     setTitle("");
-    setVisibility("private");
+    setVisibility(editorial ? "public" : "private");
+    setCreateEditorial(editorial);
     setFormError(null);
     setDialog({ type: "create" });
   }
@@ -253,7 +262,11 @@ export default function PlaylistsClient({
       const response = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, visibility }),
+        body: JSON.stringify({
+          title,
+          visibility: createEditorial ? "public" : visibility,
+          is_editorial: createEditorial,
+        }),
       });
 
       if (!response.ok) {
@@ -370,7 +383,7 @@ export default function PlaylistsClient({
 
         <button
           type="button"
-          onClick={openCreate}
+          onClick={() => openCreate()}
           disabled={atLimit || loadError}
           aria-label="Создать плейлист"
           className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -379,6 +392,19 @@ export default function PlaylistsClient({
           Создать
         </button>
       </header>
+
+      {canCreateEditorial && !loadError ? (
+        <p className="mt-4">
+          <button
+            type="button"
+            onClick={() => openCreate(true)}
+            disabled={atLimit}
+            className="text-sm font-medium text-[#7042c5] underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            Создать редакционный плейлист АудиоЛада
+          </button>
+        </p>
+      ) : null}
 
       {atLimit && !loadError ? (
         <p className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#70628e]">
@@ -409,13 +435,64 @@ export default function PlaylistsClient({
           </p>
           <button
             type="button"
-            onClick={openCreate}
+            onClick={() => openCreate()}
             disabled={atLimit}
             className="mt-6 inline-flex items-center gap-2 rounded-[20px] bg-[#7042c5] px-5 py-3 font-semibold text-white disabled:opacity-50"
           >
             <PlusIcon />
             Создать плейлист
           </button>
+        </section>
+      ) : null}
+
+      {!loadError && editorialPlaylists.length > 0 ? (
+        <section className="mt-7">
+          <h2 className="text-[21px] font-semibold">Плейлисты АудиоЛада</h2>
+          <p className="mt-1 text-sm text-[#7d70a2]">
+            Редакционные подборки платформы
+          </p>
+
+          <div className="mt-5 space-y-5">
+            {editorialPlaylists.map((playlist) => (
+              <article
+                key={playlist.id}
+                className="rounded-[26px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"
+              >
+                <div className="flex gap-4">
+                  <Link
+                    href={buildPublicPlaylistPath(playlist.slug)}
+                    className="block h-[118px] w-[118px] shrink-0 overflow-hidden rounded-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    aria-label={`Открыть плейлист ${playlist.title}`}
+                  >
+                    <PlaylistCover
+                      title={playlist.title}
+                      customCoverUrl={playlist.coverUrl}
+                      mosaicCoverUrls={playlist.mosaicCoverUrls}
+                      gradientClassName={`bg-gradient-to-br ${coverGradientForId(playlist.id)}`}
+                      className="h-full w-full rounded-[22px]"
+                    />
+                  </Link>
+
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={buildPublicPlaylistPath(playlist.slug)}
+                      className="min-w-0 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    >
+                      <p className="text-[18px] font-semibold leading-6">
+                        {playlist.title}
+                      </p>
+                      <p className="mt-1 text-sm text-[#7042c5]">
+                        {EDITORIAL_PLAYLIST_LABEL}
+                      </p>
+                      <p className="mt-1 text-sm text-[#7d70a2]">
+                        {formatItemsCount(playlist.items_count)}
+                      </p>
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       ) : null}
 
@@ -453,7 +530,9 @@ export default function PlaylistsClient({
                         {playlist.title}
                       </p>
                       <p className="mt-1 text-sm text-[#7d70a2]">
-                        {visibilityLabel(playlist.visibility)}
+                        {playlist.is_editorial
+                          ? EDITORIAL_PLAYLIST_LABEL
+                          : visibilityLabel(playlist.visibility)}
                       </p>
                       <p className="mt-1 text-sm text-[#7d70a2]">
                         {formatItemsCount(playlist.items_count)}
@@ -568,7 +647,9 @@ export default function PlaylistsClient({
                   className="text-[22px] font-semibold"
                 >
                   {dialog.type === "create"
-                    ? "Новый плейлист"
+                    ? createEditorial
+                      ? "Новый плейлист АудиоЛада"
+                      : "Новый плейлист"
                     : "Переименовать"}
                 </h2>
 
@@ -589,7 +670,7 @@ export default function PlaylistsClient({
                   </span>
                 </label>
 
-                {dialog.type === "create" ? (
+                {dialog.type === "create" && !createEditorial ? (
                   <fieldset className="mt-4">
                     <legend className="text-sm font-medium">Кто видит</legend>
                     <div className="mt-3 space-y-2">
@@ -630,6 +711,13 @@ export default function PlaylistsClient({
                       </label>
                     </div>
                   </fieldset>
+                ) : null}
+
+                {dialog.type === "create" && createEditorial ? (
+                  <p className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#70628e]">
+                    Плейлист будет публичным и отмечен как {EDITORIAL_PLAYLIST_LABEL}.
+                    После создания вы сможете добавить практики из каталога.
+                  </p>
                 ) : null}
 
                 {formError ? (

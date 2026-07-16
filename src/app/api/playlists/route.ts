@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { assertPlatformAdmin } from "@/lib/auth/platform-admin";
 import { allocateUniquePlaylistSlug } from "@/lib/playlists/slug";
 import {
   countOwnedPlaylists,
@@ -18,6 +19,7 @@ function toPlaylistResponse(row: PlaylistRow) {
     published_at: row.published_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    is_editorial: row.is_editorial,
   };
 }
 
@@ -52,6 +54,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
+  if (parsed.isEditorial) {
+    const adminCheck = await assertPlatformAdmin(supabase, user.id);
+
+    if (!adminCheck.ok) {
+      return NextResponse.json(
+        { error: adminCheck.status === 403 ? "forbidden" : "internal_error" },
+        { status: adminCheck.status },
+      );
+    }
+  }
+
   const { count, error: countError } = await countOwnedPlaylists(supabase);
 
   if (countError || count === null) {
@@ -75,9 +88,10 @@ export async function POST(request: Request) {
     visibility: parsed.visibility,
     slug: null,
     published_at: null,
+    is_editorial: parsed.isEditorial,
   };
 
-  if (parsed.visibility === "public") {
+  if (parsed.visibility === "public" || parsed.isEditorial) {
     let slug: string | null;
 
     try {
@@ -98,6 +112,7 @@ export async function POST(request: Request) {
 
     insertPayload = {
       ...insertPayload,
+      visibility: "public",
       slug,
       published_at: new Date().toISOString(),
     };
@@ -107,7 +122,7 @@ export async function POST(request: Request) {
     .from("playlists")
     .insert(insertPayload)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial",
     )
     .single();
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
@@ -80,8 +80,9 @@ export default function LibraryAddButton({
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isDisabled = isPending || action === "in_library";
+  const isPendingOnlyDisabled = isPending;
   const buttonLabel = getLibraryButtonLabel(action, isPending, promoSignup);
+  const inLibrary = action === "in_library";
 
   async function handleAdd() {
     if (isPending || action !== "add") {
@@ -163,22 +164,41 @@ export default function LibraryAddButton({
       return;
     }
 
+    if (action === "in_library") {
+      router.push("/my-practices");
+      return;
+    }
+
     if (action === "add") {
       void handleAdd();
     }
   }
+
+  const ariaLabel = inLibrary
+    ? "Практика уже в Аудиотеке. Перейти в Аудиотеку"
+    : buttonLabel;
 
   return (
     <div>
       <button
         type="button"
         onClick={handleClick}
-        disabled={isDisabled}
-        aria-disabled={isDisabled}
+        disabled={isPendingOnlyDisabled}
+        aria-disabled={isPendingOnlyDisabled}
         aria-busy={isPending}
+        aria-label={ariaLabel}
         className={className}
       >
-        {buttonLabel}
+        {inLibrary ? (
+          <span className="inline-flex items-center justify-center gap-2">
+            <span aria-hidden className="text-[#7042c5]">
+              ✓
+            </span>
+            {buttonLabel}
+          </span>
+        ) : (
+          buttonLabel
+        )}
       </button>
 
       {errorMessage ? (

@@ -24,7 +24,11 @@ export default function PublicPlaylistPageView({
 
   return (
     <div className="px-5 pt-6 pb-8">
-      <p className="text-sm font-medium text-[#7042c5]">Публичный плейлист</p>
+      <p className="text-sm font-medium text-[#7042c5]">
+        {detail.playlist.isEditorial
+          ? "Плейлист АудиоЛада"
+          : "Публичный плейлист"}
+      </p>
 
       <div className="mx-auto mt-5 w-full max-w-[280px]">
         <PlaylistCover

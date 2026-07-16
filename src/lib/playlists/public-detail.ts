@@ -3,6 +3,7 @@ import { cache } from "react";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
 import { isPracticeEligibleForPublicPlaylist } from "@/lib/playlists/public-content";
+import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
 import {
   isValidPlaylistPublicSlug,
   normalizePlaylistPublicSlug,
@@ -61,6 +62,7 @@ type PlaylistDbRow = {
   updated_at: string;
   cover_path: string | null;
   cover_updated_at: string | null;
+  is_editorial: boolean | null;
 };
 
 export type PublicPlaylistItemView = {
@@ -84,6 +86,7 @@ export type PublicPlaylistView = {
     visibility: "public";
     published_at: string;
     updated_at: string;
+    isEditorial: boolean;
   };
   items: PublicPlaylistItemView[];
   itemsCount: number;
@@ -141,7 +144,8 @@ export const loadPublicPlaylistBySlug = cache(
       created_at,
       updated_at,
       cover_path,
-      cover_updated_at
+      cover_updated_at,
+      is_editorial
     `,
       )
       .eq("slug", slug)
@@ -365,6 +369,7 @@ export const loadPublicPlaylistBySlug = cache(
           visibility: "public",
           published_at: playlist.published_at,
           updated_at: playlist.updated_at,
+          isEditorial: playlist.is_editorial === true,
         },
         items,
         itemsCount: items.length,
@@ -376,7 +381,9 @@ export const loadPublicPlaylistBySlug = cache(
         allUnavailable: items.length > 0 && availableCount === 0,
         coverUrl,
         mosaicCoverUrls: mosaicFromAvailable,
-        ownerLabel: "Подборка пользователя АудиоЛада",
+        ownerLabel: playlist.is_editorial
+          ? EDITORIAL_PLAYLIST_LABEL
+          : "Подборка пользователя АудиоЛада",
       },
     };
   },

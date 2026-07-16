@@ -162,10 +162,12 @@ export async function listPlaylistMembershipForPractice(
       title,
       visibility,
       updated_at,
+      is_editorial,
       playlist_items(count)
     `,
     )
     .eq("user_id", userId)
+    .eq("is_editorial", false)
     .order("updated_at", { ascending: false });
   if (error) {
     return { playlists: [], error: error.message };

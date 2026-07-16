@@ -36,6 +36,10 @@ export default async function PlaylistDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  if (!loaded.ok && loaded.reason === "forbidden") {
+    redirect("/playlists");
+  }
+
   if (!loaded.ok) {
     return (
       <main className="min-h-screen bg-platform-surface text-[#25135c]">

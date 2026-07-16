@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { assertPlatformAdmin } from "@/lib/auth/platform-admin";
 import {
   assertPlaylistCoverPathForOwner,
   removePlaylistCoverObject,
@@ -10,6 +11,10 @@ import {
   getOwnedPlaylistById,
   playlistSlugExists,
 } from "@/lib/playlists/queries";
+import {
+  canUserEditPlaylist,
+  loadPlaylistForAccessCheck,
+} from "@/lib/playlists/playlist-access";
 import { allocateUniquePlaylistSlug } from "@/lib/playlists/slug";
 import type { PlaylistRow } from "@/lib/playlists/types";
 import {
@@ -32,6 +37,7 @@ function toPlaylistResponse(row: PlaylistRow) {
     published_at: row.published_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    is_editorial: row.is_editorial,
   };
 }
 
@@ -90,8 +96,51 @@ export async function PATCH(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, id);
+
+  if (accessError || !accessRow) {
+    console.error("playlists_patch_access_error", accessError);
+    return notFoundResponse();
+  }
+
+  const canEdit = await canUserEditPlaylist(supabase, user.id, accessRow);
+
+  if (!canEdit) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  if (parsed.isEditorial !== undefined) {
+    const adminCheck = await assertPlatformAdmin(supabase, user.id);
+
+    if (!adminCheck.ok) {
+      return NextResponse.json(
+        { error: adminCheck.status === 403 ? "forbidden" : "internal_error" },
+        { status: adminCheck.status },
+      );
+    }
+  }
+
   const nextTitle = parsed.title ?? playlist.title;
   const nextVisibility = parsed.visibility ?? playlist.visibility;
+  const nextIsEditorial =
+    parsed.isEditorial !== undefined
+      ? parsed.isEditorial
+      : playlist.is_editorial;
+
+  if (nextIsEditorial && nextVisibility === "private") {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  if (playlist.is_editorial && nextVisibility === "private") {
+    return NextResponse.json(
+      {
+        error: "invalid_request",
+        message: "Редакционный плейлист нельзя сделать приватным.",
+      },
+      { status: 400 },
+    );
+  }
 
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -101,27 +150,33 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.title = parsed.title;
   }
 
+  if (parsed.isEditorial !== undefined) {
+    updates.is_editorial = parsed.isEditorial;
+  }
+
   if (nextVisibility === playlist.visibility) {
     // title-only or no-op visibility
   } else if (nextVisibility === "public") {
-    const contentCheck = await assertPlaylistPublicContentAllowed(
-      supabase,
-      id,
-    );
+    if (!nextIsEditorial) {
+      const contentCheck = await assertPlaylistPublicContentAllowed(
+        supabase,
+        id,
+      );
 
-    if (!contentCheck.ok) {
-      if (contentCheck.reason === "invalid") {
-        return NextResponse.json(
-          {
-            error: "public_content_invalid",
-            message: PUBLIC_PLAYLIST_CONTENT_ERROR_MESSAGE,
-          },
-          { status: 400 },
-        );
+      if (!contentCheck.ok) {
+        if (contentCheck.reason === "invalid") {
+          return NextResponse.json(
+            {
+              error: "public_content_invalid",
+              message: PUBLIC_PLAYLIST_CONTENT_ERROR_MESSAGE,
+            },
+            { status: 400 },
+          );
+        }
+
+        console.error("playlists_patch_public_content_check_error");
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
       }
-
-      console.error("playlists_patch_public_content_check_error");
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
     let slug = playlist.slug;
@@ -158,7 +213,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(updates)
     .eq("id", id)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial",
     )
     .maybeSingle();
 

@@ -17,6 +17,18 @@ export type PlaylistRow = {
   updated_at: string;
   cover_path: string | null;
   cover_updated_at: string | null;
+  is_editorial: boolean;
+};
+
+export type EditorialPlaylistListItem = {
+  id: string;
+  title: string;
+  slug: string;
+  published_at: string;
+  updated_at: string;
+  items_count: number;
+  coverUrl: string | null;
+  mosaicCoverUrls: Array<string | null>;
 };
 
 export type PlaylistListItem = PlaylistRow & {
