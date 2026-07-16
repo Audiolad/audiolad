@@ -1,8 +1,8 @@
 "use client";
 
-import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
+import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
 import {
   buildPublicPlaylistCanonicalUrl,
@@ -41,14 +41,6 @@ function formatItemsCount(count: number): string {
   }
 
   return `${count} материалов`;
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor">
-      <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
-    </svg>
-  );
 }
 
 function coverGradientForId(id: string): string {
@@ -534,7 +526,7 @@ export default function PlaylistDetailClient({
           </Link>
         </section>
       ) : (
-        <section className="mt-7 space-y-3">
+        <section className="mt-5 space-y-1.5 pb-[calc(var(--global-mini-player-height,0px)+5.5rem)]">
           {listError ? (
             <p className="rounded-[18px] border border-[#f0d0d8] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]" role="alert">
               {listError}
@@ -546,84 +538,39 @@ export default function PlaylistDetailClient({
             const rowMoving = movingPracticeId === item.practiceId;
 
             return (
-            <article
-              key={item.practiceId}
-              className="flex gap-3 rounded-[22px] border border-[#eadff8] bg-white p-3 shadow-[0_8px_22px_rgba(91,62,145,0.05)]"
-            >
-              <div className="flex w-7 shrink-0 items-start justify-center pt-3 text-sm font-medium text-[#8f82ad]">
-                {index + 1}
-              </div>
-
-              <div className="h-[84px] w-[84px] shrink-0">
-                <ProductCoverThumbnail
-                  slug={item.practiceId}
-                  title={item.title}
-                  coverUrl={item.coverDisplayUrl}
-                  className="h-full w-full rounded-[18px]"
-                />
-              </div>
-
-              <div className="flex min-w-0 flex-1 flex-col">
-                <p className="line-clamp-2 text-[16px] font-semibold leading-5">
-                  {item.title}
-                </p>
-                {item.authorName ? (
-                  <p className="mt-1 truncate text-sm text-[#25135c]">
-                    {item.authorName}
-                  </p>
-                ) : null}
-                {item.metaLabel ? (
-                  <p className="mt-1 text-xs text-[#7d70a2]">{item.metaLabel}</p>
-                ) : null}
-                {!item.available ? (
-                  <p className="mt-1 text-xs text-[#b34f63]">
-                    Материал сейчас недоступен
-                  </p>
-                ) : null}
-
-                <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                  {item.listenHref ? (
-                    <Link
-                      href={item.listenHref}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-[#7042c5]"
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
-                        <PlayIcon />
-                      </span>
-                      Слушать
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex items-center gap-2 text-sm font-medium text-[#7042c5] opacity-50"
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
-                        <PlayIcon />
-                      </span>
-                      Слушать
-                    </button>
-                  )}
-
-                  <div className="flex shrink-0 items-center gap-1">
+              <PlaylistItemRow
+                key={item.practiceId}
+                index={index}
+                item={{
+                  practiceId: item.practiceId,
+                  title: item.title,
+                  authorName: item.authorName,
+                  coverDisplayUrl: item.coverDisplayUrl,
+                  metaLabel: item.metaLabel,
+                  available: item.available,
+                  href: item.listenHref,
+                  listenHref: item.listenHref,
+                }}
+                trailingControls={
+                  <>
                     <div className="flex flex-col">
                       <button
                         type="button"
-                        aria-label={`Переместить выше: ${item.title}`}
+                        aria-label="Переместить выше"
                         disabled={isFirst || reorderBusy}
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                         onClick={() => void moveItem(item.practiceId, "up")}
                       >
-                        {rowMoving ? "…" : "↑"}
+                        <span aria-hidden>{rowMoving ? "…" : "↑"}</span>
                       </button>
                       <button
                         type="button"
-                        aria-label={`Переместить ниже: ${item.title}`}
+                        aria-label="Переместить ниже"
                         disabled={isLast || reorderBusy}
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                         onClick={() => void moveItem(item.practiceId, "down")}
                       >
-                        ↓
+                        <span aria-hidden>↓</span>
                       </button>
                     </div>
 
@@ -633,18 +580,18 @@ export default function PlaylistDetailClient({
                     >
                       <button
                         type="button"
-                        aria-label={`Меню материала ${item.title}`}
+                        aria-label="Действия с материалом"
                         aria-expanded={menuId === item.practiceId}
                         aria-haspopup="menu"
                         disabled={reorderBusy}
-                        className="flex h-10 w-10 items-center justify-center text-2xl leading-none text-[#8f82ad] disabled:opacity-40"
+                        className="flex h-10 w-10 items-center justify-center text-xl leading-none text-[#8f82ad] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                         onClick={() =>
                           setMenuId((current) =>
                             current === item.practiceId ? null : item.practiceId,
                           )
                         }
                       >
-                        ···
+                        <span aria-hidden>···</span>
                       </button>
 
                       {menuId === item.practiceId ? (
@@ -670,10 +617,9 @@ export default function PlaylistDetailClient({
                         </div>
                       ) : null}
                     </div>
-                  </div>
-                </div>
-              </div>
-            </article>
+                  </>
+                }
+              />
             );
           })}
         </section>

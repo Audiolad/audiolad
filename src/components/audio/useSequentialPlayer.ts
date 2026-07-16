@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 
 import {
   calculateProgramProgressPercent,
@@ -72,6 +79,11 @@ type UseSequentialPlayerOptions = {
   onRequestPreviousProduct?: () => Promise<boolean>;
   getSessionGeneration?: () => number;
   registerCleanup?: (cleanup: () => void) => void;
+  /**
+   * Shared <audio> element owned by GlobalAudioPlayerProvider so engine remounts
+   * do not recreate the media element (required for iOS autoplay unlock).
+   */
+  audioRef: MutableRefObject<HTMLAudioElement | null>;
 };
 
 type SwitchTrackOptions = {
@@ -98,8 +110,8 @@ export function useSequentialPlayer({
   onRequestPreviousProduct,
   getSessionGeneration,
   registerCleanup,
+  audioRef,
 }: UseSequentialPlayerOptions) {
-  const audioRef = useRef<HTMLAudioElement>(null);
   const urlRequestRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef<PendingSavePayload | null>(null);
@@ -437,6 +449,11 @@ export function useSequentialPlayer({
       return;
     }
 
+    // Imperative src — required when <audio> lives outside this component.
+    if (audio.getAttribute("src") !== src) {
+      audio.src = src;
+    }
+
     audio.load();
     setIsLoading(true);
     setStatusMessage("Подготавливаем аудио…");
@@ -528,7 +545,12 @@ export function useSequentialPlayer({
         onInitialAutoplayAttempted?.();
         userWantsPlaybackRef.current = true;
 
-        void audio.play().catch(() => {
+        void audio.play().catch((error: unknown) => {
+          const name =
+            error && typeof error === "object" && "name" in error
+              ? String((error as { name?: string }).name)
+              : "unknown";
+          debugSnapshot("autoplay", `blocked:${name}`);
           userWantsPlaybackRef.current = false;
           setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
         });

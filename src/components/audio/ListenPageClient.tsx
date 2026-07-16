@@ -31,6 +31,8 @@ export default function ListenPageClient({
     activeQueue,
     clearPlaylistQueue,
     isInternalQueueNavigation,
+    confirmInternalQueueNavigation,
+    isQueueDrivenPractice,
   } = useGlobalAudioPlayer();
 
   useEffect(() => {
@@ -38,12 +40,23 @@ export default function ListenPageClient({
       return;
     }
 
-    // Internal queue router.replace — keep queue, do not reload/autoplay again.
+    // Internal queue router.replace (from or to page) — keep queue, no reload.
     if (isInternalQueueNavigation(practiceId)) {
+      confirmInternalQueueNavigation(practiceId);
       return;
     }
 
-    // User opened a different listen route — leave playlist queue mode.
+    // Previous queue entry page still mounted after provider already advanced.
+    if (
+      activeQueue &&
+      activeSession?.practiceId &&
+      activeSession.practiceId !== practiceId &&
+      isQueueDrivenPractice(practiceId)
+    ) {
+      return;
+    }
+
+    // True standalone listen navigation — leave playlist queue mode.
     if (activeQueue) {
       clearPlaylistQueue();
     }
@@ -70,6 +83,7 @@ export default function ListenPageClient({
     authorSlug,
     autoplay,
     clearPlaylistQueue,
+    confirmInternalQueueNavigation,
     coverGradient,
     coverImageUrl,
     coverSymbol,
@@ -78,6 +92,7 @@ export default function ListenPageClient({
     initialProgress,
     isAuthorPreview,
     isInternalQueueNavigation,
+    isQueueDrivenPractice,
     loadSession,
     practiceId,
     practiceTitle,

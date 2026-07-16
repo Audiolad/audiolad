@@ -183,16 +183,34 @@ function simulateExhaustDedupe() {
 /** Simulate internal replace guard vs standalone clear. */
 function simulateNavigationGuard() {
   let queueActive = true;
-  let replaceTarget = "B";
+  let pending = { from: "A", to: "B" };
+  let sessionPracticeId = "B";
   let cleared = false;
+  const queueDriven = new Set(["A", "B", "C"]);
 
   function isInternal(practiceId) {
-    return replaceTarget === practiceId;
+    if (
+      pending &&
+      (practiceId === pending.to || practiceId === pending.from)
+    ) {
+      return true;
+    }
+    return sessionPracticeId === practiceId && queueActive;
   }
 
-  function onListenMount(practiceId) {
+  function onListenEffect(practiceId) {
     if (isInternal(practiceId)) {
+      if (pending && practiceId === pending.to) pending = null;
       return "keep-queue";
+    }
+    // Stale previous page after advance (session already on B, page still A).
+    if (
+      queueActive &&
+      sessionPracticeId &&
+      sessionPracticeId !== practiceId &&
+      queueDriven.has(practiceId)
+    ) {
+      return "stale-keep";
     }
     if (queueActive) {
       cleared = true;
@@ -201,10 +219,26 @@ function simulateNavigationGuard() {
     return "standalone-load";
   }
 
-  assert(onListenMount("B") === "keep-queue", "replace B keeps queue");
-  assert(!cleared, "queue not cleared on replace");
-  assert(onListenMount("Z") === "standalone-load", "other listen standalone");
+  // Critical race: activeQueue updates to B while ListenPageClient is still on A.
+  assert(onListenEffect("A") === "keep-queue", "from-page keeps queue during pending");
+  assert(!cleared, "queue not cleared on from-page");
+  assert(onListenEffect("B") === "keep-queue", "to-page keeps queue");
+  assert(!pending, "pending cleared on confirm");
+  assert(onListenEffect("Z") === "standalone-load", "other listen standalone");
   assert(cleared, "standalone clears queue");
+}
+
+/** Old buggy guard only matched target — clears queue on from-page. */
+function simulateLegacyBugWouldClear() {
+  let replaceTarget = "B";
+  let cleared = false;
+  function legacy(practiceId) {
+    if (replaceTarget === practiceId) return "keep";
+    cleared = true;
+    return "clear";
+  }
+  assert(legacy("A") === "clear", "legacy clears from-page A");
+  assert(cleared, "legacy bug reproduced");
 }
 
 /** Simulate restart fromStart ignoring saved mid-track progress. */
@@ -222,20 +256,38 @@ function simulateRestartFromZero() {
 
 simulateExhaustDedupe();
 simulateNavigationGuard();
+simulateLegacyBugWouldClear();
 simulateRestartFromZero();
 
 // Source guards present in provider / listen client
 const provider = read("src/components/audio/GlobalAudioPlayerProvider.tsx");
 assert(provider.includes("transitionLockRef"), "transition lock");
-assert(provider.includes("queueReplaceTargetRef"), "replace target");
+assert(provider.includes("pendingQueueNavigationRef"), "pending nav token");
+assert(provider.includes("confirmInternalQueueNavigation"), "confirm nav");
+assert(provider.includes("beginPendingQueueNavigation"), "begin pending");
+assert(provider.includes("persistentAudioRef"), "persistent audio");
 assert(provider.includes("lastExhaustedPracticeIdRef"), "exhaust dedupe");
 assert(provider.includes("playbackInstanceId"), "remount instance");
 assert(provider.includes("forceStartAtBeginning"), "restart from start");
 assert(provider.includes("isInternalQueueNavigation"), "nav guard export");
+assert(
+  provider.includes("Survives engine remounts"),
+  "persistent audio comment present",
+);
 
 const listenClient = read("src/components/audio/ListenPageClient.tsx");
 assert(listenClient.includes("isInternalQueueNavigation"), "listen uses guard");
+assert(listenClient.includes("confirmInternalQueueNavigation"), "listen confirms");
+assert(listenClient.includes("isQueueDrivenPractice"), "stale page guard");
 assert(listenClient.includes("clearPlaylistQueue"), "standalone clear");
+
+const player = read("src/components/audio/useSequentialPlayer.ts");
+assert(player.includes("audioRef: MutableRefObject"), "shared audio ref option");
+assert(player.includes("blocked:"), "autoplay block debug");
+
+const compactRow = read("src/components/playlists/PlaylistItemRow.tsx");
+assert(compactRow.includes("min-h-[76px]"), "compact row height");
+assert(compactRow.includes('aria-label={`Слушать ${item.title}`}'), "play a11y");
 
 const sessionRoute = read(
   "src/app/api/listen/product/[slug]/[productSlug]/session/route.ts",

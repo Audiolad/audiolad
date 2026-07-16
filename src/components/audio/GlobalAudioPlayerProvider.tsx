@@ -58,10 +58,21 @@ type SessionContextValue = {
   restartPlaylistQueue: () => Promise<LoadPlaylistQueueResult>;
   returnToPlaylistSource: () => void;
   isQueueDrivenPractice: (practiceId: string) => boolean;
-  /** True while / after internal queue router.replace for this practice. */
+  /**
+   * True while pending internal queue navigation involves this practice
+   * (from or to), or when it is the settled current queue entry.
+   */
   isInternalQueueNavigation: (practiceId: string) => boolean;
+  /** Clears pending token after the target listen page confirms. */
+  confirmInternalQueueNavigation: (practiceId: string) => void;
   noticeMessage: string | null;
   clearNoticeMessage: () => void;
+};
+
+type PendingQueueNavigation = {
+  token: number;
+  fromPracticeId: string | null;
+  targetPracticeId: string;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -72,8 +83,10 @@ function GlobalPlayerEngine({
   session,
   sessionGenerationRef,
   stopEngineRef,
+  persistentAudioRef,
   queueHasNext,
   queueHasPrevious,
+  skipAutoplayUrlSync,
   onTracksExhausted,
   onRequestPreviousProduct,
   children,
@@ -81,8 +94,11 @@ function GlobalPlayerEngine({
   session: LoadSessionInput;
   sessionGenerationRef: MutableRefObject<number>;
   stopEngineRef: MutableRefObject<(() => void) | null>;
+  persistentAudioRef: MutableRefObject<HTMLAudioElement | null>;
   queueHasNext: boolean;
   queueHasPrevious: boolean;
+  /** Queue path already called router.replace — avoid a duplicate replace. */
+  skipAutoplayUrlSync: boolean;
   onTracksExhausted: (
     fromPracticeId: string,
   ) => Promise<"advanced" | "completed" | "none">;
@@ -93,7 +109,7 @@ function GlobalPlayerEngine({
   const recoveryTimerRef = useRef<number | null>(null);
 
   const handleInitialAutoplayAttempted = useCallback(() => {
-    if (!session.requestAutoplay) {
+    if (!session.requestAutoplay || skipAutoplayUrlSync) {
       return;
     }
 
@@ -107,7 +123,13 @@ function GlobalPlayerEngine({
     }
 
     router.replace(path, { scroll: false });
-  }, [router, session.authorSlug, session.productSlug, session.requestAutoplay]);
+  }, [
+    router,
+    session.authorSlug,
+    session.productSlug,
+    session.requestAutoplay,
+    skipAutoplayUrlSync,
+  ]);
 
   const registerCleanup = useCallback(
     (cleanup: () => void) => {
@@ -131,11 +153,11 @@ function GlobalPlayerEngine({
     onInitialAutoplayAttempted: handleInitialAutoplayAttempted,
     getSessionGeneration: () => sessionGenerationRef.current,
     registerCleanup,
+    audioRef: persistentAudioRef,
   });
 
   const {
     audioRef,
-    src,
     currentTrack,
     isPlaying,
     isRecovering,
@@ -151,7 +173,7 @@ function GlobalPlayerEngine({
   const playerContextValue = {
     ...playerControls,
     audioRef,
-    src,
+    src: engine.src,
     currentTrack,
     isPlaying,
     isRecovering,
@@ -305,13 +327,6 @@ function GlobalPlayerEngine({
 
   return (
     <PlayerEngineContext.Provider value={playerContextValue}>
-      <audio
-        ref={audioRef}
-        src={src ?? undefined}
-        preload="metadata"
-        playsInline
-        className="global-audio-element"
-      />
       {children}
       <GlobalMiniPlayer />
       <PlayerDebugPanel />
@@ -332,14 +347,26 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const [playbackInstanceId, setPlaybackInstanceId] = useState(0);
   const sessionGenerationRef = useRef(0);
   const stopEngineRef = useRef<(() => void) | null>(null);
+  /** Survives engine remounts so iOS keeps the unlocked media element. */
+  const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
   const sessionRef = useRef<LoadSessionInput | null>(null);
   const activeQueueRef = useRef<PlaylistQueue | null>(null);
   const transitionLockRef = useRef(false);
   const queueDrivenPracticeIdsRef = useRef<Set<string>>(new Set());
-  /** Practice id targeted by the latest internal queue router.replace. */
-  const queueReplaceTargetRef = useRef<string | null>(null);
+  /** Explicit from→to token for internal queue navigation (not URL timing). */
+  const pendingQueueNavigationRef = useRef<PendingQueueNavigation | null>(null);
+  const pendingQueueNavigationTokenRef = useRef(0);
   /** Practice id that already triggered cross-product advance (ended/Next dedupe). */
   const lastExhaustedPracticeIdRef = useRef<string | null>(null);
+  const pendingNavSafetyTimerRef = useRef<number | null>(null);
+
+  const clearPendingQueueNavigation = useCallback(() => {
+    pendingQueueNavigationRef.current = null;
+    if (pendingNavSafetyTimerRef.current !== null) {
+      window.clearTimeout(pendingNavSafetyTimerRef.current);
+      pendingNavSafetyTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -358,9 +385,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     activeQueueRef.current = null;
     setQueueCompleted(false);
     queueDrivenPracticeIdsRef.current = new Set();
-    queueReplaceTargetRef.current = null;
+    clearPendingQueueNavigation();
     lastExhaustedPracticeIdRef.current = null;
-  }, []);
+  }, [clearPendingQueueNavigation]);
 
   const loadSession = useCallback((input: LoadSessionInput) => {
     setDismissedPracticeId(null);
@@ -412,7 +439,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   }, []);
 
   const isInternalQueueNavigation = useCallback((practiceId: string) => {
-    if (queueReplaceTargetRef.current === practiceId) {
+    const pending = pendingQueueNavigationRef.current;
+    if (
+      pending &&
+      (practiceId === pending.targetPracticeId ||
+        practiceId === pending.fromPracticeId)
+    ) {
       return true;
     }
 
@@ -420,6 +452,39 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     const current = queue?.entries[queue.currentIndex];
     return Boolean(current && getQueueEntryPracticeId(current) === practiceId);
   }, []);
+
+  const confirmInternalQueueNavigation = useCallback((practiceId: string) => {
+    const pending = pendingQueueNavigationRef.current;
+    if (pending && pending.targetPracticeId === practiceId) {
+      clearPendingQueueNavigation();
+    }
+  }, [clearPendingQueueNavigation]);
+
+  const beginPendingQueueNavigation = useCallback(
+    (fromPracticeId: string | null, targetPracticeId: string) => {
+      pendingQueueNavigationTokenRef.current += 1;
+      const token = pendingQueueNavigationTokenRef.current;
+      pendingQueueNavigationRef.current = {
+        token,
+        fromPracticeId,
+        targetPracticeId,
+      };
+
+      if (pendingNavSafetyTimerRef.current !== null) {
+        window.clearTimeout(pendingNavSafetyTimerRef.current);
+      }
+
+      // Never leave the token stuck after a failed/hung transition.
+      pendingNavSafetyTimerRef.current = window.setTimeout(() => {
+        const current = pendingQueueNavigationRef.current;
+        if (current?.token === token) {
+          pendingQueueNavigationRef.current = null;
+        }
+        pendingNavSafetyTimerRef.current = null;
+      }, 15_000);
+    },
+    [],
+  );
 
   const activateEntryAtIndex = useCallback(
     async (
@@ -470,9 +535,18 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             runtimeSkippedCount: runtimeSkipped,
           };
 
-          // Mark internal replace BEFORE state updates so ListenPageClient
-          // does not treat router.replace as standalone navigation.
-          queueReplaceTargetRef.current = loaded.session.practiceId;
+          const fromPracticeId =
+            sessionRef.current?.practiceId ??
+            (queue.entries[queue.currentIndex]
+              ? getQueueEntryPracticeId(queue.entries[queue.currentIndex])
+              : null);
+
+          // Mark pending from→to BEFORE state/URL updates so the still-mounted
+          // previous ListenPageClient does not clear the queue.
+          beginPendingQueueNavigation(
+            fromPracticeId,
+            loaded.session.practiceId,
+          );
 
           setActiveQueue(nextQueue);
           activeQueueRef.current = nextQueue;
@@ -481,7 +555,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             nextQueue.entries.map((item) => getQueueEntryPracticeId(item)),
           );
 
-          // Force engine remount even when practiceId stays the same (restart).
+          // Remount engine state for the new product; <audio> stays persistent.
           setPlaybackInstanceId((value) => value + 1);
 
           loadSession({
@@ -528,7 +602,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         transitionLockRef.current = false;
       }
     },
-    [loadSession, router],
+    [beginPendingQueueNavigation, loadSession, router],
   );
 
   const loadPlaylistQueue = useCallback(
@@ -746,6 +820,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       returnToPlaylistSource,
       isQueueDrivenPractice,
       isInternalQueueNavigation,
+      confirmInternalQueueNavigation,
       noticeMessage,
       clearNoticeMessage,
     }),
@@ -753,6 +828,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       activeQueue,
       clearNoticeMessage,
       clearPlaylistQueue,
+      confirmInternalQueueNavigation,
       currentQueueEntry,
       dismissedPracticeId,
       isInternalQueueNavigation,
@@ -772,14 +848,23 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   return (
     <SessionContext.Provider value={sessionValue}>
+      {/* Persistent media element — must not remount across queue products (iOS). */}
+      <audio
+        ref={persistentAudioRef}
+        preload="metadata"
+        playsInline
+        className="global-audio-element"
+      />
       {session ? (
         <GlobalPlayerEngine
           key={`${session.practiceId}:${playbackInstanceId}`}
           session={session}
           sessionGenerationRef={sessionGenerationRef}
           stopEngineRef={stopEngineRef}
+          persistentAudioRef={persistentAudioRef}
           queueHasNext={queueHasNext}
           queueHasPrevious={queueHasPrevious}
+          skipAutoplayUrlSync={Boolean(activeQueue)}
           onTracksExhausted={onTracksExhausted}
           onRequestPreviousProduct={onRequestPreviousProduct}
         >
