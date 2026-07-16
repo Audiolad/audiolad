@@ -7,6 +7,7 @@ HEALTH_WATCH_MAX_RESTART_DELTA="${HEALTH_WATCH_MAX_RESTART_DELTA:-2}"
 hw_read_pm2_metrics() {
   local app_name="${1:-audiolad}"
   local json_source="${HW_PM2_JLIST_JSON:-}"
+  local attempt metrics_line
 
   if [[ -n "$json_source" && -f "$json_source" ]]; then
     python3 - "$app_name" "$json_source" <<'PY'
@@ -32,7 +33,8 @@ PY
     return
   fi
 
-  pm2 jlist 2>/dev/null | python3 - "$app_name" <<'PY'
+  for attempt in 1 2 3; do
+    mapfile -t metrics_line < <(pm2 jlist 2>/dev/null | python3 - "$app_name" <<'PY'
 import json, sys
 app_name = sys.argv[1]
 raw = sys.stdin.read().strip()
@@ -55,6 +57,30 @@ print(0)
 print(0)
 print(0)
 PY
+)
+    if [[ "${metrics_line[0]:-missing}" != "missing" ]]; then
+      printf '%s\n' "${metrics_line[@]}"
+      return
+    fi
+    sleep 2
+  done
+
+  if pm2 describe "$app_name" 2>/dev/null | grep -q "status.*online"; then
+    local restart_time unstable_restarts pid
+    restart_time="$(pm2 jlist 2>/dev/null | python3 -c "import json,sys
+raw=sys.stdin.read().strip()
+apps=json.loads(raw) if raw else []
+for app in apps:
+    if app.get('name')=='$app_name':
+        print(app.get('pm2_env',{}).get('restart_time',0)); break
+else: print(0)" 2>/dev/null || echo 0)"
+    unstable_restarts="$(pm2 describe "$app_name" 2>/dev/null | awk -F'│' '/unstable restarts/ {gsub(/ /,"",$3); print $3; exit}')"
+    pid="$(pm2 describe "$app_name" 2>/dev/null | awk -F'│' '/^│ pid / {gsub(/ /,"",$3); print $3; exit}')"
+    printf '%s\n' "online" "${restart_time:-0}" "${unstable_restarts:-0}" "${pid:-0}" "0"
+    return
+  fi
+
+  printf '%s\n' "missing" "0" "0" "0" "0"
 }
 
 hw_probe_health_endpoint() {

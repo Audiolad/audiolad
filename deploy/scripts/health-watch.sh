@@ -43,6 +43,17 @@ baseline_pid="${baseline_pm2[3]:-0}"
 
 log_info "PM2 baseline: status=${baseline_status} restart_time=${restart_before} unstable_restarts=${unstable_before} pid=${baseline_pid}"
 
+if [[ "$baseline_status" == "missing" ]]; then
+  log_warn "PM2 baseline unavailable immediately after reload; waiting 10s before watch probes"
+  sleep 10
+  mapfile -t baseline_pm2 < <(hw_read_pm2_metrics "$PM2_APP_NAME")
+  restart_before="${baseline_pm2[1]:-0}"
+  unstable_before="${baseline_pm2[2]:-0}"
+  baseline_status="${baseline_pm2[0]:-unknown}"
+  baseline_pid="${baseline_pm2[3]:-0}"
+  log_info "PM2 baseline retry: status=${baseline_status} restart_time=${restart_before} unstable_restarts=${unstable_before} pid=${baseline_pid}"
+fi
+
 check_once() {
   local probe_output
   probe_output="$(hw_evaluate_probe \
