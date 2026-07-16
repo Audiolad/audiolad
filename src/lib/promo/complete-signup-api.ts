@@ -4,12 +4,27 @@ const UUID_PATTERN =
 const PRACTICE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type PromoCompleteSignupBody = {
+  practice_id?: string;
   practice_slug: string;
   progress?: {
     audio_item_id: string;
     position_seconds: number;
     completed: boolean;
   } | null;
+};
+
+export type PromoCompleteSignupResponse = {
+  ok: true;
+  practiceSaved: boolean;
+  alreadySaved: boolean;
+  progressTransferred: boolean;
+  library: {
+    practice_id: string;
+    practice_slug: string;
+    access_source: string;
+    inserted: boolean;
+    in_library: boolean;
+  };
 };
 
 export type PromoClaimRpcResult = {
@@ -29,6 +44,7 @@ export function parsePromoCompleteSignupBody(
 
   const record = body as Record<string, unknown>;
   const practiceSlug = record.practice_slug;
+  const practiceIdRaw = record.practice_id;
 
   if (typeof practiceSlug !== "string") {
     return null;
@@ -42,6 +58,16 @@ export function parsePromoCompleteSignupBody(
     !PRACTICE_SLUG_PATTERN.test(trimmedSlug)
   ) {
     return null;
+  }
+
+  let practiceId: string | undefined;
+
+  if (practiceIdRaw !== undefined && practiceIdRaw !== null) {
+    if (typeof practiceIdRaw !== "string" || !UUID_PATTERN.test(practiceIdRaw.trim())) {
+      return null;
+    }
+
+    practiceId = practiceIdRaw.trim();
   }
 
   let progress: PromoCompleteSignupBody["progress"] = null;
@@ -76,6 +102,7 @@ export function parsePromoCompleteSignupBody(
   }
 
   return {
+    practice_id: practiceId,
     practice_slug: trimmedSlug,
     progress,
   };
@@ -114,7 +141,8 @@ export function mapPromoClaimRpcErrorMessage(message: string): {
   if (
     normalized.includes("practice_not_found") ||
     normalized.includes("practice_not_published") ||
-    normalized.includes("practice_not_promo_eligible")
+    normalized.includes("practice_not_promo_eligible") ||
+    normalized.includes("practice_identifier_required")
   ) {
     return { status: 404, error: "practice_not_found" };
   }

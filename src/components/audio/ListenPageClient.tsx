@@ -12,6 +12,9 @@ import {
   resolvePromoAttribution,
 } from "@/lib/promo/attribution";
 import {
+  shouldRunPromoPostSignupHandler,
+} from "@/lib/promo/post-signup";
+import {
   guestProgressToListenEntries,
   readGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
@@ -170,7 +173,7 @@ export default function ListenPageClient({
 
   return (
     <>
-      {isAuthenticated && promoConversionMode ? (
+      {shouldRunPromoPostSignupHandler(isAuthenticated) ? (
         <PromoPostSignupHandler
           practiceId={practiceId}
           practiceSlug={productSlug}

@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { trackPromoEvent } from "@/lib/promo/analytics-client";
 import { clearGuestPracticeProgress, readGuestPracticeProgress } from "@/lib/promo/guest-progress";
+import {
+  isPromoSignupContextForPractice,
+} from "@/lib/promo/post-signup";
 import {
   clearPromoSignupContext,
   readPromoSignupContext,
@@ -28,9 +31,10 @@ export default function PromoPostSignupHandler({
 }: PromoPostSignupHandlerProps) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
+  const attemptedRef = useRef(false);
 
   useEffect(() => {
-    if (running) {
+    if (running || attemptedRef.current) {
       return;
     }
 
@@ -48,27 +52,30 @@ export default function PromoPostSignupHandler({
 
       const pending = readPromoSignupContext();
 
-      if (!pending || pending.practiceId !== practiceId) {
+      if (!isPromoSignupContextForPractice(pending, practiceId)) {
         return;
       }
 
+      attemptedRef.current = true;
       setRunning(true);
 
       const guestProgress = readGuestPracticeProgress(practiceId);
+      const resolvedPracticeSlug = pending?.practiceSlug || practiceSlug;
 
       try {
         const response = await fetch("/api/promo/complete-signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            practice_slug: practiceSlug,
+            practice_id: pending?.practiceId ?? practiceId,
+            practice_slug: resolvedPracticeSlug,
             progress: guestProgress
               ? {
                   audio_item_id: guestProgress.trackId,
                   position_seconds: guestProgress.positionSeconds,
                   completed: guestProgress.completed,
                 }
-              : pending.trackId
+              : pending?.trackId
                 ? {
                     audio_item_id: pending.trackId,
                     position_seconds: pending.position ?? 0,
@@ -78,7 +85,21 @@ export default function PromoPostSignupHandler({
           }),
         });
 
-        if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              library?: { inserted?: boolean };
+              error?: string;
+            }
+          | null;
+
+        if (!response.ok || payload?.ok !== true) {
+          console.warn("promo_post_signup_failed", {
+            status: response.status,
+            error: payload?.error ?? "unknown",
+            practiceSlug: resolvedPracticeSlug,
+          });
+          attemptedRef.current = false;
           return;
         }
 
@@ -87,11 +108,17 @@ export default function PromoPostSignupHandler({
 
         if (!cancelled) {
           onCompleted?.({
-            inserted: response.status === 201,
+            inserted: payload.library?.inserted === true,
             practiceCompleted: guestProgress?.completed === true,
           });
           router.refresh();
         }
+      } catch (error) {
+        attemptedRef.current = false;
+        console.warn("promo_post_signup_error", {
+          practiceSlug: resolvedPracticeSlug,
+          message: error instanceof Error ? error.message : "unknown",
+        });
       } finally {
         if (!cancelled) {
           setRunning(false);

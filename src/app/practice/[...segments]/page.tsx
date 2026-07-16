@@ -515,19 +515,17 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      {user ? (
+        <PromoPostSignupHandler
+          practiceId={practice.id}
+          practiceSlug={practice.slug}
+        />
+      ) : null}
       {promoConversionMode ? (
-        <>
-          <PromoPracticeTracker
-            practiceId={practice.id}
-            practiceSlug={practice.slug}
-          />
-          {user ? (
-            <PromoPostSignupHandler
-              practiceId={practice.id}
-              practiceSlug={practice.slug}
-            />
-          ) : null}
-        </>
+        <PromoPracticeTracker
+          practiceId={practice.id}
+          practiceSlug={practice.slug}
+        />
       ) : null}
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}

@@ -35,27 +35,46 @@ export async function POST(request: Request) {
   const parsed = parsePromoCompleteSignupBody(body);
 
   if (!parsed) {
+    console.warn("promo_complete_signup_invalid_body");
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   const { data, error } = await supabase.rpc("claim_promo_practice", {
     p_practice_slug: parsed.practice_slug,
+    p_practice_id: parsed.practice_id ?? null,
   });
 
   if (error) {
     const mapped = mapPromoClaimRpcErrorMessage(error.message);
 
     if (mapped.status >= 500) {
-      console.error("promo_complete_signup_claim_error", error.message);
+      console.error("promo_complete_signup_claim_error", {
+        code: error.code,
+        message: error.message,
+        practiceSlug: parsed.practice_slug,
+        hasPracticeId: Boolean(parsed.practice_id),
+      });
+    } else {
+      console.warn("promo_complete_signup_claim_rejected", {
+        status: mapped.status,
+        error: mapped.error,
+        practiceSlug: parsed.practice_slug,
+        hasPracticeId: Boolean(parsed.practice_id),
+      });
     }
 
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });
   }
 
   if (!isPromoClaimRpcResult(data)) {
-    console.error("promo_complete_signup_claim_empty_result");
+    console.error("promo_complete_signup_claim_empty_result", {
+      practiceSlug: parsed.practice_slug,
+      hasPracticeId: Boolean(parsed.practice_id),
+    });
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
+
+  let progressTransferred = false;
 
   if (parsed.progress) {
     const { error: progressError } = await supabase
@@ -73,7 +92,12 @@ export async function POST(request: Request) {
       );
 
     if (progressError) {
-      console.error("promo_complete_signup_progress_error", progressError.message);
+      console.error("promo_complete_signup_progress_error", {
+        message: progressError.message,
+        practiceId: data.practice_id,
+      });
+    } else {
+      progressTransferred = true;
     }
   }
 
@@ -109,8 +133,19 @@ export async function POST(request: Request) {
     });
   }
 
+  console.info("promo_complete_signup_success", {
+    practiceId: data.practice_id,
+    practiceSlug: data.practice_slug,
+    inserted: data.inserted,
+    progressTransferred,
+  });
+
   return NextResponse.json(
     {
+      ok: true,
+      practiceSaved: true,
+      alreadySaved: !data.inserted,
+      progressTransferred,
       library: {
         practice_id: data.practice_id,
         practice_slug: data.practice_slug,
