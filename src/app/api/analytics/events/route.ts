@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
-  isPromoAnalyticsEventName,
+  isAllowedAnalyticsEventName,
+  isPwaAnalyticsEventName,
+  sanitizePwaAnalyticsPayload,
+} from "@/lib/pwa/analytics-events";
+import {
   sanitizeAnalyticsPosition,
   sanitizeAnalyticsString,
   sanitizeAnalyticsTrackId,
@@ -20,6 +24,7 @@ type AnalyticsEventBody = {
   referrer?: unknown;
   current_position?: unknown;
   duration?: unknown;
+  payload?: unknown;
 };
 
 function parseAnalyticsEventBody(body: unknown): AnalyticsEventBody | null {
@@ -28,6 +33,23 @@ function parseAnalyticsEventBody(body: unknown): AnalyticsEventBody | null {
   }
 
   return body as AnalyticsEventBody;
+}
+
+function sanitizeJsonPayload(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const payload = value as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+
+  for (const [key, raw] of Object.entries(payload)) {
+    if (typeof raw === "string") {
+      next[key] = raw.slice(0, 128);
+    }
+  }
+
+  return next;
 }
 
 export async function POST(request: Request) {
@@ -48,7 +70,7 @@ export async function POST(request: Request) {
   const eventName =
     typeof parsed.event_name === "string" ? parsed.event_name.trim() : "";
 
-  if (!isPromoAnalyticsEventName(eventName)) {
+  if (!isAllowedAnalyticsEventName(eventName)) {
     return NextResponse.json({ error: "invalid_event" }, { status: 400 });
   }
 
@@ -60,6 +82,30 @@ export async function POST(request: Request) {
   const trackId = sanitizeAnalyticsTrackId(
     typeof parsed.track_id === "string" ? parsed.track_id : null,
   );
+
+  let rpcPayload = sanitizeJsonPayload(parsed.payload);
+
+  if (isPwaAnalyticsEventName(eventName)) {
+    const pwaPayload = sanitizePwaAnalyticsPayload({
+      event_name: eventName,
+      anonymous_session_id:
+        typeof parsed.anonymous_session_id === "string"
+          ? parsed.anonymous_session_id
+          : null,
+      platform:
+        typeof rpcPayload.platform === "string" ? rpcPayload.platform : null,
+      source: typeof rpcPayload.source === "string" ? rpcPayload.source : null,
+    });
+
+    if (!pwaPayload) {
+      return NextResponse.json({ error: "invalid_event" }, { status: 400 });
+    }
+
+    rpcPayload = {
+      platform: pwaPayload.platform,
+      source: pwaPayload.source,
+    };
+  }
 
   const { data, error } = await supabase.rpc("insert_analytics_event", {
     p_event_name: eventName,
@@ -99,7 +145,7 @@ export async function POST(request: Request) {
     p_duration: sanitizeAnalyticsPosition(
       typeof parsed.duration === "number" ? parsed.duration : null,
     ),
-    p_payload: {},
+    p_payload: rpcPayload,
   });
 
   if (error) {

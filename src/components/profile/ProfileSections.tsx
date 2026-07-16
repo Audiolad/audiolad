@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
 import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
 import {
   formatCounterDisplay,
@@ -308,6 +309,8 @@ export function ProfileAccountSection() {
       </h2>
 
       <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+        <PwaSettingsMenuItem variant="profile" />
+
         <Link
           href="/settings"
           className="flex min-h-[56px] w-full items-center justify-between border-b border-[#eee6f7] px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
