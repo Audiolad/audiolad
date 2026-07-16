@@ -21,14 +21,14 @@ type ProfileUserCardProps = {
 export function ProfileUserCard({ card }: ProfileUserCardProps) {
   return (
     <section
-      className="relative mt-6 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)]"
+      className="relative mt-6 min-w-0 overflow-hidden rounded-[28px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f2e6fb] p-5 shadow-[0_12px_30px_rgba(90,60,145,0.08)] lg:p-6"
       aria-labelledby="profile-user-name"
     >
       <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#d8b8f2]/25 blur-2xl" />
 
-      <div className="relative flex items-center gap-4">
+      <div className="relative flex items-center gap-4 lg:gap-5">
         <div
-          className="flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-[#f7effe] shadow-sm"
+          className="flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-[#f7effe] shadow-sm lg:h-[100px] lg:w-[100px]"
           aria-hidden="true"
         >
           <span className="text-4xl text-[#7042c5]">{card.initial}</span>
@@ -75,7 +75,10 @@ type ProfileCountersProps = {
 
 export function ProfileCounters({ counters }: ProfileCountersProps) {
   return (
-    <section className="mt-5 grid grid-cols-3 gap-3" aria-label="Сводка">
+    <section
+      className="mt-5 grid min-w-0 grid-cols-3 gap-3"
+      aria-label="Сводка"
+    >
       {counters.map((counter) => {
         const valueLabel = formatCounterDisplay(counter.value);
         const content = (
@@ -114,7 +117,7 @@ export function ProfileCounters({ counters }: ProfileCountersProps) {
 
 export function ProfileQuickLinks() {
   return (
-    <section className="mt-6" aria-label="Быстрые разделы">
+    <section className="mt-6 min-w-0" aria-label="Быстрые разделы">
       <div className="grid grid-cols-2 gap-3">
         <Link
           href="/my-practices"
@@ -161,7 +164,7 @@ export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
 
   if (section.kind === "prospect") {
     return (
-      <section className="mt-8" aria-labelledby="profile-author-heading">
+      <section className="mt-8 min-w-0" aria-labelledby="profile-author-heading">
         <h2 id="profile-author-heading" className="text-[21px] font-semibold">
           Стать автором АудиоЛада
         </h2>
@@ -188,7 +191,7 @@ export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
       : "/author-dashboard";
 
   return (
-    <section className="mt-8" aria-labelledby="profile-author-heading">
+    <section className="mt-8 min-w-0" aria-labelledby="profile-author-heading">
       <h2 id="profile-author-heading" className="text-[21px] font-semibold">
         Для авторов
       </h2>
@@ -229,7 +232,7 @@ export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
 
 export function ProfileAccountSection() {
   return (
-    <section className="mt-8" aria-labelledby="profile-account-heading">
+    <section className="mt-8 min-w-0" aria-labelledby="profile-account-heading">
       <h2 id="profile-account-heading" className="text-[21px] font-semibold">
         Аккаунт
       </h2>
@@ -257,6 +260,25 @@ export function ProfileAccountSection() {
           </span>
         </Link>
       </div>
+    </section>
+  );
+}
+
+type ProfileSignOutSectionProps = {
+  signOutAction: () => Promise<void>;
+};
+
+export function ProfileSignOutSection({ signOutAction }: ProfileSignOutSectionProps) {
+  return (
+    <section className="mt-8 min-w-0">
+      <form action={signOutAction}>
+        <button
+          type="submit"
+          className="min-h-11 w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b34f63]"
+        >
+          Выйти
+        </button>
+      </form>
     </section>
   );
 }
