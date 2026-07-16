@@ -7,8 +7,7 @@ export const EMPTY_GUEST_HOME_DATA = {
 } as const;
 
 export const EMPTY_PERSONAL_HOME_DATA = {
-  greetingTitle: "Добрый день",
-  greetingPhrase: "Можно выбрать то, что сейчас действительно поддерживает.",
+  greetingFirstName: null,
   timeOfDaySectionTitle: "Небольшая пауза для себя",
   continueListening: null,
   startSuggestions: [],

@@ -45,8 +45,7 @@ export type GuestHomeData = {
 };
 
 export type PersonalHomeData = {
-  greetingTitle: string;
-  greetingPhrase: string;
+  greetingFirstName: string | null;
   timeOfDaySectionTitle: string;
   continueListening: ContinueListeningItem | null;
   startSuggestions: HomeProduct[];

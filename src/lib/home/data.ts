@@ -3,7 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 
-import { buildPersonalGreetingContent } from "./greeting";
+import {
+  getDayPeriodFromHour,
+  getTimeOfDaySectionTitle,
+} from "./greeting";
 import { getGreetingFirstName } from "./profile-name";
 import {
   enrichCatalogProducts,
@@ -375,12 +378,11 @@ export async function getPersonalHomeData(
   const newProducts = excludeProducts(allProducts.slice(0, 8), shownIds);
   const personalFreeProducts = excludeProducts(freeProducts.slice(0, 8), shownIds);
   const greetingFirstName = getGreetingFirstName(profile, userMetadata);
-  const greetingContent = buildPersonalGreetingContent(greetingFirstName);
+  const timeOfDayPeriod = getDayPeriodFromHour(new Date().getHours());
 
   return {
-    greetingTitle: greetingContent.greetingTitle,
-    greetingPhrase: greetingContent.greetingPhrase,
-    timeOfDaySectionTitle: greetingContent.timeOfDaySectionTitle,
+    greetingFirstName,
+    timeOfDaySectionTitle: getTimeOfDaySectionTitle(timeOfDayPeriod),
     continueListening,
     startSuggestions,
     forYouProducts,

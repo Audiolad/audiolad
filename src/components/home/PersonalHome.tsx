@@ -12,10 +12,7 @@ type PersonalHomeProps = {
 export default function PersonalHome({ data }: PersonalHomeProps) {
   return (
     <>
-      <DailyGreeting
-        title={data.greetingTitle}
-        phrase={data.greetingPhrase}
-      />
+      <DailyGreeting firstName={data.greetingFirstName} />
 
       <ContinueListening
         item={data.continueListening}
