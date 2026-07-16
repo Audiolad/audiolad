@@ -4,6 +4,22 @@
 
 ---
 
+## Сессия — 15 июля 2026 (плейлисты PR3.1 review → deploy)
+
+**Сделано:**
+
+- Точечное ревью RPC: remove из public после drift; `updated_at` через `clock_timestamp()`; preflight gates/limits до mutate.
+- Commit PR3.1: `24616e7e2ec5fb85211fce9a6f5dc9a413d2c09c`.
+- Backup: `postgres-pre-playlists-pr3-20260715-204130.dump`.
+- Migration RPC применена к production; SQL smoke PASS.
+- Deploy release `20260715-204408-24616e7` (previous `20260715-200910-c470e23`).
+- HTTP/API/UI smoke PASS; тестовые пользователи удалены.
+- Push не выполнялся.
+
+**Следующий шаг:** commit post-deploy docs → страница `/playlists/[id]`.
+
+---
+
 ## Сессия — 15 июля 2026 (плейлисты PR3.1 + закрытие PR2 docs)
 
 **Сделано:**

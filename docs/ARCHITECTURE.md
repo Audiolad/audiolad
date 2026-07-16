@@ -85,7 +85,7 @@ Timeweb Cloud
 - Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
 - `/playlists/new` → redirect `/playlists`.
 - Деталь `/playlists/[id]`, reorder и Play All — ещё не реализованы.
-- Миграция/deploy PR3.1 на production — ещё нет.
+- PR3.1 на production: commit `24616e7`, release `20260715-204408-24616e7`.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 

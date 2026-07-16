@@ -140,12 +140,13 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Элемент плейлиста = `practice_id` (целый продукт).
 - `playlist_items` **не** выдаёт entitlement / listen-доступ.
 - Атомарная смена набора плейлистов: RPC `public.set_practice_playlist_membership(uuid, uuid[])`
-  (`supabase/migrations/20260715280000_playlist_membership_rpc.sql`).
-- Private add: действующий доступ как у `resolveProductAccess` (author_members / active `user_practices` / free published catalog listen).
-- Public add: те же условия, что `claim_free_practice` / `isPracticeEligibleForPublicPlaylist`.
-- Position нового элемента: `MAX(position)+1` под `FOR UPDATE` родительского плейлиста.
+  (`supabase/migrations/20260715280000_playlist_membership_rpc.sql`) — **применена к production**.
+- Порядок: ownership → gates (только для add) → locks → **preflight** gates/limits → delete → insert → `updated_at` (`clock_timestamp()` только при реальном изменении).
+- Private add: действующий доступ как у `resolveProductAccess`.
+- Public add: условия `claim_free_practice` / `isPracticeEligibleForPublicPlaylist`.
+- Remove из public/private разрешён даже если продукт больше не проходит gate.
+- Position нового элемента: `MAX(position)+1` под `FOR UPDATE`.
 - API: `GET/PUT /api/playlists/membership`.
-- Миграция PR3.1 на production **ещё не применена**.
 
 ### Будущие маршруты
 

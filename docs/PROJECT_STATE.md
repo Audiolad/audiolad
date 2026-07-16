@@ -91,20 +91,24 @@
 ## Плейлисты (состояние на 2026-07-15)
 
 - PR1 миграция `20260715270000_create_playlists.sql` **применена к production**.
-- PR2 развёрнут: release `20260715-200910-c470e23`, commit `c470e23`.
-- `/playlists` работает с реальными данными владельца; create/rename/delete/change visibility через API.
+- PR2 развёрнут ранее: commit `c470e23`.
+- PR3.1 развёрнут: commit `24616e7`, release `20260715-204408-24616e7`, previous `20260715-200910-c470e23`.
+- Миграция RPC `20260715280000_playlist_membership_rpc.sql` **применена к production**.
+- Добавление из Аудиотеки: меню `···` → multi-select sheet → `GET/PUT /api/playlists/membership`.
+- Inline создание private-плейлиста внутри sheet работает.
+- Private add требует entitlement; public add — free catalog rules; remove без gate.
+- `playlist_items` не создаёт entitlement / не меняет `user_practices`.
+- Лимит 100 элементов на плейлист.
 - `/playlists/new` → redirect `/playlists` (для гостя сначала auth с `next`).
-- Профиль показывает реальный count плейлистов.
-- PR3.1 (код в рабочей копии, **не закоммичен / не на production**): добавление из Аудиотеки в один или несколько плейлистов; atomic RPC membership; лимит 100.
-- Публичная страница `/p/[slug]` ещё не реализована; страница содержимого `/playlists/[id]`, reorder и Play All — нет.
-- Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`; previous = `20260715-190051-35f01ac`.
-- Backup перед миграцией PR1: `/var/www/audiolad/backups/postgres-pre-playlists-20260715-200359.dump`.
+- Публичная страница `/p/[slug]` ещё не реализована.
+- Страница содержимого `/playlists/[id]`, reorder и Play All — нет.
+- Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
+- Backup перед PR3.1: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-20260715-204130.dump`.
 
 ## Что ещё не реализовано
 
 - Страница содержимого плейлиста `/playlists/[id]`, reorder, Play All.
 - Публичный каталог подборок `/p/[slug]`.
-- Применение/deploy PR3.1 на production.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
 - Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).
 
