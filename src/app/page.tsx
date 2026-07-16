@@ -53,7 +53,19 @@ export default async function Home() {
   const state = await resolveHomeRenderState();
 
   if (state.kind === "critical") {
-    return <HomeCriticalFallback isAuthenticated={false} />;
+    let isAuthenticated = false;
+
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      isAuthenticated = Boolean(user);
+    } catch {
+      isAuthenticated = false;
+    }
+
+    return <HomeCriticalFallback isAuthenticated={isAuthenticated} />;
   }
 
   if (state.kind === "personal") {

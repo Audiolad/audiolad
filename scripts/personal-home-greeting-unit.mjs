@@ -5,6 +5,7 @@ import {
   getNextRotatingIndex,
   getPersonalGreetingAtIndex,
   getPersonalHomeVisitContentFromStorage,
+  getPersonalHomeWisdomAtIndex,
   normalizeStoredIndex,
   readPersonalHomeStoredIndex,
   resolvePersonalHomeVisitContent,
@@ -149,6 +150,27 @@ function testVisitRotationFromStorage() {
   );
 }
 
+function testCachedServerSnapshotPattern() {
+  const cache = new Map();
+
+  function getServerSnapshot(firstName) {
+    if (!cache.has(firstName)) {
+      cache.set(firstName, {
+        greetingTitle: getPersonalGreetingAtIndex(0, firstName),
+        wisdomPhrase: getPersonalHomeWisdomAtIndex(0),
+      });
+    }
+
+    return cache.get(firstName);
+  }
+
+  const first = getServerSnapshot("Сергей");
+  const second = getServerSnapshot("Сергей");
+
+  assert(first === second, "server snapshot must stay referentially stable");
+  assert(first.greetingTitle.includes("Сергей"), "cached snapshot keeps content");
+}
+
 function run() {
   testNextIndexAdvances();
   testNextIndexWraps();
@@ -161,6 +183,7 @@ function run() {
   testStorageReadFailure();
   testStorageWriteFailure();
   testVisitRotationFromStorage();
+  testCachedServerSnapshotPattern();
   console.log("personal-home-greeting-unit: all tests passed");
 }
 

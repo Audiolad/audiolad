@@ -374,7 +374,6 @@ export default function AuthorApplicationPanel({
 
   const [formValues, setFormValues] = useState(initialResolution.values);
   const [restoredDraftNotice, setRestoredDraftNotice] = useState(false);
-  const [successContact, setSuccessContact] = useState<string | null>(null);
   const draftHydratedRef = useRef(false);
   const submitInFlightRef = useRef(false);
 
@@ -401,7 +400,7 @@ export default function AuthorApplicationPanel({
   }, [application, defaultValues]);
 
   useEffect(() => {
-    if (successContact || showSubmittedBanner) {
+    if (state.submitted || showSubmittedBanner) {
       return;
     }
 
@@ -413,7 +412,13 @@ export default function AuthorApplicationPanel({
     }, DRAFT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [formValues, showSubmittedBanner, successContact]);
+  }, [formValues, showSubmittedBanner, state.submitted]);
+
+  useEffect(() => {
+    if (state.submitted && state.submittedContact) {
+      clearAuthorApplicationDraft(window.localStorage);
+    }
+  }, [state.submitted, state.submittedContact]);
 
   function handleSubmit() {
     if (isPending || submitInFlightRef.current) {
@@ -421,27 +426,28 @@ export default function AuthorApplicationPanel({
     }
 
     submitInFlightRef.current = true;
-
-    void Promise.resolve(
-      submitAction(buildAuthorApplicationFormData(formValues)),
-    ).then((nextState) => {
-      submitInFlightRef.current = false;
-
-      if (!nextState) {
-        return;
-      }
-
-      if (nextState.submitted && nextState.submittedContact) {
-        clearAuthorApplicationDraft(window.localStorage);
-        setSuccessContact(nextState.submittedContact);
-        return;
-      }
-
-      if (nextState.values) {
-        setFormValues(nextState.values);
-      }
-    });
+    submitAction(buildAuthorApplicationFormData(formValues));
   }
+
+  useEffect(() => {
+    if (!submitInFlightRef.current || isPending) {
+      return;
+    }
+
+    submitInFlightRef.current = false;
+
+    if (state.submitted) {
+      return;
+    }
+
+    if (!state.values) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setFormValues(state.values!);
+    });
+  }, [isPending, state]);
 
   if (audience === "guest") {
     return (
@@ -497,7 +503,7 @@ export default function AuthorApplicationPanel({
   });
 
   const resolvedSuccessContact =
-    successContact ??
+    (state.submitted && state.submittedContact) ||
     (showSubmittedBanner ? defaultValues.contact.trim() || null : null);
 
   if (resolvedSuccessContact) {
