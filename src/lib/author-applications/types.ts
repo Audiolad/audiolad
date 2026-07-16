@@ -60,6 +60,8 @@ export type AuthorApplicationFieldErrors = Partial<
 
 export type AuthorApplicationFormState = {
   ok: boolean;
+  submitted?: boolean;
+  submittedContact?: string;
   errors: AuthorApplicationFieldErrors;
   values?: AuthorApplicationFormValues;
 };

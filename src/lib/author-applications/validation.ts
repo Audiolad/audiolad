@@ -116,6 +116,40 @@ function trimValue(value: FormDataEntryValue | null | undefined): string {
   return String(value ?? "").trim();
 }
 
+export function buildAuthorApplicationFormData(
+  values: AuthorApplicationFormValues,
+): FormData {
+  const formData = new FormData();
+
+  formData.set("displayName", values.displayName);
+
+  for (const direction of values.selectedDirections) {
+    formData.append("directionOptions", direction);
+  }
+
+  formData.set("directionOther", values.directionOther);
+  formData.set("about", values.about);
+  formData.set("contact", values.contact);
+
+  if (values.hasReadyMaterials) {
+    formData.set("hasReadyMaterials", "on");
+  }
+
+  if (values.wantsTraining) {
+    formData.set("wantsTraining", "on");
+  }
+
+  if (values.interestedInSchool) {
+    formData.set("interestedInSchool", "on");
+  }
+
+  if (values.consentPersonalData) {
+    formData.set("consentPersonalData", "on");
+  }
+
+  return formData;
+}
+
 export function normalizeAuthorApplicationFormValues(
   formData: FormData,
 ): AuthorApplicationFormValues {

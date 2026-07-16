@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 import {
   AUTHOR_DIRECTION_OTHER,
   AUTHOR_DIRECTION_PRESETS,
+  AUTHOR_APPLICATION_LIMITS,
 } from "@/lib/author-applications/validation";
-import { AUTHOR_APPLICATION_LIMITS } from "@/lib/author-applications/validation";
 
 import {
   becomeAuthorBodyClass,
@@ -20,6 +18,8 @@ type AuthorApplicationDirectionPickerProps = {
   directionOther: string;
   directionError?: string;
   directionOtherError?: string;
+  onSelectedDirectionsChange: (next: string[]) => void;
+  onDirectionOtherChange: (next: string) => void;
 };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -39,10 +39,21 @@ export default function AuthorApplicationDirectionPicker({
   directionOther,
   directionError,
   directionOtherError,
+  onSelectedDirectionsChange,
+  onDirectionOtherChange,
 }: AuthorApplicationDirectionPickerProps) {
-  const [showOther, setShowOther] = useState(
-    selectedDirections.includes(AUTHOR_DIRECTION_OTHER),
-  );
+  const showOther = selectedDirections.includes(AUTHOR_DIRECTION_OTHER);
+
+  function toggleDirection(option: string, checked: boolean) {
+    if (checked) {
+      onSelectedDirectionsChange([...new Set([...selectedDirections, option])]);
+      return;
+    }
+
+    onSelectedDirectionsChange(
+      selectedDirections.filter((item) => item !== option),
+    );
+  }
 
   return (
     <fieldset
@@ -65,11 +76,9 @@ export default function AuthorApplicationDirectionPicker({
               type="checkbox"
               name="directionOptions"
               value={option}
-              defaultChecked={selectedDirections.includes(option)}
-              onChange={
-                option === AUTHOR_DIRECTION_OTHER
-                  ? (event) => setShowOther(event.currentTarget.checked)
-                  : undefined
+              checked={selectedDirections.includes(option)}
+              onChange={(event) =>
+                toggleDirection(option, event.currentTarget.checked)
               }
               className="mt-0.5 h-5 w-5 shrink-0 accent-[#7042c5]"
             />
@@ -90,7 +99,8 @@ export default function AuthorApplicationDirectionPicker({
             name="directionOther"
             type="text"
             maxLength={AUTHOR_APPLICATION_LIMITS.directionOtherMax}
-            defaultValue={directionOther}
+            value={directionOther}
+            onChange={(event) => onDirectionOtherChange(event.currentTarget.value)}
             aria-invalid={Boolean(directionOtherError)}
             aria-describedby={
               directionOtherError ? "directionOther-error" : undefined
