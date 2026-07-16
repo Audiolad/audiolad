@@ -102,6 +102,7 @@
 - PR1–PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`; previous `20260716-053201-5acf034`; до PR5 был `20260716-045024-d4b9860`).
 - Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
 - `/playlists/[id]`: items, listen, delete item, edit cover, reorder ↑↓, copy link (только public + slug + `published_at`).
+- **`/playlists` owned list (production `93fc9c6`, fix `c7a3809`):** `listOwnedPlaylists()` явно фильтрует `user_id = auth.uid()`; чужие public playlists не попадают в «Мои плейлисты»; RLS public SELECT для `/p/[slug]` без изменений.
 - **PR5 `/p/[slug]` развёрнут:** gate `visibility=public` + `published_at IS NOT NULL`; guest без redirect; auth read-only; RLS + server loader; service role только для signed custom cover после gate; unavailable drift остаётся в списке; metadata index/follow; `force-dynamic`.
 - **Play All (рабочая копия, не production):** очередь `PlaylistQueueEntry[]` (`kind=product`); owner + public free; unavailable skip; Previous → начало предыдущего продукта; queue in-memory (F5 не восстанавливает); URL `router.replace`; completion «Плейлист прослушан»; entitlement не меняется.
 - Сохранение чужих плейлистов, публичный каталог подборок, drag-and-drop — нет.
