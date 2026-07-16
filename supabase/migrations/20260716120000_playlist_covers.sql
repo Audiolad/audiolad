@@ -101,6 +101,7 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.get_owned_playlist_mosaic_covers() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_owned_playlist_mosaic_covers() FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_owned_playlist_mosaic_covers() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_owned_playlist_mosaic_covers() TO service_role;
 
