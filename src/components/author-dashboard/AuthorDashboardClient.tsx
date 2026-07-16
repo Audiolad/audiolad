@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
@@ -185,7 +186,9 @@ export default function AuthorDashboardClient({
 
   return (
     <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="block flex-1">
           <span className="mb-2 block text-sm font-medium text-[#5f5484]">
             Авторское пространство
