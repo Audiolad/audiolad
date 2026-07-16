@@ -84,9 +84,9 @@ Timeweb Cloud
 - Private add требует entitlement (`resolveProductAccess`); public add — free catalog rules; плейлист не даёт listen-доступ.
 - Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
 - `/playlists/new` → redirect `/playlists`.
-- PR3.2 (рабочая копия): `/playlists/[id]` — items по `position`, listen через существующий route, `DELETE /api/playlists/[id]/items/[practiceId]`; недоступные items остаются видимыми.
+- PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`): `/playlists/[id]` — items по `position`, listen через существующий route, `DELETE /api/playlists/[id]/items/[practiceId]`; недоступные items остаются видимыми.
 - Reorder и Play All — ещё не реализованы.
-- PR3.1 на production: commit `24616e7`, release `20260715-204408-24616e7`.
+- Следующий этап после PR3.2: custom и automatic covers (PR3.3).
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 

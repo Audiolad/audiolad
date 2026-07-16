@@ -150,7 +150,7 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 
 ### Будущие маршруты
 
-- владелец: `/playlists`, `/playlists/[id]` (PR3.2 в рабочей копии: просмотр + delete item; без reorder);
+- владелец: `/playlists`, `/playlists/[id]` (PR3.2 на production: просмотр + delete item; без reorder);
 - публичный просмотр: `/p/[slug]` (ещё не реализован);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 

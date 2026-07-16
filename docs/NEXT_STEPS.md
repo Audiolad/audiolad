@@ -4,11 +4,11 @@
 
 ## 0. Плейлисты — после PR3.2 (приоритет: высокий)
 
-PR1–PR3.1 на production. PR3.2 (`/playlists/[id]`) в рабочей копии: review → commit → deploy.
+PR1–PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`).
 
 Далее:
 
-1. Commit и deploy PR3.2.
+1. Custom и automatic covers (PR3.3).
 2. Reorder ↑↓ (отдельный PR).
 3. Позже — `/p/[slug]`; Play All между продуктами только отдельным этапом плеера.
 

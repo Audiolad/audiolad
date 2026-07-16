@@ -4,6 +4,21 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR3.2 production deploy)
+
+**Сделано:**
+
+- Commit PR3.2: `fafe6a56ca5e17038777d37ef3447ddd42ecbde7`.
+- Backup: `postgres-pre-playlists-pr3-2-20260716-035511.dump`.
+- Deploy release `20260716-035511-fafe6a5` (previous `20260715-204408-24616e7`).
+- Migration не требовалась.
+- Production API/UI smoke PASS; тестовые данные очищены.
+- Push не выполнялся.
+
+**Следующий шаг:** PR3.3 — custom и automatic covers.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR3.2 detail + закрытие PR3.1 docs)
 
 **Сделано:**

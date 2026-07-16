@@ -90,18 +90,18 @@
 
 ## Плейлисты (состояние на 2026-07-16)
 
-- PR1–PR3.1 на production (`24616e7`, release `20260715-204408-24616e7`).
-- PR3.2 в рабочей копии (**не закоммичен / не на production**): `/playlists/[id]` показывает реальные `playlist_items` по `position`; listen через существующий route; удаление item без entitlement; недоступные материалы остаются видимыми.
+- PR1–PR3.2 на production (`fafe6a5`, release `20260716-035511-fafe6a5`; previous `20260715-204408-24616e7`).
+- `/playlists/[id]`: items по `position`; listen через существующий route; удаление item без entitlement; недоступные остаются видимыми.
 - Карточки на `/playlists` ведут на `/playlists/[id]`; меню `···` не навигирует.
-- Reorder, Play All и `/p/[slug]` ещё не реализованы.
+- Reorder, Play All, covers и `/p/[slug]` ещё не реализованы.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
-- Backup перед PR3.1: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-20260715-204130.dump`.
+- Backup перед PR3.2: `/var/www/audiolad/backups/postgres-pre-playlists-pr3-2-20260716-035511.dump`.
 
 ## Что ещё не реализовано
 
+- Custom и automatic covers плейлистов (PR3.3).
 - Reorder элементов плейлиста, Play All.
 - Публичный каталог подборок `/p/[slug]`.
-- Deploy PR3.2 на production.
 - Глобальная защита приватных маршрутов (частично через `src/lib/auth/routes.ts` / proxy — уточнять по коду).
 - Автотесты приложения — отсутствуют (есть SQL/validation smoke для плейлистов в `supabase/tests/` и `scripts/`).
 
