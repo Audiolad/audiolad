@@ -35,6 +35,24 @@ function MiniForwardIcon() {
   );
 }
 
+function MiniPrevIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <rect x="5.5" y="5" width="2.5" height="14" rx="0.5" />
+      <path d="M18 5v14L8 12Z" />
+    </svg>
+  );
+}
+
+function MiniNextIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+      <path d="M6 5v14l10-7Z" />
+      <rect x="16" y="5" width="2.5" height="14" rx="0.5" />
+    </svg>
+  );
+}
+
 function MiniPlayIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
@@ -65,7 +83,7 @@ function MiniCloseIcon() {
 }
 
 export default function GlobalMiniPlayer() {
-  const { session, showMiniPlayer, openFullPlayer, stopAndClear } =
+  const { session, showMiniPlayer, openFullPlayer, stopAndClear, activeQueue } =
     useGlobalAudioPlayer();
   const engine = usePlayerEngine();
 
@@ -74,6 +92,7 @@ export default function GlobalMiniPlayer() {
   }
 
   const activeSession = session;
+  const queueMode = Boolean(activeQueue);
 
   const progressPercent =
     engine.displayDuration > 0
@@ -140,18 +159,33 @@ export default function GlobalMiniPlayer() {
             </div>
           </button>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Назад на 15 секунд"
-              onClick={(event) => {
-                event.stopPropagation();
-                engine.handleSeekOffset(-15);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
-              <MiniRewindIcon />
-            </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {queueMode ? (
+              <button
+                type="button"
+                aria-label="Предыдущий трек"
+                disabled={engine.isPreviousTrackDisabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void engine.handlePreviousTrack();
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/90 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <MiniPrevIcon />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="Назад на 15 секунд"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  engine.handleSeekOffset(-15);
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <MiniRewindIcon />
+              </button>
+            )}
 
             <button
               type="button"
@@ -165,17 +199,32 @@ export default function GlobalMiniPlayer() {
               {engine.isPlaying ? <MiniPauseIcon /> : <MiniPlayIcon />}
             </button>
 
-            <button
-              type="button"
-              aria-label="Вперёд на 15 секунд"
-              onClick={(event) => {
-                event.stopPropagation();
-                engine.handleSeekOffset(15);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
-              <MiniForwardIcon />
-            </button>
+            {queueMode ? (
+              <button
+                type="button"
+                aria-label="Следующий трек"
+                disabled={engine.isNextTrackDisabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void engine.handleNextTrack();
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/90 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <MiniNextIcon />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="Вперёд на 15 секунд"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  engine.handleSeekOffset(15);
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <MiniForwardIcon />
+              </button>
+            )}
           </div>
         </div>
 

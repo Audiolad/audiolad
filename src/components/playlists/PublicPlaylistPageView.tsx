@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
@@ -54,6 +55,13 @@ export default function PublicPlaylistPageView({
           <span>· {detail.totalDurationLabel}</span>
         ) : null}
       </div>
+
+      <PlayAllButton
+        variant="public"
+        playlistSlug={playlist.slug}
+        title={playlist.title}
+        items={items}
+      />
 
       <section className="mt-6 rounded-[22px] border border-[#eadff8] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
         {isAuthenticated ? (

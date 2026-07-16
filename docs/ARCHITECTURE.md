@@ -87,8 +87,8 @@ Timeweb Cloud
 - PR3.2 на production (`fafe6a5`): `/playlists/[id]` — items, listen, delete item.
 - PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`): custom cover + automatic mosaic; CAS `replace_playlist_cover_path`; private `playlist-covers`; sharp 1200×1200 WebP; signed URLs.
 - PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`): `POST /api/playlists/[id]/items/[practiceId]/move` + RPC `move_playlist_item` — атомарный ↑↓ swap соседних `playlist_items.position` по `practice_id`; без DnD / полного массива positions.
-- PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`): публичная страница `/p/[slug]` — только `visibility=public` + `published_at IS NOT NULL`; RLS+server loader (`cache()`); signed custom cover после gate; auto mosaic; unavailable drift; copy link (public+slug+published_at); без entitlement / Play All / save-чужой.
-- Play All — ещё нет.
+- PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`): публичная страница `/p/[slug]` — только `visibility=public` + `published_at IS NOT NULL`; RLS+server loader (`cache()`); signed custom cover после gate; auto mosaic; unavailable drift; copy link (public+slug+published_at); без entitlement / save-чужой.
+- Play All (рабочая копия): тонкий queue controller поверх `GlobalAudioPlayerProvider` + `useSequentialPlayer`; `PlaylistQueueEntry` (`kind=product` в MVP); builders owner/public; GET `/api/listen/product/.../session` для re-check; cross-product remount; in-memory queue; standalone listen очищает queue.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.
 

@@ -4,6 +4,19 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты Play All MVP — рабочая копия)
+
+**Сделано (не commit / не deploy):**
+
+- Этап A PR5 уже был закрыт: docs `b3f931f`, smoke helper `21af958`.
+- Play All: queue types/builders, provider controller, cross-product ended/next/prev, Media Session, mini prev/next, owner+public «Слушать всё», completion UI, session API, iPhone checklist.
+- Migration не требуется; entitlement/`user_practices`/progress schema не менялись.
+- Production не менялся.
+
+**Следующий шаг:** review → commit → backup → deploy → iPhone smoke → завершить этап плейлистов. Не профиль слушателя без отдельного задания.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR5 `/p/[slug]` production deploy)
 
 **Сделано:**

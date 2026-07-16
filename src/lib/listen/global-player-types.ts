@@ -14,6 +14,8 @@ export type GlobalPlayerSession = {
   coverImageUrl: string | null;
   isAuthorPreview: boolean;
   requestAutoplay?: boolean;
+  /** When true, start at track 0 / position 0 (Play All restart). */
+  forceStartAtBeginning?: boolean;
 };
 
 export type LoadSessionInput = GlobalPlayerSession;

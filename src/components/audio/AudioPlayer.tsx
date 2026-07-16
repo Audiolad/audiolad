@@ -195,7 +195,17 @@ export default function AudioPlayer({
   isAuthorPreview = false,
   sessionPayload,
 }: AudioPlayerProps) {
-  const { session, loadSession, dismissedPracticeId } = useGlobalAudioPlayer();
+  const {
+    session,
+    loadSession,
+    dismissedPracticeId,
+    activeQueue,
+    queueCompleted,
+    restartPlaylistQueue,
+    returnToPlaylistSource,
+    noticeMessage,
+    clearNoticeMessage,
+  } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
   const isEngineReady =
     Boolean(engine) && session?.practiceId === practiceId;
@@ -203,7 +213,12 @@ export default function AudioPlayer({
     dismissedPracticeId === practiceId && !isEngineReady;
 
   const [coverImageFailed, setCoverImageFailed] = useState(false);
+  const [restartingQueue, setRestartingQueue] = useState(false);
   const showCoverImage = Boolean(coverImageUrl) && !coverImageFailed;
+  const queueLabel =
+    activeQueue && !queueCompleted
+      ? `Плейлист: ${activeQueue.currentIndex + 1} из ${activeQueue.entries.length}`
+      : null;
 
   const {
     isMultiTrack = tracks.length > 1,
@@ -305,8 +320,61 @@ export default function AudioPlayer({
         </div>
       </section>
 
+      {noticeMessage ? (
+        <div className="mt-4 rounded-[18px] border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/85">
+          <p>{noticeMessage}</p>
+          <button
+            type="button"
+            className="mt-2 text-xs font-medium text-white/70 underline"
+            onClick={clearNoticeMessage}
+          >
+            Скрыть
+          </button>
+        </div>
+      ) : null}
+
+      {queueCompleted && activeQueue ? (
+        <section className="mt-10 rounded-[28px] border border-white/15 bg-white/10 px-6 py-8 text-center">
+          <h2 className="text-[24px] font-semibold">Плейлист прослушан</h2>
+          <p className="mt-3 text-sm leading-6 text-white/70">
+            Вы прослушали все доступные материалы этой подборки.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              type="button"
+              disabled={restartingQueue}
+              onClick={() => {
+                void (async () => {
+                  setRestartingQueue(true);
+                  await restartPlaylistQueue();
+                  setRestartingQueue(false);
+                })();
+              }}
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#4b2f86] disabled:opacity-60"
+            >
+              {restartingQueue ? "Запуск…" : "Прослушать ещё раз"}
+            </button>
+            <button
+              type="button"
+              onClick={returnToPlaylistSource}
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white"
+            >
+              Вернуться к плейлисту
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="mt-7 text-center">
-        <h1 className="text-[29px] font-semibold leading-tight">{practiceTitle}</h1>
+        {queueLabel ? (
+          <p className="text-xs uppercase tracking-[0.14em] text-white/55">
+            {queueLabel}
+            {activeQueue?.title ? ` · ${activeQueue.title}` : ""}
+          </p>
+        ) : null}
+        <h1 className="mt-2 text-[29px] font-semibold leading-tight">
+          {practiceTitle}
+        </h1>
         {showTrackTitle ? (
           <p className="mt-2 text-[18px] font-medium leading-snug text-white/90">
             {currentTrackTitle}
@@ -575,7 +643,7 @@ export default function AudioPlayer({
         </section>
       ) : null}
 
-      {isEngineReady && programCompleted ? (
+      {isEngineReady && programCompleted && !activeQueue ? (
         <section className="mt-6 text-center">
           <button
             type="button"

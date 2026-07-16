@@ -46,6 +46,8 @@ import {
 } from "@/lib/audio/playback-recovery";
 import { logPlayerDebug } from "@/lib/audio/player-debug";
 
+type TracksExhaustedResult = "advanced" | "completed" | "none";
+
 type UseSequentialPlayerOptions = {
   authorSlug: string;
   productSlug: string;
@@ -53,7 +55,21 @@ type UseSequentialPlayerOptions = {
   tracks: ListenTrack[];
   initialProgress: ListenProgressEntry[];
   requestInitialAutoplay?: boolean;
+  forceStartAtBeginning?: boolean;
+  /** When true, Next stays enabled on the last track (queue will advance). */
+  queueHasNext?: boolean;
+  /** When true, Previous can leave the first track for the prior queue entry. */
+  queueHasPrevious?: boolean;
   onInitialAutoplayAttempted?: () => void;
+  /**
+   * Called when the last track ends or Next is pressed on the last track.
+   * Receives the practiceId that exhausted so duplicate ended/Next cannot advance twice.
+   */
+  onTracksExhausted?: (
+    fromPracticeId: string,
+  ) => Promise<TracksExhaustedResult>;
+  /** Called when Previous is pressed on the first track (after restart threshold). */
+  onRequestPreviousProduct?: () => Promise<boolean>;
   getSessionGeneration?: () => number;
   registerCleanup?: (cleanup: () => void) => void;
 };
@@ -74,7 +90,12 @@ export function useSequentialPlayer({
   tracks,
   initialProgress,
   requestInitialAutoplay = false,
+  forceStartAtBeginning = false,
+  queueHasNext = false,
+  queueHasPrevious = false,
   onInitialAutoplayAttempted,
+  onTracksExhausted,
+  onRequestPreviousProduct,
   getSessionGeneration,
   registerCleanup,
 }: UseSequentialPlayerOptions) {
@@ -96,15 +117,32 @@ export function useSequentialPlayer({
   const resumePositionRef = useRef(0);
   const isPlayingRef = useRef(false);
   const getSessionGenerationRef = useRef(getSessionGeneration);
+  const onTracksExhaustedRef = useRef(onTracksExhausted);
+  const onRequestPreviousProductRef = useRef(onRequestPreviousProduct);
 
   useEffect(() => {
     getSessionGenerationRef.current = getSessionGeneration;
   }, [getSessionGeneration]);
 
-  const initialPlayback = useMemo(
-    () => resolveInitialPlayback(tracks, initialProgress),
-    [initialProgress, tracks],
-  );
+  useEffect(() => {
+    onTracksExhaustedRef.current = onTracksExhausted;
+  }, [onTracksExhausted]);
+
+  useEffect(() => {
+    onRequestPreviousProductRef.current = onRequestPreviousProduct;
+  }, [onRequestPreviousProduct]);
+
+  const initialPlayback = useMemo(() => {
+    if (forceStartAtBeginning) {
+      return {
+        trackIndex: 0,
+        positionSeconds: 0,
+        allCompleted: false,
+      };
+    }
+
+    return resolveInitialPlayback(tracks, initialProgress);
+  }, [forceStartAtBeginning, initialProgress, tracks]);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(
     initialPlayback.trackIndex,
@@ -522,6 +560,15 @@ export function useSequentialPlayer({
         return;
       }
 
+      if (onTracksExhaustedRef.current) {
+        const result = await onTracksExhaustedRef.current(practiceId);
+
+        if (result === "advanced" || result === "completed") {
+          userWantsPlaybackRef.current = result === "advanced";
+          return;
+        }
+      }
+
       userWantsPlaybackRef.current = false;
       setProgramCompleted(true);
     };
@@ -582,6 +629,7 @@ export function useSequentialPlayer({
     playbackRateIndex,
     pendingStartPosition,
     playerError,
+    practiceId,
     switchToTrack,
     tracks.length,
     saveProgress,
@@ -739,19 +787,30 @@ export function useSequentialPlayer({
       return;
     }
 
+    if (onRequestPreviousProductRef.current) {
+      const moved = await onRequestPreviousProductRef.current();
+
+      if (moved) {
+        return;
+      }
+    }
+
     audio.currentTime = 0;
     setCurrentTime(0);
   };
 
   const handleNextTrack = async () => {
-    if (currentTrackIndex >= tracks.length - 1) {
+    if (currentTrackIndex < tracks.length - 1) {
+      await switchToTrack(currentTrackIndex + 1, {
+        autoPlay: isPlaying,
+        startPosition: 0,
+      });
       return;
     }
 
-    await switchToTrack(currentTrackIndex + 1, {
-      autoPlay: isPlaying,
-      startPosition: 0,
-    });
+    if (onTracksExhaustedRef.current) {
+      await onTracksExhaustedRef.current(practiceId);
+    }
   };
 
   const handleSelectTrack = async (index: number) => {
@@ -1181,8 +1240,11 @@ export function useSequentialPlayer({
     programProgressPercent,
     programCompleted,
     isPreviousTrackDisabled:
-      currentTrackIndex === 0 && currentTime <= PREVIOUS_TRACK_THRESHOLD_SECONDS,
-    isNextTrackDisabled: currentTrackIndex >= tracks.length - 1,
+      currentTrackIndex === 0 &&
+      currentTime <= PREVIOUS_TRACK_THRESHOLD_SECONDS &&
+      !queueHasPrevious,
+    isNextTrackDisabled:
+      currentTrackIndex >= tracks.length - 1 && !queueHasNext,
     handlePlayPause,
     handleSeekOffset,
     handleRangeChange,

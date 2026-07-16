@@ -1,6 +1,7 @@
 "use client";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
 import {
@@ -504,6 +505,12 @@ export default function PlaylistDetailClient({
               Скопировать ссылку
             </button>
           ) : null}
+          <PlayAllButton
+            variant="owner"
+            playlistId={detail.playlist.id}
+            title={detail.playlist.title}
+            items={detail.items}
+          />
         </div>
       </header>
 
