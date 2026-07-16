@@ -82,12 +82,12 @@ Timeweb Cloud
 - Membership PR3.1: `GET/PUT /api/playlists/membership` + RPC `set_practice_playlist_membership`.
 - Entry point добавления: меню `···` в Аудиотеке (`/my-practices`) → `AddToPlaylistSheet`.
 - Private add требует entitlement (`resolveProductAccess`); public add — free catalog rules; плейлист не даёт listen-доступ.
-- Public slug серверный (`slugifyTitle` + random suffix); `/p/[slug]` ещё нет.
+- Public slug серверный (`slugifyTitle` + random suffix).
 - `/playlists/new` → redirect `/playlists`.
 - PR3.2 на production (`fafe6a5`): `/playlists/[id]` — items, listen, delete item.
 - PR3.3 на production (`cbd4db1`, release `20260716-042225-cbd4db1`): custom cover + automatic mosaic; CAS `replace_playlist_cover_path`; private `playlist-covers`; sharp 1200×1200 WebP; signed URLs.
 - PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`): `POST /api/playlists/[id]/items/[practiceId]/move` + RPC `move_playlist_item` — атомарный ↑↓ swap соседних `playlist_items.position` по `practice_id`; без DnD / полного массива positions.
-- PR5 (рабочая копия, не production): публичная страница `/p/[slug]` — только `visibility=public` + `published_at IS NOT NULL`; RLS+server loader; signed custom cover; без entitlement / Play All / save-чужой.
+- PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`): публичная страница `/p/[slug]` — только `visibility=public` + `published_at IS NOT NULL`; RLS+server loader (`cache()`); signed custom cover после gate; auto mosaic; unavailable drift; copy link (public+slug+published_at); без entitlement / Play All / save-чужой.
 - Play All — ещё нет.
 
 На `/profile` и `/profile/edit` имя и email — реальные; статистика, авторы и часть полей формы — демонстрационные или disabled.

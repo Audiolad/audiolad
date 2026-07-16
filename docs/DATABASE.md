@@ -153,7 +153,7 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 ### Будущие маршруты
 
 - владелец: `/playlists`, `/playlists/[id]` (PR3.2+ на production: просмотр + delete item + covers + reorder);
-- публичный просмотр: `/p/[slug]` (PR5 в рабочей копии);
+- публичный просмотр: `/p/[slug]` (PR5 на production);
 - демо `/playlist/morning-energy` не использовать для реальных данных.
 
 ### Covers (PR3.3) — на production
@@ -179,7 +179,16 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - API: `POST /api/playlists/[id]/items/[practiceId]/move` (session client, без service role).
 - Migration: `20260716140000_move_playlist_item.sql` (применена к production).
 - Drag-and-drop, Play All — нет.
-- Публичная страница `/p/[slug]` — PR5 (рабочая копия): загрузка через RLS + `loadPublicPlaylistBySlug`; только public + `published_at IS NOT NULL`; без новой RPC; entitlement не выдаётся.
+
+### Public page (PR5) — на production
+
+- Маршрут `/p/[slug]`; migration не требуется.
+- Gate: `visibility = 'public'` AND `published_at IS NOT NULL` AND valid slug; иначе `notFound()`.
+- Загрузка: session/anon Supabase client + RLS (`loadPublicPlaylistBySlug`, React `cache()`); без новой RPC.
+- Service role только для signed custom cover после public gate; path через `isValidPlaylistCoverPath(userId, playlistId)`.
+- Bucket `playlist-covers` остаётся private.
+- Drift/unavailable item остаётся в позиции («Материал сейчас недоступен»); без audio signed URL / entitlement / `user_practices` / progress / `updated_at` writes.
+- Copy link в owner UI только при public + slug + `published_at`.
 
 ### Мутации
 

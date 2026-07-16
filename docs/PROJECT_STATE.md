@@ -90,14 +90,13 @@
 
 ## Плейлисты (состояние на 2026-07-16)
 
-- PR1–PR4 на production (`d4b9860`, release `20260716-045024-d4b9860`; previous `20260716-042225-cbd4db1`).
+- PR1–PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`; previous `20260716-053201-5acf034`; до PR5 был `20260716-045024-d4b9860`).
 - Covers: private bucket `playlist-covers`; custom signed URL; automatic mosaic 0/1/2/3/4+; CAS replace/clear; sharp 1200×1200 WebP.
-- `/playlists/[id]`: items, listen, delete item, edit cover, **reorder ↑↓**.
-- PR4: RPC `move_playlist_item` (атомарный swap соседей, gaps OK, temp=`max(position)+1`); API `POST .../items/[practiceId]/move`; entitlement/`user_practices`/`audio_items` не меняются; unavailable можно двигать.
-- Play All ещё не реализован; drag-and-drop нет.
-- **PR5 `/p/[slug]`** — в рабочей копии (не на production): публичный просмотр public+published; без entitlement.
+- `/playlists/[id]`: items, listen, delete item, edit cover, reorder ↑↓, copy link (только public + slug + `published_at`).
+- **PR5 `/p/[slug]` развёрнут:** gate `visibility=public` + `published_at IS NOT NULL`; guest без redirect; auth read-only; RLS + server loader; service role только для signed custom cover после gate; unavailable drift остаётся в списке; metadata index/follow; `force-dynamic`.
+- Play All, сохранение чужих плейлистов, публичный каталог подборок, drag-and-drop — нет.
 - Rollback: `/var/www/audiolad-deploy/scripts/rollback.sh`.
-- Backup перед PR4: `/var/www/audiolad/backups/postgres-pre-playlists-pr4-20260716-044937.dump`.
+- Backup перед PR5: `/var/www/audiolad/backups/postgres-pre-playlists-pr5-20260716-052634.dump`.
 
 ## Что ещё не реализовано
 

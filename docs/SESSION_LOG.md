@@ -4,22 +4,30 @@
 
 ---
 
+## Сессия — 16 июля 2026 (плейлисты PR5 `/p/[slug]` production deploy)
+
+**Сделано:**
+
+- Review PR5: `cache()` loader; без `audio_url`; copy-link только при `published_at`; `/p` не private.
+- Commit PR5: `5acf0343e4c2f3e5bc55a54853e546d968f73223`.
+- Follow-up fix: `6a692a26785441b7f9441ea2fae865e0811dc83e` (copy-link + published_at).
+- Backup: `postgres-pre-playlists-pr5-20260716-052634.dump` (migration не применялась).
+- Deploy: `20260716-053853-6a692a2` (previous `20260716-053201-5acf034`; до PR5 `20260716-045024-d4b9860`).
+- Production public/HTTP/SEO/UI/copy-link/freshness smoke PASS; fixtures cleanup OK.
+- Push не выполнялся.
+- Post-deploy docs: этот блок (не закоммичен автоматически).
+
+**Следующий шаг:** Play All / save чужого / публичный каталог / DnD — только по отдельному заданию.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты PR5 `/p/[slug]` + docs PR4)
 
 **Этап A:**
 
 - Post-deploy docs PR4: `5225b27d9e091dbc541cd859502fd6d152beb04c`
 
-**Этап B PR5 (рабочая копия, не закоммичено):**
-
-- Публичная страница `/p/[slug]` (Variant A: RLS + server loader).
-- Gate: `visibility=public` + `published_at IS NOT NULL` + slug validation.
-- Drift items: остаются в списке, недоступные без listen.
-- Signed custom cover (service role, private bucket); mosaic из public-compatible.
-- Owner copy-link на list + detail.
-- Production не менялся.
-
-**Следующий шаг:** review → commit PR5 → deploy → public smoke. Не Play All / DnD.
+**Этап B PR5:** см. сессию deploy выше.
 
 ---
 
