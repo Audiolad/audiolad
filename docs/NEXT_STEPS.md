@@ -2,7 +2,17 @@
 
 Ближайшие технические задачи «АудиоЛад».
 
-## 0. Плейлисты — Play All MVP (приоритет: высокий)
+## 0. SEO — после PR1 (приоритет: средний)
+
+SEO PR1 на production (`89abe17`, release `20260716-065224-89abe17`).
+
+Далее:
+
+1. SEO-PR2: title templates, OG image, author canonical.
+2. SEO-PR3: JSON-LD Product/Offer + BreadcrumbList.
+3. SEO-PR4: `playlists.description` (migration) + stable public playlist cover URLs.
+
+## 0a. Плейлисты — Play All MVP (приоритет: высокий)
 
 PR1–PR5 на production (`6a692a2`). Play All реализован в рабочей копии (не commit / не production).
 

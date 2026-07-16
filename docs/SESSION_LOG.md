@@ -4,6 +4,21 @@
 
 ---
 
+## Сессия — 16 июля 2026 (SEO PR1 production deploy)
+
+**Сделано:**
+
+- Commit SEO-PR1: `89abe1782bf7c1f8bc79bf9e3a38f63fbdd3e9fe` (`metadataBase`, `robots.txt`, `sitemap.xml`, noindex listen/auth/checkout, cover alt).
+- Push: `chore/database-baseline` → origin.
+- Deploy: `20260716-065224-89abe17` (previous `20260716-053853-6a692a2` / `6a692a2`).
+- Production smoke PASS: robots/sitemap 200; sitemap 25 URL (9 static, 12 product, 3 author, 1 playlist); noindex listen/auth/checkout; canonical `https://audiolad.ru`; product covers public; playlist custom covers остаются signed.
+- Migration не применялась; БД/RLS/Nginx/Storage не менялись.
+- Первый deploy attempt упал на Playwright path; повтор с `PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright` — OK.
+
+**Следующий шаг:** SEO-PR2 (title templates, OG, JSON-LD) или Play All — по отдельному заданию.
+
+---
+
 ## Сессия — 16 июля 2026 (плейлисты Play All MVP — рабочая копия)
 
 **Сделано (не commit / не deploy):**

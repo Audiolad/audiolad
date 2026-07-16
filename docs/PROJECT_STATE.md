@@ -88,6 +88,15 @@
 - `/practice/personal-boundaries`, `/player/personal-boundaries`, `/program/inner-support`, `/checkout/personal-boundaries`.
 - `/settings`.
 
+## SEO (состояние на 2026-07-16)
+
+- **SEO PR1 на production** (`89abe17`, release `20260716-065224-89abe17`; previous `20260716-053853-6a692a2`).
+- `metadataBase`, `/robots.txt`, динамический `/sitemap.xml` (catalog-listed products, authors, public published playlists).
+- `noindex,follow` на `/listen/*`; `noindex,nofollow` на `/auth/*` и `/checkout/result`.
+- Alt-тексты обложек на публичных страницах; product covers — public bucket URL.
+- Custom playlist covers — signed URL (ограничение для OG/indexing images; отдельный PR).
+- JSON-LD, OG templates, `playlists.description` — не в этом релизе.
+
 ## Плейлисты (состояние на 2026-07-16)
 
 - PR1–PR5 на production (`6a692a2`, release `20260716-053853-6a692a2`; previous `20260716-053201-5acf034`; до PR5 был `20260716-045024-d4b9860`).
