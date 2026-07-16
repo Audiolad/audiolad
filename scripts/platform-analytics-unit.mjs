@@ -91,6 +91,7 @@ function testIntegrations() {
   assert(migration.includes("record_platform_signup_completed"), "signup completion rpc");
   assert(migration.includes("signup_completed_user_uidx"), "unique signup index");
   assert(providers.includes("PlatformAnalyticsProvider"), "global analytics provider");
+  assert(providers.includes("YandexMetrika"), "yandex metrika provider");
   assert(player.includes("ListenAnalyticsTracker"), "player analytics tracker");
 }
 

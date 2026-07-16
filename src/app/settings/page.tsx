@@ -1,5 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import PwaSettingsSection from "@/components/pwa/PwaSettingsSection";
+import AnalyticsPrivacySection from "@/components/settings/AnalyticsPrivacySection";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { signOut } from "@/app/auth/sign-out/actions";
 import {
@@ -221,6 +222,8 @@ export default async function SettingsPage() {
               </section>
             ),
           )}
+
+          <AnalyticsPrivacySection />
 
           <section
             id={SETTINGS_LEGAL_SECTION_ID}
