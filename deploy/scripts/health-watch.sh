@@ -4,6 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/health-watch-lib.sh
+source "$SCRIPT_DIR/lib/health-watch-lib.sh"
 
 POST_DEPLOY=false
 if [[ "${1:-}" == "--post-deploy" ]]; then
@@ -14,6 +16,8 @@ WATCH_SECONDS="${HEALTH_WATCH_SECONDS:-120}"
 INTERVAL_SECONDS="${HEALTH_WATCH_INTERVAL:-15}"
 FAIL_THRESHOLD="${HEALTH_WATCH_FAIL_THRESHOLD:-3}"
 failures=0
+successful_probes=0
+failed_probes=0
 expected_build_id=""
 watch_log="$DEPLOY_LOG_DIR/health-watch-$(date -u +"%Y%m%d-%H%M%S").log"
 error_log_path="/root/.pm2/logs/audiolad-error.log"
@@ -31,66 +35,47 @@ if [[ -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then
   log_info "Expected BUILD_ID: $expected_build_id"
 fi
 
+mapfile -t baseline_pm2 < <(hw_read_pm2_metrics "$PM2_APP_NAME")
+restart_before="${baseline_pm2[1]:-0}"
+unstable_before="${baseline_pm2[2]:-0}"
+baseline_status="${baseline_pm2[0]:-unknown}"
+baseline_pid="${baseline_pm2[3]:-0}"
+
+log_info "PM2 baseline: status=${baseline_status} restart_time=${restart_before} unstable_restarts=${unstable_before} pid=${baseline_pid}"
+
 check_once() {
-  local issues=()
+  local probe_output
+  probe_output="$(hw_evaluate_probe \
+    "http://127.0.0.1:${PRODUCTION_PORT}" \
+    "$HEALTH_PATH" \
+    "$expected_build_id" \
+    "$PM2_APP_NAME" \
+    "$restart_before" \
+    "$unstable_before" \
+    "$error_log_path" \
+    "$error_log_offset" 2>&1 || true)"
 
-  if ! curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}${HEALTH_PATH}" >/tmp/audiolad-health.json 2>/dev/null; then
-    issues+=("health_endpoint_unreachable")
-  else
-    local build_id
-    build_id="$(python3 - <<'PY'
-import json
-from pathlib import Path
-print(json.loads(Path("/tmp/audiolad-health.json").read_text()).get("buildId") or "")
-PY
-)"
-    if [[ -n "$expected_build_id" && "$build_id" != "$expected_build_id" ]]; then
-      issues+=("build_id_mismatch:${build_id}")
-    fi
+  local restart_after unstable_after status issues_line
+  restart_after="$(printf '%s\n' "$probe_output" | awk -F= '/^restart_after=/{print $2; exit}')"
+  unstable_after="$(printf '%s\n' "$probe_output" | awk -F= '/^unstable_after=/{print $2; exit}')"
+  status="$(printf '%s\n' "$probe_output" | awk -F= '/^status=/{print $2; exit}')"
+  issues_line="$(printf '%s\n' "$probe_output" | awk -F= '/^issues=/{print $2; exit}')"
+
+  if [[ -z "$issues_line" ]]; then
+    successful_probes=$((successful_probes + 1))
+    log_info "Health watch check passed (restart_delta=$((restart_after - restart_before)) status=${status} unstable=${unstable_after})"
+    return 0
   fi
 
-  if ! curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}/" | grep -q "Аудио, которое помогает"; then
-    issues+=("guest_home_marker_missing")
-  fi
+  failed_probes=$((failed_probes + 1))
+  log_warn "Health watch issues: ${issues_line}"
+  log_warn "Diagnostics: restart_before=${restart_before} restart_after=${restart_after} restart_delta=$((restart_after - restart_before)) unstable_before=${unstable_before} unstable_after=${unstable_after} status=${status} successful_probes=${successful_probes} failed_probes=${failed_probes}"
+  return 1
+}
 
-  if curl -fsS "http://127.0.0.1:${PRODUCTION_PORT}/" | grep -Eqi "This page couldn.t load|_global-error"; then
-    issues+=("global_error_detected")
-  fi
-
-  if ! pm2 describe "$PM2_APP_NAME" 2>/dev/null | grep -q "status.*online"; then
-    issues+=("pm2_not_online")
-  fi
-
-  local restarts
-  restarts="$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys
-raw=sys.stdin.read().strip()
-if not raw:
-    print(0); raise SystemExit
-apps=json.loads(raw)
-for app in apps:
-    if app.get("name")=="audiolad":
-        print(app.get("pm2_env",{}).get("restart_time",0))
-        break
-else:
-    print(0)
-' 2>/dev/null || echo 0)"
-  if [[ -n "$restarts" && "$restarts" -gt 3 ]]; then
-    issues+=("pm2_restart_loop:${restarts}")
-  fi
-
-  if [[ -f "$error_log_path" && "$error_log_offset" -ge 0 ]]; then
-    if tail -c +"$((error_log_offset + 1))" "$error_log_path" 2>/dev/null | grep -Eqi "ChunkLoadError|Maximum update depth exceeded"; then
-      issues+=("critical_runtime_error_since_watch_start")
-    fi
-  fi
-
-  if ((${#issues[@]} > 0)); then
-    log_warn "Health watch issues: ${issues[*]}"
-    return 1
-  fi
-
-  log_info "Health watch check passed"
-  return 0
+log_diagnostics_summary() {
+  mapfile -t final_pm2 < <(hw_read_pm2_metrics "$PM2_APP_NAME")
+  log_error "Health watch summary: restart_before=${restart_before} restart_after=${final_pm2[1]:-0} restart_delta=$((${final_pm2[1]:-0} - restart_before)) unstable_before=${unstable_before} unstable_after=${final_pm2[2]:-0} status=${final_pm2[0]:-unknown} pid=${final_pm2[3]:-0} uptime=${final_pm2[4]:-0} successful_probes=${successful_probes} failed_probes=${failed_probes}"
 }
 
 end_time=$((SECONDS + WATCH_SECONDS))
@@ -100,6 +85,7 @@ while (( SECONDS < end_time )); do
   else
     failures=$((failures + 1))
     if (( failures >= FAIL_THRESHOLD )); then
+      log_diagnostics_summary
       log_error "Health watch failed ${failures} times in a row"
       exit 1
     fi
@@ -110,10 +96,11 @@ done
 if [[ "$POST_DEPLOY" == true ]]; then
   log_info "Running final browser smoke test"
   if ! "$SCRIPT_DIR/smoke-test.sh" "https://audiolad.ru"; then
+    log_diagnostics_summary
     log_error "Final browser smoke test failed during health watch"
     exit 1
   fi
 fi
 
-log_info "Health watch completed successfully"
+log_info "Health watch completed successfully (successful_probes=${successful_probes} failed_probes=${failed_probes})"
 exit 0
