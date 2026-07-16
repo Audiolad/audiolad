@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ProductAccessReason =
   | "free"
+  | "guest_promo"
   | "purchased"
   | "granted"
   | "author_owner"
@@ -16,6 +17,7 @@ export type ProductAccessInput = {
   is_free: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  guest_access_enabled?: boolean | null;
 };
 
 export type ProductAccessResult = {
@@ -179,6 +181,21 @@ export async function resolveProductAccess(
       canAcquire: false,
       isPubliclyListed,
       reason: "free",
+      isAuthorMember: false,
+      accessSource: null,
+      hasEntitlement: false,
+    };
+  }
+
+  if (
+    practice.guest_access_enabled === true &&
+    isPracticePublished(practice.status)
+  ) {
+    return {
+      canListen: true,
+      canAcquire: false,
+      isPubliclyListed,
+      reason: "guest_promo",
       isAuthorMember: false,
       accessSource: null,
       hasEntitlement: false,

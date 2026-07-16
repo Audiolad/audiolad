@@ -24,6 +24,7 @@ export type PublicPracticeRow = {
   status: string | null;
   updated_at: string | null;
   is_catalog_listed: boolean | null;
+  guest_access_enabled?: boolean | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -72,6 +73,7 @@ export async function getPracticeByAuthorAndSlug(
       status,
       updated_at,
       is_catalog_listed,
+      guest_access_enabled,
       authors!inner (
         id,
         name,

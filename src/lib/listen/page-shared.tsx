@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 
 import AudioPlayer from "@/components/audio/AudioPlayer";
 import ListenPageClient from "@/components/audio/ListenPageClient";
@@ -11,6 +12,7 @@ import { resolveListenAccess } from "@/lib/listen/access";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import type { ListenTrack } from "@/lib/listen/types";
+import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
 import {
   resolveProductAccess,
 } from "@/lib/products/access";
@@ -241,6 +243,7 @@ export async function renderListenPage(
       status,
       is_free,
       is_catalog_listed,
+      guest_access_enabled,
       authors!inner (
         id,
         name,
@@ -372,6 +375,18 @@ export async function renderListenPage(
     practiceRow.updated_at,
   );
   const trimmedFormat = getDisplayFormat(practiceRow.format);
+  const isAuthenticated = Boolean(user);
+  const promoConversionMode = shouldShowPromoConversionFlow({
+    isAuthenticated,
+    hasEntitlement: productAccess.hasEntitlement,
+    canListen: productAccess.canListen,
+    accessReason: productAccess.reason,
+  });
+  const guestProgressMode = shouldUseGuestProgressPersistence({
+    isAuthenticated,
+    canListen: productAccess.canListen,
+    accessReason: productAccess.reason,
+  });
 
   return (
     <ListenShell backHref={practiceHref} backLabel="← К практике">
@@ -381,21 +396,31 @@ export async function renderListenPage(
         </p>
       </div>
 
-      <ListenPageClient
-        practiceId={practiceRow.id}
-        authorSlug={resolvedAuthorSlug}
-        productSlug={practiceRow.slug}
-        practiceTitle={practiceRow.title}
-        authorName={authorName}
-        format={trimmedFormat}
-        tracks={tracks}
-        initialProgress={initialProgress}
-        coverSymbol={coverSymbol}
-        coverGradient={coverGradient}
-        coverImageUrl={coverImageUrl}
-        isAuthorPreview={access.mode === "author_preview"}
-        autoplay={options?.autoplay === true}
-      />
+      <Suspense fallback={null}>
+        <ListenPageClient
+          practiceId={practiceRow.id}
+          authorSlug={resolvedAuthorSlug}
+          productSlug={practiceRow.slug}
+          practiceTitle={practiceRow.title}
+          authorName={authorName}
+          format={trimmedFormat}
+          tracks={tracks}
+          initialProgress={initialProgress}
+          coverSymbol={coverSymbol}
+          coverGradient={coverGradient}
+          coverImageUrl={coverImageUrl}
+          isAuthorPreview={access.mode === "author_preview"}
+          autoplay={options?.autoplay === true}
+          promoConversionMode={promoConversionMode}
+          isAuthenticated={isAuthenticated}
+          guestProgressMode={guestProgressMode}
+          guestProgressMeta={
+            guestProgressMode
+              ? { practiceSlug: practiceRow.slug }
+              : undefined
+          }
+        />
+      </Suspense>
 
       <AudioPlayer
         practiceId={practiceRow.id}
@@ -407,6 +432,9 @@ export async function renderListenPage(
         coverGradient={coverGradient}
         coverImageUrl={coverImageUrl}
         isAuthorPreview={access.mode === "author_preview"}
+        promoConversionMode={promoConversionMode}
+        authorSlug={resolvedAuthorSlug}
+        productSlug={practiceRow.slug}
         sessionPayload={{
           practiceId: practiceRow.id,
           authorSlug: resolvedAuthorSlug,
@@ -420,6 +448,11 @@ export async function renderListenPage(
           coverGradient,
           coverImageUrl,
           isAuthorPreview: access.mode === "author_preview",
+          guestProgressMode,
+          guestProgressMeta: guestProgressMode
+            ? { practiceSlug: practiceRow.slug }
+            : undefined,
+          promoConversionMode,
         }}
       />
     </ListenShell>

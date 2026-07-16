@@ -153,6 +153,8 @@ function GlobalPlayerEngine({
     onInitialAutoplayAttempted: handleInitialAutoplayAttempted,
     getSessionGeneration: () => sessionGenerationRef.current,
     registerCleanup,
+    guestProgressMode: Boolean(session.guestProgressMode),
+    guestProgressMeta: session.guestProgressMeta,
     audioRef: persistentAudioRef,
   });
 

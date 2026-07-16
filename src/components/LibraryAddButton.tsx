@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
+  buildPromoSignUpHref,
+  buildPromoSignupContext,
+  storePromoSignupContext,
+} from "@/lib/promo/signup-context";
+import {
   mapLibraryClaimButtonError,
   resolveLibraryActionAfterClaimSuccess,
   type PracticeLibraryAction,
@@ -15,6 +20,8 @@ type LibraryAddButtonProps = {
   signInReturnPath: string;
   action: Exclude<PracticeLibraryAction, "hidden">;
   className?: string;
+  practiceId?: string;
+  promoSignup?: boolean;
 };
 
 type ApiErrorBody = {
@@ -40,6 +47,7 @@ function isClaimLibrarySuccessBody(body: unknown): body is ClaimLibrarySuccessBo
 function getLibraryButtonLabel(
   action: Exclude<PracticeLibraryAction, "hidden">,
   isPending: boolean,
+  promoSignup: boolean,
 ): string {
   if (isPending) {
     return "Добавляем…";
@@ -47,7 +55,9 @@ function getLibraryButtonLabel(
 
   switch (action) {
     case "sign_in":
-      return "Войти, чтобы добавить";
+      return promoSignup
+        ? "Сохранить в Аудиотеку"
+        : "Войти, чтобы добавить";
     case "add":
       return "Добавить в Аудиотеку";
     case "in_library":
@@ -62,6 +72,8 @@ export default function LibraryAddButton({
   signInReturnPath,
   action: initialAction,
   className,
+  practiceId,
+  promoSignup = false,
 }: LibraryAddButtonProps) {
   const router = useRouter();
   const [action, setAction] = useState(initialAction);
@@ -69,7 +81,7 @@ export default function LibraryAddButton({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isDisabled = isPending || action === "in_library";
-  const buttonLabel = getLibraryButtonLabel(action, isPending);
+  const buttonLabel = getLibraryButtonLabel(action, isPending, promoSignup);
 
   async function handleAdd() {
     if (isPending || action !== "add") {
@@ -127,6 +139,21 @@ export default function LibraryAddButton({
   }
 
   function handleSignIn() {
+    if (promoSignup && practiceId) {
+      const context = buildPromoSignupContext({
+        returnTo: signInReturnPath,
+        practiceSlug,
+        practiceId,
+        intent: "save_practice",
+      });
+
+      if (context) {
+        storePromoSignupContext(context);
+        router.push(buildPromoSignUpHref(context));
+        return;
+      }
+    }
+
     router.push(buildAuthRouteHref("/auth/sign-in", signInReturnPath));
   }
 

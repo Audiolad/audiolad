@@ -16,6 +16,7 @@ type PracticePricing = {
   format: string | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  guest_access_enabled?: boolean | null;
 };
 
 export function isProgramFormat(format: string | null): boolean {
@@ -141,7 +142,11 @@ export function resolveLibraryAction(input: {
     isPracticeCatalogListed(practice) &&
     isPracticePublished(practice.status);
 
-  if (!isPublicFreeProduct) {
+  const isGuestPromoProduct =
+    practice.guest_access_enabled === true &&
+    isPracticePublished(practice.status);
+
+  if (!isPublicFreeProduct && !isGuestPromoProduct) {
     return "hidden";
   }
 
@@ -246,6 +251,7 @@ function buildCommercialPresentation(input: {
   };
   authorSlug: string;
   paymentsConfigured: boolean;
+  isAuthenticated: boolean;
 }): Pick<
   PracticeAccessPresentation,
   | "statusBadge"
@@ -253,12 +259,17 @@ function buildCommercialPresentation(input: {
   | "primaryAction"
   | "showPaymentLegalNote"
 > {
-  const { access, practice, authorSlug, paymentsConfigured } = input;
+  const { access, practice, authorSlug, paymentsConfigured, isAuthenticated } =
+    input;
   const priceLabel = formatPracticePrice(practice.price);
+  const guestListenWithoutAutoplay =
+    !isAuthenticated &&
+    (access.reason === "free" || access.reason === "guest_promo");
   const listenHref = buildListenPath(authorSlug, practice.slug, {
-    autoplay: true,
+    autoplay: !guestListenWithoutAutoplay,
   });
   const audioReady = hasAudioReady(practice.audio_url);
+  const listenLabel = guestListenWithoutAutoplay ? "Начать слушать" : "Слушать";
 
   if (access.reason === "admin") {
     return {
@@ -278,15 +289,35 @@ function buildCommercialPresentation(input: {
     };
   }
 
-  if (access.canListen && access.reason === "free") {
+  if (access.canListen && access.reason === "guest_promo") {
     return {
-      statusBadge: getFreeStatusLabel(practice.format),
-      statusDetail: null,
+      statusBadge: "Бесплатное прослушивание",
+      statusDetail: "Доступно без регистрации по этой ссылке",
       primaryAction: audioReady
         ? {
             kind: "listen",
             href: listenHref,
-            label: "Слушать",
+            label: listenLabel,
+          }
+        : {
+            kind: "audio_pending",
+            label: getAudioPendingLabel(practice.audio_url),
+          },
+      showPaymentLegalNote: false,
+    };
+  }
+
+  if (access.canListen && access.reason === "free") {
+    return {
+      statusBadge: getFreeStatusLabel(practice.format),
+      statusDetail: guestListenWithoutAutoplay
+        ? "Можно слушать без регистрации"
+        : null,
+      primaryAction: audioReady
+        ? {
+            kind: "listen",
+            href: listenHref,
+            label: listenLabel,
           }
         : {
             kind: "audio_pending",
@@ -440,6 +471,7 @@ export function buildPracticeAccessPresentation(input: {
     practice,
     authorSlug,
     paymentsConfigured,
+    isAuthenticated,
   });
 
   const isAuthorOwner = access.reason === "author_owner";

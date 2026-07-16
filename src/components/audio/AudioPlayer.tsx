@@ -7,6 +7,7 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import PromoPlaybackPrompts from "@/components/promo/PromoPlaybackPrompts";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
 
@@ -21,6 +22,9 @@ type AudioPlayerProps = {
   coverImageUrl?: string | null;
   isAuthorPreview?: boolean;
   sessionPayload?: LoadSessionInput;
+  promoConversionMode?: boolean;
+  authorSlug?: string;
+  productSlug?: string;
 };
 
 function formatTime(seconds: number): string {
@@ -194,6 +198,9 @@ export default function AudioPlayer({
   coverImageUrl = null,
   isAuthorPreview = false,
   sessionPayload,
+  promoConversionMode = false,
+  authorSlug = "",
+  productSlug = "",
 }: AudioPlayerProps) {
   const {
     session,
@@ -564,6 +571,23 @@ export default function AudioPlayer({
           </p>
         ) : null}
       </section>
+      ) : null}
+
+      {isEngineReady && promoConversionMode && authorSlug && productSlug ? (
+        <PromoPlaybackPrompts
+          enabled={promoConversionMode}
+          practiceId={practiceId}
+          practiceSlug={productSlug}
+          authorSlug={authorSlug}
+          productSlug={productSlug}
+          trackId={currentTrack?.id ?? null}
+          currentTime={currentTime}
+          duration={displayDuration}
+          isPlaying={isPlaying}
+          programCompleted={programCompleted}
+          attribution={session?.promoAttribution ?? null}
+          onReplay={() => void handleStartOver()}
+        />
       ) : null}
 
       {isEngineReady && isMultiTrack ? (

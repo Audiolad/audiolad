@@ -20,6 +20,7 @@ type PracticeAccessRow = {
   is_free: boolean | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  guest_access_enabled?: boolean | null;
 };
 
 export type ListenApiContext = {
@@ -37,7 +38,7 @@ export type ListenApiLoadResult =
 export function shouldUseServiceRoleStorageForProductAccess(
   reason: ProductAccessReason,
 ): boolean {
-  return reason === "free";
+  return reason === "free" || reason === "guest_promo";
 }
 
 export async function loadListenApiContext(

@@ -47,6 +47,10 @@ function drainPendingSave(
 
 import { buildListenApiBase } from "@/lib/products/paths";
 import {
+  buildGuestProgressPayload,
+  saveGuestPracticeProgress,
+} from "@/lib/promo/guest-progress";
+import {
   syncMediaSessionPlaybackState,
   verifyRealPlayback,
   waitForPlayingEvent,
@@ -79,6 +83,12 @@ type UseSequentialPlayerOptions = {
   onRequestPreviousProduct?: () => Promise<boolean>;
   getSessionGeneration?: () => number;
   registerCleanup?: (cleanup: () => void) => void;
+  guestProgressMode?: boolean;
+  guestProgressMeta?: {
+    practiceSlug: string;
+    source?: string | null;
+    campaign?: string | null;
+  };
   /**
    * Shared <audio> element owned by GlobalAudioPlayerProvider so engine remounts
    * do not recreate the media element (required for iOS autoplay unlock).
@@ -110,6 +120,8 @@ export function useSequentialPlayer({
   onRequestPreviousProduct,
   getSessionGeneration,
   registerCleanup,
+  guestProgressMode = false,
+  guestProgressMeta,
   audioRef,
 }: UseSequentialPlayerOptions) {
   const urlRequestRef = useRef(0);
@@ -254,6 +266,26 @@ export function useSequentialPlayer({
 
       updateProgressEntry(audioItemId, positionSeconds, completed);
 
+      if (guestProgressMode && guestProgressMeta) {
+        const track = tracks.find((item) => item.id === audioItemId);
+
+        saveGuestPracticeProgress(
+          buildGuestProgressPayload({
+            practiceId,
+            practiceSlug: guestProgressMeta.practiceSlug,
+            trackId: audioItemId,
+            positionSeconds,
+            durationSeconds: track?.durationSeconds ?? null,
+            started: positionSeconds > 0 || completed,
+            completed,
+            source: guestProgressMeta.source,
+            campaign: guestProgressMeta.campaign,
+          }),
+          options,
+        );
+        return;
+      }
+
       pendingSaveRef.current = {
         audioItemId,
         positionSeconds,
@@ -304,7 +336,7 @@ export function useSequentialPlayer({
         });
       }
     },
-    [updateProgressEntry],
+    [guestProgressMeta, guestProgressMode, practiceId, tracks, updateProgressEntry],
   );
 
   useEffect(() => {

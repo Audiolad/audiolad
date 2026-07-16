@@ -16,6 +16,23 @@ export type GlobalPlayerSession = {
   requestAutoplay?: boolean;
   /** When true, start at track 0 / position 0 (Play All restart). */
   forceStartAtBeginning?: boolean;
+  /** Guest promo funnel: persist progress in localStorage instead of server. */
+  guestProgressMode?: boolean;
+  guestProgressMeta?: {
+    practiceSlug: string;
+    source?: string | null;
+    campaign?: string | null;
+  };
+  /** Show signup conversion prompts in the player. */
+  promoConversionMode?: boolean;
+  promoAttribution?: {
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    utmContent: string | null;
+    source: string | null;
+    campaign: string | null;
+  } | null;
 };
 
 export type LoadSessionInput = GlobalPlayerSession;

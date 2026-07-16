@@ -7,6 +7,8 @@ import BuyPracticeButton from "@/components/BuyPracticeButton";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
+import PromoPostSignupHandler from "@/components/promo/PromoPostSignupHandler";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
@@ -15,6 +17,7 @@ import {
   canUseBuyerPreviewMode,
 } from "@/lib/products/practice-access-ui";
 import { resolveProductAccess } from "@/lib/products/access";
+import { shouldShowPromoConversionFlow } from "@/lib/promo/access";
 import {
   getPracticeAuthorSlug,
   getPracticeByAuthorAndSlug,
@@ -23,6 +26,7 @@ import {
 } from "@/lib/products/lookup";
 import {
   buildAuthorPublicPath,
+  buildListenPath,
   buildPracticeCanonicalUrl,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
@@ -500,9 +504,31 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listenParam === "required"
       ? "Для прослушивания необходимо приобрести доступ."
       : null;
+  const promoConversionMode = shouldShowPromoConversionFlow({
+    isAuthenticated: Boolean(user),
+    hasEntitlement: access.hasEntitlement,
+    canListen: access.canListen,
+    accessReason: access.reason,
+  });
+
+  const promoListenPath = buildListenPath(resolvedAuthorSlug, practice.slug);
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      {promoConversionMode ? (
+        <>
+          <PromoPracticeTracker
+            practiceId={practice.id}
+            practiceSlug={practice.slug}
+          />
+          {user ? (
+            <PromoPostSignupHandler
+              practiceId={practice.id}
+              practiceSlug={practice.slug}
+            />
+          ) : null}
+        </>
+      ) : null}
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
@@ -676,7 +702,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             <section className="mt-4">
               <LibraryAddButton
                 practiceSlug={practice.slug}
-                signInReturnPath={practicePagePath}
+                practiceId={practice.id}
+                promoSignup={promoConversionMode}
+                signInReturnPath={
+                  promoConversionMode ? promoListenPath : practicePagePath
+                }
                 action={presentation.libraryAction}
                 className={`w-full rounded-[22px] border border-[#e2d7f2] bg-[#faf6ff] px-5 py-4 text-sm font-semibold text-[#7d70a2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-80 ${disabledButtonClasses()}`}
               />

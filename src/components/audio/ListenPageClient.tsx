@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useGlobalAudioPlayer } from "@/components/audio/GlobalAudioPlayerProvider";
+import PromoPostSignupHandler, {
+  PromoSignupSuccessBanner,
+} from "@/components/promo/PromoPostSignupHandler";
+import {
+  parsePromoAttributionFromSearchParams,
+  resolvePromoAttribution,
+} from "@/lib/promo/attribution";
+import {
+  guestProgressToListenEntries,
+  readGuestPracticeProgress,
+} from "@/lib/promo/guest-progress";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 
 type ListenPageClientProps = LoadSessionInput & {
   autoplay?: boolean;
+  promoConversionMode?: boolean;
+  isAuthenticated?: boolean;
 };
 
 export default function ListenPageClient({
@@ -23,7 +37,56 @@ export default function ListenPageClient({
   coverGradient,
   coverImageUrl,
   isAuthorPreview,
+  promoConversionMode = false,
+  isAuthenticated = false,
+  guestProgressMode = false,
+  guestProgressMeta,
+  promoAttribution = null,
 }: ListenPageClientProps) {
+  const searchParams = useSearchParams();
+  const [signupBannerVisible, setSignupBannerVisible] = useState(false);
+  const [practiceCompletedAfterSignup, setPracticeCompletedAfterSignup] =
+    useState(false);
+
+  const resolvedAttribution = useMemo(() => {
+    if (promoAttribution) {
+      return promoAttribution;
+    }
+
+    return resolvePromoAttribution(
+      parsePromoAttributionFromSearchParams(searchParams),
+    );
+  }, [promoAttribution, searchParams]);
+
+  const mergedInitialProgress = useMemo(() => {
+    if (!guestProgressMode) {
+      return initialProgress;
+    }
+
+    const guestProgress = readGuestPracticeProgress(practiceId);
+    const guestEntries = guestProgressToListenEntries(guestProgress);
+
+    if (guestEntries.length === 0) {
+      return initialProgress;
+    }
+
+    if (initialProgress.length === 0) {
+      return guestEntries;
+    }
+
+    const byId = new Map(
+      initialProgress.map((entry) => [entry.audioItemId, entry]),
+    );
+
+    for (const entry of guestEntries) {
+      if (!byId.has(entry.audioItemId)) {
+        byId.set(entry.audioItemId, entry);
+      }
+    }
+
+    return [...byId.values()];
+  }, [guestProgressMode, initialProgress, practiceId]);
+
   const {
     loadSession,
     session: activeSession,
@@ -40,13 +103,11 @@ export default function ListenPageClient({
       return;
     }
 
-    // Internal queue router.replace (from or to page) — keep queue, no reload.
     if (isInternalQueueNavigation(practiceId)) {
       confirmInternalQueueNavigation(practiceId);
       return;
     }
 
-    // Previous queue entry page still mounted after provider already advanced.
     if (
       activeQueue &&
       activeSession?.practiceId &&
@@ -56,7 +117,6 @@ export default function ListenPageClient({
       return;
     }
 
-    // True standalone listen navigation — leave playlist queue mode.
     if (activeQueue) {
       clearPlaylistQueue();
     }
@@ -69,12 +129,16 @@ export default function ListenPageClient({
       authorName,
       format,
       tracks,
-      initialProgress,
+      initialProgress: mergedInitialProgress,
       coverSymbol,
       coverGradient,
       coverImageUrl,
       isAuthorPreview,
       requestAutoplay: autoplay && activeSession?.practiceId !== practiceId,
+      guestProgressMode,
+      guestProgressMeta,
+      promoConversionMode,
+      promoAttribution: resolvedAttribution,
     });
   }, [
     activeQueue,
@@ -89,16 +153,41 @@ export default function ListenPageClient({
     coverSymbol,
     dismissedPracticeId,
     format,
-    initialProgress,
+    guestProgressMeta,
+    guestProgressMode,
     isAuthorPreview,
     isInternalQueueNavigation,
     isQueueDrivenPractice,
     loadSession,
+    mergedInitialProgress,
     practiceId,
     practiceTitle,
     productSlug,
+    promoConversionMode,
+    resolvedAttribution,
     tracks,
   ]);
 
-  return null;
+  return (
+    <>
+      {isAuthenticated && promoConversionMode ? (
+        <PromoPostSignupHandler
+          practiceId={practiceId}
+          practiceSlug={productSlug}
+          onCompleted={({ practiceCompleted }) => {
+            setPracticeCompletedAfterSignup(practiceCompleted);
+            setSignupBannerVisible(true);
+          }}
+        />
+      ) : null}
+
+      {signupBannerVisible ? (
+        <PromoSignupSuccessBanner
+          practiceCompleted={practiceCompletedAfterSignup}
+          onContinueListening={() => setSignupBannerVisible(false)}
+          onDismiss={() => setSignupBannerVisible(false)}
+        />
+      ) : null}
+    </>
+  );
 }
