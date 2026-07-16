@@ -1,0 +1,47 @@
+import type { ReactNode } from "react";
+
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+
+type CoverOverlayCardProps = {
+  slug: string;
+  title: string;
+  coverUrl: string | null;
+  authorName?: string | null;
+  format?: string | null;
+  className?: string;
+  children: ReactNode;
+};
+
+export default function CoverOverlayCard({
+  slug,
+  title,
+  coverUrl,
+  authorName,
+  format,
+  className = "",
+  children,
+}: CoverOverlayCardProps) {
+  return (
+    <article
+      className={`relative isolate overflow-hidden rounded-[28px] shadow-[0_12px_30px_rgba(91,62,145,0.12)] ${className}`}
+    >
+      <div className="absolute inset-0" aria-hidden="true">
+        <ProductCoverThumbnail
+          slug={slug}
+          title={title}
+          coverUrl={coverUrl}
+          authorName={authorName}
+          format={format}
+          className="h-full w-full rounded-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#25135c]/92 via-[#25135c]/55 to-[#25135c]/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#25135c]/65 via-[#25135c]/20 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(37,19,92,0)_0%,rgba(37,19,92,0.35)_100%)]" />
+      </div>
+
+      <div className="relative z-10 flex min-h-[340px] flex-col p-5 sm:min-h-[320px] lg:min-h-[300px]">
+        {children}
+      </div>
+    </article>
+  );
+}
