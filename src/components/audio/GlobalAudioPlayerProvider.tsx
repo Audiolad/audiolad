@@ -573,6 +573,13 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             router.replace(path, { scroll: false });
           }
 
+          // Returning to a previously exhausted product must allow a new exhaust.
+          if (
+            lastExhaustedPracticeIdRef.current === loaded.session.practiceId
+          ) {
+            lastExhaustedPracticeIdRef.current = null;
+          }
+
           if (runtimeSkipped > queue.runtimeSkippedCount) {
             setNoticeMessage(
               runtimeSkipped - queue.runtimeSkippedCount === 1 &&

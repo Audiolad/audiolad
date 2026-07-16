@@ -254,7 +254,27 @@ function simulateRestartFromZero() {
   assert(savedProgress.positionSeconds === 120, "db progress untouched");
 }
 
+/** Returning to an exhausted product must clear dedupe. */
+function simulateExhaustDedupeResetOnReturn() {
+  let lastExhausted = "A";
+  function afterLand(practiceId) {
+    if (lastExhausted === practiceId) lastExhausted = null;
+  }
+  afterLand("A"); // Previous back to A
+  assert(lastExhausted === null, "dedupe cleared on return to A");
+  let advances = 0;
+  function onTracksExhausted(from) {
+    if (lastExhausted === from) return "none";
+    lastExhausted = from;
+    advances += 1;
+    return "advanced";
+  }
+  assert(onTracksExhausted("A") === "advanced", "A can exhaust again");
+  assert(advances === 1, "second exhaust of A after return");
+}
+
 simulateExhaustDedupe();
+simulateExhaustDedupeResetOnReturn();
 simulateNavigationGuard();
 simulateLegacyBugWouldClear();
 simulateRestartFromZero();

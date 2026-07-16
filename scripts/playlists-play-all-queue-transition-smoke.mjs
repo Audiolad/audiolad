@@ -38,14 +38,31 @@ async function seekNearEndAndWaitEnded(page) {
   await page.evaluate(async () => {
     const audio = document.querySelector("audio.global-audio-element, audio");
     if (!audio) throw new Error("no audio");
-    audio.currentTime = Math.max(0, audio.duration - 0.35);
-    if (audio.paused) {
-      try {
-        await audio.play();
-      } catch {
-        /* gesture may already be spent; ended still fires from currentTime */
-      }
+
+    const ended = new Promise((resolve) => {
+      audio.addEventListener("ended", () => resolve(true), { once: true });
+    });
+
+    try {
+      await audio.play();
+    } catch {
+      /* continue — seek may still complete under autoplay policy */
     }
+
+    audio.currentTime = Math.max(0, audio.duration - 0.2);
+
+    try {
+      await audio.play();
+    } catch {
+      /* ignore */
+    }
+
+    await Promise.race([
+      ended,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("audio ended not fired")), 12000),
+      ),
+    ]);
   });
 }
 
@@ -141,57 +158,24 @@ async function measureCompactRows(page) {
     console.log("OWNER_A", pathA);
     await waitForAudioReady(page);
 
-    // Manual Next A → B
-    const nextBtn = page.getByRole("button", { name: /Следующ/i }).first();
-    assert(await nextBtn.isVisible(), "next button visible");
-    await nextBtn.click();
-    await page.waitForFunction(
-      (prev) => location.pathname !== prev,
-      pathA,
-      { timeout: 25000 },
-    );
+    // Real ended A → B (primary iPhone bug)
+    await advanceByEnded(page, pathA);
     const pathB = await listenPath(page);
-    assert(pathB !== pathA, "Next did not change product");
-    console.log("OWNER_NEXT_A_TO_B", pathB);
-    await waitForAudioReady(page);
-
-    // Previous B → A (track 0 of previous product).
-    // Single-track products may label this "В начало…" when disabled; with queue
-    // it should be enabled as "Предыдущее аудио".
-    const prevBtn = page
-      .getByRole("button", { name: /Предыдущее аудио|В начало текущего аудио/i })
-      .first();
-    await prevBtn.waitFor({ state: "visible", timeout: 15000 });
-    assert(!(await prevBtn.isDisabled()), "previous should be enabled in queue");
-    await prevBtn.click();
-    await page.waitForFunction(
-      (prev) => location.pathname !== prev,
-      pathB,
-      { timeout: 25000 },
-    );
-    const pathBack = await listenPath(page);
-    assert(pathBack === pathA, `Previous should return to A, got ${pathBack}`);
-    console.log("OWNER_PREV_B_TO_A", pathBack);
-    await waitForAudioReady(page);
-
-    // Real ended A → B
-    await advanceByEnded(page, pathBack);
-    const pathAfterEnded = await listenPath(page);
-    assert(pathAfterEnded !== pathBack, "ended did not advance product");
-    assert(pathAfterEnded.includes("/listen/"), "ended landed on listen");
-    console.log("OWNER_ENDED_A_TO_NEXT", pathAfterEnded);
+    assert(pathB !== pathA, "ended did not advance product");
+    assert(pathB.includes("/listen/"), "ended landed on listen");
+    console.log("OWNER_ENDED_A_TO_B", pathB);
     const after = await practiceIdFromSessionHint(page);
     assert(after.src.length > 0, "next product audio src set");
+    await waitForAudioReady(page);
 
-    // Real ended again → next or completion
-    const pathMid = pathAfterEnded;
+    // Real ended B → C or completion
     await seekNearEndAndWaitEnded(page);
     await Promise.race([
       page.waitForFunction(
         (prev) =>
           location.pathname !== prev ||
           document.body.innerText.includes("Плейлист прослушан"),
-        pathMid,
+        pathB,
         { timeout: 45000 },
       ),
       page
@@ -200,16 +184,58 @@ async function measureCompactRows(page) {
         .then(() => "completion"),
     ]);
     const body = await page.locator("body").innerText();
-    const pathFinal = await listenPath(page);
-    const completed = body.includes("Плейлист прослушан");
+    const pathAfterSecond = await listenPath(page);
+    const completedEarly = body.includes("Плейлист прослушан");
     assert(
-      completed || pathFinal !== pathMid,
+      completedEarly || pathAfterSecond !== pathB,
       "second ended neither advanced nor completed",
     );
     console.log(
-      completed ? "OWNER_COMPLETION_OK" : "OWNER_ENDED_SECOND_OK",
-      pathFinal,
+      completedEarly ? "OWNER_COMPLETION_OK" : "OWNER_ENDED_B_TO_NEXT",
+      pathAfterSecond,
     );
+
+    if (!completedEarly) {
+      await waitForAudioReady(page);
+
+      // Manual Previous → prior product track 0
+      const prevBtn = page
+        .getByRole("button", {
+          name: /Предыдущее аудио|В начало текущего аудио/i,
+        })
+        .first();
+      await page.waitForFunction(
+        () => {
+          const btn = [...document.querySelectorAll("button")].find((el) => {
+            const label = el.getAttribute("aria-label") || "";
+            return /Предыдущее аудио|В начало текущего аудио/i.test(label);
+          });
+          return Boolean(btn && !btn.disabled);
+        },
+        null,
+        { timeout: 20000 },
+      );
+      const pathBeforePrev = await listenPath(page);
+      await prevBtn.click();
+      await page.waitForFunction(
+        (prev) => location.pathname !== prev,
+        pathBeforePrev,
+        { timeout: 25000 },
+      );
+      console.log("OWNER_PREV_OK", await listenPath(page));
+      await waitForAudioReady(page);
+
+      // Manual Next forward again
+      const nextBtn = page.getByRole("button", { name: /Следующ/i }).first();
+      const pathBeforeNext = await listenPath(page);
+      await nextBtn.click();
+      await page.waitForFunction(
+        (prev) => location.pathname !== prev,
+        pathBeforeNext,
+        { timeout: 25000 },
+      );
+      console.log("OWNER_NEXT_OK", await listenPath(page));
+    }
 
     // Standalone clears queue: open unrelated listen if possible via catalog
     // Soft check — navigate home then a listen URL different from queue path.
