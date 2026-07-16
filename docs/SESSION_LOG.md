@@ -4,6 +4,20 @@
 
 ---
 
+## Сессия — 16 июля 2026 (owned playlists filter — push и production verify)
+
+**Сделано:**
+
+- Fix commit: `c7a3809` (`fix: filter owned playlists by user`) — `listOwnedPlaylists()` фильтрует `.eq("user_id", userId)`; smoke `scripts/playlists-owned-list-validation-smoke.mjs`.
+- Push: `chore/database-baseline` → origin (`c7a3809`, `93fc9c6`).
+- **Отдельный deploy `c7a3809` не выполнялся:** active release уже `20260716-074720-93fc9c6` (`93fc9c6`, включает `c7a3809`); redeploy старого commit был бы downgrade.
+- Production verify: PR5 smoke PASS; disposable user B — `/playlists` без чужого public playlist; `/p/{slug}` 200, custom cover 200; signed audio в HTML нет; regression HTTP OK; validator/warning в коде сохранены.
+- Migration / БД / RLS / Storage / Nginx не менялись.
+
+**Следующий шаг:** owner UI smoke через `AUDIOLAD_SMOKE_*` при необходимости (credentials не заданы в env).
+
+---
+
 ## Сессия — 16 июля 2026 (SEO PR1 production deploy)
 
 **Сделано:**
