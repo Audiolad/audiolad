@@ -10,6 +10,11 @@ import {
   formatAdminPercent,
   type AdminAnalyticsPeriod,
 } from "@/lib/admin/analytics-period";
+import {
+  isTestAnalyticsSession,
+  isTestAnonymousId,
+  parseAdminIncludeTestParam,
+} from "@/lib/admin/analytics-test-traffic";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type AdminAnalyticsMetricCard = {
@@ -65,6 +70,9 @@ export type AdminAnalyticsDashboard = {
   period: AdminAnalyticsPeriod;
   periodLabel: string;
   generatedAt: string;
+  includeTest: boolean;
+  excludedTestVisitors: number;
+  excludedTestSessions: number;
   metrics: AdminAnalyticsMetricCard[];
   funnel: AdminAnalyticsFunnelStep[];
   sources: AdminAnalyticsSourceRow[];
@@ -77,8 +85,27 @@ type SessionRow = {
   anonymous_id: string;
   user_id: string | null;
   utm_source: string | null;
+  utm_campaign: string | null;
   referrer_domain: string | null;
 };
+
+function filterIncludedEvents(
+  events: EventRow[],
+  includedSessionIds: Set<string>,
+  includeTest: boolean,
+): EventRow[] {
+  if (includeTest) {
+    return events;
+  }
+
+  return events.filter((event) => {
+    if (event.session_id) {
+      return includedSessionIds.has(event.session_id);
+    }
+
+    return !isTestAnonymousId(event.anonymous_session_id);
+  });
+}
 
 type EventRow = {
   id: string;
@@ -119,7 +146,9 @@ async function fetchSessions(range: { from: string | null; to: string | null }) 
 
   let query = service
     .from("analytics_sessions")
-    .select("id, anonymous_id, user_id, utm_source, referrer_domain, started_at");
+    .select(
+      "id, anonymous_id, user_id, utm_source, utm_campaign, referrer_domain, started_at",
+    );
 
   if (range.from) {
     query = query.gte("started_at", range.from);
@@ -310,15 +339,27 @@ async function fetchPracticeMeta(practiceIds: string[]) {
 
 export async function getAdminAnalyticsDashboard(input?: {
   period?: string | null;
+  includeTest?: string | null;
 }): Promise<AdminAnalyticsDashboard> {
   const period = parseAdminAnalyticsPeriod(input?.period);
+  const includeTest = parseAdminIncludeTestParam(input?.includeTest);
   const range = resolveAdminAnalyticsPeriodRange(period);
   const generatedAt = new Date().toISOString();
 
-  const [sessions, events] = await Promise.all([
+  const [allSessions, allEvents] = await Promise.all([
     fetchSessions(range),
     fetchEvents(range),
   ]);
+
+  const testSessions = allSessions.filter((session) => isTestAnalyticsSession(session));
+  const excludedTestSessions = testSessions.length;
+  const excludedTestVisitors = new Set(testSessions.map(visitorKey)).size;
+
+  const sessions = includeTest
+    ? allSessions
+    : allSessions.filter((session) => !isTestAnalyticsSession(session));
+  const includedSessionIds = new Set(sessions.map((session) => session.id));
+  const events = filterIncludedEvents(allEvents, includedSessionIds, includeTest);
 
   const sessionMap = new Map(sessions.map((session) => [session.id, session]));
   const visitorSet = new Set(sessions.map(visitorKey));
@@ -408,8 +449,11 @@ export async function getAdminAnalyticsDashboard(input?: {
     },
     {
       key: "visitors",
-      label: "Посетители",
-      hint: "Уникальные anonymous_id с учётом связанного user_id.",
+      label: "Уникальные посетители",
+      hint:
+        "Считаются по аккаунту или анонимному идентификатору браузера. " +
+        "Один человек на разных устройствах, в разных браузерах или после очистки данных " +
+        "может учитываться несколько раз.",
       value: visitorSet.size,
     },
     {
@@ -465,7 +509,11 @@ export async function getAdminAnalyticsDashboard(input?: {
   ];
 
   const funnel: AdminAnalyticsFunnelStep[] = [
-    { key: "visitors", label: "Посетители", value: visitorSet.size },
+    {
+      key: "visitors",
+      label: "Уникальные посетители",
+      value: visitorSet.size,
+    },
     {
       key: "practice_view",
       label: "Открыли практику",
@@ -551,6 +599,9 @@ export async function getAdminAnalyticsDashboard(input?: {
     period,
     periodLabel: range.label,
     generatedAt,
+    includeTest,
+    excludedTestVisitors,
+    excludedTestSessions,
     metrics,
     funnel,
     sources: buildSourceRows(sessions, events),
@@ -559,4 +610,4 @@ export async function getAdminAnalyticsDashboard(input?: {
   };
 }
 
-export { parseAdminAnalyticsPeriod };
+export { parseAdminAnalyticsPeriod, parseAdminIncludeTestParam };

@@ -70,6 +70,7 @@ function testAdminDashboard() {
   assert(page.includes("getAdminAnalyticsDashboard"), "admin analytics wired");
   assert(page.includes("AdminAnalyticsPeriodPicker"), "period picker in admin page");
   assert(queries.includes("audio_play_started"), "play starts in admin queries");
+  assert(queries.includes("isTestAnalyticsSession"), "test traffic filter in admin queries");
 }
 
 function testIntegrations() {

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import AdminAnalyticsFunnel from "@/components/admin/AdminAnalyticsFunnel";
 import AdminAnalyticsMetrics from "@/components/admin/AdminAnalyticsMetrics";
 import AdminAnalyticsPeriodPicker from "@/components/admin/AdminAnalyticsPeriodPicker";
+import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalyticsTestTrafficControls";
 import AdminAnalyticsSourcesTable from "@/components/admin/AdminAnalyticsSourcesTable";
 import AdminPopularPracticesTable from "@/components/admin/AdminPopularPracticesTable";
 import AdminRecentActivityList from "@/components/admin/AdminRecentActivityList";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; includeTest?: string }>;
 }) {
   const params = await searchParams;
 
@@ -25,7 +26,10 @@ export default async function AdminOverviewPage({
   try {
     [overviewStats, analyticsDashboard] = await Promise.all([
       getAdminOverviewStats(),
-      getAdminAnalyticsDashboard({ period: params.period }),
+      getAdminAnalyticsDashboard({
+        period: params.period,
+        includeTest: params.includeTest,
+      }),
     ]);
   } catch (error) {
     console.error("admin_overview_load_error", error);
@@ -58,9 +62,19 @@ export default async function AdminOverviewPage({
             </p>
           </div>
 
-          <Suspense fallback={null}>
-            <AdminAnalyticsPeriodPicker currentPeriod={analyticsDashboard.period} />
-          </Suspense>
+          <div className="flex flex-col items-end gap-3">
+            <Suspense fallback={null}>
+              <AdminAnalyticsPeriodPicker currentPeriod={analyticsDashboard.period} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <AdminAnalyticsTestTrafficControls
+                currentPeriod={analyticsDashboard.period}
+                includeTest={analyticsDashboard.includeTest}
+                excludedTestVisitors={analyticsDashboard.excludedTestVisitors}
+                excludedTestSessions={analyticsDashboard.excludedTestSessions}
+              />
+            </Suspense>
+          </div>
         </div>
 
         <AdminAnalyticsMetrics metrics={analyticsDashboard.metrics} />

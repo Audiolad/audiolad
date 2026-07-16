@@ -181,7 +181,9 @@ async function sqlStats(service) {
 }
 
 async function fetchAdminOverviewNumbers(page) {
-  const cards = await page.locator("article").all();
+  const cards = await page
+    .locator('section[aria-labelledby="admin-overview-heading"] article')
+    .all();
   const result = {};
 
   for (const card of cards) {
@@ -232,6 +234,212 @@ function assertEq(label, actual, expected) {
   }
 }
 
+async function assertAdminDenied(page, path) {
+  const response = await page.goto(`${BASE}${path}`, {
+    waitUntil: "domcontentloaded",
+  });
+  const body = await page.content();
+  if (response?.status() !== 404 && !body.includes("404")) {
+    throw new Error(`access_not_denied:${path}`);
+  }
+}
+
+async function readAnalyticsUniqueVisitorCount(page) {
+  const analyticsSection = page.locator(
+    'section[aria-labelledby="admin-analytics-heading"]',
+  );
+  const metricCards = analyticsSection.locator("article");
+  const metricCount = await metricCards.count();
+
+  for (let index = 0; index < metricCount; index += 1) {
+    const label =
+      (await metricCards.nth(index).locator("p").first().textContent())?.trim() ?? "";
+
+    if (label.includes("Уникальные посетители")) {
+      const valueText =
+        (await metricCards.nth(index).locator("p").nth(1).textContent())?.trim() ?? "";
+      const numeric = valueText.replace(/[^\d]/g, "");
+      return Number.parseInt(numeric, 10);
+    }
+  }
+
+  throw new Error("analytics_unique_visitors_metric_missing");
+}
+
+async function verifyOwnerAnalyticsDashboard(page) {
+  const pageErrors = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+
+  await page.goto(`${BASE}/admin`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Обзор" }).waitFor();
+  await page.getByRole("heading", { name: "Аналитика платформы" }).waitFor();
+
+  for (const label of ["Сегодня", "Вчера", "7 дней", "30 дней", "Всё время"]) {
+    await page.getByRole("link", { name: label }).waitFor();
+  }
+
+  await page.getByRole("heading", { name: "Источники" }).waitFor();
+  await page.getByRole("heading", { name: "Что слушают" }).waitFor();
+  await page.getByRole("heading", { name: "Недавняя активность" }).waitFor();
+
+  const analyticsSection = page.locator(
+    'section[aria-labelledby="admin-analytics-heading"]',
+  );
+  const metricCards = analyticsSection.locator("article");
+  const metricCount = await metricCards.count();
+  if (metricCount < 1) {
+    throw new Error("analytics_metrics_missing");
+  }
+
+  for (let index = 0; index < metricCount; index += 1) {
+    const valueText = (await metricCards.nth(index).locator("p").nth(1).textContent())?.trim() ?? "";
+    if (!valueText) {
+      throw new Error(`analytics_metric_empty:${index}`);
+    }
+  }
+
+  await page.goto(`${BASE}/admin?period=7d`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Аналитика платформы" }).waitFor();
+  await page.getByRole("link", { name: "7 дней" }).waitFor();
+  await page.getByRole("heading", { name: "Источники" }).waitFor();
+  await page.getByRole("heading", { name: "Что слушают" }).waitFor();
+  await page.getByRole("heading", { name: "Недавняя активность" }).waitFor();
+
+  const withoutTestVisitors = await readAnalyticsUniqueVisitorCount(page);
+  const toggle = page.getByRole("link", { name: "Не учитывать тестовый трафик" });
+  await toggle.waitFor();
+  const toggleHref = await toggle.getAttribute("href");
+
+  if (!toggleHref?.includes("includeTest=1")) {
+    throw new Error(`test_traffic_toggle_href:${toggleHref}`);
+  }
+
+  if (withoutTestVisitors >= 56) {
+    throw new Error(
+      `analytics_test_filter_not_applied:${withoutTestVisitors}>=56`,
+    );
+  }
+
+  await page.getByText(/Исключено тестовых посетителей:/).waitFor();
+
+  await page.goto(`${BASE}/admin?period=7d&includeTest=1`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.getByRole("heading", { name: "Аналитика платформы" }).waitFor();
+
+  const withTestVisitors = await readAnalyticsUniqueVisitorCount(page);
+
+  if (withTestVisitors !== 56) {
+    throw new Error(
+      `analytics_with_test_visitors: expected 56, got ${withTestVisitors}`,
+    );
+  }
+
+  const body = await page.content();
+  if (/Application error|Internal Server Error|Unhandled Runtime Error/i.test(body)) {
+    throw new Error("analytics_dashboard_runtime_error");
+  }
+
+  if (pageErrors.length > 0) {
+    throw new Error(`analytics_dashboard_page_errors:${pageErrors.join(" | ")}`);
+  }
+
+  console.log("owner_analytics_dashboard: ok");
+}
+
+async function testListenerAnalyticsTableAccess(env, listenerEmail) {
+  const admin = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+  const pub = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+
+  const { data: linkData, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: listenerEmail,
+  });
+
+  if (error || !linkData?.properties?.hashed_token) {
+    throw new Error("listener_auth_link_failed");
+  }
+
+  const { data, error: verifyError } = await pub.auth.verifyOtp({
+    token_hash: linkData.properties.hashed_token,
+    type: "email",
+  });
+
+  if (verifyError || !data.session) {
+    throw new Error("listener_auth_verify_failed");
+  }
+
+  const listenerClient = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+      },
+    },
+  );
+
+  listenerClient.auth.setSession({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  });
+
+  const sessionResult = await listenerClient.from("analytics_sessions").select("id").limit(1);
+  const eventsResult = await listenerClient.from("analytics_events").select("id").limit(1);
+
+  if (!sessionResult.error) {
+    throw new Error("listener_can_read_analytics_sessions");
+  }
+
+  if (!eventsResult.error) {
+    throw new Error("listener_can_read_analytics_events");
+  }
+
+  console.log("listener_analytics_table_access: denied");
+}
+
+async function resolveAuthorOwnerEmail(service) {
+  const { data: authorMembers } = await service
+    .from("author_members")
+    .select("user_id")
+    .eq("role", "owner");
+
+  for (const member of authorMembers ?? []) {
+    const { data: profile } = await service
+      .from("profiles")
+      .select("role")
+      .eq("id", member.user_id)
+      .maybeSingle();
+
+    if (
+      profile?.role === "platform_owner" ||
+      profile?.role === "platform_admin"
+    ) {
+      continue;
+    }
+
+    const { data: authUser } = await service.auth.admin.getUserById(member.user_id);
+    if (authUser.user?.email) {
+      return authUser.user.email;
+    }
+  }
+
+  return null;
+}
+
 async function main() {
   const env = loadEnv();
   const service = createClient(
@@ -271,14 +479,7 @@ async function main() {
     .limit(1)
     .maybeSingle();
 
-  let authorEmail = null;
-
-  if (authorMember?.user_id) {
-    const { data: authUser } = await service.auth.admin.getUserById(
-      authorMember.user_id,
-    );
-    authorEmail = authUser.user?.email ?? null;
-  }
+  const authorEmail = await resolveAuthorOwnerEmail(service);
 
   const { data: applications } = await service
     .from("author_applications")
@@ -308,6 +509,8 @@ async function main() {
 
     await ownerPage.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
     await ownerPage.getByRole("heading", { name: "Обзор" }).waitFor();
+
+    await verifyOwnerAnalyticsDashboard(ownerPage);
 
     const uiStats = await fetchAdminOverviewNumbers(ownerPage);
     console.log("ui_stats", uiStats);
@@ -401,18 +604,17 @@ async function main() {
 
     for (const path of [
       "/admin",
+      "/admin?period=7d",
+      "/admin?period=7d&includeTest=1",
+      "/admin?period=7d&includeTest=0",
       "/admin/users",
       "/admin/author-applications",
       `/admin/author-applications/${applicationId}`,
     ]) {
-      const response = await listenerPage.goto(`${BASE}${path}`, {
-        waitUntil: "domcontentloaded",
-      });
-      const body = await listenerPage.content();
-      if (response?.status() !== 404 && !body.includes("404")) {
-        throw new Error(`listener_access_not_denied:${path}`);
-      }
+      await assertAdminDenied(listenerPage, path);
     }
+
+    await testListenerAnalyticsTableAccess(env, listenerProfile.email);
 
     await context.clearCookies();
 
@@ -421,13 +623,16 @@ async function main() {
       const authorCookies = await getAuthCookies(BASE, authorEmail);
       await context.addCookies(authorCookies);
       const authorPage = await context.newPage();
-      const response = await authorPage.goto(`${BASE}/admin`, {
-        waitUntil: "domcontentloaded",
-      });
-      const body = await authorPage.content();
-      if (response?.status() !== 404 && !body.includes("404")) {
-        throw new Error("author_member_access_not_denied");
+      for (const path of [
+        "/admin",
+        "/admin?period=7d",
+        "/admin?period=7d&includeTest=1",
+      ]) {
+        await assertAdminDenied(authorPage, path);
       }
+      console.log("author_owner_analytics_access: denied");
+    } else {
+      console.log("author_owner_analytics_access: skipped_no_distinct_author");
     }
 
     console.log("admin-panel-verification: all checks passed");

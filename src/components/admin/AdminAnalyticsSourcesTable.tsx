@@ -22,7 +22,7 @@ export default function AdminAnalyticsSourcesTable({
           <thead>
             <tr className="border-b border-[#eadff8] text-[#796ba0]">
               <th className="px-2 py-2 font-medium">Источник</th>
-              <th className="px-2 py-2 font-medium">Посетители</th>
+              <th className="px-2 py-2 font-medium">Уникальные посетители</th>
               <th className="px-2 py-2 font-medium">Регистрации</th>
               <th className="px-2 py-2 font-medium">Запуски</th>
               <th className="px-2 py-2 font-medium">Дослушивания</th>
