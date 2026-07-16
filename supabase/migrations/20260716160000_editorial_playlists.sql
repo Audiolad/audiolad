@@ -59,10 +59,19 @@ DECLARE
   v_user_id uuid;
   v_user_count integer;
 BEGIN
-  SELECT count(*)::integer, min(u.id)
-  INTO v_user_count, v_user_id
+  SELECT count(*)::integer
+  INTO v_user_count
   FROM auth.users AS u
   WHERE lower(u.email) = lower('1@audiolad.ru');
+
+  IF v_user_count = 1 THEN
+    SELECT u.id
+    INTO v_user_id
+    FROM auth.users AS u
+    WHERE lower(u.email) = lower('1@audiolad.ru')
+    ORDER BY u.id
+    LIMIT 1;
+  END IF;
 
   IF v_user_count = 1 AND v_user_id IS NOT NULL THEN
     UPDATE public.profiles
