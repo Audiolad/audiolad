@@ -49,8 +49,13 @@ export default function PlatformAnalyticsProvider({
     });
 
     void (async () => {
+      const storedSessionId = readStoredSessionId();
+      if (storedSessionId) {
+        setCachedAnalyticsSessionId(storedSessionId);
+      }
+
       const sessionId = await ensureAnalyticsSession({
-        sessionId: readStoredSessionId(),
+        sessionId: storedSessionId,
         landingPath: pathname || "/",
         ...attributionToApiFields(attribution),
         referrer_domain: referrerDomain ?? (source === "direct" ? null : source),

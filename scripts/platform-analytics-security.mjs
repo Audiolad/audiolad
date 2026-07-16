@@ -72,7 +72,7 @@ function testSignupRpcSecurity() {
 }
 
 async function testApiValidation() {
-  const base = process.env.ANALYTICS_HTTP_BASE_URL ?? process.env.ANALYTICS_E2E_BASE_URL ?? "http://127.0.0.1:3002";
+  const base = process.env.ANALYTICS_HTTP_BASE_URL ?? process.env.BASE_URL ?? process.env.ANALYTICS_E2E_BASE_URL ?? "http://127.0.0.1:3001";
 
   const invalidEvent = await fetch(`${base}/api/analytics/track`, {
     method: "POST",

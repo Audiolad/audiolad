@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 /**
- * Platform analytics browser E2E against local dev server.
+ * Platform analytics browser E2E against local Next.js server.
  *
  * Usage:
- *   PORT=3001 node scripts/platform-analytics-e2e.mjs
+ *   BASE_URL=http://127.0.0.1:3001 AUDIOLAD_ALLOW_PLAYWRIGHT=1 node scripts/platform-analytics-e2e.mjs
  */
 import "./lib/assert-playwright-allowed.mjs";
 import { chromium } from "playwright";
 import { execSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const BASE_URL = process.env.ANALYTICS_E2E_BASE_URL ?? "http://127.0.0.1:3001";
+const BASE_URL =
+  process.env.BASE_URL ??
+  process.env.ANALYTICS_E2E_BASE_URL ??
+  "http://127.0.0.1:3001";
 const UTM =
   "?utm_source=max&utm_medium=social&utm_campaign=analytics_dev_test&utm_content=browser_e2e";
 const PRACTICE_PATH = "/practice/sergey-petrov/dengi-menya-obozhayut";
@@ -18,6 +22,8 @@ const LISTEN_PATH = "/listen/sergey-petrov/dengi-menya-obozhayut";
 const ts = Date.now();
 const TEST_EMAIL = process.env.ANALYTICS_E2E_EMAIL ?? `e2e-analytics-${ts}@audiolad.ru`;
 const TEST_PASSWORD = process.env.ANALYTICS_E2E_PASSWORD ?? "E2eAnalyticsPass123!";
+const SIGN_UP_SUBMIT = /создать аккаунт|зарегистрироваться/i;
+const DIAG_DIR = join(process.cwd(), "tmp", "platform-analytics-e2e-diag");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -54,15 +60,84 @@ async function waitForAnalyticsSession(page, timeoutMs = 15000) {
   throw new Error("analytics_session_not_initialized");
 }
 
+function attachPageDiagnostics(page, label) {
+  const consoleErrors = [];
+  const pageErrors = [];
+  const failedRequests = [];
+  const redirectChain = [];
+
+  page.on("console", (msg) => {
+    if (msg.type() === "error") consoleErrors.push(msg.text());
+  });
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  page.on("requestfailed", (request) => {
+    failedRequests.push({
+      url: request.url(),
+      failure: request.failure()?.errorText ?? "unknown",
+    });
+  });
+  page.on("response", (response) => {
+    const status = response.status();
+    if (status >= 300 && status < 400) {
+      redirectChain.push({
+        url: response.url(),
+        status,
+        location: response.headers().location ?? null,
+      });
+    }
+  });
+
+  return {
+    label,
+    consoleErrors,
+    pageErrors,
+    failedRequests,
+    redirectChain,
+    async capture() {
+      mkdirSync(DIAG_DIR, { recursive: true });
+      const prefix = `${label}-${Date.now()}`;
+      const bodyText = await page.evaluate(() => document.body?.innerText ?? "");
+      const payload = {
+        label,
+        baseUrl: BASE_URL,
+        url: page.url(),
+        title: await page.title(),
+        bodyTextPreview: bodyText.slice(0, 3000),
+        consoleErrors,
+        pageErrors,
+        failedRequests,
+        redirectChain,
+      };
+      writeFileSync(join(DIAG_DIR, `${prefix}.json`), JSON.stringify(payload, null, 2));
+      await page.screenshot({ path: join(DIAG_DIR, `${prefix}.png`), fullPage: true });
+      writeFileSync(join(DIAG_DIR, `${prefix}.html`), await page.content());
+      return payload;
+    },
+  };
+}
+
+async function openSignUpPage(page) {
+  const response = await page.goto(`${BASE_URL}/auth/sign-up`, {
+    waitUntil: "domcontentloaded",
+  });
+  const signUpForm = page.getByTestId("sign-up-form");
+  await signUpForm.waitFor({ state: "visible", timeout: 30000 });
+  const submitButton = page.getByRole("button", { name: SIGN_UP_SUBMIT });
+  await submitButton.waitFor({ state: "visible", timeout: 10000 });
+  return {
+    status: response?.status() ?? null,
+    submitButton,
+  };
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  const consoleErrors = [];
-  page.on("console", (msg) => {
-    if (msg.type() === "error") consoleErrors.push(msg.text());
-  });
+  const guestDiag = attachPageDiagnostics(page, "guest");
   const sessionResponses = [];
   page.on("response", async (response) => {
     if (response.url().includes("/api/analytics/session")) {
@@ -82,15 +157,18 @@ async function main() {
   });
 
   await page.goto(`${BASE_URL}/${UTM}`, { waitUntil: "domcontentloaded" });
-  await page.waitForResponse(
-    (response) =>
-      response.url().includes("/api/analytics/session") && response.status() === 200,
-    { timeout: 45000 },
-  ).catch(() => null);
+  await page
+    .waitForResponse(
+      (response) =>
+        response.url().includes("/api/analytics/session") && response.status() === 200,
+      { timeout: 45000 },
+    )
+    .catch(() => null);
   await page.waitForTimeout(1500);
   const guestStorage = await waitForAnalyticsSession(page).catch(async (error) => {
+    const diag = await guestDiag.capture();
     throw new Error(
-      `${error.message}; sessionResponses=${JSON.stringify(sessionResponses)}; consoleErrors=${JSON.stringify(consoleErrors)}`,
+      `${error.message}; sessionResponses=${JSON.stringify(sessionResponses)}; diagnostics=${JSON.stringify(diag)}`,
     );
   });
   assert(guestStorage.anonymousId, "anonymous_id created");
@@ -107,7 +185,8 @@ async function main() {
   );
   assert(pageViewsAfterLanding >= 1, "page_view recorded");
 
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1500);
   const storageAfterReload = await readStorage(page);
   assert(storageAfterReload.sessionId === guestStorage.sessionId, "reload keeps same session");
 
@@ -116,18 +195,32 @@ async function main() {
   );
   assert(sessionsAfterReload === 1, "reload did not create new analytics session");
 
-  await page.goto(`${BASE_URL}/catalog`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE_URL}/catalog`, { waitUntil: "domcontentloaded" });
   const attributionAfterNav = await readStorage(page);
   assert(attributionAfterNav.attribution?.includes("max"), "UTM preserved after internal nav");
 
-  await page.goto(`${BASE_URL}${PRACTICE_PATH}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE_URL}${PRACTICE_PATH}`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForResponse(
+      (response) =>
+        response.url().includes("/api/analytics/track") && response.status() === 200,
+      { timeout: 30000 },
+    )
+    .catch(() => null);
   await page.waitForTimeout(1000);
   const practiceViews = countPlatformEvents(
     `AND session_id='${guestStorage.sessionId}' AND event_name='practice_view'`,
   );
   assert(practiceViews === 1, `single practice_view expected, got ${practiceViews}`);
 
-  await page.goto(`${BASE_URL}${LISTEN_PATH}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE_URL}${LISTEN_PATH}`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForResponse(
+      (response) =>
+        response.url().includes("/api/analytics/track") && response.status() === 200,
+      { timeout: 30000 },
+    )
+    .catch(() => null);
   await page.waitForTimeout(1000);
   const listenViews = countPlatformEvents(
     `AND session_id='${guestStorage.sessionId}' AND event_name='listen_page_view'`,
@@ -147,10 +240,13 @@ async function main() {
     await playButton.click();
   }
 
-  await page.waitForFunction(() => {
-    const audio = document.querySelector("audio");
-    return audio && !audio.paused && audio.currentTime > 0.2;
-  }, { timeout: 20000 });
+  await page.waitForFunction(
+    () => {
+      const audio = document.querySelector("audio");
+      return audio && !audio.paused && audio.currentTime > 0.2;
+    },
+    { timeout: 20000 },
+  );
 
   await page.waitForTimeout(1500);
   const playAfter = countPlatformEvents(
@@ -192,19 +288,38 @@ async function main() {
     await playButton.click();
   }
   await page.waitForTimeout(1500);
-  await page.waitForFunction(() => {
-    const audio = document.querySelector("audio");
-    return audio && !audio.paused;
-  }, { timeout: 10000 }).catch(() => null);
+  await page
+    .waitForFunction(() => {
+      const audio = document.querySelector("audio");
+      return audio && !audio.paused;
+    }, { timeout: 10000 })
+    .catch(() => null);
   await page.unroute("**/api/analytics/track");
 
   // Signup scenario in fresh context with same campaign marker
   const signupContext = await browser.newContext();
   const signupPage = await signupContext.newPage();
-  await signupPage.goto(`${BASE_URL}/${UTM}`, { waitUntil: "networkidle" });
+  await signupContext.clearCookies();
+  await signupPage.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
+  await signupPage.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  const signupDiag = attachPageDiagnostics(signupPage, "signup");
+
+  await signupPage.goto(`${BASE_URL}/${UTM}`, { waitUntil: "domcontentloaded" });
   const signupStorage = await waitForAnalyticsSession(signupPage);
 
-  await signupPage.goto(`${BASE_URL}/auth/sign-up`, { waitUntil: "networkidle" });
+  let signUpSubmit;
+  try {
+    const signUpOpen = await openSignUpPage(signupPage);
+    assert(signUpOpen.status === 200, `sign-up HTTP status expected 200, got ${signUpOpen.status}`);
+    signUpSubmit = signUpOpen.submitButton;
+  } catch (error) {
+    const diag = await signupDiag.capture();
+    throw new Error(`${error.message}; diagnostics=${JSON.stringify(diag)}`);
+  }
+
   await signupPage.locator('input[autocomplete="given-name"]').click();
   await signupPage.waitForTimeout(500);
   const signupStarted = countPlatformEvents(
@@ -213,7 +328,11 @@ async function main() {
   assert(signupStarted === 1, "signup_started once");
 
   await signupPage.locator('input[autocomplete="given-name"]').fill("");
-  await signupPage.getByRole("button", { name: /создать аккаунт/i }).click();
+  await signupPage.locator('[data-testid="sign-up-form"]').evaluate((form) => {
+    if (form instanceof HTMLFormElement) {
+      form.requestSubmit();
+    }
+  });
   await signupPage.waitForTimeout(500);
   const signupCompletedOnError = countPlatformEvents(
     `AND session_id='${signupStorage.sessionId}' AND event_name='signup_completed'`,
@@ -224,10 +343,20 @@ async function main() {
   await signupPage.locator('input[autocomplete="family-name"]').fill("Analytics");
   await signupPage.locator('input[autocomplete="email"]').fill(TEST_EMAIL);
   await signupPage.locator('input[autocomplete="new-password"]').fill(TEST_PASSWORD);
-  await signupPage.getByRole("button", { name: /создать аккаунт/i }).click();
-  await signupPage.waitForURL(/\/(my-practices|profile|auth)/, { timeout: 30000 });
+  await signUpSubmit.click();
+  await signupPage.waitForURL(
+    (url) => {
+      const path = new URL(url).pathname;
+      return (
+        path === "/my-practices" ||
+        path === "/profile" ||
+        path === "/auth/sign-in"
+      );
+    },
+    { timeout: 30000 },
+  );
 
-  const userId = sql(`SELECT id FROM auth.users WHERE email='${TEST_EMAIL}'`);
+  const userId = sql(`SELECT id FROM auth.users WHERE email='${TEST_EMAIL.replace(/'/g, "''")}'`);
   assert(userId, "test user created");
 
   await signupPage.waitForTimeout(2000);
@@ -247,12 +376,18 @@ async function main() {
   );
   assert(linkedEvents >= 2, "previous session events linked to user_id");
 
-  await signupPage.reload({ waitUntil: "networkidle" });
+  await signupPage.reload({ waitUntil: "domcontentloaded" });
   await signupPage.waitForTimeout(1500);
   const signupCompletedAfterRefresh = countPlatformEvents(
     `AND event_name='signup_completed' AND user_id='${userId}'`,
   );
   assert(signupCompletedAfterRefresh === 1, "refresh did not duplicate signup_completed");
+
+  assert(
+    signupDiag.consoleErrors.every((line) => !/hydration/i.test(line)),
+    `hydration console errors: ${JSON.stringify(signupDiag.consoleErrors)}`,
+  );
+  assert(signupDiag.pageErrors.length === 0, `page errors: ${JSON.stringify(signupDiag.pageErrors)}`);
 
   await signupContext.close();
   await browser.close();

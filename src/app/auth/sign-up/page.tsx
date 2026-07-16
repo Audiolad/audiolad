@@ -124,7 +124,11 @@ function SignUpForm() {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-8 space-y-5"
+          data-testid="sign-up-form"
+        >
           <label className="block">
             <span className="text-sm font-medium">Имя</span>
 

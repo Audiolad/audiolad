@@ -26,7 +26,7 @@ function loadEnv() {
 
 loadEnv();
 
-const baseUrl = process.env.ANALYTICS_HTTP_BASE_URL ?? "http://127.0.0.1:3002";
+const baseUrl = process.env.ANALYTICS_HTTP_BASE_URL ?? process.env.BASE_URL ?? "http://127.0.0.1:3001";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
