@@ -12,7 +12,6 @@ import type { GuestHomeData, PersonalHomeData } from "@/lib/home/types";
 
 import GuestHome from "@/components/home/GuestHome";
 import HomeCriticalFallback from "@/components/home/HomeCriticalFallback";
-import HomePageShell from "@/components/home/HomePageShell";
 import PersonalHome from "@/components/home/PersonalHome";
 
 export const dynamic = "force-dynamic";
@@ -53,32 +52,12 @@ export default async function Home() {
   const state = await resolveHomeRenderState();
 
   if (state.kind === "critical") {
-    let isAuthenticated = false;
-
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      isAuthenticated = Boolean(user);
-    } catch {
-      isAuthenticated = false;
-    }
-
-    return <HomeCriticalFallback isAuthenticated={isAuthenticated} />;
+    return <HomeCriticalFallback />;
   }
 
   if (state.kind === "personal") {
-    return (
-      <HomePageShell isAuthenticated>
-        <PersonalHome data={state.data} />
-      </HomePageShell>
-    );
+    return <PersonalHome data={state.data} />;
   }
 
-  return (
-    <HomePageShell isAuthenticated={false}>
-      <GuestHome data={state.data} />
-    </HomePageShell>
-  );
+  return <GuestHome data={state.data} />;
 }

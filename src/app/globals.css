@@ -13,7 +13,7 @@
   --listener-sidebar-width: 240px;
   --listener-now-playing-width: 320px;
   --listener-desktop-player-height: 0px;
-  --listener-topbar-height: 0px;
+  --listener-topbar-height: 56px;
   --listener-shell-gap: 16px;
 }
 
@@ -44,6 +44,23 @@
   pointer-events: none;
   left: -9999px;
   top: 0;
+}
+
+@media (min-width: 1280px) {
+  .listener-app-shell__body.platform-mobile-shell {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .listener-app-shell__body {
+    display: grid;
+    grid-template-columns:
+      var(--listener-sidebar-width)
+      minmax(0, 1fr)
+      var(--listener-now-playing-width);
+    gap: var(--listener-shell-gap);
+    align-items: stretch;
+  }
 }
 
 @theme inline {

@@ -37,6 +37,21 @@ export const LISTENER_PRIMARY_NAV_ITEMS: readonly ListenerPrimaryNavItem[] = [
   { key: "profile", title: "Профиль", href: "/profile", icon: "profile" },
 ] as const;
 
+export type ListenerSidebarNavItem = {
+  key: string;
+  title: string;
+  href: string;
+};
+
+/** Desktop sidebar «Моё пространство» — primary routes without profile tab. */
+export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
+  { key: "home", title: "Главная", href: "/" },
+  { key: "catalog", title: "Каталог", href: "/catalog" },
+  { key: "library", title: "Аудиотека", href: "/my-practices" },
+  { key: "playlists", title: "Плейлисты", href: "/playlists" },
+  { key: "history", title: "Недавно слушали", href: "/history" },
+] as const;
+
 /**
  * Active-state rules for primary listener nav items (BottomNav parity).
  * Neutral paths (legal, auth) never highlight a tab.
