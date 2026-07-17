@@ -52,6 +52,62 @@ export type CatalogSections = {
   paidProducts: CatalogProduct[];
 };
 
+export type CatalogQueryOptions = {
+  topicKey?: string | null;
+};
+
+async function getPublishedPracticeIdsForTopicKey(
+  supabase: SupabaseClient,
+  topicKey: string,
+): Promise<string[]> {
+  const normalizedKey = topicKey.trim().toLowerCase();
+
+  if (!normalizedKey) {
+    return [];
+  }
+
+  const { data: topicRow, error: topicError } = await supabase
+    .from("topics")
+    .select("id")
+    .eq("is_active", true)
+    .eq("key", normalizedKey)
+    .maybeSingle();
+
+  if (topicError || !topicRow?.id) {
+    return [];
+  }
+
+  const { data: practiceRows, error: practicesError } = await supabase
+    .from("practices")
+    .select("id")
+    .eq("status", "published")
+    .eq("is_catalog_listed", true);
+
+  if (practicesError) {
+    return [];
+  }
+
+  const publishedPracticeIds = new Set(
+    (practiceRows ?? []).map((row) => row.id as string),
+  );
+
+  if (publishedPracticeIds.size === 0) {
+    return [];
+  }
+
+  const { data: assignmentRows, error: assignmentError } = await supabase
+    .from("practice_topics")
+    .select("practice_id")
+    .eq("topic_id", topicRow.id)
+    .in("practice_id", [...publishedPracticeIds]);
+
+  if (assignmentError) {
+    return [];
+  }
+
+  return (assignmentRows ?? []).map((row) => row.practice_id as string);
+}
+
 function normalizeAuthor(
   authors: CatalogPracticeRow["authors"],
 ): { name: string; slug: string } | null {
@@ -105,8 +161,23 @@ function getSortTimestamp(
 
 export async function getPublishedCatalogProducts(
   supabase: SupabaseClient,
+  options?: CatalogQueryOptions,
 ): Promise<CatalogProduct[]> {
-  const { data: practices, error } = await supabase
+  const topicKey = options?.topicKey?.trim().toLowerCase() || null;
+  let practiceIdsForTopic: string[] | null = null;
+
+  if (topicKey) {
+    practiceIdsForTopic = await getPublishedPracticeIdsForTopicKey(
+      supabase,
+      topicKey,
+    );
+
+    if (practiceIdsForTopic.length === 0) {
+      return [];
+    }
+  }
+
+  let query = supabase
     .from("practices")
     .select(
       `
@@ -133,6 +204,12 @@ export async function getPublishedCatalogProducts(
     .eq("is_catalog_listed", true)
     .not("slug", "is", null)
     .not("author_id", "is", null);
+
+  if (practiceIdsForTopic) {
+    query = query.in("id", practiceIdsForTopic);
+  }
+
+  const { data: practices, error } = await query;
 
   if (error) {
     return [];
@@ -191,6 +268,8 @@ export async function getPublishedCatalogProducts(
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
+          isFree: practice.is_free,
+          price: practice.price,
         }),
         statsLabel: formatCatalogProductStats({
           audioCount,
@@ -229,7 +308,8 @@ export function splitCatalogProducts(products: CatalogProduct[]): CatalogSection
 
 export async function getPublishedCatalogSections(
   supabase: SupabaseClient,
+  options?: CatalogQueryOptions,
 ): Promise<CatalogSections> {
-  const products = await getPublishedCatalogProducts(supabase);
+  const products = await getPublishedCatalogProducts(supabase, options);
   return splitCatalogProducts(products);
 }
