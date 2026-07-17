@@ -75,6 +75,10 @@
     height: 100%;
   }
 
+  .listener-app-shell__center-scroll {
+    min-height: 0;
+  }
+
   .listener-home-content {
     --home-page-gutter: 0px;
   }

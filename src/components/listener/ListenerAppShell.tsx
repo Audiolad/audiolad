@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
+import DesktopCenterSearch from "@/components/listener/DesktopCenterSearch";
+import DesktopRightColumn from "@/components/listener/DesktopRightColumn";
 import DesktopSidebar from "@/components/listener/DesktopSidebar";
-import DesktopTopBar from "@/components/listener/DesktopTopBar";
-import NowPlayingPanel from "@/components/listener/NowPlayingPanel";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
@@ -17,11 +17,7 @@ export function ListenerAppShell({
   shellData,
 }: ListenerAppShellProps) {
   return (
-    <div className="listener-app-shell min-h-dvh bg-platform-surface text-[#25135c] xl:flex xl:h-dvh xl:flex-col xl:gap-4 xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-[calc(1.25rem+var(--global-mini-player-height))]">
-      <div className="hidden xl:block xl:shrink-0">
-        <DesktopTopBar shellData={shellData} />
-      </div>
-
+    <div className="listener-app-shell min-h-dvh bg-platform-surface text-[#25135c] xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-[calc(1.25rem+var(--global-mini-player-height))]">
       <div
         className={`listener-app-shell__body mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass} xl:mx-0 xl:min-h-0 xl:max-w-none xl:flex-1 xl:bg-transparent`}
       >
@@ -30,11 +26,16 @@ export function ListenerAppShell({
         </div>
 
         <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-          {children}
+          <div className="listener-app-shell__center-scroll xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-y-auto">
+            <div className="hidden xl:block xl:shrink-0 xl:px-6">
+              <DesktopCenterSearch />
+            </div>
+            {children}
+          </div>
         </section>
 
         <div className="listener-app-shell__now-playing-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
-          <NowPlayingPanel />
+          <DesktopRightColumn shellData={shellData} />
         </div>
       </div>
 

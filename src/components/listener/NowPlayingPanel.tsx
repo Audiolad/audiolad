@@ -31,7 +31,7 @@ function formatTime(seconds: number): string {
 
 function EmptyState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
       <div
         className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#f3ebfc] text-2xl text-[#7042c5]"
         aria-hidden="true"
@@ -45,26 +45,31 @@ function EmptyState() {
   );
 }
 
-export default function NowPlayingPanel() {
+export default function NowPlayingPanel({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { session } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
 
   const hasSession = Boolean(session?.tracks.length);
   const isEngineReady = Boolean(engine);
 
+  const panelShellClass = embedded
+    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+    : "flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]";
+
   if (!hasSession || !session) {
     return (
-      <aside
-        className="flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
-        aria-label="Сейчас играет"
-      >
-        <div className="shrink-0 border-b border-[#f0e8f8] px-5 py-4">
+      <div className={panelShellClass} aria-label="Сейчас играет">
+        <div className="shrink-0 border-b border-[#f0e8f8] px-5 py-3">
           <h2 className="text-[17px] font-semibold text-[#25135c]">
             Сейчас играет
           </h2>
         </div>
         <EmptyState />
-      </aside>
+      </div>
     );
   }
 
@@ -112,11 +117,8 @@ export default function NowPlayingPanel() {
   const authorHref = authorSlug ? buildAuthorPublicPath(authorSlug) : null;
 
   return (
-    <aside
-      className="flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
-      aria-label="Сейчас играет"
-    >
-      <div className="shrink-0 border-b border-[#f0e8f8] px-5 py-4">
+    <div className={panelShellClass} aria-label="Сейчас играет">
+      <div className="shrink-0 border-b border-[#f0e8f8] px-5 py-3">
         <h2 className="text-[17px] font-semibold text-[#25135c]">
           Сейчас играет
         </h2>
@@ -213,6 +215,6 @@ export default function NowPlayingPanel() {
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

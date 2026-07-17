@@ -43,9 +43,8 @@ export type ListenerSidebarNavItem = {
   href: string;
 };
 
-/** Desktop sidebar «Моё пространство» — primary routes without profile tab. */
+/** Desktop sidebar «Моё пространство» — sections without home (logo links to /). */
 export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
-  { key: "home", title: "Главная", href: "/" },
   { key: "catalog", title: "Каталог", href: "/catalog" },
   { key: "library", title: "Аудиотека", href: "/my-practices" },
   { key: "playlists", title: "Плейлисты", href: "/playlists" },

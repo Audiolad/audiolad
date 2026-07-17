@@ -11,7 +11,7 @@ export default function CatalogListenerLayout({
     <>
       <CatalogMobileHeader />
 
-      <div className="listener-catalog-content px-5 lg:px-10 xl:flex-1 xl:overflow-y-auto xl:px-6 xl:pt-4 xl:pb-5">
+      <div className="listener-catalog-content px-5 lg:px-10 xl:px-6 xl:pt-3 xl:pb-5">
         {children}
       </div>
     </>

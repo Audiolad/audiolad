@@ -13,7 +13,16 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
       className="flex h-full min-h-0 w-[var(--listener-sidebar-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
       aria-label="Моё пространство"
     >
-      <h2 className="shrink-0 px-3 pt-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4]">
+      <div className="flex h-14 min-h-14 shrink-0 items-center px-3">
+        <Link
+          href="/"
+          className="text-[22px] font-semibold leading-none text-[#6234b5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          АудиоЛад
+        </Link>
+      </div>
+
+      <h2 className="shrink-0 px-3 pt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4]">
         Моё пространство
       </h2>
 
