@@ -60,6 +60,41 @@
       var(--listener-now-playing-width);
     gap: var(--listener-shell-gap);
     align-items: stretch;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .listener-app-shell__sidebar-slot,
+  .listener-app-shell__now-playing-slot {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .listener-app-shell__main-column {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .listener-home-content {
+    --home-page-gutter: 0px;
+  }
+
+  .listener-home-content .home-carousel-track {
+    margin-right: 0;
+    padding-right: 0;
+    scroll-padding-right: 0;
+  }
+
+  .listener-home-content .home-section-carousel {
+    margin-top: 1.5rem;
+  }
+
+  .listener-home-content .featured-card__cover {
+    width: 168px;
+  }
+
+  .listener-home-content .featured-card__content {
+    padding: 1rem 1.125rem;
   }
 }
 

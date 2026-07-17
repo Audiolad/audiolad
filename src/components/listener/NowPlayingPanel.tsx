@@ -55,10 +55,10 @@ export default function NowPlayingPanel() {
   if (!hasSession || !session) {
     return (
       <aside
-        className="flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
+        className="flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
         aria-label="Сейчас играет"
       >
-        <div className="border-b border-[#f0e8f8] px-5 py-4">
+        <div className="shrink-0 border-b border-[#f0e8f8] px-5 py-4">
           <h2 className="text-[17px] font-semibold text-[#25135c]">
             Сейчас играет
           </h2>

@@ -19,7 +19,7 @@ export function ListenerAppShell({
   shellData,
 }: ListenerAppShellProps) {
   return (
-    <div className="listener-app-shell min-h-dvh bg-platform-surface text-[#25135c] xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-[calc(1.25rem+var(--global-mini-player-height))]">
+    <div className="listener-app-shell min-h-dvh bg-platform-surface text-[#25135c] xl:flex xl:h-dvh xl:flex-col xl:gap-4 xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-[calc(1.25rem+var(--global-mini-player-height))]">
       <div className="hidden xl:block xl:shrink-0">
         <DesktopTopBar shellData={shellData} />
       </div>
@@ -27,14 +27,14 @@ export function ListenerAppShell({
       <div
         className={`listener-app-shell__body mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass} xl:mx-0 xl:min-h-0 xl:max-w-none xl:flex-1 xl:bg-transparent`}
       >
-        <div className="hidden xl:flex xl:min-h-0 xl:self-stretch">
+        <div className="listener-app-shell__sidebar-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
           <DesktopSidebar shellData={shellData} />
         </div>
 
-        <section className="min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+        <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
           <HomeMobileHeader shellData={shellData} />
 
-          <div className="px-5 lg:px-10 xl:flex-1 xl:overflow-y-auto xl:px-8 xl:pt-2 xl:pb-4">
+          <div className="listener-home-content px-5 lg:px-10 xl:flex-1 xl:overflow-y-auto xl:px-6 xl:pt-1 xl:pb-5">
             {children}
           </div>
 
@@ -43,7 +43,7 @@ export function ListenerAppShell({
           </div>
         </section>
 
-        <div className="hidden xl:flex xl:min-h-0 xl:self-stretch">
+        <div className="listener-app-shell__now-playing-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
           <NowPlayingPanel />
         </div>
       </div>

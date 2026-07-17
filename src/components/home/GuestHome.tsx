@@ -33,12 +33,12 @@ export default function GuestHome({ data }: GuestHomeProps) {
 
   return (
     <>
-      <section className="mt-8 lg:mt-12">
-        <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15]">
+      <section className="mt-8 xl:mt-5">
+        <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15] xl:text-[34px] xl:leading-[1.12]">
           Аудио, которое помогает вернуться к себе
         </h1>
 
-        <p className="mt-3 max-w-[720px] text-lg font-medium leading-7 text-[#7042c5] lg:text-xl">
+        <p className="mt-3 max-w-[720px] text-lg font-medium leading-7 text-[#7042c5] lg:text-xl xl:max-w-none xl:text-[17px] xl:leading-7">
           Авторские аудиопрактики, медитации, лекции, подкасты и программы в
           одном спокойном пространстве.
         </p>

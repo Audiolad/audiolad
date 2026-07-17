@@ -10,18 +10,18 @@ type DesktopSidebarProps = {
 export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
   return (
     <aside
-      className="flex h-full min-h-0 w-[var(--listener-sidebar-width)] shrink-0 flex-col rounded-[20px] border border-[#eadff8] bg-[#fffdfd] p-4 shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
+      className="flex h-full min-h-0 w-[var(--listener-sidebar-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
       aria-label="Моё пространство"
     >
-      <h2 className="px-3 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
+      <h2 className="shrink-0 px-3 pt-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4]">
         Моё пространство
       </h2>
 
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
         <DesktopSidebarNav />
       </div>
 
-      <div className="mt-4 shrink-0 rounded-[18px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f5ecff] p-4">
+      <div className="mx-3 mb-3 shrink-0 rounded-[18px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f5ecff] p-4">
         <p className="text-[14px] font-medium leading-snug text-[#4a3d6b]">
           Создавайте и вдохновляйте тысячи людей
         </p>
