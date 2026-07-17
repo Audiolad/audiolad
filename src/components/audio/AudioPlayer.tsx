@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import FormattedPlainText from "@/components/FormattedPlainText";
 import {
   useGlobalAudioPlayer,
@@ -405,7 +406,11 @@ export default function AudioPlayer({
             Аудио {currentTrackIndex + 1} из {tracks.length}
           </p>
         ) : null}
-        <p className="mt-2 text-sm font-medium text-white/70">{authorName}</p>
+        <AuthorLink
+          authorSlug={authorSlug}
+          authorName={authorName}
+          className="mt-2 inline-block text-sm font-medium text-white/70 hover:text-white"
+        />
         {trimmedFormat ? (
           <p className="mt-2 text-xs uppercase tracking-[0.14em] text-white/50">
             {trimmedFormat}

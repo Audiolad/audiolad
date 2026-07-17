@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogProduct } from "@/lib/products/catalog";
@@ -14,20 +15,22 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
   const showPrice = !isProductFree(product.isFree, product.price);
 
   return (
-    <Link
-      href={product.href}
-      className="block rounded-[24px] border border-[#e8def5] bg-white p-4 shadow-sm transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] active:shadow-sm"
-    >
-      <article className="flex min-w-0 items-stretch gap-4 max-[360px]:gap-3.5 sm:gap-5">
+    <article className="block rounded-[24px] border border-[#e8def5] bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex min-w-0 items-stretch gap-4 max-[360px]:gap-3.5 sm:gap-5">
         <div className="w-[36%] min-w-[108px] max-w-[132px] shrink-0 sm:max-w-[140px]">
-          <ProductCoverThumbnail
-            slug={product.slug}
-            title={product.title}
-            coverUrl={product.coverUrl}
-            authorName={product.authorName}
-            format={product.format}
-            className="aspect-square w-full rounded-[20px]"
-          />
+          <Link
+            href={product.href}
+            className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            <ProductCoverThumbnail
+              slug={product.slug}
+              title={product.title}
+              coverUrl={product.coverUrl}
+              authorName={product.authorName}
+              format={product.format}
+              className="aspect-square w-full rounded-[20px]"
+            />
+          </Link>
 
           <div className="mt-2.5 space-y-1.5">
             {product.statsLabel ? (
@@ -49,7 +52,12 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
           </p>
 
           <h3 className="mt-1 line-clamp-3 text-[17px] font-semibold leading-[1.3] text-[#25135c] sm:text-[18px]">
-            {product.title}
+            <Link
+              href={product.href}
+              className="hover:text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              {product.title}
+            </Link>
           </h3>
 
           {summary ? (
@@ -61,12 +69,14 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
           )}
 
           {product.authorName ? (
-            <p className="mt-2.5 shrink-0 text-sm font-medium text-[#7042c5]">
-              {product.authorName}
-            </p>
+            <AuthorLink
+              authorSlug={product.authorSlug}
+              authorName={product.authorName}
+              className="mt-2.5 shrink-0 text-sm font-medium text-[#7042c5]"
+            />
           ) : null}
         </div>
-      </article>
-    </Link>
+      </div>
+    </article>
   );
 }

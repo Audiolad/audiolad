@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { ProfileContinueState } from "@/lib/profile/types";
 
@@ -90,9 +91,11 @@ export default function ProfileContinueSection({
               </h3>
 
               {state.item.product.authorName ? (
-                <p className="mt-1 truncate text-sm font-medium text-[#7042c5] lg:text-[15px]">
-                  {state.item.product.authorName}
-                </p>
+                <AuthorLink
+                  authorSlug={state.item.product.authorSlug}
+                  authorName={state.item.product.authorName}
+                  className="mt-1 truncate text-sm font-medium text-[#7042c5] lg:text-[15px]"
+                />
               ) : null}
 
               {state.item.isProgram && state.item.stepLabel ? (

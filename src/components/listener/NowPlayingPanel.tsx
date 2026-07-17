@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import {
-  buildAuthorPublicPath,
   buildListenPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
@@ -280,7 +280,6 @@ export default function NowPlayingPanel({
     authorSlug && productSlug
       ? buildPracticePublicPath(authorSlug, productSlug)
       : null;
-  const authorHref = authorSlug ? buildAuthorPublicPath(authorSlug) : null;
 
   const contentPaddingClass = embedded ? "px-4 pb-4" : "px-5 py-4";
 
@@ -314,18 +313,11 @@ export default function NowPlayingPanel({
         </h3>
 
         {authorName ? (
-          authorHref ? (
-            <Link
-              href={authorHref}
-              className="mt-1.5 inline-block max-w-full truncate text-[14px] font-medium text-[#7042c5] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              {authorName}
-            </Link>
-          ) : (
-            <p className="mt-1.5 line-clamp-1 text-[14px] font-medium text-[#7042c5]">
-              {authorName}
-            </p>
-          )
+          <AuthorLink
+            authorSlug={authorSlug}
+            authorName={authorName}
+            className="mt-1.5 inline-block max-w-full truncate text-[14px] font-medium text-[#7042c5]"
+          />
         ) : null}
 
         {displayDuration > 0 ? (

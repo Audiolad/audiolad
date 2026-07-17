@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
 
@@ -43,9 +44,11 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
         </h2>
 
         {product.authorName ? (
-          <p className="mt-2 text-sm font-medium text-[#7042c5]">
-            {product.authorName}
-          </p>
+          <AuthorLink
+            authorSlug={product.authorSlug}
+            authorName={product.authorName}
+            className="mt-2 text-sm font-medium text-[#7042c5]"
+          />
         ) : null}
 
         {product.statsLabel ? (

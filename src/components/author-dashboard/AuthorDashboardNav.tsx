@@ -3,6 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M5 20c1.5-3 4.5-5 7-5s5.5 2 7 5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function ProductsIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -48,6 +62,12 @@ export default function AuthorDashboardNav({
       label: "Продукты",
       icon: ProductsIcon,
       active: pathname === "/author-dashboard",
+    },
+    {
+      href: `/author-dashboard/profile${authorQuery}`,
+      label: "Страница автора",
+      icon: ProfileIcon,
+      active: pathname.startsWith("/author-dashboard/profile"),
     },
     {
       href: `/author-dashboard/promotion${authorQuery}`,

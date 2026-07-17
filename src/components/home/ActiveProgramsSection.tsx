@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { ActiveProgramItem } from "@/lib/home/types";
 
@@ -47,9 +48,11 @@ export default function ActiveProgramsSection({
               </h3>
 
               {program.product.authorName ? (
-                <p className="mt-1 text-sm font-medium text-[#7042c5]">
-                  {program.product.authorName}
-                </p>
+                <AuthorLink
+                  authorSlug={program.product.authorSlug}
+                  authorName={program.product.authorName}
+                  className="mt-1 text-sm font-medium text-[#7042c5]"
+                />
               ) : null}
 
               <p className="mt-2 text-sm text-[#7d70a2]">{program.stepLabel}</p>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import LibraryPracticeMenu from "@/components/playlists/LibraryPracticeMenu";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import {
@@ -134,9 +135,12 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
         ) : (
           <>
             {practice.authorName ? (
-              <p className="mt-1 text-sm font-medium text-[#25135c]">
-                {practice.authorName}
-              </p>
+              <AuthorLink
+                authorSlug={practice.authorSlug}
+                authorName={practice.authorName}
+                stopPropagation
+                className="pointer-events-auto relative z-[2] mt-1 text-sm font-medium text-[#25135c]"
+              />
             ) : null}
 
             {meta ? <p className="mt-1 text-sm text-[#7d70a2]">{meta}</p> : null}

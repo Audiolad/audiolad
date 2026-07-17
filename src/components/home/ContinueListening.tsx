@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import CoverOverlayCard from "@/components/home/CoverOverlayCard";
 import type { ContinueListeningItem, HomeProduct } from "@/lib/home/types";
 
@@ -66,9 +67,11 @@ export default function ContinueListening({
           </h3>
 
           {product.authorName ? (
-            <p className="mt-1.5 line-clamp-1 text-sm font-medium text-white/85">
-              {product.authorName}
-            </p>
+            <AuthorLink
+              authorSlug={product.authorSlug}
+              authorName={product.authorName}
+              className="mt-1.5 line-clamp-1 text-sm font-medium text-white/85 hover:text-white"
+            />
           ) : null}
 
           {item.isProgram && item.currentTrackTitle ? (

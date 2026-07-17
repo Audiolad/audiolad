@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
+import AuthorLink from "@/components/authors/AuthorLink";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
@@ -28,7 +29,6 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import {
-  buildAuthorPublicPath,
   buildListenPath,
   buildPracticeCanonicalUrl,
   buildPracticePublicPath,
@@ -502,7 +502,6 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     format: practice.format,
   });
   const subtitle = practice.subtitle?.trim() || null;
-  const authorPublicPath = buildAuthorPublicPath(resolvedAuthorSlug);
   const listenDeniedMessage =
     listenParam === "required"
       ? "Для прослушивания необходимо приобрести доступ."
@@ -633,13 +632,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             ) : null}
 
             {authorName ? (
-              <Link
-                href={authorPublicPath}
-                className="mt-3 inline-flex min-h-11 items-center text-base font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                aria-label={`Страница автора ${authorName}`}
-              >
-                {authorName}
-              </Link>
+              <AuthorLink
+                authorSlug={resolvedAuthorSlug}
+                authorName={authorName}
+                className="mt-3 inline-flex min-h-11 items-center text-base font-medium text-[#7042c5]"
+              />
             ) : null}
 
             {meta && (

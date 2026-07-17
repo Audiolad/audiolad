@@ -574,6 +574,7 @@ export default function PlaylistDetailClient({
                   practiceId: item.practiceId,
                   title: item.title,
                   authorName: item.authorName,
+                  authorSlug: item.authorSlug,
                   coverDisplayUrl: item.coverDisplayUrl,
                   formatLabel: item.formatLabel,
                   metaLabel: item.metaLabel,

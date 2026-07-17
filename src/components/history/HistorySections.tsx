@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import {
   getCompletedStatusLabel,
@@ -102,9 +103,11 @@ export function HistoryCard({ item }: HistoryCardProps) {
           </Link>
 
           {item.authorName ? (
-            <p className="mt-1 text-sm font-medium text-[#7042c5]">
-              {item.authorName}
-            </p>
+            <AuthorLink
+              authorSlug={item.authorSlug}
+              authorName={item.authorName}
+              className="mt-1 text-sm font-medium text-[#7042c5]"
+            />
           ) : null}
 
           {item.metaLabel ? (

@@ -4,12 +4,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import AuthorLink from "@/components/authors/AuthorLink";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 
 export type PlaylistItemRowData = {
   practiceId: string;
   title: string;
   authorName: string | null;
+  authorSlug?: string | null;
   coverDisplayUrl: string | null;
   formatLabel?: string | null;
   metaLabel?: string | null;
@@ -129,9 +131,11 @@ export default function PlaylistItemRow({
           </p>
         )}
         {item.authorName ? (
-          <p className="mt-0.5 truncate text-[12px] leading-4 text-[#5c4f82]">
-            {item.authorName}
-          </p>
+          <AuthorLink
+            authorSlug={item.authorSlug}
+            authorName={item.authorName}
+            className="mt-0.5 block truncate text-[12px] leading-4 text-[#5c4f82]"
+          />
         ) : null}
         {!item.available ? (
           <p className="mt-0.5 truncate text-[11px] leading-4 text-[#b34f63]">

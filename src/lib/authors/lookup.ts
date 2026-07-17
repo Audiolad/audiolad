@@ -7,8 +7,12 @@ export type PublicAuthorRow = {
   id: string;
   name: string;
   slug: string;
+  author_type?: string | null;
   description: string | null;
+  short_bio?: string | null;
+  full_bio?: string | null;
   avatar_url: string | null;
+  banner_url?: string | null;
 };
 
 export type AuthorPublishedPractice = {
@@ -30,7 +34,9 @@ export async function getAuthorBySlug(
 ): Promise<{ author: PublicAuthorRow | null; error: boolean }> {
   const { data, error } = await supabase
     .from("authors")
-    .select("id, name, slug, description, avatar_url")
+    .select(
+      "id, name, slug, author_type, description, short_bio, full_bio, avatar_url, banner_url",
+    )
     .eq("slug", authorSlug)
     .maybeSingle();
 

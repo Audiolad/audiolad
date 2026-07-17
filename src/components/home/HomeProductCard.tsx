@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { HomeProduct } from "@/lib/home/types";
@@ -57,9 +58,11 @@ export default function HomeProductCard({
       </h3>
 
       {product.authorName ? (
-        <p className="mt-1 line-clamp-1 text-sm font-medium text-[#7042c5]">
-          {product.authorName}
-        </p>
+        <AuthorLink
+          authorSlug={product.authorSlug}
+          authorName={product.authorName}
+          className="mt-1 line-clamp-1 text-sm font-medium text-[#7042c5]"
+        />
       ) : null}
 
       {product.statsLabel ? (

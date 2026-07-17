@@ -1,5 +1,6 @@
 "use client";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import {
   GLOBAL_MINI_PLAYER_HEIGHT_PX,
   useGlobalAudioPlayer,
@@ -157,7 +158,12 @@ export default function GlobalMiniPlayer() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{title}</p>
               {subtitle ? (
-                <p className="truncate text-xs text-white/70">{subtitle}</p>
+                <AuthorLink
+                  authorSlug={activeSession.authorSlug}
+                  authorName={subtitle}
+                  stopPropagation
+                  className="truncate text-xs text-white/70 hover:text-white"
+                />
               ) : null}
             </div>
           </button>
