@@ -16,6 +16,26 @@ export type GuestPracticeProgress = {
 const STORAGE_PREFIX = "audiolad_gp:";
 const SAVE_THROTTLE_MS = 12_000;
 
+export function hasAnyGuestPracticeProgress(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+
+      if (key?.startsWith(STORAGE_PREFIX)) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
 let lastSaveAt = 0;
 
 function buildStorageKey(practiceId: string): string {

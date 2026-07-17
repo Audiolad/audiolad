@@ -10,27 +10,28 @@ function assert(condition, message) {
   }
 }
 
-function testGuestHomeWiring() {
-  const guestHome = readFileSync(
-    "/var/www/audiolad/src/components/home/GuestHome.tsx",
-    "utf8",
-  );
+function testProviderWiring() {
   const provider = readFileSync(
     "/var/www/audiolad/src/components/audio/GlobalAudioPlayerProvider.tsx",
     "utf8",
   );
-
-  assert(guestHome.includes("GuestHomePlayerSeed"), "GuestHome mounts seed");
-  assert(guestHome.includes("pickGuestDefaultListenTarget"), "GuestHome picks first free product");
-  assert(!guestHome.includes("Женские деньги"), "GuestHome does not hardcode product title");
-  assert(provider.includes("peekGuestPlayerFallbackTarget"), "provider reads guest fallback");
-  assert(
-    provider.includes("GUEST_PLAYER_FALLBACK_REGISTERED_EVENT"),
-    "provider listens for late guest fallback registration",
+  const guestHome = readFileSync(
+    "/var/www/audiolad/src/components/home/GuestHome.tsx",
+    "utf8",
   );
-  assert(provider.includes("applyGuestPlayerFallback"), "provider applies guest fallback on demand");
-  assert(provider.includes("fetchListenSessionPayload"), "provider loads guest session payload");
-  assert(provider.includes("requestAutoplay: false"), "guest restore does not autoplay");
+  const welcomePractice = readFileSync(
+    "/var/www/audiolad/src/lib/listen/welcome-practice.ts",
+    "utf8",
+  );
+
+  assert(!guestHome.includes("GuestHomePlayerSeed"), "GuestHome no longer seeds via client registry");
+  assert(!guestHome.includes("pickGuestDefaultListenTarget"), "GuestHome does not pick freeProducts[0]");
+  assert(provider.includes("/api/listen/welcome-session"), "provider loads welcome session API");
+  assert(provider.includes("applyWelcomeSession"), "provider applies welcome session");
+  assert(provider.includes("shouldLoadWelcomeSession"), "provider gates welcome load");
+  assert(provider.includes("hasAnyGuestPracticeProgress"), "provider respects guest progress");
+  assert(welcomePractice.includes("klyuch-k-izobiliyu"), "welcome practice uses stable slug");
+  assert(!welcomePractice.includes("Женские деньги"), "welcome practice is not hardcoded by title");
 }
 
 function testSharedPlayerState() {
@@ -47,7 +48,7 @@ function testSharedPlayerState() {
   assert(bar.includes("useGlobalAudioPlayer"), "desktop bar uses global player session");
 }
 
-testGuestHomeWiring();
+testProviderWiring();
 testSharedPlayerState();
 
 console.log("guest-player-bootstrap-unit: ok");

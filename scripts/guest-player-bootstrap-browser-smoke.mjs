@@ -51,5 +51,13 @@ if (!metrics.playEnabled) {
   throw new Error(`guest player play control disabled: ${JSON.stringify(metrics)}`);
 }
 
+function isWelcomePracticeTitle(title) {
+  return typeof title === "string" && title.includes("Ключ к Изобилию");
+}
+
 await browser.close();
-console.log("guest-player-bootstrap-browser-smoke: ok");
+console.log("guest-player-bootstrap-browser-smoke: ok", JSON.stringify({ title: metrics.barTitle }));
+
+if (!isWelcomePracticeTitle(metrics.barTitle)) {
+  throw new Error(`expected welcome practice, got ${metrics.barTitle}`);
+}
