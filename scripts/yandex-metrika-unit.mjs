@@ -64,6 +64,8 @@ function testComponentContract() {
   assert(banner.includes('consent !== "unknown"'), "banner only for unknown");
   assert(banner.includes('writeAnalyticsConsent("granted")'), "banner grant action");
   assert(banner.includes('writeAnalyticsConsent("denied")'), "banner deny action");
+  assert(banner.includes("createPortal"), "banner renders via portal");
+  assert(!banner.includes("pointer-events-none"), "banner avoids Safari pointer-events trap");
   assert(hook.includes('() => "unknown"'), "server snapshot unknown");
   assert(hook.includes("() => false"), "server snapshot not granted");
 }
@@ -97,6 +99,11 @@ function testProvidersAndSettings() {
 
   assert(providers.includes("YandexMetrika"), "metrika mounted in providers");
   assert(providers.includes("AnalyticsConsentBanner"), "consent banner mounted");
+  assert(
+    providers.indexOf("GlobalAudioPlayerProvider") <
+      providers.indexOf("AnalyticsConsentBanner"),
+    "consent banner mounted after player provider",
+  );
   assert(settings.includes("Конфиденциальность"), "privacy heading");
   assert(settings.includes('consent === "unknown"'), "settings explain unknown state");
   assert(privacy.includes("Яндекс Метрика"), "privacy mentions metrika");

@@ -28,6 +28,10 @@ import {
   readDesktopPlayerLastSession,
   writeDesktopPlayerLastSession,
 } from "@/lib/listen/desktop-player-persistence";
+import {
+  GUEST_PLAYER_FALLBACK_REGISTERED_EVENT,
+  peekGuestPlayerFallbackTarget,
+} from "@/lib/listen/guest-player-fallback";
 import { isListenPlayerPathname } from "@/lib/navigation/bottom-nav";
 import {
   guestProgressToListenEntries,
@@ -452,6 +456,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const lastExhaustedPracticeIdRef = useRef<string | null>(null);
   const pendingNavSafetyTimerRef = useRef<number | null>(null);
   const desktopPlayerRestoreAttemptedRef = useRef(false);
+  const guestFallbackInFlightRef = useRef(false);
 
   const clearPendingQueueNavigation = useCallback(() => {
     pendingQueueNavigationRef.current = null;
@@ -963,6 +968,42 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     );
   }, [showMiniPlayer]);
 
+  const applyGuestPlayerFallback = useCallback(async (): Promise<boolean> => {
+    if (sessionRef.current || guestFallbackInFlightRef.current) {
+      return false;
+    }
+
+    const guestTarget = peekGuestPlayerFallbackTarget();
+
+    if (!guestTarget) {
+      return false;
+    }
+
+    guestFallbackInFlightRef.current = true;
+
+    try {
+      const guestLoaded = await fetchListenSessionPayload(
+        guestTarget.authorSlug,
+        guestTarget.productSlug,
+      );
+
+      if (!guestLoaded.ok || sessionRef.current) {
+        return false;
+      }
+
+      loadSession(
+        mergeGuestProgressIntoSession({
+          ...guestLoaded.session,
+          requestAutoplay: false,
+        }),
+      );
+      setDesktopPlayerRestoreState("ready");
+      return true;
+    } finally {
+      guestFallbackInFlightRef.current = false;
+    }
+  }, [loadSession, mergeGuestProgressIntoSession]);
+
   useEffect(() => {
     if (!session) {
       return;
@@ -1033,7 +1074,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           }
         }
       } catch {
-        // Fall through to empty desktop bar.
+        // Fall through to guest fallback or empty desktop bar.
+      }
+
+      if (!cancelled && (await applyGuestPlayerFallback())) {
+        return;
       }
 
       if (!cancelled) {
@@ -1047,7 +1092,23 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     return () => {
       cancelled = true;
     };
-  }, [loadSession, mergeGuestProgressIntoSession, session]);
+  }, [applyGuestPlayerFallback, loadSession, mergeGuestProgressIntoSession, session]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (sessionRef.current || desktopPlayerRestoreState !== "ready") {
+        return;
+      }
+
+      void applyGuestPlayerFallback();
+    };
+
+    window.addEventListener(GUEST_PLAYER_FALLBACK_REGISTERED_EVENT, handler);
+
+    return () => {
+      window.removeEventListener(GUEST_PLAYER_FALLBACK_REGISTERED_EVENT, handler);
+    };
+  }, [applyGuestPlayerFallback, desktopPlayerRestoreState]);
 
   useEffect(() => {
     const supabase = createClient();

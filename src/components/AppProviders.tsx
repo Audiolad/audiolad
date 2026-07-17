@@ -21,7 +21,6 @@ export default function AppProviders({
       <Suspense fallback={null}>
         <YandexMetrika />
       </Suspense>
-      <AnalyticsConsentBanner />
       <GlobalAudioPlayerProvider>
         <AnalyticsAuthLinker />
         <ClientErrorReporter />
@@ -29,6 +28,7 @@ export default function AppProviders({
           <PwaInstallProvider>{children}</PwaInstallProvider>
         </PwaInstallErrorBoundary>
       </GlobalAudioPlayerProvider>
+      <AnalyticsConsentBanner />
     </PlatformAnalyticsProvider>
   );
 }

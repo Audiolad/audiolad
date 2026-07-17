@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { GuestHomeData } from "@/lib/home/types";
+import { pickGuestDefaultListenTarget } from "@/lib/listen/guest-player-fallback";
 
 import AuthorsRail from "./AuthorsRail";
+import GuestHomePlayerSeed from "./GuestHomePlayerSeed";
 import HeroFeaturedProduct from "./HeroFeaturedProduct";
 import { PlayIcon } from "./HomeIcons";
 import HowItWorks from "./HowItWorks";
@@ -32,9 +34,12 @@ function getPrimaryListenHref(data: GuestHomeData): string {
 
 export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
   const primaryListenHref = getPrimaryListenHref(data);
+  const guestPlayerTarget = pickGuestDefaultListenTarget(data);
 
   return (
     <>
+      <GuestHomePlayerSeed target={guestPlayerTarget} />
+
       <section className="mt-8 xl:mt-5">
         <h1 className="text-[32px] font-semibold leading-tight text-[#25135c] lg:text-[42px] lg:leading-[1.15] xl:text-[34px] xl:leading-[1.12]">
           Аудио, которое помогает вернуться к себе

@@ -1,25 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 import { writeAnalyticsConsent } from "@/lib/analytics/analytics-consent";
 import { useAnalyticsConsent } from "@/lib/analytics/use-analytics-consent";
 
+function useClientMounted(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
 export default function AnalyticsConsentBanner() {
   const consent = useAnalyticsConsent();
+  const mounted = useClientMounted();
 
-  if (consent !== "unknown") {
+  if (consent !== "unknown" || !mounted) {
     return null;
   }
 
-  return (
+  return createPortal(
     <aside
       role="dialog"
       aria-labelledby="analytics-consent-heading"
       aria-describedby="analytics-consent-description"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[21] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]"
+      className="fixed bottom-0 left-1/2 z-[21] w-[min(100%-2rem,430px)] -translate-x-1/2 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]"
     >
-      <div className="pointer-events-auto w-full max-w-[430px] rounded-[22px] border border-[#eadff8] bg-white p-5 shadow-[0_12px_30px_rgba(90,60,145,0.16)]">
+      <div className="w-full rounded-[22px] border border-[#eadff8] bg-white p-5 shadow-[0_12px_30px_rgba(90,60,145,0.16)]">
         <h2
           id="analytics-consent-heading"
           className="text-[17px] font-semibold leading-snug text-[#25135c]"
@@ -58,6 +69,7 @@ export default function AnalyticsConsentBanner() {
           </button>
         </div>
       </div>
-    </aside>
+    </aside>,
+    document.body,
   );
 }
