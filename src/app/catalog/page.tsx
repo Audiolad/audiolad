@@ -65,11 +65,11 @@ export default async function CatalogPage() {
 
           {freeProducts.length > 0 ? (
             <CatalogProductCarousel
-              title="Слушать бесплатно"
+              title="Слушать в подарок"
               products={freeProducts}
-              ariaLabel="Слушать бесплатно"
-              prevAriaLabel="Предыдущие бесплатные практики"
-              nextAriaLabel="Следующие бесплатные практики"
+              ariaLabel="Слушать в подарок"
+              prevAriaLabel="Предыдущие практики в подарок"
+              nextAriaLabel="Следующие практики в подарок"
             />
           ) : null}
 

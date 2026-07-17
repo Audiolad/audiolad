@@ -328,7 +328,7 @@ export default function EditorialPracticePickerSheet({
                 className="w-full rounded-[16px] border border-[#ddcfef] px-3 py-2.5 text-sm outline-none focus:border-[#7042c5]"
               >
                 <option value="all">Все</option>
-                <option value="free">Бесплатные</option>
+                <option value="free">Подарки</option>
                 <option value="paid">Платные</option>
               </select>
             </label>

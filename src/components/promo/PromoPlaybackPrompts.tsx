@@ -268,14 +268,14 @@ export default function PromoPlaybackPrompts({
           <p className="text-lg font-semibold text-white">Практика завершена</p>
           <p className="mt-2 text-sm leading-6 text-white/75">
             Сохраните её, чтобы возвращаться к ней снова. После регистрации мы
-            добавим в вашу Аудиотеку ещё три бесплатные практики.
+            добавим в вашу Аудиотеку ещё три практики в подарок.
           </p>
           <button
             type="button"
             onClick={() => navigateToSignup("get_gifts")}
             className="mt-4 w-full min-h-11 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#4b2f86] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            Получить 4 практики бесплатно
+            Получить 4 практики в подарок
           </button>
           <button
             type="button"

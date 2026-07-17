@@ -54,7 +54,7 @@ function mapLibraryClaimButtonError(status, errorCode) {
   }
 
   if (status === 409 || errorCode === "practice_not_free") {
-    return "Этот материал нельзя добавить бесплатно";
+    return "Этот материал нельзя добавить в подарок";
   }
 
   if (status === 400 || errorCode === "invalid_request") {
@@ -299,7 +299,7 @@ function testErrorMessages() {
   );
   assert(
     mapLibraryClaimButtonError(409, "practice_not_free") ===
-      "Этот материал нельзя добавить бесплатно",
+      "Этот материал нельзя добавить в подарок",
     "409 safe message",
   );
   assert(

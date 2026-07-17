@@ -44,4 +44,4 @@ export function arePracticesEligibleForPublicPlaylist(
 }
 
 export const PUBLIC_PLAYLIST_CONTENT_ERROR_MESSAGE =
-  "Чтобы сделать плейлист публичным, оставьте в нём только бесплатные материалы, доступные всем.";
+  "Чтобы сделать плейлист публичным, оставьте в нём только подарочные материалы, доступные всем.";

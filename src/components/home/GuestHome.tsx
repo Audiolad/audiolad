@@ -49,7 +49,7 @@ export default function GuestHome({ data }: GuestHomeProps) {
             className="home-primary-cta home-primary-cta--hero"
           >
             <PlayIcon />
-            Начать слушать бесплатно
+            Начать слушать
           </Link>
 
           <Link
@@ -66,9 +66,9 @@ export default function GuestHome({ data }: GuestHomeProps) {
       ) : null}
 
       <ProductRail
-        title="Попробуйте бесплатно"
+        title="Попробуйте в подарок"
         products={data.freeProducts}
-        ariaLabel="Попробуйте бесплатно"
+        ariaLabel="Попробуйте в подарок"
         href="/catalog"
       />
 

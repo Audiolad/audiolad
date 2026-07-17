@@ -60,7 +60,10 @@ export default function LibraryPracticeMenu({
           aria-expanded={menuOpen}
           aria-label="Дополнительное меню"
           className="px-2 text-2xl leading-none text-[#8f82ad] hover:text-[#7042c5]"
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMenuOpen((open) => !open);
+          }}
         >
           ···
         </button>

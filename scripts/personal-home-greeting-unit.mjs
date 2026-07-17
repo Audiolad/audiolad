@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 
 import {
+  assertAllPersonalHomeWisdomPhrasePunctuation,
   formatPersonalGreeting,
+  formatDisplayFirstName,
   getNextRotatingIndex,
   getPersonalGreetingAtIndex,
   getPersonalHomeVisitContentFromStorage,
   getPersonalHomeWisdomAtIndex,
   normalizeStoredIndex,
   readPersonalHomeStoredIndex,
+  resolvePersonalGreetingTemplateIndex,
   resolvePersonalHomeVisitContent,
 } from "../src/lib/home/personal-greeting.ts";
 
@@ -53,25 +56,25 @@ function testInvalidStoredIndex() {
 
 function testGreetingWithName() {
   const text = getPersonalGreetingAtIndex(0, "Сергей");
-  assert(text === "Сергей, привет! 💜", "named greeting is formatted with heart");
+  assert(text === "Сергей, привет 💜", "named greeting is formatted with heart");
   assert(
-    formatPersonalGreeting("{name}, добро пожаловать", "Сергей") ===
-      "Сергей, добро пожаловать",
+    formatPersonalGreeting("{name}, здравствуйте", "Сергей") ===
+      "Сергей, здравствуйте",
     "template with name",
   );
 }
 
 function testGreetingWithoutName() {
   const text = getPersonalGreetingAtIndex(0, null);
-  assert(text === "Рады вас видеть", "anonymous greeting at index 0");
+  assert(text === "Привет", "anonymous greeting at index 0");
   assert(
-    getPersonalGreetingAtIndex(1, "   ") === "Снова рады вам",
+    getPersonalGreetingAtIndex(1, "   ") === "Здравствуйте",
     "blank name uses anonymous set",
   );
 }
 
 function testNoBrokenPlaceholders() {
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 3; index += 1) {
     const named = getPersonalGreetingAtIndex(index, "Сергей");
     assert(!named.includes("{name}"), "named greeting has no placeholder");
     assert(named.endsWith("💜"), "named greeting includes heart");
@@ -79,7 +82,7 @@ function testNoBrokenPlaceholders() {
     assert(!named.includes("null"), "named greeting has no null");
   }
 
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < 3; index += 1) {
     const anonymous = getPersonalGreetingAtIndex(index, null);
     assert(!anonymous.startsWith(","), "anonymous greeting has no leading comma");
     assert(!anonymous.includes("{name}"), "anonymous greeting has no placeholder");
@@ -172,6 +175,26 @@ function testCachedServerSnapshotPattern() {
   assert(first.greetingTitle.includes("Сергей"), "cached snapshot keeps content");
 }
 
+function testLongNameUsesShortGreeting() {
+  assert(
+    resolvePersonalGreetingTemplateIndex(2, "Александра") === 0,
+    "long name uses shortest greeting template",
+  );
+  assert(
+    getPersonalGreetingAtIndex(2, "Александра") === "Александра, привет 💜",
+    "long name greeting text is short",
+  );
+  assert(
+    formatDisplayFirstName("Константин-Александрович") ===
+      "Константин-Алексан…",
+    "extreme name gets controlled ellipsis",
+  );
+}
+
+function testWisdomPhrasePunctuation() {
+  assertAllPersonalHomeWisdomPhrasePunctuation();
+}
+
 function run() {
   testNextIndexAdvances();
   testNextIndexWraps();
@@ -180,6 +203,8 @@ function run() {
   testGreetingWithName();
   testGreetingWithoutName();
   testNoBrokenPlaceholders();
+  testLongNameUsesShortGreeting();
+  testWisdomPhrasePunctuation();
   testIndependentIndices();
   testStorageReadFailure();
   testStorageWriteFailure();

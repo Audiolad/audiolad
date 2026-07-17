@@ -31,8 +31,8 @@ export function isProgramFormat(format: string | null): boolean {
 
 export function getFreeStatusLabel(format: string | null): string {
   return isProgramFormat(format)
-    ? "Бесплатная программа"
-    : "Бесплатная практика";
+    ? "Программа в подарок"
+    : "Практика в подарок";
 }
 
 export function getEntitlementStatusLabel(accessSource: string | null): string {
@@ -43,7 +43,7 @@ export function getEntitlementStatusLabel(accessSource: string | null): string {
       return "Подарок";
     case "starter":
     case "free_claim":
-      return "Получено бесплатно";
+      return "Получено в подарок";
     case "subscription":
       return "По подписке";
     case "program":
@@ -170,7 +170,7 @@ export function mapLibraryClaimButtonError(
   }
 
   if (status === 409 || errorCode === "practice_not_free") {
-    return "Этот материал нельзя добавить бесплатно";
+    return "Этот материал нельзя добавить в подарок";
   }
 
   if (status === 400 || errorCode === "invalid_request") {
@@ -291,7 +291,7 @@ function buildCommercialPresentation(input: {
 
   if (access.canListen && access.reason === "guest_promo") {
     return {
-      statusBadge: "Бесплатное прослушивание",
+      statusBadge: "Прослушивание в подарок",
       statusDetail: "Доступно без регистрации по этой ссылке",
       primaryAction: audioReady
         ? {

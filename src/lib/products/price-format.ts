@@ -26,7 +26,7 @@ export function getProductPriceLabel(
   isFree: boolean | null | undefined,
 ): string {
   if (isProductFree(isFree, price)) {
-    return "Бесплатно";
+    return "Подарок";
   }
 
   if (typeof price === "number" && Number.isFinite(price) && price > 0) {

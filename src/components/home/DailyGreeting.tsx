@@ -63,27 +63,23 @@ export default function DailyGreeting({ firstName }: DailyGreetingProps) {
   const { greetingTitle, wisdomPhrase } =
     usePersonalHomeVisitContent(firstName);
 
+  const greetingBody = greetingTitle.endsWith("💜")
+    ? greetingTitle.slice(0, -2).trimEnd()
+    : greetingTitle;
+  const showHeart = greetingTitle.endsWith("💜");
+
   return (
     <section
-      className="mt-6 rounded-[24px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f5edfc] px-5 py-4"
+      className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f5edfc] px-5 py-4"
       aria-label="Персональное приветствие"
     >
-      <h1 className="text-[22px] font-semibold leading-tight text-[#25135c] lg:text-[24px]">
-        {greetingTitle.endsWith("💜") ? (
-          <>
-            <span className="whitespace-nowrap">
-              {greetingTitle.slice(0, -2).trimEnd()}
-            </span>
-            <span
-              aria-hidden="true"
-              className="ml-1 inline-block text-[0.92em] leading-none"
-            >
-              💜
-            </span>
-          </>
-        ) : (
-          greetingTitle
-        )}
+      <h1 className="flex min-w-0 max-w-full items-baseline gap-1 text-[clamp(17px,4.2vw,24px)] font-semibold leading-tight tracking-[0.01em] text-[#25135c]">
+        <span className="min-w-0">{greetingBody}</span>
+        {showHeart ? (
+          <span aria-hidden="true" className="shrink-0 leading-none">
+            💜
+          </span>
+        ) : null}
       </h1>
       <p className="mt-2 min-h-[3rem] text-[15px] leading-6 text-[#6f61a3] sm:min-h-[4.5rem]">
         <em>{wisdomPhrase}</em>

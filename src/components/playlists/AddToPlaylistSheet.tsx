@@ -51,7 +51,7 @@ async function readApiError(response: Response): Promise<string> {
     }
 
     if (data.error === "public_content_invalid") {
-      return "В публичный плейлист можно добавлять только бесплатные материалы, доступные всем.";
+      return "В публичный плейлист можно добавлять только подарочные материалы, доступные всем.";
     }
 
     if (data.error === "entitlement_required") {
@@ -545,7 +545,7 @@ export default function AddToPlaylistSheet({
                           !item.canAdd &&
                           !item.contains ? (
                             <span className="mt-1 block text-xs text-[#b34f63]">
-                              Только бесплатные общедоступные материалы
+                              Только подарочные общедоступные материалы
                             </span>
                           ) : null}
                           {full ? (

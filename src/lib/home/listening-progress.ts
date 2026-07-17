@@ -128,7 +128,7 @@ function mapPracticeToHomeProduct(
     meta: null,
     statsLabel: null,
     productTypeLabel: audioCount >= 2 ? "Программа аудиопрактик" : "Аудиопрактика",
-    priceLabel: practice.is_free ? "Бесплатно" : `${practice.price ?? 0} ₽`,
+    priceLabel: practice.is_free ? "Подарок" : `${practice.price ?? 0} ₽`,
     sortTimestamp: getSortTimestamp(practice.published_at, practice.created_at),
     audioCount,
     listenHref: buildListenPath(author.slug, practice.slug, { autoplay: true }),

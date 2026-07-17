@@ -142,7 +142,7 @@ export function BecomeAuthorInfoSections() {
         <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
           <ul className="list-disc space-y-2 pl-5">
             <li>страницу автора и авторский кабинет;</li>
-            <li>публикацию бесплатных и платных продуктов;</li>
+            <li>публикацию подарочных и платных продуктов;</li>
             <li>размещение в каталоге и ссылки для продвижения;</li>
             <li>доступ к аудитории платформы;</li>
             <li>
@@ -169,8 +169,8 @@ export function BecomeAuthorInfoSections() {
               text: "Расскажите о себе, своём опыте и направлении — это займёт несколько минут.",
             },
             {
-              title: "Подготовить профиль и бесплатные материалы",
-              text: "После предварительного одобрения вы сможете оформить авторский профиль и подготовить минимум одну бесплатную аудиопрактику.",
+              title: "Подготовить профиль и материалы в подарок",
+              text: "После предварительного одобрения вы сможете оформить авторский профиль и подготовить минимум одну аудиопрактику в подарок.",
             },
             {
               title: "Пройти проверку материалов",
@@ -205,10 +205,10 @@ export function BecomeAuthorInfoSections() {
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <article className="rounded-[22px] border border-[#eadff8] bg-white p-5">
-            <h3 className="text-[17px] font-semibold">Бесплатные публикации</h3>
+            <h3 className="text-[17px] font-semibold">Публикации в подарок</h3>
             <ul className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}>
               <li>оформить авторский профиль;</li>
-              <li>размещать согласованные бесплатные материалы;</li>
+              <li>размещать согласованные материалы в подарок;</li>
               <li>знакомить слушателей со своим подходом;</li>
               <li>готовить продукты к коммерческому размещению.</li>
             </ul>

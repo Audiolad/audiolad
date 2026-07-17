@@ -160,7 +160,7 @@ export function validatePublishRequirements(
       return {
         ok: false,
         code: "invalid_price",
-        message: "Для бесплатного продукта цена должна быть 0 ₽.",
+        message: "Для подарочного продукта цена должна быть 0 ₽.",
       };
     }
   } else if (practice.price <= 0) {

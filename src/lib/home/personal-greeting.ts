@@ -1,16 +1,13 @@
 export const PERSONAL_HOME_GREETINGS_WITH_NAME = [
-  "{name}, привет!",
-  "{name}, рады вас видеть",
-  "{name}, снова рады вам",
-  "{name}, добро пожаловать",
-  "{name}, хорошо, что вы здесь",
+  "{name}, привет",
+  "{name}, здравствуйте",
+  "{name}, рады вам",
 ] as const;
 
 export const PERSONAL_HOME_GREETINGS_ANONYMOUS = [
-  "Рады вас видеть",
-  "Снова рады вам",
-  "Добро пожаловать",
-  "Хорошо, что вы здесь",
+  "Привет",
+  "Здравствуйте",
+  "Рады вам",
 ] as const;
 
 export const PERSONAL_HOME_WISDOM_PHRASES = [
@@ -25,7 +22,7 @@ export const PERSONAL_HOME_WISDOM_PHRASES = [
   "Необязательно делать много. Иногда важно сделать главное.",
   "Состояние, из которого вы действуете, меняет результат.",
   "Каждый новый день можно начать с возвращения к себе.",
-  "Тишина не останавливает движение — она помогает выбрать направление.",
+  "Тишина не останавливает движение – она помогает выбрать направление.",
   "Даже короткая практика может вернуть ощущение опоры.",
   "Сначала услышьте себя, а затем отвечайте миру.",
   "Мягкость к себе не мешает силе.",
@@ -33,7 +30,7 @@ export const PERSONAL_HOME_WISDOM_PHRASES = [
   "Иногда путь открывается после того, как мы перестаём торопить его.",
   "Ваше настоящее состояние важнее идеального плана.",
   "Достаточно одного маленького шага, сделанного осознанно.",
-  "Спокойствие — это пространство, в котором рождаются новые решения.",
+  "Спокойствие – это пространство, в котором рождаются новые решения.",
   "Вы можете начать заново с любого момента.",
   "Внутренняя опора растёт каждый раз, когда вы выбираете себя.",
   "Голос, записанный с живым чувством, находит своего слушателя.",
@@ -99,7 +96,59 @@ export function formatPersonalGreeting(
     return template.replace(/\{name\},?\s*/g, "").trim();
   }
 
-  return template.replace("{name}", trimmed);
+  return template.replace("{name}", formatDisplayFirstName(trimmed));
+}
+
+const LONG_NAME_GREETING_LENGTH = 10;
+const EXTREME_NAME_DISPLAY_LENGTH = 18;
+
+export function formatDisplayFirstName(name: string): string {
+  const trimmed = name.trim();
+
+  if (trimmed.length <= EXTREME_NAME_DISPLAY_LENGTH) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, EXTREME_NAME_DISPLAY_LENGTH)}…`;
+}
+
+export function resolvePersonalGreetingTemplateIndex(
+  rotationIndex: number,
+  firstName: string | null,
+): number {
+  const trimmed = firstName?.trim();
+  const templates = trimmed
+    ? PERSONAL_HOME_GREETINGS_WITH_NAME
+    : PERSONAL_HOME_GREETINGS_ANONYMOUS;
+
+  if (!trimmed) {
+    return normalizeStoredIndex(rotationIndex, templates.length) ?? 0;
+  }
+
+  const safeIndex =
+    normalizeStoredIndex(rotationIndex, templates.length) ?? 0;
+
+  if (trimmed.length >= LONG_NAME_GREETING_LENGTH) {
+    return 0;
+  }
+
+  return safeIndex;
+}
+
+export function assertPersonalHomeWisdomPhrasePunctuation(phrase: string): void {
+  if (phrase.includes("—")) {
+    throw new Error(`wisdom phrase uses em dash: ${phrase}`);
+  }
+
+  if (/ - /.test(phrase)) {
+    throw new Error(`wisdom phrase uses hyphen as dash: ${phrase}`);
+  }
+}
+
+export function assertAllPersonalHomeWisdomPhrasePunctuation(): void {
+  for (const phrase of PERSONAL_HOME_WISDOM_PHRASES) {
+    assertPersonalHomeWisdomPhrasePunctuation(phrase);
+  }
 }
 
 export function getPersonalGreetingTemplateCount(firstName: string | null): number {
@@ -116,7 +165,7 @@ export function getPersonalGreetingAtIndex(
   const templates = trimmed
     ? PERSONAL_HOME_GREETINGS_WITH_NAME
     : PERSONAL_HOME_GREETINGS_ANONYMOUS;
-  const safeIndex = normalizeStoredIndex(index, templates.length) ?? 0;
+  const safeIndex = resolvePersonalGreetingTemplateIndex(index, firstName);
   const template = templates[safeIndex];
   const greeting = trimmed ? formatPersonalGreeting(template, trimmed) : template;
 

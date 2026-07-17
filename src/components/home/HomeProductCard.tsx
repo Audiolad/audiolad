@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import GiftBadge from "@/components/products/GiftBadge";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
 
@@ -33,11 +34,7 @@ export default function HomeProductCard({
           />
         </Link>
 
-        {product.isFree ? (
-          <span className="absolute left-2.5 top-2.5 rounded-full bg-[#6f3dcc] px-2.5 py-1 text-[10px] font-medium text-white">
-            Бесплатно
-          </span>
-        ) : null}
+        {product.isFree ? <GiftBadge size="md" /> : null}
 
         {showPlayButton && listenHref ? (
           <Link

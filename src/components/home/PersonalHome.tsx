@@ -77,9 +77,9 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
 
       <HomeSectionBoundary section="personal_free_materials">
         <ProductRail
-          title="Бесплатные материалы"
+          title="Материалы в подарок"
           products={data.freeProducts}
-          ariaLabel="Бесплатные материалы"
+          ariaLabel="Материалы в подарок"
           href="/catalog"
         />
       </HomeSectionBoundary>

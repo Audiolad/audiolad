@@ -1732,7 +1732,7 @@ export default function AuthorProductForm({
                   : "border border-[#c6afe6] text-[#7042c5]"
               }`}
             >
-              Бесплатно
+              В подарок
             </button>
             <button
               type="button"

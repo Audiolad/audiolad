@@ -85,7 +85,7 @@ export function mapMembershipRpcError(message: string): {
       status: 409,
       error: "public_content_invalid",
       message:
-        "В публичный плейлист можно добавлять только бесплатные материалы, доступные всем.",
+        "В публичный плейлист можно добавлять только подарочные материалы, доступные всем.",
     };
   }
 

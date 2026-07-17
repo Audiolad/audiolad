@@ -19,7 +19,7 @@ export default function HomeStartSuggestions({
         С чего начнём?
       </h2>
       <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-        Выберите бесплатную практику или откройте материал из каталога.
+        Выберите практику в подарок или откройте материал из каталога.
       </p>
 
       <div className="home-carousel-track catalog-carousel mt-4 flex gap-3 overflow-x-auto pb-1">
