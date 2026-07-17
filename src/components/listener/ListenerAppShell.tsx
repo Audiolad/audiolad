@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
-import LegalFooter from "@/components/LegalFooter";
 import DesktopSidebar from "@/components/listener/DesktopSidebar";
 import DesktopTopBar from "@/components/listener/DesktopTopBar";
-import HomeMobileHeader from "@/components/listener/HomeMobileHeader";
 import NowPlayingPanel from "@/components/listener/NowPlayingPanel";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
@@ -32,15 +30,7 @@ export function ListenerAppShell({
         </div>
 
         <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-          <HomeMobileHeader shellData={shellData} />
-
-          <div className="listener-home-content px-5 lg:px-10 xl:flex-1 xl:overflow-y-auto xl:px-6 xl:pt-1 xl:pb-5">
-            {children}
-          </div>
-
-          <div className="px-5 pb-6 lg:px-10 xl:hidden">
-            <LegalFooter className="mt-6" />
-          </div>
+          {children}
         </section>
 
         <div className="listener-app-shell__now-playing-slot hidden xl:flex xl:min-h-0 xl:self-stretch">

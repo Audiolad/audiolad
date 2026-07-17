@@ -96,6 +96,12 @@
   .listener-home-content .featured-card__content {
     padding: 1rem 1.125rem;
   }
+
+  .listener-catalog-content .catalog-carousel {
+    margin-right: 0;
+    padding-right: 0;
+    scroll-padding-right: 0;
+  }
 }
 
 @theme inline {
