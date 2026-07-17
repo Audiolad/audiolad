@@ -3,6 +3,21 @@
  * Email policy, auth anti-bypass, recovery, avatar, and foundation checks.
  */
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+
+function repoPath(...segments) {
+  return path.join(REPO_ROOT, ...segments);
+}
+
+function readRepoFile(...segments) {
+  return readFileSync(repoPath(...segments), "utf8");
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -11,7 +26,7 @@ function assert(condition, message) {
 }
 
 const policy = JSON.parse(
-  readFileSync("/var/www/audiolad/config/email-domain-policy.json", "utf8"),
+  readRepoFile("config", "email-domain-policy.json"),
 );
 
 const PERSONAL = new Set(
@@ -175,9 +190,12 @@ function testBlockedDomains() {
 }
 
 function testPolicyIntegrity() {
-  const allowedDomains = readFileSync(
-    "/var/www/audiolad/src/lib/auth/email/allowed-domains.ts",
-    "utf8",
+  const allowedDomains = readRepoFile(
+    "src",
+    "lib",
+    "auth",
+    "email",
+    "allowed-domains.ts",
   );
 
   assert(
@@ -194,17 +212,16 @@ function testPolicyIntegrity() {
 }
 
 function testAntiBypass() {
-  const signUpAction = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-up/actions.ts",
-    "utf8",
-  );
-  const signUpPage = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-up/page.tsx",
-    "utf8",
-  );
-  const hookRoute = readFileSync(
-    "/var/www/audiolad/src/app/api/auth/hooks/before-user-created/route.ts",
-    "utf8",
+  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
+  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  const hookRoute = readRepoFile(
+    "src",
+    "app",
+    "api",
+    "auth",
+    "hooks",
+    "before-user-created",
+    "route.ts",
   );
 
   assert(
@@ -224,21 +241,21 @@ function testAntiBypass() {
 }
 
 function testRecovery() {
-  const recovery = readFileSync(
-    "/var/www/audiolad/src/lib/auth/recovery.ts",
-    "utf8",
+  const recovery = readRepoFile("src", "lib", "auth", "recovery.ts");
+  const forgotAction = readRepoFile(
+    "src",
+    "app",
+    "auth",
+    "forgot-password",
+    "actions.ts",
   );
-  const forgotAction = readFileSync(
-    "/var/www/audiolad/src/app/auth/forgot-password/actions.ts",
-    "utf8",
-  );
-  const callback = readFileSync(
-    "/var/www/audiolad/src/app/auth/callback/route.ts",
-    "utf8",
-  );
-  const resetAction = readFileSync(
-    "/var/www/audiolad/src/app/auth/reset-password/actions.ts",
-    "utf8",
+  const callback = readRepoFile("src", "app", "auth", "callback", "route.ts");
+  const resetAction = readRepoFile(
+    "src",
+    "app",
+    "auth",
+    "reset-password",
+    "actions.ts",
   );
 
   assert(recovery.includes("getSafeNextPath"), "recovery uses safe next path");
@@ -253,17 +270,15 @@ function testRecovery() {
 }
 
 function testAvatar() {
-  const avatarLib = readFileSync(
-    "/var/www/audiolad/src/lib/profile/avatar.ts",
-    "utf8",
-  );
-  const avatarImage = readFileSync(
-    "/var/www/audiolad/src/lib/profile/avatar-image.ts",
-    "utf8",
-  );
-  const avatarRoute = readFileSync(
-    "/var/www/audiolad/src/app/api/profile/avatar/route.ts",
-    "utf8",
+  const avatarLib = readRepoFile("src", "lib", "profile", "avatar.ts");
+  const avatarImage = readRepoFile("src", "lib", "profile", "avatar-image.ts");
+  const avatarRoute = readRepoFile(
+    "src",
+    "app",
+    "api",
+    "profile",
+    "avatar",
+    "route.ts",
   );
 
   assert(avatarLib.includes("user-avatars"), "avatar bucket constant");
@@ -277,18 +292,19 @@ function testAvatar() {
 
 function testEmailFoundationFiles() {
   for (const file of [
-    "/var/www/audiolad/supabase/migrations/20260717150000_email_foundation.sql",
-    "/var/www/audiolad/supabase/migrations/20260717151000_email_sync_and_profile.sql",
-    "/var/www/audiolad/supabase/migrations/20260717152000_user_avatars.sql",
-    "/var/www/audiolad/src/lib/email/enqueue.ts",
-    "/var/www/audiolad/docs/email/timeweb-smtp-setup.md",
+    "supabase/migrations/20260717150000_email_foundation.sql",
+    "supabase/migrations/20260717151000_email_sync_and_profile.sql",
+    "supabase/migrations/20260717152000_user_avatars.sql",
+    "src/lib/email/enqueue.ts",
+    "docs/email/timeweb-smtp-setup.md",
   ]) {
-    readFileSync(file, "utf8");
+    readRepoFile(...file.split("/"));
   }
 
-  const foundation = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260717150000_email_foundation.sql",
-    "utf8",
+  const foundation = readRepoFile(
+    "supabase",
+    "migrations",
+    "20260717150000_email_foundation.sql",
   );
 
   assert(foundation.includes("email_outbox"), "outbox table migration exists");
@@ -297,18 +313,9 @@ function testEmailFoundationFiles() {
 }
 
 function testPreferencesAndConsents() {
-  const preferences = readFileSync(
-    "/var/www/audiolad/src/lib/email/preferences.ts",
-    "utf8",
-  );
-  const signUpAction = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-up/actions.ts",
-    "utf8",
-  );
-  const signUpPage = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-up/page.tsx",
-    "utf8",
-  );
+  const preferences = readRepoFile("src", "lib", "email", "preferences.ts");
+  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
+  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
 
   assert(
     preferences.includes("listener_marketing: false"),
