@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import GiftBadge from "@/components/products/GiftBadge";
-import type { CoverBadgeVariant } from "@/components/products/cover-badge-types";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
 
@@ -11,16 +10,20 @@ type HomeProductCardProps = {
   product: HomeProduct;
   showPlayButton?: boolean;
   showGiftBadge?: boolean;
-  giftBadgeVariant?: CoverBadgeVariant;
+  showGiftProductLabel?: boolean;
 };
 
 export default function HomeProductCard({
   product,
   showPlayButton = true,
   showGiftBadge = true,
-  giftBadgeVariant = "glass",
+  showGiftProductLabel = false,
 }: HomeProductCardProps) {
   const listenHref = product.listenHref;
+  const serviceLineLabel =
+    showGiftProductLabel && product.isFree
+      ? "ПОДАРОК"
+      : product.productTypeLabel;
 
   return (
     <article className="flex h-full w-[168px] shrink-0 snap-start flex-col sm:w-[180px]">
@@ -39,9 +42,7 @@ export default function HomeProductCard({
           />
         </Link>
 
-        {showGiftBadge && product.isFree ? (
-          <GiftBadge size="md" variant={giftBadgeVariant} />
-        ) : null}
+        {showGiftBadge && product.isFree ? <GiftBadge size="md" /> : null}
 
         {showPlayButton && listenHref ? (
           <Link
@@ -55,7 +56,7 @@ export default function HomeProductCard({
       </div>
 
       <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]">
-        {product.productTypeLabel}
+        {serviceLineLabel}
       </p>
 
       <h3 className="mt-1 line-clamp-2 min-h-[44px] text-[15px] font-semibold leading-[22px] text-[#25135c]">

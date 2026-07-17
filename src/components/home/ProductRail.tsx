@@ -1,4 +1,3 @@
-import type { CoverBadgeVariant } from "@/components/products/cover-badge-types";
 import type { HomeProduct } from "@/lib/home/types";
 
 import HomeProductCard from "./HomeProductCard";
@@ -11,7 +10,7 @@ type ProductRailProps = {
   href?: string;
   linkLabel?: string;
   showGiftBadge?: boolean;
-  giftBadgeVariant?: CoverBadgeVariant;
+  showGiftProductLabel?: boolean;
 };
 
 export default function ProductRail({
@@ -21,7 +20,7 @@ export default function ProductRail({
   href,
   linkLabel,
   showGiftBadge = true,
-  giftBadgeVariant = "glass",
+  showGiftProductLabel = false,
 }: ProductRailProps) {
   if (products.length === 0) {
     return null;
@@ -37,7 +36,7 @@ export default function ProductRail({
             <HomeProductCard
               product={product}
               showGiftBadge={showGiftBadge}
-              giftBadgeVariant={giftBadgeVariant}
+              showGiftProductLabel={showGiftProductLabel}
             />
           </div>
         ))}

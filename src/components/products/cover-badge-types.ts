@@ -2,5 +2,3 @@
 export type CoverBadgeKind = "gift";
 
 export type CoverBadgeSize = "sm" | "md";
-
-export type CoverBadgeVariant = "glass" | "outline";
