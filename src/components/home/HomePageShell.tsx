@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import BottomNav from "@/components/BottomNav";
 import LegalFooter from "@/components/LegalFooter";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
@@ -22,12 +23,7 @@ export default function HomePageShell({
         <div className="px-5 pt-5 lg:px-10 lg:pt-8">
           <header className="border-b border-[#eadff8] pb-4">
             <div className="flex items-center justify-between gap-4">
-              <Link
-                href="/"
-                className="text-[28px] font-semibold leading-none text-[#6234b5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] lg:text-[30px]"
-              >
-                АудиоЛад
-              </Link>
+              <AudioladHorizontalLogo priority />
 
               {!isAuthenticated ? (
                 <div className="flex shrink-0 gap-2 text-sm">

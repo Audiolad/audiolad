@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 
+import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import { profilePageFullWidthClassName } from "@/lib/profile/layout";
 
 export default function ProfilePageHeader() {
@@ -8,13 +8,7 @@ export default function ProfilePageHeader() {
     <header
       className={`flex items-center justify-between ${profilePageFullWidthClassName}`}
     >
-      <Image
-        src="/audiolad-logo.png"
-        alt="АудиоЛад"
-        width={48}
-        height={48}
-        className="h-12 w-12 object-contain"
-      />
+      <AudioladHorizontalLogo />
 
       <h1 className="text-[28px] font-semibold lg:text-[30px]">Профиль</h1>
 
