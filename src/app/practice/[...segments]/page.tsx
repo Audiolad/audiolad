@@ -486,6 +486,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     audioCount: publicAudioItems.length,
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
+    isFree: practice.is_free,
+    price: practice.price,
   });
   const description = practice.description?.trim() || null;
   const gradient = getCoverGradient(practice.slug);

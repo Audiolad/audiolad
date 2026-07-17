@@ -8,6 +8,11 @@ import {
   getAuthorBySlug,
   getAuthorPublishedPractices,
 } from "@/lib/authors/lookup";
+import {
+  getProductServiceLineLabel,
+  PRODUCT_SERVICE_LINE_CLASS,
+} from "@/lib/products/product-service-label";
+import { isProductFree } from "@/lib/products/price-format";
 import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
@@ -126,7 +131,16 @@ export default async function AuthorPublicPage({ params }: PageProps) {
             ) : (
               <div className="mt-4 space-y-3">
                 {practices.map((practice) => {
-                  const formatLabel = getDisplayFormat(practice.format);
+                  const productTypeLabel =
+                    getDisplayFormat(practice.format) ?? "Аудиопрактика";
+                  const serviceLineLabel = getProductServiceLineLabel(
+                    productTypeLabel,
+                    practice.is_free,
+                    practice.price,
+                  );
+                  const showFormatMeta =
+                    !isProductFree(practice.is_free, practice.price) &&
+                    (productTypeLabel !== "Аудиопрактика" || practice.duration_minutes);
 
                   return (
                   <Link
@@ -136,7 +150,8 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="text-[17px] font-semibold leading-5">
+                        <p className={PRODUCT_SERVICE_LINE_CLASS}>{serviceLineLabel}</p>
+                        <h3 className="mt-1 text-[17px] font-semibold leading-5">
                           {practice.title}
                         </h3>
                         {practice.subtitle ? (
@@ -144,12 +159,18 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                             {practice.subtitle}
                           </p>
                         ) : null}
-                        {formatLabel ? (
+                        {showFormatMeta ? (
                           <p className="mt-2 text-sm text-[#7d70a2]">
-                            {formatLabel}
+                            {productTypeLabel !== "Аудиопрактика"
+                              ? productTypeLabel
+                              : null}
                             {practice.duration_minutes
-                              ? ` · ${practice.duration_minutes} мин`
+                              ? `${productTypeLabel !== "Аудиопрактика" ? " · " : ""}${practice.duration_minutes} мин`
                               : ""}
+                          </p>
+                        ) : practice.duration_minutes ? (
+                          <p className="mt-2 text-sm text-[#7d70a2]">
+                            {practice.duration_minutes} мин
                           </p>
                         ) : null}
                       </div>

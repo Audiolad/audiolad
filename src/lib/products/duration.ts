@@ -1,4 +1,5 @@
 import { getDisplayFormat } from "@/lib/author-products/format";
+import { isProductFree } from "@/lib/products/price-format";
 
 export function normalizeDurationSeconds(
   value: number | null | undefined,
@@ -90,6 +91,8 @@ type FormatProductMetaInput = {
   audioCount: number;
   totalDurationSeconds?: number | null;
   durationMinutesFallback?: number | null;
+  isFree?: boolean | null;
+  price?: number | null;
 };
 
 /** Catalog card stats under cover: 7 аудио · 29 мин or 12 мин (no format prefix). */
@@ -116,7 +119,8 @@ export function formatCatalogProductStats(
 
 /** Catalog and practice meta: format · 3 аудио · 29 мин or format · 12 мин */
 export function formatProductMeta(input: FormatProductMetaInput): string | null {
-  const trimmedFormat = getDisplayFormat(input.format) ?? "";
+  const omitFormat = isProductFree(input.isFree, input.price);
+  const trimmedFormat = omitFormat ? "" : getDisplayFormat(input.format) ?? "";
   const duration = formatProductDuration(
     input.totalDurationSeconds,
     input.durationMinutesFallback,

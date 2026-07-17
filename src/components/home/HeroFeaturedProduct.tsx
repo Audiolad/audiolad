@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
+import { getProductServiceLineLabel } from "@/lib/products/product-service-label";
 
 import { PlayIcon } from "./HomeIcons";
 
@@ -11,6 +12,11 @@ type HeroFeaturedProductProps = {
 
 export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProps) {
   const listenHref = product.listenHref;
+  const serviceLineLabel = getProductServiceLineLabel(
+    product.productTypeLabel,
+    product.isFree,
+    product.price,
+  );
 
   return (
     <article className="featured-card mt-8 overflow-hidden rounded-[28px]">
@@ -30,7 +36,7 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
 
       <div className="featured-card__content">
         <span className="inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
-          {product.productTypeLabel}
+          {serviceLineLabel}
         </span>
 
         <h2 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">

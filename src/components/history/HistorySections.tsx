@@ -8,6 +8,7 @@ import {
 } from "@/lib/history/format";
 import { buildHistoryFilterHref } from "@/lib/history/logic";
 import type { HistoryFilter, HistoryGroup, HistoryItem } from "@/lib/history/types";
+import { PRODUCT_SERVICE_LINE_CLASS } from "@/lib/products/product-service-label";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 
 type HistoryFiltersProps = {
@@ -89,9 +90,13 @@ export function HistoryCard({ item }: HistoryCardProps) {
         </Link>
 
         <div className="flex min-w-0 flex-1 flex-col">
+          {item.serviceLineLabel ? (
+            <p className={PRODUCT_SERVICE_LINE_CLASS}>{item.serviceLineLabel}</p>
+          ) : null}
+
           <Link
             href={productHref}
-            className="line-clamp-2 text-[17px] font-semibold leading-6 text-[#25135c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            className={`line-clamp-2 text-[17px] font-semibold leading-6 text-[#25135c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${item.serviceLineLabel ? "mt-1" : ""}`}
           >
             {item.title}
           </Link>

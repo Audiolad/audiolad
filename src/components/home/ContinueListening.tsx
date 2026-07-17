@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import CoverOverlayCard from "@/components/home/CoverOverlayCard";
 import type { ContinueListeningItem, HomeProduct } from "@/lib/home/types";
+import { getProductServiceLineLabel } from "@/lib/products/product-service-label";
 
 import { PlayIcon } from "./HomeIcons";
 import HomeStartSuggestions from "./HomeStartSuggestions";
@@ -37,6 +38,11 @@ export default function ContinueListening({
   }
 
   const { product } = item;
+  const serviceLineLabel = getProductServiceLineLabel(
+    product.productTypeLabel,
+    product.isFree,
+    product.price,
+  );
 
   return (
     <section className="mt-6" aria-label="Продолжить прослушивание">
@@ -53,7 +59,7 @@ export default function ContinueListening({
         className="mt-4"
       >
         <span className="inline-flex w-fit rounded-full bg-[#7042c5]/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
-          {product.productTypeLabel}
+          {serviceLineLabel}
         </span>
 
         <div className="mt-auto min-w-0 pt-6">

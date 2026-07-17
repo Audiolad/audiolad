@@ -25,6 +25,7 @@ export type HistoryItem = {
   authorSlug: string | null;
   productSlug: string;
   formatLabel: string | null;
+  serviceLineLabel: string | null;
   metaLabel: string | null;
   coverUrl: string | null;
   isProgram: boolean;

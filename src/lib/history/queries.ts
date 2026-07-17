@@ -9,6 +9,7 @@ import type { ListenProgressEntry } from "@/lib/listen/types";
 import { resolveProductAccess } from "@/lib/products/access";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { formatAudioDuration, formatProductMeta } from "@/lib/products/duration";
+import { getGiftProductServiceLineLabel } from "@/lib/products/product-service-label";
 import {
   buildListenPath,
   buildPracticePublicPath,
@@ -47,6 +48,7 @@ type PracticeRow = {
   cover_url: string | null;
   updated_at: string | null;
   is_free: boolean | null;
+  price: number | null;
   status: string | null;
   is_catalog_listed: boolean | null;
   guest_access_enabled: boolean | null;
@@ -259,11 +261,17 @@ async function buildHistoryItem(
     authorSlug: author.slug,
     productSlug: practice.slug,
     formatLabel: getDisplayFormat(practice.format),
+    serviceLineLabel: getGiftProductServiceLineLabel(
+      practice.is_free,
+      practice.price,
+    ),
     metaLabel: formatProductMeta({
       format: practice.format,
       audioCount,
       totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
       durationMinutesFallback: practice.duration_minutes,
+      isFree: practice.is_free,
+      price: practice.price,
     }),
     coverUrl: getProductCoverDisplayUrl(practice.cover_url, practice.updated_at),
     isProgram: tracks.length >= 2,
@@ -338,6 +346,7 @@ export async function getListeningHistoryPageData(
           cover_url,
           updated_at,
           is_free,
+          price,
           status,
           is_catalog_listed,
           guest_access_enabled,

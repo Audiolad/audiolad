@@ -4,12 +4,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { PRODUCT_SERVICE_LINE_CLASS } from "@/lib/products/product-service-label";
 
 export type PlaylistItemRowData = {
   practiceId: string;
   title: string;
   authorName: string | null;
   coverDisplayUrl: string | null;
+  serviceLineLabel?: string | null;
   metaLabel?: string | null;
   available: boolean;
   /** Listen or product href for title/cover; null when unavailable. */
@@ -109,15 +111,20 @@ export default function PlaylistItemRow({
       )}
 
       <div className="min-w-0 flex-1 py-0.5">
+        {item.serviceLineLabel ? (
+          <p className={PRODUCT_SERVICE_LINE_CLASS}>{item.serviceLineLabel}</p>
+        ) : null}
         {titleHref ? (
           <Link
             href={titleHref}
-            className="line-clamp-2 text-[14px] font-semibold leading-[1.25] text-[#25135c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            className={`line-clamp-2 text-[14px] font-semibold leading-[1.25] text-[#25135c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${item.serviceLineLabel ? "mt-0.5" : ""}`}
           >
             {item.title}
           </Link>
         ) : (
-          <p className="line-clamp-2 text-[14px] font-semibold leading-[1.25] text-[#25135c]">
+          <p
+            className={`line-clamp-2 text-[14px] font-semibold leading-[1.25] text-[#25135c] ${item.serviceLineLabel ? "mt-0.5" : ""}`}
+          >
             {item.title}
           </p>
         )}

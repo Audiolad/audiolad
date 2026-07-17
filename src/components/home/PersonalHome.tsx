@@ -30,8 +30,6 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
           products={data.forYouProducts}
           ariaLabel="Для вас"
           href="/catalog"
-          showGiftBadge={false}
-          showGiftProductLabel={true}
         />
       </HomeSectionBoundary>
 
@@ -56,7 +54,6 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
           ariaLabel="Из вашей Аудиотеки"
           href="/my-practices"
           linkLabel="Аудиотека"
-          showGiftBadge={false}
         />
       </HomeSectionBoundary>
 

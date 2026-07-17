@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { CatalogProduct } from "@/lib/products/catalog";
+import {
+  getProductServiceLineLabel,
+  PRODUCT_SERVICE_LINE_CLASS,
+} from "@/lib/products/product-service-label";
 
 type CatalogProductCardProps = {
   product: CatalogProduct;
@@ -9,6 +13,11 @@ type CatalogProductCardProps = {
 
 export default function CatalogProductCard({ product }: CatalogProductCardProps) {
   const summary = product.subtitle?.trim() || product.description?.trim() || null;
+  const serviceLineLabel = getProductServiceLineLabel(
+    product.productTypeLabel,
+    product.isFree,
+    product.price,
+  );
 
   return (
     <Link
@@ -39,8 +48,8 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4] sm:text-xs">
-            {product.productTypeLabel}
+          <p className={`${PRODUCT_SERVICE_LINE_CLASS} sm:text-xs`}>
+            {serviceLineLabel}
           </p>
 
           <h3 className="mt-1 line-clamp-3 text-[17px] font-semibold leading-[1.3] text-[#25135c] sm:text-[18px]">

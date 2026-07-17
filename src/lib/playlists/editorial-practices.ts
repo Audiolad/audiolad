@@ -170,6 +170,8 @@ export async function listEditorialPracticeOptions(
         audioCount,
         totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
         durationMinutesFallback: row.duration_minutes,
+        isFree: row.is_free,
+        price: row.price,
       }),
       coverDisplayUrl: getProductCoverDisplayUrl(
         row.cover_url,
