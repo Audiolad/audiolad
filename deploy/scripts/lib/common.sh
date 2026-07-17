@@ -59,6 +59,41 @@ wait_for_health() {
   return 1
 }
 
+wait_for_build_id_match() {
+  local release_dir="$1"
+  local base_url="${2:-http://127.0.0.1:${PRODUCTION_PORT}}"
+  local attempts="${3:-40}"
+  local delay="${4:-2}"
+  local expected actual
+
+  if [[ ! -f "$release_dir/.next/BUILD_ID" ]]; then
+    log_error "Release BUILD_ID missing: $release_dir/.next/BUILD_ID"
+    return 1
+  fi
+
+  expected="$(tr -d '\n' < "$release_dir/.next/BUILD_ID")"
+
+  for ((i = 1; i <= attempts; i++)); do
+    actual="$(
+      curl -fsS "${base_url}${HEALTH_PATH}" 2>/dev/null | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("buildId") or "")
+except Exception:
+    print("")' 2>/dev/null || true
+    )"
+
+    if [[ "$actual" == "$expected" && -n "$actual" ]]; then
+      log_info "Production BUILD_ID matched release: $expected"
+      return 0
+    fi
+
+    sleep "$delay"
+  done
+
+  log_error "Production BUILD_ID mismatch after reload (expected=$expected last=$actual)"
+  return 1
+}
+
 send_deploy_alert() {
   local subject="$1"
   local message="$2"

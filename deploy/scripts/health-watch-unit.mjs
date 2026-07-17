@@ -165,6 +165,27 @@ function testUnstableRestartsGrowthRollback() {
   );
 }
 
+function testBaselineAfterReloadHealthy() {
+  evaluateCase(
+    "post-reload baseline reset",
+    baseline({ restartTime: 7421 }),
+    pm2Current({ restartTime: 7421, pid: 3415095 }),
+    { httpOk: true, httpStatus: 200, buildIdMatch: true, guestHomeOk: true },
+    "healthy",
+  );
+}
+
+function testBuildIdMismatchRollback() {
+  evaluateCase(
+    "build id mismatch during transition",
+    baseline({ restartTime: 7421 }),
+    pm2Current({ restartTime: 7421, pid: 3419288 }),
+    { httpOk: true, httpStatus: 200, buildIdMatch: false, guestHomeOk: true },
+    "rollback",
+    "build_id_mismatch",
+  );
+}
+
 function testAccumulatedRestartWithoutGrowthHealthy() {
   evaluateCase(
     "old accumulated restart count without new growth",
@@ -227,6 +248,8 @@ const tests = [
   testInvalidPm2JsonWatchCheck,
   testUnstableRestartsGrowthRollback,
   testAccumulatedRestartWithoutGrowthHealthy,
+  testBaselineAfterReloadHealthy,
+  testBuildIdMismatchRollback,
   testSnapshotParser,
   testLogFormat,
 ];
