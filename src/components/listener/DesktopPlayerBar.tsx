@@ -2,7 +2,6 @@
 
 import { useEffect, type ReactNode } from "react";
 
-import AuthorLink from "@/components/authors/AuthorLink";
 import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
@@ -280,11 +279,12 @@ function DesktopPlayerActiveState({
               {title}
             </p>
             {subtitle ? (
-              <AuthorLink
-                authorSlug={session.authorSlug}
-                authorName={subtitle}
-                className="mt-0.5 block truncate text-[13px] text-[#7042c5]"
-              />
+              <p
+                className="mt-0.5 truncate text-[13px] text-[#7042c5]"
+                title={subtitle}
+              >
+                {subtitle}
+              </p>
             ) : null}
           </div>
         </div>
