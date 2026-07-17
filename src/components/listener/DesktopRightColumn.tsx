@@ -11,10 +11,12 @@ export default function DesktopRightColumn({
 }: DesktopRightColumnProps) {
   return (
     <aside
-      className="flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
+      className="listener-right-column flex h-full min-h-0 w-[var(--listener-now-playing-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
       aria-label="Панель пользователя и воспроизведения"
     >
-      <DesktopRightColumnTop shellData={shellData} />
+      <div className="shrink-0 px-4 pt-4">
+        <DesktopRightColumnTop shellData={shellData} />
+      </div>
       <NowPlayingPanel embedded />
     </aside>
   );
