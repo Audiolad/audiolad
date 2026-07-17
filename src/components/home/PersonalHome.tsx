@@ -1,16 +1,19 @@
+import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { PersonalHomeData } from "@/lib/home/types";
 
 import ActiveProgramsSection from "./ActiveProgramsSection";
 import ContinueListening from "./ContinueListening";
 import DailyGreeting from "./DailyGreeting";
 import HomeSectionBoundary from "./HomeSectionBoundary";
+import HomeTopicNavigation from "./HomeTopicNavigation";
 import ProductRail from "./ProductRail";
 
 type PersonalHomeProps = {
   data: PersonalHomeData;
+  homeTopics: HomeTopicItem[];
 };
 
-export default function PersonalHome({ data }: PersonalHomeProps) {
+export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
   return (
     <>
       <HomeSectionBoundary section="personal_greeting">
@@ -22,6 +25,10 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
           item={data.continueListening}
           startSuggestions={data.startSuggestions}
         />
+      </HomeSectionBoundary>
+
+      <HomeSectionBoundary section="personal_home_topics">
+        <HomeTopicNavigation topics={homeTopics} />
       </HomeSectionBoundary>
 
       <HomeSectionBoundary section="personal_for_you">

@@ -7,6 +7,7 @@ import {
   loadGuestHomeDataSafe,
   loadPersonalHomeDataSafe,
 } from "@/lib/home/load-safe";
+import { loadHomeTopicsSafe } from "@/lib/home/topic-navigation";
 import { logHomeSectionError } from "@/lib/home/safe";
 import type { GuestHomeData, PersonalHomeData } from "@/lib/home/types";
 
@@ -21,10 +22,10 @@ type HomeRenderState =
   | { kind: "personal"; data: PersonalHomeData }
   | { kind: "critical" };
 
-async function resolveHomeRenderState(): Promise<HomeRenderState> {
+async function resolveHomeRenderState(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<HomeRenderState> {
   try {
-    const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -49,15 +50,20 @@ async function resolveHomeRenderState(): Promise<HomeRenderState> {
 }
 
 export default async function Home() {
-  const state = await resolveHomeRenderState();
+  const supabase = await createClient();
+
+  const [state, homeTopics] = await Promise.all([
+    resolveHomeRenderState(supabase),
+    loadHomeTopicsSafe(supabase),
+  ]);
 
   if (state.kind === "critical") {
     return <HomeCriticalFallback />;
   }
 
   if (state.kind === "personal") {
-    return <PersonalHome data={state.data} />;
+    return <PersonalHome data={state.data} homeTopics={homeTopics} />;
   }
 
-  return <GuestHome data={state.data} />;
+  return <GuestHome data={state.data} homeTopics={homeTopics} />;
 }

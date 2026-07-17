@@ -128,6 +128,20 @@ src/lib/topics/
 
 ---
 
+## Home navigation (Stage C)
+
+- Главная (guest и personal) загружает темы сервером через `loadHomeTopicsSafe()` → `listHomeTopicsWithCatalogCounts()`.
+- Условия показа на Главной: `is_active`, `show_on_home`, минимум один published catalog-listed продукт.
+- Сортировка: `sort_order ASC`, `title ASC` (в query layer этапа A).
+- Компонент: `src/components/home/HomeTopicNavigation.tsx` — один источник для guest и personal.
+- Ссылки: `/catalog?topic=<key>` (`topic.key`, не title/slug).
+- `show_on_home` применяется **только** на Главной; Каталог показывает все active темы с продуктами.
+- Legacy `?need=` больше **не создаётся** внутренними ссылками Главной.
+- Каталог временно поддерживает старые внешние `?need=` через `resolveCatalogTopicSearchParam()` (`src/lib/catalog/topic-filter.ts`).
+- При ошибке загрузки тем блок скрывается; Главная не падает.
+
+---
+
 ## Analytics
 
 Использовать **`topic_key`**, не `topic_title`.

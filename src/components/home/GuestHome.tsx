@@ -1,17 +1,19 @@
 import Link from "next/link";
 
+import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { GuestHomeData } from "@/lib/home/types";
 
 import AuthorsRail from "./AuthorsRail";
 import HeroFeaturedProduct from "./HeroFeaturedProduct";
 import { PlayIcon } from "./HomeIcons";
 import HowItWorks from "./HowItWorks";
-import NeedsNavigation from "./NeedsNavigation";
+import HomeTopicNavigation from "./HomeTopicNavigation";
 import ProductRail from "./ProductRail";
 import SignUpInvitation from "./SignUpInvitation";
 
 type GuestHomeProps = {
   data: GuestHomeData;
+  homeTopics: HomeTopicItem[];
 };
 
 function getPrimaryListenHref(data: GuestHomeData): string {
@@ -28,7 +30,7 @@ function getPrimaryListenHref(data: GuestHomeData): string {
   return "/catalog";
 }
 
-export default function GuestHome({ data }: GuestHomeProps) {
+export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
   const primaryListenHref = getPrimaryListenHref(data);
 
   return (
@@ -72,7 +74,7 @@ export default function GuestHome({ data }: GuestHomeProps) {
         href="/catalog"
       />
 
-      <NeedsNavigation />
+      <HomeTopicNavigation topics={homeTopics} />
 
       <ProductRail
         title="Новое в АудиоЛаде"
