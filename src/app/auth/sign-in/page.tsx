@@ -12,6 +12,7 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegistered = searchParams.get("registered") === "1";
+  const isReset = searchParams.get("reset") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -75,6 +76,12 @@ function SignInForm() {
           </div>
         )}
 
+        {isReset && (
+          <div className="mt-8 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm leading-6 text-[#3d8d65]">
+            Пароль обновлён. Войдите с новым паролем.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <label className="block">
             <span className="text-sm font-medium">Электронная почта</span>
@@ -102,6 +109,18 @@ function SignInForm() {
               placeholder="Введите пароль"
               className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5]"
             />
+
+            <p className="mt-2 text-right text-sm">
+              <Link
+                href={buildAuthRouteHref(
+                  "/auth/forgot-password",
+                  searchParams.get("next"),
+                )}
+                className="font-medium text-[#7042c5]"
+              >
+                Забыли пароль?
+              </Link>
+            </p>
           </label>
 
           {message && (

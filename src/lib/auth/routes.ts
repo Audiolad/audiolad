@@ -11,7 +11,15 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/admin",
 ] as const;
 
-const AUTH_ROUTES = ["/auth/sign-in", "/auth/sign-up"] as const;
+const AUTH_ROUTES = [
+  "/auth/sign-in",
+  "/auth/sign-up",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+] as const;
+
+/** Routes that redirect authenticated users to the app home/profile. */
+const AUTH_ENTRY_ROUTES = ["/auth/sign-in", "/auth/sign-up"] as const;
 
 const DEFAULT_AUTHENTICATED_REDIRECT = "/profile";
 
@@ -40,6 +48,10 @@ export function isPrivateRoute(pathname: string): boolean {
 
 export function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((route) => matchesRoutePrefix(pathname, route));
+}
+
+export function isAuthEntryRoute(pathname: string): boolean {
+  return AUTH_ENTRY_ROUTES.some((route) => matchesRoutePrefix(pathname, route));
 }
 
 function getPathnameFromNext(next: string): string {
@@ -86,7 +98,7 @@ function isUnsafeNextPath(trimmed: string): boolean {
     return true;
   }
 
-  return isAuthRoute(pathname);
+  return isAuthEntryRoute(pathname);
 }
 
 export function resolveValidatedNextPath(
@@ -113,7 +125,7 @@ export function getSafeNextPath(
 }
 
 export function buildAuthRouteHref(
-  route: "/auth/sign-in" | "/auth/sign-up",
+  route: "/auth/sign-in" | "/auth/sign-up" | "/auth/forgot-password",
   next: string | null | undefined,
   extraParams?: Record<string, string>,
 ): string {

@@ -1,6 +1,6 @@
 import {
   getSafeNextPath,
-  isAuthRoute,
+  isAuthEntryRoute,
   isPrivateRoute,
 } from "@/lib/auth/routes";
 import { createServerClient } from "@supabase/ssr";
@@ -106,7 +106,7 @@ export async function updateSession(request: NextRequest) {
     );
   }
 
-  if (authenticatedUser && isAuthRoute(pathname)) {
+  if (authenticatedUser && isAuthEntryRoute(pathname)) {
     const destination = getSafeNextPath(
       request.nextUrl.searchParams.get("next"),
     );
