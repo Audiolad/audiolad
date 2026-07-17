@@ -268,8 +268,6 @@ export async function getPublishedCatalogProducts(
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
-          isFree: practice.is_free,
-          price: practice.price,
         }),
         statsLabel: formatCatalogProductStats({
           audioCount,
