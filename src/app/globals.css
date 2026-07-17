@@ -8,6 +8,13 @@
   --bottom-nav-content-gap: 28px;
   --global-mini-player-height: 0px;
   --home-page-gutter: 1.25rem;
+
+  /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
+  --listener-sidebar-width: 240px;
+  --listener-now-playing-width: 320px;
+  --listener-desktop-player-height: 0px;
+  --listener-topbar-height: 0px;
+  --listener-shell-gap: 16px;
 }
 
 .platform-top-safe-padding {

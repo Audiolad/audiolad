@@ -17,6 +17,11 @@ import {
   shouldShowBottomNav,
   type BottomNavVariant,
 } from "@/lib/navigation/bottom-nav";
+import {
+  isListenerPrimaryNavItemActive,
+  LISTENER_PRIMARY_NAV_ITEMS,
+  type ListenerPrimaryNavIconKey,
+} from "@/lib/navigation/listener-nav";
 
 type NavItem = {
   title: string;
@@ -24,13 +29,22 @@ type NavItem = {
   Icon: ComponentType<{ active?: boolean; className?: string }>;
 };
 
-const items: NavItem[] = [
-  { title: "Главная", href: "/", Icon: HomeNavIcon },
-  { title: "Каталог", href: "/catalog", Icon: CatalogNavIcon },
-  { title: "Аудиотека", href: "/my-practices", Icon: LibraryNavIcon },
-  { title: "Плейлисты", href: "/playlists", Icon: PlaylistsNavIcon },
-  { title: "Профиль", href: "/profile", Icon: ProfileNavIcon },
-];
+const LISTENER_NAV_ICONS: Record<
+  ListenerPrimaryNavIconKey,
+  NavItem["Icon"]
+> = {
+  home: HomeNavIcon,
+  catalog: CatalogNavIcon,
+  library: LibraryNavIcon,
+  playlists: PlaylistsNavIcon,
+  profile: ProfileNavIcon,
+};
+
+const items: NavItem[] = LISTENER_PRIMARY_NAV_ITEMS.map((item) => ({
+  title: item.title,
+  href: item.href,
+  Icon: LISTENER_NAV_ICONS[item.icon],
+}));
 
 type BottomNavProps = {
   variant?: BottomNavVariant;
@@ -46,15 +60,9 @@ export default function BottomNav({ variant = "default" }: BottomNavProps) {
   }
 
   function isActive(href: string) {
-    if (isNeutralPath) {
-      return false;
-    }
-
-    if (href === "/") {
-      return pathname === "/";
-    }
-
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return isListenerPrimaryNavItemActive(pathname, href, {
+      isNeutralPath: isNeutralPath,
+    });
   }
 
   return (
