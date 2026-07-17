@@ -6,9 +6,9 @@ import { profilePageFullWidthClassName } from "@/lib/profile/layout";
 export default function ProfilePageHeader() {
   return (
     <header
-      className={`flex items-center justify-between ${profilePageFullWidthClassName}`}
+      className={`flex min-w-0 items-center justify-between gap-3 md:gap-4 ${profilePageFullWidthClassName}`}
     >
-      <AudioladHorizontalLogo />
+      <AudioladHorizontalLogo variant="profile" />
 
       <h1 className="text-[28px] font-semibold lg:text-[30px]">Профиль</h1>
 

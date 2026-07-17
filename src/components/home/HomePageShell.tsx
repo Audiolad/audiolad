@@ -20,9 +20,9 @@ export default function HomePageShell({
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass}`}
       >
-        <div className="px-5 pt-5 lg:px-10 lg:pt-8">
-          <header className="border-b border-[#eadff8] pb-4">
-            <div className="flex items-center justify-between gap-4">
+        <div className="px-5 pt-4 md:pt-5 lg:px-10 lg:pt-8">
+          <header className="border-b border-[#eadff8] pb-3 md:pb-4">
+            <div className="flex min-w-0 items-center justify-between gap-3 md:gap-4">
               <AudioladHorizontalLogo priority />
 
               {!isAuthenticated ? (

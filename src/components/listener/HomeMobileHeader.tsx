@@ -9,8 +9,8 @@ type HomeMobileHeaderProps = {
 
 export default function HomeMobileHeader({ shellData }: HomeMobileHeaderProps) {
   return (
-    <header className="border-b border-[#eadff8] px-5 pb-4 pt-5 lg:px-10 lg:pt-8 xl:hidden">
-      <div className="flex items-center justify-between gap-4">
+    <header className="border-b border-[#eadff8] px-5 pb-3 pt-4 md:pb-4 md:pt-5 lg:px-10 lg:pt-8 xl:hidden">
+      <div className="flex min-w-0 items-center justify-between gap-3 md:gap-4">
         <AudioladHorizontalLogo priority />
 
         {!shellData.isAuthenticated ? (
