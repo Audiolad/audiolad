@@ -112,7 +112,7 @@ export default function GlobalMiniPlayer() {
 
   return (
     <div
-      className="global-mini-player fixed inset-x-0 z-30 border-t border-white/10 bg-gradient-to-r from-[#5a3a96] via-[#6f4bbb] to-[#4b2f86] shadow-[0_-10px_30px_rgba(36,19,63,0.35)]"
+      className="global-mini-player fixed inset-x-0 z-30 border-t border-white/10 bg-gradient-to-r from-[#5a3a96] via-[#6f4bbb] to-[#4b2f86] shadow-[0_-10px_30px_rgba(36,19,63,0.35)] xl:hidden"
       style={{
         bottom: `calc(${BOTTOM_NAV_MAIN_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`,
         height: `${GLOBAL_MINI_PLAYER_HEIGHT_PX}px`,
