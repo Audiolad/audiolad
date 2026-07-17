@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
@@ -33,7 +34,18 @@ export function ProfileUserCard({ card }: ProfileUserCardProps) {
           className="flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-[#f7effe] shadow-sm lg:h-[100px] lg:w-[100px]"
           aria-hidden="true"
         >
-          <span className="text-4xl text-[#7042c5]">{card.initial}</span>
+          {card.avatarUrl ? (
+            <Image
+              src={card.avatarUrl}
+              alt=""
+              width={100}
+              height={100}
+              unoptimized
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-4xl text-[#7042c5]">{card.initial}</span>
+          )}
         </div>
 
         <div className="min-w-0">

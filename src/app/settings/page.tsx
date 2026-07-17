@@ -19,91 +19,6 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-function getSections(emailDescription: string) {
-  return [
-    {
-      title: "Аккаунт",
-      items: [
-        {
-          icon: "◎",
-          title: "Личные данные",
-          description: "Имя, фотография и контактная информация",
-        },
-        {
-          icon: "✉",
-          title: "Электронная почта",
-          description: emailDescription,
-        },
-        {
-          icon: "⌘",
-          title: "Пароль и безопасность",
-          description: "Изменение пароля и защита аккаунта",
-        },
-      ],
-    },
-    {
-      title: "Прослушивание",
-      items: [
-        {
-          icon: "♫",
-          title: "Качество аудио",
-          description: "Высокое",
-        },
-        {
-          icon: "⇩",
-          title: "Настройки скачивания",
-          description: "Только через Wi-Fi",
-        },
-        {
-          icon: "▶",
-          title: "Автовоспроизведение",
-          description: "Продолжать следующую практику",
-        },
-      ],
-    },
-    {
-      title: "Уведомления",
-      items: [
-        {
-          icon: "◌",
-          title: "Новые практики авторов",
-          description: "Получать уведомления о новых материалах",
-        },
-        {
-          icon: "♡",
-          title: "Рекомендации",
-          description: "Персональные подборки и предложения",
-        },
-        {
-          icon: "₽",
-          title: "Покупки и платежи",
-          description: "Чеки, статусы и подтверждения оплаты",
-        },
-      ],
-    },
-    {
-      title: "Приложение",
-      items: [
-        {
-          icon: "☼",
-          title: "Оформление",
-          description: "Светлая тема",
-        },
-        {
-          icon: "Я",
-          title: "Язык",
-          description: "Русский",
-        },
-        {
-          icon: "?",
-          title: "Помощь и поддержка",
-          description: "Ответы на вопросы и связь с нами",
-        },
-      ],
-    },
-  ];
-}
-
 function BackIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
@@ -143,7 +58,35 @@ export default async function SettingsPage() {
   const initial = getInitial(displayName);
   const roleLabel = getProfileRolePrimaryLabel(authorWorkspaces.length);
   const emailDescription = user.email?.trim() || "Не указан";
-  const sections = getSections(emailDescription);
+
+  const accountItems = [
+    {
+      icon: "◎",
+      title: "Личные данные",
+      description: "Имя, фотография и контактная информация",
+      href: "/profile/edit",
+    },
+    {
+      icon: "✉",
+      title: "Электронная почта",
+      description: emailDescription,
+      href: null,
+    },
+    {
+      icon: "⌘",
+      title: "Пароль и безопасность",
+      description: "Восстановление пароля",
+      href: "/auth/forgot-password",
+    },
+  ];
+
+  const appItems = [
+    {
+      icon: "?",
+      title: "Помощь и поддержка",
+      description: "Ответы на вопросы и связь с нами",
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
@@ -183,45 +126,64 @@ export default async function SettingsPage() {
             </div>
           </section>
 
-          {sections.map((section) =>
-            section.title === "Приложение" ? (
-              <PwaSettingsSection key={section.title} items={section.items} />
-            ) : (
-              <section key={section.title} className="mt-8">
-                <h2 className="text-[20px] font-semibold">{section.title}</h2>
+          <section className="mt-8">
+            <h2 className="text-[20px] font-semibold">Аккаунт</h2>
 
-                <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
-                  {section.items.map((item, index) => (
-                    <button
-                      key={item.title}
-                      type="button"
-                      className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
-                        index !== section.items.length - 1
-                          ? "border-b border-[#eee6f7]"
-                          : ""
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
-                          {item.icon}
-                        </span>
-
-                        <span className="min-w-0">
-                          <span className="block font-medium">{item.title}</span>
-
-                          <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
-                            {item.description}
-                          </span>
-                        </span>
+            <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
+              {accountItems.map((item, index) =>
+                item.href ? (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
+                      index !== accountItems.length - 1
+                        ? "border-b border-[#eee6f7]"
+                        : ""
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
+                        {item.icon}
                       </span>
 
-                      <span className="shrink-0 text-xl text-[#7042c5]">›</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ),
-          )}
+                      <span className="min-w-0">
+                        <span className="block font-medium">{item.title}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
+                          {item.description}
+                        </span>
+                      </span>
+                    </span>
+
+                    <span className="shrink-0 text-xl text-[#7042c5]">›</span>
+                  </Link>
+                ) : (
+                  <div
+                    key={item.title}
+                    className={`flex w-full items-center justify-between gap-3 px-5 py-4 ${
+                      index !== accountItems.length - 1
+                        ? "border-b border-[#eee6f7]"
+                        : ""
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
+                        {item.icon}
+                      </span>
+
+                      <span className="min-w-0">
+                        <span className="block font-medium">{item.title}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
+                          {item.description}
+                        </span>
+                      </span>
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+          </section>
+
+          <PwaSettingsSection items={appItems} />
 
           <AnalyticsPrivacySection />
 
@@ -265,13 +227,6 @@ export default async function SettingsPage() {
                 Выйти из аккаунта
               </button>
             </form>
-
-            <button
-              type="button"
-              className="mt-3 w-full px-5 py-3 text-sm text-[#a692b4]"
-            >
-              Удалить аккаунт
-            </button>
           </section>
 
           <p className="mt-6 text-center text-xs text-[#a692b4]">

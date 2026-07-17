@@ -1,4 +1,7 @@
+import ProfileAvatarEditor from "@/components/profile/ProfileAvatarEditor";
+import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateProfile } from "./actions";
@@ -83,26 +86,6 @@ function BackIcon() {
   );
 }
 
-function CameraIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <path
-        d="M4 8.5A2.5 2.5 0 0 1 6.5 6h2l1.2-1.8h4.6L15.5 6h2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx="12"
-        cy="12.5"
-        r="3"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
 const disabledFieldClass =
   "mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-[#f9f7fc] px-4 py-4 outline-none disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -128,7 +111,7 @@ export default async function EditProfilePage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, avatar_path, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -136,6 +119,20 @@ export default async function EditProfilePage({
   const { firstName, lastName } = getEditNameFields(profile, meta);
   const email = user.email ?? "";
   const initial = getDisplayInitial(profile, meta, email);
+
+  let avatarUrl: string | null = null;
+
+  if (profile?.avatar_path) {
+    try {
+      const storage = createServiceRoleClient();
+      avatarUrl = await createUserAvatarSignedUrl(storage, profile.avatar_path, {
+        userId: user.id,
+        cacheBuster: profile.avatar_url ?? profile.avatar_path,
+      });
+    } catch {
+      avatarUrl = profile.avatar_url;
+    }
+  }
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
@@ -168,34 +165,9 @@ export default async function EditProfilePage({
             </div>
           )}
 
+          <ProfileAvatarEditor initialAvatarUrl={avatarUrl} initial={initial} />
+
           <form action={updateProfile}>
-            <section className="mt-7">
-              <div className="flex flex-col items-center">
-                <div className="relative">
-                  <div className="flex h-[130px] w-[130px] items-center justify-center overflow-hidden rounded-[34px] bg-gradient-to-br from-[#eadcf7] to-[#c4a4e5] text-[46px] font-semibold text-[#7042c5] shadow-[0_14px_34px_rgba(96,59,168,0.14)]">
-                    {initial}
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled
-                    aria-label="Изменить фотографию"
-                    className="absolute -bottom-2 -right-2 flex h-12 w-12 cursor-not-allowed items-center justify-center rounded-full border-4 border-white bg-[#7042c5] text-white opacity-60 shadow-lg"
-                  >
-                    <CameraIcon />
-                  </button>
-                </div>
-
-                <p className="mt-5 text-sm font-medium text-[#8a7ca9]">
-                  Изменить фотографию
-                </p>
-
-                <p className="mt-2 text-center text-xs leading-5 text-[#8a7ca9]">
-                  Будет доступно позже
-                </p>
-              </div>
-            </section>
-
             <section className="mt-8 space-y-5">
               <label className="block">
                 <span className="text-sm font-medium">Имя</span>
@@ -234,101 +206,16 @@ export default async function EditProfilePage({
                 />
 
                 <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                  На этот адрес будут приходить чеки и уведомления о покупках.
-                </p>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium">Телефон</span>
-
-                <input
-                  type="tel"
-                  disabled
-                  placeholder="+7 999 000-00-00"
-                  className={disabledFieldClass}
-                />
-
-                <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                  Будет доступно позже
-                </p>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium">О себе</span>
-
-                <textarea
-                  rows={4}
-                  disabled
-                  placeholder="Несколько слов о себе"
-                  className={`${disabledFieldClass} resize-none`}
-                />
-
-                <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                  Будет доступно позже
-                </p>
-              </label>
-            </section>
-
-            <section className="mt-7">
-              <h2 className="text-[20px] font-semibold">Интересы</h2>
-
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                Они помогут АудиоЛаду подбирать подходящие материалы.
-              </p>
-
-              <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                Будет доступно позже
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  "Спокойствие",
-                  "Любовь",
-                  "Изобилие",
-                  "Женственность",
-                  "Личные границы",
-                  "Энергия",
-                  "Сон",
-                  "Молитвы",
-                ].map((interest) => (
-                  <button
-                    key={interest}
-                    type="button"
-                    disabled
-                    className="cursor-not-allowed rounded-full border border-[#ddcfef] bg-[#f9f7fc] px-4 py-2 text-sm text-[#8a7ca9] opacity-60"
+                  Email нельзя изменить в профиле. Для смены пароля используйте{" "}
+                  <Link
+                    href="/auth/forgot-password"
+                    className="font-medium text-[#7042c5]"
                   >
-                    {interest}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-7 rounded-[22px] border border-[#eadff8] bg-[#faf6ff] p-5 opacity-80">
-              <p className="font-semibold">Публичность профиля</p>
-
-              <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                Будет доступно позже
-              </p>
-
-              <div className="mt-4 flex items-center justify-between">
-                <div className="pr-4">
-                  <p className="text-sm font-medium text-[#8a7ca9]">
-                    Показывать имя авторам
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[#7d70a2]">
-                    Имя будет видно рядом с отзывами и комментариями.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  disabled
-                  aria-label="Показывать имя авторам"
-                  className="relative h-7 w-12 shrink-0 cursor-not-allowed rounded-full bg-[#c9b8e3] opacity-60"
-                >
-                  <span className="absolute right-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm" />
-                </button>
-              </div>
+                    восстановление доступа
+                  </Link>
+                  .
+                </p>
+              </label>
             </section>
 
             <section className="mt-8 grid grid-cols-2 gap-3">

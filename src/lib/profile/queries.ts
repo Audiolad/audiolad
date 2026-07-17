@@ -12,6 +12,8 @@ import type { ContinueListeningItem } from "@/lib/home/types";
 import { resolveInitialPlayback } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
@@ -33,6 +35,8 @@ import type {
 type ProfileRow = {
   full_name: string | null;
   role: string | null;
+  avatar_path: string | null;
+  avatar_url: string | null;
 };
 
 type ProgressRow = {
@@ -299,7 +303,7 @@ export async function getProfilePageData(
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, role")
+      .select("full_name, role, avatar_path, avatar_url")
       .eq("id", user.id)
       .maybeSingle(),
     countActiveLibraryItems(supabase, user.id),
@@ -328,10 +332,26 @@ export async function getProfilePageData(
   const displayName = getDisplayName(profile, user);
   const workspaceCount = authorWorkspaces.length;
 
+  let avatarUrl: string | null = null;
+
+  if (profile?.avatar_path) {
+    try {
+      const storage = createServiceRoleClient();
+      avatarUrl = await createUserAvatarSignedUrl(storage, profile.avatar_path, {
+        userId: user.id,
+        cacheBuster: profile.avatar_url ?? profile.avatar_path,
+      });
+    } catch (error) {
+      console.error("profile_avatar_signed_url_error", error);
+      avatarUrl = profile.avatar_url;
+    }
+  }
+
   const card: ProfileCardData = {
     displayName,
     initial: getInitial(displayName),
     email: user.email?.trim() ?? "",
+    avatarUrl,
     rolePrimaryLabel: getProfileRolePrimaryLabel(workspaceCount),
     authorWorkspaceCountLabel: getAuthorWorkspaceCountLabel(workspaceCount),
   };

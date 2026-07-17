@@ -15,6 +15,7 @@ export type ProfileCardData = {
   displayName: string;
   initial: string;
   email: string;
+  avatarUrl: string | null;
   rolePrimaryLabel: string;
   authorWorkspaceCountLabel: string | null;
 };
