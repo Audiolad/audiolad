@@ -15,6 +15,7 @@ export {
 
 export {
   countActivePracticeTopics,
+  getActivePracticeTopics,
   getPracticeTopicKeys,
   getPracticeTopics,
   getTopicBySlug,

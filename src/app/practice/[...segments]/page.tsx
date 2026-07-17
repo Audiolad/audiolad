@@ -7,12 +7,14 @@ import BuyPracticeButton from "@/components/BuyPracticeButton";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import PromoPostSignupHandler from "@/components/promo/PromoPostSignupHandler";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
+import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
   buildPracticeAccessPresentation,
   canUseBuyerPreviewMode,
@@ -514,6 +516,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   const promoListenPath = buildListenPath(resolvedAuthorSlug, practice.slug);
 
+  const practiceTopics = await loadPublicPracticeTopicsSafe(
+    supabase,
+    practice.id,
+  );
+
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
       {user ? (
@@ -638,6 +645,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             {meta && (
               <p className="mt-3 text-sm text-[#7d70a2]">{meta}</p>
             )}
+
+            <ProductTopicLinks topics={practiceTopics} className="mt-4" />
           </section>
 
           {description ? (

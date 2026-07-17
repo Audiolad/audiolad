@@ -154,6 +154,18 @@ src/lib/topics/
 
 ---
 
+## Public product page (Stage E)
+
+- Публичная страница продукта (`/practice/{authorSlug}/{productSlug}`) показывает **активные** темы через `loadPublicPracticeTopicsSafe()` → `getActivePracticeTopics()`.
+- Inactive/архивные темы публично **не показываются** (фильтр в query layer этапа A).
+- UI: `ProductTopicLinks` — компактные navigation chips, не overlay на cover.
+- Ссылки: `/catalog?topic=<key>` через `buildCatalogTopicHref()`.
+- При ошибке загрузки тем блок скрывается; страница продукта не падает.
+- Темы на карточках Главной, Каталога, Аудиотеки и Плейлистов **не реализованы** (отдельная задача).
+- `/topics/[slug]` **не используется**.
+
+---
+
 ## Analytics
 
 Использовать **`topic_key`**, не `topic_title`.

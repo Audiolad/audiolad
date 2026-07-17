@@ -205,6 +205,18 @@ export async function getPracticeTopics(
   return { activeTopics, archivedTopics };
 }
 
+export async function getActivePracticeTopics(
+  supabase: SupabaseClient,
+  practiceId: string,
+): Promise<Array<{ key: string; title: string }>> {
+  const { activeTopics } = await getPracticeTopics(supabase, practiceId);
+
+  return activeTopics.map((topic) => ({
+    key: topic.key,
+    title: topic.title,
+  }));
+}
+
 export async function getPracticeTopicKeys(
   supabase: SupabaseClient,
   practiceId: string,
