@@ -16,7 +16,7 @@ export default function DesktopSidebarNav() {
       <ul className="space-y-1">
         {LISTENER_SIDEBAR_NAV_ITEMS.map((item) => {
           const active = isListenerPrimaryNavItemActive(pathname, item.href, {
-            isNeutralPath: false,
+            isNeutralPath: pathname === "/",
           });
 
           return (

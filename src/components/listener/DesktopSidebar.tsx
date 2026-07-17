@@ -1,7 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import DesktopSidebarNav from "@/components/listener/DesktopSidebarNav";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
+
+const SIDEBAR_LOGO_WIDTH = 1796;
+const SIDEBAR_LOGO_HEIGHT = 402;
 
 type DesktopSidebarProps = {
   shellData: ListenerShellData;
@@ -13,18 +17,28 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
       className="flex h-full min-h-0 w-[var(--listener-sidebar-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
       aria-label="Моё пространство"
     >
-      <div className="flex h-14 min-h-14 shrink-0 items-center px-3">
+      <div className="flex min-h-14 shrink-0 items-center px-3 py-2">
         <Link
           href="/"
-          className="text-[22px] font-semibold leading-none text-[#6234b5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          className="inline-flex max-w-full rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
-          АудиоЛад
+          <Image
+            src="/brand/audiolad-logo-sidebar.png"
+            alt="АудиоЛад"
+            width={SIDEBAR_LOGO_WIDTH}
+            height={SIDEBAR_LOGO_HEIGHT}
+            className="h-10 w-auto max-w-full object-contain object-left"
+            priority
+          />
         </Link>
       </div>
 
-      <h2 className="shrink-0 px-3 pt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4]">
+      <Link
+        href="/"
+        className="block shrink-0 px-3 pt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4] transition-colors hover:text-[#7f70a8] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
         Моё пространство
-      </h2>
+      </Link>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
         <DesktopSidebarNav />
