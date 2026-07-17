@@ -70,10 +70,10 @@ export default function DailyGreeting({ firstName }: DailyGreetingProps) {
 
   return (
     <section
-      className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f5edfc] px-5 py-4 xl:mt-3 xl:rounded-[20px] xl:px-4 xl:py-3"
+      className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f5edfc] px-5 py-4 xl:mt-0 xl:rounded-[20px] xl:border-[#ebe2f6] xl:bg-gradient-to-r xl:from-[#faf6ff] xl:to-[#f7f0fc] xl:px-7 xl:py-[18px]"
       aria-label="Персональное приветствие"
     >
-      <h1 className="flex min-w-0 max-w-full items-baseline gap-1 text-[clamp(17px,4.2vw,24px)] font-semibold leading-tight tracking-[0.01em] text-[#25135c] xl:text-[26px] xl:leading-snug">
+      <h1 className="flex min-w-0 max-w-full items-baseline gap-1 text-[clamp(17px,4.2vw,24px)] font-semibold leading-tight tracking-[0.01em] text-[#25135c] xl:text-[25px] xl:leading-[1.2]">
         <span className="min-w-0">{greetingBody}</span>
         {showHeart ? (
           <span aria-hidden="true" className="shrink-0 leading-none">
@@ -81,7 +81,7 @@ export default function DailyGreeting({ firstName }: DailyGreetingProps) {
           </span>
         ) : null}
       </h1>
-      <p className="mt-2 min-h-[3rem] text-[15px] leading-6 text-[#6f61a3] sm:min-h-[4.5rem] xl:mt-1.5 xl:min-h-0 xl:text-[15px] xl:leading-snug">
+      <p className="mt-2 min-h-[3rem] text-[15px] leading-6 text-[#6f61a3] sm:min-h-[4.5rem] xl:mt-1 xl:min-h-0 xl:text-[16px] xl:leading-[1.45]">
         <em>{wisdomPhrase}</em>
       </p>
     </section>

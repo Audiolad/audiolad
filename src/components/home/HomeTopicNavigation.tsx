@@ -30,10 +30,10 @@ export default function HomeTopicNavigation({ topics }: HomeTopicNavigationProps
   const { firstRow, secondRow } = splitHomeTopicsIntoScrollRows(topics);
 
   return (
-    <section className="home-needs-strip home-section-carousel mt-8">
+    <section className="home-needs-strip home-section-carousel mt-8 xl:mt-8">
       <HomeSectionHeader title="Выберите, что вам сейчас нужно" href="/catalog" />
 
-      <nav className="home-needs-track mt-4" aria-label="Темы АудиоЛад">
+      <nav className="home-needs-track mt-3.5 xl:mt-4" aria-label="Темы АудиоЛад">
         <div className="home-needs-rows">
           <div className="home-needs-row">
             {firstRow.map((topic) => (

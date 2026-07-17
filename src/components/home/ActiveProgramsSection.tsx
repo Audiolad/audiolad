@@ -18,10 +18,10 @@ export default function ActiveProgramsSection({
   }
 
   return (
-    <section className="mt-8" aria-label="Ваши программы">
+    <section className="mt-8 xl:mt-8" aria-label="Ваши программы">
       <HomeSectionHeader title="Ваши программы" href="/my-practices" />
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-3.5 space-y-3 xl:mt-4">
         {programs.map((program) => (
           <article
             key={program.product.id}

@@ -87,10 +87,20 @@
     margin-right: 0;
     padding-right: 0;
     scroll-padding-right: 0;
+    gap: 0.875rem;
   }
 
-  .listener-home-content .home-section-carousel {
-    margin-top: 1.5rem;
+  .listener-home-content .home-section-carousel,
+  .listener-home-content .home-needs-strip {
+    margin-top: 2rem;
+  }
+
+  .listener-home-content [data-catalog-carousel-item] .home-product-card {
+    width: 172px;
+  }
+
+  .listener-home-content .home-needs-track {
+    margin-top: 1rem;
   }
 
   .listener-home-content .featured-card__cover {

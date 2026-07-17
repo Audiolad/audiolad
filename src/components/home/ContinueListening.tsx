@@ -5,6 +5,7 @@ import type { ContinueListeningItem, HomeProduct } from "@/lib/home/types";
 import { getProductServiceLineLabel } from "@/lib/products/product-service-label";
 
 import { PlayIcon } from "./HomeIcons";
+import HomeSectionHeader from "./HomeSectionHeader";
 import HomeStartSuggestions from "./HomeStartSuggestions";
 
 type ContinueListeningProps = {
@@ -45,10 +46,8 @@ export default function ContinueListening({
   );
 
   return (
-    <section className="mt-6" aria-label="Продолжить прослушивание">
-      <h2 className="text-[22px] font-semibold leading-tight text-[#25135c]">
-        Продолжить прослушивание
-      </h2>
+    <section className="mt-6 xl:mt-7" aria-label="Продолжить прослушивание">
+      <HomeSectionHeader title="Продолжить прослушивание" />
 
       <CoverOverlayCard
         slug={product.slug}
@@ -56,14 +55,14 @@ export default function ContinueListening({
         coverUrl={product.coverUrl}
         authorName={product.authorName}
         format={product.format}
-        className="mt-4"
+        className="mt-3.5 xl:mt-4"
       >
         <span className="inline-flex w-fit rounded-full bg-[#7042c5]/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
           {serviceLineLabel}
         </span>
 
-        <div className="mt-auto min-w-0 pt-6">
-          <h3 className="line-clamp-2 text-[22px] font-semibold leading-tight text-white sm:text-[24px]">
+        <div className="mt-auto min-w-0 pt-6 xl:pt-4">
+          <h3 className="line-clamp-2 text-[22px] font-semibold leading-tight text-white sm:text-[24px] xl:text-[20px] xl:leading-[1.25]">
             <Link
               href={product.href}
               className="hover:text-white/90 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -90,7 +89,7 @@ export default function ContinueListening({
             </p>
           ) : null}
 
-          <div className="mt-4">
+          <div className="mt-4 xl:mt-3">
             <OverlayProgressBar percent={item.progressPercent} />
             <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">
               <span className="inline-flex shrink-0 opacity-90 [&_svg]:h-3.5 [&_svg]:w-3.5">
@@ -102,7 +101,7 @@ export default function ContinueListening({
 
           <Link
             href={item.listenHref}
-            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(37,19,92,0.35)] transition-colors hover:bg-[#6234b5] active:bg-[#5a2fa3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(37,19,92,0.35)] transition-colors hover:bg-[#6234b5] active:bg-[#5a2fa3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white xl:mt-3.5 xl:min-h-10 xl:rounded-xl xl:px-4 xl:py-2.5 xl:shadow-[0_6px_18px_rgba(37,19,92,0.28)]"
           >
             <PlayIcon />
             {item.isProgram ? "Продолжить программу" : "Продолжить"}

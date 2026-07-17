@@ -22,11 +22,11 @@ export default function DesktopCenterSearch() {
   return (
     <Link
       href="/catalog"
-      className="flex h-14 min-h-14 w-full items-center gap-2.5 rounded-[20px] border border-[#eadff8] bg-[#fffdfd] px-4 text-[15px] text-[#9485b4] shadow-[0_4px_14px_rgba(90,60,145,0.05)] transition hover:border-[#dcc9f2] hover:text-[#796ba0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      className="flex h-[58px] min-h-[58px] w-full items-center gap-3 rounded-[18px] border border-[#e8ddf5] bg-white px-4 text-[15px] leading-none text-[#9485b4] shadow-[0_2px_10px_rgba(90,60,145,0.04)] transition-[border-color,box-shadow,color] hover:border-[#dcc9f2] hover:text-[#796ba0] hover:shadow-[0_4px_14px_rgba(90,60,145,0.07)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       aria-label="Поиск практик — перейти в каталог"
     >
       <SearchIcon />
-      <span>Поиск практик</span>
+      <span className="translate-y-px">Поиск практик</span>
     </Link>
   );
 }

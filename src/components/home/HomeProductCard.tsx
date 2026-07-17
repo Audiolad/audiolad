@@ -26,7 +26,7 @@ export default function HomeProductCard({
   );
 
   return (
-    <article className="flex h-full w-[168px] shrink-0 snap-start flex-col sm:w-[180px]">
+    <article className="home-product-card flex h-full w-[168px] shrink-0 snap-start flex-col sm:w-[180px] xl:w-[172px]">
       <div className="relative">
         <Link
           href={product.href}
@@ -55,7 +55,7 @@ export default function HomeProductCard({
 
       <p className={`mt-3 ${PRODUCT_SERVICE_LINE_CLASS}`}>{serviceLineLabel}</p>
 
-      <h3 className="mt-1 line-clamp-2 min-h-[44px] text-[15px] font-semibold leading-[22px] text-[#25135c]">
+      <h3 className="mt-1 line-clamp-2 min-h-[44px] text-[15px] font-semibold leading-[22px] text-[#25135c] xl:min-h-0">
         <Link
           href={product.href}
           className="hover:text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
