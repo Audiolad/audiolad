@@ -29,7 +29,8 @@ export function classifyResumeHistoryResponse(input: {
     return "restored";
   }
 
-  if (input.status === 401) {
+  // Guest resume-session returns this exact payload when no auth cookie exists.
+  if (input.status === 401 && input.reason === "unauthenticated") {
     return "no_history";
   }
 

@@ -22,8 +22,16 @@ function testClassifyResumeHistoryResponse() {
     "200 means restored history",
   );
   assert(
-    classifyResumeHistoryResponse({ status: 401 }) === "no_history",
-    "401 means no history for guest",
+    classifyResumeHistoryResponse({
+      status: 401,
+      reason: "unauthenticated",
+    }) === "no_history",
+    "expected guest resume 401 means no history",
+  );
+  assert(
+    classifyResumeHistoryResponse({ status: 401, reason: "unauthorized" }) ===
+      "failed",
+    "unexpected 401 reason means failed",
   );
   assert(
     classifyResumeHistoryResponse({ status: 404, reason: "no_history" }) ===
@@ -225,6 +233,10 @@ function testWelcomePersistenceGuard() {
   assert(
     provider.includes("welcomePlaybackStartedRef"),
     "welcome playback gate for desktop persistence",
+  );
+  assert(
+    provider.includes("welcomePlaybackStarted"),
+    "welcome mini-player waits for first playback",
   );
   assert(
     provider.includes("if (session.isWelcomeSession) {\n      return;\n    }"),

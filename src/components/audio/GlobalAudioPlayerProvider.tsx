@@ -115,6 +115,7 @@ function GlobalPlayerEngine({
   skipAutoplayUrlSync,
   onTracksExhausted,
   onRequestPreviousProduct,
+  onWelcomePlaybackStarted,
   children,
 }: {
   session: LoadSessionInput;
@@ -130,6 +131,7 @@ function GlobalPlayerEngine({
     fromPracticeId: string,
   ) => Promise<"advanced" | "completed" | "none">;
   onRequestPreviousProduct: () => Promise<boolean>;
+  onWelcomePlaybackStarted?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -228,8 +230,9 @@ function GlobalPlayerEngine({
   useEffect(() => {
     if (isPlaying && session.isWelcomeSession) {
       welcomePlaybackStartedRef.current = true;
+      onWelcomePlaybackStarted?.();
     }
-  }, [isPlaying, session.isWelcomeSession]);
+  }, [isPlaying, onWelcomePlaybackStarted, session.isWelcomeSession]);
 
   useEffect(() => {
     mediaSessionHandlersRef.current = {
@@ -251,7 +254,8 @@ function GlobalPlayerEngine({
   useEffect(() => {
     if (
       session.isWelcomeSession &&
-      !welcomePlaybackStartedRef.current
+      !welcomePlaybackStartedRef.current &&
+      !isPlaying
     ) {
       return;
     }
@@ -277,6 +281,7 @@ function GlobalPlayerEngine({
       return;
     }
 
+    persistPlaybackSnapshot();
     const intervalId = window.setInterval(persistPlaybackSnapshot, 3000);
 
     return () => {
@@ -296,7 +301,8 @@ function GlobalPlayerEngine({
   useEffect(() => {
     if (
       session.isWelcomeSession &&
-      !welcomePlaybackStartedRef.current
+      !welcomePlaybackStartedRef.current &&
+      !isPlaying
     ) {
       return;
     }
@@ -326,6 +332,7 @@ function GlobalPlayerEngine({
     audioRef,
     currentTime,
     currentTrack?.id,
+    isPlaying,
     session.authorSlug,
     session.isWelcomeSession,
     session.practiceId,
@@ -472,6 +479,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     useState<DesktopPlayerRestoreState>("pending");
   const [playbackInstanceId, setPlaybackInstanceId] = useState(0);
   const [sessionGeneration, setSessionGeneration] = useState(0);
+  const [welcomePlaybackStarted, setWelcomePlaybackStarted] = useState(false);
   const sessionGenerationRef = useRef(0);
   const stopEngineRef = useRef<(() => void) | null>(null);
   /** Survives engine remounts so iOS keeps the unlocked media element. */
@@ -988,11 +996,22 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     activeQueue && !queueCompleted && activeQueue.currentIndex > 0,
   );
 
+  const handleWelcomePlaybackStarted = useCallback(() => {
+    setWelcomePlaybackStarted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!session?.isWelcomeSession) {
+      setWelcomePlaybackStarted(false);
+    }
+  }, [session?.isWelcomeSession, session?.practiceId]);
+
   const showMiniPlayer = Boolean(
     session &&
       session.tracks.length > 0 &&
       !isListenPlayerPathname(pathname) &&
-      !queueCompleted,
+      !queueCompleted &&
+      (!session.isWelcomeSession || welcomePlaybackStarted),
   );
 
   useEffect(() => {
@@ -1271,6 +1290,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           skipAutoplayUrlSync={Boolean(activeQueue)}
           onTracksExhausted={onTracksExhausted}
           onRequestPreviousProduct={onRequestPreviousProduct}
+          onWelcomePlaybackStarted={handleWelcomePlaybackStarted}
         >
           {children}
         </GlobalPlayerEngine>
