@@ -74,7 +74,7 @@ export async function getPracticeByAuthorAndSlug(
       updated_at,
       is_catalog_listed,
       guest_access_enabled,
-      authors!inner (
+      authors!practices_author_id_fkey!inner (
         id,
         name,
         slug,
@@ -142,7 +142,7 @@ export async function resolveLegacyPracticePath(
     .select(
       `
       slug,
-      authors (
+      authors!practices_author_id_fkey (
         slug
       )
     `,

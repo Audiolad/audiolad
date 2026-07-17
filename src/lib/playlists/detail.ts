@@ -285,7 +285,7 @@ export async function loadOwnedPlaylistDetail(
         audio_url,
         status,
         is_catalog_listed,
-        authors (
+        authors!practices_author_id_fkey (
           id,
           name,
           slug

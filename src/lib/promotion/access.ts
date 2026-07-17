@@ -78,7 +78,7 @@ export async function requirePromotionCampaignAccess(campaignId: string) {
         title,
         slug,
         status,
-        authors (
+        authors!practices_author_id_fkey (
           slug
         )
       )

@@ -39,7 +39,7 @@ async function getPublishedAuthors(
       `
       id,
       author_id,
-      authors!inner (
+      authors!practices_author_id_fkey!inner (
         id,
         name,
         slug,

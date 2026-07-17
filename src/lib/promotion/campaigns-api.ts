@@ -81,7 +81,7 @@ export async function GET(request: Request) {
           title,
           slug,
           status,
-          authors (
+          authors!practices_author_id_fkey (
             slug
           )
         )
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
           title,
           slug,
           status,
-          authors (
+          authors!practices_author_id_fkey (
             slug
           )
         )

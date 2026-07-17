@@ -194,7 +194,7 @@ export async function getPublishedCatalogProducts(
       updated_at,
       published_at,
       created_at,
-      authors!inner (
+      authors!practices_author_id_fkey!inner (
         name,
         slug
       )
@@ -212,6 +212,7 @@ export async function getPublishedCatalogProducts(
   const { data: practices, error } = await query;
 
   if (error) {
+    console.error("catalog_practices_load_error", error.message);
     return [];
   }
 

@@ -310,7 +310,7 @@ async function fetchPracticeMeta(practiceIds: string[]) {
 
   const { data, error } = await service
     .from("practices")
-    .select("id, title, authors(name)")
+    .select("id, title, authors!practices_author_id_fkey(name)")
     .in("id", practiceIds);
 
   if (error) {

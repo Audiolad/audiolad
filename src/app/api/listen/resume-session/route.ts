@@ -42,11 +42,14 @@ export async function GET() {
 
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
-    .select("slug, authors (slug)")
+    .select("slug, authors!practices_author_id_fkey (slug)")
     .eq("id", latest.practice_id)
     .maybeSingle();
 
   if (practiceError || !practice) {
+    if (practiceError) {
+      console.error("resume_session_practice_lookup_error", practiceError.message);
+    }
     return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
   }
 

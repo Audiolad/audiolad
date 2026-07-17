@@ -308,7 +308,7 @@ export async function getContinueListening(
       updated_at,
       published_at,
       created_at,
-      authors (name, slug)
+      authors!practices_author_id_fkey (name, slug)
     `,
     )
     .in("id", practiceIds);
@@ -408,7 +408,7 @@ export async function getRecentlyListenedProducts(
       updated_at,
       published_at,
       created_at,
-      authors (name, slug)
+      authors!practices_author_id_fkey (name, slug)
     `,
     )
     .in("id", orderedPracticeIds);
@@ -489,7 +489,7 @@ export async function getActivePrograms(
       updated_at,
       published_at,
       created_at,
-      authors (name, slug)
+      authors!practices_author_id_fkey (name, slug)
     `,
     )
     .in("id", multiTrackPracticeIds);

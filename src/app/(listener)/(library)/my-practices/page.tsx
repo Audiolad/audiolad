@@ -148,7 +148,7 @@ export default async function MyPracticesPage() {
         updated_at,
         audio_url,
         status,
-        authors (
+        authors!practices_author_id_fkey (
           id,
           name,
           slug,

@@ -190,7 +190,7 @@ export const loadPublicPlaylistBySlug = cache(
         updated_at,
         status,
         is_catalog_listed,
-        authors (
+        authors!practices_author_id_fkey (
           name,
           slug
         )
