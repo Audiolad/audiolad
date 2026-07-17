@@ -527,6 +527,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const loadSession = useCallback((input: LoadSessionInput) => {
     setDismissedPracticeId(null);
+    setWelcomePlaybackStarted(false);
 
     const requestAutoplay = input.requestAutoplay ?? false;
     const normalizedInput: LoadSessionInput = {
@@ -570,6 +571,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     sessionGenerationRef.current += 1;
     setSessionGeneration(sessionGenerationRef.current);
     setDismissedPracticeId(sessionRef.current?.practiceId ?? null);
+    setWelcomePlaybackStarted(false);
     stopEngineRef.current?.();
     stopEngineRef.current = null;
     clearMediaSession();
@@ -1000,12 +1002,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     setWelcomePlaybackStarted(true);
   }, []);
 
-  useEffect(() => {
-    if (!session?.isWelcomeSession) {
-      setWelcomePlaybackStarted(false);
-    }
-  }, [session?.isWelcomeSession, session?.practiceId]);
-
   const showMiniPlayer = Boolean(
     session &&
       session.tracks.length > 0 &&
@@ -1047,8 +1043,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         explicitProductRequested: isListenPlayerPathname(pathname),
       })
     ) {
-      setDesktopPlayerRestoreState("ready");
       desktopPlayerRestoreAttemptedRef.current = true;
+      queueMicrotask(() => {
+        setDesktopPlayerRestoreState("ready");
+      });
       return;
     }
 
