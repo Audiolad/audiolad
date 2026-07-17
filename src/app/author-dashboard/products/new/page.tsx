@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,13 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     redirect("/author-dashboard");
   }
 
+  const initialAuthor =
+    authors.find((item) => item.slug === params.author) ?? authors[0];
+  const topicFormData = await loadAuthorProductTopicFormData(
+    supabase,
+    initialAuthor.id,
+  );
+
   return (
     <AuthorShell
       title="Создать аудиопродукт"
@@ -38,6 +46,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
       <AuthorProductForm
         authors={authors}
         initialAuthorSlug={params.author}
+        topicFormData={topicFormData}
         mode="create"
       />
     </AuthorShell>

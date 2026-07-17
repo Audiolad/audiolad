@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mapTopicRpcError } from "@/lib/topics/errors";
+
 import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
 import { minutesFromSeconds } from "./utils";
@@ -185,6 +187,12 @@ export async function publishPracticeProduct(
   });
 
   if (error) {
+    const mapped = mapTopicRpcError(error.message);
+
+    if (mapped.code !== "topic_sync_failed") {
+      throw mapped;
+    }
+
     throw new Error("practice_publish_failed");
   }
 }

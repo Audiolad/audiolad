@@ -142,6 +142,18 @@ src/lib/topics/
 
 ---
 
+## Author product form (Stage D)
+
+- Кабинет автора: create/edit (`AuthorProductForm`) загружает темы на сервере через `loadAuthorProductTopicFormData()`.
+- Автор выбирает только из `listActiveTopics()` — active directory, без free-text и без author-created topics.
+- UI: `TopicSelector` (`src/components/author-products/TopicSelector.tsx`) — chip multi-select, лимит через `resolveAuthorTopicLimit()`.
+- Draft: **0–3** активных тем; publish: **1–3** активных (`publish_audio_product` v4 + client hint).
+- Сохранение: после PATCH продукта → `PATCH /api/author/products/[id]/topics` → RPC `set_practice_topics` (не прямой INSERT в `practice_topics`).
+- Edit: назначенные темы из `getPracticeTopics()`; inactive assigned показываются как «Архивная тема» и удаляются при save без их key.
+- Счётчик «Выбрано N из M» — M из resolver, не hardcode в UI.
+
+---
+
 ## Analytics
 
 Использовать **`topic_key`**, не `topic_title`.

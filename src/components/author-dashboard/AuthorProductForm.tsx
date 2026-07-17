@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
+import TopicSelector from "@/components/author-products/TopicSelector";
+import type { AuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import type {
   AuthorProductDetail,
   AuthorWorkspace,
@@ -42,6 +44,8 @@ import {
 } from "@/lib/author-products/form-merge";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 import { formatRubles } from "@/lib/products/price-format";
+import type { AssignedTopic, TopicOption } from "@/lib/topics/types";
+import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 
 type PracticeContext = {
   practiceId: string;
@@ -60,6 +64,7 @@ type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
   initialAuthorSlug?: string;
   initialProduct?: AuthorProductDetail;
+  topicFormData: AuthorProductTopicFormData;
   mode: "create" | "edit";
 };
 
@@ -202,6 +207,56 @@ function buildInitialForm(
   };
 }
 
+function buildInitialTopicKeys(topicFormData: AuthorProductTopicFormData): string[] {
+  return [
+    ...topicFormData.selectedTopicKeys,
+    ...topicFormData.archivedTopics.map((topic) => topic.key),
+  ];
+}
+
+function getActiveTopicKeysForSync(
+  topicKeys: string[],
+  archivedTopics: AssignedTopic[],
+): string[] {
+  const archivedKeySet = new Set(archivedTopics.map((topic) => topic.key));
+
+  return topicKeys.filter((key) => !archivedKeySet.has(key));
+}
+
+function countActiveSelectedTopics(
+  topicKeys: string[],
+  topicOptions: TopicOption[],
+  archivedTopics: AssignedTopic[],
+): number {
+  const optionKeys = new Set(topicOptions.map((topic) => topic.key));
+  const archivedKeySet = new Set(archivedTopics.map((topic) => topic.key));
+
+  return topicKeys.filter(
+    (key) => optionKeys.has(key) && !archivedKeySet.has(key),
+  ).length;
+}
+
+function mapTopicOptionsForSelector(
+  topicOptions: TopicOption[],
+): Array<{ key: string; title: string; isActive: boolean }> {
+  return topicOptions.map((topic) => ({
+    key: topic.key,
+    title: topic.title,
+    isActive: true,
+  }));
+}
+
+function mapArchivedTopicsForSelector(
+  archivedTopics: AssignedTopic[],
+): Array<{ key: string; title: string; isActive: boolean; isArchived: true }> {
+  return archivedTopics.map((topic) => ({
+    key: topic.key,
+    title: topic.title,
+    isActive: false,
+    isArchived: true as const,
+  }));
+}
+
 function buildProductSavePayload(
   form: FormState,
   slugLocked: boolean,
@@ -222,6 +277,7 @@ export default function AuthorProductForm({
   authors,
   initialAuthorSlug,
   initialProduct,
+  topicFormData,
   mode,
 }: AuthorProductFormProps) {
   const router = useRouter();
@@ -248,6 +304,17 @@ export default function AuthorProductForm({
       },
     ],
   );
+  const [topicOptions, setTopicOptions] = useState<TopicOption[]>(
+    topicFormData.topicOptions,
+  );
+  const [topicLimit, setTopicLimit] = useState(topicFormData.topicLimit);
+  const [archivedTopics, setArchivedTopics] = useState<AssignedTopic[]>(
+    topicFormData.archivedTopics,
+  );
+  const [topicKeys, setTopicKeys] = useState<string[]>(() =>
+    buildInitialTopicKeys(topicFormData),
+  );
+  const [topicError, setTopicError] = useState<string | undefined>(undefined);
   const [practiceId, setPracticeId] = useState(initialProduct?.practice.id ?? "");
   const practiceIdRef = useRef(initialProduct?.practice.id ?? "");
   const [message, setMessage] = useState<string | null>(null);
@@ -670,22 +737,79 @@ export default function AuthorProductForm({
     return { ok: true };
   }
 
-  async function reloadSavedProduct(targetPracticeId: string): Promise<boolean> {
-    const response = await fetch(`/api/author/products/${targetPracticeId}`, {
-      cache: "no-store",
-    });
+  async function applyTopicFormData(data: AuthorProductTopicFormData) {
+    setTopicOptions(data.topicOptions);
+    setTopicLimit(data.topicLimit);
+    setArchivedTopics(data.archivedTopics);
+    setTopicKeys(buildInitialTopicKeys(data));
+  }
+
+  async function syncProductTopics(targetPracticeId: string): Promise<boolean> {
+    setTopicError(undefined);
+
+    const response = await fetch(
+      `/api/author/products/${targetPracticeId}/topics`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic_keys: getActiveTopicKeysForSync(topicKeys, archivedTopics),
+        }),
+      },
+    );
 
     const payload = (await response.json()) as {
-      product?: AuthorProductDetail;
+      topics?: AuthorProductTopicFormData;
       error?: string;
+      message?: string;
     };
 
-    if (!response.ok || !payload.product) {
+    if (!response.ok) {
+      setTopicError(
+        payload.message ?? "Не удалось сохранить темы продукта.",
+      );
       return false;
     }
 
-    setForm(buildInitialForm(authors, initialAuthorSlug, payload.product));
-    setAudioItems(payload.product.audio_items);
+    if (payload.topics) {
+      await applyTopicFormData(payload.topics);
+    }
+
+    return true;
+  }
+
+  async function reloadSavedProduct(targetPracticeId: string): Promise<boolean> {
+    const [productResponse, topicsResponse] = await Promise.all([
+      fetch(`/api/author/products/${targetPracticeId}`, {
+        cache: "no-store",
+      }),
+      fetch(`/api/author/products/${targetPracticeId}/topics`, {
+        cache: "no-store",
+      }),
+    ]);
+
+    const productPayload = (await productResponse.json()) as {
+      product?: AuthorProductDetail;
+      error?: string;
+    };
+    const topicsPayload = (await topicsResponse.json()) as {
+      topics?: AuthorProductTopicFormData;
+      error?: string;
+    };
+
+    if (!productResponse.ok || !productPayload.product) {
+      return false;
+    }
+
+    setForm(
+      buildInitialForm(authors, initialAuthorSlug, productPayload.product),
+    );
+    setAudioItems(productPayload.product.audio_items);
+
+    if (topicsResponse.ok && topicsPayload.topics) {
+      await applyTopicFormData(topicsPayload.topics);
+    }
+
     return true;
   }
 
@@ -694,6 +818,7 @@ export default function AuthorProductForm({
     setError(null);
     setMessage(null);
     setFieldErrors({});
+    setTopicError(undefined);
 
     try {
       const ensured = await ensurePracticeId();
@@ -764,6 +889,14 @@ export default function AuthorProductForm({
         return false;
       }
 
+      const topicsSynced = await syncProductTopics(id);
+
+      if (!topicsSynced) {
+        setError("Не удалось сохранить темы продукта.");
+        await reloadSavedProduct(id);
+        return false;
+      }
+
       const reloaded = await reloadSavedProduct(id);
 
       if (!reloaded) {
@@ -803,6 +936,7 @@ export default function AuthorProductForm({
     setError(null);
     setMessage(null);
     setFieldErrors({});
+    setTopicError(undefined);
 
     if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
       setFieldErrors({
@@ -822,6 +956,19 @@ export default function AuthorProductForm({
         setBusy(false);
         return;
       }
+    }
+
+    const activeTopicCount = countActiveSelectedTopics(
+      topicKeys,
+      topicOptions,
+      archivedTopics,
+    );
+    const topicMinimumCheck = assertPublishedTopicMinimum(activeTopicCount);
+
+    if (!topicMinimumCheck.ok) {
+      setTopicError(topicMinimumCheck.message);
+      setBusy(false);
+      return;
     }
 
     try {
@@ -855,6 +1002,14 @@ export default function AuthorProductForm({
             formatCustom:
               payload.message ?? "Укажите название своего формата",
           });
+        } else if (
+          payload.error === "topic_min_required" ||
+          payload.error === "topic_limit_exceeded" ||
+          payload.error === "topic_not_found"
+        ) {
+          setTopicError(
+            payload.message ?? "Не удалось опубликовать аудиопродукт.",
+          );
         } else {
           setError(payload.message ?? "Не удалось опубликовать аудиопродукт.");
         }
@@ -1661,6 +1816,22 @@ export default function AuthorProductForm({
               ) : null}
             </label>
           </div>
+        </div>
+
+        <div>
+          <span className="mb-2 block text-sm font-medium">Темы</span>
+          <TopicSelector
+            options={mapTopicOptionsForSelector(topicOptions)}
+            archivedTopics={mapArchivedTopicsForSelector(archivedTopics)}
+            value={topicKeys}
+            limit={topicLimit}
+            disabled={busy || reorderBusy}
+            error={topicError}
+            onChange={(keys) => {
+              setTopicError(undefined);
+              setTopicKeys(keys);
+            }}
+          />
         </div>
 
         <div>

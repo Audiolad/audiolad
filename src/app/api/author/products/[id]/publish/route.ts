@@ -45,7 +45,30 @@ export async function POST(_request: Request, context: RouteContext) {
 
     try {
       await publishPracticeProduct(supabase, id, publishedAt);
-    } catch {
+    } catch (publishError) {
+      if (
+        publishError &&
+        typeof publishError === "object" &&
+        "code" in publishError &&
+        "message" in publishError
+      ) {
+        const mapped = publishError as {
+          code: string;
+          message: string;
+          status?: number;
+        };
+
+        console.error("author_publish_domain_error", id, mapped.code);
+
+        return NextResponse.json(
+          {
+            error: mapped.code,
+            message: mapped.message,
+          },
+          { status: mapped.status ?? 400 },
+        );
+      }
+
       console.error("author_publish_atomic_error", id);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }

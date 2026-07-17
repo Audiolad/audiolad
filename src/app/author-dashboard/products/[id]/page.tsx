@@ -4,6 +4,7 @@ import AuthorProductForm from "@/components/author-dashboard/AuthorProductForm";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
+import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,12 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     notFound();
   }
 
+  const topicFormData = await loadAuthorProductTopicFormData(
+    supabase,
+    product.practice.author_id,
+    id,
+  );
+
   return (
     <AuthorShell
       title="Редактировать аудиопродукт"
@@ -76,6 +83,7 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
       <AuthorProductForm
         authors={authors}
         initialProduct={product}
+        topicFormData={topicFormData}
         mode="edit"
       />
     </AuthorShell>
