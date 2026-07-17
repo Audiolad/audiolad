@@ -9,11 +9,13 @@ import { PlayIcon } from "./HomeIcons";
 type HomeProductCardProps = {
   product: HomeProduct;
   showPlayButton?: boolean;
+  showGiftBadge?: boolean;
 };
 
 export default function HomeProductCard({
   product,
   showPlayButton = true,
+  showGiftBadge = true,
 }: HomeProductCardProps) {
   const listenHref = product.listenHref;
 
@@ -34,7 +36,7 @@ export default function HomeProductCard({
           />
         </Link>
 
-        {product.isFree ? <GiftBadge size="md" /> : null}
+        {showGiftBadge && product.isFree ? <GiftBadge size="md" /> : null}
 
         {showPlayButton && listenHref ? (
           <Link

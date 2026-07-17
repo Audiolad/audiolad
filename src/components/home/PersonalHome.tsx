@@ -54,6 +54,7 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
           ariaLabel="Из вашей Аудиотеки"
           href="/my-practices"
           linkLabel="Аудиотека"
+          showGiftBadge={false}
         />
       </HomeSectionBoundary>
 

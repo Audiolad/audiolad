@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import LibraryPracticeMenu from "@/components/playlists/LibraryPracticeMenu";
-import GiftBadge from "@/components/products/GiftBadge";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
@@ -9,7 +8,6 @@ import {
   buildListenPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
-import { isProductFree } from "@/lib/products/price-format";
 import {
   LISTEN_AUTOPLAY_QUERY_PARAM,
   LISTEN_AUTOPLAY_QUERY_VALUE,
@@ -112,10 +110,6 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
         ? buildListenPath(authorSlug, practice.slug, { autoplay: true })
         : `/listen/${practice.slug}?${LISTEN_AUTOPLAY_QUERY_PARAM}=${LISTEN_AUTOPLAY_QUERY_VALUE}`
       : null;
-  const showGiftBadge =
-    practice !== null &&
-    isProductFree(practice.isFree, practice.price);
-
   return (
     <article className="relative flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 pb-14 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
       {productHref ? (
@@ -133,7 +127,6 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
           coverUrl={coverDisplayUrl}
           className="aspect-square h-full w-full rounded-[20px]"
         />
-        {showGiftBadge ? <GiftBadge size="sm" /> : null}
       </div>
 
       <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col">

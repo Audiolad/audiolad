@@ -9,6 +9,7 @@ type ProductRailProps = {
   ariaLabel: string;
   href?: string;
   linkLabel?: string;
+  showGiftBadge?: boolean;
 };
 
 export default function ProductRail({
@@ -17,6 +18,7 @@ export default function ProductRail({
   ariaLabel,
   href,
   linkLabel,
+  showGiftBadge = true,
 }: ProductRailProps) {
   if (products.length === 0) {
     return null;
@@ -29,7 +31,7 @@ export default function ProductRail({
       <div className="home-carousel-track catalog-carousel mt-4 flex gap-3 overflow-x-auto pb-1">
         {products.map((product) => (
           <div key={product.id} data-catalog-carousel-item>
-            <HomeProductCard product={product} />
+            <HomeProductCard product={product} showGiftBadge={showGiftBadge} />
           </div>
         ))}
       </div>
