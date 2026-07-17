@@ -55,6 +55,7 @@ function testComponentContract() {
     "utf8",
   );
 
+  assert(component.includes('id="yandex-metrika-stub"'), "ym queue stub before tag.js");
   assert(component.includes('from "next/script"'), "loads via next/script");
   assert(component.includes('strategy="afterInteractive"'), "after hydration");
   assert(component.includes("skipInitialHit"), "avoids duplicate initial hit");

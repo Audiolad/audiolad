@@ -49,6 +49,12 @@ export default function YandexMetrika() {
 
   return (
     <>
+      <Script id="yandex-metrika-stub" strategy="afterInteractive">
+        {`
+window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments);};
+window.ym.l=Date.now();
+        `}
+      </Script>
       <Script
         id="yandex-metrika-tag"
         src="https://mc.yandex.ru/metrika/tag.js"
