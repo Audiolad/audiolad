@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import GiftBadge from "@/components/products/GiftBadge";
+import type { CoverBadgeVariant } from "@/components/products/cover-badge-types";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
 
@@ -10,12 +11,14 @@ type HomeProductCardProps = {
   product: HomeProduct;
   showPlayButton?: boolean;
   showGiftBadge?: boolean;
+  giftBadgeVariant?: CoverBadgeVariant;
 };
 
 export default function HomeProductCard({
   product,
   showPlayButton = true,
   showGiftBadge = true,
+  giftBadgeVariant = "glass",
 }: HomeProductCardProps) {
   const listenHref = product.listenHref;
 
@@ -36,7 +39,9 @@ export default function HomeProductCard({
           />
         </Link>
 
-        {showGiftBadge && product.isFree ? <GiftBadge size="md" /> : null}
+        {showGiftBadge && product.isFree ? (
+          <GiftBadge size="md" variant={giftBadgeVariant} />
+        ) : null}
 
         {showPlayButton && listenHref ? (
           <Link

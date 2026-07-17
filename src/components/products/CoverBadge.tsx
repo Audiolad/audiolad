@@ -32,6 +32,14 @@ const BADGE_LABELS: Record<CoverBadgeKind, string> = {
   gift: "Подарок",
 };
 
+const GIFT_STROKE_PROPS = {
+  fill: "none" as const,
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
 function GiftIcon({ className }: { className: string }) {
   return (
     <svg
@@ -48,6 +56,26 @@ function GiftIcon({ className }: { className: string }) {
       <path d="M12 8v13" />
       <path d="M7.5 7.5C9 5.5 12 5.5 12 8c0-2.5 3-2.5 4.5-0.5" />
       <path d="M3 12h18v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z" />
+    </svg>
+  );
+}
+
+function OutlineGiftIcon({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <circle cx="20" cy="20" r="18.25" strokeWidth="1.5" />
+      <g transform="translate(8 8)">
+        <rect x="3" y="8" width="18" height="4" rx="0.5" {...GIFT_STROKE_PROPS} />
+        <path d="M12 8v13" {...GIFT_STROKE_PROPS} />
+        <path d="M7.5 7.5C9 5.5 12 5.5 12 8c0-2.5 3-2.5 4.5-0.5" {...GIFT_STROKE_PROPS} />
+        <path d="M3 12h18v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z" {...GIFT_STROKE_PROPS} />
+      </g>
     </svg>
   );
 }
@@ -70,10 +98,24 @@ function CoverBadgeIcon({
 export default function CoverBadge({
   kind,
   size = "md",
+  variant = "glass",
   className = "",
 }: CoverBadgeProps) {
   const sizeClass = SIZE_CLASSES[size];
   const label = BADGE_LABELS[kind];
+
+  if (variant === "outline" && kind === "gift") {
+    return (
+      <span
+        className={`pointer-events-none absolute text-white ${sizeClass.container} ${className}`}
+        role="img"
+        aria-label={label}
+        title={label}
+      >
+        <OutlineGiftIcon className="h-full w-full" />
+      </span>
+    );
+  }
 
   return (
     <span

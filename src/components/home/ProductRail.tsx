@@ -1,3 +1,4 @@
+import type { CoverBadgeVariant } from "@/components/products/cover-badge-types";
 import type { HomeProduct } from "@/lib/home/types";
 
 import HomeProductCard from "./HomeProductCard";
@@ -10,6 +11,7 @@ type ProductRailProps = {
   href?: string;
   linkLabel?: string;
   showGiftBadge?: boolean;
+  giftBadgeVariant?: CoverBadgeVariant;
 };
 
 export default function ProductRail({
@@ -19,6 +21,7 @@ export default function ProductRail({
   href,
   linkLabel,
   showGiftBadge = true,
+  giftBadgeVariant = "glass",
 }: ProductRailProps) {
   if (products.length === 0) {
     return null;
@@ -31,7 +34,11 @@ export default function ProductRail({
       <div className="home-carousel-track catalog-carousel mt-4 flex gap-3 overflow-x-auto pb-1">
         {products.map((product) => (
           <div key={product.id} data-catalog-carousel-item>
-            <HomeProductCard product={product} showGiftBadge={showGiftBadge} />
+            <HomeProductCard
+              product={product}
+              showGiftBadge={showGiftBadge}
+              giftBadgeVariant={giftBadgeVariant}
+            />
           </div>
         ))}
       </div>

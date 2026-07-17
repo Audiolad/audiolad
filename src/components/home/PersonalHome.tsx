@@ -30,6 +30,7 @@ export default function PersonalHome({ data }: PersonalHomeProps) {
           products={data.forYouProducts}
           ariaLabel="Для вас"
           href="/catalog"
+          giftBadgeVariant="outline"
         />
       </HomeSectionBoundary>
 
