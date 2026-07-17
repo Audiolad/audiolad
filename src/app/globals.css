@@ -102,6 +102,25 @@
     padding-right: 0;
     scroll-padding-right: 0;
   }
+
+  .listener-library-content div.-mx-5 {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .listener-library-content .mt-5.space-y-4 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .listener-library-content .mt-5.space-y-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @theme inline {

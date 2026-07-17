@@ -1,9 +1,7 @@
-import BottomNav from "@/components/BottomNav";
 import MyPracticesLibrary from "@/components/my-practices/MyPracticesLibrary";
 import type { LibraryCardItem } from "@/components/my-practices/LibraryCard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -118,26 +116,6 @@ function mapLibraryItems(rows: LibraryRow[] | null): LibraryCardItem[] {
     });
 }
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <circle
-        cx="11"
-        cy="11"
-        r="7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m16.5 16.5 4 4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export default async function MyPracticesPage() {
   const supabase = await createClient();
 
@@ -186,35 +164,15 @@ export default async function MyPracticesPage() {
   );
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
-      >
-        <div className="px-5 pt-6">
-          <header className="flex items-center justify-between">
-            <div>
-              <h1 className="text-[28px] font-semibold">Аудиотека</h1>
-              <p className="mt-1 text-sm text-[#7d70a2]">
-                Ваши подарки и купленные материалы
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              aria-label="Поиск"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5] opacity-60"
-            >
-              <SearchIcon />
-            </button>
-          </header>
-
-          <MyPracticesLibrary items={libraryItems} error={Boolean(error)} />
-        </div>
-
-        <BottomNav />
+    <>
+      <div className="hidden xl:block">
+        <h1 className="text-[28px] font-semibold">Аудиотека</h1>
+        <p className="mt-1 text-sm text-[#7d70a2]">
+          Ваши подарки и купленные материалы
+        </p>
       </div>
-    </main>
+
+      <MyPracticesLibrary items={libraryItems} error={Boolean(error)} />
+    </>
   );
 }
