@@ -115,10 +115,20 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
+
+  .listener-playlists-content section .mt-5.space-y-5 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
 }
 
 @media (min-width: 1440px) {
   .listener-library-content .mt-5.space-y-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .listener-playlists-content section .mt-5.space-y-5 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
