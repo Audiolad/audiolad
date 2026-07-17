@@ -74,6 +74,10 @@ export function resolveFormatForStorage(
   return preset.trim() || null;
 }
 
+/** Uppercase format line on product cards (rails, catalog, library, etc.). */
+export const PRODUCT_FORMAT_LINE_CLASS =
+  "text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9485b4]";
+
 /** Public label for cards, pages, and author dashboard lists. */
 export function getDisplayFormat(format: string | null | undefined): string | null {
   const trimmed = typeof format === "string" ? format.trim() : "";

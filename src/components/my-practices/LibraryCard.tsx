@@ -2,7 +2,10 @@ import Link from "next/link";
 
 import LibraryPracticeMenu from "@/components/playlists/LibraryPracticeMenu";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
-import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getDisplayFormat,
+  PRODUCT_FORMAT_LINE_CLASS,
+} from "@/lib/author-products/format";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import {
   buildListenPath,
@@ -12,11 +15,6 @@ import {
   LISTEN_AUTOPLAY_QUERY_PARAM,
   LISTEN_AUTOPLAY_QUERY_VALUE,
 } from "@/lib/listen/autoplay-intent";
-import {
-  getGiftProductServiceLineLabel,
-  PRODUCT_SERVICE_LINE_CLASS,
-} from "@/lib/products/product-service-label";
-import { isProductFree } from "@/lib/products/price-format";
 
 export type LibraryCardItem = {
   id: string;
@@ -42,30 +40,11 @@ type LibraryCardProps = {
   index: number;
 };
 
-function formatPracticeMeta(
-  format: string | null | undefined,
+function formatPracticeDuration(
   durationMinutes: number | null | undefined,
-  isFree: boolean | null | undefined,
-  price: number | null | undefined,
 ): string | null {
-  const trimmedFormat = isProductFree(isFree, price)
-    ? ""
-    : getDisplayFormat(format) ?? "";
-  const duration =
-    typeof durationMinutes === "number" && durationMinutes > 0
-      ? `${durationMinutes} мин`
-      : "";
-
-  if (trimmedFormat && duration) {
-    return `${trimmedFormat} · ${duration}`;
-  }
-
-  if (trimmedFormat) {
-    return trimmedFormat;
-  }
-
-  if (duration) {
-    return duration;
+  if (typeof durationMinutes === "number" && durationMinutes > 0) {
+    return `${durationMinutes} мин`;
   }
 
   return null;
@@ -100,17 +79,8 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
   const title = isUnavailable
     ? "Практика временно недоступна"
     : practice.title.trim();
-  const meta = practice
-    ? formatPracticeMeta(
-        practice.format,
-        practice.durationMinutes,
-        practice.isFree,
-        practice.price,
-      )
-    : null;
-  const serviceLineLabel = practice
-    ? getGiftProductServiceLineLabel(practice.isFree, practice.price)
-    : null;
+  const formatLabel = practice ? getDisplayFormat(practice.format) : null;
+  const meta = practice ? formatPracticeDuration(practice.durationMinutes) : null;
   const coverDisplayUrl = practice
     ? getProductCoverDisplayUrl(practice.coverUrl, practice.updatedAt)
     : null;
@@ -147,12 +117,12 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
       </div>
 
       <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col">
-        {serviceLineLabel ? (
-          <p className={PRODUCT_SERVICE_LINE_CLASS}>{serviceLineLabel}</p>
+        {formatLabel ? (
+          <p className={PRODUCT_FORMAT_LINE_CLASS}>{formatLabel}</p>
         ) : null}
 
         <p
-          className={`line-clamp-2 text-[17px] font-semibold leading-6 text-[#25135c] ${serviceLineLabel ? "mt-1" : ""}`}
+          className={`line-clamp-2 text-[17px] font-semibold leading-6 text-[#25135c] ${formatLabel ? "mt-1" : ""}`}
         >
           {title}
         </p>

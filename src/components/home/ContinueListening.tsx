@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import CoverOverlayCard from "@/components/home/CoverOverlayCard";
 import type { ContinueListeningItem, HomeProduct } from "@/lib/home/types";
-import { getProductServiceLineLabel } from "@/lib/products/product-service-label";
 
 import { PlayIcon } from "./HomeIcons";
 import HomeSectionHeader from "./HomeSectionHeader";
@@ -39,11 +38,6 @@ export default function ContinueListening({
   }
 
   const { product } = item;
-  const serviceLineLabel = getProductServiceLineLabel(
-    product.productTypeLabel,
-    product.isFree,
-    product.price,
-  );
 
   return (
     <section className="mt-6 xl:mt-7" aria-label="Продолжить прослушивание">
@@ -58,7 +52,7 @@ export default function ContinueListening({
         className="mt-3.5 xl:mt-4"
       >
         <span className="inline-flex w-fit rounded-full bg-[#7042c5]/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
-          {serviceLineLabel}
+          {product.productTypeLabel}
         </span>
 
         <div className="mt-auto min-w-0 pt-6 xl:pt-4">

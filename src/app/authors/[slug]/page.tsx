@@ -3,15 +3,11 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import BottomNav from "@/components/BottomNav";
-import { getDisplayFormat } from "@/lib/author-products/format";
+import { getDisplayFormat, PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import {
   getAuthorBySlug,
   getAuthorPublishedPractices,
 } from "@/lib/authors/lookup";
-import {
-  getProductServiceLineLabel,
-  PRODUCT_SERVICE_LINE_CLASS,
-} from "@/lib/products/product-service-label";
 import { isProductFree } from "@/lib/products/price-format";
 import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
@@ -133,14 +129,7 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                 {practices.map((practice) => {
                   const productTypeLabel =
                     getDisplayFormat(practice.format) ?? "Аудиопрактика";
-                  const serviceLineLabel = getProductServiceLineLabel(
-                    productTypeLabel,
-                    practice.is_free,
-                    practice.price,
-                  );
-                  const showFormatMeta =
-                    !isProductFree(practice.is_free, practice.price) &&
-                    (productTypeLabel !== "Аудиопрактика" || practice.duration_minutes);
+                  const showPrice = !isProductFree(practice.is_free, practice.price);
 
                   return (
                   <Link
@@ -150,7 +139,7 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className={PRODUCT_SERVICE_LINE_CLASS}>{serviceLineLabel}</p>
+                        <p className={PRODUCT_FORMAT_LINE_CLASS}>{productTypeLabel}</p>
                         <h3 className="mt-1 text-[17px] font-semibold leading-5">
                           {practice.title}
                         </h3>
@@ -159,24 +148,17 @@ export default async function AuthorPublicPage({ params }: PageProps) {
                             {practice.subtitle}
                           </p>
                         ) : null}
-                        {showFormatMeta ? (
-                          <p className="mt-2 text-sm text-[#7d70a2]">
-                            {productTypeLabel !== "Аудиопрактика"
-                              ? productTypeLabel
-                              : null}
-                            {practice.duration_minutes
-                              ? `${productTypeLabel !== "Аудиопрактика" ? " · " : ""}${practice.duration_minutes} мин`
-                              : ""}
-                          </p>
-                        ) : practice.duration_minutes ? (
+                        {practice.duration_minutes ? (
                           <p className="mt-2 text-sm text-[#7d70a2]">
                             {practice.duration_minutes} мин
                           </p>
                         ) : null}
                       </div>
+                      {showPrice ? (
                       <span className="shrink-0 rounded-full bg-[#f4ecfb] px-3 py-1 text-sm font-semibold text-[#7042c5]">
                         {practice.priceLabel}
                       </span>
+                      ) : null}
                     </div>
                   </Link>
                   );

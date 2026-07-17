@@ -8,8 +8,7 @@ import {
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { resolveProductAccess } from "@/lib/products/access";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
-import { formatAudioDuration, formatProductMeta } from "@/lib/products/duration";
-import { getGiftProductServiceLineLabel } from "@/lib/products/product-service-label";
+import { formatAudioDuration, formatCatalogProductStats } from "@/lib/products/duration";
 import {
   buildListenPath,
   buildPracticePublicPath,
@@ -261,17 +260,10 @@ async function buildHistoryItem(
     authorSlug: author.slug,
     productSlug: practice.slug,
     formatLabel: getDisplayFormat(practice.format),
-    serviceLineLabel: getGiftProductServiceLineLabel(
-      practice.is_free,
-      practice.price,
-    ),
-    metaLabel: formatProductMeta({
-      format: practice.format,
+    metaLabel: formatCatalogProductStats({
       audioCount,
       totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
       durationMinutesFallback: practice.duration_minutes,
-      isFree: practice.is_free,
-      price: practice.price,
     }),
     coverUrl: getProductCoverDisplayUrl(practice.cover_url, practice.updated_at),
     isProgram: tracks.length >= 2,

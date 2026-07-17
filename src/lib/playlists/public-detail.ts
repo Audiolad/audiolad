@@ -12,11 +12,8 @@ import type { PlaylistVisibility } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import {
   formatProductDuration,
-  formatProductMeta,
+  formatCatalogProductStats,
 } from "@/lib/products/duration";
-import {
-  getGiftProductServiceLineLabel,
-} from "@/lib/products/product-service-label";
 import {
   buildListenPath,
   buildPracticePublicPath,
@@ -75,7 +72,6 @@ export type PublicPlaylistItemView = {
   authorName: string | null;
   authorSlug: string | null;
   formatLabel: string | null;
-  serviceLineLabel: string | null;
   metaLabel: string | null;
   coverDisplayUrl: string | null;
   available: boolean;
@@ -256,7 +252,6 @@ export const loadPublicPlaylistBySlug = cache(
           authorName: null,
           authorSlug: null,
           formatLabel: null,
-          serviceLineLabel: null,
           metaLabel: null,
           coverDisplayUrl: null,
           available: false,
@@ -329,18 +324,11 @@ export const loadPublicPlaylistBySlug = cache(
         authorName,
         authorSlug,
         formatLabel: getDisplayFormat(practice.format),
-        serviceLineLabel: getGiftProductServiceLineLabel(
-          practice.is_free,
-          practice.price,
-        ),
         metaLabel: eligible
-          ? formatProductMeta({
-              format: practice.format,
+          ? formatCatalogProductStats({
               audioCount,
               totalDurationSeconds: durationSeconds,
               durationMinutesFallback: practice.duration_minutes,
-              isFree: practice.is_free,
-              price: practice.price,
             })
           : null,
         coverDisplayUrl:

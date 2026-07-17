@@ -575,7 +575,7 @@ export default function PlaylistDetailClient({
                   title: item.title,
                   authorName: item.authorName,
                   coverDisplayUrl: item.coverDisplayUrl,
-                  serviceLineLabel: item.serviceLineLabel,
+                  formatLabel: item.formatLabel,
                   metaLabel: item.metaLabel,
                   available: item.available,
                   href: item.listenHref,

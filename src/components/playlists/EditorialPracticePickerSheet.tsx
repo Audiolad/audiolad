@@ -402,8 +402,12 @@ export default function EditorialPracticePickerSheet({
                             : ""}
                         </p>
                         <p className="mt-1 text-xs text-[#8a7ca9]">
-                          {practice.priceLabel}
-                          {practice.metaLabel ? ` · ${practice.metaLabel}` : ""}
+                          {!practice.isFree && practice.priceLabel
+                            ? practice.priceLabel
+                            : null}
+                          {practice.metaLabel
+                            ? `${!practice.isFree && practice.priceLabel ? " · " : ""}${practice.metaLabel}`
+                            : ""}
                         </p>
                         {practice.alreadyAdded ? (
                           <p className="mt-1 text-xs font-medium text-[#7042c5]">

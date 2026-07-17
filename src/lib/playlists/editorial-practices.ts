@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
-import { formatProductMeta } from "@/lib/products/duration";
+import { formatCatalogProductStats } from "@/lib/products/duration";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import {
   groupAudioSummariesByPractice,
@@ -165,13 +165,10 @@ export async function listEditorialPracticeOptions(
       authorName: author.name,
       authorSlug: author.slug,
       formatLabel: getDisplayFormat(row.format),
-      metaLabel: formatProductMeta({
-        format: row.format,
+      metaLabel: formatCatalogProductStats({
         audioCount,
         totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
         durationMinutesFallback: row.duration_minutes,
-        isFree: row.is_free,
-        price: row.price,
       }),
       coverDisplayUrl: getProductCoverDisplayUrl(
         row.cover_url,

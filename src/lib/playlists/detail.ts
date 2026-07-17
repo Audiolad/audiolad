@@ -14,9 +14,8 @@ import {
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import {
   formatProductDuration,
-  formatProductMeta,
+  formatCatalogProductStats,
 } from "@/lib/products/duration";
-import { getGiftProductServiceLineLabel } from "@/lib/products/product-service-label";
 import { buildListenPath } from "@/lib/products/paths";
 import {
   groupAudioSummariesByPractice,
@@ -65,7 +64,6 @@ export type PlaylistDetailItemView = {
   authorName: string | null;
   authorSlug: string | null;
   formatLabel: string | null;
-  serviceLineLabel: string | null;
   metaLabel: string | null;
   coverDisplayUrl: string | null;
   available: boolean;
@@ -365,7 +363,6 @@ export async function loadOwnedPlaylistDetail(
         authorName: null,
         authorSlug: null,
         formatLabel: null,
-        serviceLineLabel: null,
         metaLabel: null,
         coverDisplayUrl: null,
         available: false,
@@ -414,17 +411,10 @@ export async function loadOwnedPlaylistDetail(
       authorName,
       authorSlug,
       formatLabel: getDisplayFormat(practice.format),
-      serviceLineLabel: getGiftProductServiceLineLabel(
-        practice.is_free,
-        practice.price,
-      ),
-      metaLabel: formatProductMeta({
-        format: practice.format,
+      metaLabel: formatCatalogProductStats({
         audioCount,
         totalDurationSeconds: durationSeconds,
         durationMinutesFallback: practice.duration_minutes,
-        isFree: practice.is_free,
-        price: practice.price,
       }),
       coverDisplayUrl: getProductCoverDisplayUrl(
         practice.cover_url,

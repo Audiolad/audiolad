@@ -1,11 +1,9 @@
 import Link from "next/link";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogProduct } from "@/lib/products/catalog";
-import {
-  getProductServiceLineLabel,
-  PRODUCT_SERVICE_LINE_CLASS,
-} from "@/lib/products/product-service-label";
+import { isProductFree } from "@/lib/products/price-format";
 
 type CatalogProductCardProps = {
   product: CatalogProduct;
@@ -13,11 +11,7 @@ type CatalogProductCardProps = {
 
 export default function CatalogProductCard({ product }: CatalogProductCardProps) {
   const summary = product.subtitle?.trim() || product.description?.trim() || null;
-  const serviceLineLabel = getProductServiceLineLabel(
-    product.productTypeLabel,
-    product.isFree,
-    product.price,
-  );
+  const showPrice = !isProductFree(product.isFree, product.price);
 
   return (
     <Link
@@ -41,15 +35,17 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
                 {product.statsLabel}
               </p>
             ) : null}
-            <p className="text-[15px] font-semibold leading-5 text-[#7042c5] sm:text-base">
-              {product.priceLabel}
-            </p>
+            {showPrice ? (
+              <p className="text-[15px] font-semibold leading-5 text-[#7042c5] sm:text-base">
+                {product.priceLabel}
+              </p>
+            ) : null}
           </div>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <p className={`${PRODUCT_SERVICE_LINE_CLASS} sm:text-xs`}>
-            {serviceLineLabel}
+          <p className={`${PRODUCT_FORMAT_LINE_CLASS} sm:text-xs`}>
+            {product.productTypeLabel}
           </p>
 
           <h3 className="mt-1 line-clamp-3 text-[17px] font-semibold leading-[1.3] text-[#25135c] sm:text-[18px]">

@@ -1,11 +1,8 @@
 import Link from "next/link";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { HomeProduct } from "@/lib/home/types";
-import {
-  getProductServiceLineLabel,
-  PRODUCT_SERVICE_LINE_CLASS,
-} from "@/lib/products/product-service-label";
 
 import { PlayIcon } from "./HomeIcons";
 
@@ -19,11 +16,6 @@ export default function HomeProductCard({
   showPlayButton = true,
 }: HomeProductCardProps) {
   const listenHref = product.listenHref;
-  const serviceLineLabel = getProductServiceLineLabel(
-    product.productTypeLabel,
-    product.isFree,
-    product.price,
-  );
 
   return (
     <article className="home-product-card flex h-full w-[168px] shrink-0 snap-start flex-col sm:w-[180px] xl:w-[172px]">
@@ -53,7 +45,7 @@ export default function HomeProductCard({
         ) : null}
       </div>
 
-      <p className={`mt-3 ${PRODUCT_SERVICE_LINE_CLASS}`}>{serviceLineLabel}</p>
+      <p className={`mt-3 ${PRODUCT_FORMAT_LINE_CLASS}`}>{product.productTypeLabel}</p>
 
       <h3 className="mt-1 line-clamp-2 min-h-[44px] text-[15px] font-semibold leading-[22px] text-[#25135c] xl:min-h-0">
         <Link
