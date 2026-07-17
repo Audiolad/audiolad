@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
+import AuthorLink from "@/components/authors/AuthorLink";
 import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
@@ -102,44 +103,145 @@ function ExpandIcon() {
   );
 }
 
-export default function DesktopPlayerBar() {
-  const { session, showMiniPlayer, openFullPlayer, activeQueue } =
-    useGlobalAudioPlayer();
-  const engine = useOptionalPlayerEngine();
+const secondaryButtonClass =
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-40";
 
-  const isVisible = Boolean(showMiniPlayer && session && engine);
+const disabledSecondaryButtonClass = `${secondaryButtonClass} pointer-events-none opacity-40`;
 
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1280px)");
+function DesktopPlayerBarShell({
+  children,
+  ariaLabel = "Плеер",
+}: {
+  children: ReactNode;
+  ariaLabel?: string;
+}) {
+  return (
+    <section
+      className="desktop-player-bar hidden shrink-0 border-t border-[#eadff8] bg-[#fffdfd] shadow-[0_-4px_16px_rgba(90,60,145,0.06)] xl:flex xl:flex-col xl:justify-center"
+      style={{ height: `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px` }}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </section>
+  );
+}
 
-    const syncHeight = () => {
-      const height =
-        isVisible && media.matches
-          ? `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px`
-          : "0px";
-      document.documentElement.style.setProperty(
-        "--listener-desktop-player-height",
-        height,
-      );
-    };
+function DesktopPlayerEmptyState() {
+  return (
+    <DesktopPlayerBarShell ariaLabel="Плеер">
+      <div className="flex min-h-0 items-center gap-4 px-5 py-2">
+        <div className="flex min-w-0 max-w-[240px] flex-1 items-center gap-3">
+          <div
+            className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[12px] border border-[#eadff8] bg-[#faf6ff] text-xl text-[#b79adf]"
+            aria-hidden="true"
+          >
+            ♫
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold leading-snug text-[#25135c]">
+              Выберите практику, чтобы начать слушать
+            </p>
+            <p className="mt-0.5 text-[13px] text-[#9485b4]">
+              Последний трек появится здесь
+            </p>
+          </div>
+        </div>
 
-    syncHeight();
-    media.addEventListener("change", syncHeight);
+        <div className="flex min-w-0 flex-[1.4] flex-col gap-2">
+          <div className="flex items-center justify-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Назад на 15 секунд"
+              disabled
+              className={disabledSecondaryButtonClass}
+            >
+              <RewindIcon />
+            </button>
+            <button
+              type="button"
+              aria-label="Воспроизвести"
+              disabled
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#dcc9f2] text-white opacity-70"
+            >
+              <PlayIcon />
+            </button>
+            <button
+              type="button"
+              aria-label="Вперёд на 15 секунд"
+              disabled
+              className={disabledSecondaryButtonClass}
+            >
+              <ForwardIcon />
+            </button>
+          </div>
+          <div
+            className="h-1.5 min-w-0 flex-1 rounded-full bg-[#eee6f7]"
+            aria-hidden="true"
+          />
+        </div>
 
-    return () => {
-      media.removeEventListener("change", syncHeight);
-      document.documentElement.style.setProperty(
-        "--listener-desktop-player-height",
-        "0px",
-      );
-    };
-  }, [isVisible]);
+        <div className="flex shrink-0 items-center gap-2 opacity-40">
+          <button
+            type="button"
+            aria-label="Открыть полный плеер"
+            disabled
+            className={disabledSecondaryButtonClass}
+          >
+            <ExpandIcon />
+          </button>
+          <button
+            type="button"
+            disabled
+            aria-label="Скорость воспроизведения"
+            className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-[#eadff8] px-3 text-[13px] font-semibold tabular-nums text-[#7042c5]"
+          >
+            1×
+          </button>
+        </div>
+      </div>
+    </DesktopPlayerBarShell>
+  );
+}
 
-  if (!isVisible || !session || !engine) {
-    return null;
-  }
+function DesktopPlayerRestoringState() {
+  return (
+    <DesktopPlayerBarShell ariaLabel="Плеер">
+      <div className="flex min-h-0 items-center gap-4 px-5 py-2" aria-busy="true">
+        <div className="flex min-w-0 max-w-[240px] flex-1 items-center gap-3">
+          <div className="h-[52px] w-[52px] shrink-0 rounded-[12px] bg-[#f3ebfc]" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-40 max-w-full rounded bg-[#f3ebfc]" />
+            <div className="h-3 w-24 max-w-full rounded bg-[#f3ebfc]" />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-[1.4] flex-col gap-2">
+          <div className="flex items-center justify-center gap-1.5">
+            <div className="h-10 w-10 rounded-full bg-[#f3ebfc]" />
+            <div className="h-12 w-12 rounded-full bg-[#eadff8]" />
+            <div className="h-10 w-10 rounded-full bg-[#f3ebfc]" />
+          </div>
+          <div className="h-1.5 rounded-full bg-[#eee6f7]" />
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <div className="h-10 w-10 rounded-full bg-[#f3ebfc]" />
+          <div className="h-10 w-10 rounded-full bg-[#f3ebfc]" />
+        </div>
+      </div>
+    </DesktopPlayerBarShell>
+  );
+}
 
-  const queueMode = Boolean(activeQueue);
+function DesktopPlayerActiveState({
+  session,
+  engine,
+  queueMode,
+  openFullPlayer,
+}: {
+  session: NonNullable<ReturnType<typeof useGlobalAudioPlayer>["session"]>;
+  engine: NonNullable<ReturnType<typeof useOptionalPlayerEngine>>;
+  queueMode: boolean;
+  openFullPlayer: () => void;
+}) {
   const activeCoverUrl =
     engine.currentTrack?.coverImageUrl ?? session.coverImageUrl;
   const title =
@@ -151,15 +253,8 @@ export default function DesktopPlayerBar() {
       ? Math.min(100, (engine.currentTime / engine.displayDuration) * 100)
       : 0;
 
-  const secondaryButtonClass =
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-40";
-
   return (
-    <section
-      className="desktop-player-bar hidden shrink-0 border-t border-[#eadff8] bg-[#fffdfd] shadow-[0_-4px_16px_rgba(90,60,145,0.06)] xl:flex xl:flex-col xl:justify-center"
-      style={{ height: `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px` }}
-      aria-label="Плеер"
-    >
+    <DesktopPlayerBarShell>
       <div className="flex min-h-0 items-center gap-4 px-5 py-2">
         <div className="flex min-w-0 max-w-[240px] flex-1 items-center gap-3">
           <div
@@ -185,12 +280,11 @@ export default function DesktopPlayerBar() {
               {title}
             </p>
             {subtitle ? (
-              <p
-                className="mt-0.5 truncate text-[13px] text-[#7042c5]"
-                title={subtitle}
-              >
-                {subtitle}
-              </p>
+              <AuthorLink
+                authorSlug={session.authorSlug}
+                authorName={subtitle}
+                className="mt-0.5 block truncate text-[13px] text-[#7042c5]"
+              />
             ) : null}
           </div>
         </div>
@@ -328,6 +422,55 @@ export default function DesktopPlayerBar() {
           </button>
         </div>
       </div>
-    </section>
+    </DesktopPlayerBarShell>
   );
+}
+
+export default function DesktopPlayerBar() {
+  const { session, openFullPlayer, activeQueue, desktopPlayerRestoreState } =
+    useGlobalAudioPlayer();
+  const engine = useOptionalPlayerEngine();
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)");
+
+    const syncHeight = () => {
+      document.documentElement.style.setProperty(
+        "--listener-desktop-player-height",
+        media.matches ? `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px` : "0px",
+      );
+    };
+
+    syncHeight();
+    media.addEventListener("change", syncHeight);
+
+    return () => {
+      media.removeEventListener("change", syncHeight);
+      document.documentElement.style.setProperty(
+        "--listener-desktop-player-height",
+        "0px",
+      );
+    };
+  }, []);
+
+  if (session && engine) {
+    return (
+      <DesktopPlayerActiveState
+        session={session}
+        engine={engine}
+        queueMode={Boolean(activeQueue)}
+        openFullPlayer={openFullPlayer}
+      />
+    );
+  }
+
+  if (
+    session ||
+    desktopPlayerRestoreState === "pending" ||
+    desktopPlayerRestoreState === "restoring"
+  ) {
+    return <DesktopPlayerRestoringState />;
+  }
+
+  return <DesktopPlayerEmptyState />;
 }

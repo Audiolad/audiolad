@@ -22,7 +22,17 @@ import {
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import {
+  clearDesktopPlayerLastSession,
+  mergeDesktopPlaybackIntoSession,
+  readDesktopPlayerLastSession,
+  writeDesktopPlayerLastSession,
+} from "@/lib/listen/desktop-player-persistence";
 import { isListenPlayerPathname } from "@/lib/navigation/bottom-nav";
+import {
+  guestProgressToListenEntries,
+  readGuestPracticeProgress,
+} from "@/lib/promo/guest-progress";
 import {
   buildSafeListenReplacePath,
   fetchListenSessionPayload,
@@ -43,6 +53,8 @@ type LoadPlaylistQueueResult =
   | { ok: true; skipMessage: string | null }
   | { ok: false; error: string };
 
+export type DesktopPlayerRestoreState = "pending" | "restoring" | "ready";
+
 type SessionContextValue = {
   session: LoadSessionInput | null;
   dismissedPracticeId: string | null;
@@ -50,6 +62,7 @@ type SessionContextValue = {
   stopAndClear: () => void;
   openFullPlayer: () => void;
   showMiniPlayer: boolean;
+  desktopPlayerRestoreState: DesktopPlayerRestoreState;
   activeQueue: PlaylistQueue | null;
   currentQueueEntry: PlaylistQueueEntry | null;
   queueCompleted: boolean;
@@ -217,6 +230,74 @@ function GlobalPlayerEngine({
   ]);
 
   useEffect(() => {
+    const trackId = currentTrack?.id;
+
+    if (!trackId) {
+      return;
+    }
+
+    const persistPlaybackSnapshot = () => {
+      writeDesktopPlayerLastSession({
+        practiceId: session.practiceId,
+        authorSlug: session.authorSlug,
+        productSlug: session.productSlug,
+        audioItemId: trackId,
+        positionSeconds: audioRef.current?.currentTime ?? currentTime,
+      });
+    };
+
+    if (!isPlaying) {
+      persistPlaybackSnapshot();
+      return;
+    }
+
+    const intervalId = window.setInterval(persistPlaybackSnapshot, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    audioRef,
+    currentTime,
+    currentTrack?.id,
+    isPlaying,
+    session.authorSlug,
+    session.practiceId,
+    session.productSlug,
+  ]);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      const trackId = currentTrack?.id;
+
+      if (!trackId) {
+        return;
+      }
+
+      writeDesktopPlayerLastSession({
+        practiceId: session.practiceId,
+        authorSlug: session.authorSlug,
+        productSlug: session.productSlug,
+        audioItemId: trackId,
+        positionSeconds: audioRef.current?.currentTime ?? currentTime,
+      });
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [
+    audioRef,
+    currentTime,
+    currentTrack?.id,
+    session.authorSlug,
+    session.practiceId,
+    session.productSlug,
+  ]);
+
+  useEffect(() => {
     const scheduleRecovery = () => {
       if (document.visibilityState !== "visible") {
         return;
@@ -352,6 +433,8 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const [activeQueue, setActiveQueue] = useState<PlaylistQueue | null>(null);
   const [queueCompleted, setQueueCompleted] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [desktopPlayerRestoreState, setDesktopPlayerRestoreState] =
+    useState<DesktopPlayerRestoreState>("pending");
   const [playbackInstanceId, setPlaybackInstanceId] = useState(0);
   const [sessionGeneration, setSessionGeneration] = useState(0);
   const sessionGenerationRef = useRef(0);
@@ -368,6 +451,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   /** Practice id that already triggered cross-product advance (ended/Next dedupe). */
   const lastExhaustedPracticeIdRef = useRef<string | null>(null);
   const pendingNavSafetyTimerRef = useRef<number | null>(null);
+  const desktopPlayerRestoreAttemptedRef = useRef(false);
 
   const clearPendingQueueNavigation = useCallback(() => {
     pendingQueueNavigationRef.current = null;
@@ -442,10 +526,65 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     stopEngineRef.current?.();
     stopEngineRef.current = null;
     clearMediaSession();
+    clearDesktopPlayerLastSession();
     setSession(null);
     clearPlaylistQueue();
     setNoticeMessage(null);
   }, [clearPlaylistQueue]);
+
+  const mergeGuestProgressIntoSession = useCallback(
+    (input: LoadSessionInput): LoadSessionInput => {
+      const withDesktopPlayback = mergeDesktopPlaybackIntoSession(
+        input,
+        readDesktopPlayerLastSession(),
+      );
+
+      const guestProgress = readGuestPracticeProgress(withDesktopPlayback.practiceId);
+
+      if (!guestProgress) {
+        return withDesktopPlayback;
+      }
+
+      const guestEntries = guestProgressToListenEntries(guestProgress);
+
+      if (guestEntries.length === 0) {
+        return withDesktopPlayback;
+      }
+
+      if (withDesktopPlayback.initialProgress.length === 0) {
+        return {
+          ...withDesktopPlayback,
+          initialProgress: guestEntries,
+          guestProgressMode: true,
+          guestProgressMeta: {
+            practiceSlug: guestProgress.practiceSlug,
+            source: guestProgress.source,
+            campaign: guestProgress.campaign,
+          },
+        };
+      }
+
+      const merged = new Map(
+        withDesktopPlayback.initialProgress.map((entry) => [entry.audioItemId, entry]),
+      );
+
+      for (const entry of guestEntries) {
+        merged.set(entry.audioItemId, entry);
+      }
+
+      return {
+        ...withDesktopPlayback,
+        initialProgress: [...merged.values()],
+        guestProgressMode: true,
+        guestProgressMeta: {
+          practiceSlug: guestProgress.practiceSlug,
+          source: guestProgress.source,
+          campaign: guestProgress.campaign,
+        },
+      };
+    },
+    [],
+  );
 
   const openFullPlayer = useCallback(() => {
     if (!session) {
@@ -825,6 +964,92 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   }, [showMiniPlayer]);
 
   useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    writeDesktopPlayerLastSession({
+      practiceId: session.practiceId,
+      authorSlug: session.authorSlug,
+      productSlug: session.productSlug,
+    });
+  }, [session]);
+
+  useEffect(() => {
+    if (session || desktopPlayerRestoreAttemptedRef.current) {
+      return;
+    }
+
+    desktopPlayerRestoreAttemptedRef.current = true;
+    let cancelled = false;
+
+    async function restoreDesktopPlayerSession() {
+      setDesktopPlayerRestoreState("restoring");
+
+      const restoreSession = (payload: LoadSessionInput) => {
+        if (cancelled) {
+          return;
+        }
+
+        loadSession(
+          mergeGuestProgressIntoSession({
+            ...payload,
+            requestAutoplay: false,
+          }),
+        );
+        setDesktopPlayerRestoreState("ready");
+      };
+
+      const persisted = readDesktopPlayerLastSession();
+
+      if (persisted) {
+        const loaded = await fetchListenSessionPayload(
+          persisted.authorSlug,
+          persisted.productSlug,
+        );
+
+        if (loaded.ok) {
+          restoreSession(loaded.session);
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch("/api/listen/resume-session", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+
+        if (response.ok) {
+          const data = (await response.json()) as {
+            ok?: boolean;
+            session?: LoadSessionInput;
+          };
+
+          if (data.ok && data.session) {
+            restoreSession(data.session);
+            return;
+          }
+        }
+      } catch {
+        // Fall through to empty desktop bar.
+      }
+
+      if (!cancelled) {
+        clearDesktopPlayerLastSession();
+        setDesktopPlayerRestoreState("ready");
+      }
+    }
+
+    void restoreDesktopPlayerSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSession, mergeGuestProgressIntoSession, session]);
+
+  useEffect(() => {
     const supabase = createClient();
 
     const {
@@ -848,6 +1073,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       stopAndClear,
       openFullPlayer,
       showMiniPlayer,
+      desktopPlayerRestoreState,
       activeQueue,
       currentQueueEntry,
       queueCompleted,
@@ -867,6 +1093,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       clearPlaylistQueue,
       confirmInternalQueueNavigation,
       currentQueueEntry,
+      desktopPlayerRestoreState,
       dismissedPracticeId,
       isInternalQueueNavigation,
       isQueueDrivenPractice,
