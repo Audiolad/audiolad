@@ -82,7 +82,7 @@ async function fetchProductSitemapEntries(
         slug,
         updated_at,
         created_at,
-        authors!inner (
+        authors!practices_author_id_fkey (
           slug
         )
       `,
@@ -152,7 +152,7 @@ async function fetchAuthorSitemapEntries(
       .select(
         `
         updated_at,
-        authors!inner (
+        authors!practices_author_id_fkey (
           slug
         )
       `,

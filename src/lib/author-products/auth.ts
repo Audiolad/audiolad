@@ -77,7 +77,7 @@ export async function listAuthorWorkspacesForUser(
     .select(
       `
       role,
-      authors (
+      authors!author_members_author_id_fkey (
         id,
         name,
         slug

@@ -342,7 +342,7 @@ export async function getListeningHistoryPageData(
           status,
           is_catalog_listed,
           guest_access_enabled,
-          authors (name, slug)
+          authors!practices_author_id_fkey (name, slug)
         `,
         )
         .in("id", practiceIds),

@@ -81,7 +81,7 @@ export async function listEditorialPracticeOptions(
       status,
       is_catalog_listed,
       author_id,
-      authors!inner (
+      authors!practices_author_id_fkey (
         id,
         name,
         slug

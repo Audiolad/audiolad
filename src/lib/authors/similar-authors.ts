@@ -26,7 +26,7 @@ export async function findSimilarAuthors(
       `
       id,
       author_id,
-      authors!inner (
+      authors!practices_author_id_fkey (
         id,
         name,
         slug,

@@ -250,7 +250,7 @@ export async function renderListenPage(
       is_free,
       is_catalog_listed,
       guest_access_enabled,
-      authors!inner (
+      authors!practices_author_id_fkey (
         id,
         name,
         slug

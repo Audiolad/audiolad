@@ -194,7 +194,7 @@ export async function getPublishedCatalogProducts(
       updated_at,
       published_at,
       created_at,
-      authors!inner (
+      authors!practices_author_id_fkey (
         name,
         slug
       )

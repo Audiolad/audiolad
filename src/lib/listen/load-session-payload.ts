@@ -179,7 +179,7 @@ export async function loadListenSessionPayload(
       status,
       is_free,
       is_catalog_listed,
-      authors!inner (
+      authors!practices_author_id_fkey (
         id,
         name,
         slug
