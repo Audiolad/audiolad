@@ -31,8 +31,14 @@ import {
 import { isListenPlayerPathname } from "@/lib/navigation/bottom-nav";
 import {
   guestProgressToListenEntries,
+  hasAnyGuestPracticeProgress,
   readGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
+import {
+  classifyResumeHistoryResponse,
+  shouldLoadWelcomeSession,
+  shouldSkipInitialSessionRestore,
+} from "@/lib/listen/initial-session-policy";
 import {
   buildSafeListenReplacePath,
   fetchListenSessionPayload,
@@ -53,7 +59,13 @@ type LoadPlaylistQueueResult =
   | { ok: true; skipMessage: string | null }
   | { ok: false; error: string };
 
-export type DesktopPlayerRestoreState = "pending" | "restoring" | "ready";
+export type DesktopPlayerRestoreState =
+  | "pending"
+  | "restoring"
+  | "restored"
+  | "no-history"
+  | "ready"
+  | "failed";
 
 type SessionContextValue = {
   session: LoadSessionInput | null;
@@ -211,6 +223,13 @@ function GlobalPlayerEngine({
     previousTrack: playerControls.handlePreviousTrack,
     nextTrack: playerControls.handleNextTrack,
   });
+  const welcomePlaybackStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (isPlaying && session.isWelcomeSession) {
+      welcomePlaybackStartedRef.current = true;
+    }
+  }, [isPlaying, session.isWelcomeSession]);
 
   useEffect(() => {
     mediaSessionHandlersRef.current = {
@@ -230,6 +249,13 @@ function GlobalPlayerEngine({
   ]);
 
   useEffect(() => {
+    if (
+      session.isWelcomeSession &&
+      !welcomePlaybackStartedRef.current
+    ) {
+      return;
+    }
+
     const trackId = currentTrack?.id;
 
     if (!trackId) {
@@ -262,11 +288,19 @@ function GlobalPlayerEngine({
     currentTrack?.id,
     isPlaying,
     session.authorSlug,
+    session.isWelcomeSession,
     session.practiceId,
     session.productSlug,
   ]);
 
   useEffect(() => {
+    if (
+      session.isWelcomeSession &&
+      !welcomePlaybackStartedRef.current
+    ) {
+      return;
+    }
+
     const handlePageHide = () => {
       const trackId = currentTrack?.id;
 
@@ -293,6 +327,7 @@ function GlobalPlayerEngine({
     currentTime,
     currentTrack?.id,
     session.authorSlug,
+    session.isWelcomeSession,
     session.practiceId,
     session.productSlug,
   ]);
@@ -486,11 +521,15 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     setDismissedPracticeId(null);
 
     const requestAutoplay = input.requestAutoplay ?? false;
+    const normalizedInput: LoadSessionInput = {
+      ...input,
+      isWelcomeSession: input.isWelcomeSession === true,
+    };
     const current = sessionRef.current;
     let shouldBumpGeneration = true;
     let shouldBumpPlaybackInstance = true;
 
-    if (current?.practiceId === input.practiceId) {
+    if (current?.practiceId === normalizedInput.practiceId) {
       shouldBumpPlaybackInstance =
         requestAutoplay && !current.requestAutoplay;
       shouldBumpGeneration = shouldBumpPlaybackInstance;
@@ -502,20 +541,20 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     }
 
     setSession((previous) => {
-      if (previous?.practiceId === input.practiceId) {
+      if (previous?.practiceId === normalizedInput.practiceId) {
         if (shouldBumpPlaybackInstance) {
           setPlaybackInstanceId((value) => value + 1);
         }
 
         return {
           ...previous,
-          ...input,
+          ...normalizedInput,
           requestAutoplay,
         };
       }
 
       setPlaybackInstanceId((value) => value + 1);
-      return input;
+      return normalizedInput;
     });
   }, []);
 
@@ -968,6 +1007,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
+    if (session.isWelcomeSession) {
+      return;
+    }
+
     writeDesktopPlayerLastSession({
       practiceId: session.practiceId,
       authorSlug: session.authorSlug,
@@ -977,6 +1020,16 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (session || desktopPlayerRestoreAttemptedRef.current) {
+      return;
+    }
+
+    if (
+      shouldSkipInitialSessionRestore({
+        explicitProductRequested: isListenPlayerPathname(pathname),
+      })
+    ) {
+      setDesktopPlayerRestoreState("ready");
+      desktopPlayerRestoreAttemptedRef.current = true;
       return;
     }
 
@@ -997,10 +1050,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             requestAutoplay: false,
           }),
         );
-        setDesktopPlayerRestoreState("ready");
+        setDesktopPlayerRestoreState("restored");
       };
 
       const persisted = readDesktopPlayerLastSession();
+      let hadPersistedDesktopSession = Boolean(persisted);
 
       if (persisted) {
         const loaded = await fetchListenSessionPayload(
@@ -1012,7 +1066,22 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           restoreSession(loaded.session);
           return;
         }
+
+        clearDesktopPlayerLastSession();
+        hadPersistedDesktopSession = false;
       }
+
+      const hasGuestProgress = hasAnyGuestPracticeProgress();
+
+      if (hasGuestProgress) {
+        if (!cancelled) {
+          setDesktopPlayerRestoreState("ready");
+        }
+        return;
+      }
+
+      let resumeHistoryResult: ReturnType<typeof classifyResumeHistoryResponse> =
+        "not_applicable";
 
       try {
         const response = await fetch("/api/listen/resume-session", {
@@ -1031,13 +1100,83 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             restoreSession(data.session);
             return;
           }
+
+          resumeHistoryResult = "failed";
+        } else {
+          const data = (await response.json().catch(() => null)) as {
+            reason?: string;
+          } | null;
+
+          resumeHistoryResult = classifyResumeHistoryResponse({
+            status: response.status,
+            reason: data?.reason ?? null,
+          });
         }
       } catch {
-        // Fall through to empty desktop bar.
+        resumeHistoryResult = "failed";
+      }
+
+      if (resumeHistoryResult === "failed") {
+        if (!cancelled) {
+          setDesktopPlayerRestoreState("failed");
+        }
+        return;
       }
 
       if (!cancelled) {
-        clearDesktopPlayerLastSession();
+        setDesktopPlayerRestoreState("no-history");
+      }
+
+      const shouldWelcome = shouldLoadWelcomeSession({
+        phase: "no-history",
+        hasActiveSession: false,
+        explicitProductRequested: false,
+        hasPersistedDesktopSession: hadPersistedDesktopSession,
+        hasGuestProgress,
+        resumeHistoryResult,
+      });
+
+      if (!shouldWelcome) {
+        if (!cancelled) {
+          setDesktopPlayerRestoreState("ready");
+        }
+        return;
+      }
+
+      try {
+        const welcomeResponse = await fetch("/api/listen/welcome-session", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+
+        if (welcomeResponse.ok) {
+          const welcomeData = (await welcomeResponse.json()) as {
+            ok?: boolean;
+            session?: LoadSessionInput;
+          };
+
+          if (welcomeData.ok && welcomeData.session) {
+            restoreSession({
+              ...welcomeData.session,
+              requestAutoplay: false,
+              forceStartAtBeginning: true,
+              initialProgress: [],
+              isWelcomeSession: true,
+            });
+            return;
+          }
+        } else {
+          console.error(
+            "welcome_session_fetch_failed",
+            welcomeResponse.status,
+          );
+        }
+      } catch (error) {
+        console.error("welcome_session_fetch_error", error);
+      }
+
+      if (!cancelled) {
         setDesktopPlayerRestoreState("ready");
       }
     }
@@ -1047,7 +1186,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     return () => {
       cancelled = true;
     };
-  }, [loadSession, mergeGuestProgressIntoSession, session]);
+  }, [loadSession, mergeGuestProgressIntoSession, pathname, session]);
 
   useEffect(() => {
     const supabase = createClient();

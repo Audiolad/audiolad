@@ -25,6 +25,8 @@ export type GlobalPlayerSession = {
   };
   /** Show signup conversion prompts in the player. */
   promoConversionMode?: boolean;
+  /** Preloaded default session for listeners without history. */
+  isWelcomeSession?: boolean;
   promoAttribution?: {
     utmSource: string | null;
     utmMedium: string | null;

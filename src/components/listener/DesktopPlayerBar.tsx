@@ -426,6 +426,131 @@ function DesktopPlayerActiveState({
   );
 }
 
+function DesktopPlayerPreviewState({
+  session,
+  engine,
+  openFullPlayer,
+}: {
+  session: NonNullable<ReturnType<typeof useGlobalAudioPlayer>["session"]>;
+  engine: ReturnType<typeof useOptionalPlayerEngine>;
+  openFullPlayer: () => void;
+}) {
+  const firstTrack = session.tracks[0] ?? null;
+  const activeCoverUrl = firstTrack?.coverImageUrl ?? session.coverImageUrl;
+  const title =
+    firstTrack?.title?.trim() || session.practiceTitle;
+  const subtitle = session.authorName;
+  const displayDuration = firstTrack?.durationSeconds ?? 0;
+
+  return (
+    <DesktopPlayerBarShell>
+      <div className="flex min-h-0 items-center gap-4 px-5 py-2">
+        <div className="flex min-w-0 max-w-[240px] flex-1 items-center gap-3">
+          <div
+            className={`flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${session.coverGradient} text-xl text-white shadow-inner`}
+          >
+            {activeCoverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={activeCoverUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              session.coverSymbol
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p
+              className="line-clamp-2 text-[15px] font-semibold leading-snug text-[#25135c]"
+              title={title}
+            >
+              {title}
+            </p>
+            {subtitle ? (
+              <AuthorLink
+                authorSlug={session.authorSlug}
+                authorName={subtitle}
+                className="mt-0.5 block truncate text-[13px] text-[#7042c5]"
+              />
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-[1.4] flex-col gap-2">
+          <div className="flex items-center justify-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Назад на 15 секунд"
+              disabled
+              className={disabledSecondaryButtonClass}
+            >
+              <RewindIcon />
+            </button>
+            <button
+              type="button"
+              aria-label="Воспроизвести"
+              disabled={!engine}
+              onClick={() => {
+                if (engine) {
+                  void engine.handlePlayPause();
+                }
+              }}
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white shadow-[0_6px_16px_rgba(96,59,168,0.22)] transition hover:bg-[#6234b5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-wait disabled:opacity-70"
+            >
+              <PlayIcon />
+            </button>
+            <button
+              type="button"
+              aria-label="Вперёд на 15 секунд"
+              disabled
+              className={disabledSecondaryButtonClass}
+            >
+              <ForwardIcon />
+            </button>
+          </div>
+
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-[#9485b4]">
+              0:00
+            </span>
+            <div
+              className="h-1.5 min-w-0 flex-1 rounded-full bg-[#eee6f7]"
+              aria-hidden="true"
+            />
+            <span className="w-10 shrink-0 text-[11px] tabular-nums text-[#9485b4]">
+              {formatTime(displayDuration)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-label="Открыть полный плеер"
+            onClick={() => {
+              openFullPlayer();
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            <ExpandIcon />
+          </button>
+
+          <button
+            type="button"
+            disabled
+            aria-label="Скорость воспроизведения 1×"
+            className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-[#eadff8] px-3 text-[13px] font-semibold tabular-nums text-[#7042c5] opacity-40"
+          >
+            1×
+          </button>
+        </div>
+      </div>
+    </DesktopPlayerBarShell>
+  );
+}
+
 export default function DesktopPlayerBar() {
   const { session, openFullPlayer, activeQueue, desktopPlayerRestoreState } =
     useGlobalAudioPlayer();
@@ -464,10 +589,20 @@ export default function DesktopPlayerBar() {
     );
   }
 
+  if (session) {
+    return (
+      <DesktopPlayerPreviewState
+        session={session}
+        engine={engine}
+        openFullPlayer={openFullPlayer}
+      />
+    );
+  }
+
   if (
-    session ||
     desktopPlayerRestoreState === "pending" ||
-    desktopPlayerRestoreState === "restoring"
+    desktopPlayerRestoreState === "restoring" ||
+    desktopPlayerRestoreState === "no-history"
   ) {
     return <DesktopPlayerRestoringState />;
   }

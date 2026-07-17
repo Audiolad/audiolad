@@ -18,6 +18,26 @@ const SAVE_THROTTLE_MS = 12_000;
 
 let lastSaveAt = 0;
 
+export function hasAnyGuestPracticeProgress(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+
+      if (key?.startsWith(STORAGE_PREFIX)) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
 function buildStorageKey(practiceId: string): string {
   return `${STORAGE_PREFIX}${practiceId}`;
 }
