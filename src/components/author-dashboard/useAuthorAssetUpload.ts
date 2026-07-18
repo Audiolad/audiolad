@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { validateCoverFile } from "@/lib/author-products/cover-validation-client";
 import {
   AUTHOR_BANNER_ERROR_MESSAGES,
   AUTHOR_BANNER_UPLOAD_HINT,
@@ -16,7 +15,6 @@ export type AuthorAssetUploadResult = {
 type UseAuthorAssetUploadOptions = {
   assetUrl: string | null;
   authorId: string;
-  kind: "avatar" | "banner";
   onUpdated?: (result: AuthorAssetUploadResult) => void;
   disabled?: boolean;
 };
@@ -24,22 +22,17 @@ type UseAuthorAssetUploadOptions = {
 export function useAuthorAssetUpload({
   assetUrl,
   authorId,
-  kind,
   onUpdated,
   disabled = false,
 }: UseAuthorAssetUploadOptions) {
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const bannerFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
 
-  const displaySrc =
-    kind === "banner"
-      ? localPreviewUrl ?? (assetUrl?.trim() || null)
-      : assetUrl?.trim() || null;
+  const displaySrc = localPreviewUrl ?? (assetUrl?.trim() || null);
   const showPreview = Boolean(displaySrc) && !previewFailed;
   const isBusy = uploading || deleting;
 
@@ -53,19 +46,16 @@ export function useAuthorAssetUpload({
     });
   }, []);
 
-  useEffect(() => {
-    if (kind !== "banner") {
-      return;
-    }
-
-    return () => {
+  useEffect(
+    () => () => {
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
       }
-    };
-  }, [kind, localPreviewUrl]);
+    },
+    [localPreviewUrl],
+  );
 
-  const uploadAsset = useCallback(
+  const uploadBanner = useCallback(
     async (file: File) => {
       setUploading(true);
       setError(null);
@@ -76,7 +66,7 @@ export function useAuthorAssetUpload({
         formData.set("author_id", authorId);
         formData.set("file", file);
 
-        const response = await fetch(`/api/author/profile/${kind}`, {
+        const response = await fetch("/api/author/profile/banner", {
           method: "POST",
           body: formData,
         });
@@ -86,23 +76,18 @@ export function useAuthorAssetUpload({
             | { message?: string }
             | null;
           throw new Error(
-            payload?.message ??
-              (kind === "banner"
-                ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
-                : "Не удалось загрузить изображение."),
+            payload?.message ?? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
           );
         }
 
         const payload = (await response.json()) as { url?: string | null };
-        if (kind === "banner") {
-          clearLocalPreview();
-        }
+        clearLocalPreview();
         onUpdated?.({ url: payload.url ?? null });
       } finally {
         setUploading(false);
       }
     },
-    [authorId, clearLocalPreview, kind, onUpdated],
+    [authorId, clearLocalPreview, onUpdated],
   );
 
   const openPicker = useCallback(() => {
@@ -110,24 +95,15 @@ export function useAuthorAssetUpload({
       return;
     }
 
-    if (kind === "avatar") {
-      avatarFileInputRef.current?.click();
-      return;
-    }
-
-    bannerFileInputRef.current?.click();
-  }, [disabled, isBusy, kind]);
+    fileInputRef.current?.click();
+  }, [disabled, isBusy]);
 
   const deleteAsset = useCallback(async () => {
-    if (disabled || isBusy) {
+    if (disabled || isBusy || !assetUrl) {
       return;
     }
 
-    if (!assetUrl) {
-      return;
-    }
-
-    if (!window.confirm(kind === "avatar" ? "Удалить фото?" : "Удалить баннер?")) {
+    if (!window.confirm("Удалить баннер?")) {
       return;
     }
 
@@ -136,7 +112,7 @@ export function useAuthorAssetUpload({
 
     try {
       const response = await fetch(
-        `/api/author/profile/${kind}?author_id=${encodeURIComponent(authorId)}`,
+        `/api/author/profile/banner?author_id=${encodeURIComponent(authorId)}`,
         { method: "DELETE" },
       );
 
@@ -144,51 +120,16 @@ export function useAuthorAssetUpload({
         throw new Error("delete_failed");
       }
 
-      if (kind === "banner") {
-        clearLocalPreview();
-      }
-
+      clearLocalPreview();
       onUpdated?.({ url: null });
     } catch {
       setError("Не удалось удалить изображение.");
     } finally {
       setDeleting(false);
     }
-  }, [assetUrl, authorId, clearLocalPreview, disabled, isBusy, kind, onUpdated]);
+  }, [assetUrl, authorId, clearLocalPreview, disabled, isBusy, onUpdated]);
 
-  const handleAvatarFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-
-      if (!file || disabled || isBusy) {
-        return;
-      }
-
-      const validationError = await validateCoverFile(file);
-
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-
-      setError(null);
-      setPreviewFailed(false);
-
-      try {
-        await uploadAsset(file);
-      } catch (uploadError) {
-        setError(
-          uploadError instanceof Error
-            ? uploadError.message
-            : "Не удалось загрузить изображение.",
-        );
-      }
-    },
-    [disabled, isBusy, uploadAsset],
-  );
-
-  const handleBannerFileChange = useCallback(
+  const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       event.target.value = "";
@@ -217,7 +158,7 @@ export function useAuthorAssetUpload({
       });
 
       try {
-        await uploadAsset(file);
+        await uploadBanner(file);
       } catch (uploadError) {
         clearLocalPreview();
         setError(
@@ -227,11 +168,11 @@ export function useAuthorAssetUpload({
         );
       }
     },
-    [clearLocalPreview, disabled, isBusy, uploadAsset],
+    [clearLocalPreview, disabled, isBusy, uploadBanner],
   );
 
   return {
-    fileInputRef: kind === "avatar" ? avatarFileInputRef : bannerFileInputRef,
+    fileInputRef,
     uploading,
     deleting,
     error,
@@ -239,10 +180,9 @@ export function useAuthorAssetUpload({
     showPreview,
     openPicker,
     deleteAsset,
-    handleFileChange:
-      kind === "avatar" ? handleAvatarFileChange : handleBannerFileChange,
+    handleFileChange,
     isBusy,
     setPreviewFailed,
-    uploadHint: kind === "banner" ? AUTHOR_BANNER_UPLOAD_HINT : undefined,
+    uploadHint: AUTHOR_BANNER_UPLOAD_HINT,
   };
 }

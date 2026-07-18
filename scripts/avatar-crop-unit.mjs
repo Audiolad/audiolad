@@ -143,17 +143,17 @@ function testCoverValidationAllowsServerCrop() {
 }
 
 function testAvatarUploadHintUpdated() {
-  const authorProfile = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorProfileClient.tsx",
+  const authorAvatar = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorAvatarUploadBlock.tsx",
     "utf8",
   );
 
   assert(
-    !authorProfile.includes("Квадратное изображение"),
+    !authorAvatar.includes("Квадратное изображение"),
     "author avatar hint no longer requires square source",
   );
   assert(
-    authorProfile.includes("uploadHint"),
+    authorAvatar.includes("AVATAR_UPLOAD_HINT"),
     "author avatar uses shared upload hint",
   );
   assert(

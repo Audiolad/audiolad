@@ -143,7 +143,7 @@ function testBannerUploadUsesDedicatedValidation() {
   );
 
   const bannerHandlerMatch = hookSource.match(
-    /const handleBannerFileChange = useCallback\([\s\S]*?\n  \);/,
+    /const handleFileChange = useCallback\([\s\S]*?\n  \);/,
   );
 
   assert(bannerHandlerMatch, "banner file change handler exists");

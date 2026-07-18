@@ -66,7 +66,6 @@ function AuthorBannerUploadBlock({
   } = useAuthorAssetUpload({
     assetUrl: bannerUrl,
     authorId,
-    kind: "banner",
     disabled,
     onUpdated: (result) => onUpdated(result.url),
   });
