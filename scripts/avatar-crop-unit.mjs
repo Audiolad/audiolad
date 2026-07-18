@@ -126,19 +126,19 @@ function testAvatarSourceValidationAllowsNonSquare() {
   );
 }
 
-function testCoverValidationStillRequiresSquareForProducts() {
+function testCoverValidationAllowsServerCrop() {
   const source = readFileSync(
     "/var/www/audiolad/src/lib/author-products/cover-validation-client.ts",
     "utf8",
   );
 
   assert(
-    source.includes('width !== height'),
-    "product cover validation still enforces 1:1",
+    source.includes("MIN_COVER_DIMENSION = 400"),
+    "product cover validation uses relaxed 400px minimum",
   );
   assert(
-    source.includes("Обложка должна быть квадратной"),
-    "product cover square error message preserved",
+    !source.includes('width !== height'),
+    "product cover client validation no longer enforces strict 1:1",
   );
 }
 
@@ -196,7 +196,7 @@ function run() {
   testClampCropArea();
   testRestrictCropPosition();
   testAvatarSourceValidationAllowsNonSquare();
-  testCoverValidationStillRequiresSquareForProducts();
+  testCoverValidationAllowsServerCrop();
   testAvatarUploadHintUpdated();
   testSharedCropperComponentExists();
   testBannerHintUsesDedicatedValidation();

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
 import {
-  processUserAvatarImage,
-  userAvatarProcessErrorMessage,
-} from "@/lib/profile/avatar-image";
+  cleanupImageManifest,
+  uploadOptimizedImageSet,
+} from "@/lib/images/image-upload-service";
+import { parseImageManifest } from "@/lib/images/image-manifest";
+import { imageProcessErrorMessage } from "@/lib/images/process-image";
+import { avatarProcessErrorMessage } from "@/lib/images/process-avatar-image";
 import {
   assertUserAvatarPathForOwner,
-  buildUserAvatarStoragePath,
   createUserAvatarSignedUrl,
   removeUserAvatarObject,
   USER_AVATAR_MAX_BYTES,
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("avatar_path")
+    .select("avatar_path, avatar_image")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "invalid_request",
-        message: userAvatarProcessErrorMessage("missing_file"),
+        message: imageProcessErrorMessage("missing_file", "user-avatar"),
       },
       { status: 400 },
     );
@@ -67,50 +69,45 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "invalid_file_size",
-        message: userAvatarProcessErrorMessage("invalid_file_size"),
+        message: imageProcessErrorMessage("invalid_file_size", "user-avatar"),
       },
       { status: 400 },
     );
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const processed = await processUserAvatarImage(buffer, file.type);
+  const storage = createServiceRoleClient();
+  const previousPath = profile?.avatar_path ?? null;
+  const previousManifest = parseImageManifest(profile?.avatar_image);
 
-  if (!processed.ok) {
+  const uploaded = await uploadOptimizedImageSet({
+    profile: "user-avatar",
+    bucket: USER_AVATARS_BUCKET,
+    buffer,
+    declaredMime: file.type,
+    storage: storage.storage,
+    context: { userId: user.id },
+  });
+
+  if (!uploaded.ok) {
     return NextResponse.json(
       {
-        error: processed.code,
-        message: userAvatarProcessErrorMessage(processed.code),
+        error: uploaded.code,
+        message: avatarProcessErrorMessage(uploaded.code as "corrupt_image"),
       },
-      { status: 400 },
+      { status: uploaded.code === "upload_failed" ? 500 : 400 },
     );
   }
 
-  const previousPath = profile?.avatar_path ?? null;
-  const nextPath = buildUserAvatarStoragePath(user.id);
+  const nextPath = uploaded.data.primaryDisplayPath;
 
   if (!assertUserAvatarPathForOwner(nextPath, user.id)) {
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  const storage = createServiceRoleClient();
-
-  const { error: uploadError } = await storage.storage
-    .from(USER_AVATARS_BUCKET)
-    .upload(nextPath, processed.buffer, {
-      contentType: processed.contentType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("profile_avatar_upload_error", uploadError.message);
-    return NextResponse.json(
-      {
-        error: "upload_failed",
-        message: "Не удалось сохранить фотографию. Попробуйте ещё раз.",
-      },
-      { status: 500 },
+    await cleanupImageManifest(
+      storage.storage,
+      USER_AVATARS_BUCKET,
+      uploaded.data.manifest,
     );
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   const cacheBuster = Date.now();
@@ -125,23 +122,31 @@ export async function POST(request: Request) {
     .update({
       avatar_path: nextPath,
       avatar_url: avatarUrl,
+      avatar_image: uploaded.data.manifest,
     })
     .eq("id", user.id);
 
   if (updateError) {
     console.error("profile_avatar_update_error", updateError.message);
-    const cleanup = await removeUserAvatarObject(storage, nextPath, user.id);
-
-    if (!cleanup.ok) {
-      console.error("profile_avatar_orphan_cleanup_error", cleanup.error);
-    }
-
+    await cleanupImageManifest(
+      storage.storage,
+      USER_AVATARS_BUCKET,
+      uploaded.data.manifest,
+    );
     return NextResponse.json(
       {
         error: "internal_error",
         message: "Не удалось сохранить фотографию. Попробуйте ещё раз.",
       },
       { status: 500 },
+    );
+  }
+
+  if (previousManifest) {
+    await cleanupImageManifest(
+      storage.storage,
+      USER_AVATARS_BUCKET,
+      previousManifest,
     );
   }
 
@@ -165,6 +170,7 @@ export async function POST(request: Request) {
     avatarUrl,
     avatarPath: nextPath,
     cacheBuster,
+    avatar_image: uploaded.data.manifest,
   });
 }
 
@@ -187,7 +193,7 @@ export async function DELETE(request: Request) {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("avatar_path")
+    .select("avatar_path, avatar_image")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -197,6 +203,7 @@ export async function DELETE(request: Request) {
   }
 
   const previousPath = profile?.avatar_path ?? null;
+  const previousManifest = parseImageManifest(profile?.avatar_image);
 
   if (!previousPath) {
     return new NextResponse(null, { status: 204 });
@@ -212,6 +219,7 @@ export async function DELETE(request: Request) {
     .update({
       avatar_path: null,
       avatar_url: null,
+      avatar_image: null,
     })
     .eq("id", user.id);
 
@@ -222,6 +230,15 @@ export async function DELETE(request: Request) {
 
   try {
     const storage = createServiceRoleClient();
+
+    if (previousManifest) {
+      await cleanupImageManifest(
+        storage.storage,
+        USER_AVATARS_BUCKET,
+        previousManifest,
+      );
+    }
+
     const removed = await removeUserAvatarObject(
       storage,
       previousPath,

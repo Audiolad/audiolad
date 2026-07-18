@@ -25,8 +25,17 @@ export const USER_AVATAR_ALLOWED_MIME = new Set([
 
 const UUID_RE =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-const AVATAR_PATH_RE = new RegExp(`^(${UUID_RE})\\/(${UUID_RE})\\.webp$`, "i");
+const LEGACY_AVATAR_PATH_RE = new RegExp(
+  `^(${UUID_RE})\\/(${UUID_RE})\\.webp$`,
+  "i",
+);
 
+const VARIANT_AVATAR_PATH_RE = new RegExp(
+  `^(${UUID_RE})\\/variants\\/(${UUID_RE})\\/(xs|sm|md|lg|xl|placeholder)\\.webp$`,
+  "i",
+);
+
+/** @deprecated Legacy single-file path; new uploads use variant paths. */
 export function buildUserAvatarStoragePath(
   userId: string,
   fileId = randomUUID(),
@@ -58,7 +67,9 @@ export function isValidUserAvatarPath(
     return false;
   }
 
-  const match = AVATAR_PATH_RE.exec(trimmed);
+  const legacyMatch = LEGACY_AVATAR_PATH_RE.exec(trimmed);
+  const variantMatch = VARIANT_AVATAR_PATH_RE.exec(trimmed);
+  const match = legacyMatch ?? variantMatch;
 
   if (!match) {
     return false;
