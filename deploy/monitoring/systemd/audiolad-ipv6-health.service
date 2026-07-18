@@ -1,0 +1,8 @@
+[Unit]
+Description=Audiolad IPv6 HTTPS health observation
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/var/www/audiolad/deploy/monitoring/ipv6-health-check.sh

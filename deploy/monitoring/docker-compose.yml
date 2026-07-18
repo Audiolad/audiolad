@@ -6,7 +6,7 @@ services:
     volumes:
       - ./data:/app/data
     ports:
-      - "127.0.0.1:3002:3001"
+      - "127.0.0.1:3003:3001"
     networks:
       - audiolad-monitoring
 

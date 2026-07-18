@@ -38,6 +38,7 @@ yarn-error.log*
 
 # local backups, diagnostics, and runtime artifacts
 /backups/
+/deploy/monitoring/data/
 /screenshots/
 /test-results/
 /audiolad/tmp/
