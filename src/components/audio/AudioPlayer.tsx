@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import FormattedPlainText from "@/components/FormattedPlainText";
 import {
@@ -23,6 +24,8 @@ type AudioPlayerProps = {
   coverSymbol: string;
   coverGradient: string;
   coverImageUrl?: string | null;
+  coverImage?: unknown;
+  coverUpdatedAt?: string | null;
   isAuthorPreview?: boolean;
   sessionPayload?: LoadSessionInput;
   promoConversionMode?: boolean;
@@ -199,6 +202,8 @@ export default function AudioPlayer({
   coverSymbol,
   coverGradient,
   coverImageUrl = null,
+  coverImage = null,
+  coverUpdatedAt = null,
   isAuthorPreview = false,
   sessionPayload,
   promoConversionMode = false,
@@ -265,6 +270,12 @@ export default function AudioPlayer({
 
   const activeCoverUrl =
     currentTrack?.coverImageUrl ?? coverImageUrl ?? null;
+  const activeCoverImage =
+    currentTrack?.coverImage ?? coverImage ?? session?.coverImage ?? null;
+  const activeCoverUpdatedAt =
+    currentTrack?.coverImage != null
+      ? currentTrack.updatedAt ?? null
+      : coverUpdatedAt ?? session?.coverUpdatedAt ?? null;
 
   const showCoverImage =
     Boolean(activeCoverUrl) && coverImageFailedUrl !== activeCoverUrl;
@@ -315,10 +326,12 @@ export default function AudioPlayer({
           }`}
         >
           {showCoverImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={activeCoverUrl ?? undefined}
-              alt=""
+            <PlaybackCoverImage
+              coverUrl={activeCoverUrl}
+              coverImage={activeCoverImage}
+              updatedAt={activeCoverUpdatedAt}
+              displayWidth={360}
+              priority
               className="absolute inset-0 h-full w-full object-cover"
               onError={() => {
                 if (activeCoverUrl) {

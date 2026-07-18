@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -44,20 +46,15 @@ function ProductCard({
   return (
     <article className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
       <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[18px] bg-[#f4ecfb]">
-          {product.cover_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={product.cover_url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-3xl text-[#9a74d8]">
-              ♪
-            </div>
-          )}
-        </div>
+        <ProductCoverThumbnail
+          slug={product.slug}
+          title={product.title}
+          coverUrl={product.cover_url}
+          coverImage={product.cover_image}
+          updatedAt={product.updated_at}
+          displayWidth={96}
+          className="h-24 w-24 shrink-0 rounded-[18px]"
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">

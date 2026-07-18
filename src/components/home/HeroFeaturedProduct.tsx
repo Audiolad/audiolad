@@ -23,8 +23,12 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
           slug={product.slug}
           title={product.title}
           coverUrl={product.coverUrl}
+          coverImage={product.coverImage}
+          updatedAt={product.updatedAt}
           authorName={product.authorName}
           format={product.format}
+          displayWidth={640}
+          priority
           className="h-full w-full rounded-none"
         />
       </Link>

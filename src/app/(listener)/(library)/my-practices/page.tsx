@@ -31,6 +31,7 @@ type PracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   audio_url: string | null;
   status: string | null;
@@ -104,6 +105,7 @@ function mapLibraryItems(rows: LibraryRow[] | null): LibraryCardItem[] {
               format: practice.format,
               durationMinutes: practice.duration_minutes,
               coverUrl: practice.cover_url,
+              coverImage: practice.cover_image ?? null,
               updatedAt: practice.updated_at,
               audioUrl: practice.audio_url,
               isFree: practice.is_free,
@@ -145,6 +147,7 @@ export default async function MyPracticesPage() {
         price,
         is_free,
         cover_url,
+        cover_image,
         updated_at,
         audio_url,
         status,

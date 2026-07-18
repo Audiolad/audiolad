@@ -1,5 +1,6 @@
 "use client";
 
+import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 import type { UseCoverUploadOptions } from "@/components/author-dashboard/useCoverUpload";
 import { useCoverUpload } from "@/components/author-dashboard/useCoverUpload";
 
@@ -78,6 +79,8 @@ export default function CoverUploadBlock({
     error,
     displayError,
     displaySrc,
+    resolvedCover,
+    useManifestPreview,
     showPreview,
     openPicker,
     deleteCover,
@@ -89,6 +92,7 @@ export default function CoverUploadBlock({
 
   const previewClassName =
     previewSize === "compact" ? "h-20 w-20" : "h-28 w-28";
+  const previewWidth = previewSize === "compact" ? 80 : 112;
 
   return (
     <div>
@@ -109,14 +113,27 @@ export default function CoverUploadBlock({
         >
           {showPreview ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displaySrc ?? undefined}
-                alt=""
-                className="pointer-events-none block h-full w-full object-contain"
-                onLoad={handlePreviewLoad}
-                onError={handlePreviewError}
-              />
+              {useManifestPreview ? (
+                <ResponsiveCoverImage
+                  src={resolvedCover.src}
+                  alt=""
+                  className="pointer-events-none block h-full w-full object-contain"
+                  manifest={resolvedCover.manifest}
+                  srcSet={resolvedCover.srcSet}
+                  sizes={resolvedCover.srcSet ? resolvedCover.sizes : undefined}
+                  displayWidth={previewWidth}
+                  onError={handlePreviewError}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={displaySrc ?? undefined}
+                  alt=""
+                  className="pointer-events-none block h-full w-full object-contain"
+                  onLoad={handlePreviewLoad}
+                  onError={handlePreviewError}
+                />
+              )}
               <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-2 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100 group-focus-visible:bg-[#25135c]/35 group-focus-visible:opacity-100">
                 {replaceLabel}
               </span>

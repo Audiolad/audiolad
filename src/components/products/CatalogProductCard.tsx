@@ -26,6 +26,8 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
               slug={product.slug}
               title={product.title}
               coverUrl={product.coverUrl}
+              coverImage={product.coverImage}
+              updatedAt={product.updatedAt}
               authorName={product.authorName}
               format={product.format}
               className="aspect-square w-full rounded-[20px]"

@@ -84,8 +84,11 @@ export function HistoryCard({ item }: HistoryCardProps) {
             slug={item.productSlug}
             title={item.title}
             coverUrl={item.coverUrl}
+            coverImage={item.coverImage}
+            updatedAt={item.updatedAt}
             authorName={item.authorName}
             format={item.formatLabel}
+            displayWidth={108}
             className="h-[108px] w-[108px] rounded-[20px]"
           />
         </Link>

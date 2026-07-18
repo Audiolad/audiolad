@@ -80,6 +80,7 @@ type FormState = {
   price: number;
   coverUrl: string | null;
   coverVersion: string | null;
+  coverImage?: unknown;
   useSharedCover: boolean;
   status: string;
   publishedAt: string | null;
@@ -180,6 +181,7 @@ function buildInitialForm(
       price: practice.is_free === true ? 99 : practice.price,
       coverUrl: practice.cover_url,
       coverVersion: practice.cover_url ? practice.updated_at : null,
+      coverImage: practice.cover_image ?? null,
       useSharedCover: practice.use_shared_cover !== false,
       status: practice.status,
       publishedAt: practice.published_at,
@@ -201,6 +203,7 @@ function buildInitialForm(
     price: 99,
     coverUrl: null,
     coverVersion: null,
+    coverImage: null,
     useSharedCover: true,
     status: "draft",
     publishedAt: null,
@@ -622,9 +625,11 @@ export default function AuthorProductForm({
 
   function handleProductCoverUpdated({
     coverUrl,
+    coverImage,
     product,
   }: {
     coverUrl: string | null;
+    coverImage?: unknown;
     product?: AuthorProductDetail;
   }) {
     if (product) {
@@ -633,6 +638,7 @@ export default function AuthorProductForm({
       setForm((current) => ({
         ...current,
         coverUrl,
+        coverImage: coverImage ?? null,
         coverVersion: coverUrl ? String(Date.now()) : null,
       }));
     }
@@ -1859,6 +1865,7 @@ export default function AuthorProductForm({
           label="Обложка"
           coverUrl={form.coverUrl}
           coverVersion={form.coverVersion}
+          coverImage={form.coverImage}
           buildUploadUrl={(id) => `/api/author/products/${id}/cover`}
           buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
           getPracticeId={getPracticeIdForCoverUpload}
@@ -2100,9 +2107,11 @@ export default function AuthorProductForm({
                   <CoverUploadBlock
                     label="Обложка трека"
                     coverUrl={audioItem.cover_url}
+                    coverImage={audioItem.cover_image}
                     coverVersion={
                       audioItem.cover_url ? audioItem.updated_at : null
                     }
+                    previewWidth={80}
                     buildUploadUrl={(id) =>
                       `/api/author/products/${id}/audio/${audioItem.id}/cover`
                     }

@@ -12,6 +12,8 @@ export type GlobalPlayerSession = {
   coverSymbol: string;
   coverGradient: string;
   coverImageUrl: string | null;
+  coverImage?: unknown;
+  coverUpdatedAt?: string | null;
   isAuthorPreview: boolean;
   requestAutoplay?: boolean;
   /** When true, start at track 0 / position 0 (Play All restart). */

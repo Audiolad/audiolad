@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
-import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
+import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { listPracticeProgress } from "@/lib/listen/progress";
@@ -28,6 +28,7 @@ type AudioItemRow = {
   duration_seconds: number | null;
   audio_path: string | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   status: string;
 };
@@ -98,7 +99,7 @@ async function loadListenTracks(
   let query = supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, audio_path, cover_url, updated_at, status",
+      "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status",
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
@@ -115,6 +116,7 @@ async function loadListenTracks(
 
   const practiceContext = {
     cover_url: practice.cover_url,
+    cover_image: practice.cover_image,
     updated_at: practice.updated_at,
     use_shared_cover: practice.use_shared_cover ?? true,
   };
@@ -140,6 +142,7 @@ async function loadListenTracks(
     description: practice.description,
     duration_minutes: practice.duration_minutes,
     cover_url: practice.cover_url,
+    cover_image: practice.cover_image,
     updated_at: practice.updated_at,
     use_shared_cover: practice.use_shared_cover ?? true,
   })];
@@ -174,6 +177,7 @@ export async function loadListenSessionPayload(
       duration_minutes,
       audio_url,
       cover_url,
+      cover_image,
       use_shared_cover,
       updated_at,
       status,
@@ -251,10 +255,17 @@ export async function loadListenSessionPayload(
         initialProgress,
         coverSymbol: getCoverSymbol(practiceRow.slug),
         coverGradient: getCoverGradient(practiceRow.slug),
-        coverImageUrl: buildCoverDisplayUrl(
-          practiceRow.cover_url,
-          practiceRow.updated_at,
+        coverImageUrl: resolveProductCoverUrl(
+          {
+            cover_url: practiceRow.cover_url,
+            cover_image: practiceRow.cover_image,
+            updated_at: practiceRow.updated_at,
+          },
+          360,
+          "lg",
         ),
+        coverImage: practiceRow.cover_image ?? null,
+        coverUpdatedAt: practiceRow.updated_at ?? null,
         isAuthorPreview: access.mode === "author_preview",
         forceStartAtBeginning: options?.forceStartAtBeginning === true,
       },

@@ -18,6 +18,7 @@ export type ProductFormSnapshot = {
   price: number;
   coverUrl: string | null;
   coverVersion: string | null;
+  coverImage?: unknown;
   useSharedCover: boolean;
   status: string;
   publishedAt: string | null;
@@ -41,6 +42,7 @@ export function productDetailToFormSnapshot(
     price: practice.is_free === true ? 99 : practice.price,
     coverUrl: practice.cover_url,
     coverVersion: practice.cover_url ? practice.updated_at : null,
+    coverImage: practice.cover_image ?? null,
     useSharedCover: practice.use_shared_cover !== false,
     status: practice.status,
     publishedAt: practice.published_at,

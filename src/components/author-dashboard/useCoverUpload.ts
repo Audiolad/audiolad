@@ -1,19 +1,22 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AuthorProductDetail } from "@/lib/author-products/types";
 import { validateCoverFile } from "@/lib/author-products/cover-validation-client";
-import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
+import { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 
 export type CoverUploadResult = {
   coverUrl: string | null;
+  coverImage?: unknown;
   product?: AuthorProductDetail;
 };
 
 export type UseCoverUploadOptions = {
   coverUrl: string | null;
   coverVersion: string | null;
+  coverImage?: unknown;
+  previewWidth?: number;
   buildUploadUrl: (practiceId: string) => string;
   buildDeleteUrl: (practiceId: string) => string;
   getPracticeId: () => Promise<string | null>;
@@ -25,6 +28,8 @@ export type UseCoverUploadOptions = {
 export function useCoverUpload({
   coverUrl,
   coverVersion,
+  coverImage,
+  previewWidth = 112,
   buildUploadUrl,
   buildDeleteUrl,
   getPracticeId,
@@ -40,15 +45,43 @@ export function useCoverUpload({
   const [previewFailureKey, setPreviewFailureKey] = useState<string | null>(
     null,
   );
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const localPreviewUrlRef = useRef<string | null>(null);
 
-  const displaySrc = useMemo(
-    () => buildCoverDisplayUrl(coverUrl, coverVersion),
-    [coverUrl, coverVersion],
+  const resolvedCover = useMemo(
+    () =>
+      buildProductCoverResponsiveProps(
+        coverUrl,
+        coverImage,
+        coverVersion,
+        previewWidth,
+      ),
+    [coverImage, coverUrl, coverVersion, previewWidth],
   );
 
-  const previewKey = `${coverUrl ?? ""}:${coverVersion ?? ""}`;
+  const previewKey = `${coverUrl ?? ""}:${coverVersion ?? ""}:${localPreviewUrl ?? ""}`;
   const previewFailed = previewFailureKey === previewKey;
+  const displaySrc = localPreviewUrl ?? resolvedCover.src;
   const showPreview = Boolean(displaySrc) && !previewFailed;
+  const useManifestPreview = Boolean(resolvedCover.src) && !localPreviewUrl;
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrlRef.current) {
+        URL.revokeObjectURL(localPreviewUrlRef.current);
+        localPreviewUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const clearLocalPreview = useCallback(() => {
+    if (localPreviewUrlRef.current) {
+      URL.revokeObjectURL(localPreviewUrlRef.current);
+      localPreviewUrlRef.current = null;
+    }
+
+    setLocalPreviewUrl(null);
+  }, []);
 
   const openPicker = useCallback(() => {
     if (disabled || uploading || deleting) {
@@ -73,6 +106,11 @@ export function useCoverUpload({
         return;
       }
 
+      clearLocalPreview();
+      const objectUrl = URL.createObjectURL(file);
+      localPreviewUrlRef.current = objectUrl;
+      setLocalPreviewUrl(objectUrl);
+
       try {
         const practiceId = await getPracticeId();
 
@@ -92,6 +130,7 @@ export function useCoverUpload({
         let payload: {
           product?: AuthorProductDetail;
           cover_url?: string;
+          cover_image?: unknown;
           message?: string;
           error?: string;
         } | null = null;
@@ -110,6 +149,7 @@ export function useCoverUpload({
             payload = JSON.parse(responseText) as {
               product?: AuthorProductDetail;
               cover_url?: string;
+              cover_image?: unknown;
               message?: string;
               error?: string;
             };
@@ -134,9 +174,16 @@ export function useCoverUpload({
           payload?.cover_url ??
           payload?.product?.practice.cover_url ??
           coverUrl;
+        const nextCoverImage =
+          payload?.cover_image ??
+          payload?.product?.practice.cover_image ??
+          coverImage;
+
+        clearLocalPreview();
 
         onUpdated?.({
           coverUrl: nextCoverUrl ?? null,
+          coverImage: nextCoverImage ?? null,
           product: payload?.product,
         });
 
@@ -149,7 +196,14 @@ export function useCoverUpload({
         setUploading(false);
       }
     },
-    [coverUrl, buildUploadUrl, getPracticeId, onUpdated],
+    [
+      buildUploadUrl,
+      clearLocalPreview,
+      coverImage,
+      coverUrl,
+      getPracticeId,
+      onUpdated,
+    ],
   );
 
   const deleteCover = useCallback(async () => {
@@ -180,6 +234,7 @@ export function useCoverUpload({
       let payload: {
         product?: AuthorProductDetail;
         cover_url?: string | null;
+        cover_image?: unknown;
       } | null = null;
 
       const responseText = await response.text();
@@ -189,6 +244,7 @@ export function useCoverUpload({
           payload = JSON.parse(responseText) as {
             product?: AuthorProductDetail;
             cover_url?: string | null;
+            cover_image?: unknown;
           };
         } catch {
           if (!response.ok) {
@@ -203,8 +259,11 @@ export function useCoverUpload({
         return;
       }
 
+      clearLocalPreview();
+
       onUpdated?.({
         coverUrl: payload?.cover_url ?? null,
+        coverImage: payload?.cover_image ?? null,
         product: payload?.product,
       });
 
@@ -216,7 +275,14 @@ export function useCoverUpload({
     } finally {
       setDeleting(false);
     }
-  }, [coverUrl, buildDeleteUrl, deleteConfirmMessage, getPracticeId, onUpdated]);
+  }, [
+    buildDeleteUrl,
+    clearLocalPreview,
+    coverUrl,
+    deleteConfirmMessage,
+    getPracticeId,
+    onUpdated,
+  ]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,6 +315,8 @@ export function useCoverUpload({
     error,
     displayError,
     displaySrc,
+    resolvedCover,
+    useManifestPreview,
     showPreview,
     openPicker,
     deleteCover,

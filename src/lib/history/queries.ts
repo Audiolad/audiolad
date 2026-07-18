@@ -7,7 +7,7 @@ import {
 } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { resolveProductAccess } from "@/lib/products/access";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { mapProductCoverFields } from "@/lib/products/cover-display";
 import { formatAudioDuration, formatCatalogProductStats } from "@/lib/products/duration";
 import {
   buildListenPath,
@@ -45,6 +45,7 @@ type PracticeRow = {
   format: string | null;
   duration_minutes: number | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   is_free: boolean | null;
   price: number | null;
@@ -265,7 +266,7 @@ async function buildHistoryItem(
       totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
       durationMinutesFallback: practice.duration_minutes,
     }),
-    coverUrl: getProductCoverDisplayUrl(practice.cover_url, practice.updated_at),
+    ...mapProductCoverFields(practice),
     isProgram: tracks.length >= 2,
     stepLabel:
       tracks.length >= 2
@@ -336,6 +337,7 @@ export async function getListeningHistoryPageData(
           format,
           duration_minutes,
           cover_url,
+          cover_image,
           updated_at,
           is_free,
           price,

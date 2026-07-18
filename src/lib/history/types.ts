@@ -18,7 +18,9 @@ export type AggregatedPracticeProgress = {
   lastUpdatedAt: string;
 };
 
-export type HistoryItem = {
+import type { ProductCoverFields } from "@/lib/products/cover-display";
+
+export type HistoryItem = ProductCoverFields & {
   practiceId: string;
   title: string;
   authorName: string | null;
@@ -26,7 +28,6 @@ export type HistoryItem = {
   productSlug: string;
   formatLabel: string | null;
   metaLabel: string | null;
-  coverUrl: string | null;
   isProgram: boolean;
   stepLabel: string | null;
   progressPercent: number;

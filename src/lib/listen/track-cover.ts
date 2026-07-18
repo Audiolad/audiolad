@@ -1,4 +1,4 @@
-import { resolvePlaybackCoverUrl } from "@/lib/products/cover-display";
+import { resolvePlaybackCoverFields, resolvePlaybackCoverUrl } from "@/lib/products/cover-display";
 
 import type { ListenTrack } from "./types";
 
@@ -9,11 +9,13 @@ export type ListenTrackSourceRow = {
   position: number;
   duration_seconds: number | null;
   cover_url?: string | null;
+  cover_image?: unknown;
   updated_at?: string | null;
 };
 
 export type ListenTrackPracticeContext = {
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   use_shared_cover?: boolean | null;
 };
@@ -22,6 +24,20 @@ export function mapRowToListenTrack(
   item: ListenTrackSourceRow,
   practice: ListenTrackPracticeContext,
 ): ListenTrack {
+  const coverFields = resolvePlaybackCoverFields(
+    {
+      cover_url: practice.cover_url,
+      cover_image: practice.cover_image,
+      updated_at: practice.updated_at,
+      use_shared_cover: practice.use_shared_cover ?? true,
+    },
+    {
+      cover_url: item.cover_url ?? null,
+      cover_image: item.cover_image,
+      updated_at: item.updated_at ?? null,
+    },
+  );
+
   return {
     id: item.id,
     title: item.title,
@@ -31,14 +47,19 @@ export function mapRowToListenTrack(
     coverImageUrl: resolvePlaybackCoverUrl(
       {
         cover_url: practice.cover_url,
+        cover_image: practice.cover_image,
         updated_at: practice.updated_at,
         use_shared_cover: practice.use_shared_cover ?? true,
       },
       {
         cover_url: item.cover_url ?? null,
+        cover_image: item.cover_image,
         updated_at: item.updated_at ?? null,
       },
+      360,
     ),
+    coverImage: coverFields.coverImage ?? null,
+    updatedAt: coverFields.updatedAt ?? null,
   };
 }
 
@@ -63,10 +84,14 @@ export function mapLegacyPracticeToListenTrack(
     coverImageUrl: resolvePlaybackCoverUrl(
       {
         cover_url: practice.cover_url,
+        cover_image: practice.cover_image,
         updated_at: practice.updated_at,
         use_shared_cover: practice.use_shared_cover ?? true,
       },
       null,
+      360,
     ),
+    coverImage: practice.cover_image ?? null,
+    updatedAt: practice.updated_at ?? null,
   };
 }
