@@ -5,6 +5,7 @@ import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
 import {
   buildPublicPlaylistCanonicalUrl,
@@ -103,7 +104,15 @@ export default function PlaylistDetailClient({
   const hasUnavailable = items.some((item) => !item.available);
   const mosaicCoverUrls = items
     .slice(0, 4)
-    .map((item) => item.coverDisplayUrl);
+    .map((item) =>
+      getProductCoverDisplayUrl(
+        item.coverUrl,
+        item.updatedAt,
+        item.coverImage,
+        168,
+        "sm",
+      ),
+    );
   const reorderBusy = movingPracticeId !== null || submitting;
 
   useEffect(() => {
@@ -575,7 +584,9 @@ export default function PlaylistDetailClient({
                   title: item.title,
                   authorName: item.authorName,
                   authorSlug: item.authorSlug,
-                  coverDisplayUrl: item.coverDisplayUrl,
+                  coverUrl: item.coverUrl,
+                  coverImage: item.coverImage,
+                  updatedAt: item.updatedAt,
                   formatLabel: item.formatLabel,
                   metaLabel: item.metaLabel,
                   available: item.available,

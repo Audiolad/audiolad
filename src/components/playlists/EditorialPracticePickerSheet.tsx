@@ -10,7 +10,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import type { EditorialPracticeOption } from "@/lib/playlists/editorial-practices";
+import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
 type EditorialPracticePickerSheetProps = {
   playlistId: string;
@@ -381,11 +383,17 @@ export default function EditorialPracticePickerSheet({
                       } disabled:cursor-not-allowed`}
                     >
                       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[16px] bg-[#efe4fb]">
-                        {practice.coverDisplayUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={practice.coverDisplayUrl}
-                            alt=""
+                        {getProductCoverDisplayUrl(
+                          practice.coverUrl,
+                          practice.updatedAt,
+                          practice.coverImage,
+                          56,
+                        ) ? (
+                          <PlaybackCoverImage
+                            coverUrl={practice.coverUrl}
+                            coverImage={practice.coverImage}
+                            updatedAt={practice.updatedAt}
+                            displayWidth={56}
                             className="h-full w-full object-cover"
                           />
                         ) : null}

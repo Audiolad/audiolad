@@ -11,7 +11,7 @@ import {
   isPracticePublished,
   type ProductAccessInput,
 } from "@/lib/products/access";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { mapProductCoverFields, getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
 import {
   formatProductDuration,
   formatCatalogProductStats,
@@ -44,6 +44,7 @@ type PracticeEmbed = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   audio_url: string | null;
   status: string | null;
@@ -57,7 +58,7 @@ type ItemRow = {
   practices: PracticeEmbed | PracticeEmbed[] | null;
 };
 
-export type PlaylistDetailItemView = {
+export type PlaylistDetailItemView = ProductCoverFields & {
   practiceId: string;
   position: number;
   title: string;
@@ -65,7 +66,6 @@ export type PlaylistDetailItemView = {
   authorSlug: string | null;
   formatLabel: string | null;
   metaLabel: string | null;
-  coverDisplayUrl: string | null;
   available: boolean;
   unavailableReason: string | null;
   listenHref: string | null;
@@ -281,6 +281,7 @@ export async function loadOwnedPlaylistDetail(
         price,
         is_free,
         cover_url,
+        cover_image,
         updated_at,
         audio_url,
         status,
@@ -364,7 +365,9 @@ export async function loadOwnedPlaylistDetail(
         authorSlug: null,
         formatLabel: null,
         metaLabel: null,
-        coverDisplayUrl: null,
+        coverUrl: null,
+        coverImage: null,
+        updatedAt: null,
         available: false,
         unavailableReason: "Материал сейчас недоступен",
         listenHref: null,
@@ -416,19 +419,22 @@ export async function loadOwnedPlaylistDetail(
         totalDurationSeconds: durationSeconds,
         durationMinutesFallback: practice.duration_minutes,
       }),
-      coverDisplayUrl: getProductCoverDisplayUrl(
-        practice.cover_url,
-        practice.updated_at,
-      ),
+      ...mapProductCoverFields(practice),
       available: Boolean(listenHref),
       unavailableReason: listenHref ? null : "Материал сейчас недоступен",
       listenHref,
     });
   }
 
-  const mosaicCoverUrls = items
-    .slice(0, 4)
-    .map((item) => item.coverDisplayUrl);
+  const mosaicCoverUrls = items.slice(0, 4).map((item) =>
+    getProductCoverDisplayUrl(
+      item.coverUrl,
+      item.updatedAt,
+      item.coverImage,
+      168,
+      "sm",
+    ),
+  );
 
   let coverUrl: string | null = null;
 

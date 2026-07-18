@@ -22,8 +22,13 @@ export const PLAYLIST_COVER_ALLOWED_MIME = new Set([
 
 const UUID_RE =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-const COVER_PATH_RE = new RegExp(
+const LEGACY_COVER_PATH_RE = new RegExp(
   `^(${UUID_RE})\\/(${UUID_RE})\\/(${UUID_RE})\\.webp$`,
+  "i",
+);
+
+const VARIANT_COVER_PATH_RE = new RegExp(
+  `^(${UUID_RE})\\/(${UUID_RE})\\/variants\\/(${UUID_RE})\\/(xs|sm|md|lg|xl|placeholder)\\.webp$`,
   "i",
 );
 
@@ -65,7 +70,9 @@ export function isValidPlaylistCoverPath(
     return false;
   }
 
-  const match = COVER_PATH_RE.exec(trimmed);
+  const legacyMatch = LEGACY_COVER_PATH_RE.exec(trimmed);
+  const variantMatch = VARIANT_COVER_PATH_RE.exec(trimmed);
+  const match = legacyMatch ?? variantMatch;
 
   if (!match) {
     return false;
@@ -104,10 +111,21 @@ export function parsePlaylistCoverPath(coverPath: string): {
     return null;
   }
 
-  const match = COVER_PATH_RE.exec(coverPath.trim());
+  const trimmed = coverPath.trim();
+  const legacyMatch = LEGACY_COVER_PATH_RE.exec(trimmed);
+  const variantMatch = VARIANT_COVER_PATH_RE.exec(trimmed);
+  const match = legacyMatch ?? variantMatch;
 
   if (!match) {
     return null;
+  }
+
+  if (variantMatch) {
+    return {
+      userId: match[1],
+      playlistId: match[2],
+      fileName: `${match[4]}.webp`,
+    };
   }
 
   return {

@@ -12,7 +12,9 @@ export type PlaylistItemRowData = {
   title: string;
   authorName: string | null;
   authorSlug?: string | null;
-  coverDisplayUrl: string | null;
+  coverUrl: string | null;
+  coverImage?: unknown;
+  updatedAt?: string | null;
   formatLabel?: string | null;
   metaLabel?: string | null;
   available: boolean;
@@ -95,8 +97,11 @@ export default function PlaylistItemRow({
           <ProductCoverThumbnail
             slug={item.practiceId}
             title={item.title}
-            coverUrl={item.coverDisplayUrl}
+            coverUrl={item.coverUrl}
+            coverImage={item.coverImage}
+            updatedAt={item.updatedAt}
             authorName={item.authorName}
+            displayWidth={56}
             className="h-full w-full rounded-[12px]"
           />
         </Link>
@@ -105,8 +110,11 @@ export default function PlaylistItemRow({
           <ProductCoverThumbnail
             slug={item.practiceId}
             title={item.title}
-            coverUrl={item.coverDisplayUrl}
+            coverUrl={item.coverUrl}
+            coverImage={item.coverImage}
+            updatedAt={item.updatedAt}
             authorName={item.authorName}
+            displayWidth={56}
             className="h-full w-full rounded-[12px]"
           />
         </div>

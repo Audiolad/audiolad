@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
 import {
-  playlistCoverProcessErrorMessage,
-  processPlaylistCoverImage,
-} from "@/lib/playlists/cover-image";
+  cleanupImageManifest,
+  uploadOptimizedImageSet,
+} from "@/lib/images/image-upload-service";
+import { parseImageManifest } from "@/lib/images/image-manifest";
+import { imageProcessErrorMessage } from "@/lib/images/process-image";
+import { playlistCoverProcessErrorMessage } from "@/lib/playlists/cover-image";
 import {
   assertPlaylistCoverPathForOwner,
-  buildPlaylistCoverStoragePath,
   createPlaylistCoverSignedUrl,
   PLAYLIST_COVER_MAX_BYTES,
   PLAYLIST_COVERS_BUCKET,
@@ -104,43 +106,44 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const processed = await processPlaylistCoverImage(buffer, file.type);
+  const storage = createServiceRoleClient();
+  const previousManifest = parseImageManifest(playlist.cover_image);
 
-  if (!processed.ok) {
+  const uploaded = await uploadOptimizedImageSet({
+    profile: "playlist-cover",
+    bucket: PLAYLIST_COVERS_BUCKET,
+    buffer,
+    declaredMime: file.type,
+    storage: storage.storage,
+    context: { userId: user.id, playlistId: id },
+  });
+
+  if (!uploaded.ok) {
     return NextResponse.json(
       {
-        error: processed.code,
-        message: playlistCoverProcessErrorMessage(processed.code),
+        error: uploaded.code,
+        message:
+          uploaded.code === "upload_failed"
+            ? "Не удалось сохранить обложку. Попробуйте ещё раз."
+            : imageProcessErrorMessage(
+                uploaded.code as "corrupt_image",
+                "playlist-cover",
+              ),
       },
-      { status: 400 },
+      { status: uploaded.code === "upload_failed" ? 500 : 400 },
     );
   }
 
   const expectedOldPath = playlist.cover_path;
-  const nextPath = buildPlaylistCoverStoragePath(user.id, id);
+  const nextPath = uploaded.data.primaryDisplayPath;
 
   if (!assertPlaylistCoverPathForOwner(nextPath, user.id, id)) {
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  const storage = createServiceRoleClient();
-
-  const { error: uploadError } = await storage.storage
-    .from(PLAYLIST_COVERS_BUCKET)
-    .upload(nextPath, processed.buffer, {
-      contentType: processed.contentType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("playlist_cover_upload_error", uploadError.message);
-    return NextResponse.json(
-      {
-        error: "upload_failed",
-        message: "Не удалось сохранить обложку. Попробуйте ещё раз.",
-      },
-      { status: 500 },
+    await cleanupImageManifest(
+      storage.storage,
+      PLAYLIST_COVERS_BUCKET,
+      uploaded.data.manifest,
     );
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   const cas = await replacePlaylistCoverPathCas(
@@ -184,19 +187,32 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (cas.result.status === "conflict") {
-    const cleanup = await removePlaylistCoverObject(
-      storage,
-      nextPath,
-      user.id,
-      id,
+    await cleanupImageManifest(
+      storage.storage,
+      PLAYLIST_COVERS_BUCKET,
+      uploaded.data.manifest,
     );
-    if (!cleanup.ok) {
-      console.error("playlist_cover_orphan_cleanup_error", cleanup.error);
-    }
     return conflictResponse();
   }
 
   const confirmedOld = cas.result.previous_path;
+
+  const { error: manifestUpdateError } = await supabase
+    .from("playlists")
+    .update({ cover_image: uploaded.data.manifest })
+    .eq("id", id);
+
+  if (manifestUpdateError) {
+    console.error("playlist_cover_manifest_update_error", manifestUpdateError.message);
+  }
+
+  if (previousManifest) {
+    await cleanupImageManifest(
+      storage.storage,
+      PLAYLIST_COVERS_BUCKET,
+      previousManifest,
+    );
+  }
 
   if (
     confirmedOld &&
@@ -264,12 +280,54 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const previousPath = playlist.cover_path;
+  const previousManifest = parseImageManifest(playlist.cover_image);
 
-  if (!previousPath) {
+  if (!previousPath && !previousManifest) {
     return new NextResponse(null, { status: 204 });
   }
 
-  if (!assertPlaylistCoverPathForOwner(previousPath, user.id, id)) {
+  if (!previousPath && previousManifest) {
+    const { error: manifestClearError } = await supabase
+      .from("playlists")
+      .update({ cover_image: null })
+      .eq("id", id);
+
+    if (manifestClearError) {
+      console.error(
+        "playlist_cover_manifest_only_clear_error",
+        manifestClearError.message,
+      );
+      return NextResponse.json(
+        {
+          error: "internal_error",
+          message:
+            "Не удалось вернуть автоматическую обложку. Попробуйте ещё раз.",
+        },
+        { status: 500 },
+      );
+    }
+
+    try {
+      const storage = createServiceRoleClient();
+      await cleanupImageManifest(
+        storage.storage,
+        PLAYLIST_COVERS_BUCKET,
+        previousManifest,
+      );
+    } catch (error) {
+      console.error(
+        "playlist_cover_manifest_only_storage_delete_exception",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    return new NextResponse(null, { status: 204 });
+  }
+
+  if (
+    previousPath &&
+    !assertPlaylistCoverPathForOwner(previousPath, user.id, id)
+  ) {
     console.error("playlist_cover_delete_invalid_stored_path");
     return NextResponse.json(
       {
@@ -305,14 +363,36 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   if (cas.result.status === "conflict") {
-    // Parallel replace won — do not delete the new object.
     return conflictResponse();
   }
 
-  // status ok (including idempotent already-null)
-  if (cas.result.previous_path) {
-    try {
-      const storage = createServiceRoleClient();
+  const { error: manifestClearError } = await supabase
+    .from("playlists")
+    .update({ cover_image: null })
+    .eq("id", id);
+
+  if (manifestClearError) {
+    console.error("playlist_cover_manifest_clear_error", manifestClearError.message);
+    return NextResponse.json(
+      {
+        error: "internal_error",
+        message:
+          "Не удалось вернуть автоматическую обложку. Попробуйте ещё раз.",
+      },
+      { status: 500 },
+    );
+  }
+
+  try {
+    const storage = createServiceRoleClient();
+
+    if (previousManifest) {
+      await cleanupImageManifest(
+        storage.storage,
+        PLAYLIST_COVERS_BUCKET,
+        previousManifest,
+      );
+    } else if (cas.result.previous_path) {
       const removed = await removePlaylistCoverObject(
         storage,
         cas.result.previous_path,
@@ -323,12 +403,12 @@ export async function DELETE(request: Request, context: RouteContext) {
       if (!removed.ok) {
         console.error("playlist_cover_storage_delete_error", removed.error);
       }
-    } catch (error) {
-      console.error(
-        "playlist_cover_storage_delete_exception",
-        error instanceof Error ? error.message : error,
-      );
     }
+  } catch (error) {
+    console.error(
+      "playlist_cover_storage_delete_exception",
+      error instanceof Error ? error.message : error,
+    );
   }
 
   return new NextResponse(null, { status: 204 });

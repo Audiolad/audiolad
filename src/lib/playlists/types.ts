@@ -16,6 +16,7 @@ export type PlaylistRow = {
   created_at: string;
   updated_at: string;
   cover_path: string | null;
+  cover_image?: unknown;
   cover_updated_at: string | null;
   is_editorial: boolean;
 };
