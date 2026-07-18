@@ -28,7 +28,7 @@ const LEGACY_COVER_PATH_RE = new RegExp(
 );
 
 const VARIANT_COVER_PATH_RE = new RegExp(
-  `^(${UUID_RE})\\/(${UUID_RE})\\/variants\\/(${UUID_RE})\\/(xs|sm|md|lg|xl|placeholder)\\.webp$`,
+  `^(${UUID_RE})\\/(${UUID_RE})\\/variants\\/(${UUID_RE})\\/(sm|md|lg|xl|placeholder)\\.webp$`,
   "i",
 );
 

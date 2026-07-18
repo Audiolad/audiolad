@@ -49,4 +49,40 @@ assert(
   "wrong playlist segment",
 );
 
+const versionId = "66666666-6666-4666-8666-666666666666";
+const variantLg = `${userId}/${playlistId}/variants/${versionId}/lg.webp`;
+const variantSm = `${userId}/${playlistId}/variants/${versionId}/sm.webp`;
+const variantPlaceholder = `${userId}/${playlistId}/variants/${versionId}/placeholder.webp`;
+
+assert(isValidPlaylistCoverPath(variantLg, userId, playlistId), "valid lg variant");
+assert(isValidPlaylistCoverPath(variantSm, userId, playlistId), "valid sm variant");
+assert(
+  isValidPlaylistCoverPath(variantPlaceholder, userId, playlistId),
+  "valid placeholder variant",
+);
+assert(
+  !isValidPlaylistCoverPath(
+    `${userId}/${playlistId}/variants/${versionId}/xs.webp`,
+    userId,
+    playlistId,
+  ),
+  "unknown xs variant",
+);
+assert(
+  !isValidPlaylistCoverPath(
+    `${userId}/${playlistId}/variants/${versionId}/lg.jpg`,
+    userId,
+    playlistId,
+  ),
+  "variant wrong ext",
+);
+assert(
+  !isValidPlaylistCoverPath(
+    `${otherUser}/${playlistId}/variants/${versionId}/lg.webp`,
+    userId,
+    playlistId,
+  ),
+  "variant foreign user",
+);
+
 console.log("PR3_3_PATH_SMOKE_PASS");
