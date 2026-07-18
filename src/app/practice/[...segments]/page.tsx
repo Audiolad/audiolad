@@ -621,6 +621,17 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             items={publicAudioItems}
             durationMinutesFallback={practice.duration_minutes}
             productTitle={practice.title}
+            practiceCover={{
+              cover_url: practice.cover_url,
+              cover_image: practice.cover_image,
+              updated_at: practice.updated_at,
+              use_shared_cover: practice.use_shared_cover ?? true,
+            }}
+            playback={{
+              enabled: presentation.primaryAction.kind === "listen",
+              authorSlug: resolvedAuthorSlug,
+              productSlug: practice.slug,
+            }}
           />
 
           <section className="mt-6">

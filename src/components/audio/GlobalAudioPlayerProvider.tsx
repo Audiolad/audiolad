@@ -124,7 +124,11 @@ function GlobalPlayerEngine({
   const recoveryTimerRef = useRef<number | null>(null);
 
   const handleInitialAutoplayAttempted = useCallback(() => {
-    if (!session.requestAutoplay || skipAutoplayUrlSync) {
+    if (
+      !session.requestAutoplay ||
+      skipAutoplayUrlSync ||
+      session.suppressListenUrlSync
+    ) {
       return;
     }
 
@@ -143,6 +147,7 @@ function GlobalPlayerEngine({
     session.authorSlug,
     session.productSlug,
     session.requestAutoplay,
+    session.suppressListenUrlSync,
     skipAutoplayUrlSync,
   ]);
 
@@ -161,6 +166,7 @@ function GlobalPlayerEngine({
     initialProgress: session.initialProgress,
     requestInitialAutoplay: Boolean(session.requestAutoplay),
     forceStartAtBeginning: Boolean(session.forceStartAtBeginning),
+    initialTrackId: session.initialTrackId ?? null,
     queueHasNext,
     queueHasPrevious,
     onTracksExhausted,
@@ -491,8 +497,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     let shouldBumpPlaybackInstance = true;
 
     if (current?.practiceId === input.practiceId) {
+      const trackSelectionChanged =
+        Boolean(input.initialTrackId) &&
+        input.initialTrackId !== current.initialTrackId;
+
       shouldBumpPlaybackInstance =
-        requestAutoplay && !current.requestAutoplay;
+        (requestAutoplay && !current.requestAutoplay) || trackSelectionChanged;
       shouldBumpGeneration = shouldBumpPlaybackInstance;
     }
 

@@ -71,6 +71,7 @@ type UseSequentialPlayerOptions = {
   initialProgress: ListenProgressEntry[];
   requestInitialAutoplay?: boolean;
   forceStartAtBeginning?: boolean;
+  initialTrackId?: string | null;
   /** When true, Next stays enabled on the last track (queue will advance). */
   queueHasNext?: boolean;
   /** When true, Previous can leave the first track for the prior queue entry. */
@@ -119,6 +120,7 @@ export function useSequentialPlayer({
   initialProgress,
   requestInitialAutoplay = false,
   forceStartAtBeginning = false,
+  initialTrackId = null,
   queueHasNext = false,
   queueHasPrevious = false,
   onInitialAutoplayAttempted,
@@ -186,8 +188,20 @@ export function useSequentialPlayer({
       };
     }
 
+    if (initialTrackId) {
+      const selectedIndex = tracks.findIndex((track) => track.id === initialTrackId);
+
+      if (selectedIndex >= 0) {
+        return {
+          trackIndex: selectedIndex,
+          positionSeconds: 0,
+          allCompleted: false,
+        };
+      }
+    }
+
     return resolveInitialPlayback(tracks, initialProgress);
-  }, [forceStartAtBeginning, initialProgress, tracks]);
+  }, [forceStartAtBeginning, initialProgress, initialTrackId, tracks]);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(
     initialPlayback.trackIndex,
@@ -1049,6 +1063,33 @@ export function useSequentialPlayer({
     });
   };
 
+  const handlePlayTrackAtIndex = async (index: number) => {
+    if (index < 0 || index >= tracks.length) {
+      return;
+    }
+
+    if (index === currentTrackIndex) {
+      const audio = audioRef.current;
+
+      if (audio?.paused && src) {
+        userWantsPlaybackRef.current = true;
+
+        try {
+          await audio.play();
+        } catch {
+          setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+        }
+      }
+
+      return;
+    }
+
+    await switchToTrack(index, {
+      autoPlay: true,
+      startPosition: 0,
+    });
+  };
+
   const handleRetry = () => {
     if (!currentTrack) {
       return;
@@ -1530,6 +1571,7 @@ export function useSequentialPlayer({
     handlePreviousTrack,
     handleNextTrack,
     handleSelectTrack,
+    handlePlayTrackAtIndex,
     handleRetry,
     handleSpeedChange,
     handleStartOver,

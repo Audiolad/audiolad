@@ -18,6 +18,10 @@ export type GlobalPlayerSession = {
   requestAutoplay?: boolean;
   /** When true, start at track 0 / position 0 (Play All restart). */
   forceStartAtBeginning?: boolean;
+  /** Start playback on this track (position 0) instead of resume position. */
+  initialTrackId?: string | null;
+  /** Keep the current route when autoplay starts (e.g. product page contents). */
+  suppressListenUrlSync?: boolean;
   /** Guest promo funnel: persist progress in localStorage instead of server. */
   guestProgressMode?: boolean;
   guestProgressMeta?: {

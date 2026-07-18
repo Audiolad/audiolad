@@ -6,6 +6,9 @@ export type PublicAudioItem = {
   description: string | null;
   position: number;
   durationSeconds: number | null;
+  coverUrl: string | null;
+  coverImage: unknown;
+  updatedAt: string | null;
 };
 
 type AudioItemRow = {
@@ -14,6 +17,9 @@ type AudioItemRow = {
   description: string | null;
   position: number;
   duration_seconds: number | null;
+  cover_url: string | null;
+  cover_image: unknown;
+  updated_at: string | null;
   status: string;
 };
 
@@ -30,7 +36,9 @@ export async function loadPublicAudioItems(
 ): Promise<PublicAudioItem[]> {
   let query = supabase
     .from("audio_items")
-    .select("id, title, description, position, duration_seconds, status")
+    .select(
+      "id, title, description, position, duration_seconds, cover_url, cover_image, updated_at, status",
+    )
     .eq("practice_id", input.practiceId)
     .order("position", { ascending: true });
 
@@ -59,6 +67,9 @@ export async function loadPublicAudioItems(
         : null,
     position: item.position,
     durationSeconds: item.duration_seconds,
+    coverUrl: item.cover_url?.trim() || null,
+    coverImage: item.cover_image ?? null,
+    updatedAt: item.updated_at ?? null,
   }));
 }
 
