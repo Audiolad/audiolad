@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import LegalPageShell from "@/components/legal/LegalPageShell";
 
