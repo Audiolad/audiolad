@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { formatCatalogProductStats } from "@/lib/products/duration";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import {
@@ -19,6 +19,7 @@ type EditorialPracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   audio_url: string | null;
   status: string | null;
@@ -30,7 +31,7 @@ type EditorialPracticeRow = {
     | null;
 };
 
-export type EditorialPracticeOption = {
+export type EditorialPracticeOption = ProductCoverFields & {
   id: string;
   title: string;
   authorId: string;
@@ -38,7 +39,6 @@ export type EditorialPracticeOption = {
   authorSlug: string;
   formatLabel: string | null;
   metaLabel: string | null;
-  coverDisplayUrl: string | null;
   isFree: boolean;
   priceLabel: string;
   alreadyAdded: boolean;
@@ -76,6 +76,7 @@ export async function listEditorialPracticeOptions(
       price,
       is_free,
       cover_url,
+      cover_image,
       updated_at,
       audio_url,
       status,
@@ -170,10 +171,7 @@ export async function listEditorialPracticeOptions(
         totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
         durationMinutesFallback: row.duration_minutes,
       }),
-      coverDisplayUrl: getProductCoverDisplayUrl(
-        row.cover_url,
-        row.updated_at,
-      ),
+      ...mapProductCoverFields(row),
       isFree: isProductFree(row.is_free, row.price),
       priceLabel: getProductPriceLabel(row.price, row.is_free),
       alreadyAdded: addedSet.has(row.id),

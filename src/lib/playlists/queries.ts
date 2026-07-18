@@ -151,7 +151,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial",
     )
     .eq("id", playlistId)
     .maybeSingle();

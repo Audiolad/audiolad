@@ -9,7 +9,7 @@ import {
   normalizePlaylistPublicSlug,
 } from "@/lib/playlists/public-slug";
 import type { PlaylistVisibility } from "@/lib/playlists/types";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { mapProductCoverFields, getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
 import {
   formatProductDuration,
   formatCatalogProductStats,
@@ -39,6 +39,7 @@ type PracticeEmbed = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   status: string | null;
   is_catalog_listed: boolean | null;
@@ -65,7 +66,7 @@ type PlaylistDbRow = {
   is_editorial: boolean | null;
 };
 
-export type PublicPlaylistItemView = {
+export type PublicPlaylistItemView = ProductCoverFields & {
   practiceId: string;
   position: number;
   title: string;
@@ -73,7 +74,6 @@ export type PublicPlaylistItemView = {
   authorSlug: string | null;
   formatLabel: string | null;
   metaLabel: string | null;
-  coverDisplayUrl: string | null;
   available: boolean;
   href: string | null;
 };
@@ -187,6 +187,7 @@ export const loadPublicPlaylistBySlug = cache(
         price,
         is_free,
         cover_url,
+        cover_image,
         updated_at,
         status,
         is_catalog_listed,
@@ -253,7 +254,9 @@ export const loadPublicPlaylistBySlug = cache(
           authorSlug: null,
           formatLabel: null,
           metaLabel: null,
-          coverDisplayUrl: null,
+          coverUrl: null,
+          coverImage: null,
+          updatedAt: null,
           available: false,
           href: null,
         });
@@ -274,9 +277,11 @@ export const loadPublicPlaylistBySlug = cache(
       const audioSummary = audioByPractice.get(practice.id);
       const durationSeconds = audioSummary?.totalDurationSeconds ?? null;
       const audioCount = audioSummary?.audioCount ?? 0;
-      const coverDisplayUrl = getProductCoverDisplayUrl(
-        practice.cover_url,
-        practice.updated_at,
+      const coverFields = mapProductCoverFields(practice);
+      const mosaicUrl = getProductCoverDisplayUrl(
+        coverFields.coverUrl,
+        coverFields.updatedAt,
+        coverFields.coverImage,
       );
 
       if (eligible) {
@@ -292,7 +297,7 @@ export const loadPublicPlaylistBySlug = cache(
         }
 
         if (mosaicFromAvailable.length < 4) {
-          mosaicFromAvailable.push(coverDisplayUrl);
+          mosaicFromAvailable.push(mosaicUrl);
         }
       } else {
         hasUnavailable = true;
@@ -331,8 +336,13 @@ export const loadPublicPlaylistBySlug = cache(
               durationMinutesFallback: practice.duration_minutes,
             })
           : null,
-        coverDisplayUrl:
-          eligible || practice.status === "published" ? coverDisplayUrl : null,
+        ...(eligible || practice.status === "published"
+          ? coverFields
+          : {
+              coverUrl: null,
+              coverImage: null,
+              updatedAt: null,
+            }),
         available: Boolean(href),
         href,
       });
