@@ -1,7 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useCallback, useState } from "react";
+
+import { useAvatarCropUpload } from "@/components/images/useAvatarCropUpload";
+import { AVATAR_ERROR_MESSAGES, AVATAR_UPLOAD_HINT } from "@/lib/images/avatar-constants";
 
 type ProfileAvatarEditorProps = {
   initialAvatarUrl: string | null;
@@ -32,20 +35,13 @@ export default function ProfileAvatarEditor({
   initialAvatarUrl,
   initial,
 }: ProfileAvatarEditorProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
-  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
+  const uploadAvatar = useCallback(async (file: File) => {
     setIsUploading(true);
     setMessage("");
     setIsError(false);
@@ -64,25 +60,31 @@ export default function ProfileAvatarEditor({
         | null;
 
       if (!response.ok) {
-        setIsError(true);
-        setMessage(
-          payload?.message ?? "Не удалось загрузить аватар. Попробуйте ещё раз.",
+        throw new Error(
+          payload?.message ?? AVATAR_ERROR_MESSAGES.saveFailed,
         );
-        return;
       }
 
       if (payload?.avatarUrl) {
         setAvatarUrl(payload.avatarUrl);
         setMessage("Фотография обновлена.");
       }
-    } catch {
-      setIsError(true);
-      setMessage("Не удалось загрузить аватар. Попробуйте ещё раз.");
     } finally {
       setIsUploading(false);
-      event.target.value = "";
     }
-  }
+  }, []);
+
+  const {
+    fileInputRef,
+    error: cropError,
+    openPicker,
+    handleFileChange,
+    cropper,
+    isSavingCrop,
+  } = useAvatarCropUpload({
+    disabled: isUploading || isDeleting,
+    onUpload: uploadAvatar,
+  });
 
   async function handleDelete() {
     setIsDeleting(true);
@@ -110,15 +112,18 @@ export default function ProfileAvatarEditor({
     }
   }
 
-  const isBusy = isUploading || isDeleting;
+  const isBusy = isUploading || isDeleting || isSavingCrop;
+  const displayError = cropError;
 
   return (
     <section className="mt-7">
+      {cropper}
+
       <div className="flex flex-col items-center">
         <div className="relative">
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={openPicker}
             disabled={isBusy}
             aria-label="Изменить фотографию"
             className="relative flex h-[130px] w-[130px] items-center justify-center overflow-hidden rounded-[34px] bg-gradient-to-br from-[#eadcf7] to-[#c4a4e5] text-[46px] font-semibold text-[#7042c5] shadow-[0_14px_34px_rgba(96,59,168,0.14)] disabled:cursor-wait"
@@ -139,7 +144,7 @@ export default function ProfileAvatarEditor({
 
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={openPicker}
             disabled={isBusy}
             aria-label="Выбрать фотографию"
             className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-full border-4 border-white bg-[#7042c5] text-white shadow-lg disabled:cursor-wait"
@@ -148,7 +153,7 @@ export default function ProfileAvatarEditor({
           </button>
 
           <input
-            ref={inputRef}
+            ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
@@ -156,8 +161,12 @@ export default function ProfileAvatarEditor({
           />
         </div>
 
-        <p className="mt-5 text-sm font-medium text-[#8a7ca9]">
-          {isUploading
+        <p className="mt-3 max-w-sm text-center text-sm leading-5 text-[#8a7ca9]">
+          {AVATAR_UPLOAD_HINT}
+        </p>
+
+        <p className="mt-2 text-sm font-medium text-[#8a7ca9]">
+          {isUploading || isSavingCrop
             ? "Загружаем фотографию…"
             : isDeleting
               ? "Удаляем фотографию…"
@@ -173,6 +182,12 @@ export default function ProfileAvatarEditor({
           >
             Удалить фотографию
           </button>
+        ) : null}
+
+        {displayError ? (
+          <p role="alert" className="mt-3 text-center text-sm leading-6 text-[#b34f63]">
+            {displayError}
+          </p>
         ) : null}
 
         {message ? (

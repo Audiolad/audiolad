@@ -22,6 +22,7 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { getShortBioLengthError } from "@/lib/authors/validation";
 
 import { useAuthorAssetUpload } from "./useAuthorAssetUpload";
+import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 
 type PublishedProductOption = {
   id: string;
@@ -37,110 +38,6 @@ type AuthorProfileClientProps = {
   authors: AuthorWorkspace[];
   topicOptions: TopicSelectorOption[];
 };
-
-function AuthorAvatarUploadBlock({
-  authorId,
-  avatarUrl,
-  disabled,
-  onUpdated,
-}: {
-  authorId: string;
-  avatarUrl: string | null;
-  disabled?: boolean;
-  onUpdated: (url: string | null) => void;
-}) {
-  const {
-    fileInputRef,
-    uploading,
-    deleting,
-    error,
-    displaySrc,
-    showPreview,
-    openPicker,
-    deleteAsset,
-    handleFileChange,
-    isBusy,
-    setPreviewFailed,
-  } = useAuthorAssetUpload({
-    assetUrl: avatarUrl,
-    authorId,
-    kind: "avatar",
-    disabled,
-    onUpdated: (result) => onUpdated(result.url),
-  });
-
-  return (
-    <div>
-      <span className="mb-2 block text-sm font-medium">Фотография или логотип</span>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={disabled || isBusy}
-          className="group relative block h-28 w-28 overflow-hidden rounded-[18px] border border-[#d9c9ef] bg-[#f8f4fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
-        >
-          {showPreview && displaySrc ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displaySrc}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={() => setPreviewFailed(true)}
-              />
-              <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-2 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100">
-                Заменить
-              </span>
-            </>
-          ) : (
-            <span className="flex h-full items-center justify-center text-xs text-[#8c79b6]">
-              Загрузить
-            </span>
-          )}
-        </button>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={openPicker}
-            disabled={disabled || isBusy}
-            className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
-          >
-            {uploading ? "Загрузка…" : showPreview ? "Изменить" : "Загрузить"}
-          </button>
-          {avatarUrl ? (
-            <button
-              type="button"
-              onClick={() => void deleteAsset()}
-              disabled={disabled || isBusy}
-              className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2]"
-            >
-              {deleting ? "Удаление…" : "Удалить"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
-        Квадратное изображение JPG, PNG или WebP до 3 МБ.
-      </p>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="sr-only"
-        onChange={handleFileChange}
-      />
-
-      {error ? (
-        <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 function AuthorBannerUploadBlock({
   authorId,

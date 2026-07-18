@@ -157,23 +157,23 @@ function testBannerUploadUsesDedicatedValidation() {
   );
 }
 
-function testProductCoverValidationUnchanged() {
+function testProductCoverValidationRelaxed() {
   const coverValidation = readFileSync(
     "/var/www/audiolad/src/lib/author-products/cover-validation-client.ts",
     "utf8",
   );
 
   assert(
-    coverValidation.includes('width !== height'),
-    "product cover validation still enforces 1:1",
+    coverValidation.includes("MIN_COVER_DIMENSION = 400"),
+    "product cover validation uses 400px minimum",
   );
   assert(
-    coverValidation.includes("1000 × 1000"),
-    "product cover validation still requires 1000x1000 minimum",
+    !coverValidation.includes("width !== height"),
+    "product cover validation no longer enforces strict 1:1 on client",
   );
   assert(
-    coverValidation.includes("Обложка должна быть квадратной"),
-    "product cover square error message preserved",
+    !coverValidation.includes("1000 × 1000"),
+    "product cover validation no longer requires 1000x1000 minimum",
   );
 }
 
@@ -193,19 +193,19 @@ function testAuthorProfileBannerPreview() {
   );
 }
 
-function testApiRouteUsesBannerValidation() {
+function testApiRouteUsesSharedImagePipeline() {
   const route = readFileSync(
     "/var/www/audiolad/src/app/api/author/profile/[kind]/route.ts",
     "utf8",
   );
 
   assert(
-    route.includes("validateAuthorBannerBuffer"),
-    "author asset API validates banner on server",
+    route.includes("uploadOptimizedImageSet"),
+    "author asset API uses shared image upload service",
   );
   assert(
-    route.includes("banner-validation-server"),
-    "author asset API uses server banner validation module",
+    route.includes('"author-banner"') || route.includes("'author-banner'"),
+    "author asset API includes author-banner profile",
   );
 }
 
@@ -215,9 +215,9 @@ function run() {
   testBannerConfigContract();
   testBannerHintAndMessages();
   testBannerUploadUsesDedicatedValidation();
-  testProductCoverValidationUnchanged();
+  testProductCoverValidationRelaxed();
   testAuthorProfileBannerPreview();
-  testApiRouteUsesBannerValidation();
+  testApiRouteUsesSharedImagePipeline();
   console.log("author-banner-validation-unit: ok");
 }
 

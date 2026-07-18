@@ -14,6 +14,8 @@ export type AuthorProfileRow = {
   banner_url: string | null;
   avatar_path: string | null;
   banner_path: string | null;
+  avatar_image?: unknown;
+  banner_image?: unknown;
   updated_at: string | null;
 };
 
@@ -67,7 +69,7 @@ export async function getAuthorProfileDetail(
   const { data: author, error } = await supabase
     .from("authors")
     .select(
-      "id, name, slug, author_type, short_bio, full_bio, description, avatar_url, banner_url, avatar_path, banner_path, updated_at",
+      "id, name, slug, author_type, short_bio, full_bio, description, avatar_url, banner_url, avatar_path, banner_path, avatar_image, banner_image, updated_at",
     )
     .eq("id", authorId)
     .maybeSingle();

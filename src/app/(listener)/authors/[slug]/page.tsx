@@ -90,6 +90,8 @@ export default async function AuthorPublicPage({ params }: PageProps) {
           shortBio={data.shortBio}
           avatarUrl={data.avatarUrl}
           bannerUrl={data.bannerUrl}
+          avatarImage={data.avatarImage}
+          bannerImage={data.bannerImage}
           publishedCount={data.publishedCount}
         />
 

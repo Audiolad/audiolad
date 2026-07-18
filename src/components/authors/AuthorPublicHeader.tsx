@@ -1,4 +1,10 @@
+import {
+  AuthorBannerImage,
+  AvatarImage,
+} from "@/components/images/ResponsiveImage";
 import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
+import { parseImageManifest } from "@/lib/images/image-manifest";
+import type { ImageManifest } from "@/lib/images/image-types";
 
 function getAuthorInitial(name: string): string {
   const trimmed = name.trim();
@@ -11,6 +17,8 @@ type AuthorPublicHeaderProps = {
   shortBio: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  avatarImage?: unknown;
+  bannerImage?: unknown;
   publishedCount: number;
 };
 
@@ -19,17 +27,24 @@ export default function AuthorPublicHeader({
   shortBio,
   avatarUrl,
   bannerUrl,
+  avatarImage,
+  bannerImage,
   publishedCount,
 }: AuthorPublicHeaderProps) {
+  const avatarManifest = parseImageManifest(avatarImage);
+  const bannerManifest = parseImageManifest(bannerImage);
+
   return (
     <section className="overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
       <div className="relative h-28 sm:h-36 xl:h-44">
         {bannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <AuthorBannerImage
             src={bannerUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
+            manifest={bannerManifest as ImageManifest | null}
+            displayWidth={1280}
+            priority
           />
         ) : (
           <div
@@ -47,11 +62,12 @@ export default function AuthorPublicHeader({
         <div className="-mt-10 flex items-end gap-4 sm:-mt-12 sm:gap-5">
           <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[22px] border-4 border-white bg-gradient-to-br from-[#7042c5] to-[#a27bd9] text-3xl font-semibold text-white shadow-[0_8px_24px_rgba(91,62,145,0.18)] sm:h-[104px] sm:w-[104px] sm:rounded-[24px]">
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <AvatarImage
                 src={avatarUrl}
                 alt={buildAuthorAvatarAlt(name)}
                 className="h-full w-full object-cover"
+                manifest={avatarManifest as ImageManifest | null}
+                size={104}
               />
             ) : (
               getAuthorInitial(name)

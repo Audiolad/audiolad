@@ -4,19 +4,23 @@ import {
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
-import { getCoverExtension } from "@/lib/author-products/media";
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
-import { COVER_EXTENSIONS } from "@/lib/author-products/utils";
 import { AUTHOR_BANNER_ERROR_MESSAGES } from "@/lib/authors/banner-validation-client";
-import { validateAuthorBannerBuffer } from "@/lib/authors/banner-validation-server";
 import {
   buildAuthorAssetStoragePath,
-  getAuthorAssetPublicUrl,
   removeAuthorAssetFiles,
   type AuthorAssetKind,
 } from "@/lib/authors/assets";
 import { AUTHOR_ASSETS_BUCKET } from "@/lib/authors/constants";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
+import {
+  cleanupImageManifest,
+  primaryPublicUrl,
+  uploadOptimizedImageSet,
+} from "@/lib/images/image-upload-service";
+import { parseImageManifest } from "@/lib/images/image-manifest";
+import { imageProcessErrorMessage } from "@/lib/images/process-image";
+import { avatarProcessErrorMessage } from "@/lib/images/process-avatar-image";
 
 type RouteContext = {
   params: Promise<{ kind: string }>;
@@ -38,6 +42,12 @@ function getPathColumn(kind: AuthorAssetKind): "avatar_path" | "banner_path" {
   return kind === "avatar" ? "avatar_path" : "banner_path";
 }
 
+function getImageColumn(
+  kind: AuthorAssetKind,
+): "avatar_image" | "banner_image" {
+  return kind === "avatar" ? "avatar_image" : "banner_image";
+}
+
 export async function DELETE(request: Request, context: RouteContext) {
   try {
     const { kind: rawKind } = await context.params;
@@ -56,13 +66,29 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     const { supabase } = await requireAuthorMembership(authorId);
 
+    const { data: existing } = await supabase
+      .from("authors")
+      .select("avatar_image, banner_image")
+      .eq("id", authorId)
+      .maybeSingle();
+
+    const manifest =
+      kind === "avatar"
+        ? parseImageManifest(existing?.avatar_image)
+        : parseImageManifest(existing?.banner_image);
+
     await removeAuthorAssetFiles(supabase, authorId, kind);
+
+    if (manifest) {
+      await cleanupImageManifest(supabase.storage, AUTHOR_ASSETS_BUCKET, manifest);
+    }
 
     const { error: updateError } = await supabase
       .from("authors")
       .update({
         [getUrlColumn(kind)]: null,
         [getPathColumn(kind)]: null,
+        [getImageColumn(kind)]: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", authorId);
@@ -100,138 +126,105 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMembership(authorId);
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    if (kind === "banner") {
-      const validated = await validateAuthorBannerBuffer(buffer, file.type);
-
-      if (!validated.ok) {
-        return NextResponse.json(
-          {
-            error: validated.code,
-            message: validated.message,
-          },
-          { status: 400 },
-        );
-      }
-
-      const extension = getCoverExtension(file);
-
-      if (!extension) {
-        return NextResponse.json(
-          {
-            error: "invalid_file_type",
-            message: AUTHOR_BANNER_ERROR_MESSAGES.unsupportedFormat,
-          },
-          { status: 400 },
-        );
-      }
-
-      const storagePath = buildAuthorAssetStoragePath(authorId, kind, extension);
-
-      const { error: uploadError } = await supabase.storage
-        .from(AUTHOR_ASSETS_BUCKET)
-        .upload(storagePath, buffer, {
-          contentType: file.type,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error("author_asset_upload_error", uploadError.message);
-        return NextResponse.json(
-          {
-            error: "upload_failed",
-            message: AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
-          },
-          { status: 500 },
-        );
-      }
-
-      for (const oldExtension of COVER_EXTENSIONS) {
-        if (oldExtension === extension) {
-          continue;
-        }
-
-        const oldPath = buildAuthorAssetStoragePath(authorId, kind, oldExtension);
-        await supabase.storage.from(AUTHOR_ASSETS_BUCKET).remove([oldPath]);
-      }
-
-      const cacheBuster = Date.now();
-      const assetUrl = `${getAuthorAssetPublicUrl(storagePath)}?v=${cacheBuster}`;
-
-      const { error: updateError } = await supabase
-        .from("authors")
-        .update({
-          [getUrlColumn(kind)]: assetUrl,
-          [getPathColumn(kind)]: storagePath,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", authorId);
-
-      if (updateError) {
-        console.error("author_asset_update_error", updateError.message);
-        return NextResponse.json(
-          {
-            error: "internal_error",
-            message: AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
-          },
-          { status: 500 },
-        );
-      }
-
-      const profile = await getAuthorProfileDetail(supabase, authorId);
-
-      return NextResponse.json({ profile, url: assetUrl });
-    }
-
     if (file.size <= 0 || file.size > MAX_COVER_BYTES) {
       return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
     }
 
-    const extension = getCoverExtension(file);
+    const { supabase } = await requireAuthorMembership(authorId);
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    if (!extension) {
-      return NextResponse.json({ error: "invalid_file_type" }, { status: 400 });
+    const { data: existing } = await supabase
+      .from("authors")
+      .select("avatar_image, banner_image")
+      .eq("id", authorId)
+      .maybeSingle();
+
+    const previousManifest = parseImageManifest(
+      kind === "avatar" ? existing?.avatar_image : existing?.banner_image,
+    );
+
+    const profileName =
+      kind === "avatar" ? ("author-avatar" as const) : ("author-banner" as const);
+
+    const uploaded = await uploadOptimizedImageSet({
+      profile: profileName,
+      bucket: AUTHOR_ASSETS_BUCKET,
+      buffer,
+      declaredMime: file.type,
+      storage: supabase.storage,
+      context: { authorId, authorKind: kind },
+    });
+
+    if (!uploaded.ok) {
+      const message =
+        kind === "avatar"
+          ? avatarProcessErrorMessage(uploaded.code as "corrupt_image")
+          : imageProcessErrorMessage(
+              uploaded.code as "corrupt_image",
+              "author-banner",
+            );
+
+      return NextResponse.json(
+        {
+          error: uploaded.code,
+          message:
+            kind === "banner" && uploaded.code === "invalid_aspect_ratio"
+              ? AUTHOR_BANNER_ERROR_MESSAGES.tooSmall
+              : message,
+        },
+        { status: uploaded.code === "upload_failed" ? 500 : 400 },
+      );
     }
 
-    const storagePath = buildAuthorAssetStoragePath(authorId, kind, extension);
-
-    const { error: uploadError } = await supabase.storage
-      .from(AUTHOR_ASSETS_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("author_asset_upload_error", uploadError.message);
-      return NextResponse.json({ error: "upload_failed" }, { status: 500 });
-    }
-
-    for (const oldExtension of COVER_EXTENSIONS) {
-      if (oldExtension === extension) {
-        continue;
-      }
-
-      const oldPath = buildAuthorAssetStoragePath(authorId, kind, oldExtension);
-      await supabase.storage.from(AUTHOR_ASSETS_BUCKET).remove([oldPath]);
-    }
-
-    const assetUrl = getAuthorAssetPublicUrl(storagePath);
+    const cacheBuster = Date.now();
+    const assetUrl = `${primaryPublicUrl(AUTHOR_ASSETS_BUCKET, uploaded.data, cacheBuster)}`;
+    const storagePath = uploaded.data.primaryDisplayPath;
 
     const { error: updateError } = await supabase
       .from("authors")
       .update({
         [getUrlColumn(kind)]: assetUrl,
         [getPathColumn(kind)]: storagePath,
+        [getImageColumn(kind)]: uploaded.data.manifest,
         updated_at: new Date().toISOString(),
       })
       .eq("id", authorId);
 
     if (updateError) {
       console.error("author_asset_update_error", updateError.message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      await cleanupImageManifest(
+        supabase.storage,
+        AUTHOR_ASSETS_BUCKET,
+        uploaded.data.manifest,
+      );
+      return NextResponse.json(
+        {
+          error: "internal_error",
+          message:
+            kind === "banner"
+              ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
+              : "Не удалось сохранить фотографию. Попробуйте ещё раз.",
+        },
+        { status: 500 },
+      );
+    }
+
+    if (previousManifest) {
+      await cleanupImageManifest(
+        supabase.storage,
+        AUTHOR_ASSETS_BUCKET,
+        previousManifest,
+      );
+    }
+
+    for (const legacyExt of ["jpg", "png", "webp"] as const) {
+      const legacyPath = buildAuthorAssetStoragePath(authorId, kind, legacyExt);
+      if (legacyPath !== storagePath) {
+        await supabase.storage
+          .from(AUTHOR_ASSETS_BUCKET)
+          .remove([legacyPath])
+          .catch(() => undefined);
+      }
     }
 
     const profile = await getAuthorProfileDetail(supabase, authorId);
