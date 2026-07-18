@@ -93,7 +93,10 @@ function SignUpForm() {
     email,
     password,
   });
-  fieldValuesRef.current = { firstName, lastName, email, password };
+
+  useEffect(() => {
+    fieldValuesRef.current = { firstName, lastName, email, password };
+  }, [email, firstName, lastName, password]);
 
   useEffect(() => {
     const form = formRef.current;
