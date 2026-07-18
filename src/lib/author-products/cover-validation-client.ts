@@ -1,6 +1,8 @@
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
 
-const MIN_COVER_DIMENSION = 1000;
+export const MIN_COVER_DIMENSION = 400;
+export { MAX_COVER_BYTES as COVER_MAX_BYTES };
+
 const ALLOWED_COVER_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -54,11 +56,7 @@ export async function validateCoverFile(file: File): Promise<string | null> {
     const { width, height } = await readImageDimensions(file);
 
     if (width < MIN_COVER_DIMENSION || height < MIN_COVER_DIMENSION) {
-      return "Минимальный размер обложки — 1000 × 1000 пикселей.";
-    }
-
-    if (width !== height) {
-      return "Обложка должна быть квадратной — соотношение сторон 1:1.";
+      return `Минимальный размер обложки — ${MIN_COVER_DIMENSION} × ${MIN_COVER_DIMENSION} пикселей.`;
     }
   } catch {
     return "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.";
@@ -66,5 +64,3 @@ export async function validateCoverFile(file: File): Promise<string | null> {
 
   return null;
 }
-
-export { MAX_COVER_BYTES as COVER_MAX_BYTES, MIN_COVER_DIMENSION };

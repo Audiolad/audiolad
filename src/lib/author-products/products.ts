@@ -15,6 +15,7 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
   description,
   audio_path,
   cover_url,
+  cover_image,
   duration_seconds,
   original_file_name,
   file_size_bytes,
@@ -32,7 +33,7 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, price, is_free, status, cover_url, updated_at",
+      "id, title, slug, format, price, is_free, status, cover_url, cover_image, updated_at",
     )
     .eq("author_id", authorId)
     .order("updated_at", { ascending: false });
@@ -92,6 +93,7 @@ export async function getAuthorProductDetail(
       price,
       is_free,
       cover_url,
+      cover_image,
       use_shared_cover,
       audio_url,
       status,
@@ -215,6 +217,7 @@ export async function createDraftProduct(
       price,
       is_free,
       cover_url,
+      cover_image,
       use_shared_cover,
       audio_url,
       status,

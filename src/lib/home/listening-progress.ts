@@ -8,6 +8,7 @@ import {
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { formatAudioDuration } from "@/lib/products/duration";
 import { buildListenPath } from "@/lib/products/paths";
+import { mapProductCoverFields } from "@/lib/products/cover-display";
 import {
   groupAudioSummariesByPractice,
   loadPublishedAudioSummaries,
@@ -35,6 +36,7 @@ type PracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -121,7 +123,7 @@ function mapPracticeToHomeProduct(
     format: practice.format?.trim() || null,
     price: practice.price,
     isFree: practice.is_free === true,
-    coverUrl: practice.cover_url,
+    ...mapProductCoverFields(practice),
     authorName: author.name,
     authorSlug: author.slug,
     href: `/practice/${author.slug}/${practice.slug}`,
@@ -305,6 +307,7 @@ export async function getContinueListening(
       price,
       is_free,
       cover_url,
+      cover_image,
       updated_at,
       published_at,
       created_at,
@@ -405,6 +408,7 @@ export async function getRecentlyListenedProducts(
       price,
       is_free,
       cover_url,
+      cover_image,
       updated_at,
       published_at,
       created_at,
@@ -486,6 +490,7 @@ export async function getActivePrograms(
       price,
       is_free,
       cover_url,
+      cover_image,
       updated_at,
       published_at,
       created_at,

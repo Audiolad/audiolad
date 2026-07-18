@@ -6,6 +6,8 @@ type CoverOverlayCardProps = {
   slug: string;
   title: string;
   coverUrl: string | null;
+  coverImage?: unknown;
+  updatedAt?: string | null;
   authorName?: string | null;
   format?: string | null;
   className?: string;
@@ -16,6 +18,8 @@ export default function CoverOverlayCard({
   slug,
   title,
   coverUrl,
+  coverImage,
+  updatedAt,
   authorName,
   format,
   className = "",
@@ -30,8 +34,12 @@ export default function CoverOverlayCard({
           slug={slug}
           title={title}
           coverUrl={coverUrl}
+          coverImage={coverImage}
+          updatedAt={updatedAt}
           authorName={authorName}
           format={format}
+          displayWidth={640}
+          priority
           className="h-full w-full rounded-none"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#25135c]/92 via-[#25135c]/55 to-[#25135c]/10" />

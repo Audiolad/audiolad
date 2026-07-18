@@ -1,5 +1,6 @@
 "use client";
 
+import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import {
   GLOBAL_MINI_PLAYER_HEIGHT_PX,
@@ -102,6 +103,12 @@ export default function GlobalMiniPlayer() {
 
   const activeCoverUrl =
     engine.currentTrack?.coverImageUrl ?? activeSession.coverImageUrl;
+  const activeCoverImage =
+    engine.currentTrack?.coverImage ?? activeSession.coverImage ?? null;
+  const activeCoverUpdatedAt =
+    engine.currentTrack?.coverImage != null
+      ? engine.currentTrack.updatedAt ?? null
+      : activeSession.coverUpdatedAt ?? null;
 
   const title =
     engine.currentTrack?.title?.trim() || activeSession.practiceTitle;
@@ -144,10 +151,11 @@ export default function GlobalMiniPlayer() {
               className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${activeSession.coverGradient} text-xl text-white shadow-inner`}
             >
               {activeCoverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={activeCoverUrl}
-                  alt=""
+                <PlaybackCoverImage
+                  coverUrl={activeCoverUrl}
+                  coverImage={activeCoverImage}
+                  updatedAt={activeCoverUpdatedAt}
+                  displayWidth={44}
                   className="h-full w-full object-cover"
                 />
               ) : (

@@ -12,6 +12,13 @@ import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import PromoPostSignupHandler from "@/components/promo/PromoPostSignupHandler";
+import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
+import {
+  buildProductCoverResponsiveProps,
+  getProductCoverDisplayUrl,
+  getProductCoverGradient,
+  getProductCoverSymbol,
+} from "@/lib/products/cover-display";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
@@ -44,23 +51,6 @@ type PageProps = {
   searchParams: Promise<{ listen?: string; preview?: string }>;
 };
 
-const coverGradients = [
-  "from-[#f0d9ff] via-[#dec4ff] to-[#c9b6f4]",
-  "from-[#ffe0ed] via-[#f4c7e3] to-[#d7b9ef]",
-  "from-[#dff4eb] via-[#ccebdc] to-[#b9ddcf]",
-  "from-[#fff0d2] via-[#f5dfbb] to-[#e4cfa8]",
-  "from-[#e8f0ff] via-[#d4e2ff] to-[#b8c9ef]",
-];
-
-const slugSymbols: Record<string, string> = {
-  "elixir-molodosti": "❀",
-  "klyuch-k-izobiliyu": "⚿",
-  "kod-prityazheniya": "✦",
-  "personal-boundaries": "◯",
-};
-
-const fallbackSymbols = ["♡", "☼", "✧", "❈"];
-
 const METADATA_DESCRIPTION_FALLBACK =
   "Аудиопрактика на платформе АудиоЛад.";
 
@@ -74,47 +64,6 @@ function normalizeOne<T>(value: T | T[] | null | undefined): T | null {
   }
 
   return value;
-}
-
-function stableHash(input: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
-  }
-
-  return hash;
-}
-
-function getCoverGradient(slug: string): string {
-  return coverGradients[stableHash(slug) % coverGradients.length];
-}
-
-function getCoverSymbol(slug: string): string {
-  if (slugSymbols[slug]) {
-    return slugSymbols[slug];
-  }
-
-  return fallbackSymbols[stableHash(slug) % fallbackSymbols.length];
-}
-
-function buildCoverDisplayUrl(
-  coverUrl: string | null,
-  updatedAt: string | null,
-): string | null {
-  if (!coverUrl?.trim()) {
-    return null;
-  }
-
-  const trimmed = coverUrl.trim();
-
-  if (!updatedAt?.trim()) {
-    return trimmed;
-  }
-
-  const separator = trimmed.includes("?") ? "&" : "?";
-
-  return `${trimmed}${separator}v=${encodeURIComponent(updatedAt.trim())}`;
 }
 
 function getAuthorName(practice: PublicPracticeRow): string | null {
@@ -490,11 +439,21 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     durationMinutesFallback: practice.duration_minutes,
   });
   const description = practice.description?.trim() || null;
-  const gradient = getCoverGradient(practice.slug);
-  const symbol = getCoverSymbol(practice.slug);
-  const coverDisplayUrl = buildCoverDisplayUrl(
+  const gradient = getProductCoverGradient(practice.slug);
+  const symbol = getProductCoverSymbol(practice.slug);
+  const coverDisplayUrl = getProductCoverDisplayUrl(
     practice.cover_url,
     practice.updated_at,
+    practice.cover_image,
+    640,
+    "lg",
+  );
+  const coverResponsive = buildProductCoverResponsiveProps(
+    practice.cover_url,
+    practice.cover_image,
+    practice.updated_at,
+    640,
+    "lg",
   );
   const coverAlt = buildProductCoverAlt({
     title: practice.title,
@@ -589,10 +548,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
               }`}
             >
               {coverDisplayUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={coverDisplayUrl}
+                <ResponsiveCoverImage
+                  src={coverResponsive.src ?? coverDisplayUrl}
                   alt={coverAlt}
+                  manifest={coverResponsive.manifest}
+                  srcSet={coverResponsive.srcSet}
+                  sizes={coverResponsive.srcSet ? coverResponsive.sizes : undefined}
+                  displayWidth={640}
+                  priority
                   className="h-full w-full object-cover"
                 />
               ) : (

@@ -7,7 +7,6 @@ import {
   getDisplayFormat,
   PRODUCT_FORMAT_LINE_CLASS,
 } from "@/lib/author-products/format";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import {
   buildListenPath,
   buildPracticePublicPath,
@@ -27,6 +26,7 @@ export type LibraryCardItem = {
     format: string | null;
     durationMinutes: number | null;
     coverUrl: string | null;
+    coverImage?: unknown;
     updatedAt: string | null;
     audioUrl: string | null;
     isFree: boolean | null;
@@ -82,9 +82,6 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
     : practice.title.trim();
   const formatLabel = practice ? getDisplayFormat(practice.format) : null;
   const meta = practice ? formatPracticeDuration(practice.durationMinutes) : null;
-  const coverDisplayUrl = practice
-    ? getProductCoverDisplayUrl(practice.coverUrl, practice.updatedAt)
-    : null;
   const audioReady = hasAudioReady(practice?.audioUrl);
   const audioStatus = getAudioStatusLabel(practice?.audioUrl);
   const authorSlug = practice?.authorSlug ?? null;
@@ -112,7 +109,12 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
         <ProductCoverThumbnail
           slug={practice?.slug ?? `library-item-${index}`}
           title={title}
-          coverUrl={coverDisplayUrl}
+          coverUrl={practice?.coverUrl ?? null}
+          coverImage={practice?.coverImage}
+          updatedAt={practice?.updatedAt}
+          authorName={practice?.authorName}
+          format={practice?.format}
+          displayWidth={124}
           className="aspect-square h-full w-full rounded-[20px]"
         />
       </div>

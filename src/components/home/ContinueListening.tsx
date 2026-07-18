@@ -48,6 +48,8 @@ export default function ContinueListening({
         slug={product.slug}
         title={product.title}
         coverUrl={product.coverUrl}
+        coverImage={product.coverImage}
+        updatedAt={product.updatedAt}
         authorName={product.authorName}
         format={product.format}
         className="mt-3.5 xl:mt-4"

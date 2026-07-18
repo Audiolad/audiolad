@@ -20,6 +20,7 @@ export type PublicPracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   audio_url: string | null;
   status: string | null;
   updated_at: string | null;
@@ -69,6 +70,7 @@ export async function getPracticeByAuthorAndSlug(
       price,
       is_free,
       cover_url,
+      cover_image,
       audio_url,
       status,
       updated_at,

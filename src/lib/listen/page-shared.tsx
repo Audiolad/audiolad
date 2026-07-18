@@ -8,6 +8,7 @@ import ListenPageClient from "@/components/audio/ListenPageClient";
 import BottomNav from "@/components/BottomNav";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
+import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { listPracticeProgress } from "@/lib/listen/progress";
@@ -170,7 +171,7 @@ async function loadListenTracks(
   let query = supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, audio_path, cover_url, updated_at, status",
+      "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status",
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
@@ -244,6 +245,7 @@ export async function renderListenPage(
       duration_minutes,
       audio_url,
       cover_url,
+      cover_image,
       use_shared_cover,
       updated_at,
       status,
@@ -376,10 +378,17 @@ export async function renderListenPage(
   const authorName = getAuthorName(practiceRow.authors);
   const coverGradient = getCoverGradient(practiceRow.slug);
   const coverSymbol = getCoverSymbol(practiceRow.slug);
-  const coverImageUrl = buildCoverDisplayUrl(
-    practiceRow.cover_url,
-    practiceRow.updated_at,
+  const coverImageUrl = resolveProductCoverUrl(
+    {
+      cover_url: practiceRow.cover_url,
+      cover_image: (practiceRow as { cover_image?: unknown }).cover_image,
+      updated_at: practiceRow.updated_at,
+    },
+    360,
+    "lg",
   );
+  const coverImage = (practiceRow as { cover_image?: unknown }).cover_image ?? null;
+  const coverUpdatedAt = practiceRow.updated_at ?? null;
   const trimmedFormat = getDisplayFormat(practiceRow.format);
   const isAuthenticated = Boolean(user);
   const promoConversionMode = shouldShowPromoConversionFlow({
@@ -415,6 +424,8 @@ export async function renderListenPage(
           coverSymbol={coverSymbol}
           coverGradient={coverGradient}
           coverImageUrl={coverImageUrl}
+          coverImage={coverImage}
+          coverUpdatedAt={coverUpdatedAt}
           isAuthorPreview={access.mode === "author_preview"}
           autoplay={options?.autoplay === true}
           promoConversionMode={promoConversionMode}
@@ -437,6 +448,8 @@ export async function renderListenPage(
         coverSymbol={coverSymbol}
         coverGradient={coverGradient}
         coverImageUrl={coverImageUrl}
+        coverImage={coverImage}
+        coverUpdatedAt={coverUpdatedAt}
         isAuthorPreview={access.mode === "author_preview"}
         promoConversionMode={promoConversionMode}
         authorSlug={resolvedAuthorSlug}
@@ -453,6 +466,8 @@ export async function renderListenPage(
           coverSymbol,
           coverGradient,
           coverImageUrl,
+          coverImage,
+          coverUpdatedAt,
           isAuthorPreview: access.mode === "author_preview",
           guestProgressMode,
           guestProgressMeta: guestProgressMode

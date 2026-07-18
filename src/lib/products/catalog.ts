@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
+import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
 import {
   groupAudioSummariesByPractice,
@@ -21,13 +21,14 @@ type CatalogPracticeRow = {
   price: number | null;
   is_free: boolean | null;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
   authors: { name: string; slug: string } | { name: string; slug: string }[] | null;
 };
 
-export type CatalogProduct = {
+export type CatalogProduct = ProductCoverFields & {
   id: string;
   title: string;
   slug: string;
@@ -36,7 +37,6 @@ export type CatalogProduct = {
   format: string | null;
   price: number | null;
   isFree: boolean;
-  coverUrl: string | null;
   authorName: string | null;
   authorSlug: string | null;
   href: string;
@@ -191,6 +191,7 @@ export async function getPublishedCatalogProducts(
       price,
       is_free,
       cover_url,
+      cover_image,
       updated_at,
       published_at,
       created_at,
@@ -256,10 +257,7 @@ export async function getPublishedCatalogProducts(
         format: practice.format?.trim() || null,
         price: practice.price,
         isFree: isProductFree(practice.is_free, practice.price),
-        coverUrl: getProductCoverDisplayUrl(
-          practice.cover_url,
-          practice.updated_at,
-        ),
+        ...mapProductCoverFields(practice),
         authorName: author.name,
         authorSlug: author.slug,
         href: buildPracticePublicPath(author.slug, practice.slug),

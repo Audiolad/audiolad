@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import {
   useGlobalAudioPlayer,
@@ -242,6 +243,8 @@ export default function NowPlayingPanel({
     productSlug,
     tracks,
     coverImageUrl,
+    coverImage,
+    coverUpdatedAt,
     coverSymbol,
     coverGradient,
   } = session;
@@ -268,6 +271,11 @@ export default function NowPlayingPanel({
   const title =
     currentTrack?.title?.trim() || practiceTitle.trim() || "Без названия";
   const activeCoverUrl = currentTrack?.coverImageUrl ?? coverImageUrl;
+  const activeCoverImage = currentTrack?.coverImage ?? coverImage ?? null;
+  const activeCoverUpdatedAt =
+    currentTrack?.coverImage != null
+      ? currentTrack.updatedAt ?? null
+      : coverUpdatedAt ?? null;
   const description = currentTrack?.description?.trim() ?? "";
 
   const nextTrack = tracks[currentTrackIndex + 1] ?? null;
@@ -292,10 +300,11 @@ export default function NowPlayingPanel({
       <div className={`min-h-0 flex-1 overflow-y-auto ${contentPaddingClass}`}>
         <div className="overflow-hidden rounded-[16px] border border-[#f0e8f8] bg-[#faf6ff]">
           {activeCoverUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={activeCoverUrl}
-              alt=""
+            <PlaybackCoverImage
+              coverUrl={activeCoverUrl}
+              coverImage={activeCoverImage}
+              updatedAt={activeCoverUpdatedAt}
+              displayWidth={280}
               className="aspect-square w-full object-cover"
             />
           ) : (

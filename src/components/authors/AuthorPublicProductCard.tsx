@@ -29,7 +29,10 @@ export default function AuthorPublicProductCard({
           slug={product.slug}
           title={product.title}
           coverUrl={product.coverUrl}
+          coverImage={product.coverImage}
+          updatedAt={product.updatedAt}
           format={product.format}
+          displayWidth={160}
           className={`aspect-square w-full rounded-[20px] ${variant === "featured" ? "max-w-[160px]" : ""}`}
         />
       </Link>

@@ -95,6 +95,43 @@ function testAuthorFormToggle() {
   assert(source.includes("Обложка трека"), "track cover block label");
 }
 
+function testCoverUploadPreviewManifest() {
+  const hookSource = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/useCoverUpload.ts",
+    "utf8",
+  );
+  const blockSource = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/CoverUploadBlock.tsx",
+    "utf8",
+  );
+  const formSource = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorProductForm.tsx",
+    "utf8",
+  );
+
+  assert(hookSource.includes("coverImage"), "useCoverUpload accepts coverImage");
+  assert(
+    hookSource.includes("buildProductCoverResponsiveProps"),
+    "useCoverUpload resolves manifest variants for preview",
+  );
+  assert(
+    hookSource.includes("createObjectURL"),
+    "useCoverUpload keeps local object URL before upload completes",
+  );
+  assert(
+    blockSource.includes("ResponsiveCoverImage"),
+    "CoverUploadBlock uses responsive manifest preview",
+  );
+  assert(
+    formSource.includes("coverImage={audioItem.cover_image}"),
+    "AuthorProductForm passes track coverImage to preview",
+  );
+  assert(
+    formSource.includes("coverImage={form.coverImage}"),
+    "AuthorProductForm passes product coverImage to preview",
+  );
+}
+
 function testPlayerActiveCover() {
   const source = readFileSync(
     "/var/www/audiolad/src/components/audio/AudioPlayer.tsx",
@@ -115,6 +152,7 @@ const tests = [
   ["listen track type", testListenTrackType],
   ["track cover API route", testTrackCoverApiRoute],
   ["author form toggle", testAuthorFormToggle],
+  ["cover upload manifest preview", testCoverUploadPreviewManifest],
   ["player active cover", testPlayerActiveCover],
 ];
 

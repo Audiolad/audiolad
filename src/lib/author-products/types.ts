@@ -28,6 +28,7 @@ export type AudioItemRow = {
   description: string | null;
   audio_path: string | null;
   cover_url: string | null;
+  cover_image?: unknown;
   duration_seconds: number | null;
   original_file_name: string | null;
   file_size_bytes: number | null;
@@ -50,6 +51,7 @@ export type PracticeRow = {
   price: number;
   is_free: boolean;
   cover_url: string | null;
+  cover_image?: unknown;
   use_shared_cover: boolean;
   audio_url: string | null;
   status: string;
@@ -68,6 +70,7 @@ export type AuthorProductListItem = {
   is_free: boolean;
   status: string;
   cover_url: string | null;
+  cover_image?: unknown;
   updated_at: string;
   audio_count: number;
 };

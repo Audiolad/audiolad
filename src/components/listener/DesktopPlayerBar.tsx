@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 
+import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import {
   useGlobalAudioPlayer,
@@ -165,6 +166,12 @@ function DesktopPlayerActiveState({
 }) {
   const activeCoverUrl =
     engine.currentTrack?.coverImageUrl ?? session.coverImageUrl;
+  const activeCoverImage =
+    engine.currentTrack?.coverImage ?? session.coverImage ?? null;
+  const activeCoverUpdatedAt =
+    engine.currentTrack?.coverImage != null
+      ? engine.currentTrack.updatedAt ?? null
+      : session.coverUpdatedAt ?? null;
   const title =
     engine.currentTrack?.title?.trim() || session.practiceTitle;
   const subtitle = session.authorName;
@@ -182,10 +189,11 @@ function DesktopPlayerActiveState({
             className={`flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${session.coverGradient} text-xl text-white shadow-inner`}
           >
             {activeCoverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={activeCoverUrl}
-                alt=""
+              <PlaybackCoverImage
+                coverUrl={activeCoverUrl}
+                coverImage={activeCoverImage}
+                updatedAt={activeCoverUpdatedAt}
+                displayWidth={52}
                 className="h-full w-full object-cover"
               />
             ) : (

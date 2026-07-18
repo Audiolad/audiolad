@@ -79,8 +79,11 @@ export default function ProfileContinueSection({
                 slug={state.item.product.slug}
                 title={state.item.product.title}
                 coverUrl={state.item.product.coverUrl}
+                coverImage={state.item.product.coverImage}
+                updatedAt={state.item.product.updatedAt}
                 authorName={state.item.product.authorName}
                 format={state.item.product.format}
+                displayWidth={112}
                 className="h-[72px] w-[72px] rounded-[18px] lg:h-[112px] lg:w-[112px] lg:rounded-[22px]"
               />
             </div>
