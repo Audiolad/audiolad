@@ -78,16 +78,6 @@ function OrderedList({ items }: { items: string[] }) {
 export default function PaymentAndRefundPage() {
   return (
     <LegalPageShell>
-      <div className="px-5 pb-8 pt-6 lg:px-12 lg:pt-10">
-          <header className="border-b border-[#eadff8] pb-5">
-            <Link
-              href="/"
-              className="text-[28px] font-semibold leading-none text-[#6234b5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              АудиоЛад
-            </Link>
-          </header>
-
           <h1 className="mt-6 text-[28px] font-semibold leading-tight lg:text-[32px]">
             Оплата, получение и возврат
           </h1>
@@ -436,7 +426,6 @@ export default function PaymentAndRefundPage() {
               </em>
             </p>
           </div>
-        </div>
     </LegalPageShell>
   );
 }
