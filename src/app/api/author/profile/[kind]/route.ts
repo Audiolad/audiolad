@@ -7,6 +7,10 @@ import {
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
 import { AUTHOR_BANNER_ERROR_MESSAGES } from "@/lib/authors/banner-validation-client";
 import {
+  DEFAULT_BANNER_POSITION_X,
+  DEFAULT_BANNER_POSITION_Y,
+} from "@/lib/authors/banner-position";
+import {
   buildAuthorAssetStoragePath,
   removeAuthorAssetFiles,
   type AuthorAssetKind,
@@ -89,6 +93,12 @@ export async function DELETE(request: Request, context: RouteContext) {
         [getUrlColumn(kind)]: null,
         [getPathColumn(kind)]: null,
         [getImageColumn(kind)]: null,
+        ...(kind === "banner"
+          ? {
+              banner_position_x: DEFAULT_BANNER_POSITION_X,
+              banner_position_y: DEFAULT_BANNER_POSITION_Y,
+            }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", authorId);
@@ -186,6 +196,12 @@ export async function POST(request: Request, context: RouteContext) {
         [getUrlColumn(kind)]: assetUrl,
         [getPathColumn(kind)]: storagePath,
         [getImageColumn(kind)]: uploaded.data.manifest,
+        ...(kind === "banner"
+          ? {
+              banner_position_x: DEFAULT_BANNER_POSITION_X,
+              banner_position_y: DEFAULT_BANNER_POSITION_Y,
+            }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", authorId);

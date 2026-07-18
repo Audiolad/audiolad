@@ -46,9 +46,30 @@ const AVATAR_VARIANTS: VariantSpec[] = [
 ];
 
 const BANNER_VARIANTS: VariantSpec[] = [
-  { key: "sm", width: 640, height: 213, quality: 82, fit: "cover", required: true },
-  { key: "md", width: 1280, height: 427, quality: 81, fit: "cover", required: true },
-  { key: "lg", width: 1920, height: 640, quality: 80, fit: "cover", required: true },
+  {
+    key: "sm",
+    width: 640,
+    height: 2400,
+    quality: 82,
+    fit: "inside",
+    required: true,
+  },
+  {
+    key: "md",
+    width: 1280,
+    height: 4800,
+    quality: 81,
+    fit: "inside",
+    required: true,
+  },
+  {
+    key: "lg",
+    width: 1920,
+    height: 7200,
+    quality: 80,
+    fit: "inside",
+    required: true,
+  },
 ];
 
 const PLAYLIST_VARIANTS: VariantSpec[] = [

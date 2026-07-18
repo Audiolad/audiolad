@@ -15,6 +15,8 @@ import {
   getAuthorBySlug,
   type AuthorPublishedPractice,
 } from "./lookup";
+import { normalizeStoredBannerPosition } from "@/lib/authors/banner-position";
+
 import {
   getAuthorProfileDetail,
   resolveAuthorShortBio,
@@ -40,6 +42,8 @@ export type AuthorPublicPageData = {
   bannerUrl: string | null;
   avatarImage?: unknown;
   bannerImage?: unknown;
+  bannerPositionX: number;
+  bannerPositionY: number;
   publishedCount: number;
   topics: AuthorProfileTopic[];
   featuredProducts: AuthorPublicProduct[];
@@ -190,6 +194,16 @@ export async function loadAuthorPublicPageData(
       ),
       avatarImage: sanitizePublicImageManifest(profile?.avatar_image),
       bannerImage: sanitizePublicImageManifest(profile?.banner_image),
+      ...(() => {
+        const bannerPosition = normalizeStoredBannerPosition({
+          banner_position_x: profile?.banner_position_x,
+          banner_position_y: profile?.banner_position_y,
+        });
+        return {
+          bannerPositionX: bannerPosition.x,
+          bannerPositionY: bannerPosition.y,
+        };
+      })(),
       publishedCount: allProducts.length,
       topics: profile?.topics ?? [],
       featuredProducts,

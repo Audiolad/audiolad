@@ -133,13 +133,13 @@ function testBannerHintAndMessages() {
 
 function testBannerUploadUsesDedicatedValidation() {
   const hookSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/useAuthorAssetUpload.ts",
+    "/var/www/audiolad/src/components/author-dashboard/useAuthorBannerUpload.ts",
     "utf8",
   );
 
   assert(
     hookSource.includes("validateAuthorBannerFile"),
-    "author asset upload hook uses banner validation",
+    "author banner upload hook uses banner validation",
   );
 
   const bannerHandlerMatch = hookSource.match(
@@ -178,17 +178,21 @@ function testProductCoverValidationRelaxed() {
 }
 
 function testAuthorProfileBannerPreview() {
-  const authorProfile = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorProfileClient.tsx",
+  const authorBanner = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
     "utf8",
   );
 
   assert(
-    authorProfile.includes("object-cover object-center"),
-    "banner preview uses cover + center positioning",
+    authorBanner.includes("object-cover"),
+    "banner preview uses object-cover",
   );
   assert(
-    authorProfile.includes("uploadHint"),
+    authorBanner.includes("objectPosition"),
+    "banner preview uses saved object-position",
+  );
+  assert(
+    authorBanner.includes("uploadHint"),
     "banner block uses shared upload hint",
   );
 }

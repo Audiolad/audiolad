@@ -174,18 +174,18 @@ function testSharedCropperComponentExists() {
 }
 
 function testBannerHintUsesDedicatedValidation() {
-  const authorProfile = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorProfileClient.tsx",
+  const authorBanner = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
     "utf8",
   );
 
   assert(
-    authorProfile.includes("uploadHint"),
+    authorBanner.includes("uploadHint"),
     "banner block uses shared upload hint",
   );
   assert(
-    !authorProfile.includes("validateCoverFile"),
-    "author profile banner no longer uses product cover validation",
+    !authorBanner.includes("validateCoverFile"),
+    "author banner block does not use product cover validation",
   );
 }
 

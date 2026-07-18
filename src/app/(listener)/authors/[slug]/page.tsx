@@ -92,6 +92,8 @@ export default async function AuthorPublicPage({ params }: PageProps) {
           bannerUrl={data.bannerUrl}
           avatarImage={data.avatarImage}
           bannerImage={data.bannerImage}
+          bannerPositionX={data.bannerPositionX}
+          bannerPositionY={data.bannerPositionY}
           publishedCount={data.publishedCount}
         />
 

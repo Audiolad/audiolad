@@ -22,6 +22,7 @@ export type ResponsiveImageProps = {
   draggable?: boolean;
   sizes?: string;
   srcSet?: string | null;
+  objectPosition?: string;
 };
 
 export default function ResponsiveImage({
@@ -38,6 +39,7 @@ export default function ResponsiveImage({
   draggable,
   sizes,
   srcSet,
+  objectPosition,
 }: ResponsiveImageProps) {
   const [failed, setFailed] = useState(false);
   const blur = useMemo(
@@ -79,14 +81,15 @@ export default function ResponsiveImage({
       draggable={draggable}
       sizes={sizes}
       srcSet={srcSet ?? undefined}
-      style={
-        blur
+      style={{
+        ...(objectPosition ? { objectPosition } : {}),
+        ...(blur
           ? {
               backgroundImage: `url(${blur})`,
               backgroundSize: "cover",
             }
-          : undefined
-      }
+          : {}),
+      }}
       onError={() => {
         setFailed(true);
         onError?.();

@@ -19,10 +19,16 @@ import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import {
+  getDefaultBannerPosition,
+  type BannerPosition,
+} from "@/lib/authors/banner-position";
 import { getShortBioLengthError } from "@/lib/authors/validation";
 
-import { useAuthorAssetUpload } from "./useAuthorAssetUpload";
 import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
+import AuthorBannerUploadBlock, {
+  readBannerPositionFromProfileRow,
+} from "./AuthorBannerUploadBlock";
 
 type PublishedProductOption = {
   id: string;
@@ -38,110 +44,6 @@ type AuthorProfileClientProps = {
   authors: AuthorWorkspace[];
   topicOptions: TopicSelectorOption[];
 };
-
-function AuthorBannerUploadBlock({
-  authorId,
-  bannerUrl,
-  disabled,
-  onUpdated,
-}: {
-  authorId: string;
-  bannerUrl: string | null;
-  disabled?: boolean;
-  onUpdated: (url: string | null) => void;
-}) {
-  const {
-    fileInputRef,
-    uploading,
-    deleting,
-    error,
-    displaySrc,
-    showPreview,
-    openPicker,
-    deleteAsset,
-    handleFileChange,
-    isBusy,
-    setPreviewFailed,
-    uploadHint,
-  } = useAuthorAssetUpload({
-    assetUrl: bannerUrl,
-    authorId,
-    disabled,
-    onUpdated: (result) => onUpdated(result.url),
-  });
-
-  return (
-    <div>
-      <span className="mb-2 block text-sm font-medium">Фоновый баннер</span>
-      <div className="relative flex flex-col gap-4">
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={disabled || isBusy}
-          className="group relative block h-32 w-full overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#f8f4fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 sm:h-40"
-        >
-          {showPreview && displaySrc ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displaySrc}
-                alt=""
-                className="h-full w-full object-cover object-center"
-                onError={() => setPreviewFailed(true)}
-              />
-              <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-3 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100">
-                Заменить баннер
-              </span>
-            </>
-          ) : (
-            <span className="flex h-full items-center justify-center text-sm text-[#8c79b6]">
-              Загрузить баннер
-            </span>
-          )}
-        </button>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={openPicker}
-            disabled={disabled || isBusy}
-            className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
-          >
-            {uploading ? "Загрузка…" : showPreview ? "Изменить" : "Загрузить"}
-          </button>
-          {bannerUrl ? (
-            <button
-              type="button"
-              onClick={() => void deleteAsset()}
-              disabled={disabled || isBusy}
-              className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7d70a2]"
-            >
-              {deleting ? "Удаление…" : "Удалить"}
-            </button>
-          ) : null}
-        </div>
-
-        <p className="text-sm leading-5 text-[#7d70a2]">
-          {uploadHint}
-        </p>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="sr-only"
-        onChange={handleFileChange}
-      />
-
-      {error ? (
-        <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 export default function AuthorProfileClient({
   authors,
@@ -166,6 +68,9 @@ export default function AuthorProfileClient({
   const [fullBio, setFullBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerPosition, setBannerPosition] = useState<BannerPosition>(
+    getDefaultBannerPosition(),
+  );
   const [topicKeys, setTopicKeys] = useState<string[]>([]);
   const [featuredProductIds, setFeaturedProductIds] = useState<string[]>([]);
   const [publishedProducts, setPublishedProducts] = useState<
@@ -210,6 +115,7 @@ export default function AuthorProfileClient({
         setFullBio(profile.full_bio?.trim() || "");
         setAvatarUrl(profile.avatar_url);
         setBannerUrl(profile.banner_url);
+        setBannerPosition(readBannerPositionFromProfileRow(profile));
         setTopicKeys(profile.topicKeys);
         setFeaturedProductIds(profile.featuredProducts.map((product) => product.id));
         setPublishedProducts(payload.publishedProducts ?? []);
@@ -416,8 +322,12 @@ export default function AuthorProfileClient({
               <AuthorBannerUploadBlock
                 authorId={selectedAuthor.id}
                 bannerUrl={bannerUrl}
+                bannerPosition={bannerPosition}
                 disabled={saving}
-                onUpdated={setBannerUrl}
+                onUpdated={({ url, bannerPosition: nextPosition }) => {
+                  setBannerUrl(url);
+                  setBannerPosition(nextPosition);
+                }}
               />
             </div>
           </section>

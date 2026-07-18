@@ -2,6 +2,7 @@ import {
   AuthorBannerImage,
   AvatarImage,
 } from "@/components/images/ResponsiveImage";
+import { formatBannerObjectPosition } from "@/lib/authors/banner-position";
 import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 import { parseImageManifest } from "@/lib/images/image-manifest";
 import type { ImageManifest } from "@/lib/images/image-types";
@@ -19,6 +20,8 @@ type AuthorPublicHeaderProps = {
   bannerUrl: string | null;
   avatarImage?: unknown;
   bannerImage?: unknown;
+  bannerPositionX?: number;
+  bannerPositionY?: number;
   publishedCount: number;
 };
 
@@ -29,10 +32,16 @@ export default function AuthorPublicHeader({
   bannerUrl,
   avatarImage,
   bannerImage,
+  bannerPositionX = 50,
+  bannerPositionY = 50,
   publishedCount,
 }: AuthorPublicHeaderProps) {
   const avatarManifest = parseImageManifest(avatarImage);
   const bannerManifest = parseImageManifest(bannerImage);
+  const bannerObjectPosition = formatBannerObjectPosition({
+    x: bannerPositionX,
+    y: bannerPositionY,
+  });
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
@@ -42,6 +51,7 @@ export default function AuthorPublicHeader({
             src={bannerUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
+            objectPosition={bannerObjectPosition}
             manifest={bannerManifest as ImageManifest | null}
             displayWidth={1280}
             priority
