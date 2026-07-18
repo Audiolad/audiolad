@@ -165,6 +165,7 @@ function AuthorBannerUploadBlock({
     handleFileChange,
     isBusy,
     setPreviewFailed,
+    uploadHint,
   } = useAuthorAssetUpload({
     assetUrl: bannerUrl,
     authorId,
@@ -189,7 +190,7 @@ function AuthorBannerUploadBlock({
               <img
                 src={displaySrc}
                 alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover object-center"
                 onError={() => setPreviewFailed(true)}
               />
               <span className="pointer-events-none absolute inset-0 flex items-end justify-center bg-[#25135c]/0 pb-3 text-xs font-medium text-white opacity-0 transition group-hover:bg-[#25135c]/35 group-hover:opacity-100">
@@ -225,7 +226,7 @@ function AuthorBannerUploadBlock({
         </div>
 
         <p className="text-sm leading-5 text-[#7d70a2]">
-          Широкое изображение с соотношением около 3:1. JPG, PNG или WebP до 3 МБ.
+          {uploadHint}
         </p>
       </div>
 

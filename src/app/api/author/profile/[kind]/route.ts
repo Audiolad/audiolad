@@ -7,6 +7,8 @@ import {
 import { getCoverExtension } from "@/lib/author-products/media";
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
 import { COVER_EXTENSIONS } from "@/lib/author-products/utils";
+import { AUTHOR_BANNER_ERROR_MESSAGES } from "@/lib/authors/banner-validation-client";
+import { validateAuthorBannerBuffer } from "@/lib/authors/banner-validation-server";
 import {
   buildAuthorAssetStoragePath,
   getAuthorAssetPublicUrl,
@@ -99,6 +101,89 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const { supabase } = await requireAuthorMembership(authorId);
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (kind === "banner") {
+      const validated = await validateAuthorBannerBuffer(buffer, file.type);
+
+      if (!validated.ok) {
+        return NextResponse.json(
+          {
+            error: validated.code,
+            message: validated.message,
+          },
+          { status: 400 },
+        );
+      }
+
+      const extension = getCoverExtension(file);
+
+      if (!extension) {
+        return NextResponse.json(
+          {
+            error: "invalid_file_type",
+            message: AUTHOR_BANNER_ERROR_MESSAGES.unsupportedFormat,
+          },
+          { status: 400 },
+        );
+      }
+
+      const storagePath = buildAuthorAssetStoragePath(authorId, kind, extension);
+
+      const { error: uploadError } = await supabase.storage
+        .from(AUTHOR_ASSETS_BUCKET)
+        .upload(storagePath, buffer, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("author_asset_upload_error", uploadError.message);
+        return NextResponse.json(
+          {
+            error: "upload_failed",
+            message: AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
+          },
+          { status: 500 },
+        );
+      }
+
+      for (const oldExtension of COVER_EXTENSIONS) {
+        if (oldExtension === extension) {
+          continue;
+        }
+
+        const oldPath = buildAuthorAssetStoragePath(authorId, kind, oldExtension);
+        await supabase.storage.from(AUTHOR_ASSETS_BUCKET).remove([oldPath]);
+      }
+
+      const cacheBuster = Date.now();
+      const assetUrl = `${getAuthorAssetPublicUrl(storagePath)}?v=${cacheBuster}`;
+
+      const { error: updateError } = await supabase
+        .from("authors")
+        .update({
+          [getUrlColumn(kind)]: assetUrl,
+          [getPathColumn(kind)]: storagePath,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", authorId);
+
+      if (updateError) {
+        console.error("author_asset_update_error", updateError.message);
+        return NextResponse.json(
+          {
+            error: "internal_error",
+            message: AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
+          },
+          { status: 500 },
+        );
+      }
+
+      const profile = await getAuthorProfileDetail(supabase, authorId);
+
+      return NextResponse.json({ profile, url: assetUrl });
+    }
 
     if (file.size <= 0 || file.size > MAX_COVER_BYTES) {
       return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
@@ -111,7 +196,6 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const storagePath = buildAuthorAssetStoragePath(authorId, kind, extension);
-    const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
       .from(AUTHOR_ASSETS_BUCKET)
