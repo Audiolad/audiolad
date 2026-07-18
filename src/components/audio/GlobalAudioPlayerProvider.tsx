@@ -28,15 +28,9 @@ import {
   readDesktopPlayerLastSession,
   writeDesktopPlayerLastSession,
 } from "@/lib/listen/desktop-player-persistence";
-import {
-  classifyResumeHistoryResponse,
-  shouldLoadWelcomeSession,
-  shouldSkipInitialSessionRestore,
-} from "@/lib/listen/initial-session-policy";
 import { isListenPlayerPathname } from "@/lib/navigation/bottom-nav";
 import {
   guestProgressToListenEntries,
-  hasAnyGuestPracticeProgress,
   readGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
 import {
@@ -458,7 +452,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const lastExhaustedPracticeIdRef = useRef<string | null>(null);
   const pendingNavSafetyTimerRef = useRef<number | null>(null);
   const desktopPlayerRestoreAttemptedRef = useRef(false);
-  const welcomeSessionInFlightRef = useRef(false);
 
   const clearPendingQueueNavigation = useCallback(() => {
     pendingQueueNavigationRef.current = null;
@@ -970,50 +963,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     );
   }, [showMiniPlayer]);
 
-  const applyWelcomeSession = useCallback(async (): Promise<boolean> => {
-    if (sessionRef.current || welcomeSessionInFlightRef.current) {
-      return false;
-    }
-
-    welcomeSessionInFlightRef.current = true;
-
-    try {
-      const response = await fetch("/api/listen/welcome-session", {
-        method: "GET",
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok || sessionRef.current) {
-        return false;
-      }
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        session?: LoadSessionInput;
-      };
-
-      if (!data.ok || !data.session) {
-        return false;
-      }
-
-      loadSession(
-        mergeGuestProgressIntoSession({
-          ...data.session,
-          requestAutoplay: false,
-          forceStartAtBeginning: true,
-          initialProgress: [],
-        }),
-      );
-      setDesktopPlayerRestoreState("ready");
-      return true;
-    } catch {
-      return false;
-    } finally {
-      welcomeSessionInFlightRef.current = false;
-    }
-  }, [loadSession, mergeGuestProgressIntoSession]);
-
   useEffect(() => {
     if (!session) {
       return;
@@ -1031,11 +980,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    if (
-      shouldSkipInitialSessionRestore({
-        explicitProductRequested: isListenPlayerPathname(pathname),
-      })
-    ) {
+    if (isListenPlayerPathname(pathname)) {
       desktopPlayerRestoreAttemptedRef.current = true;
       queueMicrotask(() => {
         setDesktopPlayerRestoreState("ready");
@@ -1064,7 +1009,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       };
 
       const persisted = readDesktopPlayerLastSession();
-      let hadPersistedDesktopSession = Boolean(persisted);
 
       if (persisted) {
         const loaded = await fetchListenSessionPayload(
@@ -1078,20 +1022,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         }
 
         clearDesktopPlayerLastSession();
-        hadPersistedDesktopSession = false;
       }
-
-      const hasGuestProgress = hasAnyGuestPracticeProgress();
-
-      if (hasGuestProgress) {
-        if (!cancelled) {
-          setDesktopPlayerRestoreState("ready");
-        }
-        return;
-      }
-
-      let resumeHistoryResult: ReturnType<typeof classifyResumeHistoryResponse> =
-        "not_applicable";
 
       try {
         const response = await fetch("/api/listen/resume-session", {
@@ -1110,52 +1041,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             restoreSession(data.session);
             return;
           }
-
-          resumeHistoryResult = "failed";
-        } else {
-          const data = (await response.json().catch(() => null)) as {
-            reason?: string;
-          } | null;
-
-          resumeHistoryResult = classifyResumeHistoryResponse({
-            status: response.status,
-            reason: data?.reason ?? null,
-          });
         }
       } catch {
-        resumeHistoryResult = "failed";
-      }
-
-      if (resumeHistoryResult === "failed") {
-        if (!cancelled) {
-          setDesktopPlayerRestoreState("ready");
-        }
-        return;
-      }
-
-      const shouldWelcome = shouldLoadWelcomeSession({
-        phase: "no-history",
-        hasActiveSession: false,
-        explicitProductRequested: false,
-        hasPersistedDesktopSession: hadPersistedDesktopSession,
-        hasGuestProgress,
-        resumeHistoryResult,
-      });
-
-      if (!shouldWelcome) {
-        if (!cancelled) {
-          clearDesktopPlayerLastSession();
-          setDesktopPlayerRestoreState("ready");
-        }
-        return;
-      }
-
-      if (!cancelled && (await applyWelcomeSession())) {
-        return;
+        // No resume history — empty player is the expected guest state.
       }
 
       if (!cancelled) {
-        clearDesktopPlayerLastSession();
         setDesktopPlayerRestoreState("ready");
       }
     }
@@ -1165,7 +1056,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     return () => {
       cancelled = true;
     };
-  }, [applyWelcomeSession, loadSession, mergeGuestProgressIntoSession, pathname, session]);
+  }, [loadSession, mergeGuestProgressIntoSession, pathname, session]);
 
   useEffect(() => {
     const supabase = createClient();

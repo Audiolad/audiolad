@@ -106,8 +106,6 @@ function ExpandIcon() {
 const secondaryButtonClass =
   "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-40";
 
-const disabledSecondaryButtonClass = `${secondaryButtonClass} pointer-events-none opacity-40`;
-
 function DesktopPlayerBarShell({
   children,
   ariaLabel = "Плеер",
@@ -123,83 +121,6 @@ function DesktopPlayerBarShell({
     >
       {children}
     </section>
-  );
-}
-
-function DesktopPlayerEmptyState() {
-  return (
-    <DesktopPlayerBarShell ariaLabel="Плеер">
-      <div className="flex min-h-0 items-center gap-4 px-5 py-2">
-        <div className="flex min-w-0 max-w-[240px] flex-1 items-center gap-3">
-          <div
-            className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[12px] border border-[#eadff8] bg-[#faf6ff] text-xl text-[#b79adf]"
-            aria-hidden="true"
-          >
-            ♫
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold leading-snug text-[#25135c]">
-              Выберите практику, чтобы начать слушать
-            </p>
-            <p className="mt-0.5 text-[13px] text-[#9485b4]">
-              Последний трек появится здесь
-            </p>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-[1.4] flex-col gap-2">
-          <div className="flex items-center justify-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Назад на 15 секунд"
-              disabled
-              className={disabledSecondaryButtonClass}
-            >
-              <RewindIcon />
-            </button>
-            <button
-              type="button"
-              aria-label="Воспроизвести"
-              disabled
-              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#dcc9f2] text-white opacity-70"
-            >
-              <PlayIcon />
-            </button>
-            <button
-              type="button"
-              aria-label="Вперёд на 15 секунд"
-              disabled
-              className={disabledSecondaryButtonClass}
-            >
-              <ForwardIcon />
-            </button>
-          </div>
-          <div
-            className="h-1.5 min-w-0 flex-1 rounded-full bg-[#eee6f7]"
-            aria-hidden="true"
-          />
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2 opacity-40">
-          <button
-            type="button"
-            aria-label="Открыть полный плеер"
-            disabled
-            className={disabledSecondaryButtonClass}
-          >
-            <ExpandIcon />
-          </button>
-          <button
-            type="button"
-            disabled
-            aria-label="Скорость воспроизведения"
-            className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-[#eadff8] px-3 text-[13px] font-semibold tabular-nums text-[#7042c5]"
-          >
-            1×
-          </button>
-        </div>
-      </div>
-    </DesktopPlayerBarShell>
   );
 }
 
@@ -435,9 +356,10 @@ export default function DesktopPlayerBar() {
     const media = window.matchMedia("(min-width: 1280px)");
 
     const syncHeight = () => {
+      const showBar = media.matches && Boolean(session);
       document.documentElement.style.setProperty(
         "--listener-desktop-player-height",
-        media.matches ? `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px` : "0px",
+        showBar ? `${DESKTOP_PLAYER_BAR_HEIGHT_PX}px` : "0px",
       );
     };
 
@@ -451,7 +373,7 @@ export default function DesktopPlayerBar() {
         "0px",
       );
     };
-  }, []);
+  }, [session]);
 
   if (session && engine) {
     return (
@@ -472,5 +394,5 @@ export default function DesktopPlayerBar() {
     return <DesktopPlayerRestoringState />;
   }
 
-  return <DesktopPlayerEmptyState />;
+  return null;
 }
