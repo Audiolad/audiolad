@@ -8,6 +8,14 @@ import { getCoverExtension } from "@/lib/author-products/media";
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
 import { COVER_EXTENSIONS } from "@/lib/author-products/utils";
 import {
+  avatarProcessErrorMessage,
+  processAvatarImageBuffer,
+} from "@/lib/images/process-avatar-image";
+import {
+  AUTHOR_BANNER_ERROR_MESSAGES,
+} from "@/lib/authors/banner-validation-client";
+import { validateAuthorBannerBuffer } from "@/lib/authors/banner-validation-server";
+import {
   buildAuthorAssetStoragePath,
   getAuthorAssetPublicUrl,
   removeAuthorAssetFiles,
@@ -100,29 +108,85 @@ export async function POST(request: Request, context: RouteContext) {
 
     const { supabase } = await requireAuthorMembership(authorId);
 
-    if (file.size <= 0 || file.size > MAX_COVER_BYTES) {
-      return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
-    }
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const extension = getCoverExtension(file);
+    let uploadBuffer: Buffer = buffer;
+    let uploadContentType = file.type;
+    let extension = getCoverExtension(file);
 
-    if (!extension) {
-      return NextResponse.json({ error: "invalid_file_type" }, { status: 400 });
+    if (kind === "avatar") {
+      if (file.size <= 0 || file.size > MAX_COVER_BYTES) {
+        return NextResponse.json(
+          {
+            error: "invalid_file_size",
+            message: avatarProcessErrorMessage("invalid_file_size"),
+          },
+          { status: 400 },
+        );
+      }
+
+      const processed = await processAvatarImageBuffer(buffer, file.type, {
+        requireSquare: true,
+      });
+
+      if (!processed.ok) {
+        return NextResponse.json(
+          {
+            error: processed.code,
+            message: avatarProcessErrorMessage(processed.code),
+          },
+          { status: 400 },
+        );
+      }
+
+      uploadBuffer = Buffer.from(processed.buffer);
+      uploadContentType = processed.contentType;
+      extension = "webp";
+    } else {
+      const validated = await validateAuthorBannerBuffer(buffer, file.type);
+
+      if (!validated.ok) {
+        return NextResponse.json(
+          {
+            error: validated.code,
+            message: validated.message,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (!extension) {
+        return NextResponse.json(
+          {
+            error: "invalid_file_type",
+            message: AUTHOR_BANNER_ERROR_MESSAGES.unsupportedFormat,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const storagePath = buildAuthorAssetStoragePath(authorId, kind, extension);
-    const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
       .from(AUTHOR_ASSETS_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
+      .upload(storagePath, uploadBuffer, {
+        contentType: uploadContentType,
         upsert: true,
       });
 
     if (uploadError) {
       console.error("author_asset_upload_error", uploadError.message);
-      return NextResponse.json({ error: "upload_failed" }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: "upload_failed",
+          message:
+            kind === "banner"
+              ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
+              : "Не удалось сохранить фотографию. Попробуйте ещё раз.",
+        },
+        { status: 500 },
+      );
     }
 
     for (const oldExtension of COVER_EXTENSIONS) {
@@ -134,7 +198,8 @@ export async function POST(request: Request, context: RouteContext) {
       await supabase.storage.from(AUTHOR_ASSETS_BUCKET).remove([oldPath]);
     }
 
-    const assetUrl = getAuthorAssetPublicUrl(storagePath);
+    const cacheBuster = Date.now();
+    const assetUrl = `${getAuthorAssetPublicUrl(storagePath)}?v=${cacheBuster}`;
 
     const { error: updateError } = await supabase
       .from("authors")
@@ -147,7 +212,16 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (updateError) {
       console.error("author_asset_update_error", updateError.message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: "internal_error",
+          message:
+            kind === "banner"
+              ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
+              : "Не удалось сохранить фотографию. Попробуйте ещё раз.",
+        },
+        { status: 500 },
+      );
     }
 
     const profile = await getAuthorProfileDetail(supabase, authorId);

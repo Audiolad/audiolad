@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { validateCoverFile } from "@/lib/author-products/cover-validation-client";
+import {
+  appendAvatarCacheBuster,
+  useAvatarCropUpload,
+} from "@/components/images/useAvatarCropUpload";
+import {
+  AUTHOR_BANNER_ERROR_MESSAGES,
+  AUTHOR_BANNER_UPLOAD_HINT,
+  validateAuthorBannerFile,
+} from "@/lib/authors/banner-validation-client";
+import { AVATAR_ERROR_MESSAGES, AVATAR_UPLOAD_HINT } from "@/lib/images/avatar-constants";
 
 export type AuthorAssetUploadResult = {
   url: string | null;
@@ -23,26 +32,107 @@ export function useAuthorAssetUpload({
   onUpdated,
   disabled = false,
 }: UseAuthorAssetUploadOptions) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
 
-  const displaySrc = assetUrl?.trim() || null;
+  const displaySrc =
+    localPreviewUrl ?? (assetUrl?.trim() || null);
   const showPreview = Boolean(displaySrc) && !previewFailed;
   const isBusy = uploading || deleting;
 
+  const clearLocalPreview = useCallback(() => {
+    setLocalPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
+    };
+  }, [localPreviewUrl]);
+
+  const uploadAsset = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      setError(null);
+      setPreviewFailed(false);
+
+      try {
+        const formData = new FormData();
+        formData.set("author_id", authorId);
+        formData.set("file", file);
+
+        const response = await fetch(`/api/author/profile/${kind}`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { message?: string }
+            | null;
+          throw new Error(
+            payload?.message ??
+              (kind === "banner"
+                ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
+                : AVATAR_ERROR_MESSAGES.saveFailed),
+          );
+        }
+
+        const payload = (await response.json()) as { url?: string | null };
+        const nextUrl = appendAvatarCacheBuster(
+          payload.url ?? null,
+          Date.now(),
+        );
+        if (kind === "banner") {
+          clearLocalPreview();
+        }
+        onUpdated?.({ url: nextUrl });
+      } finally {
+        setUploading(false);
+      }
+    },
+    [authorId, clearLocalPreview, kind, onUpdated],
+  );
+
+  const {
+    fileInputRef: avatarFileInputRef,
+    error: avatarCropError,
+    openPicker: openAvatarPicker,
+    handleFileChange: handleAvatarFileChange,
+    cropper,
+    isSavingCrop,
+  } = useAvatarCropUpload({
+    disabled: disabled || isBusy,
+    onUpload: uploadAsset,
+  });
+
   const openPicker = useCallback(() => {
-    if (disabled || isBusy) {
+    if (disabled || isBusy || isSavingCrop) {
       return;
     }
 
-    fileInputRef.current?.click();
-  }, [disabled, isBusy]);
+    if (kind === "avatar") {
+      openAvatarPicker();
+      return;
+    }
+
+    bannerFileInputRef.current?.click();
+  }, [disabled, isBusy, isSavingCrop, kind, openAvatarPicker]);
 
   const deleteAsset = useCallback(async () => {
-    if (disabled || isBusy) {
+    if (disabled || isBusy || isSavingCrop) {
       return;
     }
 
@@ -73,9 +163,9 @@ export function useAuthorAssetUpload({
     } finally {
       setDeleting(false);
     }
-  }, [assetUrl, authorId, disabled, isBusy, kind, onUpdated]);
+  }, [assetUrl, authorId, disabled, isBusy, isSavingCrop, kind, onUpdated]);
 
-  const handleFileChange = useCallback(
+  const handleBannerFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       event.target.value = "";
@@ -84,53 +174,54 @@ export function useAuthorAssetUpload({
         return;
       }
 
-      const validationError = await validateCoverFile(file);
+      const validationError = await validateAuthorBannerFile(file);
 
       if (validationError) {
         setError(validationError);
         return;
       }
 
-      setUploading(true);
       setError(null);
       setPreviewFailed(false);
 
-      try {
-        const formData = new FormData();
-        formData.set("author_id", authorId);
-        formData.set("file", file);
-
-        const response = await fetch(`/api/author/profile/${kind}`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("upload_failed");
+      const nextPreviewUrl = URL.createObjectURL(file);
+      setLocalPreviewUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
         }
 
-        const payload = (await response.json()) as { url?: string | null };
-        onUpdated?.({ url: payload.url ?? null });
-      } catch {
-        setError("Не удалось загрузить изображение.");
-      } finally {
-        setUploading(false);
+        return nextPreviewUrl;
+      });
+
+      try {
+        await uploadAsset(file);
+      } catch (uploadError) {
+        clearLocalPreview();
+        setError(
+          uploadError instanceof Error
+            ? uploadError.message
+            : AUTHOR_BANNER_ERROR_MESSAGES.saveFailed,
+        );
       }
     },
-    [authorId, disabled, isBusy, kind, onUpdated],
+    [clearLocalPreview, disabled, isBusy, uploadAsset],
   );
 
   return {
-    fileInputRef,
-    uploading,
+    fileInputRef: kind === "avatar" ? avatarFileInputRef : bannerFileInputRef,
+    uploading: uploading || isSavingCrop,
     deleting,
-    error,
+    error: kind === "avatar" ? avatarCropError ?? error : error,
     displaySrc,
     showPreview,
     openPicker,
     deleteAsset,
-    handleFileChange,
-    isBusy,
+    handleFileChange:
+      kind === "avatar" ? handleAvatarFileChange : handleBannerFileChange,
+    isBusy: isBusy || isSavingCrop,
     setPreviewFailed,
+    cropper: kind === "avatar" ? cropper : null,
+    uploadHint:
+      kind === "avatar" ? AVATAR_UPLOAD_HINT : AUTHOR_BANNER_UPLOAD_HINT,
   };
 }

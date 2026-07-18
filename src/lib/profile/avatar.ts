@@ -2,15 +2,19 @@ import { randomUUID } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  AVATAR_MAX_BYTES,
+  AVATAR_OUTPUT_SIZE,
+} from "@/lib/images/avatar-constants";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 
 export const USER_AVATARS_BUCKET =
   process.env.USER_AVATARS_BUCKET?.trim() || "user-avatars";
 
-export const USER_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+export const USER_AVATAR_MAX_BYTES = AVATAR_MAX_BYTES;
 export const USER_AVATAR_SIGNED_URL_TTL_SECONDS = 60 * 60;
-export const USER_AVATAR_OUTPUT_SIZE = 512;
-export const USER_AVATAR_WEBP_QUALITY = 85;
+export const USER_AVATAR_OUTPUT_SIZE = AVATAR_OUTPUT_SIZE;
+export const USER_AVATAR_WEBP_QUALITY = 90;
 export const USER_AVATAR_MAX_INPUT_PIXELS = 25_000_000;
 
 export const USER_AVATAR_ALLOWED_MIME = new Set([
