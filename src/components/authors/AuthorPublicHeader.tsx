@@ -85,7 +85,7 @@ export default function AuthorPublicHeader({
           </div>
 
           <div className="min-w-0 pb-1">
-            <h1 className="text-[26px] font-semibold leading-tight text-[#25135c] sm:text-[32px] xl:text-[36px]">
+            <h1 className="min-w-0 whitespace-nowrap text-[26px] font-semibold leading-none tracking-tight text-[#25135c] sm:text-[32px] xl:text-[36px]">
               {name}
             </h1>
             {publishedCount > 0 ? (
