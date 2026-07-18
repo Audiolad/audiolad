@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  appendAvatarCacheBuster,
-  useAvatarCropUpload,
-} from "@/components/images/useAvatarCropUpload";
+import { validateCoverFile } from "@/lib/author-products/cover-validation-client";
 import {
   AUTHOR_BANNER_ERROR_MESSAGES,
   AUTHOR_BANNER_UPLOAD_HINT,
   validateAuthorBannerFile,
 } from "@/lib/authors/banner-validation-client";
-import { AVATAR_ERROR_MESSAGES, AVATAR_UPLOAD_HINT } from "@/lib/images/avatar-constants";
 
 export type AuthorAssetUploadResult = {
   url: string | null;
@@ -32,6 +28,7 @@ export function useAuthorAssetUpload({
   onUpdated,
   disabled = false,
 }: UseAuthorAssetUploadOptions) {
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -40,7 +37,9 @@ export function useAuthorAssetUpload({
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
 
   const displaySrc =
-    localPreviewUrl ?? (assetUrl?.trim() || null);
+    kind === "banner"
+      ? localPreviewUrl ?? (assetUrl?.trim() || null)
+      : assetUrl?.trim() || null;
   const showPreview = Boolean(displaySrc) && !previewFailed;
   const isBusy = uploading || deleting;
 
@@ -55,12 +54,16 @@ export function useAuthorAssetUpload({
   }, []);
 
   useEffect(() => {
+    if (kind !== "banner") {
+      return;
+    }
+
     return () => {
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
       }
     };
-  }, [localPreviewUrl]);
+  }, [kind, localPreviewUrl]);
 
   const uploadAsset = useCallback(
     async (file: File) => {
@@ -86,19 +89,15 @@ export function useAuthorAssetUpload({
             payload?.message ??
               (kind === "banner"
                 ? AUTHOR_BANNER_ERROR_MESSAGES.saveFailed
-                : AVATAR_ERROR_MESSAGES.saveFailed),
+                : "Не удалось загрузить изображение."),
           );
         }
 
         const payload = (await response.json()) as { url?: string | null };
-        const nextUrl = appendAvatarCacheBuster(
-          payload.url ?? null,
-          Date.now(),
-        );
         if (kind === "banner") {
           clearLocalPreview();
         }
-        onUpdated?.({ url: nextUrl });
+        onUpdated?.({ url: payload.url ?? null });
       } finally {
         setUploading(false);
       }
@@ -106,33 +105,21 @@ export function useAuthorAssetUpload({
     [authorId, clearLocalPreview, kind, onUpdated],
   );
 
-  const {
-    fileInputRef: avatarFileInputRef,
-    error: avatarCropError,
-    openPicker: openAvatarPicker,
-    handleFileChange: handleAvatarFileChange,
-    cropper,
-    isSavingCrop,
-  } = useAvatarCropUpload({
-    disabled: disabled || isBusy,
-    onUpload: uploadAsset,
-  });
-
   const openPicker = useCallback(() => {
-    if (disabled || isBusy || isSavingCrop) {
+    if (disabled || isBusy) {
       return;
     }
 
     if (kind === "avatar") {
-      openAvatarPicker();
+      avatarFileInputRef.current?.click();
       return;
     }
 
     bannerFileInputRef.current?.click();
-  }, [disabled, isBusy, isSavingCrop, kind, openAvatarPicker]);
+  }, [disabled, isBusy, kind]);
 
   const deleteAsset = useCallback(async () => {
-    if (disabled || isBusy || isSavingCrop) {
+    if (disabled || isBusy) {
       return;
     }
 
@@ -157,13 +144,49 @@ export function useAuthorAssetUpload({
         throw new Error("delete_failed");
       }
 
+      if (kind === "banner") {
+        clearLocalPreview();
+      }
+
       onUpdated?.({ url: null });
     } catch {
       setError("Не удалось удалить изображение.");
     } finally {
       setDeleting(false);
     }
-  }, [assetUrl, authorId, disabled, isBusy, isSavingCrop, kind, onUpdated]);
+  }, [assetUrl, authorId, clearLocalPreview, disabled, isBusy, kind, onUpdated]);
+
+  const handleAvatarFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+
+      if (!file || disabled || isBusy) {
+        return;
+      }
+
+      const validationError = await validateCoverFile(file);
+
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      setError(null);
+      setPreviewFailed(false);
+
+      try {
+        await uploadAsset(file);
+      } catch (uploadError) {
+        setError(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Не удалось загрузить изображение.",
+        );
+      }
+    },
+    [disabled, isBusy, uploadAsset],
+  );
 
   const handleBannerFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,19 +232,17 @@ export function useAuthorAssetUpload({
 
   return {
     fileInputRef: kind === "avatar" ? avatarFileInputRef : bannerFileInputRef,
-    uploading: uploading || isSavingCrop,
+    uploading,
     deleting,
-    error: kind === "avatar" ? avatarCropError ?? error : error,
+    error,
     displaySrc,
     showPreview,
     openPicker,
     deleteAsset,
     handleFileChange:
       kind === "avatar" ? handleAvatarFileChange : handleBannerFileChange,
-    isBusy: isBusy || isSavingCrop,
+    isBusy,
     setPreviewFailed,
-    cropper: kind === "avatar" ? cropper : null,
-    uploadHint:
-      kind === "avatar" ? AVATAR_UPLOAD_HINT : AUTHOR_BANNER_UPLOAD_HINT,
+    uploadHint: kind === "banner" ? AUTHOR_BANNER_UPLOAD_HINT : undefined,
   };
 }

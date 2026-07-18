@@ -74,6 +74,44 @@ export async function createPngWithAlpha(size = 640) {
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
+export async function createPortraitJpegFixture(width = 900, height = 1200) {
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="portrait-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#efe4fb"/>
+          <stop offset="100%" stop-color="#d9c9ef"/>
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#portrait-bg)"/>
+      <circle cx="${width / 2}" cy="${Math.round(height * 0.28)}" r="${Math.round(Math.min(width, height) * 0.16)}" fill="#7042c5"/>
+      <ellipse cx="${width / 2}" cy="${Math.round(height * 0.72)}" rx="${Math.round(width * 0.24)}" ry="${Math.round(height * 0.16)}" fill="#9a74d8"/>
+      <rect x="${Math.round(width * 0.12)}" y="${Math.round(height * 0.46)}" width="${Math.round(width * 0.76)}" height="${Math.round(height * 0.08)}" rx="18" fill="#25135c55"/>
+    </svg>
+  `;
+
+  return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
+}
+
+export async function createLandscapeJpegFixture(width = 1200, height = 800) {
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="landscape-bg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#7042c5"/>
+          <stop offset="100%" stop-color="#f7d2c8"/>
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#landscape-bg)"/>
+      <circle cx="${Math.round(width * 0.22)}" cy="${Math.round(height * 0.42)}" r="${Math.round(height * 0.18)}" fill="#ffffff44"/>
+      <rect x="${Math.round(width * 0.42)}" y="${Math.round(height * 0.18)}" width="${Math.round(width * 0.4)}" height="${Math.round(height * 0.64)}" rx="36" fill="#25135c77"/>
+      <polygon points="${Math.round(width * 0.78)},${Math.round(height * 0.2)} ${Math.round(width * 0.92)},${Math.round(height * 0.78)} ${Math.round(width * 0.66)},${Math.round(height * 0.78)}" fill="#ffffff33"/>
+    </svg>
+  `;
+
+  return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
+}
+
 export async function createExifOrientedLandscape() {
   return sharp({
     create: {

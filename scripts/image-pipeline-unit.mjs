@@ -2,11 +2,6 @@
 /**
  * Shared image pipeline unit checks — no database or network required.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import sharp from "sharp";
-
 import { buildCoverDisplayUrlFromManifest } from "../src/lib/images/image-url.ts";
 import { parseImageManifest } from "../src/lib/images/image-manifest.ts";
 import { resolveProductCoverUrl } from "../src/lib/images/resolve-display.ts";
@@ -17,18 +12,19 @@ import {
   validateImageBufferForProfile,
 } from "../src/lib/images/validate-image.ts";
 import { processImageForProfile } from "../src/lib/images/process-image.ts";
+import sharp from "sharp";
 
 import {
   createAvatarPortrait,
   createBannerFixture,
   createExifOrientedLandscape,
+  createLandscapeJpegFixture,
   createNoisyGradientSquare,
   createPngWithAlpha,
+  createPortraitJpegFixture,
   formatBytes,
   savingsPercent,
 } from "./lib/image-fixtures.mjs";
-
-const FIXTURES = join(process.cwd(), "scripts/fixtures/avatar-crop");
 
 function assert(condition, message) {
   if (!condition) {
@@ -36,12 +32,17 @@ function assert(condition, message) {
   }
 }
 
-function loadFixture(name) {
-  return readFileSync(join(FIXTURES, name));
+/** Programmatic JPEG buffers — no committed binary fixtures required. */
+let portraitJpeg;
+let landscapeJpeg;
+
+async function loadProgrammaticFixtures() {
+  portraitJpeg = await createPortraitJpegFixture();
+  landscapeJpeg = await createLandscapeJpegFixture();
 }
 
 async function testPngToWebpVariants() {
-  const input = loadFixture("portrait.jpg");
+  const input = portraitJpeg;
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -117,7 +118,7 @@ async function testExifOrientation() {
 }
 
 async function testMetadataStripped() {
-  const input = loadFixture("landscape.jpg");
+  const input = landscapeJpeg;
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -142,7 +143,7 @@ function testInvalidAndSvgRejected() {
 
 async function testHugeImageRejected() {
   const fakeHugeMeta = validateImageBufferForProfile(
-    loadFixture("portrait.jpg"),
+    portraitJpeg,
     "image/jpeg",
     "product-cover",
   );
@@ -157,7 +158,7 @@ async function testHugeImageRejected() {
 }
 
 async function testPlaceholderSmall() {
-  const input = loadFixture("landscape.jpg");
+  const input = landscapeJpeg;
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -212,9 +213,8 @@ function testManifestPreferredOverLegacy() {
 }
 
 function testMagicDetection() {
-  const png = loadFixture("portrait.jpg");
-  const mime = detectMimeFromMagic(png);
-  assert(mime === "image/jpeg", "fixture portrait should detect as jpeg");
+  const mime = detectMimeFromMagic(portraitJpeg);
+  assert(mime === "image/jpeg", "programmatic portrait fixture should detect as jpeg");
 }
 
 async function testRichFixturesReport() {
@@ -258,6 +258,7 @@ async function testRichFixturesReport() {
 }
 
 async function main() {
+  await loadProgrammaticFixtures();
   await testPngToWebpVariants();
   await testSmallSourceNotUpscaled();
   await testExifOrientation();
