@@ -16,6 +16,8 @@ type AvatarCropperModalProps = {
   onConfirm: (file: File) => void | Promise<void>;
 };
 
+type AvatarCropperContentProps = Omit<AvatarCropperModalProps, "isOpen">;
+
 function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
@@ -29,15 +31,14 @@ function CloseIcon() {
   );
 }
 
-export default function AvatarCropperModal({
+function AvatarCropperContent({
   imageSrc,
   sourceBlob,
   sourceMime,
-  isOpen,
   isSaving = false,
   onCancel,
   onConfirm,
-}: AvatarCropperModalProps) {
+}: AvatarCropperContentProps) {
   const titleId = useId();
   const descriptionId = useId();
   const cropContainerRef = useRef<HTMLDivElement>(null);
@@ -50,31 +51,6 @@ export default function AvatarCropperModal({
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setMinZoom(1);
-    setMaxZoom(4);
-    setCroppedAreaPixels(null);
-    setLocalError(null);
-    dragActiveRef.current = false;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [imageSrc, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !isSaving) {
         onCancel();
@@ -86,7 +62,7 @@ export default function AvatarCropperModal({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isSaving, onCancel]);
+  }, [isSaving, onCancel]);
 
   const onCropComplete = useCallback((_area: Area, areaPixels: Area) => {
     setCroppedAreaPixels(areaPixels);
@@ -142,10 +118,6 @@ export default function AvatarCropperModal({
       setLocalError("Не удалось подготовить изображение. Попробуйте ещё раз.");
     }
   }, [croppedAreaPixels, isSaving, onConfirm, sourceBlob, sourceMime]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   return (
     <div
@@ -260,5 +232,44 @@ export default function AvatarCropperModal({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AvatarCropperModal({
+  imageSrc,
+  sourceBlob,
+  sourceMime,
+  isOpen,
+  isSaving = false,
+  onCancel,
+  onConfirm,
+}: AvatarCropperModalProps) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <AvatarCropperContent
+      key={imageSrc}
+      imageSrc={imageSrc}
+      sourceBlob={sourceBlob}
+      sourceMime={sourceMime}
+      isSaving={isSaving}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
   );
 }
