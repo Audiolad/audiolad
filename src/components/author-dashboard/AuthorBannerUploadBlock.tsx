@@ -180,6 +180,7 @@ export default function AuthorBannerUploadBlock({
       ) : null}
 
       <BannerPositionEditorModal
+        key={`${editorImageSrc ?? "closed"}:${editorPosition.x}:${editorPosition.y}`}
         imageSrc={editorImageSrc ?? ""}
         position={editorPosition}
         isOpen={editorOpen && Boolean(editorImageSrc)}

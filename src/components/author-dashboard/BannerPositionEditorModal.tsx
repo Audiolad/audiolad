@@ -48,7 +48,6 @@ export default function BannerPositionEditorModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setDraftPosition(position);
     dragActiveRef.current = false;
     dragStartRef.current = null;
     const previousOverflow = document.body.style.overflow;
@@ -56,7 +55,7 @@ export default function BannerPositionEditorModal({
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [imageSrc, isOpen, position]);
+  }, [imageSrc, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
