@@ -9,13 +9,18 @@ import {
   validateEmailForRegistrationClient,
 } from "@/lib/auth/email";
 import {
+  clearSignUpClientFieldError,
+  evaluateSignUpClientFormState,
+  type SignUpClientField,
+} from "@/lib/auth/sign-up-client-form";
+import {
   buildAuthRouteHref,
   SIGN_UP_DEFAULT_REDIRECT,
 } from "@/lib/auth/routes";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useMemo, useRef, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 
 import {
   getCachedAnalyticsSessionId,
@@ -44,7 +49,11 @@ function SignUpForm() {
   >({});
   const [formError, setFormError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [firstNameTouched, setFirstNameTouched] = useState(false);
+  const [lastNameTouched, setLastNameTouched] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const signupStartedRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const nextParam = searchParams.get("next");
 
@@ -68,24 +77,97 @@ function SignUpForm() {
     });
   }
 
-  const clientEmailValidation = useMemo(
-    () => (email.trim() ? validateEmailForRegistrationClient(email) : null),
-    [email],
+  const formState = evaluateSignUpClientFormState(
+    { firstName, lastName, email, password, legalConsent },
+    fieldErrors,
+    { firstNameTouched, lastNameTouched, submitAttempted },
   );
 
-  const emailInvalid =
-    clientEmailValidation !== null && !clientEmailValidation.ok;
+  function clearFieldError(field: SignUpClientField) {
+    setFieldErrors((current) => clearSignUpClientFieldError(current, field));
+  }
 
-  const isFormReady =
-    firstName.trim().length > 0 &&
-    lastName.trim().length > 0 &&
-    email.trim().length > 0 &&
-    password.length >= PASSWORD_MIN_LENGTH &&
-    legalConsent &&
-    !emailInvalid;
+  const fieldValuesRef = useRef({
+    firstName,
+    lastName,
+    email,
+    password,
+  });
+  fieldValuesRef.current = { firstName, lastName, email, password };
+
+  useEffect(() => {
+    const form = formRef.current;
+
+    if (!form) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncAutofillValues = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const current = fieldValuesRef.current;
+
+      const syncField = (
+        selector: string,
+        fieldValue: string,
+        setValue: (value: string) => void,
+      ) => {
+        const input = form.querySelector(selector);
+
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+
+        if (input.value !== fieldValue) {
+          setValue(input.value);
+        }
+      };
+
+      syncField(
+        'input[autocomplete="given-name"]',
+        current.firstName,
+        setFirstName,
+      );
+      syncField(
+        'input[autocomplete="family-name"]',
+        current.lastName,
+        setLastName,
+      );
+      syncField('input[autocomplete="email"]', current.email, setEmail);
+      syncField(
+        'input[autocomplete="new-password"]',
+        current.password,
+        setPassword,
+      );
+    };
+
+    syncAutofillValues();
+
+    const interval = window.setInterval(syncAutofillValues, 250);
+    const stopInterval = window.setTimeout(() => {
+      window.clearInterval(interval);
+    }, 3000);
+    form.addEventListener("focusin", syncAutofillValues);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(stopInterval);
+      form.removeEventListener("focusin", syncAutofillValues);
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isLoading || !formState.isSubmitReady) {
+      setSubmitAttempted(true);
+      return;
+    }
 
     setIsLoading(true);
     setFieldErrors({});
@@ -165,6 +247,7 @@ function SignUpForm() {
         </header>
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="mt-8 space-y-5"
           data-testid="sign-up-form"
@@ -177,15 +260,41 @@ function SignUpForm() {
               type="text"
               value={firstName}
               onFocus={trackSignupStartedOnce}
+              onBlur={() => setFirstNameTouched(true)}
               onChange={(event) => {
                 trackSignupStartedOnce();
                 setFirstName(event.target.value);
+                clearFieldError("firstName");
+              }}
+              onInput={(event) => {
+                setFirstName(event.currentTarget.value);
+                clearFieldError("firstName");
               }}
               required
               autoComplete="given-name"
               placeholder="Ваше имя"
-              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5]"
+              aria-invalid={formState.firstNameFieldInvalid}
+              aria-describedby={
+                formState.firstNameErrorMessage
+                  ? fieldErrorId("firstName")
+                  : undefined
+              }
+              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+                formState.firstNameFieldInvalid
+                  ? "border-[#efc7cf]"
+                  : "border-[#ddcfef]"
+              }`}
             />
+
+            {formState.firstNameErrorMessage ? (
+              <p
+                id={fieldErrorId("firstName")}
+                role="alert"
+                className="mt-2 text-sm leading-6 text-[#b34f63]"
+              >
+                {formState.firstNameErrorMessage}
+              </p>
+            ) : null}
           </label>
 
           <label className="block">
@@ -194,12 +303,40 @@ function SignUpForm() {
             <input
               type="text"
               value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
+              onBlur={() => setLastNameTouched(true)}
+              onChange={(event) => {
+                setLastName(event.target.value);
+                clearFieldError("lastName");
+              }}
+              onInput={(event) => {
+                setLastName(event.currentTarget.value);
+                clearFieldError("lastName");
+              }}
               required
               autoComplete="family-name"
               placeholder="Ваша фамилия"
-              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5]"
+              aria-invalid={formState.lastNameFieldInvalid}
+              aria-describedby={
+                formState.lastNameErrorMessage
+                  ? fieldErrorId("lastName")
+                  : undefined
+              }
+              className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
+                formState.lastNameFieldInvalid
+                  ? "border-[#efc7cf]"
+                  : "border-[#ddcfef]"
+              }`}
             />
+
+            {formState.lastNameErrorMessage ? (
+              <p
+                id={fieldErrorId("lastName")}
+                role="alert"
+                className="mt-2 text-sm leading-6 text-[#b34f63]"
+              >
+                {formState.lastNameErrorMessage}
+              </p>
+            ) : null}
           </label>
 
           <label className="block">
@@ -209,18 +346,25 @@ function SignUpForm() {
               type="email"
               inputMode="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                clearFieldError("email");
+              }}
+              onInput={(event) => {
+                setEmail(event.currentTarget.value);
+                clearFieldError("email");
+              }}
               required
               autoComplete="email"
               placeholder="name@yandex.ru"
-              aria-invalid={emailInvalid || Boolean(fieldErrors.email)}
+              aria-invalid={formState.emailFieldInvalid}
               aria-describedby={
-                fieldErrors.email
+                formState.emailErrorMessage
                   ? fieldErrorId("email")
                   : "sign-up-email-hint"
               }
               className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
-                emailInvalid || fieldErrors.email
+                formState.emailFieldInvalid
                   ? "border-[#efc7cf]"
                   : "border-[#ddcfef]"
               }`}
@@ -233,21 +377,13 @@ function SignUpForm() {
               {EMAIL_FIELD_HINT}
             </p>
 
-            {fieldErrors.email ? (
+            {formState.emailErrorMessage ? (
               <p
                 id={fieldErrorId("email")}
                 role="alert"
                 className="mt-2 text-sm leading-6 text-[#b34f63]"
               >
-                {fieldErrors.email}
-              </p>
-            ) : emailInvalid && clientEmailValidation ? (
-              <p
-                id={fieldErrorId("email")}
-                role="alert"
-                className="mt-2 text-sm leading-6 text-[#b34f63]"
-              >
-                {getEmailValidationMessage(clientEmailValidation.code)}
+                {formState.emailErrorMessage}
               </p>
             ) : null}
           </label>
@@ -258,27 +394,38 @@ function SignUpForm() {
             <input
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                clearFieldError("password");
+              }}
+              onInput={(event) => {
+                setPassword(event.currentTarget.value);
+                clearFieldError("password");
+              }}
               required
               minLength={PASSWORD_MIN_LENGTH}
               autoComplete="new-password"
               placeholder={`Минимум ${PASSWORD_MIN_LENGTH} символов`}
-              aria-invalid={Boolean(fieldErrors.password)}
+              aria-invalid={formState.passwordFieldInvalid}
               aria-describedby={
-                fieldErrors.password ? fieldErrorId("password") : undefined
+                formState.passwordErrorMessage
+                  ? fieldErrorId("password")
+                  : undefined
               }
               className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
-                fieldErrors.password ? "border-[#efc7cf]" : "border-[#ddcfef]"
+                formState.passwordFieldInvalid
+                  ? "border-[#efc7cf]"
+                  : "border-[#ddcfef]"
               }`}
             />
 
-            {fieldErrors.password ? (
+            {formState.passwordErrorMessage ? (
               <p
                 id={fieldErrorId("password")}
                 role="alert"
                 className="mt-2 text-sm leading-6 text-[#b34f63]"
               >
-                {fieldErrors.password}
+                {formState.passwordErrorMessage}
               </p>
             ) : null}
           </label>
@@ -290,7 +437,10 @@ function SignUpForm() {
               <input
                 type="checkbox"
                 checked={legalConsent}
-                onChange={(event) => setLegalConsent(event.target.checked)}
+                onChange={(event) => {
+                  setLegalConsent(event.target.checked);
+                  clearFieldError("legalConsent");
+                }}
                 className="mt-1 h-4 w-4 shrink-0 accent-[#7042c5]"
                 aria-invalid={Boolean(fieldErrors.legalConsent)}
                 aria-describedby={
@@ -351,8 +501,9 @@ function SignUpForm() {
 
           <button
             type="submit"
-            disabled={isLoading || !isFormReady}
+            disabled={isLoading || !formState.isSubmitReady}
             aria-busy={isLoading}
+            data-testid="sign-up-submit"
             className="primary-cta primary-cta--form"
           >
             {isLoading ? "Создаём аккаунт…" : "Зарегистрироваться"}
