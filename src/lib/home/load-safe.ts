@@ -26,11 +26,9 @@ export async function loadPersonalHomeDataSafe(
     ...EMPTY_PERSONAL_HOME_DATA,
     startSuggestions: [],
     forYouProducts: [],
-    activePrograms: [],
     recentlyListened: [],
-    libraryProducts: [],
-    timeOfDayProducts: [],
+    activePrograms: [],
     newProducts: [],
-    freeProducts: [],
+    authors: [],
   });
 }

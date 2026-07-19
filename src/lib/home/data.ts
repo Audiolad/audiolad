@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
+import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
+import { resolveShowBecomeAuthorPromo } from "@/lib/listener/author-cta";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 
-import {
-  getDayPeriodFromHour,
-  getTimeOfDaySectionTitle,
-} from "./greeting";
 import { getGreetingFirstName } from "./profile-name";
 import {
   enrichCatalogProducts,
@@ -49,76 +49,6 @@ async function getPublishedAuthors(
     publishedCount: author.publishedCount,
     href: buildAuthorPublicPath(author.slug),
   }));
-}
-
-async function getLibraryProducts(
-  supabase: SupabaseClient,
-  userId: string,
-  catalogProductMap: Map<string, HomeProduct>,
-): Promise<HomeProduct[]> {
-  const { data: libraryRows, error } = await supabase
-    .from("user_practices")
-    .select(
-      `
-      id,
-      expires_at,
-      practices (
-        id
-      )
-    `,
-    )
-    .eq("user_id", userId)
-    .order("granted_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  if (!libraryRows?.length) {
-    return [];
-  }
-
-  const now = Date.now();
-  const practiceIds: string[] = [];
-
-  for (const row of libraryRows as Array<{
-    expires_at: string | null;
-    practices: { id: string } | { id: string }[] | null;
-  }>) {
-    const expiresAt = row.expires_at;
-
-    if (expiresAt !== null && Date.parse(expiresAt) <= now) {
-      continue;
-    }
-
-    const practice = Array.isArray(row.practices)
-      ? row.practices[0]
-      : row.practices;
-
-    if (practice?.id) {
-      practiceIds.push(practice.id);
-    }
-  }
-
-  return practiceIds.flatMap((practiceId) => {
-    const product = catalogProductMap.get(practiceId);
-    return product ? [product] : [];
-  });
-}
-
-function selectTimeOfDayProducts(
-  products: HomeProduct[],
-  daySeed: number,
-  limit = 6,
-): HomeProduct[] {
-  if (products.length === 0) {
-    return [];
-  }
-
-  const offset = daySeed % products.length;
-  const rotated = [...products.slice(offset), ...products.slice(0, offset)];
-
-  return rotated.slice(0, limit);
 }
 
 export async function getGuestHomeData(
@@ -204,7 +134,9 @@ export async function getPersonalHomeData(
     continueListening,
     recentlyListened,
     activePrograms,
-    libraryProducts,
+    authors,
+    authorWorkspaces,
+    authorApplication,
   ] = await Promise.all([
     safeHomeSection(
       "personal_continue_listening",
@@ -243,17 +175,51 @@ export async function getPersonalHomeData(
       { userId },
     ),
     safeHomeSection(
-      "personal_library",
-      () => getLibraryProducts(supabase, userId, catalogProductMap),
+      "personal_authors",
+      () => getPublishedAuthors(supabase),
       [],
       { userId },
     ),
+    safeHomeSection(
+      "personal_author_workspaces",
+      () => listAuthorWorkspacesForUser(userId),
+      [],
+      { userId },
+    ),
+    safeHomeSection(
+      "personal_author_application",
+      () => getCurrentAuthorApplication(supabase, userId),
+      null,
+      { userId },
+    ),
   ]);
+
+  const applicationVariant = resolveProfileApplicationVariant({
+    workspaceCount: authorWorkspaces.length,
+    applicationStatus: authorApplication?.status ?? null,
+  });
+
+  const showBecomeAuthorPromo = resolveShowBecomeAuthorPromo({
+    workspaces: authorWorkspaces,
+    applicationVariant,
+  });
 
   const shownIds = new Set<string>();
 
   if (continueListening) {
     shownIds.add(continueListening.product.id);
+  }
+
+  const forYouProducts = excludeProducts(
+    takeUniqueProducts(
+      [recentlyListened, freeProducts, allProducts.slice(0, 12)],
+      8,
+    ),
+    shownIds,
+  );
+
+  for (const product of forYouProducts) {
+    shownIds.add(product.id);
   }
 
   const visibleRecentlyListened = recentlyListened.filter(
@@ -272,50 +238,19 @@ export async function getPersonalHomeData(
     shownIds.add(program.product.id);
   }
 
-  const visibleLibraryProducts = excludeProducts(
-    libraryProducts.slice(0, 8),
-    shownIds,
-  );
-
-  for (const product of visibleLibraryProducts) {
-    shownIds.add(product.id);
-  }
-
   const startSuggestions = takeUniqueProducts([freeProducts, allProducts], 4);
-
-  const forYouProducts = excludeProducts(
-    takeUniqueProducts(
-      [recentlyListened, freeProducts, allProducts.slice(0, 12)],
-      8,
-    ),
-    shownIds,
-  );
-
-  const timeOfDayProducts = excludeProducts(
-    selectTimeOfDayProducts(
-      takeUniqueProducts([freeProducts, allProducts], 12),
-      new Date().getDate(),
-      6,
-    ),
-    shownIds,
-  );
-
   const newProducts = excludeProducts(allProducts.slice(0, 8), shownIds);
-  const personalFreeProducts = excludeProducts(freeProducts.slice(0, 8), shownIds);
   const greetingFirstName = getGreetingFirstName(profile, userMetadata);
-  const timeOfDayPeriod = getDayPeriodFromHour(new Date().getHours());
 
   return {
     greetingFirstName,
-    timeOfDaySectionTitle: getTimeOfDaySectionTitle(timeOfDayPeriod),
     continueListening,
     startSuggestions,
     forYouProducts,
-    activePrograms: visibleActivePrograms,
     recentlyListened: visibleRecentlyListened,
-    libraryProducts: visibleLibraryProducts,
-    timeOfDayProducts,
+    activePrograms: visibleActivePrograms,
     newProducts,
-    freeProducts: personalFreeProducts,
+    authors,
+    showBecomeAuthorPromo,
   };
 }
