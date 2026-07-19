@@ -1,0 +1,19 @@
+import type { ReactNode } from "react";
+
+import { HistoryPageHeader } from "@/components/history/HistorySections";
+
+export default function HistoryListenerLayout({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <>
+      <HistoryPageHeader />
+
+      <div className="listener-history-content px-5 pt-5 lg:px-10 xl:max-w-[880px] xl:px-8 xl:pt-3 xl:pb-5">
+        {children}
+      </div>
+    </>
+  );
+}

@@ -136,6 +136,10 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 1.25rem;
   }
+
+  .listener-history-content {
+    width: 100%;
+  }
 }
 
 @media (min-width: 1440px) {
