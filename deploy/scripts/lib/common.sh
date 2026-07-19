@@ -172,6 +172,11 @@ cleanup_orphan_next_servers() {
     if [[ "$ppid" == "1" ]]; then
       log_warn "Stopping orphaned next-server pid=$pid"
       kill "$pid" 2>/dev/null || true
+      sleep 1
+      if kill -0 "$pid" 2>/dev/null; then
+        log_warn "Force-stopping stubborn orphaned next-server pid=$pid"
+        kill -9 "$pid" 2>/dev/null || true
+      fi
     fi
   done < <(pgrep -f 'next-server' 2>/dev/null || true)
 }
