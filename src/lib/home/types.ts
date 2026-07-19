@@ -9,7 +9,7 @@ export type HomeAuthor = {
   id: string;
   name: string;
   slug: string;
-  description: string | null;
+  positioningText: string | null;
   avatarUrl: string | null;
   publishedCount: number;
   href: string;

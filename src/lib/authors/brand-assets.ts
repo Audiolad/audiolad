@@ -13,3 +13,12 @@ export function resolveAuthorPositioningText(
 
   return trimmed || DEFAULT_AUTHOR_SHORT_POSITIONING;
 }
+
+export function resolveAuthorCardPositioningText(
+  shortPositioning: string | null | undefined,
+): string | null {
+  const trimmed =
+    typeof shortPositioning === "string" ? shortPositioning.trim() : "";
+
+  return trimmed || null;
+}

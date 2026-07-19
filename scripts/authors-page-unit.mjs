@@ -39,8 +39,10 @@ function testPublicListLoader() {
   assert(source.includes('.eq("status", "published")'), "only published products");
   assert(source.includes('.eq("is_catalog_listed", true)'), "catalog-listed products only");
   assert(source.includes("resolveAuthorAvatarUrl"), "avatar URL resolver used");
-  assert(source.includes("resolveAuthorPositioningText"), "positioning fallback used");
-  assert(source.includes("resolveAuthorShortBio"), "short bio resolver used");
+  assert(source.includes("resolveAuthorCardPositioningText"), "card positioning resolver used");
+  assert(source.includes("positioningText:"), "positioningText mapped in loader");
+  assert(!source.includes("resolveAuthorShortBio"), "short bio resolver removed");
+  assert(!source.includes("short_bio"), "short_bio no longer selected");
   assert(source.includes("sortPublicAuthors"), "server-side sort applied");
   assert(!source.includes("for (const author"), "no per-author network loop");
   assert(source.includes("authorMap.get"), "aggregates counts in memory");
@@ -89,11 +91,11 @@ function testPositioningFallbackUsage() {
   const brand = read("src/lib/authors/brand-assets.ts");
 
   assert(
-    brand.includes("DEFAULT_AUTHOR_SHORT_POSITIONING"),
-    "positioning fallback constant exists",
+    brand.includes("resolveAuthorCardPositioningText"),
+    "card positioning resolver exists",
   );
-  assert(card.includes("author.shortPositioning"), "card renders resolved positioning");
-  assert(card.includes("author.shortBio ?"), "empty short bio block omitted");
+  assert(card.includes("author.positioningText"), "card renders positioningText");
+  assert(card.includes("author.positioningText ?"), "empty positioning block omitted");
 }
 
 function testSorting() {

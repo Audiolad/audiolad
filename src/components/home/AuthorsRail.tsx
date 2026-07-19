@@ -44,9 +44,9 @@ export default function AuthorsRail({ authors }: AuthorsRailProps) {
               </div>
             </div>
 
-            {author.description ? (
+            {author.positioningText ? (
               <p className="mt-3 line-clamp-3 text-sm leading-5 text-[#7d70a2]">
-                {author.description}
+                {author.positioningText}
               </p>
             ) : null}
 

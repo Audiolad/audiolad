@@ -39,9 +39,9 @@ export default function SimilarAuthorsSection({
               {author.name}
             </h3>
 
-            {author.shortBio ? (
+            {author.positioningText ? (
               <p className="mt-2 line-clamp-3 text-center text-sm leading-5 text-[#7d70a2]">
-                {author.shortBio}
+                {author.positioningText}
               </p>
             ) : null}
           </Link>

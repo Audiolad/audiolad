@@ -37,8 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description =
     data.shortPositioning !== DEFAULT_AUTHOR_SHORT_POSITIONING
       ? data.shortPositioning
-      : data.shortBio ||
-        `Аудиопрактики и программы автора ${data.name} на АудиоЛаде.`;
+      : `Аудиопрактики и программы автора ${data.name} на АудиоЛаде.`;
   const canonicalUrl = `${getAppOrigin()}${buildAuthorPublicPath(data.slug)}`;
   const ogImage = data.bannerUrl || data.avatarUrl || undefined;
 

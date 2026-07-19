@@ -44,7 +44,7 @@ async function getPublishedAuthors(
     id: author.id,
     name: author.name,
     slug: author.slug,
-    description: author.shortBio,
+    positioningText: author.positioningText,
     avatarUrl: author.avatarUrl,
     publishedCount: author.publishedCount,
     href: buildAuthorPublicPath(author.slug),

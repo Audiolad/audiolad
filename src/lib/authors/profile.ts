@@ -48,23 +48,6 @@ export type AuthorProfileDetail = AuthorProfileRow & {
   featuredProducts: AuthorFeaturedProductSummary[];
 };
 
-export function resolveAuthorShortBio(author: {
-  short_bio?: string | null;
-  description?: string | null;
-}): string | null {
-  const shortBio =
-    typeof author.short_bio === "string" ? author.short_bio.trim() : "";
-
-  if (shortBio) {
-    return shortBio;
-  }
-
-  const legacyDescription =
-    typeof author.description === "string" ? author.description.trim() : "";
-
-  return legacyDescription || null;
-}
-
 export async function getAuthorProfileDetail(
   supabase: SupabaseClient,
   authorId: string,

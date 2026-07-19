@@ -1,14 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
-
-import { resolveAuthorShortBio } from "./profile";
 
 export type SimilarAuthorCard = {
   id: string;
   name: string;
   slug: string;
-  shortBio: string | null;
+  positioningText: string | null;
   avatarUrl: string | null;
   href: string;
   overlapScore: number;
@@ -30,8 +29,7 @@ export async function findSimilarAuthors(
         id,
         name,
         slug,
-        short_bio,
-        description,
+        short_positioning,
         avatar_url
       )
     `,
@@ -49,8 +47,7 @@ export async function findSimilarAuthors(
       id: string;
       name: string;
       slug: string;
-      short_bio: string | null;
-      description: string | null;
+      short_positioning: string | null;
       avatar_url: string | null;
       productCount: number;
       topicOverlap: number;
@@ -65,16 +62,14 @@ export async function findSimilarAuthors(
           id: string;
           name: string;
           slug: string;
-          short_bio: string | null;
-          description: string | null;
+          short_positioning: string | null;
           avatar_url: string | null;
         }
       | Array<{
           id: string;
           name: string;
           slug: string;
-          short_bio: string | null;
-          description: string | null;
+          short_positioning: string | null;
           avatar_url: string | null;
         }>;
   }>) {
@@ -95,8 +90,7 @@ export async function findSimilarAuthors(
       id: author.id,
       name: author.name,
       slug: author.slug,
-      short_bio: author.short_bio,
-      description: author.description,
+      short_positioning: author.short_positioning,
       avatar_url: author.avatar_url,
       productCount: 1,
       topicOverlap: 0,
@@ -169,7 +163,7 @@ export async function findSimilarAuthors(
       id: candidate.id,
       name: candidate.name,
       slug: candidate.slug,
-      shortBio: resolveAuthorShortBio(candidate),
+      positioningText: resolveAuthorCardPositioningText(candidate.short_positioning),
       avatarUrl: candidate.avatar_url?.trim() || null,
       href: buildAuthorPublicPath(candidate.slug),
       overlapScore: candidate.topicOverlap,

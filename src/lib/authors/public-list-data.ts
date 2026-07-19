@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { resolveAuthorShortBio } from "@/lib/authors/profile";
-import { resolveAuthorPositioningText } from "@/lib/authors/brand-assets";
+import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { resolveAuthorAvatarUrl } from "@/lib/images/resolve-display";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 
@@ -14,8 +13,7 @@ export type PublicAuthorCard = {
   id: string;
   name: string;
   slug: string;
-  shortPositioning: string;
-  shortBio: string | null;
+  positioningText: string | null;
   avatarUrl: string | null;
   avatarImage?: unknown;
   publishedCount: number;
@@ -27,9 +25,7 @@ type AuthorJoinRow = {
   id: string;
   name: string;
   slug: string;
-  short_bio: string | null;
   short_positioning: string | null;
-  description: string | null;
   avatar_url: string | null;
   avatar_image?: unknown;
   updated_at: string | null;
@@ -50,9 +46,7 @@ export async function loadPublicAuthorsList(
         id,
         name,
         slug,
-        short_bio,
         short_positioning,
-        description,
         avatar_url,
         avatar_image,
         updated_at,
@@ -107,8 +101,7 @@ export async function loadPublicAuthorsList(
     id: author.id,
     name: author.name.trim(),
     slug: author.slug.trim(),
-    shortPositioning: resolveAuthorPositioningText(author.short_positioning),
-    shortBio: resolveAuthorShortBio(author),
+    positioningText: resolveAuthorCardPositioningText(author.short_positioning),
     avatarUrl: resolveAuthorAvatarUrl(
       {
         avatar_url: author.avatar_url,

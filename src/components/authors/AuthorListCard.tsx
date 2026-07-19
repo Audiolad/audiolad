@@ -34,13 +34,9 @@ export default function AuthorListCard({ author }: AuthorListCardProps) {
               {author.name}
             </h3>
 
-            <p className="mt-1 line-clamp-3 text-sm font-medium leading-5 text-[#7042c5]">
-              {author.shortPositioning}
-            </p>
-
-            {author.shortBio ? (
-              <p className="mt-2 line-clamp-3 text-sm leading-5 text-[#70628e]">
-                {author.shortBio}
+            {author.positioningText ? (
+              <p className="mt-1 line-clamp-3 text-sm font-medium leading-5 text-[#7042c5]">
+                {author.positioningText}
               </p>
             ) : null}
           </div>

@@ -19,7 +19,6 @@ import { normalizeStoredBannerPosition } from "@/lib/authors/banner-position";
 
 import {
   getAuthorProfileDetail,
-  resolveAuthorShortBio,
   type AuthorProfileTopic,
 } from "./profile";
 import { resolveAuthorPositioningText } from "./brand-assets";
@@ -37,7 +36,6 @@ export type AuthorPublicPageData = {
   name: string;
   slug: string;
   authorType: string;
-  shortBio: string | null;
   shortPositioning: string;
   fullBio: string | null;
   avatarUrl: string | null;
@@ -171,10 +169,6 @@ export async function loadAuthorPublicPageData(
       name: author.name,
       slug: author.slug,
       authorType: profile?.author_type ?? "person",
-      shortBio: resolveAuthorShortBio({
-        short_bio: profile?.short_bio ?? author.short_bio,
-        description: profile?.description ?? author.description,
-      }),
       shortPositioning: resolveAuthorPositioningText(
         profile?.short_positioning ?? null,
       ),

@@ -30,7 +30,7 @@ VALUES (
   '50ee125c-8951-4ac6-819a-3f6b11150008',
   'Сергей и Зоя',
   'sergey-and-zoya',
-  'Медитации, энергопрактики и программы для внутренней гармонии.',
+  NULL,
   NULL
 )
 ON CONFLICT (slug) DO NOTHING;
