@@ -18,8 +18,10 @@ function testValidation() {
   const source = read("src/lib/authors/validation.ts");
 
   assert(source.includes("MAX_SHORT_BIO_LENGTH"), "short bio limit exported");
+  assert(source.includes("MAX_FULL_BIO_LENGTH"), "full bio limit exported");
   assert(source.includes("MAX_SHORT_POSITIONING_LENGTH"), "positioning limit exported");
   assert(source.includes("normalizeShortPositioning"), "positioning normalizer");
+  assert(source.includes("normalizeFullBio"), "full bio normalizer");
   assert(source.includes("normalizeFeaturedProductIds"), "featured ids normalizer");
   assert(source.includes("MAX_FEATURED_PRODUCTS"), "featured limit enforced");
 }

@@ -1,6 +1,7 @@
 import {
   AUTHOR_TYPES,
   MAX_FEATURED_PRODUCTS,
+  MAX_FULL_BIO_LENGTH,
   MAX_SHORT_BIO_LENGTH,
   MAX_SHORT_POSITIONING_LENGTH,
   type AuthorType,
@@ -65,7 +66,15 @@ export function normalizeFullBio(value: unknown): string | null {
 
   const trimmed = value.trim();
 
-  return trimmed || null;
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.length > MAX_FULL_BIO_LENGTH) {
+    return null;
+  }
+
+  return trimmed;
 }
 
 export function normalizeTopicKeys(value: unknown): string[] | null {
@@ -105,6 +114,14 @@ export function normalizeFeaturedProductIds(value: unknown): string[] | null {
 export function getShortBioLengthError(length: number): string | null {
   if (length > MAX_SHORT_BIO_LENGTH) {
     return `Короткое описание не должно превышать ${MAX_SHORT_BIO_LENGTH} символов.`;
+  }
+
+  return null;
+}
+
+export function getFullBioLengthError(length: number): string | null {
+  if (length > MAX_FULL_BIO_LENGTH) {
+    return `Описание «Об авторе» не должно превышать ${MAX_FULL_BIO_LENGTH} символов.`;
   }
 
   return null;

@@ -11,7 +11,7 @@ import TopicSelector, {
 import {
   AUTHOR_TYPE_LABELS,
   MAX_FEATURED_PRODUCTS,
-  MAX_SHORT_BIO_LENGTH,
+  MAX_FULL_BIO_LENGTH,
   MAX_SHORT_POSITIONING_LENGTH,
   type AuthorType,
 } from "@/lib/authors/constants";
@@ -24,7 +24,10 @@ import {
   getDefaultBannerPosition,
   type BannerPosition,
 } from "@/lib/authors/banner-position";
-import { getShortBioLengthError, getShortPositioningLengthError } from "@/lib/authors/validation";
+import {
+  getFullBioLengthError,
+  getShortPositioningLengthError,
+} from "@/lib/authors/validation";
 
 import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 import AuthorBannerUploadBlock, {
@@ -65,7 +68,6 @@ export default function AuthorProfileClient({
 
   const [name, setName] = useState("");
   const [authorType, setAuthorType] = useState<AuthorType>("person");
-  const [shortBio, setShortBio] = useState("");
   const [shortPositioning, setShortPositioning] = useState("");
   const [fullBio, setFullBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -113,7 +115,6 @@ export default function AuthorProfileClient({
         const profile = payload.profile;
         setName(profile.name);
         setAuthorType((profile.author_type as AuthorType) ?? "person");
-        setShortBio(profile.short_bio?.trim() || profile.description?.trim() || "");
         setShortPositioning(profile.short_positioning?.trim() || "");
         setFullBio(profile.full_bio?.trim() || "");
         setAvatarUrl(profile.avatar_url);
@@ -186,10 +187,10 @@ export default function AuthorProfileClient({
       return;
     }
 
-    const shortBioError = getShortBioLengthError(shortBio.trim().length);
+    const fullBioError = getFullBioLengthError(fullBio.trim().length);
 
-    if (shortBioError) {
-      setError(shortBioError);
+    if (fullBioError) {
+      setError(fullBioError);
       return;
     }
 
@@ -214,7 +215,6 @@ export default function AuthorProfileClient({
           author_id: selectedAuthor.id,
           name: name.trim(),
           author_type: authorType,
-          short_bio: shortBio.trim() || null,
           short_positioning: shortPositioning.trim() || null,
           full_bio: fullBio.trim() || null,
           topic_keys: topicKeys,
@@ -255,8 +255,8 @@ export default function AuthorProfileClient({
     (product) => !featuredProductIds.includes(product.id),
   );
 
-  const shortBioLength = shortBio.trim().length;
   const shortPositioningLength = shortPositioning.trim().length;
+  const fullBioLength = fullBio.length;
 
   if (!selectedAuthor) {
     return null;
@@ -368,28 +368,19 @@ export default function AuthorProfileClient({
             <h2 className="text-lg font-semibold">Описание</h2>
 
             <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-medium">Коротко об авторе</span>
-              <textarea
-                value={shortBio}
-                onChange={(event) => setShortBio(event.target.value)}
-                rows={3}
-                maxLength={MAX_SHORT_BIO_LENGTH}
-                className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm leading-6"
-              />
-              <span className="mt-1 block text-xs text-[#7d70a2]">
-                {shortBioLength}/{MAX_SHORT_BIO_LENGTH}
-              </span>
-            </label>
-
-            <label className="mt-5 block">
               <span className="mb-2 block text-sm font-medium">Об авторе</span>
               <textarea
                 value={fullBio}
                 onChange={(event) => setFullBio(event.target.value)}
                 rows={8}
+                maxLength={MAX_FULL_BIO_LENGTH}
                 className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm leading-6"
                 placeholder="Расскажите о себе или проекте. Абзацы разделяйте пустой строкой."
               />
+              <span className="mt-1 block text-xs text-[#7d70a2]">
+                Расскажите о себе или проекте. Абзацы разделяйте пустой строкой.{" "}
+                {fullBioLength}/{MAX_FULL_BIO_LENGTH}
+              </span>
             </label>
 
             <div className="mt-5">

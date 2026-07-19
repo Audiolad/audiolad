@@ -9,6 +9,7 @@ export const AUTHOR_TYPE_LABELS: Record<AuthorType, string> = {
 };
 
 export const MAX_SHORT_BIO_LENGTH = 180;
+export const MAX_FULL_BIO_LENGTH = 700;
 export const MAX_SHORT_POSITIONING_LENGTH = 100;
 export const MAX_FEATURED_PRODUCTS = 5;
 export const MAX_AUTHOR_PROFILE_TOPICS = 6;
