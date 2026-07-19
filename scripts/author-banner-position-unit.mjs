@@ -54,6 +54,9 @@ function testResetContract() {
 function testPublicHeader() {
   const header = read("src/components/authors/AuthorPublicHeader.tsx");
   assert(header.includes("objectPosition={bannerObjectPosition}"), "public objectPosition");
+  assert(header.includes("AUTHOR_DEFAULT_BANNER_PATH"), "default brand banner");
+  assert(header.includes("AUTHOR_DEFAULT_AVATAR_PATH"), "default brand avatar");
+  assert(header.includes("resolveAuthorPositioningText"), "positioning text resolver");
   assert(!header.includes("object-center"), "no object-center");
 }
 

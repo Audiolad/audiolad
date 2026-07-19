@@ -9,6 +9,9 @@ import AuthorFeaturedSection, {
 import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
+import {
+  DEFAULT_AUTHOR_SHORT_POSITIONING,
+} from "@/lib/authors/brand-assets";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -32,8 +35,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const description =
-    data.shortBio ||
-    `Аудиопрактики и программы автора ${data.name} на АудиоЛаде.`;
+    data.shortPositioning !== DEFAULT_AUTHOR_SHORT_POSITIONING
+      ? data.shortPositioning
+      : data.shortBio ||
+        `Аудиопрактики и программы автора ${data.name} на АудиоЛаде.`;
   const canonicalUrl = `${getAppOrigin()}${buildAuthorPublicPath(data.slug)}`;
   const ogImage = data.bannerUrl || data.avatarUrl || undefined;
 
@@ -87,7 +92,11 @@ export default async function AuthorPublicPage({ params }: PageProps) {
 
         <AuthorPublicHeader
           name={data.name}
-          shortBio={data.shortBio}
+          shortPositioning={
+            data.shortPositioning === DEFAULT_AUTHOR_SHORT_POSITIONING
+              ? null
+              : data.shortPositioning
+          }
           avatarUrl={data.avatarUrl}
           bannerUrl={data.bannerUrl}
           avatarImage={data.avatarImage}

@@ -2,6 +2,7 @@ import {
   AUTHOR_TYPES,
   MAX_FEATURED_PRODUCTS,
   MAX_SHORT_BIO_LENGTH,
+  MAX_SHORT_POSITIONING_LENGTH,
   type AuthorType,
 } from "./constants";
 
@@ -104,6 +105,36 @@ export function normalizeFeaturedProductIds(value: unknown): string[] | null {
 export function getShortBioLengthError(length: number): string | null {
   if (length > MAX_SHORT_BIO_LENGTH) {
     return `Короткое описание не должно превышать ${MAX_SHORT_BIO_LENGTH} символов.`;
+  }
+
+  return null;
+}
+
+export function normalizeShortPositioning(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.length > MAX_SHORT_POSITIONING_LENGTH) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+export function getShortPositioningLengthError(length: number): string | null {
+  if (length > MAX_SHORT_POSITIONING_LENGTH) {
+    return `Короткое позиционирование не должно превышать ${MAX_SHORT_POSITIONING_LENGTH} символов.`;
   }
 
   return null;

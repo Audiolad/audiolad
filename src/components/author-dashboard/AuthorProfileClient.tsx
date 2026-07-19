@@ -12,6 +12,7 @@ import {
   AUTHOR_TYPE_LABELS,
   MAX_FEATURED_PRODUCTS,
   MAX_SHORT_BIO_LENGTH,
+  MAX_SHORT_POSITIONING_LENGTH,
   type AuthorType,
 } from "@/lib/authors/constants";
 import type { AuthorProfileDetail } from "@/lib/authors/profile";
@@ -23,7 +24,7 @@ import {
   getDefaultBannerPosition,
   type BannerPosition,
 } from "@/lib/authors/banner-position";
-import { getShortBioLengthError } from "@/lib/authors/validation";
+import { getShortBioLengthError, getShortPositioningLengthError } from "@/lib/authors/validation";
 
 import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 import AuthorBannerUploadBlock, {
@@ -65,6 +66,7 @@ export default function AuthorProfileClient({
   const [name, setName] = useState("");
   const [authorType, setAuthorType] = useState<AuthorType>("person");
   const [shortBio, setShortBio] = useState("");
+  const [shortPositioning, setShortPositioning] = useState("");
   const [fullBio, setFullBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -112,6 +114,7 @@ export default function AuthorProfileClient({
         setName(profile.name);
         setAuthorType((profile.author_type as AuthorType) ?? "person");
         setShortBio(profile.short_bio?.trim() || profile.description?.trim() || "");
+        setShortPositioning(profile.short_positioning?.trim() || "");
         setFullBio(profile.full_bio?.trim() || "");
         setAvatarUrl(profile.avatar_url);
         setBannerUrl(profile.banner_url);
@@ -190,6 +193,15 @@ export default function AuthorProfileClient({
       return;
     }
 
+    const shortPositioningError = getShortPositioningLengthError(
+      shortPositioning.trim().length,
+    );
+
+    if (shortPositioningError) {
+      setError(shortPositioningError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -203,6 +215,7 @@ export default function AuthorProfileClient({
           name: name.trim(),
           author_type: authorType,
           short_bio: shortBio.trim() || null,
+          short_positioning: shortPositioning.trim() || null,
           full_bio: fullBio.trim() || null,
           topic_keys: topicKeys,
           featured_product_ids: featuredProductIds,
@@ -243,6 +256,7 @@ export default function AuthorProfileClient({
   );
 
   const shortBioLength = shortBio.trim().length;
+  const shortPositioningLength = shortPositioning.trim().length;
 
   if (!selectedAuthor) {
     return null;
@@ -307,6 +321,24 @@ export default function AuthorProfileClient({
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="mt-5 block">
+              <span className="mb-2 block text-sm font-medium">
+                Короткое позиционирование
+              </span>
+              <input
+                type="text"
+                value={shortPositioning}
+                onChange={(event) => setShortPositioning(event.target.value)}
+                maxLength={MAX_SHORT_POSITIONING_LENGTH}
+                placeholder="Одной фразой расскажите, чем вы помогаете своим слушателям."
+                className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm"
+              />
+              <span className="mt-1 block text-xs text-[#7d70a2]">
+                Одной фразой расскажите, чем вы помогаете своим слушателям.{" "}
+                {shortPositioningLength}/{MAX_SHORT_POSITIONING_LENGTH}
+              </span>
             </label>
 
             <div className="mt-5">

@@ -16,6 +16,7 @@ import {
   normalizeFullBio,
   normalizePublicName,
   normalizeShortBio,
+  normalizeShortPositioning,
   normalizeTopicKeys,
 } from "@/lib/authors/validation";
 import { MAX_AUTHOR_PROFILE_TOPICS } from "@/lib/authors/constants";
@@ -91,6 +92,23 @@ export async function PATCH(request: Request) {
       }
 
       updates.short_bio = shortBio;
+    }
+
+    if ("short_positioning" in body) {
+      const shortPositioning = normalizeShortPositioning(body.short_positioning);
+
+      if (
+        body.short_positioning !== null &&
+        body.short_positioning !== "" &&
+        shortPositioning === null
+      ) {
+        return NextResponse.json(
+          { error: "invalid_short_positioning" },
+          { status: 400 },
+        );
+      }
+
+      updates.short_positioning = shortPositioning;
     }
 
     if ("full_bio" in body) {

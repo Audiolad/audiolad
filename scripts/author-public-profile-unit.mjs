@@ -18,6 +18,8 @@ function testValidation() {
   const source = read("src/lib/authors/validation.ts");
 
   assert(source.includes("MAX_SHORT_BIO_LENGTH"), "short bio limit exported");
+  assert(source.includes("MAX_SHORT_POSITIONING_LENGTH"), "positioning limit exported");
+  assert(source.includes("normalizeShortPositioning"), "positioning normalizer");
   assert(source.includes("normalizeFeaturedProductIds"), "featured ids normalizer");
   assert(source.includes("MAX_FEATURED_PRODUCTS"), "featured limit enforced");
 }
@@ -69,6 +71,12 @@ function testMigrationExists() {
   assert(migration.includes("full_bio"), "full bio column");
   assert(migration.includes("author-assets"), "author assets bucket");
   assert(migration.includes("Author members can update own author profile"), "authors update RLS");
+
+  const positioningMigration = read(
+    "supabase/migrations/20260719120000_author_short_positioning.sql",
+  );
+
+  assert(positioningMigration.includes("short_positioning"), "short positioning column");
 }
 
 function testAuthorDashboardNav() {

@@ -22,6 +22,7 @@ import {
   resolveAuthorShortBio,
   type AuthorProfileTopic,
 } from "./profile";
+import { resolveAuthorPositioningText } from "./brand-assets";
 import { findSimilarAuthors } from "./similar-authors";
 
 export type AuthorPublicProduct = AuthorPublishedPractice &
@@ -37,6 +38,7 @@ export type AuthorPublicPageData = {
   slug: string;
   authorType: string;
   shortBio: string | null;
+  shortPositioning: string;
   fullBio: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
@@ -173,6 +175,9 @@ export async function loadAuthorPublicPageData(
         short_bio: profile?.short_bio ?? author.short_bio,
         description: profile?.description ?? author.description,
       }),
+      shortPositioning: resolveAuthorPositioningText(
+        profile?.short_positioning ?? null,
+      ),
       fullBio: profile?.full_bio?.trim() || null,
       avatarUrl: resolveAuthorAvatarUrl(
         {

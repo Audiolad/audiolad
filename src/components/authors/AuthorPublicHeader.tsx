@@ -3,6 +3,11 @@ import {
   AvatarImage,
 } from "@/components/images/ResponsiveImage";
 import { formatBannerObjectPosition } from "@/lib/authors/banner-position";
+import {
+  AUTHOR_DEFAULT_AVATAR_PATH,
+  AUTHOR_DEFAULT_BANNER_PATH,
+  resolveAuthorPositioningText,
+} from "@/lib/authors/brand-assets";
 import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
 import { parseImageManifest } from "@/lib/images/image-manifest";
 import type { ImageManifest } from "@/lib/images/image-types";
@@ -13,9 +18,21 @@ function getAuthorInitial(name: string): string {
   return trimmed ? trimmed[0].toUpperCase() : "А";
 }
 
+function formatPublishedCount(count: number): string {
+  if (count === 1) {
+    return "1 опубликованный продукт";
+  }
+
+  if (count >= 2 && count <= 4) {
+    return `${count} опубликованных продукта`;
+  }
+
+  return `${count} опубликованных продуктов`;
+}
+
 type AuthorPublicHeaderProps = {
   name: string;
-  shortBio: string | null;
+  shortPositioning: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
   avatarImage?: unknown;
@@ -27,7 +44,7 @@ type AuthorPublicHeaderProps = {
 
 export default function AuthorPublicHeader({
   name,
-  shortBio,
+  shortPositioning,
   avatarUrl,
   bannerUrl,
   avatarImage,
@@ -42,10 +59,11 @@ export default function AuthorPublicHeader({
     x: bannerPositionX,
     y: bannerPositionY,
   });
+  const positioningText = resolveAuthorPositioningText(shortPositioning);
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-      <div className="relative h-28 sm:h-36 xl:h-44">
+    <section className="overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_32px_rgba(91,62,145,0.08)]">
+      <div className="relative h-32 sm:h-40 xl:h-48">
         {bannerUrl ? (
           <AuthorBannerImage
             src={bannerUrl}
@@ -57,20 +75,18 @@ export default function AuthorPublicHeader({
             priority
           />
         ) : (
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-[#5b3e91] via-[#7042c5] to-[#a27bd9]"
-            aria-hidden="true"
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={AUTHOR_DEFAULT_BANNER_PATH}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
           />
         )}
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-[#25135c]/55 via-transparent to-transparent"
-          aria-hidden="true"
-        />
       </div>
 
-      <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
-        <div className="-mt-10 flex items-end gap-4 sm:-mt-12 sm:gap-5">
-          <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[22px] border-4 border-white bg-gradient-to-br from-[#7042c5] to-[#a27bd9] text-3xl font-semibold text-white shadow-[0_8px_24px_rgba(91,62,145,0.18)] sm:h-[104px] sm:w-[104px] sm:rounded-[24px]">
+      <div className="relative bg-white px-5 pb-7 pt-0 sm:px-8 sm:pb-8">
+        <div className="-mt-12 flex flex-col items-center text-center sm:-mt-14">
+          <div className="relative flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[22px] border-4 border-white bg-white shadow-[0_10px_28px_rgba(91,62,145,0.16)] sm:h-[104px] sm:w-[104px] sm:rounded-[24px]">
             {avatarUrl ? (
               <AvatarImage
                 src={avatarUrl}
@@ -80,36 +96,32 @@ export default function AuthorPublicHeader({
                 size={104}
               />
             ) : (
-              getAuthorInitial(name)
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={AUTHOR_DEFAULT_AVATAR_PATH}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+                <span className="sr-only">{getAuthorInitial(name)}</span>
+              </>
             )}
           </div>
 
-          <div className="min-w-0 pb-1">
-            <h1 className="min-w-0 whitespace-nowrap text-[26px] font-semibold leading-none tracking-tight text-[#25135c] sm:text-[32px] xl:text-[36px]">
+          <div className="mt-5 max-w-2xl">
+            <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#25135c] sm:text-[32px] xl:text-[36px]">
               {name}
             </h1>
-            {publishedCount > 0 ? (
-              <p className="mt-1 text-sm text-[#7d70a2]">
-                {publishedCount}{" "}
-                {publishedCount === 1
-                  ? "опубликованный продукт"
-                  : publishedCount < 5
-                    ? "опубликованных продукта"
-                    : "опубликованных продуктов"}
-              </p>
-            ) : null}
+
+            <p className="mt-3 text-[15px] leading-7 text-[#65577f] sm:text-[16px]">
+              {positioningText}
+            </p>
+
+            <p className="mt-2 text-sm text-[#7d70a2]">
+              {formatPublishedCount(publishedCount)}
+            </p>
           </div>
         </div>
-
-        {shortBio ? (
-          <p className="mt-4 text-[15px] leading-7 text-[#65577f] sm:text-[16px]">
-            {shortBio}
-          </p>
-        ) : (
-          <p className="mt-4 text-sm leading-6 text-[#7d70a2]">
-            Аудиопрактики и программы автора на платформе АудиоЛад.
-          </p>
-        )}
       </div>
     </section>
   );
