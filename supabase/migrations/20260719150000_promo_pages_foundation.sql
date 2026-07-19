@@ -598,10 +598,8 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  SELECT
-    pp.*,
-    a.slug
-  INTO v_page, v_author_slug
+  SELECT pp.*
+  INTO v_page
   FROM public.promo_pages AS pp
   INNER JOIN public.authors AS a ON a.id = pp.author_id
   WHERE a.slug = btrim(p_author_slug)
@@ -611,6 +609,11 @@ BEGIN
   IF NOT FOUND THEN
     RETURN NULL;
   END IF;
+
+  SELECT a.slug
+  INTO v_author_slug
+  FROM public.authors AS a
+  WHERE a.id = v_page.author_id;
 
   SELECT COALESCE(
     jsonb_agg(

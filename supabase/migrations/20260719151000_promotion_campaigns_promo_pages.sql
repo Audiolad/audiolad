@@ -106,6 +106,8 @@ CREATE POLICY promotion_campaigns_update
 -- Keep legacy summary RPC working when promo_page campaigns exist
 -- ---------------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.get_author_promotion_summary(uuid, timestamptz, timestamptz);
+
 CREATE OR REPLACE FUNCTION public.get_author_promotion_summary(
   p_author_id uuid,
   p_date_from timestamptz DEFAULT NULL,
