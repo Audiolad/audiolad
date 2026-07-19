@@ -120,6 +120,10 @@ export function isUnsafePromoPageCtaHref(value: string): boolean {
     return true;
   }
 
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) {
+    return true;
+  }
+
   const lower = trimmed.toLowerCase();
 
   if (lower.includes("://")) {

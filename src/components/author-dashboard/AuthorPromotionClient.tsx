@@ -28,6 +28,8 @@ import { copyTextToClipboard } from "@/lib/playlists/public-url";
 
 type AuthorPromotionClientProps = {
   authors: AuthorWorkspace[];
+  shellless?: boolean;
+  selectedAuthor?: AuthorWorkspace | null;
 };
 
 type CampaignStatsPayload = {
@@ -141,6 +143,8 @@ function CopyLinkRow({
 
 export default function AuthorPromotionClient({
   authors,
+  shellless = false,
+  selectedAuthor: selectedAuthorProp = null,
 }: AuthorPromotionClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -167,9 +171,13 @@ export default function AuthorPromotionClient({
 
   const period = parsePromotionPeriod(searchParams.get("period"));
   const selectedAuthor = useMemo(() => {
+    if (shellless && selectedAuthorProp) {
+      return selectedAuthorProp;
+    }
+
     const slug = searchParams.get("author");
     return authors.find((author) => author.slug === slug) ?? authors[0] ?? null;
-  }, [authors, searchParams]);
+  }, [authors, searchParams, shellless, selectedAuthorProp]);
 
   const selectedCampaign = useMemo(
     () => campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null,
@@ -404,44 +412,66 @@ export default function AuthorPromotionClient({
 
   return (
     <div className="space-y-8">
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+      {!shellless ? <AuthorDashboardNav authorSlug={selectedAuthor.slug} /> : null}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <label className="block flex-1">
-          <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-            Авторское пространство
-          </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleAuthorChange(event.target.value)}
-            className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      {!shellless ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <label className="block flex-1">
+            <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+              Авторское пространство
+            </span>
+            <select
+              value={selectedAuthor.slug}
+              onChange={(event) => handleAuthorChange(event.target.value)}
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
+            >
+              {authors.map((author) => (
+                <option key={author.id} value={author.slug}>
+                  {author.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="block sm:w-48">
-          <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-            Период
-          </span>
-          <select
-            value={period}
-            onChange={(event) =>
-              handlePeriodChange(parsePromotionPeriod(event.target.value))
-            }
-            className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
-          >
-            <option value="7d">7 дней</option>
-            <option value="30d">30 дней</option>
-            <option value="90d">90 дней</option>
-            <option value="all">Всё время</option>
-          </select>
-        </label>
-      </div>
+          <label className="block sm:w-48">
+            <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+              Период
+            </span>
+            <select
+              value={period}
+              onChange={(event) =>
+                handlePeriodChange(parsePromotionPeriod(event.target.value))
+              }
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
+            >
+              <option value="7d">7 дней</option>
+              <option value="30d">30 дней</option>
+              <option value="90d">90 дней</option>
+              <option value="all">Всё время</option>
+            </select>
+          </label>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-end">
+          <label className="block sm:w-48">
+            <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+              Период
+            </span>
+            <select
+              value={period}
+              onChange={(event) =>
+                handlePeriodChange(parsePromotionPeriod(event.target.value))
+              }
+              className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
+            >
+              <option value="7d">7 дней</option>
+              <option value="30d">30 дней</option>
+              <option value="90d">90 дней</option>
+              <option value="all">Всё время</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">

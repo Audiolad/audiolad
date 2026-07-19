@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import AuthorPromotionClient from "@/components/author-dashboard/AuthorPromotionClient";
+import AuthorPromotionWorkspace from "@/components/author-dashboard/AuthorPromotionWorkspace";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listPromotionWorkspaces } from "@/lib/promotion/access";
 import { createClient } from "@/lib/supabase/server";
@@ -55,7 +55,7 @@ export default async function AuthorPromotionPage() {
       backLabel="В кабинет автора"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
-        <AuthorPromotionClient authors={authors} />
+        <AuthorPromotionWorkspace authors={authors} />
       </Suspense>
     </AuthorShell>
   );

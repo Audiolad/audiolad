@@ -11,6 +11,7 @@ import {
   PROMO_PAGE_MAX_PRODUCTS,
   buildPromoPageSlugFromInternalName,
   isPracticePromoPageEligible,
+  isUnsafePromoPageCtaHref,
   normalizePromoPageProductIds,
   validatePromoPageCtaHref,
   validatePromoPageProductsForPublish,
@@ -61,6 +62,8 @@ function testPromoPagesMigration() {
   assert(sql.includes("promo_page_status_change_requires_rpc"), "direct publish blocked");
   assert(sql.includes("audiolad.promo_page_status_bypass"), "publish rpc bypasses status guard");
   assert(sql.includes("p_is_catalog_listed IS TRUE"), "strict catalog-listed eligibility");
+  assert(sql.includes("SELECT pp.*\n  INTO v_page"), "public rpc selects page row separately");
+  assert(!sql.includes("INTO v_page, v_author_slug"), "public rpc avoids invalid multi-item into");
 }
 
 function testCampaignMigration() {
@@ -81,6 +84,10 @@ function testCampaignMigration() {
   assert(
     !sql.includes("REFERENCES public.promo_pages (id) ON DELETE CASCADE"),
     "campaign promo_page_id must not cascade delete campaigns",
+  );
+  assert(
+    sql.includes("DROP FUNCTION IF EXISTS public.get_author_promotion_summary(uuid, timestamptz, timestamptz)"),
+    "summary rpc dropped before return type change",
   );
 }
 
@@ -107,11 +114,21 @@ function testSlugValidation() {
 
 function testCtaValidation() {
   assert(validatePromoPageCtaHref("/authors/sergey-and-zoya") === null, "internal author path");
+  assert(validatePromoPageCtaHref("/catalog?topic=money") === null, "internal path with query");
   assert(validatePromoPageCtaHref(null) === null, "empty cta allowed");
   assert(validatePromoPageCtaHref("https://evil.example") === "promo_page_cta_href_invalid", "external url rejected");
   assert(validatePromoPageCtaHref("//evil.example") === "promo_page_cta_href_invalid", "protocol-relative rejected");
   assert(validatePromoPageCtaHref("javascript:alert(1)") === "promo_page_cta_href_invalid", "javascript rejected");
+  assert(validatePromoPageCtaHref("data:text/html,abc") === "promo_page_cta_href_invalid", "data url rejected");
   assert(validatePromoPageCtaHref("/auth/sign-in") === "promo_page_cta_href_invalid", "auth route rejected");
+  assert(validatePromoPageCtaHref("/authors/evil\n.example") === "promo_page_cta_href_invalid", "control char rejected");
+
+  assert(!isUnsafePromoPageCtaHref("/authors/sergey-and-zoya"), "unsafe helper accepts internal path");
+  assert(isUnsafePromoPageCtaHref("https://example.com"), "unsafe helper rejects external url");
+  assert(isUnsafePromoPageCtaHref("//example.com"), "unsafe helper rejects protocol-relative");
+  assert(isUnsafePromoPageCtaHref("javascript:alert(1)"), "unsafe helper rejects javascript");
+  assert(isUnsafePromoPageCtaHref("data:text/html,abc"), "unsafe helper rejects data url");
+  assert(isUnsafePromoPageCtaHref("/auth/sign-up"), "unsafe helper rejects auth route");
 }
 
 function testProductLimits() {
@@ -307,6 +324,41 @@ function testStage1DoesNotTouchOffer() {
   }
 }
 
+function testCreateAndCtaHardeningMigration() {
+  const sql = read(
+    "supabase/migrations/20260719155000_promo_pages_create_and_cta_hardening.sql",
+  );
+
+  assert(sql.includes("is_safe_promo_page_cta_href"), "shared sql cta helper");
+  assert(sql.includes("promo_pages_cta_href_check"), "cta check uses helper");
+  assert(sql.includes("javascript:%"), "javascript blocked in sql");
+  assert(sql.includes("data:%"), "data urls blocked in sql");
+  assert(sql.includes("'%\\\\%'"), "backslash blocked in sql");
+  assert(sql.includes("create_promo_page_draft"), "atomic create rpc");
+  assert(sql.includes("promo_page_insert_bypass"), "insert bypass scoped to create rpc");
+  assert(sql.includes("promo_page_insert_requires_rpc"), "direct insert blocked");
+  assert(sql.includes("promo_page_insert_invalid_status"), "direct insert cannot set published status");
+  assert(sql.includes("promo_page_insert_published_at_forbidden"), "direct insert cannot set published_at");
+  assert(sql.includes("REVOKE INSERT ON public.promo_pages FROM authenticated"), "no direct insert grant");
+  assert(sql.includes("DROP POLICY IF EXISTS promo_pages_insert"), "insert policy removed");
+  assert(sql.includes("REVOKE EXECUTE ON FUNCTION public.replace_promo_page_products"), "replace rpc not callable by authenticated");
+  assert(sql.includes("    'draft',"), "create rpc forces draft status");
+  assert(sql.includes("    NULL,") && sql.includes("published_at"), "create rpc keeps published_at null");
+  assert(sql.includes("    v_user_id"), "create rpc sets created_by from auth uid");
+}
+
+function testStage1CtaConstraintBaseline() {
+  const sql = read(
+    "supabase/migrations/20260719150000_promo_pages_foundation.sql",
+  );
+
+  assert(sql.includes("promo_pages_cta_href_check"), "stage1 cta check existed");
+  assert(sql.includes("char_length(cta_href) <= 512"), "stage1 checked length");
+  assert(sql.includes("cta_href ~ '^/[^/]'"), "stage1 required internal absolute path");
+  assert(sql.includes("cta_href !~ '://'"), "stage1 blocked external schemes");
+  assert(!sql.includes("is_safe_promo_page_cta_href"), "stage1 had no shared helper");
+}
+
 function testDomainModulesExist() {
   assert(read("src/lib/promo-pages/types.ts").includes("PublicPromoPageDto"), "public dto type");
   assert(read("src/lib/promo-pages/validation.ts").includes("validatePromoPageSlug"), "slug validator");
@@ -323,6 +375,8 @@ const tests = [
   ["campaign target xor", testCampaignTargetXor],
   ["public dto contract", testPublicDtoContract],
   ["user deletion policy", testUserDeletionPolicyUnchanged],
+  ["create and cta hardening migration", testCreateAndCtaHardeningMigration],
+  ["stage1 cta constraint baseline", testStage1CtaConstraintBaseline],
   ["stage1 offer isolation", testStage1DoesNotTouchOffer],
   ["domain modules", testDomainModulesExist],
 ];
