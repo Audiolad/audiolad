@@ -49,12 +49,55 @@ export function parseCatalogTopicFilter(
   return allowedKeys.includes(normalized) ? normalized : null;
 }
 
-export function buildCatalogTopicHref(topicKey: string | null): string {
-  if (!topicKey) {
-    return "/catalog";
+export type CatalogHrefOptions = {
+  q?: string | null;
+  topic?: string | null;
+};
+
+const CATALOG_SEARCH_HREF_MAX_LENGTH = 100;
+
+function normalizeCatalogHrefQuery(value: string | null | undefined): string {
+  if (value == null) {
+    return "";
   }
 
-  return `/catalog?topic=${encodeURIComponent(topicKey)}`;
+  const collapsed = value.trim().replace(/\s+/g, " ");
+
+  if (!collapsed) {
+    return "";
+  }
+
+  return collapsed.slice(0, CATALOG_SEARCH_HREF_MAX_LENGTH);
+}
+
+export function buildCatalogHref(options?: CatalogHrefOptions): string {
+  const normalizedQuery = normalizeCatalogHrefQuery(options?.q);
+  const topicKey = options?.topic?.trim().toLowerCase() || null;
+
+  const params = new URLSearchParams();
+
+  if (normalizedQuery) {
+    params.set("q", normalizedQuery);
+  }
+
+  if (topicKey) {
+    params.set("topic", topicKey);
+  }
+
+  const query = params.toString();
+
+  return query ? `/catalog?${query}` : "/catalog";
+}
+
+export function buildCatalogTopicHref(
+  topicKey: string | null,
+  q?: string | null,
+): string {
+  return buildCatalogHref({ topic: topicKey, q });
+}
+
+export function buildCatalogClearSearchHref(topicKey: string | null): string {
+  return buildCatalogHref({ topic: topicKey });
 }
 
 export function getCatalogTopicFilterLabel(

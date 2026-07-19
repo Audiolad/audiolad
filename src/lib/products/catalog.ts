@@ -56,7 +56,7 @@ export type CatalogQueryOptions = {
   topicKey?: string | null;
 };
 
-async function getPublishedPracticeIdsForTopicKey(
+export async function getPublishedPracticeIdsForTopicKey(
   supabase: SupabaseClient,
   topicKey: string,
 ): Promise<string[]> {
@@ -218,6 +218,13 @@ export async function getPublishedCatalogProducts(
 
   const practiceRows = (practices ?? []) as CatalogPracticeRow[];
 
+  return mapPracticeRowsToCatalogProducts(supabase, practiceRows);
+}
+
+export async function mapPracticeRowsToCatalogProducts(
+  supabase: SupabaseClient,
+  practiceRows: CatalogPracticeRow[],
+): Promise<CatalogProduct[]> {
   if (practiceRows.length === 0) {
     return [];
   }

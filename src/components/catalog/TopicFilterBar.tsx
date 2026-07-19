@@ -6,11 +6,13 @@ import type { TopicWithCatalogCount } from "@/lib/topics/types";
 type TopicFilterBarProps = {
   topics: TopicWithCatalogCount[];
   activeTopicKey: string | null;
+  searchQuery?: string;
 };
 
 export default function TopicFilterBar({
   topics,
   activeTopicKey,
+  searchQuery = "",
 }: TopicFilterBarProps) {
   const isAllActive = activeTopicKey === null;
 
@@ -18,7 +20,7 @@ export default function TopicFilterBar({
     <nav className="mt-6" aria-label="Фильтр по темам">
       <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Link
-          href={buildCatalogTopicHref(null)}
+          href={buildCatalogTopicHref(null, searchQuery || null)}
           prefetch={false}
           aria-current={isAllActive ? "page" : undefined}
           className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
@@ -36,7 +38,7 @@ export default function TopicFilterBar({
           return (
             <Link
               key={topic.key}
-              href={buildCatalogTopicHref(topic.key)}
+              href={buildCatalogTopicHref(topic.key, searchQuery || null)}
               prefetch={false}
               aria-current={isActive ? "page" : undefined}
               className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
