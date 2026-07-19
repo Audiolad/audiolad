@@ -1,3 +1,8 @@
+import {
+  getEmailValidationMessage,
+  validateEmailForRegistrationServer,
+} from "@/lib/auth/email";
+
 import type {
   AuthorApplicationFieldErrors,
   AuthorApplicationFormValues,
@@ -98,8 +103,8 @@ export const AUTHOR_APPLICATION_LIMITS = {
   directionOtherMax: 120,
   aboutMin: 20,
   aboutMax: 3000,
-  contactMin: 1,
-  contactMax: 300,
+  contactDetailsMin: 1,
+  contactDetailsMax: 300,
 } as const;
 
 /** Used when the simplified form no longer collects planned content. */
@@ -118,6 +123,7 @@ function trimValue(value: FormDataEntryValue | null | undefined): string {
 
 export function buildAuthorApplicationFormData(
   values: AuthorApplicationFormValues,
+  options?: { updateContactsOnly?: boolean },
 ): FormData {
   const formData = new FormData();
 
@@ -129,7 +135,8 @@ export function buildAuthorApplicationFormData(
 
   formData.set("directionOther", values.directionOther);
   formData.set("about", values.about);
-  formData.set("contact", values.contact);
+  formData.set("contactEmail", values.contactEmail);
+  formData.set("contactDetails", values.contactDetails);
 
   if (values.hasReadyMaterials) {
     formData.set("hasReadyMaterials", "on");
@@ -145,6 +152,10 @@ export function buildAuthorApplicationFormData(
 
   if (values.consentPersonalData) {
     formData.set("consentPersonalData", "on");
+  }
+
+  if (options?.updateContactsOnly) {
+    formData.set("updateContactsOnly", "on");
   }
 
   return formData;
@@ -166,12 +177,41 @@ export function normalizeAuthorApplicationFormValues(
     directionOther,
     direction,
     about: trimValue(formData.get("about")),
-    contact: trimValue(formData.get("contact")),
+    contactEmail: trimValue(formData.get("contactEmail")),
+    contactDetails: trimValue(formData.get("contactDetails")),
     hasReadyMaterials: formData.get("hasReadyMaterials") === "on",
     wantsTraining: formData.get("wantsTraining") === "on",
     interestedInSchool: formData.get("interestedInSchool") === "on",
     consentPersonalData: formData.get("consentPersonalData") === "on",
   };
+}
+
+export function isAuthorApplicationContactUpdateOnly(formData: FormData): boolean {
+  return formData.get("updateContactsOnly") === "on";
+}
+
+export function validateAuthorApplicationContactFields(
+  values: Pick<AuthorApplicationFormValues, "contactEmail" | "contactDetails">,
+): AuthorApplicationFieldErrors {
+  const errors: AuthorApplicationFieldErrors = {};
+
+  const emailResult = validateEmailForRegistrationServer(values.contactEmail);
+
+  if (!emailResult.ok) {
+    errors.contactEmail = getEmailValidationMessage(emailResult.code);
+  }
+
+  if (
+    values.contactDetails.length < AUTHOR_APPLICATION_LIMITS.contactDetailsMin ||
+    values.contactDetails.length > AUTHOR_APPLICATION_LIMITS.contactDetailsMax
+  ) {
+    errors.contactDetails =
+      values.contactDetails.length === 0
+        ? "Укажите телефон, MAX или другой способ связи."
+        : `Контакт слишком длинный (до ${AUTHOR_APPLICATION_LIMITS.contactDetailsMax} символов).`;
+  }
+
+  return errors;
 }
 
 export function validateAuthorApplicationFormValues(
@@ -209,15 +249,7 @@ export function validateAuthorApplicationFormValues(
     errors.about = `Расскажите о себе (${AUTHOR_APPLICATION_LIMITS.aboutMin}–${AUTHOR_APPLICATION_LIMITS.aboutMax} символов).`;
   }
 
-  if (
-    values.contact.length < AUTHOR_APPLICATION_LIMITS.contactMin ||
-    values.contact.length > AUTHOR_APPLICATION_LIMITS.contactMax
-  ) {
-    errors.contact =
-      values.contact.length === 0
-        ? "Укажите телефон, MAX или другой способ связи."
-        : `Контакт слишком длинный (до ${AUTHOR_APPLICATION_LIMITS.contactMax} символов).`;
-  }
+  Object.assign(errors, validateAuthorApplicationContactFields(values));
 
   if (!values.hasReadyMaterials && !values.wantsTraining) {
     errors.readiness = AUTHOR_APPLICATION_READINESS_ERROR;
@@ -243,15 +275,19 @@ export function rowToFormValues(
     | "display_name"
     | "direction"
     | "about"
-    | "contact"
+    | "contact_email"
+    | "contact_details"
     | "has_ready_materials"
     | "consent_personal_data"
   > & {
     wants_training?: boolean;
     interested_in_school?: boolean;
   },
+  options?: { fallbackContactEmail?: string | null },
 ): AuthorApplicationFormValues {
   const parsedDirection = parseStoredDirection(row.direction);
+  const storedEmail = row.contact_email?.trim() ?? "";
+  const fallbackEmail = options?.fallbackContactEmail?.trim() ?? "";
 
   return {
     displayName: row.display_name,
@@ -259,10 +295,20 @@ export function rowToFormValues(
     directionOther: parsedDirection.directionOther,
     direction: row.direction,
     about: row.about,
-    contact: row.contact ?? "",
+    contactEmail: storedEmail || fallbackEmail,
+    contactDetails: row.contact_details ?? "",
     hasReadyMaterials: row.has_ready_materials,
     wantsTraining: row.wants_training ?? false,
     interestedInSchool: row.interested_in_school ?? false,
     consentPersonalData: row.consent_personal_data,
+  };
+}
+
+export function buildSubmittedContacts(
+  values: Pick<AuthorApplicationFormValues, "contactEmail" | "contactDetails">,
+): { contactEmail: string; contactDetails: string } {
+  return {
+    contactEmail: values.contactEmail.trim(),
+    contactDetails: values.contactDetails.trim(),
   };
 }

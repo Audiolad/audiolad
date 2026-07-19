@@ -1,4 +1,5 @@
 import type { AuthorApplicationRow } from "@/lib/author-applications/types";
+import { formatApplicationContactSummary } from "@/lib/author-applications/queries";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 
@@ -15,7 +16,9 @@ export type AdminOverviewStats = {
 export type AdminApplicationListItem = {
   id: string;
   displayName: string;
-  contact: string | null;
+  contactEmail: string | null;
+  contactDetails: string | null;
+  contactSummary: string;
   direction: string;
   about: string;
   status: AuthorApplicationRow["status"];
@@ -233,7 +236,7 @@ export async function listAdminAuthorApplications(input?: {
   let query = service
     .from("author_applications")
     .select(
-      "id, display_name, contact, direction, about, status, submitted_at, created_at",
+      "id, display_name, contact_email, contact_details, direction, about, status, submitted_at, created_at",
     )
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -251,7 +254,12 @@ export async function listAdminAuthorApplications(input?: {
   return (data ?? []).map((row) => ({
     id: row.id,
     displayName: row.display_name,
-    contact: row.contact,
+    contactEmail: row.contact_email,
+    contactDetails: row.contact_details,
+    contactSummary: formatApplicationContactSummary({
+      contact_email: row.contact_email,
+      contact_details: row.contact_details,
+    }),
     direction: row.direction,
     about: row.about,
     status: row.status,

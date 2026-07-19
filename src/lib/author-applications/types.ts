@@ -15,7 +15,8 @@ export type AuthorApplicationRow = {
   user_id: string;
   status: AuthorApplicationStatus;
   display_name: string;
-  contact: string | null;
+  contact_email: string | null;
+  contact_details: string | null;
   direction: string;
   experience: string | null;
   about: string;
@@ -40,11 +41,17 @@ export type AuthorApplicationFormValues = {
   directionOther: string;
   direction: string;
   about: string;
-  contact: string;
+  contactEmail: string;
+  contactDetails: string;
   hasReadyMaterials: boolean;
   wantsTraining: boolean;
   interestedInSchool: boolean;
   consentPersonalData: boolean;
+};
+
+export type AuthorApplicationSubmittedContacts = {
+  contactEmail: string;
+  contactDetails: string;
 };
 
 export type AuthorApplicationFieldErrors = Partial<
@@ -62,7 +69,7 @@ export type AuthorApplicationFieldErrors = Partial<
 export type AuthorApplicationFormState = {
   ok: boolean;
   submitted?: boolean;
-  submittedContact?: string;
+  submittedContacts?: AuthorApplicationSubmittedContacts;
   errors: AuthorApplicationFieldErrors;
   values?: AuthorApplicationFormValues;
 };

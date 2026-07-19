@@ -35,7 +35,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-medium uppercase tracking-wide text-[#9485b4]">
         {label}
       </p>
-      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#25135c]">
+      <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#25135c]">
         {value}
       </p>
     </div>
@@ -49,15 +49,17 @@ export default function AuthorApplicationReviewForm({
     updateAuthorApplicationReview,
     INITIAL_STATE,
   );
-  const contact = application.contact?.trim() ?? "";
+  const contactEmail = application.contact_email?.trim() ?? "";
+  const contactDetails = application.contact_details?.trim() ?? "";
+  const copyText = [contactEmail, contactDetails].filter(Boolean).join("\n");
 
-  async function handleCopyContact() {
-    if (!contact) {
+  async function handleCopyContacts() {
+    if (!copyText) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(contact);
+      await navigator.clipboard.writeText(copyText);
     } catch {
       // Clipboard may be unavailable in some browsers.
     }
@@ -70,7 +72,14 @@ export default function AuthorApplicationReviewForm({
 
         <div className="mt-4 space-y-4">
           <InfoRow label="Имя" value={application.display_name} />
-          <InfoRow label="Контакт" value={contact || "—"} />
+          <InfoRow
+            label="Электронная почта"
+            value={contactEmail || "—"}
+          />
+          <InfoRow
+            label="Телефон, MAX или другой способ связи"
+            value={contactDetails || "—"}
+          />
           <InfoRow label="Тематика" value={application.direction} />
           <InfoRow label="О себе" value={application.about} />
           <InfoRow
@@ -105,13 +114,13 @@ export default function AuthorApplicationReviewForm({
           />
         </div>
 
-        {contact ? (
+        {copyText ? (
           <button
             type="button"
-            onClick={handleCopyContact}
+            onClick={handleCopyContacts}
             className="mt-5 inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
           >
-            Скопировать контакт
+            Скопировать контакты
           </button>
         ) : null}
       </section>

@@ -17,7 +17,8 @@ const EMPTY_FORM_VALUES = {
   directionOther: "",
   direction: "",
   about: "",
-  contact: "",
+  contactEmail: "",
+  contactDetails: "",
   hasReadyMaterials: false,
   wantsTraining: false,
   interestedInSchool: false,
@@ -48,8 +49,13 @@ export default async function BecomeAuthorPage({
   });
 
   const defaultValues = view.application
-    ? rowToFormValues(view.application)
-    : EMPTY_FORM_VALUES;
+    ? rowToFormValues(view.application, {
+        fallbackContactEmail: view.userEmail,
+      })
+    : {
+        ...EMPTY_FORM_VALUES,
+        contactEmail: view.userEmail ?? "",
+      };
 
   return (
     <BecomeAuthorShell>
@@ -68,6 +74,7 @@ export default async function BecomeAuthorPage({
             workspaceCount={view.workspaceCount}
             defaultValues={defaultValues}
             showSubmittedBanner={view.showSubmittedBanner}
+            userEmail={view.userEmail}
           />
         </aside>
       </div>

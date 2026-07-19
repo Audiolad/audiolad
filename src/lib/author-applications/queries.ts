@@ -9,36 +9,38 @@ import type {
 import { AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT } from "./validation";
 import { resolveBecomeAuthorAudience } from "./status";
 
+const AUTHOR_APPLICATION_SELECT = `
+  id,
+  user_id,
+  status,
+  display_name,
+  contact_email,
+  contact_details,
+  direction,
+  experience,
+  about,
+  planned_content,
+  links,
+  has_ready_materials,
+  wants_training,
+  interested_in_school,
+  consent_personal_data,
+  submitted_at,
+  reviewed_at,
+  reviewed_by,
+  review_comment,
+  admin_note,
+  created_at,
+  updated_at
+`;
+
 export async function getCurrentAuthorApplication(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<AuthorApplicationRow | null> {
   const { data, error } = await supabase
     .from("author_applications")
-    .select(
-      `
-      id,
-      user_id,
-      status,
-      display_name,
-      contact,
-      direction,
-      experience,
-      about,
-      planned_content,
-      links,
-      has_ready_materials,
-      wants_training,
-      interested_in_school,
-      consent_personal_data,
-      submitted_at,
-      reviewed_at,
-      reviewed_by,
-      review_comment,
-      created_at,
-      updated_at
-    `,
-    )
+    .select(AUTHOR_APPLICATION_SELECT)
     .eq("user_id", userId)
     .neq("status", "withdrawn")
     .order("created_at", { ascending: false })
@@ -107,7 +109,8 @@ export function mapApplicationInsertPayload(
     experience: null,
     planned_content: AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT,
     links: null,
-    contact: values.contact,
+    contact_email: values.contactEmail,
+    contact_details: values.contactDetails,
     has_ready_materials: values.hasReadyMaterials,
     wants_training: values.wantsTraining,
     interested_in_school: values.interestedInSchool,
@@ -128,7 +131,8 @@ export function mapApplicationUpdatePayload(
     experience: null,
     planned_content: resolvePlannedContentForSubmit(existing),
     links: resolveLinksForSubmit(existing),
-    contact: values.contact,
+    contact_email: values.contactEmail,
+    contact_details: values.contactDetails,
     has_ready_materials: values.hasReadyMaterials,
     wants_training: values.wantsTraining,
     interested_in_school: values.interestedInSchool,
@@ -143,9 +147,49 @@ export function mapApplicationUpdatePayload(
   };
 }
 
+export function mapApplicationContactUpdatePayload(
+  values: Pick<AuthorApplicationFormValues, "contactEmail" | "contactDetails">,
+) {
+  return {
+    contact_email: values.contactEmail,
+    contact_details: values.contactDetails,
+  };
+}
+
+export async function syncProfileContactEmail(
+  supabase: SupabaseClient,
+  userId: string,
+  contactEmail: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ contact_email: contactEmail })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("profile_contact_email_sync_error", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
 export function isDuplicateActiveApplicationError(message: string): boolean {
   return (
     message.includes("author_applications_user_non_withdrawn_unique_idx") ||
     message.includes("duplicate key value")
   );
+}
+
+export function formatApplicationContactSummary(
+  application: Pick<AuthorApplicationRow, "contact_email" | "contact_details">,
+): string {
+  const email = application.contact_email?.trim() ?? "";
+  const details = application.contact_details?.trim() ?? "";
+
+  if (email && details) {
+    return `${email} · ${details}`;
+  }
+
+  return email || details || "—";
 }

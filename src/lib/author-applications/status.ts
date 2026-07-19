@@ -31,6 +31,12 @@ export function canSubmitAuthorApplicationStatus(
   return status === "draft" || status === "needs_changes";
 }
 
+export function canUpdateAuthorApplicationContacts(
+  status: AuthorApplicationStatus,
+): boolean {
+  return status === "submitted" || status === "in_review";
+}
+
 export function normalizeAuthorApplicationStatus(
   value: string | null | undefined,
 ): AuthorApplicationStatus | null {

@@ -28,7 +28,8 @@ export type StoredAuthorApplicationDraft = {
   selectedDirections: string[];
   directionOther: string;
   about: string;
-  contact: string;
+  contactEmail: string;
+  contactDetails: string;
   hasReadyMaterials: boolean;
   wantsTraining: boolean;
   interestedInSchool: boolean;
@@ -46,7 +47,8 @@ export function formValuesToDraft(
     selectedDirections: values.selectedDirections,
     directionOther: values.directionOther,
     about: values.about,
-    contact: values.contact,
+    contactEmail: values.contactEmail,
+    contactDetails: values.contactDetails,
     hasReadyMaterials: values.hasReadyMaterials,
     wantsTraining: values.wantsTraining,
     interestedInSchool: values.interestedInSchool,
@@ -63,12 +65,34 @@ export function draftToFormValues(
     directionOther: draft.directionOther,
     direction: serializeDraftDirection(draft.selectedDirections, draft.directionOther),
     about: draft.about,
-    contact: draft.contact,
+    contactEmail: draft.contactEmail,
+    contactDetails: draft.contactDetails,
     hasReadyMaterials: draft.hasReadyMaterials,
     wantsTraining: draft.wantsTraining,
     interestedInSchool: draft.interestedInSchool,
     consentPersonalData: false,
   };
+}
+
+function parseLegacyDraftContact(
+  parsed: Partial<StoredAuthorApplicationDraft & { contact?: string }>,
+): { contactEmail: string; contactDetails: string } {
+  if (typeof parsed.contactEmail === "string") {
+    return {
+      contactEmail: parsed.contactEmail,
+      contactDetails:
+        typeof parsed.contactDetails === "string" ? parsed.contactDetails : "",
+    };
+  }
+
+  if (typeof parsed.contact === "string") {
+    return {
+      contactEmail: "",
+      contactDetails: parsed.contact,
+    };
+  }
+
+  return { contactEmail: "", contactDetails: "" };
 }
 
 export function parseStoredAuthorApplicationDraft(
@@ -79,18 +103,21 @@ export function parseStoredAuthorApplicationDraft(
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<StoredAuthorApplicationDraft>;
+    const parsed = JSON.parse(raw) as Partial<
+      StoredAuthorApplicationDraft & { contact?: string }
+    >;
 
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
+
+    const { contactEmail, contactDetails } = parseLegacyDraftContact(parsed);
 
     if (
       typeof parsed.displayName !== "string" ||
       !Array.isArray(parsed.selectedDirections) ||
       typeof parsed.directionOther !== "string" ||
       typeof parsed.about !== "string" ||
-      typeof parsed.contact !== "string" ||
       typeof parsed.hasReadyMaterials !== "boolean" ||
       typeof parsed.wantsTraining !== "boolean" ||
       typeof parsed.interestedInSchool !== "boolean"
@@ -105,7 +132,8 @@ export function parseStoredAuthorApplicationDraft(
       ),
       directionOther: parsed.directionOther,
       about: parsed.about,
-      contact: parsed.contact,
+      contactEmail,
+      contactDetails,
       hasReadyMaterials: parsed.hasReadyMaterials,
       wantsTraining: parsed.wantsTraining,
       interestedInSchool: parsed.interestedInSchool,
@@ -195,3 +223,6 @@ export function resolveInitialAuthorApplicationFormValues(input: {
 
 export const AUTHOR_APPLICATION_SUBMIT_ERROR_MESSAGE =
   "Не удалось отправить заявку. Ваши данные сохранены — попробуйте ещё раз.";
+
+export const AUTHOR_APPLICATION_CONTACT_UPDATE_ERROR_MESSAGE =
+  "Не удалось обновить контакты. Проверьте данные и попробуйте ещё раз.";

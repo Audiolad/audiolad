@@ -24,6 +24,7 @@ import {
   writeAuthorApplicationDraft,
 } from "@/lib/author-applications/draft";
 import {
+  canUpdateAuthorApplicationContacts,
   getAuthorApplicationStatusDescription,
   getAuthorApplicationStatusTitle,
   shouldShowAuthorApplicationForm,
@@ -32,11 +33,13 @@ import type {
   AuthorApplicationFormState,
   AuthorApplicationFormValues,
   AuthorApplicationRow,
+  AuthorApplicationSubmittedContacts,
   BecomeAuthorAudience,
 } from "@/lib/author-applications/types";
 import {
   AUTHOR_APPLICATION_LIMITS,
   buildAuthorApplicationFormData,
+  rowToFormValues,
 } from "@/lib/author-applications/validation";
 
 import AuthorApplicationDirectionPicker from "@/components/become-author/AuthorApplicationDirectionPicker";
@@ -55,12 +58,16 @@ const INITIAL_STATE: AuthorApplicationFormState = {
 
 const DRAFT_DEBOUNCE_MS = 400;
 
+const AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS =
+  "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
+
 type AuthorApplicationPanelProps = {
   audience: BecomeAuthorAudience;
   application: AuthorApplicationRow | null;
   workspaceCount: number;
   defaultValues: AuthorApplicationFormValues;
   showSubmittedBanner: boolean;
+  userEmail: string | null;
 };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -75,36 +82,54 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-const AUTHOR_APPLICATION_SUCCESS_SCROLL_MARGIN_CLASS =
-  "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
-
 function AuthorApplicationSuccessScreen({
-  contact,
+  contacts,
   sectionRef,
+  onEditContacts,
 }: {
-  contact: string;
+  contacts: AuthorApplicationSubmittedContacts;
   sectionRef?: RefObject<HTMLElement | null>;
+  onEditContacts: () => void;
 }) {
   return (
     <section
       ref={sectionRef}
       id="author-application-success"
-      className={`${AUTHOR_APPLICATION_SUCCESS_SCROLL_MARGIN_CLASS} rounded-[24px] border border-[#cfe8d9] bg-[#f3fbf6] p-5 lg:p-6`}
+      className={`${AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS} rounded-[24px] border border-[#cfe8d9] bg-[#f3fbf6] p-5 lg:p-6`}
       aria-live="polite"
     >
       <h2 className="text-[21px] font-semibold text-[#25135c]">
         Спасибо! Ваша заявка принята
       </h2>
       <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-        Мы рассмотрим её и свяжемся с вами по указанному контакту.
+        Мы рассмотрим её и свяжемся с вами по указанным контактам.
       </p>
       <div
         className={`mt-4 rounded-[18px] border border-[#cfe8d9] bg-white px-4 py-3 ${becomeAuthorBodyClass}`}
       >
-        <p className="font-medium text-[#25135c]">Контакт для связи:</p>
-        <p className="mt-1 break-words text-[#25135c]">{contact}</p>
+        <p className="font-medium text-[#25135c]">Контакты для связи</p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className="text-[15px] font-medium text-[#5f538f]">
+              Электронная почта:
+            </p>
+            <p className="mt-1 break-all text-[#25135c]">{contacts.contactEmail}</p>
+          </div>
+          <div>
+            <p className="text-[15px] font-medium text-[#5f538f]">
+              Телефон, MAX или другой способ связи:
+            </p>
+            <p className="mt-1 break-words text-[#25135c]">
+              {contacts.contactDetails}
+            </p>
+          </div>
+        </div>
       </div>
       <p className={`mt-4 ${becomeAuthorBodyClass}`}>
+        Мы свяжемся с вами по указанным контактам. Проверьте, пожалуйста, что они
+        указаны без ошибок.
+      </p>
+      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
         Статус заявки всегда можно посмотреть в вашем профиле.
       </p>
       <div className="mt-5 flex flex-col gap-3">
@@ -114,6 +139,13 @@ function AuthorApplicationSuccessScreen({
         >
           Перейти в профиль
         </Link>
+        <button
+          type="button"
+          onClick={onEditContacts}
+          className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#bda6e1] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          Изменить контакты для связи
+        </button>
         <Link
           href="/"
           className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#bda6e1] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
@@ -130,6 +162,8 @@ function AuthorApplicationForm({
   errors,
   isPending,
   restoredDraftNotice,
+  updateContactsOnly,
+  contactsSectionRef,
   onValuesChange,
   onSubmit,
   onInteractionStart,
@@ -138,16 +172,21 @@ function AuthorApplicationForm({
   errors: AuthorApplicationFormState["errors"];
   isPending: boolean;
   restoredDraftNotice: boolean;
+  updateContactsOnly: boolean;
+  contactsSectionRef: RefObject<HTMLDivElement | null>;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
 }) {
-  const contactInputRef = useRef<HTMLInputElement>(null);
+  const contactEmailInputRef = useRef<HTMLInputElement>(null);
 
   function patchValues(patch: Partial<AuthorApplicationFormValues>) {
     onInteractionStart?.();
     onValuesChange({ ...values, ...patch });
   }
+
+  const hasContactPreview =
+    values.contactEmail.trim().length > 0 || values.contactDetails.trim().length > 0;
 
   return (
     <form
@@ -160,6 +199,12 @@ function AuthorApplicationForm({
       {restoredDraftNotice ? (
         <div className="rounded-[18px] border border-[#d9ccf5] bg-[#faf6ff] px-4 py-3 text-[15px] leading-snug text-[#5f538f]">
           Мы восстановили данные, которые вы вводили ранее.
+        </div>
+      ) : null}
+
+      {updateContactsOnly ? (
+        <div className="rounded-[18px] border border-[#d9ccf5] bg-[#faf6ff] px-4 py-3 text-[15px] leading-snug text-[#5f538f]">
+          Измените контакты для связи. Остальные ответы анкеты сохранены.
         </div>
       ) : null}
 
@@ -227,27 +272,59 @@ function AuthorApplicationForm({
         <FieldError id="about-error" message={errors.about} />
       </div>
 
-      <div>
-        <label htmlFor="contact" className={becomeAuthorLabelClass}>
-          Телефон, MAX или другой удобный способ связи{" "}
-          <span className="text-[#b34f63]">*</span>
-        </label>
-        <input
-          ref={contactInputRef}
-          id="contact"
-          name="contact"
-          type="text"
-          required
-          minLength={AUTHOR_APPLICATION_LIMITS.contactMin}
-          maxLength={AUTHOR_APPLICATION_LIMITS.contactMax}
-          value={values.contact}
-          onChange={(event) => patchValues({ contact: event.currentTarget.value })}
-          aria-invalid={Boolean(errors.contact)}
-          aria-describedby={errors.contact ? "contact-error" : undefined}
-          className={becomeAuthorInputClass}
-          disabled={isPending}
-        />
-        <FieldError id="contact-error" message={errors.contact} />
+      <div
+        ref={contactsSectionRef}
+        id="author-application-contacts"
+        className={`${AUTHOR_APPLICATION_SCROLL_MARGIN_CLASS} space-y-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4`}
+      >
+        <p className="text-[17px] font-semibold text-[#25135c]">Контакты для связи</p>
+
+        <div>
+          <label htmlFor="contactEmail" className={becomeAuthorLabelClass}>
+            Электронная почта <span className="text-[#b34f63]">*</span>
+          </label>
+          <input
+            ref={contactEmailInputRef}
+            id="contactEmail"
+            name="contactEmail"
+            type="email"
+            autoComplete="email"
+            required
+            value={values.contactEmail}
+            onChange={(event) =>
+              patchValues({ contactEmail: event.currentTarget.value })
+            }
+            aria-invalid={Boolean(errors.contactEmail)}
+            aria-describedby={errors.contactEmail ? "contactEmail-error" : undefined}
+            className={becomeAuthorInputClass}
+            disabled={isPending}
+          />
+          <FieldError id="contactEmail-error" message={errors.contactEmail} />
+        </div>
+
+        <div>
+          <label htmlFor="contactDetails" className={becomeAuthorLabelClass}>
+            Телефон, MAX или другой удобный способ связи{" "}
+            <span className="text-[#b34f63]">*</span>
+          </label>
+          <input
+            id="contactDetails"
+            name="contactDetails"
+            type="text"
+            required
+            minLength={AUTHOR_APPLICATION_LIMITS.contactDetailsMin}
+            maxLength={AUTHOR_APPLICATION_LIMITS.contactDetailsMax}
+            value={values.contactDetails}
+            onChange={(event) =>
+              patchValues({ contactDetails: event.currentTarget.value })
+            }
+            aria-invalid={Boolean(errors.contactDetails)}
+            aria-describedby={errors.contactDetails ? "contactDetails-error" : undefined}
+            className={becomeAuthorInputClass}
+            disabled={isPending}
+          />
+          <FieldError id="contactDetails-error" message={errors.contactDetails} />
+        </div>
       </div>
 
       <fieldset
@@ -318,7 +395,7 @@ function AuthorApplicationForm({
             onChange={(event) =>
               patchValues({ consentPersonalData: event.currentTarget.checked })
             }
-            required
+            required={!updateContactsOnly}
             aria-invalid={Boolean(errors.consentPersonalData)}
             aria-describedby={
               errors.consentPersonalData ? "consent-error" : undefined
@@ -340,15 +417,34 @@ function AuthorApplicationForm({
         <FieldError id="consent-error" message={errors.consentPersonalData} />
       </div>
 
-      {values.contact.trim() ? (
+      {hasContactPreview ? (
         <div className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3">
           <p className={`${becomeAuthorBodyClass} text-[#25135c]`}>
-            Мы свяжемся с вами по контакту:{" "}
-            <span className="font-medium break-words">{values.contact.trim()}</span>
+            Мы свяжемся с вами по указанным контактам.
           </p>
+          {values.contactEmail.trim() ? (
+            <p className={`mt-2 ${becomeAuthorBodyClass} text-[#25135c]`}>
+              Электронная почта:{" "}
+              <span className="font-medium break-all">{values.contactEmail.trim()}</span>
+            </p>
+          ) : null}
+          {values.contactDetails.trim() ? (
+            <p className={`mt-2 ${becomeAuthorBodyClass} text-[#25135c]`}>
+              Дополнительный контакт:{" "}
+              <span className="font-medium break-words">
+                {values.contactDetails.trim()}
+              </span>
+            </p>
+          ) : null}
           <button
             type="button"
-            onClick={() => contactInputRef.current?.focus()}
+            onClick={() => {
+              contactsSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+              contactEmailInputRef.current?.focus();
+            }}
             className="mt-2 text-[15px] font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             disabled={isPending}
           >
@@ -363,7 +459,13 @@ function AuthorApplicationForm({
         aria-busy={isPending}
         className="flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        {isPending ? "Отправляем…" : "Стать автором"}
+        {isPending
+          ? updateContactsOnly
+            ? "Сохраняем…"
+            : "Отправляем…"
+          : updateContactsOnly
+            ? "Сохранить контакты"
+            : "Стать автором"}
       </button>
     </form>
   );
@@ -375,6 +477,7 @@ export default function AuthorApplicationPanel({
   workspaceCount,
   defaultValues,
   showSubmittedBanner,
+  userEmail,
 }: AuthorApplicationPanelProps) {
   const [state, submitAction, isPending] = useActionState(
     submitAuthorApplication,
@@ -393,11 +496,16 @@ export default function AuthorApplicationPanel({
 
   const [formValues, setFormValues] = useState(initialResolution.values);
   const [restoredDraftNotice, setRestoredDraftNotice] = useState(false);
+  const [editContactsMode, setEditContactsMode] = useState(false);
   const draftHydratedRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const successSectionRef = useRef<HTMLElement>(null);
+  const contactsSectionRef = useRef<HTMLDivElement>(null);
   const applicationStartedRef = useRef(false);
   const applicationSubmittedRef = useRef(false);
+  const userEmailSeededRef = useRef(false);
+
+  const updateContactsOnly = editContactsMode;
 
   function trackAuthorApplicationStartedOnce() {
     if (applicationStartedRef.current) {
@@ -442,7 +550,26 @@ export default function AuthorApplicationPanel({
   }, [application, defaultValues]);
 
   useEffect(() => {
-    if (state.submitted || showSubmittedBanner) {
+    if (userEmailSeededRef.current || !userEmail?.trim()) {
+      return;
+    }
+
+    userEmailSeededRef.current = true;
+
+    setFormValues((current) => {
+      if (current.contactEmail.trim()) {
+        return current;
+      }
+
+      return {
+        ...current,
+        contactEmail: userEmail.trim(),
+      };
+    });
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (state.submitted || showSubmittedBanner || editContactsMode) {
       return;
     }
 
@@ -454,10 +581,10 @@ export default function AuthorApplicationPanel({
     }, DRAFT_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [formValues, showSubmittedBanner, state.submitted]);
+  }, [editContactsMode, formValues, showSubmittedBanner, state.submitted]);
 
   useEffect(() => {
-    if (!state.submitted || !state.submittedContact || applicationSubmittedRef.current) {
+    if (!state.submitted || !state.submittedContacts || applicationSubmittedRef.current) {
       return;
     }
 
@@ -465,7 +592,7 @@ export default function AuthorApplicationPanel({
 
     const sessionId = getCachedAnalyticsSessionId();
 
-    if (sessionId) {
+    if (sessionId && !updateContactsOnly) {
       void trackPlatformEvent({
         sessionId,
         event_name: "author_application_submitted",
@@ -473,11 +600,15 @@ export default function AuthorApplicationPanel({
       });
     }
 
-    clearAuthorApplicationDraft(window.localStorage);
-  }, [state.submitted, state.submittedContact]);
+    if (!updateContactsOnly) {
+      clearAuthorApplicationDraft(window.localStorage);
+    }
+
+    setEditContactsMode(false);
+  }, [state.submitted, state.submittedContacts, updateContactsOnly]);
 
   useEffect(() => {
-    if (!state.submitted || !state.submittedContact) {
+    if (!state.submitted || !state.submittedContacts) {
       return;
     }
 
@@ -489,7 +620,22 @@ export default function AuthorApplicationPanel({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [state.submitted, state.submittedContact]);
+  }, [state.submitted, state.submittedContacts]);
+
+  useEffect(() => {
+    if (!editContactsMode) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      contactsSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [editContactsMode]);
 
   function handleSubmit() {
     if (isPending || submitInFlightRef.current) {
@@ -497,7 +643,35 @@ export default function AuthorApplicationPanel({
     }
 
     submitInFlightRef.current = true;
-    submitAction(buildAuthorApplicationFormData(formValues));
+    submitAction(
+      buildAuthorApplicationFormData(formValues, {
+        updateContactsOnly,
+      }),
+    );
+  }
+
+  function handleEditContacts() {
+    if (application) {
+      setFormValues((current) => {
+        const fromDatabase = rowToFormValues(application, {
+          fallbackContactEmail: userEmail,
+        });
+
+        return {
+          ...fromDatabase,
+          contactEmail:
+            current.contactEmail.trim() ||
+            fromDatabase.contactEmail.trim() ||
+            userEmail?.trim() ||
+            "",
+          contactDetails:
+            current.contactDetails.trim() || fromDatabase.contactDetails.trim(),
+          consentPersonalData: application.consent_personal_data,
+        };
+      });
+    }
+
+    setEditContactsMode(true);
   }
 
   useEffect(() => {
@@ -568,20 +742,30 @@ export default function AuthorApplicationPanel({
   }
 
   const status = application?.status ?? null;
-  const showForm = shouldShowAuthorApplicationForm({
-    workspaceCount,
-    applicationStatus: status,
-  });
+  const showForm =
+    shouldShowAuthorApplicationForm({
+      workspaceCount,
+      applicationStatus: status,
+    }) || editContactsMode;
 
-  const resolvedSuccessContact =
-    (state.submitted && state.submittedContact) ||
-    (showSubmittedBanner ? defaultValues.contact.trim() || null : null);
+  const bannerContacts =
+    showSubmittedBanner &&
+    (defaultValues.contactEmail.trim() || defaultValues.contactDetails.trim())
+      ? {
+          contactEmail: defaultValues.contactEmail.trim(),
+          contactDetails: defaultValues.contactDetails.trim(),
+        }
+      : null;
 
-  if (resolvedSuccessContact) {
+  const resolvedSuccessContacts =
+    (state.submitted && state.submittedContacts) || bannerContacts;
+
+  if (resolvedSuccessContacts && !editContactsMode) {
     return (
       <AuthorApplicationSuccessScreen
-        contact={resolvedSuccessContact}
+        contacts={resolvedSuccessContacts}
         sectionRef={successSectionRef}
+        onEditContacts={handleEditContacts}
       />
     );
   }
@@ -593,11 +777,12 @@ export default function AuthorApplicationPanel({
         aria-labelledby="become-author-form-heading"
       >
         <h2 id="become-author-form-heading" className="text-[21px] font-semibold">
-          Заявка автора
+          {updateContactsOnly ? "Изменение контактов" : "Заявка автора"}
         </h2>
         <p className={`mt-2 ${becomeAuthorBodyClass}`}>
-          Заполните короткую форму — мы рассмотрим её и свяжемся с вами при
-          необходимости.
+          {updateContactsOnly
+            ? "Обновите контакты для связи по вашей заявке."
+            : "Заполните короткую форму — мы рассмотрим её и свяжемся с вами при необходимости."}
         </p>
 
         {application?.review_comment && status === "needs_changes" ? (
@@ -615,6 +800,8 @@ export default function AuthorApplicationPanel({
             errors={state.errors}
             isPending={isPending}
             restoredDraftNotice={restoredDraftNotice}
+            updateContactsOnly={updateContactsOnly}
+            contactsSectionRef={contactsSectionRef}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}
@@ -659,6 +846,16 @@ export default function AuthorApplicationPanel({
           >
             Дополнить заявку
           </Link>
+        ) : null}
+
+        {application && canUpdateAuthorApplicationContacts(application.status) ? (
+          <button
+            type="button"
+            onClick={handleEditContacts}
+            className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#bda6e1] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Изменить контакты для связи
+          </button>
         ) : null}
 
         <Link

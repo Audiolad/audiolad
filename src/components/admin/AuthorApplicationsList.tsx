@@ -80,7 +80,7 @@ export default function AuthorApplicationsList({
                     </div>
                   </td>
                   <td className="px-4 py-4 text-[#796ba0]">
-                    {application.contact ?? "—"}
+                    {application.contactSummary}
                   </td>
                   <td className="px-4 py-4 text-[#796ba0]">
                     {formatDateTime(application.submittedAt ?? application.createdAt)}
@@ -118,7 +118,7 @@ export default function AuthorApplicationsList({
                   {application.displayName}
                 </h2>
                 <p className="mt-1 text-sm text-[#796ba0]">
-                  {application.contact ?? "Контакт не указан"}
+                  {application.contactSummary || "Контакт не указан"}
                 </p>
               </div>
               {isNewAuthorApplicationStatus(application.status) ? (

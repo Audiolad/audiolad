@@ -3,18 +3,27 @@
 import {
   getCurrentAuthorApplication,
   isDuplicateActiveApplicationError,
+  mapApplicationContactUpdatePayload,
   mapApplicationInsertPayload,
   mapApplicationUpdatePayload,
+  syncProfileContactEmail,
 } from "@/lib/author-applications/queries";
-import { AUTHOR_APPLICATION_SUBMIT_ERROR_MESSAGE } from "@/lib/author-applications/draft";
+import {
+  AUTHOR_APPLICATION_CONTACT_UPDATE_ERROR_MESSAGE,
+  AUTHOR_APPLICATION_SUBMIT_ERROR_MESSAGE,
+} from "@/lib/author-applications/draft";
 import {
   canSubmitAuthorApplicationStatus,
+  canUpdateAuthorApplicationContacts,
   isEditableAuthorApplicationStatus,
 } from "@/lib/author-applications/status";
 import type { AuthorApplicationFormState } from "@/lib/author-applications/types";
 import {
+  buildSubmittedContacts,
   hasAuthorApplicationFieldErrors,
+  isAuthorApplicationContactUpdateOnly,
   normalizeAuthorApplicationFormValues,
+  validateAuthorApplicationContactFields,
   validateAuthorApplicationFormValues,
 } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
@@ -31,14 +40,26 @@ function failureState(
   };
 }
 
-function successState(contact: string, values: AuthorApplicationFormState["values"]): AuthorApplicationFormState {
+function successState(
+  values: AuthorApplicationFormState["values"],
+): AuthorApplicationFormState {
+  const contacts = buildSubmittedContacts(values!);
+
   return {
     ok: true,
     submitted: true,
-    submittedContact: contact,
+    submittedContacts: contacts,
     errors: {},
     values,
   };
+}
+
+async function persistProfileContactEmail(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  contactEmail: string,
+): Promise<void> {
+  await syncProfileContactEmail(supabase, userId, contactEmail);
 }
 
 export async function submitAuthorApplication(
@@ -46,6 +67,7 @@ export async function submitAuthorApplication(
   formData: FormData,
 ): Promise<AuthorApplicationFormState> {
   const values = normalizeAuthorApplicationFormValues(formData);
+  const updateContactsOnly = isAuthorApplicationContactUpdateOnly(formData);
 
   try {
     const supabase = await createClient();
@@ -70,6 +92,62 @@ export async function submitAuthorApplication(
       );
     }
 
+    const existing = await getCurrentAuthorApplication(supabase, user.id).catch(
+      () => null,
+    );
+
+    if (updateContactsOnly) {
+      if (!existing) {
+        return failureState(
+          { conflict: "Заявка не найдена." },
+          values,
+        );
+      }
+
+      if (existing.user_id !== user.id) {
+        return failureState(
+          { auth: "Недостаточно прав для изменения этой заявки." },
+          values,
+        );
+      }
+
+      if (!canUpdateAuthorApplicationContacts(existing.status)) {
+        return failureState(
+          { conflict: "Контакты можно изменить только для отправленной заявки." },
+          values,
+        );
+      }
+
+      const errors = validateAuthorApplicationContactFields(values);
+
+      if (hasAuthorApplicationFieldErrors(errors)) {
+        return failureState(errors, values);
+      }
+
+      const { error } = await supabase
+        .from("author_applications")
+        .update(mapApplicationContactUpdatePayload(values))
+        .eq("id", existing.id)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("author_application_contact_update_error", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        });
+
+        return failureState(
+          { submit: AUTHOR_APPLICATION_CONTACT_UPDATE_ERROR_MESSAGE },
+          values,
+        );
+      }
+
+      await persistProfileContactEmail(supabase, user.id, values.contactEmail);
+
+      return successState(values);
+    }
+
     const errors = validateAuthorApplicationFormValues(values, {
       requireConsent: true,
     });
@@ -77,10 +155,6 @@ export async function submitAuthorApplication(
     if (hasAuthorApplicationFieldErrors(errors)) {
       return failureState(errors, values);
     }
-
-    const existing = await getCurrentAuthorApplication(supabase, user.id).catch(
-      () => null,
-    );
 
     if (existing && !canSubmitAuthorApplicationStatus(existing.status)) {
       return failureState(
@@ -146,12 +220,18 @@ export async function submitAuthorApplication(
       );
     }
 
-    return successState(values.contact, values);
+    await persistProfileContactEmail(supabase, user.id, values.contactEmail);
+
+    return successState(values);
   } catch (error) {
     console.error("author_application_submit_unexpected", error);
 
     return failureState(
-      { submit: AUTHOR_APPLICATION_SUBMIT_ERROR_MESSAGE },
+      {
+        submit: updateContactsOnly
+          ? AUTHOR_APPLICATION_CONTACT_UPDATE_ERROR_MESSAGE
+          : AUTHOR_APPLICATION_SUBMIT_ERROR_MESSAGE,
+      },
       values,
     );
   }
