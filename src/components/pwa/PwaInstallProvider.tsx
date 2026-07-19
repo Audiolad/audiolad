@@ -32,7 +32,7 @@ import {
   getInstallDialogMode,
   setInstallDialogMode,
   subscribeInstallDialogMode,
-} from "@/lib/pwa/dialog-copy";
+} from "@/lib/pwa/install-dialog-controller";
 import { registerPwaServiceWorker, syncPwaProfileState } from "@/lib/pwa/register-sw";
 import { shouldShowPwaBanner } from "@/lib/pwa/state-machine";
 import {

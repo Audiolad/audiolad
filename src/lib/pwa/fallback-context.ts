@@ -1,5 +1,5 @@
 import type { PwaInstallContextValue } from "@/lib/pwa/types";
-import { setInstallDialogMode } from "@/lib/pwa/dialog-copy";
+import { setInstallDialogMode } from "@/lib/pwa/install-dialog-controller";
 
 const noop = () => {};
 const noopAsync = async () => {};

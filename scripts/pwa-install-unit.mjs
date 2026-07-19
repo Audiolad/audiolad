@@ -3,6 +3,7 @@
  * PWA install unit checks — safe to run without database access.
  */
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 function assert(condition, message) {
   if (!condition) {
@@ -873,14 +874,151 @@ function testInstallDialogControllerWiring() {
     "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
     "utf8",
   );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+  const fallback = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
+    "utf8",
+  );
   const controller = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
+    "/var/www/audiolad/src/lib/pwa/install-dialog-controller.ts",
     "utf8",
   );
 
-  assert(controller.includes("setInstallDialogMode"), "dialog controller exposes setter");
+  assert(
+    controller.includes("export function setInstallDialogMode"),
+    "dialog controller exposes setter",
+  );
+  assert(
+    controller.includes("export function getInstallDialogMode"),
+    "dialog controller exposes getter",
+  );
+  assert(
+    controller.includes("export function subscribeInstallDialogMode"),
+    "dialog controller exposes subscribe",
+  );
+  assert(
+    provider.includes('@/lib/pwa/install-dialog-controller"'),
+    "provider imports dialog controller module",
+  );
+  assert(
+    dialog.includes('@/lib/pwa/install-dialog-controller"'),
+    "dialog imports dialog controller module",
+  );
+  assert(
+    fallback.includes('@/lib/pwa/install-dialog-controller"'),
+    "fallback context imports dialog controller module",
+  );
   assert(provider.includes("setInstallDialogMode"), "provider uses dialog controller");
   assert(provider.includes("useInstallDialogMode"), "provider subscribes to dialog controller");
+}
+
+function testInstallDialogControllerArchitecture() {
+  const dialogCopy = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
+    "utf8",
+  );
+  const controller = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/install-dialog-controller.ts",
+    "utf8",
+  );
+
+  assert(
+    dialogCopy.includes("export function getPwaInstallDialogCopy"),
+    "dialog copy keeps copy helper",
+  );
+  assert(
+    dialogCopy.includes("export function shouldShowInstallBookmarkFootnote"),
+    "dialog copy keeps bookmark footnote helper",
+  );
+  assert(
+    !dialogCopy.includes("export function setInstallDialogMode"),
+    "dialog copy no longer exports controller setter",
+  );
+  assert(
+    !dialogCopy.includes("export function subscribeInstallDialogMode"),
+    "dialog copy no longer exports controller subscribe",
+  );
+  assert(
+    !dialogCopy.match(/\nlet dialogMode:/),
+    "dialog copy no longer owns module-level dialog mode",
+  );
+  assert(
+    !dialogCopy.match(/\nconst listeners = new Set/),
+    "dialog copy no longer owns controller listeners",
+  );
+  assert(
+    controller.match(/\nlet dialogMode: PwaInstallDialogMode \| null = null;/),
+    "controller keeps initial dialog mode null",
+  );
+  assert(
+    !controller.includes("window") &&
+      !controller.includes("document") &&
+      !controller.includes("react"),
+    "controller stays free of browser and React APIs",
+  );
+}
+
+function testInstallDialogControllerRuntime() {
+  const script = `
+    import {
+      getInstallDialogMode,
+      setInstallDialogMode,
+      subscribeInstallDialogMode,
+    } from "./src/lib/pwa/install-dialog-controller.ts";
+
+    if (getInstallDialogMode() !== null) {
+      throw new Error("initial dialog mode must be null");
+    }
+
+    let notifyCount = 0;
+    const unsubscribe = subscribeInstallDialogMode(() => {
+      notifyCount += 1;
+    });
+
+    setInstallDialogMode("android");
+    if (getInstallDialogMode() !== "android") {
+      throw new Error("set/get must expose android mode");
+    }
+    if (notifyCount !== 1) {
+      throw new Error("subscriber must be notified after set");
+    }
+
+    setInstallDialogMode("android");
+    if (notifyCount !== 2) {
+      throw new Error("repeated set must keep notifying subscribers");
+    }
+
+    unsubscribe();
+    setInstallDialogMode("ios");
+    if (notifyCount !== 2) {
+      throw new Error("unsubscribe must stop notifications");
+    }
+    if (getInstallDialogMode() !== "ios") {
+      throw new Error("set/get must expose ios mode");
+    }
+
+    setInstallDialogMode(null);
+    if (getInstallDialogMode() !== null) {
+      throw new Error("set/get must clear dialog mode");
+    }
+  `;
+
+  const result = spawnSync("npx", ["tsx", "--eval", script], {
+    cwd: "/var/www/audiolad",
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.status !== 0) {
+    throw new Error(
+      result.stderr?.trim() ||
+        result.stdout?.trim() ||
+        "install dialog controller runtime contract failed",
+    );
+  }
 }
 
 function testProfileInstallSubtitle() {
@@ -943,6 +1081,8 @@ const tests = [
   ["closing dialog does not confirm install", testClosingDialogDoesNotConfirmInstall],
   ["install dialog accessibility", testInstallDialogAccessibility],
   ["install dialog controller wiring", testInstallDialogControllerWiring],
+  ["install dialog controller architecture", testInstallDialogControllerArchitecture],
+  ["install dialog controller runtime", testInstallDialogControllerRuntime],
   ["profile install subtitle", testProfileInstallSubtitle],
 ];
 

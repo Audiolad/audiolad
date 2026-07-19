@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 import {
-  getInstallDialogMode,
   getPwaInstallDialogCopy,
   PWA_INSTALL_BOOKMARK_FOOTNOTE,
   shouldShowInstallBookmarkFootnote,
-  subscribeInstallDialogMode,
 } from "@/lib/pwa/dialog-copy";
+import {
+  getInstallDialogMode,
+  subscribeInstallDialogMode,
+} from "@/lib/pwa/install-dialog-controller";
 import type { PwaInstallDialogMode } from "@/lib/pwa/types";
 
 function CloseIcon() {
