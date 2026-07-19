@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import {
   cleanupImageManifest,
@@ -16,6 +17,19 @@ import {
 } from "@/lib/profile/avatar";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+const LISTENER_SHELL_PATHS = [
+  "/",
+  "/catalog",
+  "/my-practices",
+  "/playlists",
+] as const;
+
+function revalidateListenerShell() {
+  for (const routePath of LISTENER_SHELL_PATHS) {
+    revalidatePath(routePath, "layout");
+  }
+}
 
 export async function POST(request: Request) {
   const supabase = await createClientFromRequest(request);
@@ -166,6 +180,8 @@ export async function POST(request: Request) {
     }
   }
 
+  revalidateListenerShell();
+
   return NextResponse.json({
     avatarUrl,
     avatarPath: nextPath,
@@ -254,6 +270,8 @@ export async function DELETE(request: Request) {
       error instanceof Error ? error.message : error,
     );
   }
+
+  revalidateListenerShell();
 
   return new NextResponse(null, { status: 204 });
 }

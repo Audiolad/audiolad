@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
@@ -5,6 +7,7 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
 import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
+import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import { getDisplayName, getInitial } from "@/lib/profile/display-name";
 import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -18,12 +21,15 @@ export type ListenerShellData = {
   isAuthenticated: boolean;
   displayName: string;
   profileInitial: string;
+  avatarUrl: string | null;
   profileHref: string;
   authorCta: ListenerAuthorCta;
 };
 
 type ProfileRow = {
   full_name: string | null;
+  avatar_path: string | null;
+  avatar_url: string | null;
 };
 
 export function resolveListenerAuthorCta(input: {
@@ -62,7 +68,7 @@ export function resolveListenerAuthorCta(input: {
   }
 }
 
-export async function getListenerShellData(
+async function loadListenerShellData(
   supabase?: SupabaseClient,
 ): Promise<ListenerShellData> {
   const client = supabase ?? (await createClient());
@@ -76,6 +82,7 @@ export async function getListenerShellData(
       isAuthenticated: false,
       displayName: "",
       profileInitial: "",
+      avatarUrl: null,
       profileHref: "/auth/sign-in",
       authorCta: resolveListenerAuthorCta({
         workspaces: [],
@@ -87,7 +94,7 @@ export async function getListenerShellData(
   const [profileResult, workspaces, application] = await Promise.all([
     client
       .from("profiles")
-      .select("full_name")
+      .select("full_name, avatar_path, avatar_url")
       .eq("id", user.id)
       .maybeSingle(),
     listAuthorWorkspacesForUser(user.id).catch((error) => {
@@ -109,11 +116,13 @@ export async function getListenerShellData(
 
   const profile = (profileResult.data as ProfileRow | null) ?? null;
   const displayName = getDisplayName(profile, user);
+  const avatarUrl = await resolveProfileAvatarUrl(profile, user.id);
 
   return {
     isAuthenticated: true,
     displayName,
     profileInitial: getInitial(displayName),
+    avatarUrl,
     profileHref: "/profile",
     authorCta: resolveListenerAuthorCta({
       workspaces,
@@ -124,3 +133,6 @@ export async function getListenerShellData(
     }),
   };
 }
+
+/** Dedupe within one RSC request when layout + page both need shell data. */
+export const getListenerShellData = cache(loadListenerShellData);

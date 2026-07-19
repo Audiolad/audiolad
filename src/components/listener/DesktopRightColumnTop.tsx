@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import UserAvatar from "@/components/profile/UserAvatar";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
 
 type DesktopRightColumnTopProps = {
@@ -35,12 +36,13 @@ export default function DesktopRightColumnTop({
           className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-[#eadff8] bg-[#fffdfd] px-3 py-2.5 transition hover:border-[#dcc9f2] hover:bg-[#fdfbff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
           aria-label={`Профиль: ${shellData.displayName}`}
         >
-          <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f3ebfc] text-[15px] font-semibold text-[#7042c5]"
-            aria-hidden="true"
-          >
-            {shellData.profileInitial}
-          </span>
+          <UserAvatar
+            avatarUrl={shellData.avatarUrl}
+            initial={shellData.profileInitial}
+            size={44}
+            className="h-11 w-11 rounded-full bg-[#f3ebfc] text-[15px] font-semibold text-[#7042c5]"
+            initialClassName="text-[15px] font-semibold text-[#7042c5]"
+          />
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight text-[#25135c]">
             {shellData.displayName}
           </span>

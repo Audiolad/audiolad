@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { useAvatarCropUpload } from "@/components/images/useAvatarCropUpload";
@@ -35,6 +36,7 @@ export default function ProfileAvatarEditor({
   initialAvatarUrl,
   initial,
 }: ProfileAvatarEditorProps) {
+  const router = useRouter();
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -68,11 +70,12 @@ export default function ProfileAvatarEditor({
       if (payload?.avatarUrl) {
         setAvatarUrl(payload.avatarUrl);
         setMessage("Фотография обновлена.");
+        router.refresh();
       }
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [router]);
 
   const {
     fileInputRef,
@@ -104,6 +107,7 @@ export default function ProfileAvatarEditor({
 
       setAvatarUrl(null);
       setMessage("Фотография удалена.");
+      router.refresh();
     } catch {
       setIsError(true);
       setMessage("Не удалось удалить аватар. Попробуйте ещё раз.");
