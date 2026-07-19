@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { GuestHomeData } from "@/lib/home/types";
 
+import BecomeAuthorPromoBanner from "@/components/listener/BecomeAuthorPromoBanner";
+
 import AuthorsRail from "./AuthorsRail";
 import HeroFeaturedProduct from "./HeroFeaturedProduct";
 import { PlayIcon } from "./HomeIcons";
@@ -91,6 +93,8 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
       />
 
       <AuthorsRail authors={data.authors} />
+
+      <BecomeAuthorPromoBanner source="home_mobile" />
 
       <HowItWorks />
 
