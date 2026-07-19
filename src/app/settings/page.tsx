@@ -1,8 +1,10 @@
 import BottomNav from "@/components/BottomNav";
 import PwaSettingsSection from "@/components/pwa/PwaSettingsSection";
 import AnalyticsPrivacySection from "@/components/settings/AnalyticsPrivacySection";
+import UserAvatar from "@/components/profile/UserAvatar";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { signOut } from "@/app/auth/sign-out/actions";
+import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import {
   getDisplayName,
   getInitial,
@@ -46,7 +48,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role")
+    .select("full_name, role, avatar_path, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -56,6 +58,7 @@ export default async function SettingsPage() {
 
   const displayName = getDisplayName(profile, user);
   const initial = getInitial(displayName);
+  const avatarUrl = await resolveProfileAvatarUrl(profile, user.id);
   const roleLabel = getProfileRolePrimaryLabel(authorWorkspaces.length);
   const emailDescription = user.email?.trim() || "Не указан";
 
@@ -115,9 +118,13 @@ export default async function SettingsPage() {
             <p className="text-sm text-white/70">Ваш аккаунт</p>
 
             <div className="mt-3 flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/15 text-2xl font-semibold">
-                {initial}
-              </div>
+              <UserAvatar
+                avatarUrl={avatarUrl}
+                initial={initial}
+                size={64}
+                className="h-16 w-16 rounded-[20px] bg-white/15 text-2xl font-semibold text-white"
+                initialClassName="text-2xl font-semibold text-white"
+              />
 
               <div>
                 <p className="text-xl font-semibold">{displayName}</p>

@@ -12,8 +12,7 @@ import type { ContinueListeningItem } from "@/lib/home/types";
 import { resolveInitialPlayback } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
-import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
@@ -332,20 +331,7 @@ export async function getProfilePageData(
   const displayName = getDisplayName(profile, user);
   const workspaceCount = authorWorkspaces.length;
 
-  let avatarUrl: string | null = null;
-
-  if (profile?.avatar_path) {
-    try {
-      const storage = createServiceRoleClient();
-      avatarUrl = await createUserAvatarSignedUrl(storage, profile.avatar_path, {
-        userId: user.id,
-        cacheBuster: profile.avatar_url ?? profile.avatar_path,
-      });
-    } catch (error) {
-      console.error("profile_avatar_signed_url_error", error);
-      avatarUrl = profile.avatar_url;
-    }
-  }
+  const avatarUrl = await resolveProfileAvatarUrl(profile, user.id);
 
   const card: ProfileCardData = {
     displayName,
