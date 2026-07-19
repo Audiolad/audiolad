@@ -36,7 +36,11 @@ const publicAudioItems = readFileSync(
   "utf8",
 );
 const practicePage = readFileSync(
-  "src/app/practice/[...segments]/page.tsx",
+  "src/app/(listener)/practice/[...segments]/page.tsx",
+  "utf8",
+);
+const practiceMobilePage = readFileSync(
+  "src/components/products/practice-page/PracticePageMobile.tsx",
   "utf8",
 );
 const globalPlayerTypes = readFileSync(
@@ -158,15 +162,23 @@ assert(
 );
 
 assert(
-  practicePage.includes("practiceCover={{"),
+  practicePage.includes("PracticePageViewModel"),
+  "practice page builds a shared view model for mobile and desktop",
+);
+assert(
+  practiceMobilePage.includes("ProductContentsSection"),
+  "practice mobile view wires contents section from shared view model",
+);
+assert(
+  practiceMobilePage.includes("practiceCover={{"),
   "practice page passes practice cover context to contents section",
 );
 assert(
-  practicePage.includes("use_shared_cover"),
+  practiceMobilePage.includes("use_shared_cover"),
   "practice page passes use_shared_cover for per-track fallback",
 );
 assert(
-  practicePage.includes('enabled: presentation.primaryAction.kind === "listen"'),
+  practiceMobilePage.includes('enabled: presentation.primaryAction.kind === "listen"'),
   "playback enabled only when listen action is available",
 );
 

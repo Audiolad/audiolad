@@ -325,7 +325,7 @@ function testSourceFiles() {
     "utf8",
   );
   const page = readFileSync(
-    "/var/www/audiolad/src/app/practice/[...segments]/page.tsx",
+    "/var/www/audiolad/src/app/(listener)/practice/[...segments]/page.tsx",
     "utf8",
   );
 
@@ -350,7 +350,8 @@ function testSourceFiles() {
   assert(button.includes("В Аудиотеке"), "in_library label");
   assert(!button.includes("free_claim"), "no technical source in UI");
 
-  assert(page.includes("LibraryAddButton"), "page uses new component");
+  assert(page.includes("PracticePageMobile"), "page uses mobile practice view");
+  assert(page.includes("PracticePageDesktop"), "page uses desktop practice view");
   assert(
     !page.includes("Добавление в библиотеку скоро появится"),
     "stub removed",

@@ -98,9 +98,12 @@ function testWiring() {
     "reset to default control present",
   );
 
-  const practicePage = read("src/app/practice/[...segments]/page.tsx");
+  const practicePage = read("src/app/(listener)/practice/[...segments]/page.tsx");
+  const practiceMobilePage = read(
+    "src/components/products/practice-page/PracticePageMobile.tsx",
+  );
   assert(
-    practicePage.includes("ListeningNoticeCard"),
+    practiceMobilePage.includes("ListeningNoticeCard"),
     "practice page uses shared card",
   );
   assert(

@@ -17,7 +17,11 @@ const component = readFileSync(
   "utf8",
 );
 const practicePage = readFileSync(
-  "src/app/practice/[...segments]/page.tsx",
+  "src/app/(listener)/practice/[...segments]/page.tsx",
+  "utf8",
+);
+const practiceMobilePage = readFileSync(
+  "src/components/products/practice-page/PracticePageMobile.tsx",
   "utf8",
 );
 const practiceTopics = readFileSync(
@@ -73,7 +77,8 @@ assert(
   "public product page loads topics on server",
 );
 assert(
-  practicePage.includes("ProductTopicLinks"),
+  practiceMobilePage.includes("ProductTopicLinks") ||
+    practiceMobilePage.includes("PracticeMetaSection"),
   "public product page renders ProductTopicLinks",
 );
 assert(

@@ -30,9 +30,8 @@ export function isProgramFormat(format: string | null): boolean {
 }
 
 export function getFreeStatusLabel(format: string | null): string {
-  return isProgramFormat(format)
-    ? "Программа в подарок"
-    : "Практика в подарок";
+  void format;
+  return "Доступно без оплаты";
 }
 
 export function getEntitlementStatusLabel(accessSource: string | null): string {

@@ -140,6 +140,15 @@
   .listener-history-content {
     width: 100%;
   }
+
+  .listener-practice-content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .listener-practice-description {
+    max-width: none;
+  }
 }
 
 @media (min-width: 1440px) {

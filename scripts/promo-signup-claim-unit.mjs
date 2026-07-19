@@ -16,7 +16,7 @@ function testPostSignupHandlerMounting() {
     "utf8",
   );
   const practicePage = readFileSync(
-    "/var/www/audiolad/src/app/practice/[...segments]/page.tsx",
+    "/var/www/audiolad/src/app/(listener)/practice/[...segments]/page.tsx",
     "utf8",
   );
   const postSignup = readFileSync(
