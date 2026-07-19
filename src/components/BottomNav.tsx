@@ -93,6 +93,7 @@ export default function BottomNav({ variant = "default" }: BottomNavProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               aria-label={item.title}
               aria-current={active ? "page" : undefined}
               className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${

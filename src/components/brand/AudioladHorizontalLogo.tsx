@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
-const HORIZONTAL_LOGO_WIDTH = 2172;
-const HORIZONTAL_LOGO_HEIGHT = 724;
+const HORIZONTAL_LOGO_WIDTH = 600;
+const HORIZONTAL_LOGO_HEIGHT = 200;
 
 /** Mobile: 64px height (~2× base). Tablet/desktop (md+): 32px height. */
 export const audioladHorizontalLogoImageClassName =

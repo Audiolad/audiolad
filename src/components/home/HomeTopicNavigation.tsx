@@ -16,7 +16,7 @@ function TopicChip({ title, href }: Pick<HomeTopicItem, "title" | "href">) {
   const wrapClass = shouldWrapHomeTopicChip(title) ? " home-need-chip--wrap" : "";
 
   return (
-    <Link href={href} className={`home-need-chip${wrapClass}`}>
+    <Link href={href} prefetch={false} className={`home-need-chip${wrapClass}`}>
       {title}
     </Link>
   );

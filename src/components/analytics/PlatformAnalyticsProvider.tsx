@@ -34,53 +34,75 @@ export default function PlatformAnalyticsProvider({
   const lastPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(
-      typeof window !== "undefined" ? window.location.search : "",
-    );
-    const attribution = resolveTrafficAttribution(
-      parseTrafficAttributionFromSearchParams(searchParams),
-    );
-    const referrerDomain =
-      extractReferrerDomain(typeof document !== "undefined" ? document.referrer : null) ??
-      null;
-    const source = resolveTrafficSource({
-      utmSource: attribution.utmSource,
-      referrerDomain,
-    });
+    let cancelled = false;
 
-    void (async () => {
-      const storedSessionId = readStoredSessionId();
-      if (storedSessionId) {
-        setCachedAnalyticsSessionId(storedSessionId);
-      }
-
-      const sessionId = await ensureAnalyticsSession({
-        sessionId: storedSessionId,
-        landingPath: pathname || "/",
-        ...attributionToApiFields(attribution),
-        referrer_domain: referrerDomain ?? (source === "direct" ? null : source),
-        device_type: detectClientDeviceType(),
-      });
-
-      if (!sessionId) {
+    const runAnalytics = () => {
+      if (cancelled) {
         return;
       }
 
-      storeSessionId(sessionId);
-      setCachedAnalyticsSessionId(sessionId);
-      initializedRef.current = true;
+      const searchParams = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search : "",
+      );
+      const attribution = resolveTrafficAttribution(
+        parseTrafficAttributionFromSearchParams(searchParams),
+      );
+      const referrerDomain =
+        extractReferrerDomain(typeof document !== "undefined" ? document.referrer : null) ??
+        null;
+      const source = resolveTrafficSource({
+        utmSource: attribution.utmSource,
+        referrerDomain,
+      });
 
-      const path = pathname || "/";
+      void (async () => {
+        const storedSessionId = readStoredSessionId();
+        if (storedSessionId) {
+          setCachedAnalyticsSessionId(storedSessionId);
+        }
 
-      if (shouldTrackPageView(path) && lastPathRef.current !== path) {
-        lastPathRef.current = path;
-        await trackPlatformEvent({
-          sessionId,
-          event_name: "page_view",
-          path,
+        const sessionId = await ensureAnalyticsSession({
+          sessionId: storedSessionId,
+          landingPath: pathname || "/",
+          ...attributionToApiFields(attribution),
+          referrer_domain: referrerDomain ?? (source === "direct" ? null : source),
+          device_type: detectClientDeviceType(),
         });
-      }
-    })();
+
+        if (!sessionId || cancelled) {
+          return;
+        }
+
+        storeSessionId(sessionId);
+        setCachedAnalyticsSessionId(sessionId);
+        initializedRef.current = true;
+
+        const path = pathname || "/";
+
+        if (shouldTrackPageView(path) && lastPathRef.current !== path) {
+          lastPathRef.current = path;
+          await trackPlatformEvent({
+            sessionId,
+            event_name: "page_view",
+            path,
+          });
+        }
+      })();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(runAnalytics, { timeout: 4000 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(idleId);
+      };
+    }
+
+    const timeoutId = window.setTimeout(runAnalytics, 2000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [pathname]);
 
   return children;

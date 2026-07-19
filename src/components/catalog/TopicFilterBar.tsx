@@ -19,6 +19,7 @@ export default function TopicFilterBar({
       <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Link
           href={buildCatalogTopicHref(null)}
+          prefetch={false}
           aria-current={isAllActive ? "page" : undefined}
           className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
             isAllActive
@@ -36,6 +37,7 @@ export default function TopicFilterBar({
             <Link
               key={topic.key}
               href={buildCatalogTopicHref(topic.key)}
+              prefetch={false}
               aria-current={isActive ? "page" : undefined}
               className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
                 isActive
