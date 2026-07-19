@@ -6,12 +6,30 @@ import type { ListenerShellData } from "@/lib/listener/shell-data";
 
 const SIDEBAR_LOGO_WIDTH = 1796;
 const SIDEBAR_LOGO_HEIGHT = 402;
+const SIDEBAR_BANNER_WIDTH = 1254;
+const SIDEBAR_BANNER_HEIGHT = 1254;
+
+const BECOME_AUTHOR_BANNER_SRC = "/images/sidebar/become-author-banner.png";
+const AUTHOR_DASHBOARD_BANNER_SRC =
+  "/images/sidebar/author-dashboard-banner.png";
+
+function isListenerAuthorDashboardHref(href: string): boolean {
+  return href.startsWith("/author-dashboard");
+}
 
 type DesktopSidebarProps = {
   shellData: ListenerShellData;
 };
 
 export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
+  const isAuthor = isListenerAuthorDashboardHref(shellData.authorCta.href);
+  const bannerSrc = isAuthor
+    ? AUTHOR_DASHBOARD_BANNER_SRC
+    : BECOME_AUTHOR_BANNER_SRC;
+  const bannerAriaLabel = isAuthor
+    ? "Перейти в кабинет автора"
+    : "Стать автором на АудиоЛад";
+
   return (
     <aside
       className="flex h-full min-h-0 w-[var(--listener-sidebar-width)] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fffdfd] shadow-[0_8px_24px_rgba(90,60,145,0.06)]"
@@ -44,17 +62,19 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
         <DesktopSidebarNav />
       </div>
 
-      <div className="mx-3 mb-3 shrink-0 rounded-[18px] border border-[#eadff8] bg-gradient-to-br from-[#fffaff] to-[#f5ecff] p-4">
-        <p className="text-[14px] font-medium leading-snug text-[#4a3d6b]">
-          Создавайте и вдохновляйте тысячи людей
-        </p>
-        <Link
-          href={shellData.authorCta.href}
-          className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6234b5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          {shellData.authorCta.label}
-        </Link>
-      </div>
+      <Link
+        href={shellData.authorCta.href}
+        aria-label={bannerAriaLabel}
+        className="mx-3 mb-3 block shrink-0 transition-[transform,filter,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:brightness-[1.03] hover:shadow-[0_6px_16px_rgba(90,60,145,0.14)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        <Image
+          src={bannerSrc}
+          alt=""
+          width={SIDEBAR_BANNER_WIDTH}
+          height={SIDEBAR_BANNER_HEIGHT}
+          className="h-auto w-full"
+        />
+      </Link>
     </aside>
   );
 }
