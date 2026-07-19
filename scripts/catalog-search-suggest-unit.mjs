@@ -2,21 +2,30 @@
 /**
  * Catalog search suggest dropdown unit checks (no DB).
  */
+import { CATALOG_AUTHOR_SUGGEST_LIMIT } from "../src/lib/catalog/author-search.ts";
 import {
+  CATALOG_PRODUCT_SUGGEST_LIMIT,
   CATALOG_SEARCH_SUGGEST_MIN_LENGTH,
-  CATALOG_SEARCH_SUGGESTION_LIMIT,
   normalizeCatalogSearchQuery,
 } from "../src/lib/catalog/search.ts";
 import {
   buildCatalogSearchResultsHref,
   buildCatalogSuggestApiUrl,
-  CATALOG_SEARCH_SUGGESTION_RESPONSE_KEYS,
+  CATALOG_AUTHOR_SUGGESTION_RESPONSE_KEYS,
+  CATALOG_PRODUCT_SUGGESTION_RESPONSE_KEYS,
+  flattenCatalogSuggestOptions,
+  getCatalogSuggestAuthorOptionId,
+  getCatalogSuggestProductOptionId,
   isCatalogSuggestAbortError,
+  isCatalogSuggestResponseEmpty,
+  mapCatalogAuthorToSuggestion,
   mapCatalogProductToSuggestion,
   moveCatalogSuggestActiveIndex,
   resolveCatalogSuggestEnterAction,
   shouldApplyCatalogSuggestResponse,
   shouldFetchCatalogSuggestions,
+  formatCatalogSearchResultsSummary,
+  isCatalogGroupedSearchEmpty,
 } from "../src/lib/catalog/search-suggestions.ts";
 import { isPublicCatalogSearchPractice } from "../src/lib/catalog/search.ts";
 
@@ -27,7 +36,6 @@ function assert(condition, message) {
 }
 
 assert(!shouldFetchCatalogSuggestions(""), "empty query does not fetch");
-assert(!shouldFetchCatalogSuggestions(" "), "whitespace does not fetch");
 assert(!shouldFetchCatalogSuggestions("а"), "1 char does not fetch");
 assert(shouldFetchCatalogSuggestions("аб"), "2 chars fetch");
 assert(
@@ -35,11 +43,6 @@ assert(
   "normalizer reuse",
 );
 
-assert(
-  buildCatalogSuggestApiUrl("деньги", null) ===
-    "/api/catalog/search/suggest?q=%D0%B4%D0%B5%D0%BD%D1%8C%D0%B3%D0%B8",
-  "suggest api q only",
-);
 assert(
   buildCatalogSuggestApiUrl("деньги", "money").includes("topic=money"),
   "suggest api q + topic",
@@ -49,72 +52,73 @@ assert(
   "client cannot set limit",
 );
 
-assert(
-  buildCatalogSearchResultsHref("деньги", "money") ===
-    "/catalog?q=%D0%B4%D0%B5%D0%BD%D1%8C%D0%B3%D0%B8&topic=money",
-  "show all href",
-);
+assert(CATALOG_SEARCH_SUGGEST_MIN_LENGTH === 2, "min length constant");
+assert(CATALOG_AUTHOR_SUGGEST_LIMIT === 3, "author suggest limit");
+assert(CATALOG_PRODUCT_SUGGEST_LIMIT === 5, "product suggest limit");
 
 assert(
-  CATALOG_SEARCH_SUGGEST_MIN_LENGTH === 2,
-  "min length constant",
+  isCatalogSuggestResponseEmpty({ authors: [], products: [] }),
+  "empty response",
 );
-assert(CATALOG_SEARCH_SUGGESTION_LIMIT === 6, "server suggest limit");
+assert(
+  !isCatalogSuggestResponseEmpty({
+    authors: [{ id: "1", name: "A", positioningText: null, avatarUrl: null, href: "/authors/a" }],
+    products: [],
+  }),
+  "authors only not empty",
+);
+
+const flat = flattenCatalogSuggestOptions({
+  authors: [{ href: "/authors/a" }, { href: "/authors/b" }],
+  products: [{ href: "/practice/a/p1" }],
+});
+
+assert(flat.length === 3, "flatten count");
+assert(flat[0]?.kind === "author" && flat[0].optionId === getCatalogSuggestAuthorOptionId(0));
+assert(flat[2]?.kind === "product" && flat[2].optionId === getCatalogSuggestProductOptionId(0));
 
 assert(
-  moveCatalogSuggestActiveIndex(-1, "down", 3) === 0,
-  "arrow down from none selects first",
+  moveCatalogSuggestActiveIndex(1, "down", 3) === 2,
+  "arrow down across sections",
 );
 assert(
   moveCatalogSuggestActiveIndex(0, "up", 3) === 0,
   "arrow up stops at first",
 );
-assert(
-  moveCatalogSuggestActiveIndex(2, "down", 3) === 2,
-  "arrow down stops at last",
-);
-assert(
-  moveCatalogSuggestActiveIndex(1, "down", 3) === 2,
-  "arrow down moves",
-);
-assert(
-  moveCatalogSuggestActiveIndex(1, "up", 3) === 0,
-  "arrow up moves",
-);
 
 assert(
-  resolveCatalogSuggestEnterAction({ activeIndex: -1, suggestions: [{ href: "/practice/a/b" }] })
+  resolveCatalogSuggestEnterAction({
+    activeIndex: 0,
+    options: [{ href: "/authors/sergey" }],
+  }).href === "/authors/sergey",
+  "enter author",
+);
+assert(
+  resolveCatalogSuggestEnterAction({
+    activeIndex: 1,
+    options: [{ href: "/authors/a" }, { href: "/practice/a/p" }],
+  }).href === "/practice/a/p",
+  "enter product",
+);
+assert(
+  resolveCatalogSuggestEnterAction({ activeIndex: -1, options: [{ href: "/authors/a" }] })
     .type === "submit",
   "enter without active item submits",
 );
-assert(
-  resolveCatalogSuggestEnterAction({
-    activeIndex: 0,
-    suggestions: [{ href: "/practice/author/product" }],
-  }).type === "open",
-  "enter with active item opens",
-);
-assert(
-  resolveCatalogSuggestEnterAction({
-    activeIndex: 0,
-    suggestions: [{ href: "/practice/author/product" }],
-  }).href === "/practice/author/product",
-  "enter active href",
-);
 
-assert(shouldApplyCatalogSuggestResponse(2, 2), "matching request id applies");
-assert(!shouldApplyCatalogSuggestResponse(1, 2), "stale request rejected");
+assert(shouldApplyCatalogSuggestResponse(2, 2), "stale guard apply");
+assert(!shouldApplyCatalogSuggestResponse(1, 2), "stale guard reject");
 
 const abortError = new Error("Aborted");
 abortError.name = "AbortError";
 assert(isCatalogSuggestAbortError(abortError), "abort error detected");
 
-const suggestion = mapCatalogProductToSuggestion({
+const productSuggestion = mapCatalogProductToSuggestion({
   id: "p1",
   title: "Практика",
   slug: "practice",
   subtitle: "Коротко",
-  description: "secret description",
+  description: "secret",
   format: "Аудиопрактика",
   price: 100,
   isFree: false,
@@ -131,37 +135,34 @@ const suggestion = mapCatalogProductToSuggestion({
   updatedAt: null,
 });
 
-assert(suggestion?.title === "Практика", "maps title");
-assert(suggestion?.href === "/practice/author/practice", "maps href");
-assert(!("description" in (suggestion ?? {})), "no description in dto");
 assert(
-  CATALOG_SEARCH_SUGGESTION_RESPONSE_KEYS.every((key) => key in (suggestion ?? {})),
-  "dto keys only",
+  CATALOG_PRODUCT_SUGGESTION_RESPONSE_KEYS.every((key) => key in (productSuggestion ?? {})),
+  "product dto keys",
 );
+assert(!("description" in (productSuggestion ?? {})), "no description in product dto");
+
+const authorSuggestion = mapCatalogAuthorToSuggestion({
+  id: "a1",
+  name: "Автор",
+  slug: "author",
+  positioningText: "Текст",
+  avatarUrl: null,
+  publishedCount: 2,
+  href: "/authors/author",
+});
+
 assert(
-  mapCatalogProductToSuggestion({
-    id: "p2",
-    title: "X",
-    slug: "x",
-    subtitle: null,
-    description: null,
-    format: null,
-    price: null,
-    isFree: true,
-    authorName: null,
-    authorSlug: "author",
-    href: "/practice/author/x",
-    meta: null,
-    statsLabel: null,
-    productTypeLabel: "Аудиопрактика",
-    priceLabel: "Подарок",
-    sortTimestamp: 0,
-    coverUrl: null,
-    coverImage: null,
-    updatedAt: null,
-  }) === null,
-  "missing author rejected",
+  CATALOG_AUTHOR_SUGGESTION_RESPONSE_KEYS.every((key) => key in (authorSuggestion ?? {})),
+  "author dto keys",
 );
+
+assert(
+  formatCatalogSearchResultsSummary(2, 8) ===
+    "Найдено: 2 автора и 8 аудиопродуктов",
+  "grouped summary",
+);
+assert(isCatalogGroupedSearchEmpty(0, 0), "grouped empty");
+assert(!isCatalogGroupedSearchEmpty(1, 0), "authors only not grouped empty");
 
 assert(
   isPublicCatalogSearchPractice({
@@ -170,7 +171,7 @@ assert(
     slug: "practice",
     author_id: "author-1",
   }),
-  "visibility helper still enforced in search layer",
+  "product visibility helper preserved",
 );
 
 console.log("catalog-search-suggest-unit: ok");

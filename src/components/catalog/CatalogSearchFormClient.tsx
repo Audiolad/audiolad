@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -17,13 +18,17 @@ import { buildCatalogClearSearchHref } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import {
   buildCatalogSuggestApiUrl,
-  getCatalogSuggestOptionId,
+  flattenCatalogSuggestOptions,
+  getCatalogSuggestActiveOptionId,
   isCatalogSuggestAbortError,
+  isCatalogSuggestResponseEmpty,
   moveCatalogSuggestActiveIndex,
   resolveCatalogSuggestEnterAction,
   shouldApplyCatalogSuggestResponse,
   shouldFetchCatalogSuggestions,
-  type CatalogSearchSuggestion,
+  type CatalogAuthorSuggestion,
+  type CatalogProductSuggestion,
+  type CatalogSearchSuggestResponse,
 } from "@/lib/catalog/search-suggestions";
 
 const SUGGEST_DEBOUNCE_MS = 275;
@@ -73,7 +78,6 @@ export default function CatalogSearchFormClient({
 }: CatalogSearchFormClientProps) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
@@ -85,12 +89,18 @@ export default function CatalogSearchFormClient({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [suggestions, setSuggestions] = useState<CatalogSearchSuggestion[]>([]);
+  const [authors, setAuthors] = useState<CatalogAuthorSuggestion[]>([]);
+  const [products, setProducts] = useState<CatalogProductSuggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const normalizedInput = normalizeCatalogSearchQuery(inputValue);
   const clearHref = buildCatalogClearSearchHref(activeTopicKey);
   const showClearButton = normalizedInput.length > 0;
+
+  const flatOptions = useMemo(
+    () => flattenCatalogSuggestOptions({ authors, products }),
+    [authors, products],
+  );
 
   const closeDropdown = useCallback(() => {
     setIsOpen(false);
@@ -100,7 +110,8 @@ export default function CatalogSearchFormClient({
   const resetSuggestState = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
-    setSuggestions([]);
+    setAuthors([]);
+    setProducts([]);
     setHasError(false);
     setIsLoading(false);
     closeDropdown();
@@ -134,20 +145,22 @@ export default function CatalogSearchFormClient({
         }
 
         if (!response.ok) {
-          setSuggestions([]);
+          setAuthors([]);
+          setProducts([]);
           setHasError(true);
           return;
         }
 
-        const payload = (await response.json()) as {
-          suggestions?: CatalogSearchSuggestion[];
+        const payload = (await response.json()) as CatalogSearchSuggestResponse & {
+          error?: string;
         };
 
         if (!shouldApplyCatalogSuggestResponse(requestId, requestIdRef.current)) {
           return;
         }
 
-        setSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
+        setAuthors(Array.isArray(payload.authors) ? payload.authors : []);
+        setProducts(Array.isArray(payload.products) ? payload.products : []);
         setHasError(false);
       } catch (error) {
         if (isCatalogSuggestAbortError(error)) {
@@ -158,7 +171,8 @@ export default function CatalogSearchFormClient({
           return;
         }
 
-        setSuggestions([]);
+        setAuthors([]);
+        setProducts([]);
         setHasError(true);
       } finally {
         if (shouldApplyCatalogSuggestResponse(requestId, requestIdRef.current)) {
@@ -219,21 +233,23 @@ export default function CatalogSearchFormClient({
     }
   }
 
+  function openDropdownIfCached() {
+    if (
+      shouldFetchCatalogSuggestions(inputValue) &&
+      (!isCatalogSuggestResponseEmpty({ authors, products }) ||
+        isLoading ||
+        hasError)
+    ) {
+      setIsOpen(true);
+    }
+  }
+
   function handleInputFocus() {
     openDropdownIfCached();
   }
 
   function handleInputClick() {
     openDropdownIfCached();
-  }
-
-  function openDropdownIfCached() {
-    if (
-      shouldFetchCatalogSuggestions(inputValue) &&
-      (suggestions.length > 0 || isLoading || hasError)
-    ) {
-      setIsOpen(true);
-    }
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -243,14 +259,14 @@ export default function CatalogSearchFormClient({
       return;
     }
 
-    if (!isOpen || suggestions.length === 0) {
+    if (!isOpen || flatOptions.length === 0) {
       return;
     }
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((current) =>
-        moveCatalogSuggestActiveIndex(current, "down", suggestions.length),
+        moveCatalogSuggestActiveIndex(current, "down", flatOptions.length),
       );
       return;
     }
@@ -258,7 +274,7 @@ export default function CatalogSearchFormClient({
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex((current) =>
-        moveCatalogSuggestActiveIndex(current, "up", suggestions.length),
+        moveCatalogSuggestActiveIndex(current, "up", flatOptions.length),
       );
       return;
     }
@@ -266,7 +282,7 @@ export default function CatalogSearchFormClient({
     if (event.key === "Enter") {
       const action = resolveCatalogSuggestEnterAction({
         activeIndex,
-        suggestions,
+        options: flatOptions,
       });
 
       if (action.type === "open") {
@@ -280,7 +296,7 @@ export default function CatalogSearchFormClient({
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     const action = resolveCatalogSuggestEnterAction({
       activeIndex: isOpen ? activeIndex : -1,
-      suggestions: isOpen ? suggestions : [],
+      options: isOpen ? flatOptions : [],
     });
 
     if (action.type === "open") {
@@ -290,8 +306,10 @@ export default function CatalogSearchFormClient({
     }
   }
 
-  const activeDescendantId =
-    activeIndex >= 0 ? getCatalogSuggestOptionId(activeIndex) : undefined;
+  const activeDescendantId = getCatalogSuggestActiveOptionId(
+    activeIndex,
+    flatOptions,
+  );
 
   return (
     <div ref={rootRef} className="relative z-30 mt-6">
@@ -303,7 +321,7 @@ export default function CatalogSearchFormClient({
         className="relative flex items-center gap-2 rounded-[22px] border border-[#ded1f1] bg-white px-3 py-2 shadow-[0_2px_10px_rgba(90,60,145,0.04)] sm:gap-3 sm:px-4 sm:py-2.5"
       >
         <label htmlFor={inputId} className="sr-only">
-          Поиск аудиопродуктов
+          Поиск аудиопродуктов и авторов
         </label>
 
         <span className="pl-1 text-[#7042c5]">
@@ -311,7 +329,6 @@ export default function CatalogSearchFormClient({
         </span>
 
         <input
-          ref={inputRef}
           id={inputId}
           name="q"
           type="search"
@@ -320,7 +337,7 @@ export default function CatalogSearchFormClient({
           onFocus={handleInputFocus}
           onClick={handleInputClick}
           onKeyDown={handleInputKeyDown}
-          placeholder="Поиск аудиопродуктов"
+          placeholder="Поиск аудиопродуктов и авторов"
           autoComplete="off"
           enterKeyHint="search"
           maxLength={100}
@@ -370,8 +387,10 @@ export default function CatalogSearchFormClient({
           listboxId={listboxId}
           query={normalizedInput}
           activeTopicKey={activeTopicKey}
-          suggestions={suggestions}
+          authors={authors}
+          products={products}
           activeIndex={activeIndex}
+          authorOffset={authors.length}
           isLoading={isLoading}
           hasError={hasError}
           onOptionHover={setActiveIndex}

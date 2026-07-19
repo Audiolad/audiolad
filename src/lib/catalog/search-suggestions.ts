@@ -1,15 +1,27 @@
-import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  CATALOG_AUTHOR_SUGGEST_LIMIT,
+  type CatalogAuthorSearchResult,
+} from "@/lib/catalog/author-search";
 import { buildCatalogHref } from "@/lib/catalog/topic-filter";
 import {
+  CATALOG_PRODUCT_SUGGEST_LIMIT,
   CATALOG_SEARCH_SUGGEST_MIN_LENGTH,
-  CATALOG_SEARCH_SUGGESTION_LIMIT,
   normalizeCatalogSearchQuery,
 } from "@/lib/catalog/search";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { getDisplayFormat } from "@/lib/author-products/format";
 
-export type CatalogSearchSuggestion = {
+export type CatalogAuthorSuggestion = {
+  id: string;
+  name: string;
+  positioningText: string | null;
+  avatarUrl: string | null;
+  href: string;
+};
+
+export type CatalogProductSuggestion = {
   id: string;
   title: string;
   authorName: string;
@@ -21,7 +33,27 @@ export type CatalogSearchSuggestion = {
   priceLabel: string;
 };
 
-export const CATALOG_SEARCH_SUGGESTION_RESPONSE_KEYS = [
+/** @deprecated Use CatalogProductSuggestion */
+export type CatalogSearchSuggestion = CatalogProductSuggestion;
+
+export type CatalogSearchSuggestResponse = {
+  authors: CatalogAuthorSuggestion[];
+  products: CatalogProductSuggestion[];
+};
+
+export type CatalogSuggestOption =
+  | { kind: "author"; href: string; optionId: string }
+  | { kind: "product"; href: string; optionId: string };
+
+export const CATALOG_AUTHOR_SUGGESTION_RESPONSE_KEYS = [
+  "id",
+  "name",
+  "positioningText",
+  "avatarUrl",
+  "href",
+] as const;
+
+export const CATALOG_PRODUCT_SUGGESTION_RESPONSE_KEYS = [
   "id",
   "title",
   "authorName",
@@ -32,6 +64,10 @@ export const CATALOG_SEARCH_SUGGESTION_RESPONSE_KEYS = [
   "isFree",
   "priceLabel",
 ] as const;
+
+/** @deprecated Use CATALOG_PRODUCT_SUGGESTION_RESPONSE_KEYS */
+export const CATALOG_SEARCH_SUGGESTION_RESPONSE_KEYS =
+  CATALOG_PRODUCT_SUGGESTION_RESPONSE_KEYS;
 
 export function shouldFetchCatalogSuggestions(
   rawQuery: string | null | undefined,
@@ -80,6 +116,12 @@ export function shouldApplyCatalogSuggestResponse(
   return requestId === latestRequestId;
 }
 
+export function isCatalogSuggestResponseEmpty(
+  response: CatalogSearchSuggestResponse,
+): boolean {
+  return response.authors.length === 0 && response.products.length === 0;
+}
+
 /** Active index stops at list boundaries (no wrap). */
 export function moveCatalogSuggestActiveIndex(
   currentIndex: number,
@@ -101,31 +143,93 @@ export function moveCatalogSuggestActiveIndex(
   return Math.max(currentIndex - 1, 0);
 }
 
+export function flattenCatalogSuggestOptions(input: {
+  authors: ReadonlyArray<{ href: string }>;
+  products: ReadonlyArray<{ href: string }>;
+}): CatalogSuggestOption[] {
+  const options: CatalogSuggestOption[] = [];
+
+  input.authors.forEach((author, index) => {
+    if (author.href) {
+      options.push({
+        kind: "author",
+        href: author.href,
+        optionId: getCatalogSuggestAuthorOptionId(index),
+      });
+    }
+  });
+
+  input.products.forEach((product, index) => {
+    if (product.href) {
+      options.push({
+        kind: "product",
+        href: product.href,
+        optionId: getCatalogSuggestProductOptionId(index),
+      });
+    }
+  });
+
+  return options;
+}
+
 export function resolveCatalogSuggestEnterAction(input: {
   activeIndex: number;
-  suggestions: ReadonlyArray<{ href: string }>;
+  options: ReadonlyArray<{ href: string }>;
 }): { type: "open"; href: string } | { type: "submit" } {
   if (
     input.activeIndex >= 0 &&
-    input.activeIndex < input.suggestions.length &&
-    input.suggestions[input.activeIndex]?.href
+    input.activeIndex < input.options.length &&
+    input.options[input.activeIndex]?.href
   ) {
     return {
       type: "open",
-      href: input.suggestions[input.activeIndex].href,
+      href: input.options[input.activeIndex].href,
     };
   }
 
   return { type: "submit" };
 }
 
-function isSafeCatalogSuggestionHref(href: string): boolean {
+function isSafeCatalogAuthorSuggestionHref(href: string): boolean {
+  return href.startsWith("/authors/") && !href.includes("//");
+}
+
+function isSafeCatalogProductSuggestionHref(href: string): boolean {
   return href.startsWith("/practice/") && !href.includes("//");
+}
+
+export function mapCatalogAuthorToSuggestion(
+  author: CatalogAuthorSearchResult,
+): CatalogAuthorSuggestion | null {
+  const name = author.name?.trim();
+  const slug = author.slug?.trim();
+  const href = author.href?.trim() || (slug ? `/authors/${slug}` : "");
+
+  if (!name || !slug || !isSafeCatalogAuthorSuggestionHref(href)) {
+    return null;
+  }
+
+  return {
+    id: author.id,
+    name,
+    positioningText: author.positioningText,
+    avatarUrl: author.avatarUrl,
+    href,
+  };
+}
+
+export function mapCatalogAuthorsToSuggestions(
+  authors: CatalogAuthorSearchResult[],
+): CatalogAuthorSuggestion[] {
+  return authors
+    .map(mapCatalogAuthorToSuggestion)
+    .filter((item): item is CatalogAuthorSuggestion => item !== null)
+    .slice(0, CATALOG_AUTHOR_SUGGEST_LIMIT);
 }
 
 export function mapCatalogProductToSuggestion(
   product: CatalogProduct,
-): CatalogSearchSuggestion | null {
+): CatalogProductSuggestion | null {
   const authorName = product.authorName?.trim();
   const authorSlug = product.authorSlug?.trim();
   const productSlug = product.slug?.trim();
@@ -136,7 +240,7 @@ export function mapCatalogProductToSuggestion(
 
   const href = product.href?.trim() || buildPracticePublicPath(authorSlug, productSlug);
 
-  if (!isSafeCatalogSuggestionHref(href)) {
+  if (!isSafeCatalogProductSuggestionHref(href)) {
     return null;
   }
 
@@ -159,13 +263,80 @@ export function mapCatalogProductToSuggestion(
 
 export function mapCatalogProductsToSuggestions(
   products: CatalogProduct[],
-): CatalogSearchSuggestion[] {
+): CatalogProductSuggestion[] {
   return products
     .map(mapCatalogProductToSuggestion)
-    .filter((item): item is CatalogSearchSuggestion => item !== null)
-    .slice(0, CATALOG_SEARCH_SUGGESTION_LIMIT);
+    .filter((item): item is CatalogProductSuggestion => item !== null)
+    .slice(0, CATALOG_PRODUCT_SUGGEST_LIMIT);
 }
 
+export function getCatalogSuggestAuthorOptionId(index: number): string {
+  return `catalog-search-author-option-${index}`;
+}
+
+export function getCatalogSuggestProductOptionId(index: number): string {
+  return `catalog-search-product-option-${index}`;
+}
+
+/** @deprecated Use getCatalogSuggestProductOptionId with flattenCatalogSuggestOptions */
 export function getCatalogSuggestOptionId(index: number): string {
-  return `catalog-search-option-${index}`;
+  return getCatalogSuggestProductOptionId(index);
+}
+
+export function getCatalogSuggestActiveOptionId(
+  activeIndex: number,
+  options: ReadonlyArray<CatalogSuggestOption>,
+): string | undefined {
+  if (activeIndex < 0 || activeIndex >= options.length) {
+    return undefined;
+  }
+
+  return options[activeIndex]?.optionId;
+}
+
+function pluralRu(count: number, one: string, few: string, many: string): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return one;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return few;
+  }
+
+  return many;
+}
+
+export function formatCatalogSearchResultsSummary(
+  authorCount: number,
+  productCount: number,
+): string | null {
+  if (authorCount === 0 && productCount === 0) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  if (authorCount > 0) {
+    parts.push(
+      `${authorCount} ${pluralRu(authorCount, "автор", "автора", "авторов")}`,
+    );
+  }
+
+  if (productCount > 0) {
+    parts.push(
+      `${productCount} ${pluralRu(productCount, "аудиопродукт", "аудиопродукта", "аудиопродуктов")}`,
+    );
+  }
+
+  return `Найдено: ${parts.join(" и ")}`;
+}
+
+export function isCatalogGroupedSearchEmpty(
+  authorCount: number,
+  productCount: number,
+): boolean {
+  return authorCount === 0 && productCount === 0;
 }

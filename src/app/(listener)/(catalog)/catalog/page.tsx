@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import CatalogSearchForm from "@/components/catalog/CatalogSearchForm";
+import CatalogSearchGroupedResults from "@/components/catalog/CatalogSearchGroupedResults";
 import TopicFilterBar from "@/components/catalog/TopicFilterBar";
-import CatalogProductCard from "@/components/products/CatalogProductCard";
 import CatalogProductCarousel from "@/components/products/CatalogProductCarousel";
+import { searchPublishedCatalogAuthors } from "@/lib/catalog/author-search";
 import {
   buildCatalogClearSearchHref,
   buildCatalogHref,
@@ -22,21 +23,6 @@ export const dynamic = "force-dynamic";
 type CatalogPageProps = {
   searchParams: Promise<{ q?: string; topic?: string; need?: string }>;
 };
-
-function formatResultsCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} результат`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} результата`;
-  }
-
-  return `${count} результатов`;
-}
 
 export async function generateMetadata({
   searchParams,
@@ -76,11 +62,17 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   );
 
   const searchResults = isSearchActive
-    ? await searchPublishedCatalogProducts(supabase, {
-        query: searchQuery,
-        topicKey: activeTopicKey,
-      })
-    : [];
+    ? await Promise.all([
+        searchPublishedCatalogAuthors(supabase, {
+          query: searchQuery,
+          topicKey: activeTopicKey,
+        }),
+        searchPublishedCatalogProducts(supabase, {
+          query: searchQuery,
+          topicKey: activeTopicKey,
+        }),
+      ]).then(([authors, products]) => ({ authors, products }))
+    : { authors: [], products: [] };
 
   const { freeProducts, paidProducts } = isSearchActive
     ? { freeProducts: [], paidProducts: [] }
@@ -113,51 +105,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       ) : null}
 
       {isSearchActive ? (
-        <section className="mt-8" aria-labelledby="catalog-search-results-heading">
-          <h2
-            id="catalog-search-results-heading"
-            className="text-[20px] font-semibold leading-7 text-[#25135c] sm:text-[22px]"
-          >
-            Результаты по запросу «{searchQuery}»
-          </h2>
-
-          {activeTopicTitle ? (
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              В теме «{activeTopicTitle}».
-            </p>
-          ) : null}
-
-          {searchResults.length > 0 ? (
-            <>
-              <p className="mt-3 text-sm font-medium text-[#7d70a2]">
-                {formatResultsCount(searchResults.length)}
-              </p>
-
-              <ul className="mt-5 flex list-none flex-col gap-4 p-0">
-                {searchResults.map((product) => (
-                  <li key={product.id}>
-                    <CatalogProductCard product={product} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <div className="mt-5 rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
-              <p className="text-[15px] font-medium text-[#5f3f9d]">
-                По запросу «{searchQuery}» ничего не найдено
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                Попробуйте изменить запрос или выбрать другую тему.
-              </p>
-              <Link
-                href={clearSearchHref}
-                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-[#ddcfef] bg-white px-5 py-2 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-              >
-                Очистить поиск
-              </Link>
-            </div>
-          )}
-        </section>
+        <CatalogSearchGroupedResults
+          searchQuery={searchQuery}
+          activeTopicTitle={activeTopicTitle}
+          authors={searchResults.authors}
+          products={searchResults.products}
+          clearSearchHref={clearSearchHref}
+        />
       ) : (
         <>
           {freeProducts.length > 0 ? (
