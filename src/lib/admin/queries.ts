@@ -1,5 +1,8 @@
 import type { AuthorApplicationRow } from "@/lib/author-applications/types";
-import { formatApplicationContactSummary } from "@/lib/author-applications/queries";
+import {
+  AUTHOR_APPLICATION_COLUMNS,
+  formatApplicationContactSummary,
+} from "@/lib/author-applications/queries";
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -281,7 +284,7 @@ export async function getAdminAuthorApplication(
 
   const { data, error } = await service
     .from("author_applications")
-    .select("*")
+    .select(AUTHOR_APPLICATION_COLUMNS)
     .eq("id", applicationId)
     .maybeSingle();
 

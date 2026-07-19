@@ -9,7 +9,8 @@ import type {
 import { AUTHOR_APPLICATION_DEFAULT_PLANNED_CONTENT } from "./validation";
 import { resolveBecomeAuthorAudience } from "./status";
 
-const AUTHOR_APPLICATION_SELECT = `
+/** Explicit column list — do not use legacy `contact` (renamed in 20260719130000). */
+export const AUTHOR_APPLICATION_COLUMNS = `
   id,
   user_id,
   status,
@@ -40,7 +41,7 @@ export async function getCurrentAuthorApplication(
 ): Promise<AuthorApplicationRow | null> {
   const { data, error } = await supabase
     .from("author_applications")
-    .select(AUTHOR_APPLICATION_SELECT)
+    .select(AUTHOR_APPLICATION_COLUMNS)
     .eq("user_id", userId)
     .neq("status", "withdrawn")
     .order("created_at", { ascending: false })
