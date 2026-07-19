@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  mergeAuthorRecommendations,
+  SIMILAR_AUTHORS_LIMIT,
+} from "@/lib/authors/author-recommendations";
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 
@@ -13,10 +17,20 @@ export type SimilarAuthorCard = {
   overlapScore: number;
 };
 
+type AuthorCandidateRow = {
+  id: string;
+  name: string;
+  slug: string;
+  short_positioning: string | null;
+  avatar_url: string | null;
+  productCount: number;
+  overlapScore: number;
+};
+
 export async function findSimilarAuthors(
   supabase: SupabaseClient,
   authorId: string,
-  authorSlug: string,
+  _authorSlug: string,
   authorTopicKeys: string[],
 ): Promise<SimilarAuthorCard[]> {
   const { data: publishedPractices, error } = await supabase
@@ -41,18 +55,7 @@ export async function findSimilarAuthors(
     return [];
   }
 
-  const authorScores = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      slug: string;
-      short_positioning: string | null;
-      avatar_url: string | null;
-      productCount: number;
-      topicOverlap: number;
-    }
-  >();
+  const authorScores = new Map<string, AuthorCandidateRow>();
 
   for (const row of publishedPractices as Array<{
     id: string;
@@ -93,7 +96,7 @@ export async function findSimilarAuthors(
       short_positioning: author.short_positioning,
       avatar_url: author.avatar_url,
       productCount: 1,
-      topicOverlap: 0,
+      overlapScore: 0,
     });
   }
 
@@ -120,7 +123,7 @@ export async function findSimilarAuthors(
       }
 
       if (authorTopicSet.has(topic.key as string)) {
-        candidate.topicOverlap += 1;
+        candidate.overlapScore += 1;
       }
     }
   }
@@ -152,29 +155,32 @@ export async function findSimilarAuthors(
       }
 
       if (authorTopicSet.has(topic.key as string)) {
-        candidate.topicOverlap += 1;
+        candidate.overlapScore += 1;
       }
     }
   }
 
-  return [...authorScores.values()]
-    .filter((candidate) => candidate.productCount > 0)
-    .map((candidate) => ({
-      id: candidate.id,
-      name: candidate.name,
-      slug: candidate.slug,
-      positioningText: resolveAuthorCardPositioningText(candidate.short_positioning),
-      avatarUrl: candidate.avatar_url?.trim() || null,
-      href: buildAuthorPublicPath(candidate.slug),
-      overlapScore: candidate.topicOverlap,
-    }))
-    .sort((left, right) => {
-      if (right.overlapScore !== left.overlapScore) {
-        return right.overlapScore - left.overlapScore;
-      }
+  const candidates = [...authorScores.values()].filter(
+    (candidate) => candidate.productCount > 0,
+  );
 
-      return left.name.localeCompare(right.name, "ru");
-    })
-    .filter((candidate) => candidate.overlapScore > 0)
-    .slice(0, 4);
+  const relatedAuthors = candidates.filter((candidate) => candidate.overlapScore > 0);
+  const fallbackAuthors = candidates.filter((candidate) => candidate.overlapScore === 0);
+
+  const merged = mergeAuthorRecommendations({
+    relatedAuthors,
+    fallbackAuthors,
+    currentAuthorId: authorId,
+    limit: SIMILAR_AUTHORS_LIMIT,
+  });
+
+  return merged.map((candidate) => ({
+    id: candidate.id,
+    name: candidate.name,
+    slug: candidate.slug,
+    positioningText: resolveAuthorCardPositioningText(candidate.short_positioning),
+    avatarUrl: candidate.avatar_url?.trim() || null,
+    href: buildAuthorPublicPath(candidate.slug),
+    overlapScore: candidate.overlapScore,
+  }));
 }

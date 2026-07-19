@@ -106,7 +106,10 @@ function testAuthorNameLinks() {
 function testSimilarAuthorsLogic() {
   const source = read("src/lib/authors/similar-authors.ts");
 
-  assert(source.includes("overlapScore"), "similar authors scored by overlap");
+  assert(source.includes("mergeAuthorRecommendations"), "similar authors uses recommendation merge");
+  assert(source.includes("SIMILAR_AUTHORS_LIMIT"), "similar authors keeps explicit limit");
+  assert(source.includes("fallbackAuthors"), "similar authors builds fallback pool");
+  assert(!source.includes(".filter((candidate) => candidate.overlapScore > 0)\n    .slice(0, 4)"), "positive-only final filter removed");
   assert(source.includes(".neq(\"author_id\", authorId)"), "current author excluded");
 }
 
