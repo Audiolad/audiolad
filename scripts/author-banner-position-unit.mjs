@@ -54,10 +54,12 @@ function testResetContract() {
 function testPublicHeader() {
   const header = read("src/components/authors/AuthorPublicHeader.tsx");
   const media = read("src/components/authors/AuthorPublicHeaderMedia.tsx");
+  const avatar = read("src/components/authors/AuthorAvatarImage.tsx");
   assert(header.includes("AuthorHeaderBanner"), "banner media component wired");
   assert(media.includes("AUTHOR_DEFAULT_BANNER_PATH"), "default brand banner");
-  assert(media.includes("AUTHOR_DEFAULT_AVATAR_PATH"), "default brand avatar");
-  assert(media.includes("onError"), "image load fallback");
+  assert(media.includes("AuthorAvatarImage"), "shared avatar component wired");
+  assert(avatar.includes("AUTHOR_DEFAULT_AVATAR_PATH"), "default brand avatar");
+  assert(avatar.includes("onError"), "image load fallback");
   assert(header.includes("resolveAuthorPositioningText"), "positioning text resolver");
   assert(header.includes("md:pt-8") || header.includes("pt-8"), "desktop text offset below banner");
 }
