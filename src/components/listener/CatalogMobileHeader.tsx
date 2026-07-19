@@ -1,14 +1,5 @@
 import Link from "next/link";
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-      <path d="m16.5 16.5 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export default function CatalogMobileHeader() {
   return (
     <div className="px-5 pt-6 xl:hidden">
@@ -23,12 +14,7 @@ export default function CatalogMobileHeader() {
 
         <h1 className="text-[28px] font-semibold">Каталог</h1>
 
-        <span
-          aria-hidden="true"
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-[#7042c5] opacity-0"
-        >
-          <SearchIcon />
-        </span>
+        <span aria-hidden="true" className="h-11 w-11 shrink-0" />
       </header>
     </div>
   );

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import CatalogSearchForm from "@/components/catalog/CatalogSearchForm";
 import CatalogSearchGroupedResults from "@/components/catalog/CatalogSearchGroupedResults";
 import TopicFilterBar from "@/components/catalog/TopicFilterBar";
 import CatalogProductCarousel from "@/components/products/CatalogProductCarousel";
@@ -93,8 +92,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             : "Опубликованные аудиопрактики и программы авторов платформы."}
         </p>
       ) : null}
-
-      <CatalogSearchForm query={searchQuery} activeTopicKey={activeTopicKey} />
 
       {filterableTopics.length > 0 ? (
         <TopicFilterBar

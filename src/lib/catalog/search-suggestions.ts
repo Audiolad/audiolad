@@ -244,11 +244,16 @@ export function mapCatalogProductToSuggestion(
     return null;
   }
 
+  const subtitle =
+    product.subtitle?.trim() ||
+    product.description?.trim().replace(/\s+/g, " ").slice(0, 120) ||
+    null;
+
   return {
     id: product.id,
     title: product.title.trim(),
     authorName,
-    subtitle: product.subtitle?.trim() || null,
+    subtitle,
     format: getDisplayFormat(product.format),
     coverUrl: getProductCoverDisplayUrl(
       product.coverUrl,
