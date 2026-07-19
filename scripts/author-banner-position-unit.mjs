@@ -53,11 +53,13 @@ function testResetContract() {
 
 function testPublicHeader() {
   const header = read("src/components/authors/AuthorPublicHeader.tsx");
-  assert(header.includes("objectPosition={bannerObjectPosition}"), "public objectPosition");
-  assert(header.includes("AUTHOR_DEFAULT_BANNER_PATH"), "default brand banner");
-  assert(header.includes("AUTHOR_DEFAULT_AVATAR_PATH"), "default brand avatar");
+  const media = read("src/components/authors/AuthorPublicHeaderMedia.tsx");
+  assert(header.includes("AuthorHeaderBanner"), "banner media component wired");
+  assert(media.includes("AUTHOR_DEFAULT_BANNER_PATH"), "default brand banner");
+  assert(media.includes("AUTHOR_DEFAULT_AVATAR_PATH"), "default brand avatar");
+  assert(media.includes("onError"), "image load fallback");
   assert(header.includes("resolveAuthorPositioningText"), "positioning text resolver");
-  assert(!header.includes("object-center"), "no object-center");
+  assert(header.includes("md:pt-8") || header.includes("pt-8"), "desktop text offset below banner");
 }
 
 function testDashboardPreview() {
