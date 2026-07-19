@@ -8,6 +8,8 @@ import {
 
 export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_SEARCH_RESULT_LIMIT = 50;
+export const CATALOG_SEARCH_SUGGESTION_LIMIT = 6;
+export const CATALOG_SEARCH_SUGGEST_MIN_LENGTH = 2;
 
 const CATALOG_PRACTICE_SEARCH_SELECT = `
   id,
@@ -144,6 +146,7 @@ async function loadPracticesMatchingFields(
   supabase: SupabaseClient,
   pattern: string,
   practiceIdsForTopic: string[] | null,
+  limit: number,
 ): Promise<CatalogPracticeSearchRow[]> {
   let query = supabase
     .from("practices")
@@ -158,7 +161,7 @@ async function loadPracticesMatchingFields(
     query = query.in("id", practiceIdsForTopic);
   }
 
-  const { data, error } = await query.limit(CATALOG_SEARCH_RESULT_LIMIT);
+  const { data, error } = await query.limit(limit);
 
   if (error) {
     return [];
@@ -171,6 +174,7 @@ async function loadPracticesMatchingAuthors(
   supabase: SupabaseClient,
   authorIds: string[],
   practiceIdsForTopic: string[] | null,
+  limit: number,
 ): Promise<CatalogPracticeSearchRow[]> {
   if (authorIds.length === 0) {
     return [];
@@ -189,7 +193,7 @@ async function loadPracticesMatchingAuthors(
     query = query.in("id", practiceIdsForTopic);
   }
 
-  const { data, error } = await query.limit(CATALOG_SEARCH_RESULT_LIMIT);
+  const { data, error } = await query.limit(limit);
 
   if (error) {
     return [];
@@ -201,6 +205,7 @@ async function loadPracticesMatchingAuthors(
 export type CatalogProductSearchOptions = {
   query: string;
   topicKey?: string | null;
+  limit?: number;
 };
 
 /**
@@ -220,6 +225,7 @@ export async function searchPublishedCatalogProducts(
     return [];
   }
 
+  const resultLimit = options.limit ?? CATALOG_SEARCH_RESULT_LIMIT;
   const topicKey = options.topicKey?.trim().toLowerCase() || null;
   let practiceIdsForTopic: string[] | null = null;
 
@@ -237,7 +243,12 @@ export async function searchPublishedCatalogProducts(
   const ilikePattern = escapeIlikePattern(normalizedQuery);
 
   const [fieldMatches, matchingAuthorIds] = await Promise.all([
-    loadPracticesMatchingFields(supabase, normalizedQuery, practiceIdsForTopic),
+    loadPracticesMatchingFields(
+      supabase,
+      normalizedQuery,
+      practiceIdsForTopic,
+      resultLimit,
+    ),
     loadMatchingAuthorIds(supabase, ilikePattern),
   ]);
 
@@ -245,12 +256,13 @@ export async function searchPublishedCatalogProducts(
     supabase,
     matchingAuthorIds,
     practiceIdsForTopic,
+    resultLimit,
   );
 
   const mergedRows = dedupePracticeRowsById([
     ...fieldMatches,
     ...authorMatches,
-  ]).slice(0, CATALOG_SEARCH_RESULT_LIMIT);
+  ]).slice(0, resultLimit);
 
   if (mergedRows.length === 0) {
     return [];
@@ -258,5 +270,5 @@ export async function searchPublishedCatalogProducts(
 
   const products = await mapPracticeRowsToCatalogProducts(supabase, mergedRows);
 
-  return products.slice(0, CATALOG_SEARCH_RESULT_LIMIT);
+  return products.slice(0, resultLimit);
 }
