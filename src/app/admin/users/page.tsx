@@ -1,4 +1,5 @@
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
+import { requireAdminPanelAccess } from "@/lib/admin/guard";
 import { listAdminUsers } from "@/lib/admin/queries";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<{ q?: string; role?: string; page?: string }>;
 }) {
+  const session = await requireAdminPanelAccess();
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10);
 
@@ -18,6 +20,7 @@ export default async function AdminUsersPage({
       page: Number.isFinite(page) ? page : 1,
       query: params.q,
       roleFilter: params.role,
+      actorUserId: session.userId,
     });
   } catch (error) {
     console.error("admin_users_page_error", error);

@@ -1,5 +1,7 @@
 import type { AuthorApplicationRow } from "@/lib/author-applications/types";
 import { formatApplicationContactSummary } from "@/lib/author-applications/queries";
+import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
+import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 
@@ -36,6 +38,8 @@ export type AdminUserListItem = {
   createdAt: string;
   isAuthor: boolean;
   practiceCount: number | null;
+  canDelete: boolean;
+  deleteBlockReason: string | null;
 };
 
 export type AdminUsersPageData = {
@@ -45,6 +49,7 @@ export type AdminUsersPageData = {
   pageSize: number;
   query: string;
   roleFilter: string;
+  actorUserId: string;
 };
 
 const USERS_PAGE_SIZE = 20;
@@ -310,6 +315,7 @@ export async function listAdminUsers(input: {
   page?: number;
   query?: string;
   roleFilter?: string;
+  actorUserId: string;
 }): Promise<AdminUsersPageData> {
   const service = createServiceRoleClient();
   const page = Math.max(1, input.page ?? 1);
@@ -365,16 +371,31 @@ export async function listAdminUsers(input: {
     practiceCountMap.set(row.user_id, (practiceCountMap.get(row.user_id) ?? 0) + 1);
   }
 
-  const users: AdminUserListItem[] = (profiles ?? []).map((row) => ({
-    id: row.id,
-    displayName: buildDisplayName(row.full_name, row.email),
-    email: row.email,
-    role: row.role,
-    roleLabel: getPlatformRoleLabel(row.role),
-    createdAt: row.created_at,
-    isAuthor: authorUserIds.has(row.id),
-    practiceCount: practiceCountMap.get(row.id) ?? 0,
-  }));
+  const deletionDependencies = await loadUserDeletionDependencies(
+    service,
+    userIds,
+  );
+
+  const users: AdminUserListItem[] = (profiles ?? []).map((row) => {
+    const eligibility = evaluateUserDeletionEligibility({
+      userId: row.id,
+      actorUserId: input.actorUserId,
+      dependencies: deletionDependencies.get(row.id) ?? null,
+    });
+
+    return {
+      id: row.id,
+      displayName: buildDisplayName(row.full_name, row.email),
+      email: row.email,
+      role: row.role,
+      roleLabel: getPlatformRoleLabel(row.role),
+      createdAt: row.created_at,
+      isAuthor: authorUserIds.has(row.id),
+      practiceCount: practiceCountMap.get(row.id) ?? 0,
+      canDelete: eligibility.canDelete,
+      deleteBlockReason: eligibility.blockReason,
+    };
+  });
 
   return {
     users,
@@ -383,6 +404,7 @@ export async function listAdminUsers(input: {
     pageSize,
     query: search,
     roleFilter,
+    actorUserId: input.actorUserId,
   };
 }
 
