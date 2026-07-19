@@ -1,0 +1,15 @@
+[Unit]
+Description=Audiolad production disk hygiene
+Documentation=file:/var/www/audiolad/deploy/scripts/audiolad-maintenance.sh
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/audiolad-maintenance.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+SyslogIdentifier=audiolad-maintenance
+StandardOutput=journal
+StandardError=journal
