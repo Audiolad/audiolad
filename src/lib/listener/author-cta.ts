@@ -55,3 +55,11 @@ export function resolveShowBecomeAuthorPromo(input: {
 
   return cta.label === "Стать автором" || cta.label === "Посмотреть решение";
 }
+
+/** Desktop sidebar bottom promo — hidden for active authors (cabinet CTA lives in the right column). */
+export function resolveShowSidebarAuthorPromo(input: {
+  workspaces: AuthorWorkspace[];
+  applicationVariant: ProfileApplicationVariant | null;
+}): boolean {
+  return resolveListenerAuthorCta(input).label !== "Кабинет автора";
+}

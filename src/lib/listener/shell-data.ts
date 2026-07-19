@@ -8,6 +8,7 @@ import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
 import {
   resolveListenerAuthorCta,
+  resolveShowSidebarAuthorPromo,
   type ListenerAuthorCta,
 } from "@/lib/listener/author-cta";
 import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
@@ -15,7 +16,11 @@ import { getDisplayName, getInitial } from "@/lib/profile/display-name";
 import { createClient } from "@/lib/supabase/server";
 
 export type { ListenerAuthorCta };
-export { resolveListenerAuthorCta, resolveShowBecomeAuthorPromo } from "@/lib/listener/author-cta";
+export {
+  resolveListenerAuthorCta,
+  resolveShowBecomeAuthorPromo,
+  resolveShowSidebarAuthorPromo,
+} from "@/lib/listener/author-cta";
 
 export type ListenerShellData = {
   isAuthenticated: boolean;
@@ -24,6 +29,7 @@ export type ListenerShellData = {
   avatarUrl: string | null;
   profileHref: string;
   authorCta: ListenerAuthorCta;
+  showSidebarAuthorPromo: boolean;
 };
 
 type ProfileRow = {
@@ -42,16 +48,19 @@ async function loadListenerShellData(
   } = await client.auth.getUser();
 
   if (!user) {
+    const guestAuthorInput = {
+      workspaces: [] as AuthorWorkspace[],
+      applicationVariant: null,
+    };
+
     return {
       isAuthenticated: false,
       displayName: "",
       profileInitial: "",
       avatarUrl: null,
       profileHref: "/auth/sign-in",
-      authorCta: resolveListenerAuthorCta({
-        workspaces: [],
-        applicationVariant: null,
-      }),
+      authorCta: resolveListenerAuthorCta(guestAuthorInput),
+      showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(guestAuthorInput),
     };
   }
 
@@ -82,19 +91,22 @@ async function loadListenerShellData(
   const displayName = getDisplayName(profile, user);
   const avatarUrl = await resolveProfileAvatarUrl(profile, user.id);
 
+  const authorInput = {
+    workspaces,
+    applicationVariant: resolveProfileApplicationVariant({
+      workspaceCount: workspaces.length,
+      applicationStatus: application?.status ?? null,
+    }),
+  };
+
   return {
     isAuthenticated: true,
     displayName,
     profileInitial: getInitial(displayName),
     avatarUrl,
     profileHref: "/profile",
-    authorCta: resolveListenerAuthorCta({
-      workspaces,
-      applicationVariant: resolveProfileApplicationVariant({
-        workspaceCount: workspaces.length,
-        applicationStatus: application?.status ?? null,
-      }),
-    }),
+    authorCta: resolveListenerAuthorCta(authorInput),
+    showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(authorInput),
   };
 }
 
