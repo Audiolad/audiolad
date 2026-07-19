@@ -6,6 +6,9 @@
  *   AUDIOLAD_ALLOW_PLAYWRIGHT=1 — allow Playwright/E2E
  *   AUDIOLAD_ALLOW_START=1      — allow manual `npm start` outside PM2
  *
+ * Fixture scripts (DB writes):
+ *   ALLOW_PRODUCTION_TEST_FIXTURES=true — see scripts/lib/guard-production-fixtures.mjs
+ *
  * Explicit production marker:
  *   AUDIOLAD_PRODUCTION_SERVER=1
  *   /var/www/audiolad-deploy/PRODUCTION_SERVER (file)
