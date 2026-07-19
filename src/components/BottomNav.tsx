@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useSyncExternalStore, type ComponentType } from "react";
+import { createPortal } from "react-dom";
 
 import {
   CatalogNavIcon,
@@ -48,14 +49,27 @@ const items: NavItem[] = LISTENER_PRIMARY_NAV_ITEMS.map((item) => ({
 
 type BottomNavProps = {
   variant?: BottomNavVariant;
+  className?: string;
 };
 
-export default function BottomNav({ variant = "default" }: BottomNavProps) {
+function useClientMounted(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
+export default function BottomNav({
+  variant = "default",
+  className = "",
+}: BottomNavProps) {
   const pathname = usePathname();
+  const mounted = useClientMounted();
   const isPlayerVariant = variant === "player";
   const isNeutralPath = isBottomNavNeutralPathname(pathname);
 
-  if (!shouldShowBottomNav(pathname)) {
+  if (!shouldShowBottomNav(pathname) || !mounted) {
     return null;
   }
 
@@ -65,23 +79,20 @@ export default function BottomNav({ variant = "default" }: BottomNavProps) {
     });
   }
 
-  return (
+  const nav = (
     <nav
       aria-label="Основная навигация"
       className={
         isPlayerVariant
-          ? "bottom-nav bottom-nav--player fixed inset-x-0 bottom-0 z-20 w-full"
-          : "bottom-nav fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)]"
+          ? `bottom-nav bottom-nav--player ${className}`.trim()
+          : `bottom-nav bottom-nav--default border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)] ${className}`.trim()
       }
-      style={{
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
     >
       <div
         className={
           isPlayerVariant
             ? "bottom-nav__inner mx-auto grid w-full max-w-[430px] grid-cols-5 items-stretch px-4"
-            : "grid grid-cols-5 items-stretch px-1"
+            : "bottom-nav__inner mx-auto grid w-full max-w-[430px] grid-cols-5 items-stretch px-1"
         }
         style={{ height: `${BOTTOM_NAV_MAIN_HEIGHT_PX}px` }}
       >
@@ -114,4 +125,6 @@ export default function BottomNav({ variant = "default" }: BottomNavProps) {
       </div>
     </nav>
   );
+
+  return createPortal(nav, document.body);
 }

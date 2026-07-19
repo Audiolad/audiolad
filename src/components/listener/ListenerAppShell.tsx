@@ -18,9 +18,9 @@ export function ListenerAppShell({
   shellData,
 }: ListenerAppShellProps) {
   return (
-    <div className="listener-app-shell min-h-dvh bg-platform-surface text-[#25135c] xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-5">
+    <div className="listener-app-shell bg-platform-surface text-[#25135c] xl:flex xl:min-h-dvh xl:h-dvh xl:flex-col xl:overflow-hidden xl:px-5 xl:pt-5 xl:pb-5">
       <div
-        className={`listener-app-shell__body mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass} xl:mx-0 xl:min-h-0 xl:max-w-none xl:flex-1 xl:bg-transparent`}
+        className={`listener-app-shell__body mx-auto w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass} xl:mx-0 xl:min-h-0 xl:max-w-none xl:flex-1 xl:bg-transparent`}
       >
         <div className="listener-app-shell__sidebar-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
           <DesktopSidebar shellData={shellData} />
@@ -41,9 +41,7 @@ export function ListenerAppShell({
         </div>
       </div>
 
-      <div className="xl:hidden">
-        <BottomNav />
-      </div>
+      <BottomNav className="xl:hidden" />
     </div>
   );
 }
