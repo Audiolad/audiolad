@@ -35,7 +35,9 @@ main() {
   require_command npm
   require_command curl
   require_command node
+  require_command flock
   ensure_dirs
+  acquire_deploy_lock
   check_disk_space 2048
 
   if [[ ! -f "$DEPLOY_ROOT/shared/.env.production" ]]; then
@@ -108,27 +110,27 @@ main() {
   log_info "Capturing PM2 baseline before production reload"
   if ! pm2 jlist 2>/dev/null | node "$SCRIPT_DIR/lib/pm2-health.mjs" snapshot --app "$PM2_APP_NAME" >"$RELEASE_DIR/.pm2-health-baseline.json"; then
     log_error "Failed to capture PM2 baseline before reload"
-    "$SCRIPT_DIR/rollback.sh" "failed to capture pm2 baseline before reload"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "failed to capture pm2 baseline before reload"
     exit 1
   fi
   cat "$RELEASE_DIR/.pm2-health-baseline.json"
 
   if ! sync_pm2_audiolad; then
     log_error "Failed to sync PM2 after release switch"
-    "$SCRIPT_DIR/rollback.sh" "failed to sync pm2 after deploy"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "failed to sync pm2 after deploy"
     exit 1
   fi
 
   if ! wait_for_release_readiness "$RELEASE_DIR"; then
     log_error "Production readiness check failed after switch"
-    "$SCRIPT_DIR/rollback.sh" "production readiness failed after deploy"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "production readiness failed after deploy"
     exit 1
   fi
 
   log_info "Running production smoke tests"
   if ! "$SCRIPT_DIR/smoke-test.sh" "https://audiolad.ru"; then
     log_error "Production smoke tests failed"
-    "$SCRIPT_DIR/rollback.sh" "production smoke failed after deploy"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "production smoke failed after deploy"
     exit 1
   fi
 
@@ -136,7 +138,7 @@ main() {
   export PM2_HEALTH_BASELINE_FILE="$RELEASE_DIR/.pm2-health-baseline.json"
   if ! "$SCRIPT_DIR/health-watch.sh" --post-deploy; then
     log_error "Post-deploy health watch failed"
-    "$SCRIPT_DIR/rollback.sh" "health watch failed after deploy"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "health watch failed after deploy"
     exit 1
   fi
 

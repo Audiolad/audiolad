@@ -15,6 +15,9 @@ READINESS_ATTEMPTS="${READINESS_ATTEMPTS:-30}"
 READINESS_DELAY="${READINESS_DELAY:-2}"
 READINESS_PROBE_SCRIPT="${READINESS_PROBE_SCRIPT:-$DEPLOY_SCRIPTS_DIR/lib/readiness-check.mjs}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://audiolad.ru}"
+DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/audiolad-deploy.lock}"
+DEPLOY_LOCK_FD="${DEPLOY_LOCK_FD:-9}"
+__AUDIOLAD_DEPLOY_LOCK_ACQUIRED="${__AUDIOLAD_DEPLOY_LOCK_ACQUIRED:-0}"
 
 log() {
   local level="$1"
@@ -28,6 +31,50 @@ log_error() { log "ERROR" "$@"; }
 
 ensure_dirs() {
   mkdir -p "$DEPLOY_ROOT/releases" "$DEPLOY_ROOT/shared" "$DEPLOY_LOG_DIR"
+}
+
+acquire_deploy_lock() {
+  if [[ "${AUDIOLAD_DEPLOY_LOCK_HELD:-}" == "1" ]]; then
+    local parent_cmd=""
+    parent_cmd="$(ps -o cmd= -p "${PPID:-0}" 2>/dev/null || true)"
+    if [[ "$parent_cmd" == *deploy.sh* ]]; then
+      log_info "Deploy lock bypass for trusted internal rollback (parent pid=${PPID})"
+      return 0
+    fi
+
+    log_error "Deploy lock bypass rejected: AUDIOLAD_DEPLOY_LOCK_HELD without deploy.sh parent"
+    log_error "Lock file: $DEPLOY_LOCK_FILE"
+    log_error "Current pid: $$"
+    exit 1
+  fi
+
+  if [[ "$__AUDIOLAD_DEPLOY_LOCK_ACQUIRED" == "1" ]]; then
+    return 0
+  fi
+
+  require_command flock
+
+  exec {DEPLOY_LOCK_FD}>>"$DEPLOY_LOCK_FILE"
+  if ! flock -n "$DEPLOY_LOCK_FD"; then
+    log_error "Another Audiolad deploy or rollback is already running."
+    log_error "Lock file: $DEPLOY_LOCK_FILE"
+    log_error "Current pid: $$"
+    log_error "Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    if command -v fuser >/dev/null 2>&1; then
+      local holder_info=""
+      holder_info="$(fuser -v "$DEPLOY_LOCK_FILE" 2>&1 || true)"
+      if [[ -n "$holder_info" ]]; then
+        log_error "Lock holders:"
+        while IFS= read -r line; do
+          [[ -n "$line" ]] && log_error "$line"
+        done <<<"$holder_info"
+      fi
+    fi
+    exit 1
+  fi
+
+  __AUDIOLAD_DEPLOY_LOCK_ACQUIRED=1
+  log_info "Acquired deploy lock at $DEPLOY_LOCK_FILE (pid=$$)"
 }
 
 atomic_symlink() {

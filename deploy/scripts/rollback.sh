@@ -21,7 +21,9 @@ EOF
 main() {
   require_command pm2
   require_command curl
+  require_command flock
   ensure_dirs
+  acquire_deploy_lock
 
   if [[ ! -L "$DEPLOY_ROOT/previous" ]]; then
     log_error "No previous release symlink found"
