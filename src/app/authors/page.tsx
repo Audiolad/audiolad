@@ -1,39 +1,15 @@
-import Image from "next/image";import BottomNav from "@/components/BottomNav";
+import BottomNav from "@/components/BottomNav";
+import AuthorListCard from "@/components/authors/AuthorListCard";
+import {
+  PUBLIC_AUTHORS_SORT_LABELS,
+  type PublicAuthorSort,
+} from "@/lib/authors/public-list";
+import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
-const authors = [
-  {
-    name: "Сергей и Зоя",
-    role: "Совместные медитации и энергопрактики",
-    description:
-      "Практики для любви, внутренней опоры, отношений, изобилия и гармонии.",
-    practices: "18 практик",
-    listeners: "12,4 тыс. слушателей",
-    image: "/audiolad-logo.png",
-    href: "/authors/sergey-and-zoya",
-  },
-  {
-    name: "Зоя Петрова",
-    role: "Женские медитации и программы",
-    description:
-      "Мягкие практики для женственности, самоценности, принятия и внутреннего спокойствия.",
-    practices: "11 практик",
-    listeners: "8,1 тыс. слушателей",
-    image: "/audiolad-logo.png",
-    href: "/authors/zoya-petrova",
-  },
-  {
-    name: "Сергей Петров",
-    role: "Энергопрактики и внутреннее развитие",
-    description:
-      "Практики для силы, ясности, границ, движения к цели и раскрытия потенциала.",
-    practices: "9 практик",
-    listeners: "7,6 тыс. слушателей",
-    image: "/audiolad-logo.png",
-    href: "/authors/sergey-petrov",
-  },
-];
+export const dynamic = "force-dynamic";
 
 function BackIcon() {
   return (
@@ -69,16 +45,22 @@ function SearchIcon() {
   );
 }
 
-export default function AuthorsPage() {
+export default async function AuthorsPage() {
+  const sort: PublicAuthorSort = "products";
+  const supabase = await createClient();
+  const { authors, error } = await loadPublicAuthorsList(supabase, { sort });
+
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}>
-        <div className="px-5 pt-5">
+      <div
+        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface lg:max-w-[1200px] ${platformMobileShellClass}`}
+      >
+        <div className="px-5 pt-5 lg:px-10 lg:pt-8">
           <header className="flex items-center justify-between">
             <Link
               href="/catalog"
               aria-label="Назад"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               <BackIcon />
             </Link>
@@ -112,79 +94,36 @@ export default function AuthorsPage() {
           </section>
 
           <section className="mt-7">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[21px] font-semibold">Все авторы</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[21px] font-semibold">
+                {authors.length > 0
+                  ? `Все авторы — ${authors.length}`
+                  : "Все авторы"}
+              </h2>
 
-              <button
-                type="button"
-                className="text-sm font-medium text-[#7042c5]"
-              >
-                По популярности⌄
-              </button>
+              <p className="text-sm font-medium text-[#7042c5]">
+                {PUBLIC_AUTHORS_SORT_LABELS[sort]}
+              </p>
             </div>
 
-            <div className="mt-5 space-y-5">
-              {authors.map((author) => (
-                <article
-                  key={author.name}
-                  className="rounded-[26px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_28px_rgba(91,62,145,0.07)]"
-                >
-                  <div className="flex gap-4">
-                    <div className="flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-[#f5edfc]">
-                      <Image
-                        src={author.image}
-                        alt={author.name}
-                        width={112}
-                        height={112}
-                        className="h-full w-full object-contain p-4"
-                      />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={author.href}
-                        className="text-[19px] font-semibold"
-                      >
-                        {author.name}
-                      </Link>
-
-                      <p className="mt-1 text-sm font-medium text-[#7042c5]">
-                        {author.role}
-                      </p>
-
-                      <p className="mt-2 line-clamp-3 text-sm leading-5 text-[#70628e]">
-                        {author.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[#eee6f7] pt-4">
-                    <div>
-                      <p className="text-sm font-medium">{author.practices}</p>
-                      <p className="mt-1 text-xs text-[#8a7ca9]">
-                        {author.listeners}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full border border-[#bda6e1] px-4 py-2 text-sm font-medium text-[#7042c5]"
-                      >
-                        Подписаться
-                      </button>
-
-                      <Link
-                        href={author.href}
-                        className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-medium text-white"
-                      >
-                        Открыть
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+            {error ? (
+              <div className="mt-5 rounded-[24px] border border-[#f0d9dc] bg-[#fff7f8] p-5 text-sm leading-6 text-[#8a4a57]">
+                Не удалось загрузить список авторов. Попробуйте обновить
+                страницу позже.
+              </div>
+            ) : authors.length === 0 ? (
+              <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-8 text-center">
+                <p className="text-base font-medium text-[#7042c5]">
+                  Авторы скоро появятся
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-5 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0 xl:grid-cols-3">
+                {authors.map((author) => (
+                  <AuthorListCard key={author.id} author={author} />
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="mt-8 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] p-5">
@@ -199,14 +138,14 @@ export default function AuthorsPage() {
 
             <Link
               href="/profile"
-              className="mt-4 inline-flex rounded-[16px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
+              className="mt-4 inline-flex min-h-11 items-center rounded-[16px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               Узнать подробнее
             </Link>
           </section>
         </div>
 
-<BottomNav />
+        <BottomNav />
       </div>
     </main>
   );

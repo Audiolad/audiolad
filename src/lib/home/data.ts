@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 
 import {
   getDayPeriodFromHour,
@@ -33,97 +34,21 @@ function buildCatalogProductMap(products: HomeProduct[]): Map<string, HomeProduc
 async function getPublishedAuthors(
   supabase: SupabaseClient,
 ): Promise<HomeAuthor[]> {
-  const { data: practices, error } = await supabase
-    .from("practices")
-    .select(
-      `
-      id,
-      author_id,
-      authors!practices_author_id_fkey (
-        id,
-        name,
-        slug,
-        description,
-        avatar_url
-      )
-    `,
-    )
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
-    .not("author_id", "is", null);
+  const { authors, error } = await loadPublicAuthorsList(supabase);
 
   if (error) {
     throw error;
   }
 
-  if (!practices?.length) {
-    return [];
-  }
-
-  const authorMap = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      slug: string;
-      description: string | null;
-      avatarUrl: string | null;
-      publishedCount: number;
-    }
-  >();
-
-  for (const row of practices as Array<{
-    author_id: string;
-    authors:
-      | {
-          id: string;
-          name: string;
-          slug: string;
-          description: string | null;
-          avatar_url: string | null;
-        }
-      | Array<{
-          id: string;
-          name: string;
-          slug: string;
-          description: string | null;
-          avatar_url: string | null;
-        }>;
-  }>) {
-    const author = Array.isArray(row.authors) ? row.authors[0] : row.authors;
-
-    if (!author?.slug?.trim() || !author?.name?.trim()) {
-      continue;
-    }
-
-    const existing = authorMap.get(author.id);
-
-    if (existing) {
-      existing.publishedCount += 1;
-      continue;
-    }
-
-    authorMap.set(author.id, {
-      id: author.id,
-      name: author.name.trim(),
-      slug: author.slug.trim(),
-      description: author.description?.trim() || null,
-      avatarUrl: author.avatar_url?.trim() || null,
-      publishedCount: 1,
-    });
-  }
-
-  return [...authorMap.values()]
-    .sort((left, right) => right.publishedCount - left.publishedCount)
-    .map((author) => ({
-      id: author.id,
-      name: author.name,
-      slug: author.slug,
-      description: author.description,
-      avatarUrl: author.avatarUrl,
-      publishedCount: author.publishedCount,
-      href: buildAuthorPublicPath(author.slug),
-    }));
+  return authors.map((author) => ({
+    id: author.id,
+    name: author.name,
+    slug: author.slug,
+    description: author.shortBio,
+    avatarUrl: author.avatarUrl,
+    publishedCount: author.publishedCount,
+    href: buildAuthorPublicPath(author.slug),
+  }));
 }
 
 async function getLibraryProducts(

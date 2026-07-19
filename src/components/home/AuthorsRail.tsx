@@ -1,30 +1,10 @@
 import Link from "next/link";
 
+import AuthorAvatarImage from "@/components/authors/AuthorAvatarImage";
 import type { HomeAuthor } from "@/lib/home/types";
-import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
+import { formatAuthorProductCount } from "@/lib/authors/public-list";
 
 import HomeSectionHeader from "./HomeSectionHeader";
-
-function formatPublishedCount(count: number): string {
-  const abs = Math.abs(count);
-  const mod10 = abs % 10;
-  const mod100 = abs % 100;
-
-  let word = "продуктов";
-
-  if (mod10 === 1 && mod100 !== 11) {
-    word = "продукт";
-  } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    word = "продукта";
-  }
-
-  return `${count} ${word}`;
-}
-
-function getAuthorInitial(name: string): string {
-  const trimmed = name.trim();
-  return trimmed ? trimmed[0].toUpperCase() : "А";
-}
 
 type AuthorsRailProps = {
   authors: HomeAuthor[];
@@ -46,19 +26,12 @@ export default function AuthorsRail({ authors }: AuthorsRailProps) {
             className="flex w-[220px] shrink-0 snap-start flex-col rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-sm sm:w-[240px]"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-gradient-to-br from-[#7042c5] to-[#a27bd9] text-2xl font-semibold text-white">
-                {author.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={author.avatarUrl}
-                    alt={buildAuthorAvatarAlt(author.name)}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  getAuthorInitial(author.name)
-                )}
+              <div className="flex h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[20px]">
+                <AuthorAvatarImage
+                  name={author.name}
+                  avatarUrl={author.avatarUrl}
+                  size={72}
+                />
               </div>
 
               <div className="min-w-0">
@@ -66,7 +39,7 @@ export default function AuthorsRail({ authors }: AuthorsRailProps) {
                   {author.name}
                 </h3>
                 <p className="mt-1 text-xs text-[#7d70a2]">
-                  {formatPublishedCount(author.publishedCount)}
+                  {formatAuthorProductCount(author.publishedCount)}
                 </p>
               </div>
             </div>

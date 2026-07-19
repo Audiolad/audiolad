@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 
-import {
-  AuthorBannerImage,
-  AvatarImage,
-} from "@/components/images/ResponsiveImage";
-import {
-  AUTHOR_DEFAULT_AVATAR_PATH,
-  AUTHOR_DEFAULT_BANNER_PATH,
-} from "@/lib/authors/brand-assets";
-import { buildAuthorAvatarAlt } from "@/lib/seo/cover-alt";
+import { AuthorBannerImage } from "@/components/images/ResponsiveImage";
+import AuthorAvatarImage from "@/components/authors/AuthorAvatarImage";
+import { AUTHOR_DEFAULT_BANNER_PATH } from "@/lib/authors/brand-assets";
 import type { ImageManifest } from "@/lib/images/image-types";
 
 type AuthorHeaderBannerProps = {
@@ -64,39 +58,15 @@ export function AuthorHeaderAvatar({
   avatarManifest,
   emergencyInitial,
 }: AuthorHeaderAvatarProps) {
-  const [customAvatarFailed, setCustomAvatarFailed] = useState(false);
-  const [defaultAvatarFailed, setDefaultAvatarFailed] = useState(false);
-
-  const showCustomAvatar = Boolean(avatarUrl) && !customAvatarFailed;
-
-  if (showCustomAvatar && avatarUrl) {
-    return (
-      <AvatarImage
-        src={avatarUrl}
-        alt={buildAuthorAvatarAlt(name)}
-        className="h-full w-full object-cover"
-        manifest={avatarManifest}
-        size={104}
-        onError={() => setCustomAvatarFailed(true)}
-      />
-    );
-  }
-
-  if (!defaultAvatarFailed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={AUTHOR_DEFAULT_AVATAR_PATH}
-        alt=""
-        className="h-full w-full object-contain"
-        onError={() => setDefaultAvatarFailed(true)}
-      />
-    );
-  }
-
   return (
-    <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#7042c5] to-[#a27bd9] text-3xl font-semibold text-white sm:text-4xl">
-      {emergencyInitial}
-    </span>
+    <AuthorAvatarImage
+      name={name}
+      avatarUrl={avatarUrl}
+      avatarManifest={avatarManifest}
+      size={104}
+      emergencyInitial={emergencyInitial}
+      priority
+      className="h-full w-full object-cover"
+    />
   );
 }

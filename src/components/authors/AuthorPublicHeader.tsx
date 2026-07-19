@@ -1,5 +1,6 @@
 import { formatBannerObjectPosition } from "@/lib/authors/banner-position";
 import { resolveAuthorPositioningText } from "@/lib/authors/brand-assets";
+import { formatAuthorPublishedCount } from "@/lib/authors/public-list";
 import { parseImageManifest } from "@/lib/images/image-manifest";
 import type { ImageManifest } from "@/lib/images/image-types";
 
@@ -12,18 +13,6 @@ function getAuthorInitial(name: string): string {
   const trimmed = name.trim();
 
   return trimmed ? trimmed[0].toUpperCase() : "А";
-}
-
-function formatPublishedCount(count: number): string {
-  if (count === 1) {
-    return "1 опубликованный продукт";
-  }
-
-  if (count >= 2 && count <= 4) {
-    return `${count} опубликованных продукта`;
-  }
-
-  return `${count} опубликованных продуктов`;
 }
 
 type AuthorPublicHeaderProps = {
@@ -97,7 +86,7 @@ export default function AuthorPublicHeader({
             </p>
 
             <p className="mt-2 text-sm text-[#7d70a2]">
-              {formatPublishedCount(publishedCount)}
+              {formatAuthorPublishedCount(publishedCount)}
             </p>
           </div>
         </div>
@@ -130,7 +119,7 @@ export default function AuthorPublicHeader({
             </p>
 
             <p className="mt-2 text-sm text-[#7d70a2]">
-              {formatPublishedCount(publishedCount)}
+              {formatAuthorPublishedCount(publishedCount)}
             </p>
           </div>
         </div>
