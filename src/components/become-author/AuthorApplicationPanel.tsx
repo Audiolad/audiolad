@@ -29,6 +29,7 @@ import {
   getAuthorApplicationStatusTitle,
   shouldShowAuthorApplicationForm,
 } from "@/lib/author-applications/status";
+import { resolveSubmitSuccessFlow } from "@/lib/author-applications/submit-success-flow";
 import type {
   AuthorApplicationFormState,
   AuthorApplicationFormValues,
@@ -503,6 +504,7 @@ export default function AuthorApplicationPanel({
   const contactsSectionRef = useRef<HTMLDivElement>(null);
   const applicationStartedRef = useRef(false);
   const applicationSubmittedRef = useRef(false);
+  const contactUpdateSubmitRef = useRef(false);
   const userEmailSeededRef = useRef(false);
 
   const updateContactsOnly = editContactsMode;
@@ -584,7 +586,20 @@ export default function AuthorApplicationPanel({
   }, [editContactsMode, formValues, showSubmittedBanner, state.submitted]);
 
   useEffect(() => {
-    if (!state.submitted || !state.submittedContacts || applicationSubmittedRef.current) {
+    const flowAction = resolveSubmitSuccessFlow({
+      submitted: Boolean(state.submitted),
+      hasSubmittedContacts: Boolean(state.submittedContacts),
+      contactUpdateSubmitPending: contactUpdateSubmitRef.current,
+      initialSubmitAlreadyHandled: applicationSubmittedRef.current,
+    });
+
+    if (flowAction.type === "noop") {
+      return;
+    }
+
+    if (flowAction.type === "complete_contact_update") {
+      contactUpdateSubmitRef.current = false;
+      setEditContactsMode(false);
       return;
     }
 
@@ -592,7 +607,7 @@ export default function AuthorApplicationPanel({
 
     const sessionId = getCachedAnalyticsSessionId();
 
-    if (sessionId && !updateContactsOnly) {
+    if (sessionId) {
       void trackPlatformEvent({
         sessionId,
         event_name: "author_application_submitted",
@@ -600,12 +615,9 @@ export default function AuthorApplicationPanel({
       });
     }
 
-    if (!updateContactsOnly) {
-      clearAuthorApplicationDraft(window.localStorage);
-    }
-
+    clearAuthorApplicationDraft(window.localStorage);
     setEditContactsMode(false);
-  }, [state.submitted, state.submittedContacts, updateContactsOnly]);
+  }, [state.submitted, state.submittedContacts]);
 
   useEffect(() => {
     if (!state.submitted || !state.submittedContacts) {
@@ -643,6 +655,11 @@ export default function AuthorApplicationPanel({
     }
 
     submitInFlightRef.current = true;
+
+    if (updateContactsOnly) {
+      contactUpdateSubmitRef.current = true;
+    }
+
     submitAction(
       buildAuthorApplicationFormData(formValues, {
         updateContactsOnly,
@@ -680,6 +697,10 @@ export default function AuthorApplicationPanel({
     }
 
     submitInFlightRef.current = false;
+
+    if (!state.submitted) {
+      contactUpdateSubmitRef.current = false;
+    }
 
     if (state.submitted) {
       return;
