@@ -46,14 +46,12 @@ export type GuestHomeData = {
 
 export type PersonalHomeData = {
   greetingFirstName: string | null;
-  timeOfDaySectionTitle: string;
   continueListening: ContinueListeningItem | null;
   startSuggestions: HomeProduct[];
   forYouProducts: HomeProduct[];
-  activePrograms: ActiveProgramItem[];
   recentlyListened: HomeProduct[];
-  libraryProducts: HomeProduct[];
-  timeOfDayProducts: HomeProduct[];
+  activePrograms: ActiveProgramItem[];
   newProducts: HomeProduct[];
-  freeProducts: HomeProduct[];
+  authors: HomeAuthor[];
+  showBecomeAuthorPromo: boolean;
 };

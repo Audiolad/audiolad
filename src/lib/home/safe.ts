@@ -8,16 +8,14 @@ export const EMPTY_GUEST_HOME_DATA = {
 
 export const EMPTY_PERSONAL_HOME_DATA = {
   greetingFirstName: null,
-  timeOfDaySectionTitle: "Небольшая пауза для себя",
   continueListening: null,
   startSuggestions: [],
   forYouProducts: [],
-  activePrograms: [],
   recentlyListened: [],
-  libraryProducts: [],
-  timeOfDayProducts: [],
+  activePrograms: [],
   newProducts: [],
-  freeProducts: [],
+  authors: [],
+  showBecomeAuthorPromo: false,
 } as const;
 
 type SupabaseLikeError = {

@@ -557,6 +557,28 @@ export async function getActivePrograms(
     });
   }
 
+  const latestActivityByPractice = new Map<string, number>();
+
+  for (const row of progressRows as ProgressRow[]) {
+    const timestamp = Date.parse(row.updated_at);
+
+    if (Number.isNaN(timestamp)) {
+      continue;
+    }
+
+    const current = latestActivityByPractice.get(row.practice_id) ?? 0;
+
+    if (timestamp > current) {
+      latestActivityByPractice.set(row.practice_id, timestamp);
+    }
+  }
+
+  items.sort(
+    (left, right) =>
+      (latestActivityByPractice.get(right.product.id) ?? 0) -
+      (latestActivityByPractice.get(left.product.id) ?? 0),
+  );
+
   return items;
 }
 

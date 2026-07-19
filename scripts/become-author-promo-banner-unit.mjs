@@ -73,20 +73,33 @@ assert(
   banner.includes("BecomeAuthorPromoSource"),
   "banner defines extensible promo source type",
 );
-for (const source of ["home_mobile", "profile_mobile", "catalog_mobile"]) {
+for (const source of [
+  "home_mobile",
+  "personal_home_mobile",
+  "personal_home_desktop",
+  "profile_mobile",
+  "catalog_mobile",
+]) {
   assert(banner.includes(`"${source}"`), `source type includes ${source}`);
 }
-assert(
-  banner.includes("BECOME_AUTHOR_HREF"),
-  "banner links via BECOME_AUTHOR_HREF",
-);
+assert(banner.includes("BECOME_AUTHOR_HREF"), "banner links via BECOME_AUTHOR_HREF");
 assert(banner.includes('aria-label="Стать автором на АудиоЛад"'), "banner aria-label");
-assert(banner.includes("xl:hidden"), "banner is mobile-only");
+assert(banner.includes("visibility"), "banner supports visibility prop");
+assert(banner.includes("xl:hidden"), "banner keeps mobile-only default");
 assert(!banner.includes("priority"), "banner does not use priority loading");
 
 assert(
-  !personalHome.includes("BecomeAuthorPromoBanner"),
-  "PersonalHome unchanged",
+  personalHome.includes("BecomeAuthorPromoBanner"),
+  "PersonalHome renders BecomeAuthorPromoBanner",
+);
+assert(
+  personalHome.includes('source="personal_home_mobile"') &&
+    personalHome.includes('source="personal_home_desktop"'),
+  "PersonalHome uses personal promo sources",
+);
+assert(
+  personalHome.includes("showBecomeAuthorPromo"),
+  "PersonalHome gates promo banner visibility",
 );
 assert(
   !sidebar.includes("become-author-mobile-banner-v1"),

@@ -50,21 +50,22 @@ async function testPartialSectionFallback() {
   );
   assert(profile === null, "profile section falls back to null");
 
-  const library = await safeHomeSection(
-    "personal_library",
+  const authors = await safeHomeSection(
+    "personal_authors",
     async () => {
-      throw new Error("library_lookup_failed");
+      throw new Error("authors_lookup_failed");
     },
     [],
     { userId: "user-1" },
   );
-  assert(Array.isArray(library) && library.length === 0, "library section falls back to []");
+  assert(Array.isArray(authors) && authors.length === 0, "authors section falls back to []");
 }
 
 function testEmptyDefaults() {
   assert(EMPTY_PERSONAL_HOME_DATA.continueListening === null, "empty personal defaults");
   assert(EMPTY_GUEST_HOME_DATA.featuredFreeProduct === null, "empty guest defaults");
-  assert(EMPTY_PERSONAL_HOME_DATA.timeOfDaySectionTitle.length > 0, "time-of-day title exists");
+  assert(Array.isArray(EMPTY_PERSONAL_HOME_DATA.authors), "personal authors defaults");
+  assert(EMPTY_PERSONAL_HOME_DATA.showBecomeAuthorPromo === false, "promo hidden by default");
 }
 
 async function run() {

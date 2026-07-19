@@ -1,7 +1,9 @@
+import BecomeAuthorPromoBanner from "@/components/listener/BecomeAuthorPromoBanner";
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { PersonalHomeData } from "@/lib/home/types";
 
 import ActiveProgramsSection from "./ActiveProgramsSection";
+import AuthorsRail from "./AuthorsRail";
 import ContinueListening from "./ContinueListening";
 import DailyGreeting from "./DailyGreeting";
 import HomeSectionBoundary from "./HomeSectionBoundary";
@@ -40,10 +42,6 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
         />
       </HomeSectionBoundary>
 
-      <HomeSectionBoundary section="personal_active_programs">
-        <ActiveProgramsSection programs={data.activePrograms} />
-      </HomeSectionBoundary>
-
       <HomeSectionBoundary section="personal_recently_listened">
         <ProductRail
           title="Недавно слушали"
@@ -54,23 +52,8 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
         />
       </HomeSectionBoundary>
 
-      <HomeSectionBoundary section="personal_library">
-        <ProductRail
-          title="Из вашей Аудиотеки"
-          products={data.libraryProducts}
-          ariaLabel="Из вашей Аудиотеки"
-          href="/my-practices"
-          linkLabel="Аудиотека"
-        />
-      </HomeSectionBoundary>
-
-      <HomeSectionBoundary section="personal_time_of_day">
-        <ProductRail
-          title={data.timeOfDaySectionTitle}
-          products={data.timeOfDayProducts}
-          ariaLabel={data.timeOfDaySectionTitle}
-          href="/catalog"
-        />
+      <HomeSectionBoundary section="personal_active_programs">
+        <ActiveProgramsSection programs={data.activePrograms} />
       </HomeSectionBoundary>
 
       <HomeSectionBoundary section="personal_new_materials">
@@ -82,14 +65,22 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
         />
       </HomeSectionBoundary>
 
-      <HomeSectionBoundary section="personal_free_materials">
-        <ProductRail
-          title="Материалы в подарок"
-          products={data.freeProducts}
-          ariaLabel="Материалы в подарок"
-          href="/catalog"
-        />
+      <HomeSectionBoundary section="personal_authors">
+        <AuthorsRail authors={data.authors} />
       </HomeSectionBoundary>
+
+      {data.showBecomeAuthorPromo ? (
+        <HomeSectionBoundary section="personal_become_author_promo">
+          <BecomeAuthorPromoBanner
+            source="personal_home_mobile"
+            visibility="mobile"
+          />
+          <BecomeAuthorPromoBanner
+            source="personal_home_desktop"
+            visibility="desktop"
+          />
+        </HomeSectionBoundary>
+      ) : null}
     </>
   );
 }
