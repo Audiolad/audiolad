@@ -1,9 +1,55 @@
-import Image from "next/image";
 import Link from "next/link";
 
+import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import { becomeAuthorBodyClass } from "@/components/become-author/typography";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import type { BecomeAuthorAudience } from "@/lib/author-applications/types";
+
+const becomeAuthorDesktopLogoImageClassName =
+  "h-auto w-[clamp(190px,18vw,220px)] max-w-full object-contain object-left";
+
+const becomeAuthorDesktopLogoLinkClassName =
+  "inline-flex shrink-0 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+const becomeAuthorBackButtonClassName =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+function BecomeAuthorBackButton({
+  backHref,
+  backLabel,
+}: {
+  backHref: string;
+  backLabel: string;
+}) {
+  return (
+    <Link href={backHref} aria-label={backLabel} className={becomeAuthorBackButtonClassName}>
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+        <path
+          d="M15 5 8 12l7 7"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </Link>
+  );
+}
+
+function BecomeAuthorHeaderActions({ audience }: { audience: BecomeAuthorAudience }) {
+  if (audience === "guest") {
+    return (
+      <Link
+        href={buildAuthRouteHref("/auth/sign-in", "/become-author")}
+        className="rounded-full border border-[#bda6e1] px-3 py-2 text-xs font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        Войти
+      </Link>
+    );
+  }
+
+  return <span className="h-11 w-11 shrink-0" aria-hidden="true" />;
+}
 
 type BecomeAuthorHeaderProps = {
   audience: BecomeAuthorAudience;
@@ -14,51 +60,38 @@ export default function BecomeAuthorHeader({ audience }: BecomeAuthorHeaderProps
   const backLabel = audience === "guest" ? "Назад в каталог" : "Назад в профиль";
 
   return (
-    <header className="flex items-center justify-between gap-3">
-      <Link
-        href={backHref}
-        aria-label={backLabel}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-      >
-        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-          <path
-            d="M15 5 8 12l7 7"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </Link>
+    <header>
+      <div className="flex items-center justify-between gap-3 lg:hidden">
+        <BecomeAuthorBackButton backHref={backHref} backLabel={backLabel} />
 
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-3">
-        <Image
-          src="/audiolad-logo.png"
-          alt=""
-          width={40}
-          height={40}
-          className="hidden h-10 w-10 object-contain lg:block"
-          aria-hidden="true"
-        />
-        <div className="min-w-0 text-center">
-          <p className="text-xs text-[#7d70a2] lg:text-left">АудиоЛад</p>
-          <h1 className="truncate text-[24px] font-semibold lg:text-[28px]">
-            Стать автором
-          </h1>
+        <div className="min-w-0 flex-1 text-center">
+          <p className="text-xs text-[#7d70a2]">АудиоЛад</p>
+          <h1 className="truncate text-[24px] font-semibold">Стать автором</h1>
+        </div>
+
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+          <BecomeAuthorHeaderActions audience={audience} />
         </div>
       </div>
 
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-        {audience === "guest" ? (
-          <Link
-            href={buildAuthRouteHref("/auth/sign-in", "/become-author")}
-            className="rounded-full border border-[#bda6e1] px-3 py-2 text-xs font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            Войти
-          </Link>
-        ) : (
-          <span className="h-11 w-11" aria-hidden="true" />
-        )}
+      <div className="hidden lg:block">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <BecomeAuthorBackButton backHref={backHref} backLabel={backLabel} />
+            <AudioladHorizontalLogo
+              className={becomeAuthorDesktopLogoImageClassName}
+              linkClassName={becomeAuthorDesktopLogoLinkClassName}
+            />
+          </div>
+
+          <div className="flex shrink-0 items-center justify-center">
+            <BecomeAuthorHeaderActions audience={audience} />
+          </div>
+        </div>
+
+        <h1 className="mt-3 text-[26px] font-semibold leading-tight tracking-[-0.01em]">
+          Стать автором
+        </h1>
       </div>
     </header>
   );
