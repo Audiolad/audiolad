@@ -7,6 +7,7 @@ import {
   AVATAR_OUTPUT_SIZE,
 } from "@/lib/images/avatar-constants";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const USER_AVATARS_BUCKET =
   process.env.USER_AVATARS_BUCKET?.trim() || "user-avatars";
@@ -157,6 +158,31 @@ export async function removeUserAvatarObject(
   }
 
   return { ok: true };
+}
+
+export type ProfileAvatarFields = {
+  avatar_path: string | null;
+  avatar_url: string | null;
+};
+
+export async function resolveProfileAvatarUrl(
+  profile: ProfileAvatarFields | null | undefined,
+  userId: string,
+): Promise<string | null> {
+  if (!profile?.avatar_path) {
+    return null;
+  }
+
+  try {
+    const storage = createServiceRoleClient();
+    return await createUserAvatarSignedUrl(storage, profile.avatar_path, {
+      userId,
+      cacheBuster: profile.avatar_url ?? profile.avatar_path,
+    });
+  } catch (error) {
+    console.error("profile_avatar_signed_url_error", error);
+    return profile.avatar_url;
+  }
 }
 
 export function appendAvatarCacheBuster(
