@@ -1,6 +1,9 @@
 import {
   parsePracticeFormat,
 } from "@/lib/author-products/format";
+import {
+  createDefaultListeningNoticeFormState,
+} from "@/lib/products/listening-notice";
 import type {
   AuthorProductDetail,
   AudioItemRow,
@@ -20,6 +23,9 @@ export type ProductFormSnapshot = {
   coverVersion: string | null;
   coverImage?: unknown;
   useSharedCover: boolean;
+  listeningNoticeEnabled: boolean;
+  listeningNoticeTitle: string;
+  listeningNoticeText: string;
   status: string;
   publishedAt: string | null;
 };
@@ -29,6 +35,7 @@ export function productDetailToFormSnapshot(
 ): ProductFormSnapshot {
   const practice = product.practice;
   const { preset, customFormat } = parsePracticeFormat(practice.format);
+  const listeningDefaults = createDefaultListeningNoticeFormState();
 
   return {
     authorId: practice.author_id,
@@ -44,6 +51,11 @@ export function productDetailToFormSnapshot(
     coverVersion: practice.cover_url ? practice.updated_at : null,
     coverImage: practice.cover_image ?? null,
     useSharedCover: practice.use_shared_cover !== false,
+    listeningNoticeEnabled: practice.listening_notice_enabled !== false,
+    listeningNoticeTitle:
+      practice.listening_notice_title ?? listeningDefaults.listeningNoticeTitle,
+    listeningNoticeText:
+      practice.listening_notice_text ?? listeningDefaults.listeningNoticeText,
     status: practice.status,
     publishedAt: practice.published_at,
   };
@@ -67,6 +79,9 @@ export function mergeServerProductIntoForm(
     isFree: current.isFree,
     price: current.price,
     useSharedCover: current.useSharedCover,
+    listeningNoticeEnabled: current.listeningNoticeEnabled,
+    listeningNoticeTitle: current.listeningNoticeTitle,
+    listeningNoticeText: current.listeningNoticeText,
     coverUrl: server.coverUrl ?? current.coverUrl,
     coverVersion: server.coverUrl ? server.coverVersion : current.coverVersion,
   };

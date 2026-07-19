@@ -27,6 +27,9 @@ export type PublicPracticeRow = {
   updated_at: string | null;
   is_catalog_listed: boolean | null;
   guest_access_enabled?: boolean | null;
+  listening_notice_enabled?: boolean | null;
+  listening_notice_title?: string | null;
+  listening_notice_text?: string | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -78,6 +81,9 @@ export async function getPracticeByAuthorAndSlug(
       updated_at,
       is_catalog_listed,
       guest_access_enabled,
+      listening_notice_enabled,
+      listening_notice_title,
+      listening_notice_text,
       authors!practices_author_id_fkey (
         id,
         name,

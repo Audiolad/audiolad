@@ -57,6 +57,9 @@ export type PracticeRow = {
   status: string;
   currency: string;
   published_at: string | null;
+  listening_notice_enabled: boolean;
+  listening_notice_title: string;
+  listening_notice_text: string;
   created_at: string;
   updated_at: string;
 };

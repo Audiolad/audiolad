@@ -6,6 +6,8 @@ import {
 } from "@/lib/author-products/auth";
 import {
   validateDescriptionLength,
+  validateListeningNoticeTextLength,
+  validateListeningNoticeTitleLength,
   validateStoredFormatLength,
   validateSubtitleLength,
   validateTitleLength,
@@ -26,6 +28,10 @@ import {
   isClearableTextFieldProvided,
   normalizeClearableTextField,
 } from "@/lib/author-products/text-fields";
+import {
+  DEFAULT_LISTENING_NOTICE_TEXT,
+  DEFAULT_LISTENING_NOTICE_TITLE,
+} from "@/lib/products/listening-notice";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PAID_PRICE_OPTIONS } from "@/lib/author-products/types";
 import { slugifyTitle } from "@/lib/author-products/utils";
@@ -79,6 +85,46 @@ function applyClearableTextField(
   } catch {
     return "invalid_request";
   }
+}
+
+function applyListeningNoticeTextField(
+  body: object,
+  key: "listening_notice_title" | "listening_notice_text",
+  updates: Record<string, unknown>,
+  validate: (value: string) => string | null,
+) {
+  if (!isClearableTextFieldProvided(body, key)) {
+    return null;
+  }
+
+  const raw = (body as Record<string, unknown>)[key];
+
+  if (raw === null || raw === undefined) {
+    updates[key] =
+      key === "listening_notice_title"
+        ? DEFAULT_LISTENING_NOTICE_TITLE
+        : DEFAULT_LISTENING_NOTICE_TEXT;
+    return null;
+  }
+
+  if (typeof raw !== "string") {
+    return "invalid_request";
+  }
+
+  const validationError = validate(raw);
+
+  if (validationError) {
+    return validationError;
+  }
+
+  if (key === "listening_notice_title") {
+    const trimmed = raw.trim();
+    updates[key] = trimmed || DEFAULT_LISTENING_NOTICE_TITLE;
+    return null;
+  }
+
+  updates[key] = raw;
+  return null;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -224,6 +270,39 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.use_shared_cover === "boolean"
     ) {
       updates.use_shared_cover = body.use_shared_cover;
+    }
+
+    if (
+      "listening_notice_enabled" in body &&
+      typeof body.listening_notice_enabled === "boolean"
+    ) {
+      updates.listening_notice_enabled = body.listening_notice_enabled;
+    }
+
+    if ("listening_notice_title" in body) {
+      const titleError = applyListeningNoticeTextField(
+        body,
+        "listening_notice_title",
+        updates,
+        validateListeningNoticeTitleLength,
+      );
+
+      if (titleError) {
+        return NextResponse.json({ error: titleError }, { status: 400 });
+      }
+    }
+
+    if ("listening_notice_text" in body) {
+      const textError = applyListeningNoticeTextField(
+        body,
+        "listening_notice_text",
+        updates,
+        validateListeningNoticeTextLength,
+      );
+
+      if (textError) {
+        return NextResponse.json({ error: textError }, { status: 400 });
+      }
     }
 
     if (

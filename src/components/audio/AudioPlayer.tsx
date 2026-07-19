@@ -5,6 +5,7 @@ import { useState } from "react";
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import AuthorLink from "@/components/authors/AuthorLink";
 import FormattedPlainText from "@/components/FormattedPlainText";
+import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
@@ -14,6 +15,7 @@ import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracke
 import ListenPageViewTracker from "@/components/analytics/ListenPageViewTracker";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
+import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
 
 type AudioPlayerProps = {
   practiceId: string;
@@ -31,6 +33,7 @@ type AudioPlayerProps = {
   promoConversionMode?: boolean;
   authorSlug?: string;
   productSlug?: string;
+  listeningNotice?: ResolvedListeningNotice | null;
 };
 
 function formatTime(seconds: number): string {
@@ -209,6 +212,7 @@ export default function AudioPlayer({
   promoConversionMode = false,
   authorSlug = "",
   productSlug = "",
+  listeningNotice = null,
 }: AudioPlayerProps) {
   const {
     session,
@@ -728,15 +732,9 @@ export default function AudioPlayer({
         </section>
       ) : null}
 
-      <section className="mt-8 rounded-[24px] border border-white/12 bg-white/8 px-5 py-5">
-        <h2 className="text-[17px] font-semibold">Перед прослушиванием</h2>
-        <FormattedPlainText
-          text={
-            "Выберите спокойное и безопасное место.\n\nНе включайте практику во время управления транспортом или работы, требующей постоянной концентрации."
-          }
-          className="mt-3 text-sm leading-6 text-white/70"
-        />
-      </section>
+      {listeningNotice ? (
+        <ListeningNoticeCard notice={listeningNotice} variant="dark" />
+      ) : null}
     </div>
   );
 }

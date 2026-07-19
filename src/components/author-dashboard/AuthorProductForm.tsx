@@ -24,7 +24,6 @@ import {
   CUSTOM_FORMAT_VALUE,
   PRODUCT_PRESET_FORMATS,
   isCustomFormatSelection,
-  parsePracticeFormat,
   resolveFormatForStorage,
   validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
@@ -40,10 +39,16 @@ import {
 import {
   mergeServerAudioItems,
   mergeServerProductIntoForm,
+  productDetailToFormSnapshot,
   resolveAudioItemIdAfterDraftCreate,
 } from "@/lib/author-products/form-merge";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 import { formatRubles } from "@/lib/products/price-format";
+import {
+  createDefaultListeningNoticeFormState,
+  DEFAULT_LISTENING_NOTICE_TEXT,
+  DEFAULT_LISTENING_NOTICE_TITLE,
+} from "@/lib/products/listening-notice";
 import type { AssignedTopic, TopicOption } from "@/lib/topics/types";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 
@@ -82,6 +87,9 @@ type FormState = {
   coverVersion: string | null;
   coverImage?: unknown;
   useSharedCover: boolean;
+  listeningNoticeEnabled: boolean;
+  listeningNoticeTitle: string;
+  listeningNoticeText: string;
   status: string;
   publishedAt: string | null;
 };
@@ -166,30 +174,12 @@ function buildInitialForm(
   initialProduct: AuthorProductDetail | undefined,
 ): FormState {
   if (initialProduct) {
-    const practice = initialProduct.practice;
-    const { preset, customFormat } = parsePracticeFormat(practice.format);
-
-    return {
-      authorId: practice.author_id,
-      title: practice.title,
-      subtitle: practice.subtitle ?? "",
-      description: practice.description ?? "",
-      formatPreset: preset,
-      customFormat,
-      slug: practice.slug,
-      isFree: practice.is_free === true,
-      price: practice.is_free === true ? 99 : practice.price,
-      coverUrl: practice.cover_url,
-      coverVersion: practice.cover_url ? practice.updated_at : null,
-      coverImage: practice.cover_image ?? null,
-      useSharedCover: practice.use_shared_cover !== false,
-      status: practice.status,
-      publishedAt: practice.published_at,
-    };
+    return productDetailToFormSnapshot(initialProduct);
   }
 
   const author =
     authors.find((item) => item.slug === initialAuthorSlug) ?? authors[0];
+  const listeningDefaults = createDefaultListeningNoticeFormState();
 
   return {
     authorId: author?.id ?? "",
@@ -205,6 +195,9 @@ function buildInitialForm(
     coverVersion: null,
     coverImage: null,
     useSharedCover: true,
+    listeningNoticeEnabled: listeningDefaults.listeningNoticeEnabled,
+    listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
+    listeningNoticeText: listeningDefaults.listeningNoticeText,
     status: "draft",
     publishedAt: null,
   };
@@ -273,6 +266,9 @@ function buildProductSavePayload(
     is_free: form.isFree,
     price: form.isFree ? 0 : form.price,
     use_shared_cover: form.useSharedCover,
+    listening_notice_enabled: form.listeningNoticeEnabled,
+    listening_notice_title: form.listeningNoticeTitle,
+    listening_notice_text: form.listeningNoticeText,
   };
 }
 
@@ -330,6 +326,8 @@ export default function AuthorProductForm({
     subtitle?: string;
     description?: string;
     formatCustom?: string;
+    listeningNoticeTitle?: string;
+    listeningNoticeText?: string;
   }>({});
   const [audioFieldErrors, setAudioFieldErrors] = useState<
     Record<string, { title?: string; description?: string }>
@@ -860,7 +858,9 @@ export default function AuthorProductForm({
             fieldKey === "title" ||
             fieldKey === "subtitle" ||
             fieldKey === "description" ||
-            fieldKey === "formatCustom"
+            fieldKey === "formatCustom" ||
+            fieldKey === "listeningNoticeTitle" ||
+            fieldKey === "listeningNoticeText"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
             return false;
@@ -1945,6 +1945,118 @@ export default function AuthorProductForm({
               ))}
             </select>
           ) : null}
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
+        <h2 className="text-[20px] font-semibold">
+          Рекомендации перед прослушиванием
+        </h2>
+
+        <div className="rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={form.listeningNoticeEnabled}
+              disabled={busy}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  listeningNoticeEnabled: event.target.checked,
+                }))
+              }
+              className="mt-1 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-[#3f3560]">
+                Показывать рекомендации на странице продукта
+              </span>
+              <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                Блок отображается на публичной странице продукта и на экране
+                прослушивания.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div
+          className={`space-y-4 ${form.listeningNoticeEnabled ? "" : "pointer-events-none opacity-50"}`}
+        >
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium">Заголовок</span>
+            <input
+              value={form.listeningNoticeTitle}
+              maxLength={PRODUCT_CONTENT_LIMITS.listeningNoticeTitle}
+              disabled={!form.listeningNoticeEnabled || busy}
+              onChange={(event) => {
+                setFieldErrors((current) => ({
+                  ...current,
+                  listeningNoticeTitle: undefined,
+                }));
+                setForm((current) => ({
+                  ...current,
+                  listeningNoticeTitle: event.target.value,
+                }));
+              }}
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+            />
+            <CharCounter
+              value={form.listeningNoticeTitle}
+              max={PRODUCT_CONTENT_LIMITS.listeningNoticeTitle}
+            />
+            {fieldErrors.listeningNoticeTitle ? (
+              <p className="mt-2 text-sm text-[#9b3d3d]">
+                {fieldErrors.listeningNoticeTitle}
+              </p>
+            ) : null}
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium">
+              Текст рекомендаций
+            </span>
+            <textarea
+              value={form.listeningNoticeText}
+              maxLength={PRODUCT_CONTENT_LIMITS.listeningNoticeText}
+              disabled={!form.listeningNoticeEnabled || busy}
+              onChange={(event) => {
+                setFieldErrors((current) => ({
+                  ...current,
+                  listeningNoticeText: undefined,
+                }));
+                setForm((current) => ({
+                  ...current,
+                  listeningNoticeText: event.target.value,
+                }));
+              }}
+              rows={5}
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+            />
+            <CharCounter
+              value={form.listeningNoticeText}
+              max={PRODUCT_CONTENT_LIMITS.listeningNoticeText}
+            />
+            {fieldErrors.listeningNoticeText ? (
+              <p className="mt-2 text-sm text-[#9b3d3d]">
+                {fieldErrors.listeningNoticeText}
+              </p>
+            ) : null}
+          </label>
+
+          <button
+            type="button"
+            disabled={!form.listeningNoticeEnabled || busy}
+            onClick={() =>
+              setForm((current) => ({
+                ...current,
+                listeningNoticeTitle: DEFAULT_LISTENING_NOTICE_TITLE,
+                listeningNoticeText: DEFAULT_LISTENING_NOTICE_TEXT,
+              }))
+            }
+            className="text-sm font-semibold text-[#7042c5] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Вернуть стандартный текст
+          </button>
         </div>
       </section>
 

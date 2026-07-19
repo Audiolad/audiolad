@@ -99,6 +99,9 @@ export async function getAuthorProductDetail(
       status,
       currency,
       published_at,
+      listening_notice_enabled,
+      listening_notice_title,
+      listening_notice_text,
       created_at,
       updated_at
     `,
@@ -223,6 +226,9 @@ export async function createDraftProduct(
       status,
       currency,
       published_at,
+      listening_notice_enabled,
+      listening_notice_title,
+      listening_notice_text,
       created_at,
       updated_at
     `,

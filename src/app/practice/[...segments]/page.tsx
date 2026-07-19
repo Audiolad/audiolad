@@ -7,6 +7,7 @@ import AuthorLink from "@/components/authors/AuthorLink";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import LegalFooter from "@/components/LegalFooter";
+import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
@@ -41,6 +42,7 @@ import {
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
+import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
 
@@ -478,6 +480,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     supabase,
     practice.id,
   );
+  const listeningNotice = resolveListeningNotice(practice);
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
@@ -700,12 +703,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             </section>
           ) : null}
 
-          <section className="mt-6 rounded-[24px] border border-[#eadff8] bg-white p-5">
-            <h2 className="text-[17px] font-semibold">Перед прослушиванием</h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#7d70a2]">
-              {`Выберите спокойное и безопасное место для прослушивания.\n\nНе включайте практику во время управления транспортом или работы, требующей постоянной концентрации.`}
-            </p>
-          </section>
+          {listeningNotice ? (
+            <ListeningNoticeCard notice={listeningNotice} variant="light" />
+          ) : null}
         </div>
 
         <div className="px-5 pb-6">

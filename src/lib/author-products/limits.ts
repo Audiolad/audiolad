@@ -56,6 +56,8 @@ export const PRODUCT_CONTENT_LIMITS = {
   audioTitle: 100,
   audioDescription: 500,
   customFormat: 60,
+  listeningNoticeTitle: 120,
+  listeningNoticeText: 1000,
 } as const;
 
 export type ProductFieldErrorCode =
@@ -65,7 +67,9 @@ export type ProductFieldErrorCode =
   | "audio_title_too_long"
   | "audio_description_too_long"
   | "custom_format_too_long"
-  | "missing_custom_format";
+  | "missing_custom_format"
+  | "listening_notice_title_too_long"
+  | "listening_notice_text_too_long";
 
 export function validateTitleLength(value: string): ProductFieldErrorCode | null {
   if (value.trim().length > PRODUCT_CONTENT_LIMITS.title) {
@@ -125,6 +129,26 @@ export function validateStoredFormatLength(
   return null;
 }
 
+export function validateListeningNoticeTitleLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.trim().length > PRODUCT_CONTENT_LIMITS.listeningNoticeTitle) {
+    return "listening_notice_title_too_long";
+  }
+
+  return null;
+}
+
+export function validateListeningNoticeTextLength(
+  value: string,
+): ProductFieldErrorCode | null {
+  if (value.length > PRODUCT_CONTENT_LIMITS.listeningNoticeText) {
+    return "listening_notice_text_too_long";
+  }
+
+  return null;
+}
+
 export function getProductFieldErrorMessage(code: string): string | null {
   switch (code) {
     case "title_too_long":
@@ -141,6 +165,10 @@ export function getProductFieldErrorMessage(code: string): string | null {
       return "Название формата не должно превышать 60 символов.";
     case "missing_custom_format":
       return "Укажите название своего формата";
+    case "listening_notice_title_too_long":
+      return "Заголовок рекомендаций не должен превышать 120 символов.";
+    case "listening_notice_text_too_long":
+      return "Текст рекомендаций не должен превышать 1000 символов.";
     default:
       return null;
   }
@@ -154,7 +182,10 @@ export function getProductFieldKeyForError(
   | "description"
   | "audioTitle"
   | "audioDescription"
-  | "formatCustom" {
+  | "audioDescription"
+  | "formatCustom"
+  | "listeningNoticeTitle"
+  | "listeningNoticeText" {
   switch (code) {
     case "title_too_long":
       return "title";
@@ -169,5 +200,9 @@ export function getProductFieldKeyForError(
     case "custom_format_too_long":
     case "missing_custom_format":
       return "formatCustom";
+    case "listening_notice_title_too_long":
+      return "listeningNoticeTitle";
+    case "listening_notice_text_too_long":
+      return "listeningNoticeText";
   }
 }

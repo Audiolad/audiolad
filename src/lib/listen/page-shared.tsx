@@ -7,7 +7,6 @@ import AudioPlayer from "@/components/audio/AudioPlayer";
 import ListenPageClient from "@/components/audio/ListenPageClient";
 import BottomNav from "@/components/BottomNav";
 import { getDisplayFormat } from "@/lib/author-products/format";
-import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
@@ -26,6 +25,7 @@ import {
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { createClient } from "@/lib/supabase/server";
 
 type PracticeRow = PublicPracticeRow & {
@@ -252,6 +252,9 @@ export async function renderListenPage(
       is_free,
       is_catalog_listed,
       guest_access_enabled,
+      listening_notice_enabled,
+      listening_notice_title,
+      listening_notice_text,
       authors!practices_author_id_fkey (
         id,
         name,
@@ -402,6 +405,7 @@ export async function renderListenPage(
     canListen: productAccess.canListen,
     accessReason: productAccess.reason,
   });
+  const listeningNotice = resolveListeningNotice(practiceRow);
 
   return (
     <ListenShell backHref={practiceHref} backLabel="← К практике">
@@ -454,6 +458,7 @@ export async function renderListenPage(
         promoConversionMode={promoConversionMode}
         authorSlug={resolvedAuthorSlug}
         productSlug={practiceRow.slug}
+        listeningNotice={listeningNotice}
         sessionPayload={{
           practiceId: practiceRow.id,
           authorSlug: resolvedAuthorSlug,
