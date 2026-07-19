@@ -77,7 +77,7 @@ main() {
   PORT="$CANDIDATE_PORT" NODE_ENV=production npm start >/tmp/audiolad-candidate.log 2>&1 &
   CANDIDATE_PID=$!
 
-  if ! wait_for_health "http://127.0.0.1:${CANDIDATE_PORT}" 40 2; then
+  if ! wait_for_production_readiness "http://127.0.0.1:${CANDIDATE_PORT}" "$(read_build_id "$RELEASE_DIR")" 40 2; then
     log_error "Candidate health check failed"
     send_deploy_alert "deploy_failed" "Candidate health check failed for $RELEASE_NAME"
     exit 1
@@ -105,32 +105,25 @@ main() {
 
   printf '%s\n' "$FULL_COMMIT" > "$RELEASE_DIR/.deploy-commit"
 
-  if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-    pm2 startOrReload "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
-  else
-    pm2 start "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME"
-  fi
-  pm2 save
-
-  if ! wait_for_health "http://127.0.0.1:${PRODUCTION_PORT}" 40 2; then
-    log_error "Production health check failed after switch"
-    "$SCRIPT_DIR/rollback.sh" "production health failed after deploy"
-    exit 1
-  fi
-
-  if ! wait_for_build_id_match "$RELEASE_DIR"; then
-    log_error "Production BUILD_ID did not match release after reload"
-    "$SCRIPT_DIR/rollback.sh" "build id mismatch after deploy"
-    exit 1
-  fi
-
-  log_info "Capturing PM2 baseline after stable production reload"
+  log_info "Capturing PM2 baseline before production reload"
   if ! pm2 jlist 2>/dev/null | node "$SCRIPT_DIR/lib/pm2-health.mjs" snapshot --app "$PM2_APP_NAME" >"$RELEASE_DIR/.pm2-health-baseline.json"; then
-    log_error "Failed to capture PM2 baseline after reload"
-    "$SCRIPT_DIR/rollback.sh" "failed to capture pm2 baseline after reload"
+    log_error "Failed to capture PM2 baseline before reload"
+    "$SCRIPT_DIR/rollback.sh" "failed to capture pm2 baseline before reload"
     exit 1
   fi
   cat "$RELEASE_DIR/.pm2-health-baseline.json"
+
+  if ! sync_pm2_audiolad; then
+    log_error "Failed to sync PM2 after release switch"
+    "$SCRIPT_DIR/rollback.sh" "failed to sync pm2 after deploy"
+    exit 1
+  fi
+
+  if ! wait_for_release_readiness "$RELEASE_DIR"; then
+    log_error "Production readiness check failed after switch"
+    "$SCRIPT_DIR/rollback.sh" "production readiness failed after deploy"
+    exit 1
+  fi
 
   log_info "Running production smoke tests"
   if ! "$SCRIPT_DIR/smoke-test.sh" "https://audiolad.ru"; then

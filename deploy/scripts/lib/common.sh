@@ -11,6 +11,10 @@ CANDIDATE_PORT="${CANDIDATE_PORT:-3001}"
 PM2_APP_NAME="${PM2_APP_NAME:-audiolad}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health/build}"
 SMOKE_TIMEOUT_MS="${SMOKE_TIMEOUT_MS:-120000}"
+READINESS_ATTEMPTS="${READINESS_ATTEMPTS:-30}"
+READINESS_DELAY="${READINESS_DELAY:-2}"
+READINESS_PROBE_SCRIPT="${READINESS_PROBE_SCRIPT:-$DEPLOY_SCRIPTS_DIR/lib/readiness-check.mjs}"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://audiolad.ru}"
 
 log() {
   local level="$1"
@@ -49,8 +53,93 @@ wait_for_health() {
   local attempts="${2:-30}"
   local delay="${3:-2}"
 
+  wait_for_production_readiness "$base_url" "" "$attempts" "$delay" "$base_url"
+}
+
+probe_readiness_once() {
+  local base_url="$1"
+  local expected_build_id="${2:-}"
+  local probe_args=(node "$READINESS_PROBE_SCRIPT" probe --url "${base_url}${HEALTH_PATH}")
+
+  if [[ -n "$expected_build_id" ]]; then
+    probe_args+=(--expected-build-id "$expected_build_id")
+  fi
+
+  local output=""
+  if ! output="$("${probe_args[@]}" 2>/dev/null)"; then
+    if [[ -z "$output" ]]; then
+      printf '%s\n' '{"ready":false,"httpStatus":null,"reason":"probe_failed","buildId":null,"status":null}'
+      return 1
+    fi
+  fi
+
+  printf '%s\n' "$output"
+}
+
+wait_for_production_readiness() {
+  local base_url="$1"
+  local expected_build_id="${2:-}"
+  local attempts="${3:-$READINESS_ATTEMPTS}"
+  local delay="${4:-$READINESS_DELAY}"
+  local label="${5:-$base_url}"
+  local probe_json http_status reason build_id
+
+  log_info "Waiting for production readiness at ${label} (max ${attempts} attempts, ${delay}s delay)"
+
   for ((i = 1; i <= attempts; i++)); do
-    if curl -fsS "${base_url}${HEALTH_PATH}" >/dev/null 2>&1; then
+    probe_json="$(probe_readiness_once "$base_url" "$expected_build_id" || true)"
+    read -r http_status reason build_id <<<"$(
+      printf '%s' "$probe_json" | node -e 'const input=require("fs").readFileSync(0,"utf8").trim()||"{}";
+let payload={};
+try { payload=JSON.parse(input); } catch {}
+process.stdout.write(`${payload.httpStatus ?? "null"}\t${payload.reason ?? "unknown"}\t${payload.buildId ?? "null"}\n`);'
+    )"
+
+    if printf '%s' "$probe_json" | node -e 'const input=require("fs").readFileSync(0,"utf8").trim()||"{}";
+let payload={};
+try { payload=JSON.parse(input); } catch {}
+process.exit(payload.ready===true?0:1);'; then
+      log_info "Production readiness confirmed at ${label} on attempt ${i} (http=${http_status}, buildId=${build_id})"
+      return 0
+    fi
+
+    log_warn "Readiness attempt ${i}/${attempts} at ${label}: http=${http_status}, reason=${reason}, buildId=${build_id}"
+    sleep "$delay"
+  done
+
+  log_error "Production readiness timeout at ${label} after ${attempts} attempts (last http=${http_status}, reason=${reason})"
+  return 1
+}
+
+wait_for_release_readiness() {
+  local release_dir="$1"
+  local expected_build_id
+
+  expected_build_id="$(read_build_id "$release_dir")"
+  if [[ "$expected_build_id" == "missing" ]]; then
+    log_error "Release BUILD_ID missing: $release_dir/.next/BUILD_ID"
+    return 1
+  fi
+
+  if ! wait_for_production_readiness "http://127.0.0.1:${PRODUCTION_PORT}" "$expected_build_id"; then
+    return 1
+  fi
+
+  wait_for_production_readiness "$PUBLIC_BASE_URL" "$expected_build_id"
+}
+
+port_has_listener() {
+  local port="$1"
+  ss -lntp 2>/dev/null | grep -q ":${port} "
+}
+
+wait_for_port_free() {
+  local port="$1"
+  local attempts="${2:-30}"
+  local delay="${3:-1}"
+
+  for ((i = 1; i <= attempts; i++)); do
+    if ! port_has_listener "$port"; then
       return 0
     fi
     sleep "$delay"
@@ -59,39 +148,62 @@ wait_for_health() {
   return 1
 }
 
-wait_for_build_id_match() {
-  local release_dir="$1"
-  local base_url="${2:-http://127.0.0.1:${PRODUCTION_PORT}}"
-  local attempts="${3:-40}"
-  local delay="${4:-2}"
-  local expected actual
+cleanup_orphan_next_servers() {
+  local keep_port="${1:-$PRODUCTION_PORT}"
+  local keep_pid=""
 
-  if [[ ! -f "$release_dir/.next/BUILD_ID" ]]; then
-    log_error "Release BUILD_ID missing: $release_dir/.next/BUILD_ID"
-    return 1
+  if port_has_listener "$keep_port"; then
+    keep_pid="$(ss -lntp 2>/dev/null | awk -v port=":${keep_port}" '
+      $0 ~ port && match($0, /pid=([0-9]+)/, m) { print m[1]; exit }
+    ')"
   fi
 
-  expected="$(tr -d '\n' < "$release_dir/.next/BUILD_ID")"
-
-  for ((i = 1; i <= attempts; i++)); do
-    actual="$(
-      curl -fsS "${base_url}${HEALTH_PATH}" 2>/dev/null | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("buildId") or "")
-except Exception:
-    print("")' 2>/dev/null || true
-    )"
-
-    if [[ "$actual" == "$expected" && -n "$actual" ]]; then
-      log_info "Production BUILD_ID matched release: $expected"
-      return 0
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    if [[ -n "$keep_pid" && "$pid" == "$keep_pid" ]]; then
+      continue
     fi
 
-    sleep "$delay"
-  done
+    local ppid cmd
+    ppid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    cmd="$(ps -o cmd= -p "$pid" 2>/dev/null || true)"
+    [[ "$cmd" == *"next-server"* ]] || continue
 
-  log_error "Production BUILD_ID mismatch after reload (expected=$expected last=$actual)"
-  return 1
+    if [[ "$ppid" == "1" ]]; then
+      log_warn "Stopping orphaned next-server pid=$pid"
+      kill "$pid" 2>/dev/null || true
+    fi
+  done < <(pgrep -f 'next-server' 2>/dev/null || true)
+}
+
+ensure_production_port_ready() {
+  log_info "Preparing port ${PRODUCTION_PORT} for PM2 sync"
+  pm2 stop "$PM2_APP_NAME" >/dev/null 2>&1 || true
+
+  if ! wait_for_port_free "$PRODUCTION_PORT" 20 1; then
+    log_warn "Port ${PRODUCTION_PORT} still busy after PM2 stop; clearing stale listeners"
+    fuser -k "${PRODUCTION_PORT}/tcp" >/dev/null 2>&1 || true
+    sleep 2
+    wait_for_port_free "$PRODUCTION_PORT" 10 1 || {
+      log_error "Port ${PRODUCTION_PORT} is still in use"
+      ss -lntp 2>/dev/null | grep ":${PRODUCTION_PORT} " || true
+      return 1
+    }
+  fi
+
+  cleanup_orphan_next_servers "$PRODUCTION_PORT"
+  sleep 1
+}
+
+sync_pm2_audiolad() {
+  ensure_production_port_ready || return 1
+
+  if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
+    pm2 startOrReload "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
+  else
+    pm2 start "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME"
+  fi
+  pm2 save
 }
 
 send_deploy_alert() {

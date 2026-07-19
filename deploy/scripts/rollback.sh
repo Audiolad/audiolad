@@ -42,21 +42,20 @@ main() {
 
   atomic_symlink "$previous_dir" "$DEPLOY_ROOT/current"
 
-  if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-    pm2 startOrReload "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
-  else
-    pm2 start "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME"
-  fi
-  pm2 save
-
-  if ! wait_for_health "http://127.0.0.1:${PRODUCTION_PORT}" 40 2; then
-    log_error "Rollback health check failed"
-    send_deploy_alert "rollback_failed" "Health failed after rollback to $previous_dir"
+  if ! sync_pm2_audiolad; then
+    log_error "Failed to sync PM2 during rollback"
+    send_deploy_alert "rollback_failed" "PM2 sync failed during rollback to $previous_dir"
     exit 1
   fi
 
-  if ! "$SCRIPT_DIR/smoke-test.sh" "https://audiolad.ru"; then
-    log_error "Rollback HTTP smoke test failed"
+  if ! wait_for_release_readiness "$previous_dir"; then
+    log_error "Rollback readiness check failed"
+    send_deploy_alert "rollback_failed" "Readiness failed after rollback to $previous_dir"
+    exit 1
+  fi
+
+  if ! "$SCRIPT_DIR/smoke-test.sh" "$PUBLIC_BASE_URL"; then
+    log_error "Rollback smoke test failed"
     send_deploy_alert "rollback_failed" "Smoke failed after rollback to $previous_dir"
     exit 1
   fi
