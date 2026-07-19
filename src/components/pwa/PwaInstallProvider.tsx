@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -27,6 +28,11 @@ import {
   isValueMomentRoute,
   resolveInstallDialogMode,
 } from "@/lib/pwa/platform";
+import {
+  getInstallDialogMode,
+  setInstallDialogMode,
+  subscribeInstallDialogMode,
+} from "@/lib/pwa/dialog-copy";
 import { registerPwaServiceWorker, syncPwaProfileState } from "@/lib/pwa/register-sw";
 import { shouldShowPwaBanner } from "@/lib/pwa/state-machine";
 import {
@@ -66,6 +72,16 @@ export function usePwaInstall(): PwaInstallContextValue {
   return context;
 }
 
+const NATIVE_PROMPT_TIMEOUT_MS = 4_000;
+
+function useInstallDialogMode(): PwaInstallDialogMode | null {
+  return useSyncExternalStore(
+    subscribeInstallDialogMode,
+    getInstallDialogMode,
+    () => null,
+  );
+}
+
 type PwaInstallProviderProps = {
   children: ReactNode;
 };
@@ -80,9 +96,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [hasDeferredPrompt, setHasDeferredPrompt] = useState(false);
-  const [dialogMode, setDialogMode] = useState<PwaInstallDialogMode | null>(
-    null,
-  );
+  const dialogMode = useInstallDialogMode();
   const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
   const [sessionHiddenBanner, setSessionHiddenBanner] = useState(false);
 
@@ -179,6 +193,8 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       confirmPwaInstalled(platform);
       setHasDeferredPrompt(false);
       deferredPromptRef.current = null;
+      setInstallDialogMode(null);
+      setIsMenuDialogOpen(false);
 
       trackPwaEventOnce(
         `${analyticsSessionRef.current}:installed`,
@@ -214,7 +230,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   }, [isBannerVisible, platform]);
 
   const closeDialog = useCallback(() => {
-    setDialogMode(null);
+    setInstallDialogMode(null);
     setIsMenuDialogOpen(false);
   }, []);
 
@@ -236,7 +252,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
 
   const openInstructions = useCallback(
     (mode: PwaInstallDialogMode, source: "banner" | "menu") => {
-      setDialogMode(mode);
+      setInstallDialogMode(mode);
       setIsMenuDialogOpen(source === "menu");
 
       if (
@@ -277,86 +293,95 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
     [browserEnvironment.userAgent, isInApp, openInstructions, platform],
   );
 
-  const runNativeInstallPrompt = useCallback(
-    async (source: "banner" | "menu") => {
-      const promptEvent = deferredPromptRef.current;
+  const runNativeInstallFromDialog = useCallback(async () => {
+    const promptEvent = deferredPromptRef.current;
 
-      if (!promptEvent) {
-        openInstructionFallback(source);
-        return;
-      }
+    if (!promptEvent) {
+      return;
+    }
 
-      try {
-        await promptEvent.prompt();
-      } catch {
-        openInstructionFallback(source);
-        return;
-      }
+    const source: "banner" | "menu" = isMenuDialogOpen ? "menu" : "banner";
 
-      trackPwaEventOnce(
-        `${analyticsSessionRef.current}:install-click:${source}`,
-        "pwa_install_clicked",
-        { platform, source },
-      );
+    trackPwaEventOnce(
+      `${analyticsSessionRef.current}:install-click:${source}`,
+      "pwa_install_clicked",
+      { platform, source },
+    );
+
+    const promptPromise = promptEvent.prompt();
+    let timedOut = false;
+    let timeoutId = 0;
+
+    try {
+      await Promise.race([
+        promptPromise,
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            timedOut = true;
+            reject(new Error("pwa_prompt_timeout"));
+          }, NATIVE_PROMPT_TIMEOUT_MS);
+        }),
+      ]);
+
+      window.clearTimeout(timeoutId);
 
       trackPwaEventOnce(
         `${analyticsSessionRef.current}:prompt-shown:${source}`,
         "pwa_install_prompt_shown",
         { platform, source },
       );
+    } catch {
+      window.clearTimeout(timeoutId);
 
-      const choice = await promptEvent.userChoice;
-
-      if (choice.outcome === "accepted") {
-        recordPwaPromptAccepted();
-        setSessionHiddenBanner(true);
-
-        trackPwaEventOnce(
-          `${analyticsSessionRef.current}:accepted:${source}`,
-          "pwa_install_accepted",
-          { platform, source },
-        );
-      } else {
-        trackPwaEventOnce(
-          `${analyticsSessionRef.current}:dismissed:${source}`,
-          "pwa_install_dismissed",
-          { platform, source },
-        );
+      if (!timedOut) {
+        deferredPromptRef.current = null;
+        setHasDeferredPrompt(false);
       }
 
+      return;
+    }
+
+    let choice: Awaited<BeforeInstallPromptEvent["userChoice"]>;
+
+    try {
+      choice = await promptEvent.userChoice;
+    } catch {
       deferredPromptRef.current = null;
       setHasDeferredPrompt(false);
-    },
-    [openInstructionFallback, platform],
-  );
+      return;
+    }
+
+    deferredPromptRef.current = null;
+    setHasDeferredPrompt(false);
+
+    if (choice.outcome === "accepted") {
+      recordPwaPromptAccepted();
+      setSessionHiddenBanner(true);
+
+      trackPwaEventOnce(
+        `${analyticsSessionRef.current}:accepted:${source}`,
+        "pwa_install_accepted",
+        { platform, source },
+      );
+      return;
+    }
+
+    trackPwaEventOnce(
+      `${analyticsSessionRef.current}:dismissed:${source}`,
+      "pwa_install_dismissed",
+      { platform, source },
+    );
+  }, [isMenuDialogOpen, platform]);
 
   const openInstallFlow = useCallback(
     async (source: "banner" | "menu") => {
-      if (installState === "installed_confirmed" || isStandalone) {
-        openInstructions("installed", source);
+      if (isStandalone) {
         return;
       }
 
-      if (installCapability === "instructions_only") {
-        openInstructionFallback(source);
-        return;
-      }
-
-      if (installCapability === "unsupported") {
-        openInstructionFallback(source);
-        return;
-      }
-
-      await runNativeInstallPrompt(source);
+      openInstructionFallback(source);
     },
-    [
-      installCapability,
-      installState,
-      isStandalone,
-      openInstructionFallback,
-      openInstructions,
-      runNativeInstallPrompt,
-    ],
+    [isStandalone, openInstructionFallback],
   );
 
   const openMenuInstall = useCallback(() => {
@@ -373,9 +398,11 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       dialogMode,
       isBannerVisible,
       isMenuDialogOpen,
+      hasNativeInstallPrompt: hasDeferredPrompt,
       remindLater,
       openInstallFlow,
       openMenuInstall,
+      runNativeInstallFromDialog,
       closeDialog,
       dismissBannerForSession,
     }),
@@ -384,6 +411,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       closeDialog,
       dialogMode,
       dismissBannerForSession,
+      hasDeferredPrompt,
       installState,
       isAuthenticated,
       isBannerVisible,
@@ -392,6 +420,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       openInstallFlow,
       openMenuInstall,
       remindLater,
+      runNativeInstallFromDialog,
       uiVariant,
     ],
   );

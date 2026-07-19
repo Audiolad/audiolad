@@ -1,6 +1,7 @@
 "use client";
 
 import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
+import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 
 type SettingsApplicationSectionProps = {
   items: Array<{
@@ -13,14 +14,18 @@ type SettingsApplicationSectionProps = {
 export default function SettingsApplicationSection({
   items,
 }: SettingsApplicationSectionProps) {
+  const { isStandalone } = usePwaInstall();
+
   return (
     <section className="mt-8">
       <h2 className="text-[20px] font-semibold">Приложение</h2>
 
       <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-white">
-        <div className="border-b border-[#eee6f7]">
-          <PwaSettingsMenuItem variant="settings" />
-        </div>
+        {!isStandalone ? (
+          <div className="border-b border-[#eee6f7]">
+            <PwaSettingsMenuItem variant="settings" />
+          </div>
+        ) : null}
 
         {items.map((item, index) => (
           <button

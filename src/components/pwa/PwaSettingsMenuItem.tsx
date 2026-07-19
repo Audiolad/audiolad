@@ -8,26 +8,22 @@ type PwaSettingsMenuItemProps = {
   variant?: "profile" | "settings";
 };
 
+const INSTALL_SUBTITLE = "Добавьте иконку на экран";
+
 export default function PwaSettingsMenuItem({
   variant = "profile",
 }: PwaSettingsMenuItemProps) {
-  const { openInstallFlow, installState, isStandalone } = usePwaInstall();
-
-  const isInstalled = installState === "installed_confirmed" || isStandalone;
-
-  const description = isInstalled
-    ? "АудиоЛад уже добавлен на это устройство"
-    : variant === "settings"
-      ? "Добавьте приложение на экран или в браузер"
-      : "Установите приложение на это устройство";
+  const { openInstallFlow, isStandalone } = usePwaInstall();
 
   const handleInstallClick = useCallback(() => {
     void openInstallFlow("menu");
   }, [openInstallFlow]);
 
-  const actionLabel = isInstalled
-    ? "Показать статус установки АудиоЛад"
-    : "Установить АудиоЛад";
+  if (isStandalone) {
+    return null;
+  }
+
+  const actionLabel = "Установить АудиоЛад";
 
   if (variant === "settings") {
     return (
@@ -45,7 +41,7 @@ export default function PwaSettingsMenuItem({
           <span className="min-w-0">
             <span className="block font-medium">Установить АудиоЛад</span>
             <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
-              {description}
+              {INSTALL_SUBTITLE}
             </span>
           </span>
         </span>
@@ -62,13 +58,13 @@ export default function PwaSettingsMenuItem({
       type="button"
       aria-label={actionLabel}
       onClick={handleInstallClick}
-      className="flex min-h-[56px] w-full cursor-pointer items-center justify-between border-b border-[#eee6f7] px-5 py-4 text-left transition-colors hover:bg-[#faf6ff] active:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+      className="flex min-h-[56px] w-full cursor-pointer items-center justify-between gap-3 border-b border-[#eee6f7] px-5 py-4 text-left transition-colors hover:bg-[#faf6ff] active:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
     >
       <span className="text-[15px] leading-6 text-[#25135c]">
         Установить АудиоЛад
       </span>
-      <span className="max-w-[52%] truncate text-right text-xs text-[#7d70a2]">
-        {description}
+      <span className="hidden shrink-0 text-right text-xs leading-5 text-[#7d70a2] min-[390px]:inline">
+        {INSTALL_SUBTITLE}
       </span>
     </button>
   );

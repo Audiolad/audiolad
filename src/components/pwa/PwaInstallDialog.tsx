@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
+import {
+  getInstallDialogMode,
+  getPwaInstallDialogCopy,
+  PWA_INSTALL_BOOKMARK_FOOTNOTE,
+  shouldShowInstallBookmarkFootnote,
+  subscribeInstallDialogMode,
+} from "@/lib/pwa/dialog-copy";
 import type { PwaInstallDialogMode } from "@/lib/pwa/types";
 
 function CloseIcon() {
@@ -46,72 +53,97 @@ function ExternalLinkIcon() {
   );
 }
 
-type DialogCopy = {
-  title: string;
-  description: string;
-};
+function useInstallDialogAccessibility(
+  isOpen: boolean,
+  onClose: () => void,
+  panelRef: React.RefObject<HTMLDivElement | null>,
+) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
 
-function getDialogCopy(mode: PwaInstallDialogMode): DialogCopy {
-  switch (mode) {
-    case "ios":
-      return {
-        title: "Добавьте АудиоЛад на экран «Домой»",
-        description:
-          "Safari не показывает системное окно установки, но вы можете добавить приложение вручную:",
-      };
-    case "android":
-      return {
-        title: "Установите АудиоЛад на телефон",
-        description:
-          "Откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».",
-      };
-    case "in_app_browser":
-      return {
-        title: "Откройте АудиоЛад во внешнем браузере",
-        description:
-          "Во встроенном браузере MAX, Telegram и других приложений установка обычно недоступна. Продолжите установку в Safari или Chrome.",
-      };
-    case "desktop_chrome":
-      return {
-        title: "Установите АудиоЛад в Chrome",
-        description:
-          "Если системное окно не открылось, установите приложение через меню браузера или сохраните страницу в закладки.",
-      };
-    case "desktop_edge":
-      return {
-        title: "Установите АудиоЛад в Edge",
-        description:
-          "Если системное окно не открылось, установите приложение через меню браузера или сохраните страницу в закладки.",
-      };
-    case "desktop_safari":
-      return {
-        title: "Сохраните АудиоЛад в Safari",
-        description:
-          "В Safari на Mac можно добавить сайт в Dock или сохранить его в закладки.",
-      };
-    case "desktop_bookmark":
-      return {
-        title: "Сохраните АудиоЛад в браузере",
-        description:
-          "В этом браузере установка как приложение может быть недоступна. Сохраните страницу в закладки или используйте Chrome / Edge.",
-      };
-    case "installed":
-      return {
-        title: "АудиоЛад уже добавлен",
-        description:
-          "АудиоЛад уже добавлен на это устройство. Открывайте его с домашнего экрана или из списка приложений.",
-      };
-    default:
-      return {
-        title: "Установка недоступна",
-        description:
-          "Попробуйте открыть АудиоЛад в Chrome, Edge или Safari на поддерживаемом устройстве.",
-      };
-  }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const panel = panelRef.current;
+    const focusables = () => {
+      if (!panel) {
+        return [] as HTMLElement[];
+      }
+
+      return Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"));
+    };
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const initialFocus = focusables()[0] ?? panel;
+    initialFocus?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const nodes = focusables();
+
+      if (nodes.length === 0) {
+        return;
+      }
+
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (active === first || !panel?.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [isOpen, onClose, panelRef]);
 }
 
 export default function PwaInstallDialog() {
-  const { dialogMode, closeDialog } = usePwaInstall();
+  const {
+    closeDialog,
+    uiVariant,
+    hasNativeInstallPrompt,
+    runNativeInstallFromDialog,
+  } = usePwaInstall();
+  const dialogMode = useSyncExternalStore(
+    subscribeInstallDialogMode,
+    getInstallDialogMode,
+    () => null,
+  );
+  const panelRef = useRef<HTMLDivElement>(null);
+  const isMobile = uiVariant === "mobile";
+
+  useInstallDialogAccessibility(Boolean(dialogMode), closeDialog, panelRef);
 
   const openInExternalBrowser = useCallback(() => {
     if (typeof window === "undefined") {
@@ -130,19 +162,38 @@ export default function PwaInstallDialog() {
     return null;
   }
 
-  const { title, description } = getDialogCopy(dialogMode);
+  const { title, description } = getPwaInstallDialogCopy(dialogMode);
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-[#25135c]/35 p-4 sm:items-center"
+      className={
+        isMobile
+          ? "fixed inset-0 z-[60] flex items-end justify-center bg-[#25135c]/35 p-0"
+          : "fixed inset-0 z-[60] flex items-center justify-center bg-[#25135c]/35 p-4"
+      }
       role="presentation"
       onClick={closeDialog}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pwa-install-dialog-title"
-        className="w-full max-w-[430px] rounded-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_20px_50px_rgba(86,52,141,0.18)]"
+        aria-describedby="pwa-install-dialog-description"
+        tabIndex={-1}
+        className={
+          isMobile
+            ? "flex max-h-[min(100dvh,720px)] w-full max-w-[430px] flex-col overflow-y-auto rounded-t-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_20px_50px_rgba(86,52,141,0.22)]"
+            : "w-full max-w-[430px] rounded-[24px] border border-[#eadff8] bg-white p-5 shadow-[0_20px_50px_rgba(86,52,141,0.18)]"
+        }
+        style={
+          isMobile
+            ? {
+                paddingBottom:
+                  "max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem))",
+              }
+            : undefined
+        }
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -153,130 +204,184 @@ export default function PwaInstallDialog() {
             >
               {title}
             </h2>
-            <p className="mt-2 text-sm leading-6 text-[#796ba0]">{description}</p>
+            <p
+              id="pwa-install-dialog-description"
+              className="mt-2 text-sm leading-6 text-[#796ba0]"
+            >
+              {description}
+            </p>
           </div>
 
           <button
             type="button"
             aria-label="Закрыть"
             onClick={closeDialog}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#7042c5] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#7042c5] transition-colors hover:bg-[#f4ecfb] active:bg-[#eadff8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
           >
             <CloseIcon />
           </button>
         </div>
 
-        {dialogMode === "in_app_browser" ? (
-          <>
-            <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-              <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-                Нажмите «Поделиться» или «⋯» и выберите «Открыть в Safari» / «Открыть в
-                браузере».
-              </li>
-              <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-                Если пункта нет — скопируйте ссылку и вставьте её в Safari или Chrome.
-              </li>
-            </ul>
+        <InstallDialogInstructions
+          dialogMode={dialogMode}
+          onOpenExternalBrowser={openInExternalBrowser}
+        />
 
+        {shouldShowInstallBookmarkFootnote(dialogMode) ? (
+          <p className="mt-4 text-xs leading-5 text-[#9a8cb8]">
+            {PWA_INSTALL_BOOKMARK_FOOTNOTE}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-2">
+          {hasNativeInstallPrompt ? (
             <button
               type="button"
-              onClick={openInExternalBrowser}
-              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              onClick={() => void runNativeInstallFromDialog()}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white transition-colors active:bg-[#6238ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              <ExternalLinkIcon />
-              Открыть в браузере
+              Установить
             </button>
-          </>
-        ) : null}
+          ) : null}
 
-        {dialogMode === "ios" ? (
-          <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="flex items-start gap-3 rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
-                <ShareIcon />
-              </span>
-              <span>
-                <strong className="font-medium">1.</strong> Нажмите кнопку «Поделиться» в
-                нижней панели Safari.
-              </span>
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <strong className="font-medium">2.</strong> Выберите «На экран &quot;Домой&quot;».
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <strong className="font-medium">3.</strong> Подтвердите добавление.
-            </li>
-          </ol>
-        ) : null}
-
-        {dialogMode === "android" ? (
-          <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <strong className="font-medium">1.</strong> Откройте меню браузера (обычно «⋮» или
-              «⋯»).
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <strong className="font-medium">2.</strong> Выберите «Установить приложение» или
-              «Добавить на главный экран».
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              <strong className="font-medium">3.</strong> Подтвердите установку.
-            </li>
-          </ol>
-        ) : null}
-
-        {dialogMode === "desktop_chrome" || dialogMode === "desktop_edge" ? (
-          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Откройте меню браузера и выберите «Установить АудиоЛад» или «Установить
-              приложение», если пункт доступен.
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Нажмите <strong className="font-medium">Ctrl+D</strong> (или{" "}
-              <strong className="font-medium">Cmd+D</strong> на Mac), чтобы добавить страницу в
-              закладки.
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Создайте ярлык на рабочем столе через меню браузера, если такой пункт есть.
-            </li>
-          </ul>
-        ) : null}
-
-        {dialogMode === "desktop_safari" ? (
-          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              В меню «Файл» выберите «Добавить в Dock», чтобы закрепить АудиоЛад на панели
-              Dock.
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Нажмите <strong className="font-medium">Cmd+D</strong>, чтобы добавить страницу в
-              закладки.
-            </li>
-          </ul>
-        ) : null}
-
-        {dialogMode === "desktop_bookmark" ? (
-          <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              Нажмите <strong className="font-medium">Ctrl+D</strong> (или{" "}
-              <strong className="font-medium">Cmd+D</strong> на Mac), чтобы добавить страницу
-              в закладки.
-            </li>
-            <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-              В Chrome или Edge откройте меню браузера и выберите «Установить АудиоЛад» или
-              «Установить приложение», если пункт доступен.
-            </li>
-          </ul>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={closeDialog}
-          className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          Понятно
-        </button>
+          <button
+            type="button"
+            onClick={closeDialog}
+            className={
+              hasNativeInstallPrompt
+                ? "inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-sm font-medium text-[#7042c5] transition-colors active:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                : "inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white transition-colors active:bg-[#6238ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            }
+          >
+            Понятно
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+type InstallDialogInstructionsProps = {
+  dialogMode: PwaInstallDialogMode;
+  onOpenExternalBrowser: () => void;
+};
+
+function InstallDialogInstructions({
+  dialogMode,
+  onOpenExternalBrowser,
+}: InstallDialogInstructionsProps) {
+  if (dialogMode === "in_app_browser") {
+    return (
+      <>
+        <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+          <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+            Нажмите «Поделиться» или «⋯» и выберите «Открыть в Safari» / «Открыть в
+            браузере».
+          </li>
+          <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+            Если пункта нет — скопируйте ссылку и вставьте её в Safari или Chrome.
+          </li>
+        </ul>
+
+        <button
+          type="button"
+          onClick={onOpenExternalBrowser}
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          <ExternalLinkIcon />
+          Открыть в браузере
+        </button>
+      </>
+    );
+  }
+
+  if (dialogMode === "ios") {
+    return (
+      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <li className="flex items-start gap-3 rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
+            <ShareIcon />
+          </span>
+          <span>
+            <strong className="font-medium">1.</strong> Нажмите кнопку «Поделиться».
+          </span>
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">2.</strong> Выберите «На экран &quot;Домой&quot;».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">3.</strong> Нажмите «Добавить».
+        </li>
+      </ol>
+    );
+  }
+
+  if (dialogMode === "android") {
+    return (
+      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">1.</strong> Откройте меню браузера — значок ⋮
+          или ≡.
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">2.</strong> Выберите «Установить приложение»
+          или «Добавить на главный экран».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">3.</strong> Подтвердите добавление иконки.
+        </li>
+      </ol>
+    );
+  }
+
+  if (dialogMode === "desktop_chrome" || dialogMode === "desktop_edge") {
+    return (
+      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">1.</strong> Откройте меню браузера — значок ⋮
+          или ≡.
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">2.</strong> Выберите «Установить АудиоЛад» или
+          «Установить приложение».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">3.</strong> Подтвердите установку приложения.
+        </li>
+      </ol>
+    );
+  }
+
+  if (dialogMode === "desktop_safari") {
+    return (
+      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">1.</strong> В меню «Файл» выберите «Добавить в
+          Dock».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">2.</strong> Подтвердите добавление АудиоЛад в Dock.
+        </li>
+      </ol>
+    );
+  }
+
+  if (dialogMode === "desktop_bookmark") {
+    return (
+      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">1.</strong> Откройте АудиоЛад в Chrome или Edge.
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">2.</strong> Откройте меню браузера и выберите
+          «Установить АудиоЛад» или «Установить приложение».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">3.</strong> Подтвердите установку приложения.
+        </li>
+      </ol>
+    );
+  }
+
+  return null;
 }

@@ -207,7 +207,8 @@ function testAndroidUsesPromptCapability() {
 
   assert(provider.includes("beforeinstallprompt"), "captures beforeinstallprompt");
   assert(provider.includes("appinstalled"), "handles appinstalled");
-  assert(provider.includes("promptEvent.prompt()"), "calls native prompt on click");
+  assert(provider.includes("runNativeInstallFromDialog"), "native prompt runs from dialog");
+  assert(provider.includes("promptEvent.prompt()"), "calls native prompt explicitly");
 }
 
 function testAndroidInstructionsOnly() {
@@ -217,6 +218,10 @@ function testAndroidInstructionsOnly() {
   );
   const dialog = readFileSync(
     "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+  const dialogCopy = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
     "utf8",
   );
 
@@ -229,6 +234,10 @@ function testAndroidInstructionsOnly() {
   assert(
     dialog.includes("Установить приложение"),
     "android instructions mention install",
+  );
+  assert(
+    dialogCopy.includes("Установить АудиоЛад"),
+    "android fallback title is unified",
   );
 }
 
@@ -243,9 +252,18 @@ function testDesktopInstallFallback() {
   );
 
   assert(provider.includes("openInstructionFallback"), "install fallback helper exists");
-  assert(provider.includes("catch"), "native prompt errors fall back to instructions");
+  assert(
+    !provider.match(/runNativeInstallFromDialog[\s\S]{0,500}closeDialog\(\)/),
+    "native prompt dismiss keeps instruction dialog open",
+  );
   assert(dialog.includes("desktop_chrome"), "chrome desktop instructions");
   assert(dialog.includes("desktop_safari"), "safari desktop instructions");
+  assert(
+    readFileSync("/var/www/audiolad/src/lib/pwa/dialog-copy.ts", "utf8").includes(
+      "закладках браузера",
+    ),
+    "bookmark note is secondary",
+  );
 }
 
 function testMobileBannerPlatformHint() {
@@ -280,9 +298,18 @@ function testIosInstructionsOnly() {
     "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
     "utf8",
   );
+  const dialogCopy = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
+    "utf8",
+  );
 
   assert(dialog.includes("На экран"), "ios instructions mention Add to Home Screen");
   assert(dialog.includes("Поделиться"), "ios instructions mention Share");
+  assert(dialog.includes("Добавить"), "ios instructions mention Add button");
+  assert(
+    dialogCopy.includes("Установить АудиоЛад"),
+    "ios fallback title is unified",
+  );
 }
 
 function testMenuItemAlwaysAvailable() {
@@ -518,6 +545,10 @@ function testPwaProviderErrorBoundary() {
     settingsError.includes("Не удалось загрузить настройки"),
     "settings route has localized error boundary",
   );
+  assert(
+    boundary.includes("PwaInstallDialog"),
+    "pwa boundary keeps install dialog available on fallback",
+  );
   assert(settingsError.includes("Обновить страницу"), "settings error has retry");
 }
 
@@ -540,9 +571,11 @@ function testPwaFallbackContextContract() {
     "dialogMode",
     "isBannerVisible",
     "isMenuDialogOpen",
+    "hasNativeInstallPrompt",
     "remindLater",
     "openInstallFlow",
     "openMenuInstall",
+    "runNativeInstallFromDialog",
     "closeDialog",
     "dismissBannerForSession",
   ];
@@ -697,6 +730,176 @@ function testClickDoesNotConfirmInstallAlone() {
   testAcceptedDoesNotConfirmInstall();
 }
 
+function testMenuItemVisibilityRules() {
+  const menuItem = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
+    "utf8",
+  );
+  const settingsSection = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsSection.tsx",
+    "utf8",
+  );
+
+  assert(menuItem.includes("if (isStandalone)"), "menu item hides only in standalone");
+  assert(
+    !menuItem.includes("installed_confirmed"),
+    "menu item does not hide from persistent install status",
+  );
+  assert(
+    !settingsSection.includes("installed_confirmed"),
+    "settings section does not hide install row from persistent status",
+  );
+  assert(settingsSection.includes("!isStandalone"), "settings section hides in standalone");
+}
+
+function testOpenInstallFlowAlwaysOpensDialog() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+
+  assert(
+    provider.match(
+      /const openInstallFlow[\s\S]{0,220}openInstructionFallback\(source\)/,
+    ),
+    "menu click always opens instruction dialog first",
+  );
+  assert(
+    !provider.match(/const openInstallFlow[\s\S]{0,500}runNativeInstallFromDialog/),
+    "menu click does not invoke native prompt directly",
+  );
+  assert(
+    !provider.match(/const openInstallFlow[\s\S]{0,220}installed_confirmed/),
+    "stale installed status does not block opening dialog",
+  );
+}
+
+function testNativePromptAvailablePath() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(provider.includes("runNativeInstallFromDialog"), "native prompt helper exists");
+  assert(provider.includes("promptEvent.prompt()"), "native prompt is invoked explicitly");
+  assert(provider.includes("userChoice"), "native prompt handles user choice");
+  assert(provider.includes("NATIVE_PROMPT_TIMEOUT_MS"), "native prompt has timeout guard");
+  assert(
+    dialog.includes("hasNativeInstallPrompt") && dialog.includes("Установить"),
+    "dialog exposes native install button when prompt is available",
+  );
+  assert(
+    !provider.match(/runNativeInstallFromDialog[\s\S]{0,700}closeDialog\(\)/),
+    "native prompt dismiss/error/timeout keeps instruction dialog open",
+  );
+}
+
+function testInstructionsFallbackWithoutPrompt() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+  const dialogCopy = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
+    "utf8",
+  );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(provider.includes("openInstructionFallback"), "provider opens instruction fallback");
+  assert(
+    dialogCopy.includes("Установить АудиоЛад") &&
+      dialogCopy.includes("Добавьте АудиоЛад на главный экран"),
+    "mobile fallback copy matches product wording",
+  );
+  assert(dialog.includes('dialogMode === "android"'), "android instruction steps render");
+  assert(dialog.includes("⋮"), "android steps mention overflow menu icon");
+  assert(dialog.includes("Понятно"), "manual fallback keeps dismiss button");
+}
+
+function testStandaloneHidesInstallMenuItem() {
+  const menuItem = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
+    "utf8",
+  );
+
+  assert(menuItem.includes("isStandalone"), "standalone participates in hide logic");
+  assert(
+    !menuItem.includes("installState === \"installed_confirmed\""),
+    "standalone is the only hide condition in menu item",
+  );
+}
+
+function testClosingDialogDoesNotConfirmInstall() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(provider.includes("setInstallDialogMode(null)"), "close dialog clears dialog mode");
+  assert(
+    !provider.match(/runNativeInstallFromDialog[\s\S]{0,400}confirmPwaInstalled/),
+    "native accepted outcome does not confirm install without appinstalled",
+  );
+  assert(dialog.includes("onClick={closeDialog}"), "dialog close button only closes UI");
+}
+
+function testInstallDialogAccessibility() {
+  const dialog = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
+    "utf8",
+  );
+
+  assert(dialog.includes('role="dialog"'), "dialog exposes dialog role");
+  assert(dialog.includes("aria-modal"), "dialog is modal");
+  assert(dialog.includes("aria-labelledby"), "dialog has labelled title");
+  assert(dialog.includes('event.key === "Escape"'), "dialog closes on Escape");
+  assert(dialog.includes("document.body.style.overflow = \"hidden\""), "dialog locks scroll");
+  assert(dialog.includes("safe-area-inset-bottom"), "dialog respects safe area");
+}
+
+function testInstallDialogControllerWiring() {
+  const provider = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
+    "utf8",
+  );
+  const controller = readFileSync(
+    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
+    "utf8",
+  );
+
+  assert(controller.includes("setInstallDialogMode"), "dialog controller exposes setter");
+  assert(provider.includes("setInstallDialogMode"), "provider uses dialog controller");
+  assert(provider.includes("useInstallDialogMode"), "provider subscribes to dialog controller");
+}
+
+function testProfileInstallSubtitle() {
+  const menuItem = readFileSync(
+    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
+    "utf8",
+  );
+
+  assert(menuItem.includes("Добавьте иконку на экран"), "profile uses short subtitle");
+  assert(
+    !menuItem.includes("truncate"),
+    "profile install row no longer truncates subtitle",
+  );
+  assert(
+    menuItem.includes("min-[390px]:inline"),
+    "profile subtitle hides on narrow screens",
+  );
+}
+
 const tests = [
   ["guest does not see banner", testGuestDoesNotSeeBanner],
   ["registered user after value moment", testRegisteredUserAfterValueMoment],
@@ -732,6 +935,15 @@ const tests = [
   ["corrupted storage fallback", testCorruptedStorageFallback],
   ["service worker no offline html", testServiceWorkerNoOfflineHtml],
   ["click does not confirm install", testClickDoesNotConfirmInstallAlone],
+  ["menu item visibility rules", testMenuItemVisibilityRules],
+  ["open install flow always opens dialog", testOpenInstallFlowAlwaysOpensDialog],
+  ["native prompt available path", testNativePromptAvailablePath],
+  ["instructions fallback without prompt", testInstructionsFallbackWithoutPrompt],
+  ["standalone hides install menu item", testStandaloneHidesInstallMenuItem],
+  ["closing dialog does not confirm install", testClosingDialogDoesNotConfirmInstall],
+  ["install dialog accessibility", testInstallDialogAccessibility],
+  ["install dialog controller wiring", testInstallDialogControllerWiring],
+  ["profile install subtitle", testProfileInstallSubtitle],
 ];
 
 let failed = 0;

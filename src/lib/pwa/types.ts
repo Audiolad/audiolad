@@ -37,9 +37,11 @@ export type PwaInstallContextValue = {
   dialogMode: PwaInstallDialogMode | null;
   isBannerVisible: boolean;
   isMenuDialogOpen: boolean;
+  hasNativeInstallPrompt: boolean;
   remindLater: () => void;
   openInstallFlow: (source: "banner" | "menu") => Promise<void>;
   openMenuInstall: () => void;
+  runNativeInstallFromDialog: () => Promise<void>;
   closeDialog: () => void;
   dismissBannerForSession: () => void;
 };

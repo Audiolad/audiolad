@@ -1,4 +1,5 @@
 import type { PwaInstallContextValue } from "@/lib/pwa/types";
+import { setInstallDialogMode } from "@/lib/pwa/dialog-copy";
 
 const noop = () => {};
 const noopAsync = async () => {};
@@ -16,9 +17,13 @@ export const PWA_INSTALL_FALLBACK_CONTEXT: PwaInstallContextValue = {
   dialogMode: null,
   isBannerVisible: false,
   isMenuDialogOpen: false,
+  hasNativeInstallPrompt: false,
   remindLater: noop,
   openInstallFlow: noopAsync,
   openMenuInstall: noop,
-  closeDialog: noop,
+  runNativeInstallFromDialog: noopAsync,
+  closeDialog: () => {
+    setInstallDialogMode(null);
+  },
   dismissBannerForSession: noop,
 };
