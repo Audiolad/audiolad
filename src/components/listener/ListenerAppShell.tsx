@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
-import PlatformSearchCombobox from "@/components/listener/PlatformSearchCombobox";
+import DesktopShellSearch from "@/components/listener/DesktopShellSearch";
 import DesktopPlayerBar from "@/components/listener/DesktopPlayerBar";
 import DesktopRightColumn from "@/components/listener/DesktopRightColumn";
 import DesktopSidebar from "@/components/listener/DesktopSidebar";
@@ -28,8 +28,8 @@ export function ListenerAppShell({
 
         <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
           <div className="listener-app-shell__center-scroll xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-y-auto xl:pb-[calc(1rem+var(--listener-desktop-player-height,0px))]">
-            <div className="shrink-0 px-5 pb-3 pt-4 xl:px-6 xl:pb-0 xl:pt-0">
-              <PlatformSearchCombobox />
+            <div className="hidden shrink-0 xl:block xl:min-h-[58px] xl:px-6 xl:pb-0 xl:pt-0">
+              <DesktopShellSearch />
             </div>
             {children}
           </div>

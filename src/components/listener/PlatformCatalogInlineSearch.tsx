@@ -9,7 +9,9 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import PlatformSearchField from "@/components/listener/PlatformSearchField";
+import PlatformSearchField, {
+  type PlatformSearchFieldDensity,
+} from "@/components/listener/PlatformSearchField";
 import {
   PLATFORM_SEARCH_CATALOG_URL_DEBOUNCE_MS,
   buildPlatformSearchCatalogHref,
@@ -20,9 +22,13 @@ import {
 } from "@/lib/catalog/platform-search";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 
-type PlatformCatalogInlineSearchProps = Record<string, never>;
+type PlatformCatalogInlineSearchProps = {
+  density?: PlatformSearchFieldDensity;
+};
 
-export default function PlatformCatalogInlineSearch({}: PlatformCatalogInlineSearchProps) {
+export default function PlatformCatalogInlineSearch({
+  density = "shell",
+}: PlatformCatalogInlineSearchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const catalogUrlDebounceRef = useRef<number | null>(null);
@@ -125,6 +131,7 @@ export default function PlatformCatalogInlineSearch({}: PlatformCatalogInlineSea
   return (
     <PlatformSearchField
       ariaLabel="Поиск аудиопродуктов в каталоге"
+      density={density}
       inputValue={inputValue}
       showClearButton={normalizedInput.length > 0}
       showDropdown={false}

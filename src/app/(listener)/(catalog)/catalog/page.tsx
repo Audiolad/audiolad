@@ -86,7 +86,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       <h1 className="hidden text-[28px] font-semibold xl:block">Каталог</h1>
 
       {!isSearchActive ? (
-        <p className="mt-4 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
+        <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
           {activeTopicTitle
             ? `Аудиопрактики и программы по теме «${activeTopicTitle}».`
             : "Опубликованные аудиопрактики и программы авторов платформы."}

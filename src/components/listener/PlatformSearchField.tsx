@@ -2,6 +2,8 @@
 
 import { useId, type FormEvent, type KeyboardEvent } from "react";
 
+export type PlatformSearchFieldDensity = "shell" | "compact";
+
 type PlatformSearchFieldProps = {
   inputId?: string;
   ariaLabel: string;
@@ -12,6 +14,7 @@ type PlatformSearchFieldProps = {
   activeDescendantId: string | undefined;
   activeTopicKey: string | null;
   enterHref: string;
+  density?: PlatformSearchFieldDensity;
   onInputChange: (value: string) => void;
   onInputFocus: () => void;
   onInputClick: () => void;
@@ -54,8 +57,15 @@ function ClearIcon() {
   );
 }
 
-const formClassName =
+const shellFormClassName =
   "relative flex min-w-0 items-center gap-2 rounded-[22px] border border-[#ded1f1] bg-white px-3 py-2 shadow-[0_2px_10px_rgba(90,60,145,0.04)] sm:gap-3 sm:px-4 sm:py-2.5 xl:h-[58px] xl:min-h-[58px] xl:gap-3 xl:rounded-[18px] xl:border-[#e8ddf5] xl:px-4 xl:py-0 xl:shadow-[0_2px_10px_rgba(90,60,145,0.04)] xl:transition-[border-color,box-shadow] xl:focus-within:border-[#dcc9f2] xl:focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]";
+
+const compactFormClassName =
+  "relative flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]";
+
+function resolveFormClassName(density: PlatformSearchFieldDensity): string {
+  return density === "compact" ? compactFormClassName : shellFormClassName;
+}
 
 export default function PlatformSearchField({
   inputId: inputIdProp,
@@ -67,6 +77,7 @@ export default function PlatformSearchField({
   activeDescendantId,
   activeTopicKey,
   enterHref,
+  density = "shell",
   onInputChange,
   onInputFocus,
   onInputClick,
@@ -76,12 +87,15 @@ export default function PlatformSearchField({
 }: PlatformSearchFieldProps) {
   const generatedInputId = useId();
   const inputId = inputIdProp ?? generatedInputId;
+  const formClassName = resolveFormClassName(density);
+  const isCompact = density === "compact";
 
   return (
     <form
       method="get"
       action={enterHref}
       role="search"
+      data-platform-search={density}
       onSubmit={onFormSubmit}
       className={formClassName}
     >
@@ -112,7 +126,9 @@ export default function PlatformSearchField({
         aria-controls={showDropdown ? listboxId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={showDropdown ? activeDescendantId : undefined}
-        className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none xl:leading-none"
+        className={`min-w-0 flex-1 border-0 bg-transparent text-[15px] leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none ${
+          isCompact ? "py-0" : "py-2 xl:leading-none"
+        }`}
       />
 
       {activeTopicKey ? (
@@ -131,7 +147,9 @@ export default function PlatformSearchField({
       ) : (
         <button
           type="submit"
-          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] px-3 text-sm font-medium text-white transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:px-4 xl:h-9"
+          className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-sm font-medium text-white transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+            isCompact ? "h-9 px-3" : "h-10 px-3 sm:px-4 xl:h-9"
+          }`}
         >
           Найти
         </button>
@@ -140,7 +158,13 @@ export default function PlatformSearchField({
   );
 }
 
-export function PlatformSearchSkeleton() {
+export function PlatformSearchSkeleton({
+  density = "shell",
+}: {
+  density?: PlatformSearchFieldDensity;
+}) {
+  const formClassName = resolveFormClassName(density);
+
   return (
     <div className="relative z-30" aria-hidden="true">
       <div className={`${formClassName} animate-pulse`}>
