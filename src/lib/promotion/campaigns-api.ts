@@ -253,7 +253,7 @@ export async function loadAuthorPromotionSummary(
         campaign_name: String(row.campaign_name),
         campaign_key: String(row.campaign_key),
         campaign_status: row.campaign_status === "archived" ? "archived" : "active",
-        practice_id: String(row.practice_id),
+        practice_id: row.practice_id ? String(row.practice_id) : "",
         practice_title: String(row.practice_title),
         practice_slug: String(row.practice_slug),
         author_slug: String(row.author_slug),
