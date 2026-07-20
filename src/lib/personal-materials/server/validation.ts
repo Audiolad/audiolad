@@ -2,6 +2,10 @@ import {
   PERSONAL_MATERIAL_LIMITS,
   PERSONAL_MATERIAL_TYPES,
 } from "@/lib/personal-materials/types";
+import {
+  validateReturnButtonLabel,
+  validateReturnUrl,
+} from "@/lib/personal-materials/return-url";
 
 import { PersonalMaterialApiError } from "./errors";
 import { isValidMaterialType } from "./repository";
@@ -56,6 +60,30 @@ function parseMaterialDate(value: unknown): string {
   return value.trim();
 }
 
+function parseReturnUrlField(value: unknown): string | null {
+  const parsed = validateReturnUrl(
+    value === undefined ? null : (value as string | null),
+  );
+
+  if (!parsed.valid) {
+    throw new PersonalMaterialApiError("invalid_request", 400);
+  }
+
+  return parsed.normalized;
+}
+
+function parseReturnButtonLabelField(value: unknown): string | null {
+  const parsed = validateReturnButtonLabel(
+    value === undefined ? null : (value as string | null),
+  );
+
+  if (!parsed.valid) {
+    throw new PersonalMaterialApiError("invalid_request", 400);
+  }
+
+  return parsed.normalized;
+}
+
 export function parseCreatePersonalMaterialBody(body: unknown) {
   if (typeof body !== "object" || body === null) {
     throw new PersonalMaterialApiError("invalid_request", 400);
@@ -98,6 +126,8 @@ export function parseCreatePersonalMaterialBody(body: unknown) {
       record.personalRecommendation,
       PERSONAL_MATERIAL_LIMITS.recommendationMaxLength,
     ),
+    returnUrl: parseReturnUrlField(record.returnUrl),
+    returnButtonLabel: parseReturnButtonLabelField(record.returnButtonLabel),
   };
 }
 
@@ -158,6 +188,12 @@ export function parseUpdatePersonalMaterialBody(body: unknown) {
             record.personalRecommendation,
             PERSONAL_MATERIAL_LIMITS.recommendationMaxLength,
           ),
+    returnUrl:
+      record.returnUrl === undefined ? undefined : parseReturnUrlField(record.returnUrl),
+    returnButtonLabel:
+      record.returnButtonLabel === undefined
+        ? undefined
+        : parseReturnButtonLabelField(record.returnButtonLabel),
   };
 }
 

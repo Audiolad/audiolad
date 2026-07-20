@@ -10,6 +10,8 @@ export type AuthorPersonalMaterial = {
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
+  returnUrl: string | null;
+  returnButtonLabel: string | null;
   status: "draft" | "active" | "revoked" | "deleted";
   guestAccessEnabled: boolean;
   claimed: boolean;
@@ -32,6 +34,8 @@ export type CreateAuthorPersonalMaterialInput = {
   materialDate: string;
   description?: string | null;
   personalRecommendation?: string | null;
+  returnUrl?: string | null;
+  returnButtonLabel?: string | null;
 };
 
 export type UpdateAuthorPersonalMaterialInput = {
@@ -42,6 +46,8 @@ export type UpdateAuthorPersonalMaterialInput = {
   materialDate?: string;
   description?: string | null;
   personalRecommendation?: string | null;
+  returnUrl?: string | null;
+  returnButtonLabel?: string | null;
 };
 
 export type ActivateAuthorPersonalMaterialResponse = {

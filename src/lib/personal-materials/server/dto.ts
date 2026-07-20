@@ -14,6 +14,8 @@ export type SafeAuthorPersonalMaterialDto = {
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
+  returnUrl: string | null;
+  returnButtonLabel: string | null;
   status: PersonalMaterialStatus;
   guestAccessEnabled: boolean;
   claimed: boolean;
@@ -37,6 +39,8 @@ export type SafeGuestPersonalMaterialDto = {
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
+  returnUrl: string | null;
+  returnButtonLabel: string | null;
   author: {
     id: string;
     name: string;
@@ -61,6 +65,8 @@ export function toSafeAuthorPersonalMaterialDto(
     materialDate: row.material_date,
     description: row.description,
     personalRecommendation: row.personal_recommendation,
+    returnUrl: row.return_url,
+    returnButtonLabel: row.return_button_label,
     status: row.status,
     guestAccessEnabled: row.guest_access_enabled,
     claimed: row.claimed_by_user_id !== null,
@@ -99,6 +105,8 @@ export function toSafeGuestPersonalMaterialDto(input: {
     materialDate: input.material.material_date,
     description: input.material.description,
     personalRecommendation: input.material.personal_recommendation,
+    returnUrl: input.material.return_url,
+    returnButtonLabel: input.material.return_button_label,
     author: {
       id: input.author.id,
       name: input.author.name,

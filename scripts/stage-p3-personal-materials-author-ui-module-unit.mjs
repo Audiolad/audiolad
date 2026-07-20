@@ -47,6 +47,8 @@ const valid = validatePersonalMaterialForm({
   title: "",
   description: "",
   personalRecommendation: "",
+  returnUrl: "",
+  returnButtonLabel: "",
 });
 assert.equal(Object.keys(valid).length, 0);
 
@@ -58,6 +60,8 @@ const invalid = validatePersonalMaterialForm({
   title: "",
   description: "",
   personalRecommendation: "",
+  returnUrl: "",
+  returnButtonLabel: "",
 });
 assert.ok(invalid.clientFirstName);
 

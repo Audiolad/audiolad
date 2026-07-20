@@ -54,6 +54,8 @@ function materialToFormValues(material: AuthorPersonalMaterial): PersonalMateria
     title: material.title ?? "",
     description: material.description ?? "",
     personalRecommendation: material.personalRecommendation ?? "",
+    returnUrl: material.returnUrl ?? "",
+    returnButtonLabel: material.returnButtonLabel ?? "",
   };
 }
 
@@ -181,6 +183,8 @@ export default function AuthorDiagnosticsEditorClient({
         title: formValues.title.trim() || null,
         description: formValues.description.trim() || null,
         personalRecommendation: formValues.personalRecommendation.trim() || null,
+        returnUrl: formValues.returnUrl.trim() || null,
+        returnButtonLabel: formValues.returnButtonLabel.trim() || null,
       });
 
       const nextValues = materialToFormValues(updated);

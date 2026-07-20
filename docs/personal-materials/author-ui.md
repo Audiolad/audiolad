@@ -65,6 +65,17 @@ All pages use existing `AuthorShell` inside `ListenerAppShell mode="author"`.
 - Drag-and-drop and file picker supported.
 - Replace and delete supported for drafts.
 
+## Return to chat
+
+Optional block **Возврат в чат** in create/edit forms:
+
+- **Ссылка на чат** — HTTPS URL (localhost HTTP allowed for testing)
+- **Текст кнопки** — max 120 chars, optional
+
+If URL is set without label, guest UI uses default: «Вернуться в чат с автором».
+
+`PersonalMaterialReturnChatCta` component is prepared for future guest page (secondary CTA after player/description).
+
 ## Mobile behavior
 
 - Cards instead of wide tables on list.
@@ -105,7 +116,7 @@ Also run existing P1/P2 tests when validating full personal materials stack.
 
 ## Not in this phase
 
-- Guest page `/d/[token]` with player
+- Guest page `/d/[token]` with player (return CTA component `PersonalMaterialReturnChatCta` is prepared)
 - Claim flow and `/my-materials`
 - Progress, PDF upload, author notes UI
 - Email delivery of links

@@ -68,6 +68,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         patch.personalRecommendation !== undefined
           ? patch.personalRecommendation
           : material.personal_recommendation,
+      returnUrl: patch.returnUrl !== undefined ? patch.returnUrl : material.return_url,
+      returnButtonLabel:
+        patch.returnButtonLabel !== undefined
+          ? patch.returnButtonLabel
+          : material.return_button_label,
     });
 
     if (patch.materialType && patch.materialType !== material.material_type) {

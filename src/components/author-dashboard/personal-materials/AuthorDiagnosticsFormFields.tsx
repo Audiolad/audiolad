@@ -175,6 +175,62 @@ export default function AuthorDiagnosticsFormFields({
           </span>
         ) : null}
       </div>
+
+      <section className="min-w-0 rounded-[20px] border border-[#eadff8] bg-[#faf6ff] p-4">
+        <h4 className="text-[16px] font-semibold text-[#3f365d]">Возврат в чат</h4>
+        <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+          После прослушивания клиент сможет по этой кнопке вернуться в вашу переписку.
+        </p>
+
+        <div className="mt-4 grid min-w-0 gap-4">
+          <div className="block min-w-0">
+            <label
+              htmlFor={`${idPrefix}-return-url`}
+              className="mb-2 block text-sm font-medium text-[#5f5484]"
+            >
+              Ссылка на чат
+            </label>
+            <input
+              id={`${idPrefix}-return-url`}
+              type="url"
+              inputMode="url"
+              value={values.returnUrl}
+              disabled={disabled || readOnly}
+              onChange={(event) => onChange("returnUrl", event.target.value)}
+              placeholder="Вставьте ссылку на чат в MAX, Telegram или другом сервисе"
+              className={fieldClassName}
+              autoComplete="off"
+            />
+            {errors.returnUrl ? (
+              <span className="mt-1 block text-sm text-[#b42318]">{errors.returnUrl}</span>
+            ) : null}
+          </div>
+
+          <div className="block min-w-0">
+            <label
+              htmlFor={`${idPrefix}-return-button-label`}
+              className="mb-2 block text-sm font-medium text-[#5f5484]"
+            >
+              Текст кнопки
+            </label>
+            <input
+              id={`${idPrefix}-return-button-label`}
+              type="text"
+              value={values.returnButtonLabel}
+              disabled={disabled || readOnly}
+              onChange={(event) => onChange("returnButtonLabel", event.target.value)}
+              placeholder="Вернуться в чат с Сергеем Петровым"
+              className={`${fieldClassName} break-words`}
+              autoComplete="off"
+            />
+            {errors.returnButtonLabel ? (
+              <span className="mt-1 block break-words text-sm text-[#b42318]">
+                {errors.returnButtonLabel}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

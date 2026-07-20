@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const { data: material, error } = await supabase
       .from("personal_materials")
       .select(
-        "id, author_id, created_by, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, audio_path, audio_original_filename, audio_mime_type, audio_size_bytes, duration_seconds, pdf_path, pdf_original_filename, pdf_mime_type, pdf_size_bytes, status, access_token_hash, guest_access_enabled, token_created_at, expires_at, claimed_by_user_id, claimed_at, first_opened_at, first_audio_started_at, revoked_at, deleted_at, created_at, updated_at",
+        "id, author_id, created_by, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, return_url, return_button_label, audio_path, audio_original_filename, audio_mime_type, audio_size_bytes, duration_seconds, pdf_path, pdf_original_filename, pdf_mime_type, pdf_size_bytes, status, access_token_hash, guest_access_enabled, token_created_at, expires_at, claimed_by_user_id, claimed_at, first_opened_at, first_audio_started_at, revoked_at, deleted_at, created_at, updated_at",
       )
       .eq("id", materialId)
       .maybeSingle();
