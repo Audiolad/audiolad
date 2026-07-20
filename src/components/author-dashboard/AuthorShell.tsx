@@ -40,21 +40,21 @@ export default function AuthorShell({
   actions,
 }: AuthorShellProps) {
   return (
-    <div className="listener-author-shell mx-auto w-full max-w-[960px] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] xl:max-w-none xl:px-6 xl:pb-8 xl:pt-4">
-      <header className="flex items-start justify-between gap-3">
+    <div className="listener-author-shell mx-auto w-full min-w-0 max-w-[960px] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] xl:max-w-none xl:px-6 xl:pb-8 xl:pt-4">
+      <header className="flex min-w-0 max-w-full items-start justify-between gap-2 sm:gap-3">
         <Link
           href={AUTHOR_DASHBOARD_EXIT_HREF}
-          className="inline-flex min-h-11 max-w-[46%] shrink-0 items-center gap-2 rounded-full border border-[#e4d7f4] bg-white px-3 py-2 text-left text-sm font-semibold text-[#7042c5] transition hover:border-[#c6afe6] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:max-w-none sm:px-4"
+          className="inline-flex min-h-11 max-w-[42%] shrink-0 items-center gap-2 rounded-full border border-[#e4d7f4] bg-white px-3 py-2 text-left text-sm font-semibold text-[#7042c5] transition hover:border-[#c6afe6] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:max-w-none sm:px-4"
         >
           <BackIcon />
           <span className="hidden sm:inline">← Вернуться в АудиоЛад</span>
           <span className="sm:hidden">← В АудиоЛад</span>
         </Link>
 
-        <div className="min-w-0 flex-1 px-1 text-center">
-          <h1 className="text-[22px] font-semibold leading-tight">{title}</h1>
+        <div className="min-w-0 flex-1 overflow-hidden px-1 text-center">
+          <h1 className="truncate text-[22px] font-semibold leading-tight">{title}</h1>
           {subtitle ? (
-            <p className="mt-1 text-xs text-[#7d70a2]">{subtitle}</p>
+            <p className="mt-1 truncate text-xs text-[#7d70a2]">{subtitle}</p>
           ) : null}
         </div>
 
@@ -75,7 +75,7 @@ export default function AuthorShell({
         </div>
       ) : null}
 
-      <div className="mt-6">{children}</div>
+      <div className="mt-6 min-w-0">{children}</div>
     </div>
   );
 }
