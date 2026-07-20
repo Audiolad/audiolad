@@ -76,6 +76,22 @@ export function mapPromoPageRpcErrorMessage(message: string): {
     return { error: "promo_page_cta_href_invalid", status: 400 };
   }
 
+  if (normalized.includes("promo_page_cta_label_required")) {
+    return { error: "promo_page_cta_label_required", status: 400 };
+  }
+
+  if (normalized.includes("promo_page_cta_href_required")) {
+    return { error: "promo_page_cta_href_required", status: 400 };
+  }
+
+  if (normalized.includes("promo_page_cta_heading_too_long")) {
+    return { error: "promo_page_cta_heading_too_long", status: 400 };
+  }
+
+  if (normalized.includes("promo_page_cta_description_too_long")) {
+    return { error: "promo_page_cta_description_too_long", status: 400 };
+  }
+
   if (normalized.includes("promo_page_public_title_required")) {
     return { error: "promo_page_public_title_required", status: 400 };
   }
@@ -95,7 +111,12 @@ export const PROMO_PAGE_UI_ERROR_MESSAGES: Record<string, string> = {
   promo_page_product_forbidden: "Можно добавлять только продукты вашего пространства.",
   promo_page_slug_taken: "Этот адрес уже занят. Измените slug.",
   promo_page_slug_invalid: "Проверьте адрес страницы.",
-  promo_page_cta_href_invalid: "Укажите безопасную внутреннюю ссылку для CTA.",
+  promo_page_cta_href_invalid:
+    "Разрешены только безопасные ссылки https:// или внутренние пути /...",
+  promo_page_cta_label_required: "Укажите текст кнопки.",
+  promo_page_cta_href_required: "Укажите ссылку для кнопки.",
+  promo_page_cta_heading_too_long: "Заголовок слишком длинный.",
+  promo_page_cta_description_too_long: "Описание слишком длинное.",
   promo_page_public_title_required: "Укажите публичный заголовок.",
   promo_page_internal_name_required: "Укажите внутреннее название.",
   promo_page_publish_not_allowed: "Сейчас эту страницу нельзя опубликовать.",

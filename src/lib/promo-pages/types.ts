@@ -12,8 +12,12 @@ export type PromoPageRecord = {
   public_description: string | null;
   banner_path: string | null;
   footer_text: string | null;
+  cta_enabled: boolean;
+  cta_heading: string | null;
+  cta_description: string | null;
   cta_label: string | null;
   cta_href: string | null;
+  cta_open_in_new_tab: boolean;
   published_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -47,8 +51,12 @@ export type PromoPageAdminDto = {
   public_description: string | null;
   banner_path: string | null;
   footer_text: string | null;
+  cta_enabled: boolean;
+  cta_heading: string | null;
+  cta_description: string | null;
   cta_label: string | null;
   cta_href: string | null;
+  cta_open_in_new_tab: boolean;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -76,10 +84,24 @@ export type PublicPromoPageDto = {
   public_description: string | null;
   banner_path: string | null;
   footer_text: string | null;
+  cta_enabled: boolean;
+  cta_heading: string | null;
+  cta_description: string | null;
   cta_label: string | null;
   cta_href: string | null;
+  cta_open_in_new_tab: boolean;
   published_at: string | null;
   products: PublicPromoPageProductDto[];
+};
+
+export type PublicPromoPageCtaBlock = {
+  heading: string | null;
+  description: string | null;
+  label: string;
+  href: string;
+  kind: "internal" | "external";
+  host: string | null;
+  openInNewTab: boolean;
 };
 
 export const PUBLIC_PROMO_PAGE_FORBIDDEN_FIELDS = [
