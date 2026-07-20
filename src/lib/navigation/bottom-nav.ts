@@ -7,6 +7,7 @@ const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/requisites",
   "/auth/sign-in",
   "/auth/sign-up",
+  "/checkout/result",
 ]);
 
 const BOTTOM_NAV_HIDDEN_PREFIXES = [
@@ -21,6 +22,10 @@ export const BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
 export const BOTTOM_NAV_CONTENT_GAP_PX = 28;
 
 export function shouldShowBottomNav(pathname: string): boolean {
+  if (pathname === "/checkout/result") {
+    return true;
+  }
+
   return !BOTTOM_NAV_HIDDEN_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
   );

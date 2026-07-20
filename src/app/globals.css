@@ -48,7 +48,8 @@
 
 @media (min-width: 1280px) {
   .listener-app-shell__body.platform-mobile-shell,
-  .legal-page-shell.platform-mobile-shell {
+  .legal-page-shell.platform-mobile-shell,
+  .checkout-result-shell.platform-mobile-shell {
     padding-top: 0;
     padding-bottom: 0;
   }
