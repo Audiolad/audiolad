@@ -15,6 +15,7 @@ import {
   SIGN_UP_DEFAULT_REDIRECT,
 } from "@/lib/auth/routes";
 import { validatePassword } from "@/lib/auth/password";
+import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
 import { createClient } from "@/lib/supabase/server";
 
 export type SignUpFieldError = {
@@ -178,6 +179,17 @@ export async function signUpAction(input: {
 
     if (consentError) {
       console.error("signup_marketing_consent_error", consentError.message);
+    }
+  }
+
+  if (data.user?.email) {
+    const welcomeResult = await sendWelcomeEmail({
+      toEmail: data.user.email,
+      userName: firstName,
+    });
+
+    if (!welcomeResult.ok) {
+      console.error("signup_welcome_email_failed", welcomeResult.code);
     }
   }
 
