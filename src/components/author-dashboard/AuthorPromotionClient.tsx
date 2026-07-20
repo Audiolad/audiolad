@@ -1062,11 +1062,6 @@ export default function AuthorPromotionClient({
         </>
       ) : null}
 
-      <div>
-        <Link href="/profile" className="text-sm font-medium text-[#7042c5]">
-          Вернуться в пользовательскую часть платформы
-        </Link>
-      </div>
     </div>
   );
 }

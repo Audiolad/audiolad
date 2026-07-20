@@ -29,7 +29,7 @@ export default async function AuthorProfilePage() {
   const topicOptions = await listActiveTopics(supabase);
 
   return (
-    <AuthorShell title="Страница автора" backHref="/author-dashboard" backLabel="Назад">
+    <AuthorShell title="Страница автора" internalBackHref="/author-dashboard">
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
         <AuthorProfileClient
           authors={authors}

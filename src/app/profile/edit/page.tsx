@@ -1,4 +1,5 @@
 import ProfileAvatarEditor from "@/components/profile/ProfileAvatarEditor";
+import { profileEditPaddingClassName } from "@/lib/profile/layout";
 import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -135,10 +136,8 @@ export default async function EditProfilePage({
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface pb-10">
-        <div className="px-5 pt-5">
-          <header className="flex items-center justify-between">
+    <div className={profileEditPaddingClassName}>
+      <header className="flex items-center justify-between">
             <Link
               href="/profile"
               aria-label="Назад"
@@ -234,8 +233,6 @@ export default async function EditProfilePage({
               </button>
             </section>
           </form>
-        </div>
-      </div>
-    </main>
+    </div>
   );
 }

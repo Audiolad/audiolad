@@ -35,7 +35,7 @@ export default function ProfileContinueSection({
 
   return (
     <section
-      className="mt-6 min-w-0 lg:mt-6 lg:self-start"
+      className="mt-6 min-w-0 xl:mt-6 xl:self-start"
       aria-labelledby="profile-continue-heading"
     >
       <h2

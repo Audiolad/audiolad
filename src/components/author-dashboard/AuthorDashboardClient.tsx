@@ -212,12 +212,6 @@ export default function AuthorDashboardClient({
         </Link>
       </div>
 
-      <div className="mt-4">
-        <Link href="/profile" className="text-sm font-medium text-[#7042c5]">
-          Вернуться в пользовательскую часть платформы
-        </Link>
-      </div>
-
       <section className="mt-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
