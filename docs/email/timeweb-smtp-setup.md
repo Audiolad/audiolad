@@ -155,6 +155,26 @@ AUDIOLAD_EMAIL_AUTH_SECURITY_FROM=
 AUDIOLAD_EMAIL_AUTH_SECURITY_REPLY_TO=
 ```
 
+Optional sender overrides:
+
+```env
+AUDIOLAD_EMAIL_AUTH_SECURITY_FROM=
+AUDIOLAD_EMAIL_AUTH_SECURITY_REPLY_TO=
+```
+
+Application welcome email (sent after signup, not via GoTrue):
+
+```env
+AUDIOLAD_SMTP_HOST=smtp.timeweb.ru
+AUDIOLAD_SMTP_PORT=465
+AUDIOLAD_SMTP_USER=<primary-mailbox-login>
+AUDIOLAD_SMTP_PASS=<mailbox-password>
+AUDIOLAD_SMTP_SECURE=true
+```
+
+See `docs/email/brand-email-templates.md`.
+
+
 ## Production rollout checklist (separate command)
 
 1. Apply DB migrations (`20260717150000`, `20260717151000`, `20260717152000`).

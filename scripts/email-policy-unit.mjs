@@ -330,6 +330,32 @@ function testPreferencesAndConsents() {
   assert(signUpPage.includes("/privacy"), "legal privacy link");
 }
 
+function testWelcomeEmailIntegration() {
+  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
+  const brandLayout = readRepoFile(
+    "src",
+    "lib",
+    "email",
+    "templates",
+    "brand-layout.ts",
+  );
+  const welcomeTemplate = readRepoFile(
+    "src",
+    "lib",
+    "email",
+    "templates",
+    "welcome.ts",
+  );
+
+  assert(signUpAction.includes("sendWelcomeEmail("), "signup sends welcome email");
+  assert(brandLayout.includes("renderBrandEmailShell"), "shared brand layout exists");
+  assert(
+    welcomeTemplate.includes("WELCOME_EMAIL_SUBJECT"),
+    "welcome template subject defined",
+  );
+}
+
+
 function main() {
   testPolicyIntegrity();
   testAllowedDomains();
@@ -339,6 +365,7 @@ function main() {
   testAvatar();
   testEmailFoundationFiles();
   testPreferencesAndConsents();
+  testWelcomeEmailIntegration();
   console.log("email-policy-unit: ok");
 }
 
