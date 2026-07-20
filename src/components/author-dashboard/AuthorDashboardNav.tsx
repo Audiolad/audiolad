@@ -44,6 +44,28 @@ function PromotionIcon() {
   );
 }
 
+function DiagnosticsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M7 7h10M7 12h6M7 17h8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="16"
+        rx="4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 type AuthorDashboardNavProps = {
   authorSlug?: string;
 };
@@ -62,6 +84,12 @@ export default function AuthorDashboardNav({
       label: "Продукты",
       icon: ProductsIcon,
       active: pathname === "/author-dashboard",
+    },
+    {
+      href: `/author-dashboard/diagnostics${authorQuery}`,
+      label: "Диагностики",
+      icon: DiagnosticsIcon,
+      active: pathname.startsWith("/author-dashboard/diagnostics"),
     },
     {
       href: `/author-dashboard/profile${authorQuery}`,

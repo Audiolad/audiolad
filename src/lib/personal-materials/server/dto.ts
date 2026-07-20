@@ -21,6 +21,7 @@ export type SafeAuthorPersonalMaterialDto = {
   hasPdf: boolean;
   durationSeconds: number | null;
   audioOriginalFilename: string | null;
+  audioSizeBytes: number | null;
   pdfOriginalFilename: string | null;
   expiresAt: string | null;
   createdAt: string;
@@ -67,6 +68,7 @@ export function toSafeAuthorPersonalMaterialDto(
     hasPdf: row.pdf_path !== null,
     durationSeconds: row.duration_seconds,
     audioOriginalFilename: row.audio_original_filename,
+    audioSizeBytes: row.audio_size_bytes,
     pdfOriginalFilename: row.pdf_original_filename,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
