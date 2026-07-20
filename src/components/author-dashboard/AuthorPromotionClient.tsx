@@ -86,7 +86,6 @@ function loadCustomChannelFromStats(channel: {
   channelType: string;
   customTypeLabel: string;
   customTypeLabelSaved: string;
-  utmContent: string;
 } {
   const parsedType = parseChannelTypeFormState(channel.utm_medium);
 
@@ -97,7 +96,6 @@ function loadCustomChannelFromStats(channel: {
     channelType: parsedType.channelType,
     customTypeLabel: parsedType.customTypeLabel,
     customTypeLabelSaved: parsedType.customTypeLabel,
-    utmContent: channel.utm_content,
   };
 }
 
@@ -228,7 +226,6 @@ export default function AuthorPromotionClient({
   const [campaignName, setCampaignName] = useState("");
   const [campaignKey, setCampaignKey] = useState("");
   const [practiceId, setPracticeId] = useState("");
-  const [utmContent, setUtmContent] = useState("main_post");
   const [customSource, setCustomSource] = useState("");
   const [customSourceManual, setCustomSourceManual] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
@@ -753,18 +750,6 @@ export default function AuthorPromotionClient({
               ) : null}
             </div>
 
-            <label className="block max-w-sm">
-              <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-                utm_content
-              </span>
-              <input
-                value={utmContent}
-                onChange={(event) => setUtmContent(event.target.value)}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-                placeholder="main_post"
-              />
-            </label>
-
             <div className="space-y-3">
               {PROMOTION_CHANNEL_PRESETS.map((preset) => {
                 const url = buildPromotionLink({
@@ -773,7 +758,6 @@ export default function AuthorPromotionClient({
                   campaignKey: selectedCampaign.campaign_key,
                   utmSource: preset.utm_source,
                   utmMedium: preset.utm_medium,
-                  utmContent: utmContent || preset.default_content,
                 });
 
                 return (
@@ -790,7 +774,6 @@ export default function AuthorPromotionClient({
                     campaignKey: selectedCampaign.campaign_key,
                     utmSource: resolvedCustomChannel.utmSource,
                     utmMedium: resolvedCustomChannel.utmMedium,
-                    utmContent: utmContent || "main_post",
                   })}
                 />
               ) : null}
@@ -1044,7 +1027,6 @@ export default function AuthorPromotionClient({
                               setChannelType(loaded.channelType);
                               setCustomTypeLabel(loaded.customTypeLabel);
                               setCustomTypeLabelSaved(loaded.customTypeLabelSaved);
-                              setUtmContent(loaded.utmContent);
                             }}
                             title="Загрузить параметры канала в форму «Другой канал»"
                           >

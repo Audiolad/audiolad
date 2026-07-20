@@ -94,7 +94,10 @@ function buildPromotionLink(params) {
   parsed.searchParams.set("utm_source", params.utmSource.trim().toLowerCase());
   parsed.searchParams.set("utm_medium", params.utmMedium.trim().toLowerCase());
   parsed.searchParams.set("utm_campaign", params.campaignKey.trim().toLowerCase());
-  parsed.searchParams.set("utm_content", params.utmContent.trim().toLowerCase());
+
+  if (params.utmContent?.trim()) {
+    parsed.searchParams.set("utm_content", params.utmContent.trim().toLowerCase());
+  }
 
   return parsed.toString();
 }
@@ -171,14 +174,14 @@ function testPromotionLinksModule() {
     campaignKey: "zhenskie_dengi_launch",
     utmSource: "telegram",
     utmMedium: "social",
-    utmContent: "main_post",
   });
 
   assert(
     telegram ===
-      "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi?utm_source=telegram&utm_medium=social&utm_campaign=zhenskie_dengi_launch&utm_content=main_post",
-    "telegram url matches spec",
+      "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi?utm_source=telegram&utm_medium=social&utm_campaign=zhenskie_dengi_launch",
+    "telegram url matches spec without utm_content",
   );
+  assert(!telegram.includes("utm_content"), "telegram url omits utm_content");
 
   const max = buildPromotionLink({
     authorSlug: "zoya-petrova",
@@ -186,11 +189,21 @@ function testPromotionLinksModule() {
     campaignKey: "zhenskie_dengi_launch",
     utmSource: "max",
     utmMedium: "social",
-    utmContent: "main_post",
   });
 
   assert(max.includes("utm_source=max"), "max url contains max source");
   assert(max.includes("utm_campaign=zhenskie_dengi_launch"), "max url contains campaign key");
+  assert(!max.includes("utm_content"), "max url omits utm_content");
+
+  const legacy = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "telegram",
+    utmMedium: "social",
+    utmContent: "main_post",
+  });
+  assert(legacy.includes("utm_content=main_post"), "legacy optional utm_content still supported");
 
   const linksSource = readFileSync(
     "/var/www/audiolad/src/lib/promotion/links.ts",
@@ -198,6 +211,7 @@ function testPromotionLinksModule() {
   );
   assert(linksSource.includes("searchParams.set"), "uses URL search params API");
   assert(linksSource.includes("external_url_not_allowed"), "blocks external urls");
+  assert(linksSource.includes("params.utmContent?.trim()"), "utm_content optional in link builder");
 }
 
 function testStatsConversions() {
@@ -418,10 +432,10 @@ function testPromotionLinksForCustomChannels() {
     campaignKey: "zhenskie_dengi_launch",
     utmSource: "bothelp",
     utmMedium: "messaging_bot",
-    utmContent: "main_post",
   });
   assert(bothelp.includes("utm_source=bothelp"), "bothelp source in link");
   assert(bothelp.includes("utm_medium=messaging_bot"), "bothelp medium in link");
+  assert(!bothelp.includes("utm_content"), "bothelp link omits utm_content");
   assert(
     bothelp.includes("utm_campaign=zhenskie_dengi_launch"),
     "campaign key preserved for bothelp",
@@ -433,10 +447,10 @@ function testPromotionLinksForCustomChannels() {
     campaignKey: "zhenskie_dengi_launch",
     utmSource: "sendler",
     utmMedium: "messaging_bot",
-    utmContent: "main_post",
   });
   assert(sendler.includes("utm_source=sendler"), "sendler source in link");
   assert(sendler.includes("utm_medium=messaging_bot"), "sendler medium in link");
+  assert(!sendler.includes("utm_content"), "sendler link omits utm_content");
 
   const custom = buildPromotionLink({
     authorSlug: "zoya-petrova",
@@ -444,14 +458,56 @@ function testPromotionLinksForCustomChannels() {
     campaignKey: "zhenskie_dengi_launch",
     utmSource: "baza-postoyannyh-klientov",
     utmMedium: "avtovoronka",
-    utmContent: "main_post",
   });
   assert(
     custom.includes("utm_source=baza-postoyannyh-klientov"),
     "custom source in link",
   );
   assert(custom.includes("utm_medium=avtovoronka"), "custom medium in link");
+  assert(!custom.includes("utm_content"), "custom link omits utm_content");
   assert(!custom.includes("%25"), "params are not double-encoded");
+}
+
+function testPromotionLinksWithoutUtmContentUi() {
+  const client = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorPromotionClient.tsx",
+    "utf8",
+  );
+
+  assert(!client.includes('useState("main_post")'), "no main_post default in form state");
+  assert(!client.includes('placeholder="main_post"'), "no main_post placeholder");
+  assert(!client.includes("setUtmContent"), "no utm_content form handlers");
+  assert(
+    !client.includes("utmContent: channel.utm_content"),
+    "stats loader does not map utm_content to link generator",
+  );
+
+  const vk = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "vk",
+    utmMedium: "social",
+  });
+  assert(!vk.includes("utm_content"), "vk link omits utm_content");
+
+  const direct = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "direct",
+    utmMedium: "owned",
+  });
+  assert(!direct.includes("utm_content"), "direct link omits utm_content");
+  assert(direct.includes("utm_source=direct"), "direct keeps utm_source");
+  assert(direct.includes("utm_medium=owned"), "direct keeps utm_medium");
+  assert(direct.includes("utm_campaign="), "direct keeps utm_campaign");
+
+  const analyticsSanitize = readFileSync(
+    "/var/www/audiolad/src/lib/analytics/sanitize.ts",
+    "utf8",
+  );
+  assert(analyticsSanitize.includes("utm_content"), "analytics still accepts utm_content");
 }
 
 function testCustomChannelFormUi() {
@@ -496,6 +552,7 @@ function main() {
   testCustomChannelTypeOther();
   testChannelTypeBackwardCompatibility();
   testPromotionLinksForCustomChannels();
+  testPromotionLinksWithoutUtmContentUi();
   testCustomChannelFormUi();
   testCustomChannelModulesExist();
   console.log("author-promotion-unit: ok");
