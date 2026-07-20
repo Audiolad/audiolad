@@ -4,7 +4,8 @@ import type { EmailProvider, EmailProviderMessage, EmailProviderResult } from ".
 import type { SmtpConfig } from "../smtp-config";
 
 function encodeBase64(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64");
+  const encoded = Buffer.from(value, "utf8").toString("base64");
+  return encoded.match(/.{1,76}/g)?.join("\r\n") ?? encoded;
 }
 
 function sanitizeSmtpResponseLine(line: string): string {
