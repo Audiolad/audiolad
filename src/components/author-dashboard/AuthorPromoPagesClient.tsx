@@ -7,11 +7,16 @@ import AuthorPromoPageForm from "@/components/author-dashboard/AuthorPromoPageFo
 import PromoPagePreviewModal from "@/components/promo-pages/PromoPagePreviewModal";
 import type { PromoPagePresentationProduct } from "@/components/promo-pages/PromoPagePresentation";
 import { buildPromoPagePath } from "@/lib/promo-pages/paths";
+import { mapPublicPromoPageCtaBlock } from "@/lib/promo-pages/public-page";
 import {
   getPromoPageStatusClassName,
   getPromoPageStatusLabel,
 } from "@/lib/promo-pages/status-labels";
-import type { PromoPageAdminDto, PromoPageRecord } from "@/lib/promo-pages/types";
+import type {
+  PromoPageAdminDto,
+  PromoPageRecord,
+  PublicPromoPageCtaBlock,
+} from "@/lib/promo-pages/types";
 import { getPromoPageUiErrorMessage } from "@/lib/promo-pages/errors";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { copyTextToClipboard } from "@/lib/playlists/public-url";
@@ -46,8 +51,7 @@ export default function AuthorPromoPagesClient({
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewDescription, setPreviewDescription] = useState<string | null>(null);
   const [previewFooter, setPreviewFooter] = useState<string | null>(null);
-  const [previewCtaLabel, setPreviewCtaLabel] = useState<string | null>(null);
-  const [previewCtaHref, setPreviewCtaHref] = useState<string | null>(null);
+  const [previewCta, setPreviewCta] = useState<PublicPromoPageCtaBlock | null>(null);
   const [previewProducts, setPreviewProducts] = useState<PromoPagePresentationProduct[]>([]);
 
   useEffect(() => {
@@ -220,8 +224,7 @@ export default function AuthorPromoPagesClient({
       setPreviewTitle(pagePayload.page.public_title);
       setPreviewDescription(pagePayload.page.public_description);
       setPreviewFooter(pagePayload.page.footer_text);
-      setPreviewCtaLabel(pagePayload.page.cta_label);
-      setPreviewCtaHref(pagePayload.page.cta_href);
+      setPreviewCta(mapPublicPromoPageCtaBlock(pagePayload.page));
       setPreviewProducts(
         pagePayload.page.products.map((product) => {
           const eligible = eligibleMap.get(product.practice_id);
@@ -434,8 +437,7 @@ export default function AuthorPromoPagesClient({
         publicTitle={previewTitle}
         publicDescription={previewDescription}
         footerText={previewFooter}
-        ctaLabel={previewCtaLabel}
-        ctaHref={previewCtaHref}
+        cta={previewCta}
         products={previewProducts}
         authorName={selectedAuthor.name}
       />

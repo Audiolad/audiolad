@@ -8,11 +8,9 @@ import type { PromoPagePresentationProduct } from "@/components/promo-pages/Prom
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import type { PromoEligibleProductOption } from "@/lib/promo-pages/eligible-products";
+import { getPromoPageCtaPreviewLabel } from "@/lib/promo-pages/cta-target";
 import { getPromoPageUiErrorMessage } from "@/lib/promo-pages/errors";
-import {
-  buildAuthorPageCtaPreset,
-  buildPromoPagePath,
-} from "@/lib/promo-pages/paths";
+import { buildPromoPagePath } from "@/lib/promo-pages/paths";
 import {
   getPromoPageStatusClassName,
   getPromoPageStatusLabel,
@@ -22,8 +20,11 @@ import {
   PROMO_PAGE_MAX_PRODUCTS,
   PROMO_PAGE_PUBLIC_DESCRIPTION_MAX_LENGTH,
   PROMO_PAGE_FOOTER_TEXT_MAX_LENGTH,
+  PROMO_PAGE_CTA_DESCRIPTION_MAX_LENGTH,
+  PROMO_PAGE_CTA_HEADING_MAX_LENGTH,
   buildPromoPageSlugFromInternalName,
   normalizePromoPageSlug,
+  resolvePublicPromoPageCta,
 } from "@/lib/promo-pages/validation";
 import { copyTextToClipboard } from "@/lib/playlists/public-url";
 import { formatProductMeta } from "@/lib/products/duration";
@@ -60,20 +61,58 @@ export default function AuthorPromoPageForm({
   const [slug, setSlug] = useState("");
   const [publicDescription, setPublicDescription] = useState("");
   const [footerText, setFooterText] = useState("");
+  const [ctaEnabled, setCtaEnabled] = useState(false);
+  const [ctaHeading, setCtaHeading] = useState("");
+  const [ctaDescription, setCtaDescription] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaHref, setCtaHref] = useState("");
+  const [ctaOpenInNewTab, setCtaOpenInNewTab] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [eligibleProducts, setEligibleProducts] = useState<PromoEligibleProductOption[]>([]);
 
   const isPublished = status === "published";
   const isEditable = !isPublished;
 
-  const ctaPreset = useMemo(
-    () => buildAuthorPageCtaPreset(selectedAuthor.slug),
-    [selectedAuthor.slug],
-  );
-
   const publicPath = buildPromoPagePath(selectedAuthor.slug, slug || "slug");
+  const ctaPreviewLabel = getPromoPageCtaPreviewLabel(ctaHref);
+  const previewCta = useMemo(() => {
+    const resolved = resolvePublicPromoPageCta({
+      cta_enabled: ctaEnabled,
+      cta_heading: ctaHeading,
+      cta_description: ctaDescription,
+      cta_label: ctaLabel,
+      cta_href: ctaHref,
+      cta_open_in_new_tab: ctaOpenInNewTab,
+    });
+
+    if (!resolved) {
+      return null;
+    }
+
+    return {
+      heading: resolved.heading,
+      description: resolved.description,
+      label: resolved.label,
+      href: resolved.target.href,
+      kind: resolved.target.kind,
+      host: resolved.target.kind === "external" ? resolved.target.host : null,
+      openInNewTab: resolved.openInNewTab,
+    };
+  }, [
+    ctaDescription,
+    ctaEnabled,
+    ctaHeading,
+    ctaHref,
+    ctaLabel,
+    ctaOpenInNewTab,
+  ]);
+
+  const ctaLabelPresets = [
+    "Продолжить в MAX",
+    "Продолжить в Telegram",
+    "Вернуться в чат",
+    "Продолжить",
+  ] as const;
 
   useEffect(() => {
     let cancelled = false;
@@ -153,8 +192,12 @@ export default function AuthorPromoPageForm({
         setSlugTouched(true);
         setPublicDescription(page.public_description ?? "");
         setFooterText(page.footer_text ?? "");
+        setCtaEnabled(page.cta_enabled);
+        setCtaHeading(page.cta_heading ?? "");
+        setCtaDescription(page.cta_description ?? "");
         setCtaLabel(page.cta_label ?? "");
         setCtaHref(page.cta_href ?? "");
+        setCtaOpenInNewTab(page.cta_open_in_new_tab);
         setSelectedProductIds(page.products.map((product) => product.practice_id));
       } catch (failure) {
         if (!cancelled) {
@@ -277,8 +320,12 @@ export default function AuthorPromoPageForm({
       public_title: publicTitle.trim(),
       public_description: publicDescription.trim() || null,
       footer_text: footerText.trim() || null,
+      cta_enabled: ctaEnabled,
+      cta_heading: ctaHeading.trim() || null,
+      cta_description: ctaDescription.trim() || null,
       cta_label: ctaLabel.trim() || null,
       cta_href: ctaHref.trim() || null,
+      cta_open_in_new_tab: ctaOpenInNewTab,
       practice_ids: selectedProductIds,
     };
 
@@ -438,22 +485,12 @@ export default function AuthorPromoPageForm({
     }
   }
 
-  function applyCtaPreset() {
+  function applyCtaLabelPreset(label: string) {
     if (!isEditable) {
       return;
     }
 
-    setCtaLabel(ctaPreset.label);
-    setCtaHref(ctaPreset.href);
-  }
-
-  function clearCta() {
-    if (!isEditable) {
-      return;
-    }
-
-    setCtaLabel("");
-    setCtaHref("");
+    setCtaLabel(label);
   }
 
   if (loading) {
@@ -611,53 +648,117 @@ export default function AuthorPromoPageForm({
         </section>
 
         <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-[18px] font-semibold">Нижняя CTA</h3>
+              <h3 className="text-[18px] font-semibold">Действие после прослушивания</h3>
               <p className="mt-1 text-sm text-[#7d70a2]">
-                Только безопасные внутренние ссылки платформы.
+                Кнопка после списка практик для возврата во внешнюю воронку или на
+                внутреннюю страницу АудиоЛада.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={applyCtaPreset}
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-[#2f2548]">
+              <input
+                type="checkbox"
+                checked={ctaEnabled}
+                onChange={(event) => setCtaEnabled(event.target.checked)}
                 disabled={!isEditable || saving}
-                className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
-              >
-                {ctaPreset.label}
-              </button>
-              <button
-                type="button"
-                onClick={clearCta}
-                disabled={!isEditable || saving}
-                className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
-              >
-                Очистить CTA
-              </button>
-            </div>
+                className="h-4 w-4 rounded border-[#c6afe6] text-[#7042c5]"
+              />
+              Показывать кнопку после списка практик
+            </label>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="mt-4 grid gap-4">
             <label className="block">
+              <span className="mb-2 block text-sm font-medium">Заголовок блока</span>
+              <input
+                value={ctaHeading}
+                onChange={(event) => setCtaHeading(event.target.value)}
+                disabled={!isEditable || saving}
+                maxLength={PROMO_PAGE_CTA_HEADING_MAX_LENGTH}
+                placeholder="Продолжите в чате"
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Описание</span>
+              <textarea
+                value={ctaDescription}
+                onChange={(event) => setCtaDescription(event.target.value)}
+                disabled={!isEditable || saving}
+                rows={3}
+                maxLength={PROMO_PAGE_CTA_DESCRIPTION_MAX_LENGTH}
+                placeholder="Выберите, что для вас сейчас важнее, и получите следующий шаг."
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
+              />
+            </label>
+
+            <div>
               <span className="mb-2 block text-sm font-medium">Текст кнопки</span>
+              <div className="flex flex-wrap gap-2">
+                {ctaLabelPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyCtaLabelPreset(preset)}
+                    disabled={!isEditable || saving}
+                    className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <input
                 value={ctaLabel}
                 onChange={(event) => setCtaLabel(event.target.value)}
                 disabled={!isEditable || saving}
-                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
+                placeholder="Продолжить в MAX"
+                className="mt-3 w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
               />
-            </label>
+            </div>
+
             <label className="block">
               <span className="mb-2 block text-sm font-medium">Ссылка</span>
               <input
                 value={ctaHref}
                 onChange={(event) => setCtaHref(event.target.value)}
                 disabled={!isEditable || saving}
+                placeholder="https://max.ru/..."
                 className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
-                placeholder="/authors/..."
               />
+              {ctaHref.trim() ? (
+                <p className="mt-2 text-xs text-[#7d70a2]">Откроется: {ctaPreviewLabel}</p>
+              ) : null}
             </label>
+
+            <fieldset className="block">
+              <legend className="mb-2 text-sm font-medium">Открывать</legend>
+              <div className="flex flex-wrap gap-4 text-sm text-[#2f2548]">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cta-open-mode"
+                    checked={!ctaOpenInNewTab}
+                    onChange={() => setCtaOpenInNewTab(false)}
+                    disabled={!isEditable || saving}
+                    className="h-4 w-4 border-[#c6afe6] text-[#7042c5]"
+                  />
+                  В текущем окне
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="cta-open-mode"
+                    checked={ctaOpenInNewTab}
+                    onChange={() => setCtaOpenInNewTab(true)}
+                    disabled={!isEditable || saving}
+                    className="h-4 w-4 border-[#c6afe6] text-[#7042c5]"
+                  />
+                  В новой вкладке
+                </label>
+              </div>
+            </fieldset>
           </div>
         </section>
 
@@ -813,8 +914,7 @@ export default function AuthorPromoPageForm({
         publicTitle={publicTitle.trim() || "Публичный заголовок"}
         publicDescription={publicDescription.trim() || null}
         footerText={footerText.trim() || null}
-        ctaLabel={ctaLabel.trim() || null}
-        ctaHref={ctaHref.trim() || null}
+        cta={previewCta}
         products={previewProducts}
         authorName={selectedAuthor.name}
       />
