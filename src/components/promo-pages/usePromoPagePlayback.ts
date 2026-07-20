@@ -57,9 +57,13 @@ export function getPromoProductPlayLabel(
 
 type UsePromoPagePlaybackOptions = {
   authorSlug: string;
+  onPlayStarted?: (input: { practiceId: string; trackId: string | null }) => void;
 };
 
-export function usePromoPagePlayback({ authorSlug }: UsePromoPagePlaybackOptions) {
+export function usePromoPagePlayback({
+  authorSlug,
+  onPlayStarted,
+}: UsePromoPagePlaybackOptions) {
   const { session, loadSession, clearPlaylistQueue } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
   const requestLockRef = useRef(false);
@@ -105,6 +109,11 @@ export function usePromoPagePlayback({ authorSlug }: UsePromoPagePlaybackOptions
           requestAutoplay: true,
           suppressListenUrlSync: true,
         });
+
+        onPlayStarted?.({
+          practiceId,
+          trackId: firstTrackId,
+        });
       } finally {
         requestLockRef.current = false;
         setLoadingProductId(null);
@@ -115,6 +124,7 @@ export function usePromoPagePlayback({ authorSlug }: UsePromoPagePlaybackOptions
       clearPlaylistQueue,
       engine,
       loadSession,
+      onPlayStarted,
       session,
     ],
   );
