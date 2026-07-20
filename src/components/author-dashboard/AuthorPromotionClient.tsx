@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorPromoPagesClient from "@/components/author-dashboard/AuthorPromoPagesClient";
 import PromotionCampaignLinksSection, {
   type PromotionChannelFormSeed,
 } from "@/components/author-dashboard/PromotionCampaignLinksSection";
@@ -526,6 +527,10 @@ export default function AuthorPromotionClient({
             })}
           </div>
         ) : null}
+      </section>
+
+      <section className="space-y-4">
+        <AuthorPromoPagesClient selectedAuthor={selectedAuthor} />
       </section>
 
       {createOpen ? (
