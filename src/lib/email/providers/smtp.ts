@@ -14,15 +14,14 @@ function sanitizeSmtpResponseLine(line: string): string {
 class SmtpSession {
   private buffer = "";
 
-  constructor(private readonly socket: tls.TLSSocket) {}
+  constructor(private readonly socket: tls.TLSSocket) {
+    this.socket.on("data", (chunk: Buffer | string) => {
+      this.buffer += chunk.toString("utf8");
+    });
+  }
 
-  async command(expectedCodes: number[], ...lines: string[]): Promise<string> {
-    for (const line of lines) {
-      this.socket.write(`${line}\r\n`);
-    }
-
+  async expect(expectedCodes: number[]): Promise<string> {
     const response = await this.readResponse();
-
     const code = Number.parseInt(response.slice(0, 3), 10);
 
     if (!expectedCodes.includes(code)) {
@@ -32,27 +31,38 @@ class SmtpSession {
     return response;
   }
 
+  async command(expectedCodes: number[], ...lines: string[]): Promise<string> {
+    for (const line of lines) {
+      this.socket.write(`${line}\r\n`);
+    }
+
+    return this.expect(expectedCodes);
+  }
+
   private readResponse(): Promise<string> {
     return new Promise((resolve, reject) => {
-      const onData = (chunk: Buffer | string) => {
-        this.buffer += chunk.toString("utf8");
-
+      const check = () => {
         const lines = this.buffer.split(/\r\n/);
 
         if (lines.length < 2) {
-          return;
+          return false;
         }
 
         const completeLines = lines.slice(0, -1);
         const lastComplete = completeLines.at(-1);
 
         if (!lastComplete || lastComplete.length < 4 || lastComplete[3] !== " ") {
-          return;
+          return false;
         }
 
-        cleanup();
+        this.buffer = lines.at(-1) ?? "";
         resolve(completeLines.join("\r\n"));
+        return true;
       };
+
+      if (check()) {
+        return;
+      }
 
       const onError = (error: Error) => {
         cleanup();
@@ -64,6 +74,12 @@ class SmtpSession {
         reject(new Error("SMTP connection closed unexpectedly"));
       };
 
+      const onData = () => {
+        if (check()) {
+          cleanup();
+        }
+      };
+
       const cleanup = () => {
         this.socket.off("data", onData);
         this.socket.off("error", onError);
@@ -73,7 +89,6 @@ class SmtpSession {
       this.socket.on("data", onData);
       this.socket.once("error", onError);
       this.socket.once("close", onClose);
-      onData("");
     });
   }
 }
@@ -154,8 +169,8 @@ export class SmtpEmailProvider implements EmailProvider {
       socket = await openTlsSocket(this.config);
       const session = new SmtpSession(socket);
 
-      await session.command([220]);
-      await session.command([250], `EHLO ${this.config.host}`);
+      await session.expect([220]);
+      await session.command([250], "EHLO audiolad.ru");
       await session.command([334], "AUTH LOGIN");
       await session.command([334], encodeBase64(this.config.user));
       await session.command([235], encodeBase64(this.config.password));
