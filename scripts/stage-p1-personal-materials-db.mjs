@@ -10,15 +10,12 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
-  DOCKER_CONTAINER,
-  PERSONAL_MATERIALS_TEST_DB,
   PERSONAL_MATERIALS_TEST_OPT_IN_ENV,
   TEST_DATABASE_ENV,
   assertPersonalMaterialsTestDbAllowed,
   createPersonalMaterialsSqlHelpers,
   describePersonalMaterialsTestTarget,
 } from "./lib/personal-materials-test-db.mjs";
-import { execSync } from "node:child_process";
 
 const SCRIPT_NAME = "scripts/stage-p1-personal-materials-db.mjs";
 const RUN_ID = randomUUID().slice(0, 8);
@@ -33,7 +30,7 @@ if (bootSkipped) {
 }
 
 assertPersonalMaterialsTestDbAllowed({ scriptName: SCRIPT_NAME });
-const { sqlFile, sqlScalar } = createPersonalMaterialsSqlHelpers();
+const { sqlFile, sqlScalar, runScript } = createPersonalMaterialsSqlHelpers();
 
 function assert(condition, message) {
   if (!condition) {
@@ -56,13 +53,6 @@ function generateAccessToken() {
   const rawToken = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(rawToken, "utf8").digest();
   return { rawToken, tokenHash };
-}
-
-function runScript(content) {
-  return execSync(
-    `docker exec -i ${DOCKER_CONTAINER} psql -U postgres -q -d ${PERSONAL_MATERIALS_TEST_DB} -v ON_ERROR_STOP=1 -tA`,
-    { input: content, encoding: "utf8" },
-  ).trim();
 }
 
 function lastResultLine(output) {

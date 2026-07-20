@@ -2,9 +2,10 @@
  * Isolated PostgreSQL helpers for personal materials P1 verification.
  *
  * Uses docker exec against supabase-db with an explicit non-production database name.
- * Never targets the production `postgres` database.
+ * Never targets the production `postgres` database for writes.
+ * All docker invocations use execFileSync (no shell interpolation).
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 export const PERSONAL_MATERIALS_TEST_DB =
   process.env.AUDIOLAD_PERSONAL_MATERIALS_TEST_DB_NAME ??
@@ -19,6 +20,56 @@ export const PRODUCTION_DB_NAME = "postgres";
 
 export const DOCKER_CONTAINER =
   process.env.AUDIOLAD_PERSONAL_MATERIALS_DOCKER_CONTAINER ?? "supabase-db";
+
+const SAFE_DOCKER_ARG = /^[A-Za-z0-9._:-]+$/;
+
+function assertSafeDockerArg(value, label) {
+  if (typeof value !== "string" || !SAFE_DOCKER_ARG.test(value)) {
+    throw new Error(`BLOCKED: unsafe docker ${label}: ${String(value)}`);
+  }
+}
+
+function assertContainerSafe() {
+  assertSafeDockerArg(DOCKER_CONTAINER, "container");
+}
+
+/**
+ * Run `docker exec <container> ...args` without a shell.
+ */
+export function dockerExec(args, options = {}) {
+  assertContainerSafe();
+  return execFileSync("docker", ["exec", DOCKER_CONTAINER, ...args], {
+    encoding: "utf8",
+    ...options,
+  });
+}
+
+/**
+ * Run `docker exec -i <container> ...args` without a shell (stdin via options.input).
+ */
+export function dockerExecInteractive(args, options = {}) {
+  assertContainerSafe();
+  return execFileSync("docker", ["exec", "-i", DOCKER_CONTAINER, ...args], {
+    encoding: "utf8",
+    ...options,
+  });
+}
+
+export function dockerPsql(databaseName, extraArgs, options = {}) {
+  assertSafeDockerArg(databaseName, "database");
+  return dockerExec(
+    ["psql", "-U", "postgres", "-d", databaseName, ...extraArgs],
+    options,
+  );
+}
+
+export function dockerPsqlInteractive(databaseName, extraArgs = [], options = {}) {
+  assertSafeDockerArg(databaseName, "database");
+  return dockerExecInteractive(
+    ["psql", "-U", "postgres", "-d", databaseName, ...extraArgs],
+    options,
+  );
+}
 
 export function assertPersonalMaterialsTestDbAllowed(options = {}) {
   const scriptName = options.scriptName ?? process.argv[1] ?? "unknown script";
@@ -55,10 +106,12 @@ export function assertPersonalMaterialsTestDbAllowed(options = {}) {
     process.exit(1);
   }
 
-  const currentDb = execSync(
-    `docker exec ${DOCKER_CONTAINER} psql -U postgres -d ${databaseName} -tAc "SELECT current_database();"`,
-    { encoding: "utf8" },
-  ).trim();
+  assertSafeDockerArg(databaseName, "database");
+
+  const currentDb = dockerPsql(databaseName, [
+    "-tAc",
+    "SELECT current_database();",
+  ]).trim();
 
   if (currentDb !== databaseName) {
     console.error(
@@ -76,18 +129,16 @@ export function createPersonalMaterialsSqlHelpers(options = {}) {
   });
 
   function sqlFile(content) {
-    return execSync(
-      `docker exec -i ${DOCKER_CONTAINER} psql -U postgres -d ${databaseName} -v ON_ERROR_STOP=1`,
-      { input: content, encoding: "utf8" },
+    return dockerPsqlInteractive(
+      databaseName,
+      ["-v", "ON_ERROR_STOP=1"],
+      { input: content },
     );
   }
 
   function sqlScalar(query) {
     const oneLine = query.replace(/\s+/g, " ").trim();
-    return execSync(
-      `docker exec ${DOCKER_CONTAINER} psql -U postgres -d ${databaseName} -tAc ${JSON.stringify(oneLine)}`,
-      { encoding: "utf8" },
-    ).trim();
+    return dockerPsql(databaseName, ["-tAc", oneLine]).trim();
   }
 
   function sqlJson(query) {
@@ -95,7 +146,15 @@ export function createPersonalMaterialsSqlHelpers(options = {}) {
     return raw ? JSON.parse(raw) : null;
   }
 
-  return { sqlFile, sqlScalar, sqlJson, databaseName };
+  function runScript(content) {
+    return dockerPsqlInteractive(
+      databaseName,
+      ["-q", "-v", "ON_ERROR_STOP=1", "-tA"],
+      { input: content },
+    ).trim();
+  }
+
+  return { sqlFile, sqlScalar, sqlJson, runScript, databaseName };
 }
 
 export function describePersonalMaterialsTestTarget() {
