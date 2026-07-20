@@ -10,6 +10,7 @@ import {
   aggregatePromotionFunnelMetrics,
   buildPromotionChannelBreakdown,
   calculatePromotionConversions,
+  detectPromotionStatsKind,
 } from "@/lib/promotion/stats";
 import type { PromotionStatsRow } from "@/lib/promotion/types";
 
@@ -51,6 +52,7 @@ export async function GET(request: Request, context: RouteContext) {
     const metrics = aggregatePromotionFunnelMetrics(rows);
     const conversions = calculatePromotionConversions(metrics);
     const channels = buildPromotionChannelBreakdown(rows);
+    const statsKind = detectPromotionStatsKind(rows);
 
     return NextResponse.json({
       period,
@@ -58,6 +60,7 @@ export async function GET(request: Request, context: RouteContext) {
       metrics,
       conversions,
       channels,
+      statsKind,
     });
   } catch (error) {
     return handleAuthorRouteError(error);

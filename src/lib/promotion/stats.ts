@@ -14,6 +14,15 @@ export const PROMOTION_FUNNEL_EVENTS = {
   giftsOpened: "promo_gifts_opened",
 } as const;
 
+export const PROMO_PAGE_FUNNEL_EVENTS = {
+  views: "promo_page_viewed",
+  playStarts: "promo_page_play_started",
+  completed: "promo_page_completed",
+  ctaClicked: "promo_page_cta_clicked",
+} as const;
+
+export type PromotionStatsKind = "practice" | "promo_page" | "mixed";
+
 export type PromotionFunnelMetrics = {
   uniqueViews: number;
   uniquePlayStarts: number;
@@ -26,6 +35,7 @@ export type PromotionFunnelMetrics = {
   uniqueRegistrations: number;
   uniqueSaves: number;
   uniqueGiftsOpened: number;
+  uniqueCtaClicks: number;
 };
 
 export type PromotionConversionRates = {
@@ -35,6 +45,8 @@ export type PromotionConversionRates = {
   viewToSignupClick: number;
   viewToRegistration: number;
   registrationToSave: number;
+  viewToCta: number;
+  playToCta: number;
 };
 
 export type PromotionChannelBreakdownRow = {
@@ -47,6 +59,7 @@ export type PromotionChannelBreakdownRow = {
   uniqueCompleted: number;
   uniqueSignupClicked: number;
   uniqueRegistrations: number;
+  uniqueCtaClicks: number;
 };
 
 function sumUniqueVisitors(
@@ -58,16 +71,47 @@ function sumUniqueVisitors(
     .reduce((total, row) => total + row.unique_visitors, 0);
 }
 
+export function detectPromotionStatsKind(
+  rows: PromotionStatsRow[],
+): PromotionStatsKind {
+  let hasPracticeEvents = false;
+  let hasPromoPageEvents = false;
+
+  for (const row of rows) {
+    if (row.event_name.startsWith("promo_page_")) {
+      hasPromoPageEvents = true;
+    } else if (row.event_name.startsWith("promo_")) {
+      hasPracticeEvents = true;
+    }
+  }
+
+  if (hasPracticeEvents && hasPromoPageEvents) {
+    return "mixed";
+  }
+
+  if (hasPromoPageEvents) {
+    return "promo_page";
+  }
+
+  return "practice";
+}
+
 export function aggregatePromotionFunnelMetrics(
   rows: PromotionStatsRow[],
 ): PromotionFunnelMetrics {
   return {
-    uniqueViews: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.views),
-    uniquePlayStarts: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.playStarts),
+    uniqueViews:
+      sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.views) +
+      sumUniqueVisitors(rows, PROMO_PAGE_FUNNEL_EVENTS.views),
+    uniquePlayStarts:
+      sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.playStarts) +
+      sumUniqueVisitors(rows, PROMO_PAGE_FUNNEL_EVENTS.playStarts),
     uniqueProgress25: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.progress25),
     uniqueProgress50: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.progress50),
     uniqueProgress75: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.progress75),
-    uniqueCompleted: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.completed),
+    uniqueCompleted:
+      sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.completed) +
+      sumUniqueVisitors(rows, PROMO_PAGE_FUNNEL_EVENTS.completed),
     uniqueSignupPromptShown: sumUniqueVisitors(
       rows,
       PROMOTION_FUNNEL_EVENTS.signupPromptShown,
@@ -82,6 +126,10 @@ export function aggregatePromotionFunnelMetrics(
     ),
     uniqueSaves: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.practiceSaved),
     uniqueGiftsOpened: sumUniqueVisitors(rows, PROMOTION_FUNNEL_EVENTS.giftsOpened),
+    uniqueCtaClicks: sumUniqueVisitors(
+      rows,
+      PROMO_PAGE_FUNNEL_EVENTS.ctaClicked,
+    ),
   };
 }
 
@@ -124,6 +172,14 @@ export function calculatePromotionConversions(
       metrics.uniqueSaves,
       metrics.uniqueRegistrations,
     ),
+    viewToCta: safeConversionRate(
+      metrics.uniqueCtaClicks,
+      metrics.uniqueViews,
+    ),
+    playToCta: safeConversionRate(
+      metrics.uniqueCtaClicks,
+      metrics.uniquePlayStarts,
+    ),
   };
 }
 
@@ -148,6 +204,7 @@ export function buildPromotionChannelBreakdown(
       uniqueCompleted: 0,
       uniqueSignupClicked: 0,
       uniqueRegistrations: 0,
+      uniqueCtaClicks: 0,
     };
 
     switch (row.event_name) {
@@ -161,7 +218,17 @@ export function buildPromotionChannelBreakdown(
         existing.uniqueProgress25 += row.unique_visitors;
         break;
       case PROMOTION_FUNNEL_EVENTS.completed:
+      case PROMO_PAGE_FUNNEL_EVENTS.completed:
         existing.uniqueCompleted += row.unique_visitors;
+        break;
+      case PROMO_PAGE_FUNNEL_EVENTS.views:
+        existing.uniqueViews += row.unique_visitors;
+        break;
+      case PROMO_PAGE_FUNNEL_EVENTS.playStarts:
+        existing.uniquePlayStarts += row.unique_visitors;
+        break;
+      case PROMO_PAGE_FUNNEL_EVENTS.ctaClicked:
+        existing.uniqueCtaClicks += row.unique_visitors;
         break;
       case PROMOTION_FUNNEL_EVENTS.signupClicked:
         existing.uniqueSignupClicked += row.unique_visitors;

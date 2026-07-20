@@ -115,8 +115,10 @@ function testSlugValidation() {
 function testCtaValidation() {
   assert(validatePromoPageCtaHref("/authors/sergey-and-zoya") === null, "internal author path");
   assert(validatePromoPageCtaHref("/catalog?topic=money") === null, "internal path with query");
+  assert(validatePromoPageCtaHref("https://max.ru/chat/123") === null, "external https allowed");
+  assert(validatePromoPageCtaHref("https://t.me/bot") === null, "telegram https allowed");
   assert(validatePromoPageCtaHref(null) === null, "empty cta allowed");
-  assert(validatePromoPageCtaHref("https://evil.example") === "promo_page_cta_href_invalid", "external url rejected");
+  assert(validatePromoPageCtaHref("http://evil.example") === "promo_page_cta_href_invalid", "http rejected");
   assert(validatePromoPageCtaHref("//evil.example") === "promo_page_cta_href_invalid", "protocol-relative rejected");
   assert(validatePromoPageCtaHref("javascript:alert(1)") === "promo_page_cta_href_invalid", "javascript rejected");
   assert(validatePromoPageCtaHref("data:text/html,abc") === "promo_page_cta_href_invalid", "data url rejected");
@@ -124,7 +126,8 @@ function testCtaValidation() {
   assert(validatePromoPageCtaHref("/authors/evil\n.example") === "promo_page_cta_href_invalid", "control char rejected");
 
   assert(!isUnsafePromoPageCtaHref("/authors/sergey-and-zoya"), "unsafe helper accepts internal path");
-  assert(isUnsafePromoPageCtaHref("https://example.com"), "unsafe helper rejects external url");
+  assert(!isUnsafePromoPageCtaHref("https://example.com"), "unsafe helper accepts https");
+  assert(isUnsafePromoPageCtaHref("http://example.com"), "unsafe helper rejects http");
   assert(isUnsafePromoPageCtaHref("//example.com"), "unsafe helper rejects protocol-relative");
   assert(isUnsafePromoPageCtaHref("javascript:alert(1)"), "unsafe helper rejects javascript");
   assert(isUnsafePromoPageCtaHref("data:text/html,abc"), "unsafe helper rejects data url");
@@ -359,6 +362,21 @@ function testStage1CtaConstraintBaseline() {
   assert(!sql.includes("is_safe_promo_page_cta_href"), "stage1 had no shared helper");
 }
 
+function testExternalCtaMigration() {
+  const sql = read(
+    "supabase/migrations/20260720180000_promo_page_external_cta.sql",
+  );
+
+  assert(sql.includes("cta_enabled boolean"), "cta_enabled column");
+  assert(sql.includes("cta_heading text"), "cta_heading column");
+  assert(sql.includes("cta_description text"), "cta_description column");
+  assert(sql.includes("cta_open_in_new_tab boolean"), "cta_open_in_new_tab column");
+  assert(sql.includes("is_safe_promo_page_cta_target"), "shared cta target helper");
+  assert(sql.includes("validate_promo_page_cta_for_publish"), "publish cta validator");
+  assert(sql.includes("p_promo_page_id"), "analytics insert accepts promo_page_id");
+  assert(sql.includes("v_campaign.promo_page_id IS NOT NULL"), "campaign stats supports promo pages");
+}
+
 function testDomainModulesExist() {
   assert(read("src/lib/promo-pages/types.ts").includes("PublicPromoPageDto"), "public dto type");
   assert(read("src/lib/promo-pages/validation.ts").includes("validatePromoPageSlug"), "slug validator");
@@ -376,6 +394,7 @@ const tests = [
   ["public dto contract", testPublicDtoContract],
   ["user deletion policy", testUserDeletionPolicyUnchanged],
   ["create and cta hardening migration", testCreateAndCtaHardeningMigration],
+  ["external cta migration", testExternalCtaMigration],
   ["stage1 cta constraint baseline", testStage1CtaConstraintBaseline],
   ["stage1 offer isolation", testStage1DoesNotTouchOffer],
   ["domain modules", testDomainModulesExist],
