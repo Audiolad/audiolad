@@ -510,18 +510,120 @@ function testPromotionLinksWithoutUtmContentUi() {
   assert(analyticsSanitize.includes("utm_content"), "analytics still accepts utm_content");
 }
 
+function testSystemChannelPresetsOnly() {
+  const channels = readFileSync(
+    "/var/www/audiolad/src/lib/promotion/channels.ts",
+    "utf8",
+  );
+  const linksSection = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/PromotionCampaignLinksSection.tsx",
+    "utf8",
+  );
+
+  assert(channels.includes('id: "telegram"'), "telegram preset exists");
+  assert(channels.includes('id: "max"'), "max preset exists");
+  assert(channels.includes('id: "vk"'), "vk preset exists");
+  assert(!channels.includes('id: "direct"'), "direct preset removed");
+  assert(!channels.includes('label: "Прямая ссылка"'), "direct preset label removed");
+  assert(linksSection.includes("PROMOTION_SYSTEM_CHANNEL_PRESETS"), "system presets used in UI");
+  assert(!linksSection.includes("Прямая ссылка"), "direct card absent from links section");
+  assert(linksSection.includes("Другие каналы"), "custom channels heading");
+  assert(linksSection.includes("Добавить канал"), "add channel form title");
+  assert(linksSection.includes("Добавить ссылку"), "add channel submit label");
+}
+
+function testCampaignChannelsMigration() {
+  const sql = readFileSync(
+    "/var/www/audiolad/supabase/migrations/20260720140000_promotion_campaign_channels.sql",
+    "utf8",
+  );
+
+  assert(sql.includes("promotion_campaign_channels"), "channels table");
+  assert(sql.includes("REFERENCES public.promotion_campaigns"), "fk to campaigns");
+  assert(sql.includes("ON DELETE CASCADE"), "cascade delete");
+  assert(sql.includes("UNIQUE (campaign_id, utm_source, utm_medium)"), "duplicate utm pair blocked");
+  assert(sql.includes("ENABLE ROW LEVEL SECURITY"), "RLS enabled");
+  assert(sql.includes("promotion_campaign_channels_select"), "select policy");
+  assert(sql.includes("promotion_campaign_channels_insert"), "insert policy");
+  assert(sql.includes("promotion_campaign_channels_update"), "update policy");
+  assert(sql.includes("promotion_campaign_channels_delete"), "delete policy");
+  assert(sql.includes("user_can_read_author_promotion"), "ownership via campaign");
+}
+
+function testCampaignChannelsApi() {
+  const apiModule = readFileSync(
+    "/var/www/audiolad/src/lib/promotion/campaign-channels-api.ts",
+    "utf8",
+  );
+  const listRoute = readFileSync(
+    "/var/www/audiolad/src/app/api/author/promotion/campaigns/[id]/channels/route.ts",
+    "utf8",
+  );
+  const itemRoute = readFileSync(
+    "/var/www/audiolad/src/app/api/author/promotion/campaigns/[id]/channels/[channelId]/route.ts",
+    "utf8",
+  );
+
+  assert(apiModule.includes("listCampaignChannels"), "list helper");
+  assert(apiModule.includes("createCampaignChannel"), "create helper");
+  assert(apiModule.includes("updateCampaignChannel"), "update helper");
+  assert(apiModule.includes("deleteCampaignChannel"), "delete helper");
+  assert(apiModule.includes('error: "channel_utm_duplicate"'), "duplicate pair error");
+  assert(listRoute.includes("requirePromotionCampaignAccess"), "list guarded");
+  assert(listRoute.includes("createCampaignChannel"), "create route");
+  assert(itemRoute.includes("updateCampaignChannel"), "patch route");
+  assert(itemRoute.includes("deleteCampaignChannel"), "delete route");
+  assert(!apiModule.includes("buildPromotionLink"), "url not stored in db module");
+}
+
+function testMultipleCustomChannelLinks() {
+  const bothelpTelegram = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "bothelp-telegram",
+    utmMedium: "messaging_bot",
+  });
+  const bothelpMax = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "bothelp-max",
+    utmMedium: "messaging_bot",
+  });
+
+  assert(bothelpTelegram.includes("utm_source=bothelp-telegram"), "bothelp telegram source");
+  assert(bothelpMax.includes("utm_source=bothelp-max"), "bothelp max source");
+  assert(
+    bothelpTelegram.includes("utm_campaign=zhenskie_dengi_launch"),
+    "shared campaign key telegram",
+  );
+  assert(
+    bothelpMax.includes("utm_campaign=zhenskie_dengi_launch"),
+    "shared campaign key max",
+  );
+  assert(bothelpTelegram !== bothelpMax, "distinct urls for distinct sources");
+  assert(!bothelpTelegram.includes("utm_content"), "bothelp telegram no utm_content");
+  assert(!bothelpMax.includes("utm_content"), "bothelp max no utm_content");
+}
+
 function testCustomChannelFormUi() {
+  const linksSection = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/PromotionCampaignLinksSection.tsx",
+    "utf8",
+  );
   const client = readFileSync(
     "/var/www/audiolad/src/components/author-dashboard/AuthorPromotionClient.tsx",
     "utf8",
   );
-  assert(client.includes("Тип канала"), "channel type label in form");
-  assert(client.includes("Будет использовано в ссылке как utm_medium"), "medium hint");
-  assert(client.includes("Будет использовано в ссылке как utm_source"), "source hint");
-  assert(client.includes("Укажите свой тип канала"), "custom type field label");
-  assert(client.includes("Сформировать из названия"), "reset source action");
-  assert(!client.includes('placeholder="utm_medium"'), "raw utm_medium input removed");
-  assert(client.includes("loadCustomChannelFromStats"), "stats row loads channel form");
+  assert(linksSection.includes("Тип канала"), "channel type label in form");
+  assert(linksSection.includes("Будет использовано в ссылке как utm_medium"), "medium hint");
+  assert(linksSection.includes("Будет использовано в ссылке как utm_source"), "source hint");
+  assert(linksSection.includes("Укажите свой тип канала"), "custom type field label");
+  assert(linksSection.includes("Сформировать из названия"), "reset source action");
+  assert(!linksSection.includes('placeholder="utm_medium"'), "raw utm_medium input removed");
+  assert(client.includes("buildChannelFormSeedFromStats"), "stats row loads channel form seed");
+  assert(client.includes("PromotionCampaignLinksSection"), "links section component wired");
 }
 
 function testCustomChannelModulesExist() {
@@ -552,6 +654,10 @@ function main() {
   testCustomChannelTypeOther();
   testChannelTypeBackwardCompatibility();
   testPromotionLinksForCustomChannels();
+  testSystemChannelPresetsOnly();
+  testCampaignChannelsMigration();
+  testCampaignChannelsApi();
+  testMultipleCustomChannelLinks();
   testPromotionLinksWithoutUtmContentUi();
   testCustomChannelFormUi();
   testCustomChannelModulesExist();

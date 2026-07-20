@@ -30,6 +30,17 @@ export type PromotionStatsRow = {
 
 export type PromotionPeriodKey = "7d" | "30d" | "90d" | "all";
 
+export type PromotionCampaignChannel = {
+  id: string;
+  campaign_id: string;
+  label: string;
+  utm_source: string;
+  utm_medium: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PromotionCampaignSummaryRow = {
   campaign_id: string;
   campaign_name: string;
