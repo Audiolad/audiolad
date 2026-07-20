@@ -58,7 +58,7 @@ export default function ProfileAvatarEditor({
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { avatarUrl?: string; message?: string }
+        | { avatarUrl?: string | null; message?: string }
         | null;
 
       if (!response.ok) {
@@ -67,11 +67,21 @@ export default function ProfileAvatarEditor({
         );
       }
 
-      if (payload?.avatarUrl) {
-        setAvatarUrl(payload.avatarUrl);
-        setMessage("Фотография обновлена.");
-        router.refresh();
+      if (!payload?.avatarUrl) {
+        throw new Error(AVATAR_ERROR_MESSAGES.saveIncomplete);
       }
+
+      setAvatarUrl(payload.avatarUrl);
+      setMessage("Фотография обновлена.");
+      router.refresh();
+    } catch (error) {
+      const nextMessage =
+        error instanceof Error
+          ? error.message
+          : AVATAR_ERROR_MESSAGES.saveFailed;
+      setIsError(true);
+      setMessage(nextMessage);
+      throw error;
     } finally {
       setIsUploading(false);
     }
@@ -117,7 +127,7 @@ export default function ProfileAvatarEditor({
   }
 
   const isBusy = isUploading || isDeleting || isSavingCrop;
-  const displayError = cropError;
+  const displayError = cropError ?? (isError ? message : null);
 
   return (
     <section className="mt-7">
@@ -194,7 +204,7 @@ export default function ProfileAvatarEditor({
           </p>
         ) : null}
 
-        {message ? (
+        {message && !displayError ? (
           <p
             role="status"
             className={`mt-3 text-center text-sm leading-6 ${

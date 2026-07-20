@@ -4,29 +4,84 @@ import {
   AVATAR_MAX_BYTES,
 } from "@/lib/images/avatar-constants";
 
-function hasAllowedExtension(fileName: string): boolean {
+const HEIC_MIME_TYPES = new Set([
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
+
+function inferMimeFromFileName(fileName: string): string | null {
   const normalized = fileName.trim().toLowerCase();
 
-  return (
+  if (
     normalized.endsWith(".jpg") ||
     normalized.endsWith(".jpeg") ||
-    normalized.endsWith(".png") ||
-    normalized.endsWith(".webp")
+    normalized.endsWith(".jpe")
+  ) {
+    return "image/jpeg";
+  }
+
+  if (normalized.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (normalized.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (normalized.endsWith(".heic")) {
+    return "image/heic";
+  }
+
+  if (normalized.endsWith(".heif")) {
+    return "image/heif";
+  }
+
+  return null;
+}
+
+export function isHeicLikeFile(file: Pick<File, "name" | "type">): boolean {
+  const mime = file.type.trim().toLowerCase();
+  const inferred = inferMimeFromFileName(file.name);
+
+  return (
+    HEIC_MIME_TYPES.has(mime) ||
+    inferred === "image/heic" ||
+    inferred === "image/heif"
   );
 }
 
-export function validateAvatarSourceFileMeta(file: File): string | null {
+export function resolveAvatarSourceMime(file: Pick<File, "name" | "type">): string | null {
   const mime = file.type.trim().toLowerCase();
 
-  if (!AVATAR_ALLOWED_MIME_TYPES.has(mime) || !hasAllowedExtension(file.name)) {
-    return AVATAR_ERROR_MESSAGES.unsupportedFormat;
+  if (AVATAR_ALLOWED_MIME_TYPES.has(mime)) {
+    return mime;
   }
 
+  const inferred = inferMimeFromFileName(file.name);
+
+  if (inferred && AVATAR_ALLOWED_MIME_TYPES.has(inferred)) {
+    return inferred;
+  }
+
+  return null;
+}
+
+export function validateAvatarSourceFileMeta(file: File): string | null {
   if (file.size <= 0 || file.size > AVATAR_MAX_BYTES) {
     return AVATAR_ERROR_MESSAGES.fileTooLarge;
   }
 
-  return null;
+  if (resolveAvatarSourceMime(file)) {
+    return null;
+  }
+
+  if (isHeicLikeFile(file)) {
+    return null;
+  }
+
+  return AVATAR_ERROR_MESSAGES.unsupportedFormat;
 }
 
 export async function validateAvatarSourceFile(file: File): Promise<string | null> {
@@ -40,6 +95,10 @@ export async function validateAvatarSourceFile(file: File): Promise<string | nul
     await loadAvatarSourceDimensions(file);
     return null;
   } catch {
+    if (isHeicLikeFile(file)) {
+      return AVATAR_ERROR_MESSAGES.heicUnsupported;
+    }
+
     return AVATAR_ERROR_MESSAGES.readFailed;
   }
 }
@@ -114,21 +173,42 @@ export async function createOrientedPreviewUrl(source: Blob): Promise<string> {
 
     context.drawImage(bitmap, 0, 0);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (value) => {
-          if (value) {
-            resolve(value);
-          } else {
-            reject(new Error("preview_blob_failed"));
-          }
-        },
-        "image/png",
-      );
-    });
+    const blob = await canvasToPreviewBlob(context.canvas);
 
     return URL.createObjectURL(blob);
   } finally {
     bitmap.close();
   }
+}
+
+async function canvasToPreviewBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  const attempts: Array<{ type: string; quality?: number }> = [
+    { type: "image/png" },
+    { type: "image/jpeg", quality: 0.92 },
+    { type: "image/webp", quality: 0.9 },
+  ];
+
+  for (const attempt of attempts) {
+    const blob = await tryCanvasToBlob(canvas, attempt.type, attempt.quality);
+
+    if (blob) {
+      return blob;
+    }
+  }
+
+  throw new Error("preview_blob_failed");
+}
+
+function tryCanvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (value) => resolve(value),
+      type,
+      quality,
+    );
+  });
 }

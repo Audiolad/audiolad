@@ -42,14 +42,14 @@ function chooseOutputMimeType(
   hasAlpha: boolean,
 ): AvatarCropOutput["mimeType"] {
   if (hasAlpha) {
-    return "image/webp";
+    return "image/png";
   }
 
   if (sourceMime === "image/png") {
     return "image/webp";
   }
 
-  return "image/webp";
+  return "image/jpeg";
 }
 
 function buildOutputFileName(mimeType: AvatarCropOutput["mimeType"]): string {
@@ -119,27 +119,12 @@ export async function cropAvatarToBlob(
       sourceMime === "image/png" &&
       detectAlphaChannel(context, outputSize, outputSize);
     const mimeType = chooseOutputMimeType(sourceMime, hasAlpha);
-    const quality =
-      mimeType === "image/jpeg" ? AVATAR_JPEG_QUALITY : AVATAR_WEBP_QUALITY / 100;
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (value) => {
-          if (value) {
-            resolve(value);
-          } else {
-            reject(new Error("crop_blob_failed"));
-          }
-        },
-        mimeType,
-        quality,
-      );
-    });
+    const blob = await canvasToAvatarBlob(canvas, mimeType);
 
     return {
       blob,
-      fileName: buildOutputFileName(mimeType),
-      mimeType,
+      fileName: buildOutputFileName(blob.type as AvatarCropOutput["mimeType"]),
+      mimeType: blob.type as AvatarCropOutput["mimeType"],
       width: outputSize,
       height: outputSize,
       hasAlpha,
@@ -147,6 +132,50 @@ export async function cropAvatarToBlob(
   } finally {
     bitmap.close();
   }
+}
+
+async function canvasToAvatarBlob(
+  canvas: HTMLCanvasElement,
+  preferredMime: AvatarCropOutput["mimeType"],
+): Promise<Blob> {
+  const attempts: Array<{ type: AvatarCropOutput["mimeType"]; quality?: number }> =
+    preferredMime === "image/jpeg"
+      ? [
+          { type: "image/jpeg", quality: AVATAR_JPEG_QUALITY },
+          { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 },
+          { type: "image/png" },
+        ]
+      : preferredMime === "image/png"
+        ? [{ type: "image/png" }, { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 }]
+        : [
+            { type: "image/webp", quality: AVATAR_WEBP_QUALITY / 100 },
+            { type: "image/jpeg", quality: AVATAR_JPEG_QUALITY },
+            { type: "image/png" },
+          ];
+
+  for (const attempt of attempts) {
+    const blob = await tryCanvasToBlob(canvas, attempt.type, attempt.quality);
+
+    if (blob && blob.size > 0) {
+      return blob;
+    }
+  }
+
+  throw new Error("crop_blob_failed");
+}
+
+function tryCanvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (value) => resolve(value),
+      type,
+      quality,
+    );
+  });
 }
 
 export function areaToAvatarCrop(area: Area): AvatarCropArea {

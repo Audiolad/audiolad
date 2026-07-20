@@ -23,6 +23,9 @@ const LISTENER_SHELL_PATHS = [
   "/catalog",
   "/my-practices",
   "/playlists",
+  "/profile",
+  "/profile/edit",
+  "/settings",
 ] as const;
 
 function revalidateListenerShell() {
