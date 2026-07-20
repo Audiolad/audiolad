@@ -12,7 +12,9 @@ export type SenderIdentity = {
 
 const DEFAULT_SENDER_IDENTITIES: Record<SenderIdentityKey, SenderIdentity> = {
   auth_security: {
-    from: "no-reply@audiolad.ru",
+    // Must match the Timeweb SMTP mailbox used as envelope-from (GoTrue recovery).
+    // no-reply@ is not currently allowed as MAIL FROM on Timeweb SMTP.
+    from: "inbox@audiolad.ru",
     replyTo: "support@audiolad.ru",
     displayName: "АудиоЛад",
   },

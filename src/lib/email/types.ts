@@ -23,7 +23,12 @@ export type EmailConsentStatus = "granted" | "revoked";
 export type EmailDigestFrequency = "immediate" | "daily" | "weekly";
 
 export type EmailProviderResult =
-  | { ok: true; providerMessageId?: string }
+  | {
+      ok: true;
+      providerMessageId?: string;
+      smtpResponse?: string;
+      envelopeFrom?: string;
+    }
   | { ok: false; code: string; message: string; retryable?: boolean };
 
 export type EmailProviderMessage = {
@@ -34,6 +39,7 @@ export type EmailProviderMessage = {
   html?: string;
   text?: string;
   headers?: Record<string, string>;
+  envelopeFrom?: string;
 };
 
 export interface EmailProvider {

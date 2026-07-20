@@ -1,15 +1,47 @@
 import tls from "node:tls";
 
+import {
+  applyDotStuffing,
+  buildHtmlQuotedPrintableMime,
+  formatMimeFromAddress,
+} from "../mime";
 import type { EmailProvider, EmailProviderMessage, EmailProviderResult } from "../types";
 import type { SmtpConfig } from "../smtp-config";
 
 function encodeBase64(value: string): string {
-  const encoded = Buffer.from(value, "utf8").toString("base64");
-  return encoded.match(/.{1,76}/g)?.join("\r\n") ?? encoded;
+  return Buffer.from(value, "utf8").toString("base64");
 }
 
 function sanitizeSmtpResponseLine(line: string): string {
   return line.replace(/[\r\n]+/g, " ").trim();
+}
+
+function extractProviderMessageId(response: string): string | undefined {
+  const sanitized = sanitizeSmtpResponseLine(response);
+  const eximMatch = sanitized.match(/\bid=([^\s]+)/i);
+  if (eximMatch?.[1]) {
+    return eximMatch[1];
+  }
+
+  const queueMatch = sanitized.match(/\bqueued as ([^\s]+)/i);
+  if (queueMatch?.[1]) {
+    return queueMatch[1];
+  }
+
+  return undefined;
+}
+
+function parseAngleAddress(value: string): string | null {
+  const match = value.match(/<([^>]+)>/);
+  if (match?.[1]) {
+    return match[1].trim().toLowerCase();
+  }
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return value.trim().toLowerCase();
+  }
+
+  return null;
 }
 
 class SmtpSession {
@@ -94,54 +126,23 @@ class SmtpSession {
   }
 }
 
-function buildMimeMessage(message: EmailProviderMessage): string {
-  const headers = [
-    `From: ${message.from}`,
-    `To: ${message.to}`,
-    `Subject: =?UTF-8?B?${encodeBase64(message.subject)}?=`,
-    "MIME-Version: 1.0",
-  ];
-
-  if (message.replyTo) {
-    headers.push(`Reply-To: ${message.replyTo}`);
+/**
+ * Build welcome/recovery-compatible MIME: single HTML part, quoted-printable.
+ * No client Message-ID — Timeweb assigns one (matches working recovery mail).
+ */
+export function buildWelcomeCompatibleMime(message: EmailProviderMessage): string {
+  if (!message.html) {
+    throw new Error("html body required for welcome-compatible MIME");
   }
 
-  if (message.headers) {
-    for (const [key, value] of Object.entries(message.headers)) {
-      headers.push(`${key}: ${value}`);
-    }
-  }
-
-  if (message.html && message.text) {
-    const boundary = `audiolad-${Date.now()}`;
-    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-
-    return [
-      ...headers,
-      "",
-      `--${boundary}`,
-      "Content-Type: text/plain; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
-      "",
-      encodeBase64(message.text),
-      `--${boundary}`,
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
-      "",
-      encodeBase64(message.html),
-      `--${boundary}--`,
-    ].join("\r\n");
-  }
-
-  if (message.html) {
-    headers.push("Content-Type: text/html; charset=UTF-8");
-    headers.push("Content-Transfer-Encoding: base64");
-    return [...headers, "", encodeBase64(message.html)].join("\r\n");
-  }
-
-  headers.push("Content-Type: text/plain; charset=UTF-8");
-  headers.push("Content-Transfer-Encoding: base64");
-  return [...headers, "", encodeBase64(message.text ?? "")].join("\r\n");
+  return buildHtmlQuotedPrintableMime({
+    from: message.from,
+    to: message.to,
+    subject: message.subject,
+    html: message.html,
+    replyTo: message.replyTo,
+    includeMessageId: false,
+  });
 }
 
 async function openTlsSocket(config: SmtpConfig): Promise<tls.TLSSocket> {
@@ -167,6 +168,9 @@ export class SmtpEmailProvider implements EmailProvider {
     let socket: tls.TLSSocket | null = null;
 
     try {
+      const envelopeFrom =
+        message.envelopeFrom?.trim().toLowerCase() || this.config.user.toLowerCase();
+
       socket = await openTlsSocket(this.config);
       const session = new SmtpSession(socket);
 
@@ -175,16 +179,23 @@ export class SmtpEmailProvider implements EmailProvider {
       await session.command([334], "AUTH LOGIN");
       await session.command([334], encodeBase64(this.config.user));
       await session.command([235], encodeBase64(this.config.password));
-      await session.command([250], `MAIL FROM:<${this.config.user}>`);
+      await session.command([250], `MAIL FROM:<${envelopeFrom}>`);
       await session.command([250], `RCPT TO:<${message.to}>`);
       await session.command([354], "DATA");
 
-      const payload = `${buildMimeMessage(message)}\r\n.\r\n`;
+      const mime = buildWelcomeCompatibleMime(message);
+      const stuffed = applyDotStuffing(mime);
+      const payload = `${stuffed}\r\n.\r\n`;
       socket.write(payload);
-      await session.command([250]);
+      const dataResponse = await session.expect([250]);
       await session.command([221], "QUIT");
 
-      return { ok: true };
+      return {
+        ok: true,
+        providerMessageId: extractProviderMessageId(dataResponse),
+        smtpResponse: sanitizeSmtpResponseLine(dataResponse),
+        envelopeFrom,
+      };
     } catch (error) {
       const messageText =
         error instanceof Error ? error.message : "Unknown SMTP transport error";
@@ -204,3 +215,5 @@ export class SmtpEmailProvider implements EmailProvider {
 export function createSmtpEmailProvider(config: SmtpConfig): SmtpEmailProvider {
   return new SmtpEmailProvider(config);
 }
+
+export { formatMimeFromAddress, parseAngleAddress };
