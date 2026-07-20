@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 function NoAuthorAccess() {
   return (
-    <AuthorShell title="Кабинет автора" backHref="/profile" backLabel="В профиль">
+    <AuthorShell title="Кабинет автора">
       <div className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-8 text-center">
         <p className="text-[18px] font-semibold">
           У вас пока нет доступа к кабинету автора.
@@ -48,7 +48,7 @@ export default async function AuthorDashboardPage() {
   }
 
   return (
-    <AuthorShell title="Кабинет автора" backHref="/profile" backLabel="В профиль">
+    <AuthorShell title="Кабинет автора">
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка кабинета…</p>}>
         <AuthorDashboardClient authors={authors} />
       </Suspense>

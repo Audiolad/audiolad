@@ -41,7 +41,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     <AuthorShell
       title="Создать аудиопродукт"
       subtitle="Единая форма для одиночного и составного продукта"
-      backHref="/author-dashboard"
+      internalBackHref="/author-dashboard"
     >
       <AuthorProductForm
         authors={authors}
