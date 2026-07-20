@@ -14,7 +14,7 @@ export async function listPromotionWorkspaces(
   const admin = await isPlatformAdmin(supabase, userId);
 
   if (!admin) {
-    return listAuthorWorkspacesForUser(userId);
+    return listAuthorWorkspacesForUser(userId, supabase);
   }
 
   const { data, error } = await supabase

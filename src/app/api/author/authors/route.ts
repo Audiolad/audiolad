@@ -8,8 +8,8 @@ import {
 
 export async function GET() {
   try {
-    const { user } = await requireAuthenticatedUser();
-    const authors = await listAuthorWorkspacesForUser(user.id);
+    const { supabase, user } = await requireAuthenticatedUser();
+    const authors = await listAuthorWorkspacesForUser(user.id, supabase);
 
     return NextResponse.json({ authors });
   } catch (error) {

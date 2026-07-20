@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,8 +70,9 @@ export async function requireAuthenticatedUser() {
 
 export async function listAuthorWorkspacesForUser(
   userId: string,
+  supabaseClient?: SupabaseClient,
 ): Promise<AuthorWorkspace[]> {
-  const supabase = await createClient();
+  const supabase = supabaseClient ?? (await createClient());
 
   const { data, error } = await supabase
     .from("author_members")
