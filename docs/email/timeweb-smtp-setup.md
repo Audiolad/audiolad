@@ -62,14 +62,44 @@ Application sender identities (non-GoTrue) live in `src/lib/email/sender-identit
 
 ## Redirect URLs and recovery flow
 
-1. User opens `/auth/forgot-password`.
+Recovery preserves the user's original `next` destination (for example after checkout):
+
+```text
+/auth/sign-in?next=/my-practices?purchased=<slug>
+  → /auth/forgot-password?next=...
+  → email link → /auth/callback?next=/auth/reset-password?next=...
+  → /auth/reset-password?next=...
+  → /auth/sign-in?reset=1&next=...
+  → /my-practices?purchased=<slug>
+```
+
+1. User opens `/auth/forgot-password?next=...`.
 2. App calls `resetPasswordForEmail` with `redirectTo`:
-   `https://audiolad.ru/auth/callback?next=/auth/reset-password`
-3. GoTrue sends recovery email (when SMTP is real).
-4. User opens link → `/auth/callback` exchanges code → `/auth/reset-password`.
+   `https://audiolad.ru/auth/callback?next=/auth/reset-password?next=<ultimate>`
+3. GoTrue sends recovery email (when SMTP is real). Branded template: see `docs/email/gotrue-recovery-template-rollout.md`.
+4. User opens link → `/auth/callback` exchanges code → `/auth/reset-password?next=...`.
 5. User sets a new password via `updateUser`.
+6. App redirects to `/auth/sign-in?reset=1&next=...`; sign-in completes the chain.
 
 Ensure `GOTRUE_URI_ALLOW_LIST` includes callback and reset routes.
+
+### Recommended production env (separate approval)
+
+```env
+GOTRUE_MAILER_EXTERNAL_HOSTS=audiolad.ru
+SMTP_ADMIN_EMAIL=no-reply@audiolad.ru
+```
+
+Verify `no-reply@audiolad.ru` exists in Timeweb before switching sender. If relay is denied, keep `inbox@audiolad.ru`.
+
+## DKIM (Timeweb panel)
+
+Status as of 2026-07-20 audit:
+
+- **VERIFIED** — public TXT at `dkim._domainkey.audiolad.ru` (TTL 21600)
+- Selectors `default`, `mail`, `timeweb`, `s1` — not present
+
+Confirm in Timeweb panel that outbound mail uses the `dkim` selector. If Timeweb rotates keys, update DNS from the panel value only.
 
 ## DNS checks (read-only)
 
@@ -86,7 +116,7 @@ Expected state today:
 
 - MX → Timeweb
 - SPF present for Timeweb
-- DKIM selector present
+- DKIM present at `dkim._domainkey.audiolad.ru` (verify selector matches Timeweb outbound signing)
 - DMARC `p=none` (monitoring mode)
 
 Do not change DNS during application rollout.

@@ -11,7 +11,7 @@ import {
   validatePassword,
   validatePasswordConfirmation,
 } from "@/lib/auth/password";
-import { getSafeNextPath } from "@/lib/auth/routes";
+import { buildPostPasswordResetSignInHref } from "@/lib/auth/recovery";
 import { createClient } from "@/lib/supabase/server";
 
 export type ResetPasswordFieldError = {
@@ -83,6 +83,6 @@ export async function resetPasswordAction(input: {
 
   return {
     ok: true,
-    destination: getSafeNextPath(input.next, "/auth/sign-in?reset=1"),
+    destination: buildPostPasswordResetSignInHref(input.next),
   };
 }

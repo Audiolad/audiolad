@@ -2,6 +2,7 @@
 
 import BottomNav from "@/components/BottomNav";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
+import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
 import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
@@ -78,7 +79,7 @@ function SignInForm() {
 
         {isReset && (
           <div className="mt-8 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm leading-6 text-[#3d8d65]">
-            Пароль обновлён. Войдите с новым паролем.
+            {PASSWORD_RESET_SUCCESS_MESSAGE}
           </div>
         )}
 

@@ -4,6 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   PASSWORD_RECOVERY_RATE_LIMIT_MESSAGE,
+  PASSWORD_RECOVERY_SPAM_HINT_MESSAGE,
 } from "@/lib/auth/recovery-messages";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
@@ -43,6 +44,8 @@ function ForgotPasswordForm() {
 
   const isFormReady = email.trim().length > 0 && cooldownRemainingMs <= 0;
 
+  const nextParam = searchParams.get("next");
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -56,7 +59,10 @@ function ForgotPasswordForm() {
     setMessage("");
     setIsError(false);
 
-    const result = await requestPasswordRecoveryAction({ email });
+    const result = await requestPasswordRecoveryAction({
+      email,
+      next: nextParam,
+    });
 
     cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
     setCooldownRemainingMs(COOLDOWN_MS);
@@ -81,8 +87,8 @@ function ForgotPasswordForm() {
           <h1 className="mt-8 text-[30px] font-semibold">Восстановление пароля</h1>
 
           <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            Укажите email, который использовали при регистрации. Мы отправим
-            инструкции, если аккаунт существует.
+            Введите email, который вы использовали при регистрации. Мы отправим
+            ссылку для создания нового пароля.
           </p>
         </header>
 
@@ -111,7 +117,12 @@ function ForgotPasswordForm() {
                   : "border-[#cfe8d9] bg-[#f3fbf6] text-[#3d8d65]"
               }`}
             >
-              {message}
+              <p>{message}</p>
+              {!isError ? (
+                <p className="mt-3 text-[#3d8d65]/90">
+                  {PASSWORD_RECOVERY_SPAM_HINT_MESSAGE}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -127,7 +138,7 @@ function ForgotPasswordForm() {
             aria-busy={isLoading}
             className="primary-cta primary-cta--form"
           >
-            {isLoading ? "Отправляем…" : "Отправить инструкции"}
+            {isLoading ? "Отправляем…" : "Отправить ссылку"}
           </button>
         </form>
 

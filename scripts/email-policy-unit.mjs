@@ -258,7 +258,26 @@ function testRecovery() {
     "actions.ts",
   );
 
-  assert(recovery.includes("getSafeNextPath"), "recovery uses safe next path");
+  assert(
+    recovery.includes("resolveValidatedNextPath"),
+    "recovery uses validated next path",
+  );
+  assert(
+    recovery.includes("buildResetPasswordRouteWithNext"),
+    "recovery builds reset route with next",
+  );
+  assert(
+    forgotAction.includes("next: string | null"),
+    "forgot-password action accepts next",
+  );
+  assert(
+    forgotAction.includes("buildPasswordRecoveryRedirectUrl(input.next)"),
+    "forgot-password passes ultimate next to redirect",
+  );
+  assert(
+    resetAction.includes("buildPostPasswordResetSignInHref"),
+    "reset redirects to sign-in with reset flag",
+  );
   assert(
     forgotAction.includes("PASSWORD_RECOVERY_REQUEST_MESSAGE"),
     "neutral forgot-password response",
@@ -297,6 +316,8 @@ function testEmailFoundationFiles() {
     "supabase/migrations/20260717152000_user_avatars.sql",
     "src/lib/email/enqueue.ts",
     "docs/email/timeweb-smtp-setup.md",
+    "docs/email/gotrue-recovery-template-rollout.md",
+    "supabase/templates/recovery.html",
   ]) {
     readRepoFile(...file.split("/"));
   }

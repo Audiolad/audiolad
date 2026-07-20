@@ -128,7 +128,10 @@ function ResetPasswordForm() {
 
           <p className="mt-6 text-center text-sm text-[#7d70a2]">
             <Link
-              href="/auth/forgot-password"
+              href={buildAuthRouteHref(
+                "/auth/forgot-password",
+                searchParams.get("next"),
+              )}
               className="font-semibold text-[#7042c5]"
             >
               Запросить новую ссылку
@@ -151,7 +154,7 @@ function ResetPasswordForm() {
             АудиоЛад
           </Link>
 
-          <h1 className="mt-8 text-[30px] font-semibold">Новый пароль</h1>
+          <h1 className="mt-8 text-[30px] font-semibold">Создайте новый пароль</h1>
 
           <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
             Придумайте новый пароль для входа в аккаунт.

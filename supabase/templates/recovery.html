@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Восстановление пароля</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f6f1fb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif;
+      color: #25135c;
+      line-height: 1.6;
+    "
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellspacing="0"
+      cellpadding="0"
+      style="background-color: #f6f1fb; padding: 24px 12px"
+    >
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            style="
+              max-width: 520px;
+              background-color: #ffffff;
+              border-radius: 20px;
+              border: 1px solid #eadff8;
+              overflow: hidden;
+            "
+          >
+            <tr>
+              <td style="padding: 32px 28px 8px; text-align: center">
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    color: #7042c5;
+                  "
+                >
+                  АудиоЛад
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 28px 0">
+                <h1
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 22px;
+                    font-weight: 600;
+                    color: #25135c;
+                  "
+                >
+                  Восстановление пароля
+                </h1>
+                <p style="margin: 0 0 16px; font-size: 15px; color: #6f61a3">
+                  Здравствуйте!
+                </p>
+                <p style="margin: 0 0 16px; font-size: 15px; color: #6f61a3">
+                  Мы получили запрос на восстановление пароля для вашего аккаунта
+                  в АудиоЛаде.
+                </p>
+                <p style="margin: 0 0 24px; font-size: 15px; color: #6f61a3">
+                  Нажмите кнопку ниже, чтобы создать новый пароль.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 28px 24px; text-align: center">
+                <a
+                  href="{{ .ConfirmationURL }}"
+                  style="
+                    display: inline-block;
+                    padding: 14px 28px;
+                    background-color: #7042c5;
+                    color: #ffffff;
+                    text-decoration: none;
+                    border-radius: 999px;
+                    font-size: 16px;
+                    font-weight: 600;
+                  "
+                  >Создать новый пароль</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 28px 16px">
+                <p style="margin: 0 0 8px; font-size: 14px; color: #8a7ca9">
+                  Если кнопка не работает, скопируйте ссылку ниже и откройте её в
+                  браузере:
+                </p>
+                <p
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 13px;
+                    word-break: break-all;
+                    color: #7042c5;
+                  "
+                >
+                  <a
+                    href="{{ .ConfirmationURL }}"
+                    style="color: #7042c5; text-decoration: underline"
+                    >{{ .ConfirmationURL }}</a
+                  >
+                </p>
+                <p style="margin: 0 0 16px; font-size: 14px; color: #8a7ca9">
+                  Если вы не запрашивали восстановление пароля, просто
+                  проигнорируйте это письмо. Ссылка ограничена по времени.
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #8a7ca9">
+                  Сайт:
+                  <a
+                    href="https://audiolad.ru"
+                    style="color: #7042c5; text-decoration: none"
+                    >audiolad.ru</a
+                  >
+                  · Аудиотека:
+                  <a
+                    href="https://audiolad.ru/my-practices"
+                    style="color: #7042c5; text-decoration: none"
+                    >audiolad.ru/my-practices</a
+                  >
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

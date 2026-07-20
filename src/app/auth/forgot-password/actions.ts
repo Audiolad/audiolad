@@ -14,6 +14,7 @@ export type ForgotPasswordActionResult =
 
 export async function requestPasswordRecoveryAction(input: {
   email: string;
+  next: string | null;
 }): Promise<ForgotPasswordActionResult> {
   const normalizedEmail = normalizeEmailInput(input.email);
 
@@ -25,7 +26,7 @@ export async function requestPasswordRecoveryAction(input: {
   }
 
   const supabase = await createClient();
-  const redirectTo = buildPasswordRecoveryRedirectUrl("/auth/reset-password");
+  const redirectTo = buildPasswordRecoveryRedirectUrl(input.next);
 
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo,
