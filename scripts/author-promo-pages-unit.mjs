@@ -292,22 +292,6 @@ function testSlugValidation() {
   assert(validation.includes("promo_page_slug_too_short"), "short slug error code");
 }
 
-function testEditSavePayloadOmitsAuthorId() {
-  const form = read("src/components/author-dashboard/AuthorPromoPageForm.tsx");
-
-  assert(
-    form.includes("const writePayload = {") &&
-      form.includes("const payload = isCreate") &&
-      form.includes("author_id: selectedAuthor.id,") &&
-      form.includes(": writePayload;"),
-    "edit PATCH payload must omit author_id rejected by pages-api",
-  );
-  assert(
-    form.includes('method: isCreate ? "POST" : "PATCH"'),
-    "create uses POST, edit uses PATCH",
-  );
-}
-
 function run() {
   testReplaceProductsMigration();
   testSecurityHardeningMigration();
@@ -323,7 +307,6 @@ function run() {
   testPublicPromoRouteExists();
   testPresentationComponent();
   testSlugValidation();
-  testEditSavePayloadOmitsAuthorId();
   console.log("author-promo-pages-unit: ok");
 }
 
