@@ -177,6 +177,10 @@ export default function PromotionCampaignLinksSection({
   const [channels, setChannels] = useState<PromotionCampaignChannel[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState<string | null>(null);
+  const [channelsRefreshError, setChannelsRefreshError] = useState<string | null>(
+    null,
+  );
+  const [channelsReloadNonce, setChannelsReloadNonce] = useState(0);
   const [channelFormError, setChannelFormError] = useState<string | null>(null);
   const [channelSaving, setChannelSaving] = useState(false);
   const [channelDeleting, setChannelDeleting] = useState(false);
@@ -193,6 +197,7 @@ export default function PromotionCampaignLinksSection({
   const [customTypeLabelSaved, setCustomTypeLabelSaved] = useState("");
 
   const channelsRequestToken = useRef(0);
+  const previousCampaignIdRef = useRef(campaign.id);
   const [appliedFormSeedToken, setAppliedFormSeedToken] = useState<number | null>(null);
 
   if (formSeed && formSeed.token !== appliedFormSeedToken) {
@@ -261,13 +266,33 @@ export default function PromotionCampaignLinksSection({
     setChannelFormError(null);
   }
 
+  function handleRetryChannelsLoad() {
+    if (channelsLoading) {
+      return;
+    }
+
+    setChannelsReloadNonce((value) => value + 1);
+  }
+
   useEffect(() => {
     const requestToken = ++channelsRequestToken.current;
     const campaignId = campaign.id;
+    const campaignChanged = previousCampaignIdRef.current !== campaignId;
+    previousCampaignIdRef.current = campaignId;
+
+    if (campaignChanged) {
+      setChannels([]);
+      setChannelsError(null);
+      setChannelsRefreshError(null);
+    }
 
     async function loadChannels() {
       setChannelsLoading(true);
-      setChannelsError(null);
+
+      if (campaignChanged) {
+        setChannelsError(null);
+        setChannelsRefreshError(null);
+      }
 
       try {
         const response = await fetch(
@@ -289,15 +314,22 @@ export default function PromotionCampaignLinksSection({
 
         setChannels(payload.channels ?? []);
         setChannelsError(null);
-      } catch (loadFailure) {
+        setChannelsRefreshError(null);
+      } catch {
         if (channelsRequestToken.current !== requestToken) {
           return;
         }
 
-        const code =
-          loadFailure instanceof Error ? loadFailure.message : "load_failed";
-        setChannels([]);
-        setChannelsError(getChannelErrorMessage(code));
+        setChannels((current) => {
+          if (current.length === 0) {
+            setChannelsError("Не удалось загрузить дополнительные ссылки.");
+            setChannelsRefreshError(null);
+          } else {
+            setChannelsRefreshError("Не удалось обновить список дополнительных ссылок.");
+          }
+
+          return current;
+        });
       } finally {
         if (channelsRequestToken.current === requestToken) {
           setChannelsLoading(false);
@@ -306,7 +338,7 @@ export default function PromotionCampaignLinksSection({
     }
 
     void loadChannels();
-  }, [campaign.id]);
+  }, [campaign.id, channelsReloadNonce]);
 
   async function handleSubmitChannel(event: React.FormEvent) {
     event.preventDefault();
@@ -412,6 +444,15 @@ export default function PromotionCampaignLinksSection({
           Используйте готовые ссылки для Telegram, MAX и VK или создавайте
           отдельные ссылки для других площадок, рассылок, рекламы и партнёров.
         </p>
+        <div className="mt-4 rounded-[18px] border border-[#d4c0f0] bg-[#f0e8fb] px-4 py-3">
+          <p className="text-sm text-[#5f5484]">Ссылки для кампании</p>
+          <p className="mt-1 break-words text-[18px] font-semibold text-[#3d2a66]">
+            «{campaign.name}»
+          </p>
+          <p className="mt-1 break-all text-xs text-[#7d70a2]">
+            utm_campaign={campaign.campaign_key}
+          </p>
+        </div>
         {campaign.practice_status !== "published" ? (
           <p className="mt-2 rounded-[18px] border border-[#f2dfc7] bg-[#fff9f0] px-4 py-3 text-sm text-[#8a5a16]">
             Продукт снят с публикации. Ссылки остаются рабочими, но новые
@@ -438,18 +479,42 @@ export default function PromotionCampaignLinksSection({
         <h3 className="text-[17px] font-semibold">Другие каналы</h3>
 
         {channelsLoading ? (
-          <p className="text-sm text-[#7d70a2]">Загрузка дополнительных ссылок…</p>
+          <p className="text-sm text-[#7d70a2]">Загружаем дополнительные ссылки…</p>
         ) : null}
 
         {channelsError ? (
-          <p className="text-sm text-[#9b3d3d]" role="alert">
-            {channelsError}
+          <div className="rounded-[18px] border border-[#efb8c4] bg-[#fff5f7] px-4 py-4">
+            <p className="text-sm text-[#9b3d3d]" role="alert">
+              {channelsError}
+            </p>
+            <button
+              type="button"
+              onClick={handleRetryChannelsLoad}
+              disabled={channelsLoading}
+              className="mt-3 rounded-full border border-[#efb8c4] px-4 py-2 text-sm font-semibold text-[#b34f63] disabled:opacity-60"
+            >
+              Повторить
+            </button>
+          </div>
+        ) : null}
+
+        {channelsRefreshError ? (
+          <p className="rounded-[18px] border border-[#f2dfc7] bg-[#fff9f0] px-4 py-3 text-sm text-[#8a5a16]" role="status">
+            {channelsRefreshError}
+            <button
+              type="button"
+              onClick={handleRetryChannelsLoad}
+              disabled={channelsLoading}
+              className="ml-2 font-semibold text-[#8a5a16] underline-offset-2 hover:underline disabled:opacity-60"
+            >
+              Повторить
+            </button>
           </p>
         ) : null}
 
-        {!channelsLoading && channels.length === 0 ? (
+        {!channelsLoading && !channelsError && channels.length === 0 ? (
           <p className="rounded-[18px] border border-[#eadff8] bg-[#fbf8ff] px-4 py-4 text-sm text-[#7d70a2]">
-            Вы ещё не создали дополнительных ссылок для этой кампании.
+            Дополнительных ссылок пока нет.
           </p>
         ) : null}
 
@@ -474,6 +539,9 @@ export default function PromotionCampaignLinksSection({
       <div className="rounded-[20px] border border-[#eadff8] bg-white p-4">
         <p className="text-sm font-semibold">
           {isEditing ? "Изменить канал" : "Добавить канал"}
+        </p>
+        <p className="mt-1 text-sm text-[#5f5484]">
+          Новая ссылка будет добавлена именно в эту кампанию.
         </p>
         <p className="mt-1 text-xs text-[#7d70a2]">
           Создайте отдельную ссылку для любой другой площадки, рассылки, рекламы

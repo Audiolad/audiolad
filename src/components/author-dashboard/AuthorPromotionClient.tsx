@@ -8,10 +8,14 @@ import PromotionCampaignLinksSection, {
   type PromotionChannelFormSeed,
 } from "@/components/author-dashboard/PromotionCampaignLinksSection";
 import {
+  buildPromotionPageQuery,
+  resolveSelectedCampaignId,
+} from "@/lib/promotion/campaign-selection";
+import { parseChannelTypeFormState } from "@/lib/promotion/channel-types";
+import {
   buildCampaignKeyFromName,
   normalizeCampaignKey,
 } from "@/lib/promotion/campaign-key";
-import { parseChannelTypeFormState } from "@/lib/promotion/channel-types";
 import {
   getPromotionPeriodLabel,
   parsePromotionPeriod,
@@ -121,7 +125,6 @@ export default function AuthorPromotionClient({
   const [campaigns, setCampaigns] = useState<PromotionCampaignWithProduct[]>([]);
   const [summaryRows, setSummaryRows] = useState<PromotionCampaignSummaryRow[]>([]);
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [campaignStats, setCampaignStats] = useState<CampaignStatsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -140,19 +143,28 @@ export default function AuthorPromotionClient({
   const [toast, setToast] = useState<string | null>(null);
 
   const period = parsePromotionPeriod(searchParams.get("period"));
+  const urlCampaignId = searchParams.get("campaign");
   const selectedAuthor = useMemo(() => {
     const slug = searchParams.get("author");
     return authors.find((author) => author.slug === slug) ?? authors[0] ?? null;
   }, [authors, searchParams]);
 
-  const selectedCampaign = useMemo(
-    () => campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null,
-    [campaigns, selectedCampaignId],
-  );
+  const selectedCampaignId = useMemo(() => {
+    if (campaigns.length === 0) {
+      return null;
+    }
+
+    return resolveSelectedCampaignId(campaigns, urlCampaignId);
+  }, [campaigns, urlCampaignId]);
 
   const publishedProducts = useMemo(
     () => products.filter((product) => product.status === "published"),
     [products],
+  );
+
+  const selectedCampaign = useMemo(
+    () => campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null,
+    [campaigns, selectedCampaignId],
   );
 
   const summaryTotals = useMemo(
@@ -168,6 +180,28 @@ export default function AuthorPromotionClient({
     const timer = window.setTimeout(() => setToast(null), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  function replacePromotionUrl(nextParams: URLSearchParams) {
+    const nextQuery = nextParams.toString();
+    const currentQuery = searchParams.toString();
+
+    if (nextQuery !== currentQuery) {
+      router.replace(`/author-dashboard/promotion?${nextQuery}`);
+    }
+  }
+
+  function selectCampaign(campaignId: string) {
+    setChannelFormSeed(null);
+
+    replacePromotionUrl(
+      buildPromotionPageQuery({
+        author: selectedAuthor!.slug,
+        campaign: campaignId,
+        period,
+        existing: searchParams,
+      }),
+    );
+  }
 
   useEffect(() => {
     if (!selectedAuthor) {
@@ -231,20 +265,12 @@ export default function AuthorPromotionClient({
         setCampaigns(nextCampaigns);
         setSummaryRows(summaryPayload.campaigns ?? []);
         setProducts(productsPayload.products ?? []);
-        setSelectedCampaignId((current) => {
-          if (current && nextCampaigns.some((campaign) => campaign.id === current)) {
-            return current;
-          }
-
-          return nextCampaigns[0]?.id ?? null;
-        });
       } catch {
         if (!cancelled) {
           setError("Не удалось загрузить данные продвижения.");
           setCampaigns([]);
           setSummaryRows([]);
           setProducts([]);
-          setSelectedCampaignId(null);
         }
       } finally {
         if (!cancelled) {
@@ -259,6 +285,33 @@ export default function AuthorPromotionClient({
       cancelled = true;
     };
   }, [period, refreshToken, selectedAuthor]);
+
+  useEffect(() => {
+    if (loading || campaigns.length === 0 || !selectedAuthor) {
+      return;
+    }
+
+    const resolvedId = resolveSelectedCampaignId(campaigns, urlCampaignId);
+    const resolvedCampaignParam = resolvedId ?? null;
+    const urlCampaignParam = urlCampaignId ?? null;
+
+    if (urlCampaignParam !== resolvedCampaignParam) {
+      replacePromotionUrl(
+        buildPromotionPageQuery({
+          author: selectedAuthor.slug,
+          campaign: resolvedId,
+          period,
+          existing: searchParams,
+        }),
+      );
+    }
+  }, [
+    campaigns,
+    loading,
+    period,
+    selectedAuthor,
+    urlCampaignId,
+  ]);
 
   useEffect(() => {
     const campaignId = selectedCampaignId;
@@ -309,9 +362,16 @@ export default function AuthorPromotionClient({
   }, [period, selectedCampaignId]);
 
   function handleAuthorChange(slug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("author", slug);
-    router.replace(`/author-dashboard/promotion?${params.toString()}`);
+    setCampaignStats(null);
+
+    replacePromotionUrl(
+      buildPromotionPageQuery({
+        author: slug,
+        campaign: null,
+        period,
+        existing: searchParams,
+      }),
+    );
   }
 
   function handlePeriodChange(nextPeriod: PromotionPeriodKey) {
@@ -355,7 +415,11 @@ export default function AuthorPromotionClient({
       setCampaignName("");
       setCampaignKey("");
       setPracticeId("");
-      setSelectedCampaignId(payload.campaign?.id ?? null);
+
+      if (payload.campaign?.id) {
+        selectCampaign(payload.campaign.id);
+      }
+
       setRefreshToken((value) => value + 1);
     } catch (createFailure) {
       const code =
@@ -497,7 +561,7 @@ export default function AuthorPromotionClient({
                 <button
                   key={campaign.id}
                   type="button"
-                  onClick={() => setSelectedCampaignId(campaign.id)}
+                  onClick={() => selectCampaign(campaign.id)}
                   className={`w-full rounded-[22px] border px-4 py-4 text-left transition-colors ${
                     isSelected
                       ? "border-[#9a74d8] bg-[#f4ecfb]"

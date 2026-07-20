@@ -3,6 +3,10 @@
  * Author promotion MVP unit checks — safe without database access.
  */
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function assert(condition, message) {
   if (!condition) {
@@ -109,7 +113,7 @@ function safeConversionRate(numerator, denominator) {
 
 function testMigrationContract() {
   const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716180000_promotion_campaigns.sql",
+    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
     "utf8",
   );
 
@@ -124,11 +128,11 @@ function testMigrationContract() {
 
 function testPromotionRoutes() {
   const page = readFileSync(
-    "/var/www/audiolad/src/app/author-dashboard/promotion/page.tsx",
+    join(ROOT, "src/app/author-dashboard/promotion/page.tsx"),
     "utf8",
   );
   const nav = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorDashboardNav.tsx",
+    join(ROOT, "src/components/author-dashboard/AuthorDashboardNav.tsx"),
     "utf8",
   );
 
@@ -139,11 +143,11 @@ function testPromotionRoutes() {
 
 function testStatsDoNotExposePii() {
   const migration = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716180000_promotion_campaigns.sql",
+    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
     "utf8",
   );
   const statsRoute = readFileSync(
-    "/var/www/audiolad/src/app/api/author/promotion/campaigns/[id]/route.ts",
+    join(ROOT, "src/app/api/author/promotion/campaigns/[id]/route.ts"),
     "utf8",
   );
 
@@ -206,7 +210,7 @@ function testPromotionLinksModule() {
   assert(legacy.includes("utm_content=main_post"), "legacy optional utm_content still supported");
 
   const linksSource = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/links.ts",
+    join(ROOT, "src/lib/promotion/links.ts"),
     "utf8",
   );
   assert(linksSource.includes("searchParams.set"), "uses URL search params API");
@@ -221,7 +225,7 @@ function testStatsConversions() {
 
 function testPeriodParsing() {
   const source = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/dates.ts",
+    join(ROOT, "src/lib/promotion/dates.ts"),
     "utf8",
   );
   assert(source.includes('parsePromotionPeriod'), "period parser exists");
@@ -231,11 +235,11 @@ function testPeriodParsing() {
 
 function testAccessLayer() {
   const source = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/access.ts",
+    join(ROOT, "src/lib/promotion/access.ts"),
     "utf8",
   );
   const createRoute = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/campaigns-api.ts",
+    join(ROOT, "src/lib/promotion/campaigns-api.ts"),
     "utf8",
   );
 
@@ -247,7 +251,7 @@ function testAccessLayer() {
 
 function testPromoEventsUnchanged() {
   const source = readFileSync(
-    "/var/www/audiolad/src/lib/promo/analytics-events.ts",
+    join(ROOT, "src/lib/promo/analytics-events.ts"),
     "utf8",
   );
 
@@ -257,7 +261,7 @@ function testPromoEventsUnchanged() {
 
 function testUnknownSourceLabel() {
   const source = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/channels.ts",
+    join(ROOT, "src/lib/promotion/channels.ts"),
     "utf8",
   );
   assert(source.includes("getUtmSourceLabel"), "source label helper exists");
@@ -266,7 +270,7 @@ function testUnknownSourceLabel() {
 
 function testArchivedCampaignHistory() {
   const migration = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716180000_promotion_campaigns.sql",
+    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
     "utf8",
   );
   assert(migration.includes("'archived'"), "archived status supported");
@@ -370,7 +374,7 @@ function testUtmSourceAutofill() {
 
 function testStandardChannelTypes() {
   const types = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/channel-types.ts",
+    join(ROOT, "src/lib/promotion/channel-types.ts"),
     "utf8",
   );
   assert(types.includes("messaging_bot"), "messaging bot type exists");
@@ -470,7 +474,7 @@ function testPromotionLinksForCustomChannels() {
 
 function testPromotionLinksWithoutUtmContentUi() {
   const client = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorPromotionClient.tsx",
+    join(ROOT, "src/components/author-dashboard/AuthorPromotionClient.tsx"),
     "utf8",
   );
 
@@ -504,7 +508,7 @@ function testPromotionLinksWithoutUtmContentUi() {
   assert(direct.includes("utm_campaign="), "direct keeps utm_campaign");
 
   const analyticsSanitize = readFileSync(
-    "/var/www/audiolad/src/lib/analytics/sanitize.ts",
+    join(ROOT, "src/lib/analytics/sanitize.ts"),
     "utf8",
   );
   assert(analyticsSanitize.includes("utm_content"), "analytics still accepts utm_content");
@@ -512,11 +516,11 @@ function testPromotionLinksWithoutUtmContentUi() {
 
 function testSystemChannelPresetsOnly() {
   const channels = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/channels.ts",
+    join(ROOT, "src/lib/promotion/channels.ts"),
     "utf8",
   );
   const linksSection = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/PromotionCampaignLinksSection.tsx",
+    join(ROOT, "src/components/author-dashboard/PromotionCampaignLinksSection.tsx"),
     "utf8",
   );
 
@@ -534,7 +538,7 @@ function testSystemChannelPresetsOnly() {
 
 function testCampaignChannelsMigration() {
   const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260720140000_promotion_campaign_channels.sql",
+    join(ROOT, "supabase/migrations/20260720140000_promotion_campaign_channels.sql"),
     "utf8",
   );
 
@@ -552,15 +556,15 @@ function testCampaignChannelsMigration() {
 
 function testCampaignChannelsApi() {
   const apiModule = readFileSync(
-    "/var/www/audiolad/src/lib/promotion/campaign-channels-api.ts",
+    join(ROOT, "src/lib/promotion/campaign-channels-api.ts"),
     "utf8",
   );
   const listRoute = readFileSync(
-    "/var/www/audiolad/src/app/api/author/promotion/campaigns/[id]/channels/route.ts",
+    join(ROOT, "src/app/api/author/promotion/campaigns/[id]/channels/route.ts"),
     "utf8",
   );
   const itemRoute = readFileSync(
-    "/var/www/audiolad/src/app/api/author/promotion/campaigns/[id]/channels/[channelId]/route.ts",
+    join(ROOT, "src/app/api/author/promotion/campaigns/[id]/channels/[channelId]/route.ts"),
     "utf8",
   );
 
@@ -609,11 +613,11 @@ function testMultipleCustomChannelLinks() {
 
 function testCustomChannelFormUi() {
   const linksSection = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/PromotionCampaignLinksSection.tsx",
+    join(ROOT, "src/components/author-dashboard/PromotionCampaignLinksSection.tsx"),
     "utf8",
   );
   const client = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorPromotionClient.tsx",
+    join(ROOT, "src/components/author-dashboard/AuthorPromotionClient.tsx"),
     "utf8",
   );
   assert(linksSection.includes("Тип канала"), "channel type label in form");
@@ -628,12 +632,171 @@ function testCustomChannelFormUi() {
 
 function testCustomChannelModulesExist() {
   for (const file of [
-    "/var/www/audiolad/src/lib/promotion/utm-normalize.ts",
-    "/var/www/audiolad/src/lib/promotion/channel-types.ts",
-    "/var/www/audiolad/src/lib/promotion/custom-channel.ts",
+    join(ROOT, "src/lib/promotion/utm-normalize.ts"),
+    join(ROOT, "src/lib/promotion/channel-types.ts"),
+    join(ROOT, "src/lib/promotion/custom-channel.ts"),
   ]) {
     assert(readFileSync(file, "utf8").includes("export"), `${file} exports helpers`);
   }
+}
+
+function resolveSelectedCampaignId(campaigns, urlCampaignId, currentCampaignId = null) {
+  if (campaigns.length === 0) {
+    return null;
+  }
+
+  if (
+    urlCampaignId &&
+    campaigns.some((campaign) => campaign.id === urlCampaignId)
+  ) {
+    return urlCampaignId;
+  }
+
+  if (
+    currentCampaignId &&
+    campaigns.some((campaign) => campaign.id === currentCampaignId)
+  ) {
+    return currentCampaignId;
+  }
+
+  return campaigns[0]?.id ?? null;
+}
+
+function buildPromotionPageQuery(params) {
+  const next = new URLSearchParams(params.existing?.toString() ?? "");
+
+  if (params.author) {
+    next.set("author", params.author);
+  }
+
+  if (params.period) {
+    next.set("period", params.period);
+  }
+
+  if (params.campaign) {
+    next.set("campaign", params.campaign);
+  } else if (params.campaign === null) {
+    next.delete("campaign");
+  }
+
+  return next;
+}
+
+function testCampaignSelectionLogic() {
+  const campaignA = { id: "55550c07-87b2-4752-acd5-3613378d23fb" };
+  const campaignB = { id: "6e706632-b792-4392-a330-4ec52900b7bc" };
+  const campaigns = [campaignB, campaignA];
+
+  assert(
+    resolveSelectedCampaignId(campaigns, campaignA.id) === campaignA.id,
+    "valid URL campaign wins over first list item",
+  );
+  assert(
+    resolveSelectedCampaignId(campaigns, null, campaignA.id) === campaignA.id,
+    "current selection kept when still valid",
+  );
+  assert(
+    resolveSelectedCampaignId(campaigns, null, null) === campaignB.id,
+    "fallback to first campaign",
+  );
+  assert(
+    resolveSelectedCampaignId(campaigns, "00000000-0000-0000-0000-000000000000") ===
+      campaignB.id,
+    "invalid URL falls back to first campaign",
+  );
+  assert(
+    resolveSelectedCampaignId([], campaignA.id) === null,
+    "empty campaign list resolves to null",
+  );
+
+  const restored = resolveSelectedCampaignId(
+    campaigns,
+    campaignA.id,
+    campaignB.id,
+  );
+  assert(restored === campaignA.id, "URL restoration beats stale current selection");
+
+  const authorSwitch = resolveSelectedCampaignId(
+    [campaignB],
+    campaignA.id,
+    campaignA.id,
+  );
+  assert(authorSwitch === campaignB.id, "foreign campaign id falls back for new author");
+
+  const query = buildPromotionPageQuery({
+    author: "zoya-petrova",
+    campaign: campaignA.id,
+    period: "30d",
+    existing: new URLSearchParams("author=zoya-petrova&period=7d"),
+  });
+  assert(query.get("author") === "zoya-petrova", "author preserved");
+  assert(query.get("campaign") === campaignA.id, "campaign written to query");
+  assert(query.get("period") === "30d", "period updated");
+
+  const cleared = buildPromotionPageQuery({
+    author: "other-author",
+    campaign: null,
+    existing: new URLSearchParams(
+      "author=zoya-petrova&campaign=55550c07-87b2-4752-acd5-3613378d23fb",
+    ),
+  });
+  assert(cleared.get("author") === "other-author", "author switched");
+  assert(cleared.get("campaign") === null, "campaign removed on author switch");
+}
+
+function testCampaignSelectionUiAndChannelsState() {
+  const client = readFileSync(
+    join(ROOT, "src/components/author-dashboard/AuthorPromotionClient.tsx"),
+    "utf8",
+  );
+  const linksSection = readFileSync(
+    join(ROOT, "src/components/author-dashboard/PromotionCampaignLinksSection.tsx"),
+    "utf8",
+  );
+  const selectionModule = readFileSync(
+    join(ROOT, "src/lib/promotion/campaign-selection.ts"),
+    "utf8",
+  );
+
+  assert(selectionModule.includes("resolveSelectedCampaignId"), "selection helper exported");
+  assert(client.includes('searchParams.get("campaign")'), "campaign read from URL");
+  assert(client.includes("resolveSelectedCampaignId"), "client uses selection helper");
+  assert(client.includes("buildPromotionPageQuery"), "client builds promotion query");
+  assert(client.includes("selectCampaign"), "explicit campaign selection helper");
+  assert(client.includes("router.replace"), "URL updated without full reload");
+  assert(
+    client.includes("campaign: null"),
+    "author switch clears campaign param",
+  );
+
+  assert(linksSection.includes("Ссылки для кампании"), "campaign context heading");
+  assert(
+    linksSection.includes("Новая ссылка будет добавлена именно в эту кампанию."),
+    "create form campaign hint",
+  );
+  assert(
+    linksSection.includes("Дополнительных ссылок пока нет."),
+    "loaded-empty copy",
+  );
+  assert(
+    linksSection.includes("Не удалось загрузить дополнительные ссылки."),
+    "error-without-data copy",
+  );
+  assert(linksSection.includes("Повторить"), "retry action");
+  assert(linksSection.includes("channelsReloadNonce"), "retry nonce state");
+  assert(linksSection.includes("channelsRequestToken"), "stale response guard");
+  const channelsCatchBlock = linksSection.slice(
+    linksSection.indexOf("} catch {"),
+    linksSection.indexOf("} finally {"),
+  );
+  assert(
+    !channelsCatchBlock.includes("setChannels([])"),
+    "error handler keeps existing channels",
+  );
+  assert(
+    linksSection.includes("channelsRefreshError"),
+    "refresh error state separated from empty state",
+  );
 }
 
 function main() {
@@ -661,6 +824,8 @@ function main() {
   testPromotionLinksWithoutUtmContentUi();
   testCustomChannelFormUi();
   testCustomChannelModulesExist();
+  testCampaignSelectionLogic();
+  testCampaignSelectionUiAndChannelsState();
   console.log("author-promotion-unit: ok");
 }
 
