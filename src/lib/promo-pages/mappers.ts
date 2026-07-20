@@ -66,8 +66,13 @@ export function mapPromoPageAdminDto(row: PromoPageRow): PromoPageAdminDto {
       typeof row.public_description === "string" ? row.public_description : null,
     banner_path: typeof row.banner_path === "string" ? row.banner_path : null,
     footer_text: typeof row.footer_text === "string" ? row.footer_text : null,
+    cta_enabled: row.cta_enabled === true,
+    cta_heading: typeof row.cta_heading === "string" ? row.cta_heading : null,
+    cta_description:
+      typeof row.cta_description === "string" ? row.cta_description : null,
     cta_label: typeof row.cta_label === "string" ? row.cta_label : null,
     cta_href: typeof row.cta_href === "string" ? row.cta_href : null,
+    cta_open_in_new_tab: row.cta_open_in_new_tab === true,
     published_at: typeof row.published_at === "string" ? row.published_at : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -95,8 +100,13 @@ export function mapPromoPageListItem(row: PromoPageRow): PromoPageRecord & {
       typeof row.public_description === "string" ? row.public_description : null,
     banner_path: typeof row.banner_path === "string" ? row.banner_path : null,
     footer_text: typeof row.footer_text === "string" ? row.footer_text : null,
+    cta_enabled: row.cta_enabled === true,
+    cta_heading: typeof row.cta_heading === "string" ? row.cta_heading : null,
+    cta_description:
+      typeof row.cta_description === "string" ? row.cta_description : null,
     cta_label: typeof row.cta_label === "string" ? row.cta_label : null,
     cta_href: typeof row.cta_href === "string" ? row.cta_href : null,
+    cta_open_in_new_tab: row.cta_open_in_new_tab === true,
     published_at: typeof row.published_at === "string" ? row.published_at : null,
     created_by:
       typeof row.created_by === "string" ? row.created_by : null,
