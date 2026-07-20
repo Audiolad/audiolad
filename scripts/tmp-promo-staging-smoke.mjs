@@ -1,22 +1,30 @@
 #!/usr/bin/env node
 /**
- * Full staging smoke for promo-pages — blocked on production unless ALLOW_PRODUCTION_TEST_FIXTURES=true.
+ * Full staging smoke for promo-pages — requires AUDIOLAD_TEST_DATABASE=1 on allowlisted staging.
  */
 import { createClient } from "@supabase/supabase-js";
 import { execSync, spawn } from "node:child_process";
 import { writeFileSync, readFileSync, appendFileSync, openSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { assertProductionFixturesAllowed } from "./lib/guard-production-fixtures.mjs";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+import { assertFixtureWritesAllowed } from "./lib/fixture-context.mjs";
 import { cleanupPromoStagingSuffix } from "./lib/promo-staging-fixture-cleanup.mjs";
 
 const SCRIPT_NAME = "scripts/tmp-promo-staging-smoke.mjs";
-const KONG_URL = "http://127.0.0.1:8000";
+const STAGING_SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const DOCKER_CONTAINER =
+  process.env.AUDIOLAD_TEST_DOCKER_CONTAINER ?? "supabase-db-staging";
 
-assertProductionFixturesAllowed({
+const boot = bootstrapDataWriteScript({
   scriptName: SCRIPT_NAME,
-  supabaseUrl: KONG_URL,
+  supabaseUrl: STAGING_SUPABASE_URL,
   dockerExec: true,
+  dockerContainer: DOCKER_CONTAINER,
 });
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const LOG = "/tmp/audiolad-promo-staging-smoke.log";
 const FIXTURES_PATH = "/tmp/audiolad-promo-staging-fixtures.json";
@@ -52,25 +60,27 @@ function skip(name, reason) {
 }
 
 function sql(query) {
-  assertProductionFixturesAllowed({
+  assertFixtureWritesAllowed({
     scriptName: SCRIPT_NAME,
-    supabaseUrl: KONG_URL,
+    supabaseUrl: STAGING_SUPABASE_URL,
     dockerExec: true,
+    dockerContainer: DOCKER_CONTAINER,
   });
   return execSync(
-    `docker exec supabase-db psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
+    `docker exec ${DOCKER_CONTAINER} psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
     { encoding: "utf8" },
   ).trim();
 }
 
 function sqlFile(content) {
-  assertProductionFixturesAllowed({
+  assertFixtureWritesAllowed({
     scriptName: SCRIPT_NAME,
-    supabaseUrl: KONG_URL,
+    supabaseUrl: STAGING_SUPABASE_URL,
     dockerExec: true,
+    dockerContainer: DOCKER_CONTAINER,
   });
   return execSync(
-    "docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1",
+    `docker exec -i ${DOCKER_CONTAINER} psql -U postgres -d postgres -v ON_ERROR_STOP=1`,
     { input: content, encoding: "utf8" },
   );
 }
@@ -84,7 +94,7 @@ function loadStagingEnv() {
     "docker exec supabase-kong printenv SUPABASE_SERVICE_KEY",
     { encoding: "utf8" },
   ).trim();
-  const url = "http://127.0.0.1:8000";
+  const url = STAGING_SUPABASE_URL;
 
   if (url.includes(PROD_HOST)) {
     throw new Error("SAFETY: staging URL matches production hostname");
@@ -108,7 +118,7 @@ function loadStagingEnv() {
     service,
     anonLast4: anon.slice(-4),
     serviceLast4: service.slice(-4),
-    hostname: "127.0.0.1:8000",
+    hostname: new URL(url).host,
   };
 }
 

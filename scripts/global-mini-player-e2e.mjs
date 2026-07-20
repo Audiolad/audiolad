@@ -5,6 +5,20 @@ import "./lib/assert-playwright-allowed.mjs";
  * Usage: node scripts/global-mini-player-e2e.mjs [baseUrl]
  */
 import { chromium } from "playwright";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/global-mini-player-e2e.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
 const LISTEN_PATH = "/listen/sergey-and-zoya/klyuch-k-izobiliyu?autoplay=1";

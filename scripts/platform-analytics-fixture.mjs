@@ -11,6 +11,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
+import { assertFixtureWritesAllowed } from "./lib/fixture-context.mjs";
+
 const FIXTURE_CAMPAIGN = "analytics_dev_fixture";
 
 function loadEnv() {
@@ -39,6 +41,11 @@ if (!url || !serviceKey) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
 }
+
+assertFixtureWritesAllowed({
+  scriptName: "scripts/platform-analytics-fixture.mjs",
+  supabaseUrl: url,
+});
 
 const service = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },

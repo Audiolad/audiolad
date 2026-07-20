@@ -10,6 +10,19 @@ import { createClient } from "@supabase/supabase-js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import {
+  bootstrapDataWriteScript,
+  assertProjectEnvLocalSafeForFixtures,
+  assertAdminInteractiveConfirmed,
+} from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/admin-users-deletion-interactive-check.mjs";
+
+bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  requireAdminInteractiveConfirm: true,
+  validateEnvLocal: false,
+});
 
 const BASE = process.argv[2] ?? "http://127.0.0.1:3020";
 const OUT_DIR = path.join(
@@ -19,6 +32,7 @@ const OUT_DIR = path.join(
 const PREFIX = "admin-delete-check";
 
 function loadEnv() {
+  assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
   return Object.fromEntries(
     readFileSync("/var/www/audiolad/.env.local", "utf8")
       .split("\n")

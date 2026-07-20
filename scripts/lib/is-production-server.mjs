@@ -7,7 +7,8 @@
  *   AUDIOLAD_ALLOW_START=1      — allow manual `npm start` outside PM2
  *
  * Fixture scripts (DB writes):
- *   ALLOW_PRODUCTION_TEST_FIXTURES=true — see scripts/lib/guard-production-fixtures.mjs
+ *   AUDIOLAD_TEST_DATABASE=1 on allowlisted staging/local only — see scripts/lib/fixture-context.mjs
+ *   ALLOW_PRODUCTION_TEST_FIXTURES is deprecated and does not bypass production writes.
  *
  * Explicit production marker:
  *   AUDIOLAD_PRODUCTION_SERVER=1

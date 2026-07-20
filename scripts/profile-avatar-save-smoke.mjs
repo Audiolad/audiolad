@@ -9,12 +9,30 @@ import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import {
+  bootstrapDataWriteScript,
+  assertProjectEnvLocalSafeForFixtures,
+} from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/profile-avatar-save-smoke.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const BASE_URL = process.env.AUDIT_BASE_URL ?? "http://127.0.0.1:3017";
 const OUT_DIR = path.resolve("scripts/screenshots/profile-avatar-save-smoke");
 const TEST_EMAIL = process.env.AVATAR_SMOKE_EMAIL ?? "1@audiolad.ru";
 
 function loadEnv() {
+  assertProjectEnvLocalSafeForFixtures({ envPath: path.resolve(".env.local") });
   return Object.fromEntries(
     readFileSync(path.resolve(".env.local"), "utf8")
       .split("\n")

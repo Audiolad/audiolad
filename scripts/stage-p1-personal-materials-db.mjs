@@ -10,8 +10,26 @@
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import {
+  bootstrapDataWriteScript,
+  assertProjectEnvLocalSafeForFixtures,
+} from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/stage-p1-personal-materials-db.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 function loadEnv() {
+  assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
   return Object.fromEntries(
     readFileSync("/var/www/audiolad/.env.local", "utf8")
       .split("\n")

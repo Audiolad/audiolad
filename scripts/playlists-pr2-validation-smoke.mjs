@@ -2,6 +2,20 @@
  * Mirrors src/lib/playlists/validation.ts + public-content.ts for smoke checks
  * without a test runner. Run: node scripts/playlists-pr2-validation-smoke.mjs
  */
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/playlists-pr2-validation-smoke.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const PLAYLIST_TITLE_MAX_LENGTH = 80;
 const FORBIDDEN = new Set([

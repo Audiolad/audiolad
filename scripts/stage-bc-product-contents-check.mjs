@@ -1,6 +1,23 @@
 #!/usr/bin/env node
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import {
+  bootstrapDataWriteScript,
+  assertProjectEnvLocalSafeForFixtures,
+} from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/stage-bc-product-contents-check.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const BASE = "http://localhost:3000";
 const SINGLE_SLUG = "e2e-test-odinochnyy-audioprodukt";
@@ -13,6 +30,7 @@ const PROGRAM_AUDIO_ORDER = [
 ];
 
 function loadEnv() {
+  assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
   return Object.fromEntries(
     readFileSync("/var/www/audiolad/.env.local", "utf8")
       .split("\n")

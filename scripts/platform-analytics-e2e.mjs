@@ -10,6 +10,22 @@ import { chromium } from "playwright";
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/platform-analytics-e2e.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const DOCKER_CONTAINER =
+  process.env.AUDIOLAD_TEST_DOCKER_CONTAINER ?? "supabase-db-staging";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const BASE_URL =
   process.env.BASE_URL ??
@@ -31,7 +47,7 @@ function assert(condition, message) {
 
 function sql(query) {
   return execSync(
-    `docker exec supabase-db psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
+    `docker exec ${DOCKER_CONTAINER} psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
     { encoding: "utf8" },
   ).trim();
 }

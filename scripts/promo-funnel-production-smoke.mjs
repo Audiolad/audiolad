@@ -11,6 +11,20 @@ import "./lib/assert-playwright-allowed.mjs";
  *   PROMO_SMOKE_INTERVAL_MS — guest progress wait (default: 13000)
  */
 import { chromium } from "playwright";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/promo-funnel-production-smoke.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://audiolad.ru";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const PRACTICE_URL =
   process.env.PROMO_SMOKE_PRACTICE_URL ??

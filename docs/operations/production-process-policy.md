@@ -21,6 +21,8 @@
 
 Guards в коде блокируют dev/playwright/start вне PM2. Маркер сервера: `/var/www/audiolad-deploy/PRODUCTION_SERVER`.
 
+Fixture/data-creating scripts: см. [production-fixture-policy.md](./production-fixture-policy.md).
+
 ## Разрешено на production
 
 | Действие | Когда |
@@ -111,6 +113,8 @@ export AUDIOLAD_ALLOW_DEV=1        # разрешить npm run dev
 export AUDIOLAD_ALLOW_PLAYWRIGHT=1 # разрешить E2E
 export AUDIOLAD_ALLOW_START=1      # разрешить ручной npm start
 ```
+
+Fixture override `ALLOW_PRODUCTION_TEST_FIXTURES` **не разрешает** запись в production — см. [production-fixture-policy.md](./production-fixture-policy.md).
 
 ## Playwright browsers
 

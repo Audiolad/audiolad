@@ -19,6 +19,23 @@ import {
   removePlaylistCoverObject,
 } from "../src/lib/playlists/covers.ts";
 import { processPlaylistCoverImage } from "../src/lib/playlists/cover-image.ts";
+import {
+  bootstrapDataWriteScript,
+  assertProjectEnvLocalSafeForFixtures,
+} from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/playlists-pr3-3-storage-smoke.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(__dirname, "fixtures/playlist-covers");
@@ -45,6 +62,7 @@ function loadEnvFile(path) {
 }
 
 loadEnvFile("/var/www/audiolad/.env.local");
+assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
 loadEnvFile("/var/www/audiolad-deploy/shared/.env.production");
 
 async function main() {

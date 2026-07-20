@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Integration smoke for promo pages stages 1–3.
- * Temp script — blocked on production unless ALLOW_PRODUCTION_TEST_FIXTURES=true.
+ * Temp script — production writes blocked; requires AUDIOLAD_TEST_DATABASE=1 on allowlisted staging.
  */
 import { createClient } from "@supabase/supabase-js";
 import { execSync, spawn } from "node:child_process";
@@ -13,20 +13,28 @@ import {
   writeFileSync,
 } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { assertProductionFixturesAllowed } from "./lib/guard-production-fixtures.mjs";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+import { assertFixtureWritesAllowed } from "./lib/fixture-context.mjs";
 import {
   cleanupPromoStagingSuffix,
   stagingFixtureEmails,
 } from "./lib/promo-staging-fixture-cleanup.mjs";
 
 const SCRIPT_NAME = "scripts/.tmp-promo-integration-smoke.mjs";
-const KONG_URL = "http://127.0.0.1:8000";
+const STAGING_SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const DOCKER_CONTAINER =
+  process.env.AUDIOLAD_TEST_DOCKER_CONTAINER ?? "supabase-db-staging";
 
-assertProductionFixturesAllowed({
+const boot = bootstrapDataWriteScript({
   scriptName: SCRIPT_NAME,
-  supabaseUrl: KONG_URL,
+  supabaseUrl: STAGING_SUPABASE_URL,
   dockerExec: true,
+  dockerContainer: DOCKER_CONTAINER,
 });
+if (boot.skipped) {
+  process.exit(0);
+}
 
 const LOG = "/tmp/audiolad-promo-integration-smoke.log";
 const FIXTURES_PATH = "/tmp/audiolad-promo-integration-fixtures.json";
@@ -72,25 +80,27 @@ function skip(name, reason) {
 }
 
 function sql(query) {
-  assertProductionFixturesAllowed({
+  assertFixtureWritesAllowed({
     scriptName: SCRIPT_NAME,
-    supabaseUrl: KONG_URL,
+    supabaseUrl: STAGING_SUPABASE_URL,
     dockerExec: true,
+    dockerContainer: DOCKER_CONTAINER,
   });
   return execSync(
-    `docker exec supabase-db psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
+    `docker exec ${DOCKER_CONTAINER} psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
     { encoding: "utf8" },
   ).trim();
 }
 
 function sqlFile(content) {
-  assertProductionFixturesAllowed({
+  assertFixtureWritesAllowed({
     scriptName: SCRIPT_NAME,
-    supabaseUrl: KONG_URL,
+    supabaseUrl: STAGING_SUPABASE_URL,
     dockerExec: true,
+    dockerContainer: DOCKER_CONTAINER,
   });
   return execSync(
-    "docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1",
+    `docker exec -i ${DOCKER_CONTAINER} psql -U postgres -d postgres -v ON_ERROR_STOP=1`,
     { input: content, encoding: "utf8" },
   );
 }
@@ -103,12 +113,12 @@ function loadStagingEnv() {
     encoding: "utf8",
   }).trim();
 
-  if (KONG_URL.includes(PROD_HOST)) {
+  if (STAGING_SUPABASE_URL.includes(PROD_HOST)) {
     throw new Error("SAFETY: staging URL matches production hostname");
   }
 
   const envContent = [
-    `NEXT_PUBLIC_SUPABASE_URL=${KONG_URL}`,
+    `NEXT_PUBLIC_SUPABASE_URL=${STAGING_SUPABASE_URL}`,
     `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${anon}`,
     `SUPABASE_SERVICE_ROLE_KEY=${service}`,
     `NEXT_PUBLIC_SITE_URL=${APP_BASE}`,
@@ -117,12 +127,12 @@ function loadStagingEnv() {
   ].join("\n");
   writeFileSync(STAGING_ENV_PATH, envContent);
 
-  audit.stagingSupabaseHost = "127.0.0.1:8000";
+  audit.stagingSupabaseHost = new URL(STAGING_SUPABASE_URL).host;
   audit.productionAppEnvHost = "audiolad.ru";
   audit.stagingAppBase = APP_BASE;
   audit.anonKeyLast4 = anon.slice(-4);
 
-  return { url: KONG_URL, anon, service };
+  return { url: STAGING_SUPABASE_URL, anon, service };
 }
 
 async function getSession(env, email) {
@@ -700,7 +710,7 @@ async function runVisualSmoke(fixtures, sessionA) {
     const { chromium } = await import("playwright");
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const browser = await chromium.launch({ headless: true });
-    const ref = new URL(KONG_URL).hostname.split(".")[0];
+    const ref = new URL(STAGING_SUPABASE_URL).hostname.split(".")[0];
 
     for (const [label, width, height, path] of [
       ["desktop1440", 1440, 900, fixtures.publicPath],

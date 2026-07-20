@@ -5,6 +5,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
 import {
   isValidPlaylistPublicSlug,
   normalizePlaylistPublicSlug,
@@ -14,6 +15,19 @@ import {
   buildPublicPlaylistCanonicalUrl,
 } from "../src/lib/playlists/public-url.ts";
 import { isPracticeEligibleForPublicPlaylist } from "../src/lib/playlists/public-content.ts";
+
+const SCRIPT_NAME = "scripts/playlists-pr5-validation-smoke.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);

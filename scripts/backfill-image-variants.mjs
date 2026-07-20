@@ -18,6 +18,20 @@ import { processImageForProfile } from "../src/lib/images/process-image.ts";
 import { uploadProcessedImageSet } from "../src/lib/images/upload-image-set.ts";
 import { parseImageManifest } from "../src/lib/images/image-manifest.ts";
 import { getCoverPublicUrl } from "../src/lib/author-products/utils.ts";
+import { bootstrapDataWriteScript } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/backfill-image-variants.mjs";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: SUPABASE_URL,
+  dockerExec: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
 
 function parseArgs(argv) {
   const args = {

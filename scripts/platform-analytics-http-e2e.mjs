@@ -7,6 +7,24 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
+import { assertFixtureWritesAllowed } from "./lib/fixture-context.mjs";
+import { bootstrapDataWriteScript, assertProjectEnvLocalSafeForFixtures } from "./lib/fixture-script-entry.mjs";
+
+const SCRIPT_NAME = "scripts/platform-analytics-http-e2e.mjs";
+const DOCKER_CONTAINER =
+  process.env.AUDIOLAD_TEST_DOCKER_CONTAINER ?? "supabase-db-staging";
+
+const boot = bootstrapDataWriteScript({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
+  dockerExec: true,
+  dockerContainer: DOCKER_CONTAINER,
+  validateEnvLocal: false,
+});
+if (boot.skipped) {
+  process.exit(0);
+}
+
 function loadEnv() {
   try {
     const raw = readFileSync("/var/www/audiolad/.env.local", "utf8");
@@ -25,19 +43,34 @@ function loadEnv() {
 }
 
 loadEnv();
+assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
 
-const baseUrl = process.env.ANALYTICS_HTTP_BASE_URL ?? process.env.BASE_URL ?? "http://127.0.0.1:3001";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+assertFixtureWritesAllowed({
+  scriptName: SCRIPT_NAME,
+  supabaseUrl: url,
+  dockerExec: true,
+  dockerContainer: DOCKER_CONTAINER,
+});
+
+const baseUrl = process.env.ANALYTICS_HTTP_BASE_URL ?? process.env.BASE_URL ?? "http://127.0.0.1:3001";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
 function sql(query) {
+  assertFixtureWritesAllowed({
+    scriptName: SCRIPT_NAME,
+    supabaseUrl: url,
+    dockerExec: true,
+    dockerContainer: DOCKER_CONTAINER,
+  });
   return execSync(
-    `docker exec supabase-db psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
+    `docker exec ${DOCKER_CONTAINER} psql -U postgres -d postgres -tAc ${JSON.stringify(query)}`,
     { encoding: "utf8" },
   ).trim();
 }
