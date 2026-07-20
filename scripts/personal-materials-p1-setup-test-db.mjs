@@ -23,7 +23,10 @@ import {
 } from "./lib/personal-materials-test-db.mjs";
 
 const SCRIPT_NAME = "scripts/personal-materials-p1-setup-test-db.mjs";
-const MIGRATION_FILE = "supabase/migrations/20260715143000_personal_materials_foundation.sql";
+const MIGRATION_FILES = [
+  "supabase/migrations/20260715143000_personal_materials_foundation.sql",
+  "supabase/migrations/20260720143000_personal_materials_clear_draft_audio.sql",
+];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function run(cmd, options = {}) {
@@ -87,11 +90,13 @@ function cloneSchemaOnly() {
   );
 }
 
-function applyMigration({ sqlFile }) {
-  const migrationPath = path.join(ROOT, MIGRATION_FILE);
-  const sql = readFileSync(migrationPath, "utf8");
-  console.log(`[setup] applying migration ${MIGRATION_FILE}`);
-  sqlFile(sql);
+function applyMigrations({ sqlFile }) {
+  for (const migrationFile of MIGRATION_FILES) {
+    const migrationPath = path.join(ROOT, migrationFile);
+    const sql = readFileSync(migrationPath, "utf8");
+    console.log(`[setup] applying migration ${migrationFile}`);
+    sqlFile(sql);
+  }
 }
 
 function verifyFoundation({ sqlScalar }) {
@@ -121,6 +126,7 @@ function verifyFoundation({ sqlScalar }) {
     "list_claimed_personal_materials",
     "get_personal_material_progress",
     "upsert_personal_material_progress",
+    "clear_personal_material_draft_audio",
   ];
 
   for (const rpc of rpcs) {
@@ -204,11 +210,11 @@ async function main() {
   assertPersonalMaterialsTestDbAllowed({ scriptName: SCRIPT_NAME });
   const { sqlFile, sqlScalar } = createPersonalMaterialsSqlHelpers();
 
-  applyMigration({ sqlFile });
+  applyMigrations({ sqlFile });
   verifyFoundation({ sqlScalar });
 
-  console.log(`[setup] re-applying migration for idempotency check`);
-  applyMigration({ sqlFile });
+  console.log(`[setup] re-applying migrations for idempotency check`);
+  applyMigrations({ sqlFile });
   verifyFoundation({ sqlScalar });
 
   const elapsedMs = Date.now() - started;
