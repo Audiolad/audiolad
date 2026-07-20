@@ -6,7 +6,8 @@ export type PromotionLinkParams = {
   campaignKey: string;
   utmSource: string;
   utmMedium: string;
-  utmContent: string;
+  /** Optional legacy parameter; omitted from new author promotion links. */
+  utmContent?: string;
 };
 
 const UTM_SOURCE_PATTERN = /^[a-z0-9._-]{1,64}$/i;
@@ -46,17 +47,23 @@ export function buildPromotionLink(params: PromotionLinkParams): string {
 
   const utmSource = sanitizeUtmParam(params.utmSource, UTM_SOURCE_PATTERN);
   const utmMedium = sanitizeUtmParam(params.utmMedium, UTM_MEDIUM_PATTERN);
-  const utmContent = sanitizeUtmParam(params.utmContent, UTM_CONTENT_PATTERN);
   const campaignKey = params.campaignKey.trim().toLowerCase();
 
-  if (!utmSource || !utmMedium || !utmContent || !campaignKey) {
+  if (!utmSource || !utmMedium || !campaignKey) {
     throw new Error("invalid_utm_params");
   }
 
   parsed.searchParams.set("utm_source", utmSource);
   parsed.searchParams.set("utm_medium", utmMedium);
   parsed.searchParams.set("utm_campaign", campaignKey);
-  parsed.searchParams.set("utm_content", utmContent);
+
+  if (params.utmContent?.trim()) {
+    const utmContent = sanitizeUtmParam(params.utmContent, UTM_CONTENT_PATTERN);
+
+    if (utmContent) {
+      parsed.searchParams.set("utm_content", utmContent);
+    }
+  }
 
   return parsed.toString();
 }
