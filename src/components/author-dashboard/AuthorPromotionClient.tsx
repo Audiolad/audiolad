@@ -9,7 +9,17 @@ import {
   buildCampaignKeyFromName,
   normalizeCampaignKey,
 } from "@/lib/promotion/campaign-key";
+import {
+  PROMOTION_CHANNEL_TYPE_OPTIONS,
+  parseChannelTypeFormState,
+} from "@/lib/promotion/channel-types";
 import { PROMOTION_CHANNEL_PRESETS } from "@/lib/promotion/channels";
+import {
+  buildUtmSourceFromLabel,
+  resolveCustomChannelForm,
+  validateCustomChannelForm,
+} from "@/lib/promotion/custom-channel";
+import { normalizeUtmValue, resolveCustomUtmMedium } from "@/lib/promotion/utm-normalize";
 import {
   getPromotionPeriodLabel,
   parsePromotionPeriod,
@@ -64,6 +74,65 @@ type CampaignStatsPayload = {
     uniqueRegistrations: number;
   }>;
 };
+
+function loadCustomChannelFromStats(channel: {
+  utm_source: string;
+  utm_medium: string;
+  utm_content: string;
+}): {
+  customLabel: string;
+  customSource: string;
+  customSourceManual: boolean;
+  channelType: string;
+  customTypeLabel: string;
+  customTypeLabelSaved: string;
+  utmContent: string;
+} {
+  const parsedType = parseChannelTypeFormState(channel.utm_medium);
+
+  return {
+    customLabel: getSourceLabel(channel.utm_source),
+    customSource: channel.utm_source,
+    customSourceManual: true,
+    channelType: parsedType.channelType,
+    customTypeLabel: parsedType.customTypeLabel,
+    customTypeLabelSaved: parsedType.customTypeLabel,
+    utmContent: channel.utm_content,
+  };
+}
+
+function handleCustomChannelTypeChange(
+  nextType: string,
+  currentType: string,
+  customTypeLabel: string,
+  customTypeLabelSaved: string,
+): {
+  channelType: string;
+  customTypeLabel: string;
+  customTypeLabelSaved: string;
+} {
+  if (currentType === "other" && nextType !== "other") {
+    return {
+      channelType: nextType,
+      customTypeLabel: "",
+      customTypeLabelSaved: customTypeLabel,
+    };
+  }
+
+  if (nextType === "other") {
+    return {
+      channelType: nextType,
+      customTypeLabel: customTypeLabelSaved,
+      customTypeLabelSaved,
+    };
+  }
+
+  return {
+    channelType: nextType,
+    customTypeLabel: "",
+    customTypeLabelSaved,
+  };
+}
 
 function getSourceLabel(source: string): string {
   const labels: Record<string, string> = {
@@ -161,9 +230,40 @@ export default function AuthorPromotionClient({
   const [practiceId, setPracticeId] = useState("");
   const [utmContent, setUtmContent] = useState("main_post");
   const [customSource, setCustomSource] = useState("");
-  const [customMedium, setCustomMedium] = useState("social");
-  const [customLabel, setCustomLabel] = useState("Другой канал");
+  const [customSourceManual, setCustomSourceManual] = useState(false);
+  const [customLabel, setCustomLabel] = useState("");
+  const [channelType, setChannelType] = useState("social");
+  const [customTypeLabel, setCustomTypeLabel] = useState("");
+  const [customTypeLabelSaved, setCustomTypeLabelSaved] = useState("");
   const [refreshToken, setRefreshToken] = useState(0);
+
+  const customChannelFormInput = useMemo(
+    () => ({
+      label: customLabel,
+      utmSource: customSource,
+      channelType,
+      customTypeLabel,
+    }),
+    [customLabel, customSource, channelType, customTypeLabel],
+  );
+
+  const customChannelErrors = useMemo(
+    () => validateCustomChannelForm(customChannelFormInput),
+    [customChannelFormInput],
+  );
+
+  const resolvedCustomChannel = useMemo(
+    () => resolveCustomChannelForm(customChannelFormInput),
+    [customChannelFormInput],
+  );
+
+  const resolvedCustomTypeUtm = useMemo(() => {
+    if (channelType !== "other" || !customTypeLabel.trim()) {
+      return "";
+    }
+
+    return resolveCustomUtmMedium(customTypeLabel);
+  }, [channelType, customTypeLabel]);
 
   const period = parsePromotionPeriod(searchParams.get("period"));
   const selectedAuthor = useMemo(() => {
@@ -681,15 +781,15 @@ export default function AuthorPromotionClient({
                 );
               })}
 
-              {customSource.trim() ? (
+              {resolvedCustomChannel ? (
                 <CopyLinkRow
-                  label={customLabel || "Другой канал"}
+                  label={resolvedCustomChannel.label}
                   url={buildPromotionLink({
                     authorSlug: selectedCampaign.author_slug,
                     practiceSlug: selectedCampaign.practice_slug,
                     campaignKey: selectedCampaign.campaign_key,
-                    utmSource: customSource,
-                    utmMedium: customMedium,
+                    utmSource: resolvedCustomChannel.utmSource,
+                    utmMedium: resolvedCustomChannel.utmMedium,
                     utmContent: utmContent || "main_post",
                   })}
                 />
@@ -698,25 +798,131 @@ export default function AuthorPromotionClient({
 
             <div className="rounded-[20px] border border-[#eadff8] bg-white p-4">
               <p className="text-sm font-semibold">Другой канал</p>
+              <p className="mt-1 text-xs text-[#7d70a2]">
+                Настройте собственный канал или загрузите параметры из таблицы
+                статистики ниже.
+              </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <input
-                  value={customLabel}
-                  onChange={(event) => setCustomLabel(event.target.value)}
-                  placeholder="Название канала"
-                  className="rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-                />
-                <input
-                  value={customSource}
-                  onChange={(event) => setCustomSource(event.target.value)}
-                  placeholder="utm_source"
-                  className="rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-                />
-                <input
-                  value={customMedium}
-                  onChange={(event) => setCustomMedium(event.target.value)}
-                  placeholder="utm_medium"
-                  className="rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-                />
+                <label className="block sm:col-span-2">
+                  <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+                    Название канала
+                  </span>
+                  <input
+                    value={customLabel}
+                    onChange={(event) => {
+                      const nextLabel = event.target.value;
+                      setCustomLabel(nextLabel);
+                      setCustomSource(
+                        buildUtmSourceFromLabel(
+                          nextLabel,
+                          customSource,
+                          customSourceManual,
+                        ),
+                      );
+                    }}
+                    placeholder="BotHelp"
+                    className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+                  />
+                  {customChannelErrors.label ? (
+                    <p className="mt-1 text-xs text-[#9b3d3d]">
+                      {customChannelErrors.label}
+                    </p>
+                  ) : null}
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+                    UTM-источник
+                  </span>
+                  <input
+                    value={customSource}
+                    onChange={(event) => {
+                      setCustomSourceManual(true);
+                      setCustomSource(event.target.value);
+                    }}
+                    placeholder="bothelp"
+                    className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+                  />
+                  <p className="mt-1 text-xs text-[#7d70a2]">
+                    Будет использовано в ссылке как utm_source
+                  </p>
+                  {customSourceManual ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomSourceManual(false);
+                        setCustomSource(normalizeUtmValue(customLabel));
+                      }}
+                      className="mt-1 text-xs font-medium text-[#7042c5] underline-offset-2 hover:underline"
+                    >
+                      Сформировать из названия
+                    </button>
+                  ) : null}
+                  {customChannelErrors.utmSource ? (
+                    <p className="mt-1 text-xs text-[#9b3d3d]">
+                      {customChannelErrors.utmSource}
+                    </p>
+                  ) : null}
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+                    Тип канала
+                  </span>
+                  <select
+                    value={channelType}
+                    onChange={(event) => {
+                      const next = handleCustomChannelTypeChange(
+                        event.target.value,
+                        channelType,
+                        customTypeLabel,
+                        customTypeLabelSaved,
+                      );
+                      setChannelType(next.channelType);
+                      setCustomTypeLabel(next.customTypeLabel);
+                      setCustomTypeLabelSaved(next.customTypeLabelSaved);
+                    }}
+                    className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 outline-none focus:border-[#9a74d8]"
+                  >
+                    {PROMOTION_CHANNEL_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-[#7d70a2]">
+                    Будет использовано в ссылке как utm_medium
+                  </p>
+                  {customChannelErrors.channelType ? (
+                    <p className="mt-1 text-xs text-[#9b3d3d]">
+                      {customChannelErrors.channelType}
+                    </p>
+                  ) : null}
+                </label>
+
+                {channelType === "other" ? (
+                  <label className="block sm:col-span-2">
+                    <span className="mb-2 block text-sm font-medium text-[#5f5484]">
+                      Укажите свой тип канала
+                    </span>
+                    <input
+                      value={customTypeLabel}
+                      onChange={(event) => setCustomTypeLabel(event.target.value)}
+                      placeholder="Например: автоворонка, подкаст, база клиентов"
+                      className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+                    />
+                    {resolvedCustomTypeUtm ? (
+                      <p className="mt-1 text-xs text-[#7d70a2]">
+                        Значение UTM: {resolvedCustomTypeUtm}
+                      </p>
+                    ) : null}
+                    {customChannelErrors.customTypeLabel ? (
+                      <p className="mt-1 text-xs text-[#9b3d3d]">
+                        {customChannelErrors.customTypeLabel}
+                      </p>
+                    ) : null}
+                  </label>
+                ) : null}
               </div>
             </div>
           </section>
@@ -829,7 +1035,18 @@ export default function AuthorPromotionClient({
                         campaignStats.channels.map((channel) => (
                           <tr
                             key={`${channel.utm_source}-${channel.utm_medium}-${channel.utm_content}`}
-                            className="border-b border-[#f1e9fb] last:border-b-0"
+                            className="cursor-pointer border-b border-[#f1e9fb] last:border-b-0 hover:bg-[#fbf8ff]"
+                            onClick={() => {
+                              const loaded = loadCustomChannelFromStats(channel);
+                              setCustomLabel(loaded.customLabel);
+                              setCustomSource(loaded.customSource);
+                              setCustomSourceManual(loaded.customSourceManual);
+                              setChannelType(loaded.channelType);
+                              setCustomTypeLabel(loaded.customTypeLabel);
+                              setCustomTypeLabelSaved(loaded.customTypeLabelSaved);
+                              setUtmContent(loaded.utmContent);
+                            }}
+                            title="Загрузить параметры канала в форму «Другой канал»"
                           >
                             <td className="px-4 py-3">
                               {getSourceLabel(channel.utm_source)}
