@@ -271,8 +271,7 @@ export default function AuthorPromoPageForm({
     setError(null);
     setSuccess(null);
 
-    const payload = {
-      author_id: selectedAuthor.id,
+    const writePayload = {
       internal_name: internalName.trim(),
       slug: normalizePromoPageSlug(slug),
       public_title: publicTitle.trim(),
@@ -282,6 +281,13 @@ export default function AuthorPromoPageForm({
       cta_href: ctaHref.trim() || null,
       practice_ids: selectedProductIds,
     };
+
+    const payload = isCreate
+      ? {
+          author_id: selectedAuthor.id,
+          ...writePayload,
+        }
+      : writePayload;
 
     try {
       const response = await fetch(
