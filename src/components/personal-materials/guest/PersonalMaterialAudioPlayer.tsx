@@ -11,6 +11,16 @@ import {
 type PersonalMaterialAudioPlayerProps = {
   materialId: string;
   audioApiPath: string;
+  /** local = guest localStorage; server = callback only (owner library). */
+  progressMode?: "local" | "server";
+  initialPositionSeconds?: number;
+  /** Throttled persist for server mode (default 12000ms). Local mode uses 500ms. */
+  persistIntervalMs?: number;
+  onProgressPersist?: (input: {
+    positionSeconds: number;
+    durationSeconds: number;
+    completed: boolean;
+  }) => void;
 };
 
 type AudioFetchState = "idle" | "loading" | "ready" | "error" | "unavailable";
@@ -55,19 +65,40 @@ function parseRetryAfterMs(response: Response): number {
   return 3000;
 }
 
+function isNearComplete(positionSeconds: number, durationSeconds: number): boolean {
+  if (!durationSeconds || durationSeconds <= 0) {
+    return false;
+  }
+  return positionSeconds >= Math.max(durationSeconds - 15, Math.ceil(durationSeconds * 0.95));
+}
+
 export default function PersonalMaterialAudioPlayer({
   materialId,
   audioApiPath,
+  progressMode = "local",
+  initialPositionSeconds = 0,
+  persistIntervalMs,
+  onProgressPersist,
 }: PersonalMaterialAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const signedRef = useRef<SignedAudioResponse | null>(null);
   const retryTimeoutRef = useRef<number | null>(null);
-  const pendingSeekRef = useRef<number | null>(null);
+  const pendingSeekRef = useRef<number | null>(
+    initialPositionSeconds > 0 ? initialPositionSeconds : null,
+  );
   const saveTimeoutRef = useRef<number | null>(null);
+  const lastPersistAtRef = useRef(0);
+  const onProgressPersistRef = useRef(onProgressPersist);
+
+  useEffect(() => {
+    onProgressPersistRef.current = onProgressPersist;
+  }, [onProgressPersist]);
 
   const [fetchState, setFetchState] = useState<AudioFetchState>("idle");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(
+    initialPositionSeconds > 0 ? initialPositionSeconds : 0,
+  );
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -79,21 +110,46 @@ export default function PersonalMaterialAudioPlayer({
     }
   }, []);
 
-  const scheduleProgressSave = useCallback(
-    (positionSeconds: number, durationSeconds: number) => {
-      if (saveTimeoutRef.current !== null) {
-        window.clearTimeout(saveTimeoutRef.current);
-      }
+  const persistNow = useCallback(
+    (positionSeconds: number, durationSeconds: number, force = false) => {
+      const completed = isNearComplete(positionSeconds, durationSeconds);
 
-      saveTimeoutRef.current = window.setTimeout(() => {
+      if (progressMode === "local") {
         writePersonalMaterialGuestProgress(materialId, {
           positionSeconds,
           durationSeconds: durationSeconds > 0 ? durationSeconds : undefined,
           updatedAt: new Date().toISOString(),
         });
-      }, 500);
+        return;
+      }
+
+      const now = Date.now();
+      const interval = persistIntervalMs ?? 12000;
+      if (!force && now - lastPersistAtRef.current < interval) {
+        return;
+      }
+      lastPersistAtRef.current = now;
+      onProgressPersistRef.current?.({
+        positionSeconds,
+        durationSeconds,
+        completed,
+      });
     },
-    [materialId],
+    [materialId, persistIntervalMs, progressMode],
+  );
+
+  const scheduleProgressSave = useCallback(
+    (positionSeconds: number, durationSeconds: number, force = false) => {
+      if (saveTimeoutRef.current !== null) {
+        window.clearTimeout(saveTimeoutRef.current);
+      }
+
+      const delay = progressMode === "local" ? 500 : force ? 0 : 1500;
+      saveTimeoutRef.current = window.setTimeout(() => {
+        persistNow(positionSeconds, durationSeconds, force);
+      }, delay);
+    },
+    [persistNow, progressMode],
   );
 
   const isSignedUrlExpired = useCallback(() => {
@@ -189,6 +245,10 @@ export default function PersonalMaterialAudioPlayer({
   }, [fetchSignedAudio, isSignedUrlExpired]);
 
   const restoreSavedPosition = useCallback(() => {
+    if (progressMode === "server") {
+      return;
+    }
+
     const saved = readPersonalMaterialGuestProgress(materialId);
     const audio = audioRef.current;
 
@@ -201,7 +261,7 @@ export default function PersonalMaterialAudioPlayer({
     }
 
     pendingSeekRef.current = saved.positionSeconds;
-  }, [materialId]);
+  }, [materialId, progressMode]);
 
   const handlePlayPause = useCallback(async () => {
     const audio = audioRef.current;
@@ -264,7 +324,7 @@ export default function PersonalMaterialAudioPlayer({
 
       audio.currentTime = value;
       setCurrentTime(value);
-      scheduleProgressSave(value, audio.duration || duration);
+      scheduleProgressSave(value, audio.duration || duration, true);
     },
     [duration, scheduleProgressSave],
   );
@@ -313,10 +373,16 @@ export default function PersonalMaterialAudioPlayer({
     };
 
     const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      setIsPlaying(false);
+      scheduleProgressSave(audio.currentTime, audio.duration || duration, true);
+    };
     const onEnded = () => {
       setIsPlaying(false);
-      clearPersonalMaterialGuestProgress(materialId);
+      scheduleProgressSave(audio.duration || duration, audio.duration || duration, true);
+      if (progressMode === "local") {
+        clearPersonalMaterialGuestProgress(materialId);
+      }
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -325,14 +391,28 @@ export default function PersonalMaterialAudioPlayer({
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
 
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        scheduleProgressSave(audio.currentTime, audio.duration || duration, true);
+      }
+    };
+    const onPageHide = () => {
+      scheduleProgressSave(audio.currentTime, audio.duration || duration, true);
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
     };
-  }, [duration, materialId, scheduleProgressSave]);
+  }, [duration, materialId, progressMode, scheduleProgressSave]);
 
   useEffect(() => {
     return () => {

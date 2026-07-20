@@ -10,6 +10,7 @@ const DISALLOWED_PATHS = [
   "/listen/",
   "/profile/",
   "/my-practices/",
+  "/my-materials/",
   "/favorites/",
   "/history/",
   "/downloads/",

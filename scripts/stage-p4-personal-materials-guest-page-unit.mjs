@@ -65,7 +65,9 @@ function testClaimFlow() {
   const claimContext = read("src/app/api/d/[token]/claim-context/route.ts");
   const claim = read("src/app/api/d/[token]/claim/route.ts");
   const claimPage = read("src/app/personal-materials/claim/page.tsx");
-  const myMaterial = read("src/app/my-materials/[id]/page.tsx");
+  const myMaterial = read(
+    "src/app/(listener)/(library)/my-materials/[id]/page.tsx",
+  );
   const claimLib = read("src/lib/personal-materials/server/claim.ts");
 
   assert(claimContext.includes("createSignedClaimContext"), "signed cookie");
@@ -74,7 +76,7 @@ function testClaimFlow() {
   assert(claimPage.includes("verifySignedClaimContext"), "cookie verify");
   assert(claimPage.includes("claimPersonalMaterialByMaterialId"), "post-auth claim");
   assert(claimPage.includes("/personal-materials/claim"), "claim completion path");
-  assert(myMaterial.includes("get_claimed_personal_material"), "owner read rpc");
+  assert(myMaterial.includes("getMyPersonalMaterial"), "owner read via repository");
   assert(claimLib.includes("claim_personal_material"), "rpc call");
 }
 
