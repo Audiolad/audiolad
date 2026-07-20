@@ -2,6 +2,35 @@
 
 Операционные правила для production-сервера Timeweb (`72.56.232.160`).
 
+## Canonical model
+
+```text
+feature branch → PR → main → deploy explicit canonical SHA → production
+```
+
+### Правила
+
+- **`main`** — единственная canonical branch (`origin/main`).
+- Новые ветки создаются от актуального `origin/main`.
+- Production deploy разрешён **только** для SHA, достижимого из `origin/main` (commit является предком или равен HEAD canonical main).
+- Deploy **без explicit SHA запрещён**: `deploy.sh <full-sha>`.
+- Deploy **не использует** dirty working tree — release собирается только через `git archive` из commit object.
+- **Emergency override** (`AUDIOLAD_DEPLOY_OVERRIDE=1`) требует непустой `AUDIOLAD_DEPLOY_OVERRIDE_REASON` и пишется в deploy log + `.deploy-metadata`.
+- Promotion (`526449d` и связанные WIP) и promo-pages WIP **не являются** частью canonical main, пока не пройдут отдельный PR.
+- **Не деплоить** напрямую из feature branch.
+- **Rollback** существующего release — аварийная операция; остаётся доступным без блокировки при недоступном remote.
+
+### Checklist перед deploy
+
+1. `git fetch origin main`
+2. PR merged в `main`
+3. CI/checks green
+4. Candidate SHA находится в `origin/main` (`git merge-base --is-ancestor <sha> origin/main`)
+5. `deploy.sh <full-sha>`
+6. Verify BUILD_ID и health (`/api/health/build`)
+
+Backup pre-sync main: tag `archive/pre-canonical-main-20260711` → `68c4d86`.
+
 ## Production-приложение
 
 - **Единственный** рабочий экземпляр Next.js — процесс PM2 `audiolad`.
@@ -27,7 +56,7 @@ Fixture/data-creating scripts: см. [production-fixture-policy.md](./production
 
 | Действие | Когда |
 |----------|-------|
-| `deploy/scripts/deploy.sh` | Release-based deploy |
+| `deploy/scripts/deploy.sh <commit-sha>` | Release-based deploy (explicit canonical SHA required) |
 | HTTP smoke | `scripts/production-smoke-http.mjs` (без браузера) |
 | `scripts/check-server-health.sh` | Ручная или cron-диагностика |
 | `npm run build` внутри deploy | Один build на новый release в `releases/` |
@@ -47,12 +76,14 @@ node scripts/production-smoke-http.mjs
 ## Перед deploy
 
 ```bash
+git fetch origin main
+git merge-base --is-ancestor <candidate-sha> origin/main && echo "canonical OK"
 free -h                    # RAM и swap
 bash scripts/check-server-health.sh
 pm2 status
 ```
 
-Не деплоить при RAM > 80% или swap > 50%.
+Не деплоить при RAM > 80% или swap > 50%. Deploy без SHA или с SHA вне `origin/main` отклоняется policy gate (кроме явного override с причиной).
 
 ## После deploy
 
@@ -115,6 +146,14 @@ export AUDIOLAD_ALLOW_START=1      # разрешить ручной npm start
 ```
 
 Fixture override `ALLOW_PRODUCTION_TEST_FIXTURES` **не разрешает** запись в production — см. [production-fixture-policy.md](./production-fixture-policy.md).
+
+Deploy override (только экстренно, с audit log):
+
+```bash
+export AUDIOLAD_DEPLOY_OVERRIDE=1
+export AUDIOLAD_DEPLOY_OVERRIDE_REASON="описание причины"
+deploy.sh <full-sha>
+```
 
 ## Playwright browsers
 

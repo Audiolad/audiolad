@@ -4,13 +4,19 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/canonical-deploy-policy.sh
+source "$SCRIPT_DIR/lib/canonical-deploy-policy.sh"
 
 usage() {
   cat <<'EOF'
-Usage: deploy.sh [commit-ish]
+Usage: deploy.sh <commit-sha>
 
 Safely deploy a new release without rebuilding inside the active current directory.
-If commit-ish is omitted, deploys the current checked-out commit in GIT_WORKDIR.
+Deploy commit SHA is required. Only commits reachable from origin/main are allowed
+unless AUDIOLAD_DEPLOY_OVERRIDE=1 with AUDIOLAD_DEPLOY_OVERRIDE_REASON set.
+
+Release content is extracted via git archive from the commit object only;
+dirty working tree files are never included.
 EOF
 }
 
@@ -36,6 +42,18 @@ main() {
   require_command curl
   require_command node
   require_command flock
+
+  local arg_status=0
+  validate_deploy_commit_argument "$@" || arg_status=$?
+  if (( arg_status == 2 )); then
+    usage
+    exit 0
+  fi
+  if (( arg_status != 0 )); then
+    usage
+    exit 1
+  fi
+
   ensure_dirs
   acquire_deploy_lock
   check_disk_space 2048
@@ -45,11 +63,12 @@ main() {
     exit 1
   fi
 
-  if [[ -z "$COMMIT_REF" ]]; then
-    COMMIT_REF="$(git -C "$GIT_WORKDIR" rev-parse HEAD)"
+  if ! run_deploy_policy_gate "$COMMIT_REF"; then
+    log_error "Deploy policy gate rejected commit $COMMIT_REF"
+    exit 1
   fi
 
-  FULL_COMMIT="$(git -C "$GIT_WORKDIR" rev-parse "$COMMIT_REF")"
+  local FULL_COMMIT="$DEPLOY_FULL_COMMIT"
   RELEASE_NAME="$(get_release_name "$FULL_COMMIT")"
   RELEASE_DIR="$DEPLOY_ROOT/releases/$RELEASE_NAME"
 
@@ -106,6 +125,12 @@ main() {
   log_info "Current release switched to $RELEASE_DIR"
 
   printf '%s\n' "$FULL_COMMIT" > "$RELEASE_DIR/.deploy-commit"
+  write_deploy_metadata \
+    "$RELEASE_DIR" \
+    "$FULL_COMMIT" \
+    "$DEPLOY_CANONICAL_HEAD" \
+    "$DEPLOY_OVERRIDE_FLAG" \
+    "$DEPLOY_OVERRIDE_REASON"
 
   log_info "Capturing PM2 baseline before production reload"
   if ! pm2 jlist 2>/dev/null | node "$SCRIPT_DIR/lib/pm2-health.mjs" snapshot --app "$PM2_APP_NAME" >"$RELEASE_DIR/.pm2-health-baseline.json"; then
