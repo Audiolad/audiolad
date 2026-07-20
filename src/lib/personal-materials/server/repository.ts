@@ -13,7 +13,7 @@ import {
 } from "./errors";
 
 const MATERIAL_SELECT =
-  "id, author_id, created_by, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, audio_path, audio_original_filename, audio_mime_type, audio_size_bytes, duration_seconds, pdf_path, pdf_original_filename, pdf_mime_type, pdf_size_bytes, status, guest_access_enabled, expires_at, claimed_by_user_id, claimed_at, first_opened_at, first_audio_started_at, revoked_at, deleted_at, created_at, updated_at";
+  "id, author_id, created_by, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, return_url, return_button_label, audio_path, audio_original_filename, audio_mime_type, audio_size_bytes, duration_seconds, pdf_path, pdf_original_filename, pdf_mime_type, pdf_size_bytes, status, guest_access_enabled, expires_at, claimed_by_user_id, claimed_at, first_opened_at, first_audio_started_at, revoked_at, deleted_at, created_at, updated_at";
 
 function throwRpcError(error: { message: string }) {
   const mapped = mapPersonalMaterialRpcError(error.message);
@@ -84,6 +84,8 @@ export type CreatePersonalMaterialInput = {
   materialDate: string;
   description?: string | null;
   personalRecommendation?: string | null;
+  returnUrl?: string | null;
+  returnButtonLabel?: string | null;
 };
 
 export async function createPersonalMaterialDraft(
@@ -100,6 +102,8 @@ export async function createPersonalMaterialDraft(
     p_description: input.description ?? null,
     p_personal_recommendation: input.personalRecommendation ?? null,
     p_author_notes: null,
+    p_return_url: input.returnUrl ?? null,
+    p_return_button_label: input.returnButtonLabel ?? null,
   });
 
   if (error) {
@@ -123,6 +127,8 @@ export type UpdatePersonalMaterialDraftInput = {
   title?: string | null;
   description?: string | null;
   personalRecommendation?: string | null;
+  returnUrl?: string | null;
+  returnButtonLabel?: string | null;
 };
 
 export async function updatePersonalMaterialDraft(
@@ -138,6 +144,8 @@ export async function updatePersonalMaterialDraft(
     p_description: input.description ?? null,
     p_personal_recommendation: input.personalRecommendation ?? null,
     p_author_notes: null,
+    p_return_url: input.returnUrl ?? null,
+    p_return_button_label: input.returnButtonLabel ?? null,
   });
 
   if (error) {

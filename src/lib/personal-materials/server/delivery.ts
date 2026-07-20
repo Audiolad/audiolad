@@ -19,7 +19,7 @@ import {
 import { PersonalMaterialApiError } from "./errors";
 
 const GUEST_MATERIAL_SELECT =
-  "id, author_id, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, audio_path, pdf_path, status, guest_access_enabled, expires_at, claimed_by_user_id, revoked_at, deleted_at, access_token_hash";
+  "id, author_id, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, return_url, return_button_label, audio_path, pdf_path, status, guest_access_enabled, expires_at, claimed_by_user_id, revoked_at, deleted_at, access_token_hash";
 
 export async function findGuestMaterialByRawToken(
   rawToken: string,

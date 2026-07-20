@@ -34,6 +34,8 @@ export default function AuthorDiagnosticsCreateClient({
     title: "",
     description: "",
     personalRecommendation: "",
+    returnUrl: "",
+    returnButtonLabel: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -74,6 +76,8 @@ export default function AuthorDiagnosticsCreateClient({
         title: values.title.trim() || null,
         description: values.description.trim() || null,
         personalRecommendation: values.personalRecommendation.trim() || null,
+        returnUrl: values.returnUrl.trim() || null,
+        returnButtonLabel: values.returnButtonLabel.trim() || null,
       });
 
       router.replace(

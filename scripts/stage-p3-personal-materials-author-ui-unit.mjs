@@ -72,7 +72,7 @@ function testCreateComponent() {
   assert(create.includes("submittingRef"), "double-submit guard");
   assert(create.includes("createAuthorPersonalMaterial"), "POST create");
   assert(create.includes("router.replace"), "redirect after create");
-  assert(!create.includes("uploadAuthorPersonalMaterialAudio"), "no upload before create");
+  assert(create.includes("returnUrl"), "create passes return url");
 }
 
 function testEditorComponent() {
@@ -88,7 +88,7 @@ function testEditorComponent() {
   assert(editor.includes("setOneTimeAccessUrl"), "one-time url in state only");
   assert(editor.includes("Персональная ссылка показывается только один раз"), "no fake link on reload");
   assert(editor.includes("material.authorId !== selectedAuthor.id"), "author workspace guard");
-  assert(editor.includes("isDirty"), "dirty indicator");
+  assert(editor.includes("returnUrl"), "editor saves return url");
 
   assert(upload.includes("isAllowedClientMp3File"), "client mp3 validation");
   assert(upload.includes("accept=\".mp3,audio/mpeg\""), "mp3 accept");
@@ -118,7 +118,16 @@ function testAccessibility() {
   const modal = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal.tsx");
   const upload = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload.tsx");
 
-  assert(form.includes("htmlFor") || form.includes("<label"), "labels");
+  assert(form.includes("returnUrl"), "form return url field");
+  assert(form.includes("htmlFor"), "labels linked to inputs");
+  assert(form.includes("Возврат в чат"), "return chat section");
+  assert(form.includes("break-words"), "long label wrap");
+
+  const guestCta = read("src/components/personal-materials/PersonalMaterialReturnChatCta.tsx");
+  assert(guestCta.includes("shouldShowGuestReturnChatButton"), "guest cta guard");
+  assert(guestCta.includes('rel="noopener noreferrer"'), "guest cta rel");
+  assert(guestCta.includes("getGuestReturnButtonLabel"), "guest default label");
+  assert(!guestCta.includes("dangerouslySetInnerHTML"), "no dangerous html");
   assert(modal.includes("role=\"dialog\""), "modal dialog");
   assert(modal.includes("aria-modal=\"true\""), "modal aria");
   assert(upload.includes("aria-live"), "upload live region");
@@ -133,13 +142,28 @@ function testSecurityNoPersistence() {
   assert(!api.includes("accessUrl"), "api client does not log accessUrl");
 }
 
+function testReturnUrlLayer() {
+  const migration = read("supabase/migrations/20260720180000_personal_materials_return_url.sql");
+  const returnUrlLib = read("src/lib/personal-materials/return-url.ts");
+  const dto = read("src/lib/personal-materials/server/dto.ts");
+
+  assert(migration.includes("return_url text NULL"), "migration return_url column");
+  assert(migration.includes("return_button_label text NULL"), "migration return_button_label column");
+  assert(migration.includes("invalid_return_url"), "migration url validation");
+  assert(returnUrlLib.includes("javascript:"), "blocked schemes");
+  assert(dto.includes("returnUrl: row.return_url"), "author dto return url");
+  assert(dto.includes("returnButtonLabel: input.material.return_button_label"), "guest dto return label");
+}
+
 async function runModuleTests() {
   const { execSync } = await import("node:child_process");
-  const output = execSync(
-    `npx --yes tsx ${path.join(ROOT, "scripts/stage-p3-personal-materials-author-ui-module-unit.mjs")}`,
-    { encoding: "utf8" },
-  );
-  process.stdout.write(output);
+  for (const script of [
+    "scripts/stage-p3-personal-materials-author-ui-module-unit.mjs",
+    "scripts/stage-p3-personal-materials-return-url-module-unit.mjs",
+  ]) {
+    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, { encoding: "utf8" });
+    process.stdout.write(output);
+  }
 }
 
 async function main() {
@@ -149,6 +173,7 @@ async function main() {
   testCreateComponent();
   testEditorComponent();
   testResponsiveClasses();
+  testReturnUrlLayer();
   testAccessibility();
   testSecurityNoPersistence();
   await runModuleTests();

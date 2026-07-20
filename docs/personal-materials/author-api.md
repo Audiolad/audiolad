@@ -167,8 +167,18 @@ Nginx access logs may record full request paths including `/api/d/{token}` if gu
 | ---- | ------- |
 | `20260715143000_personal_materials_foundation.sql` | P1 tables, RPC, RLS, bucket |
 | `20260720143000_personal_materials_clear_draft_audio.sql` | Draft audio metadata clear RPC |
+| `20260720180000_personal_materials_return_url.sql` | Optional return-to-chat URL and button label |
 
 Production DB does **not** include these migrations yet.
+
+## Return-to-chat fields
+
+Optional draft fields:
+
+- `return_url` — safe HTTPS link (localhost HTTP allowed for testing)
+- `return_button_label` — custom button text, max 120 chars
+
+Author and guest DTOs expose `returnUrl` / `returnButtonLabel`. Guest UI uses default label «Вернуться в чат с автором» when URL is set but label is empty.
 
 ## Tests
 

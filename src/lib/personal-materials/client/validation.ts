@@ -1,4 +1,8 @@
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
+import {
+  validateReturnButtonLabel,
+  validateReturnUrl,
+} from "@/lib/personal-materials/return-url";
 
 const CLIENT_NAME_PATTERN = /^[\p{L}\p{M}\s'.-]+$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -11,6 +15,8 @@ export type PersonalMaterialFormValues = {
   title: string;
   description: string;
   personalRecommendation: string;
+  returnUrl: string;
+  returnButtonLabel: string;
 };
 
 export type PersonalMaterialFormErrors = Partial<
@@ -28,6 +34,8 @@ export function validatePersonalMaterialForm(
   const title = values.title.trim();
   const description = values.description.trim();
   const recommendation = values.personalRecommendation.trim();
+  const returnUrl = (values.returnUrl ?? "").trim();
+  const returnButtonLabel = (values.returnButtonLabel ?? "").trim();
 
   if (!firstName || firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
     errors.clientFirstName = "Укажите имя клиента.";
@@ -55,6 +63,22 @@ export function validatePersonalMaterialForm(
 
   if (recommendation.length > PERSONAL_MATERIAL_LIMITS.recommendationMaxLength) {
     errors.personalRecommendation = "Рекомендация слишком длинная.";
+  }
+
+  if (returnUrl) {
+    const parsedReturnUrl = validateReturnUrl(returnUrl);
+
+    if (!parsedReturnUrl.valid) {
+      errors.returnUrl = "Укажите корректную HTTPS-ссылку на чат.";
+    }
+  }
+
+  if (returnButtonLabel) {
+    const parsedLabel = validateReturnButtonLabel(returnButtonLabel);
+
+    if (!parsedLabel.valid) {
+      errors.returnButtonLabel = "Текст кнопки не длиннее 120 символов.";
+    }
   }
 
   return errors;

@@ -44,6 +44,8 @@ export function mapPersonalMaterialRpcError(message: string): {
     normalized.includes("invalid_client_fields") ||
     normalized.includes("invalid_material_type") ||
     normalized.includes("invalid_token_hash") ||
+    normalized.includes("invalid_return_url") ||
+    normalized.includes("invalid_return_button_label") ||
     normalized.includes("invalid_position")
   ) {
     return { status: 422, code: "invalid_request" };

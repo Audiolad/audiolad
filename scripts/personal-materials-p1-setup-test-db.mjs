@@ -26,6 +26,7 @@ const SCRIPT_NAME = "scripts/personal-materials-p1-setup-test-db.mjs";
 const MIGRATION_FILES = [
   "supabase/migrations/20260715143000_personal_materials_foundation.sql",
   "supabase/migrations/20260720143000_personal_materials_clear_draft_audio.sql",
+  "supabase/migrations/20260720180000_personal_materials_return_url.sql",
 ];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
