@@ -27,6 +27,7 @@ const FILTERS: LibraryFilter[] = [
 type MyPracticesLibraryProps = {
   items: LibraryCardItem[];
   error: boolean;
+  purchasedSlug?: string | null;
 };
 
 function formatPracticesCount(count: number): string {
@@ -48,8 +49,13 @@ function formatPracticesCount(count: number): string {
 export default function MyPracticesLibrary({
   items,
   error,
+  purchasedSlug = null,
 }: MyPracticesLibraryProps) {
   const [activeFilter, setActiveFilter] = useState<LibraryFilterId>("all");
+  const normalizedPurchasedSlug = purchasedSlug?.trim().toLowerCase() ?? null;
+  const purchasedItem = normalizedPurchasedSlug
+    ? items.find((item) => item.practice?.slug === normalizedPurchasedSlug)
+    : null;
 
   const filteredItems = useMemo(
     () => items.filter((item) => matchesLibraryFilter(item, activeFilter)),
@@ -58,6 +64,14 @@ export default function MyPracticesLibrary({
 
   return (
     <>
+      {purchasedItem ? (
+        <div
+          role="status"
+          className="mt-6 rounded-[18px] border border-[#d9c7f4] bg-[#f8f3ff] px-4 py-3 text-center text-sm leading-5 text-[#5f4a8f]"
+        >
+          Практика добавлена в Аудиотеку
+        </div>
+      ) : null}
       <div className="-mx-5 mt-6 flex gap-2 overflow-x-auto px-5 pb-2">
         {FILTERS.map((filter) => {
           const isActive = activeFilter === filter.id;
@@ -150,7 +164,15 @@ export default function MyPracticesLibrary({
         ) : (
           <div className="mt-5 space-y-4">
             {filteredItems.map((item, index) => (
-              <LibraryCard key={item.id} item={item} index={index} />
+              <LibraryCard
+                key={item.id}
+                item={item}
+                index={index}
+                highlighted={
+                  normalizedPurchasedSlug !== null &&
+                  item.practice?.slug === normalizedPurchasedSlug
+                }
+              />
             ))}
           </div>
         )}

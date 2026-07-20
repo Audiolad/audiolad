@@ -9,11 +9,102 @@ import {
   type OrderRow,
   type PaymentRow,
 } from "@/lib/payments/payment-api";
+import {
+  createSignedCheckoutToken,
+  isStoredCheckoutTokenValidForOrder,
+} from "@/lib/payments/checkout-token";
 import { formatTochkaPaymentPurpose } from "@/lib/payments/payment-purpose";
-import { createTochkaPaymentOperation } from "@/lib/payments/tochka-client";
+import {
+  createTochkaPaymentOperation,
+  type CreateTochkaPaymentResult,
+} from "@/lib/payments/tochka-client";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+function buildProviderMetadata(
+  checkoutToken: string,
+  tochkaPayment: CreateTochkaPaymentResult,
+): Record<string, unknown> {
+  return {
+    payment_url: tochkaPayment.paymentLink,
+    payment_link_id: tochkaPayment.paymentLinkId,
+    provider_status: tochkaPayment.status,
+    create_response: tochkaPayment.rawResponse,
+    checkout_token: checkoutToken,
+  };
+}
+
+async function persistTochkaPaymentMetadata(
+  serviceRoleClient: SupabaseClient,
+  paymentId: string,
+  checkoutToken: string,
+  tochkaPayment: CreateTochkaPaymentResult,
+): Promise<boolean> {
+  const { error: updatePaymentError } = await serviceRoleClient
+    .from("payments")
+    .update({
+      provider_payment_id: tochkaPayment.operationId,
+      provider_metadata: buildProviderMetadata(checkoutToken, tochkaPayment),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", paymentId);
+
+  if (updatePaymentError) {
+    console.error("create_payment_metadata_update_error", updatePaymentError.message);
+    return false;
+  }
+
+  return true;
+}
+
+async function createTochkaPaymentForOrder(input: {
+  orderRow: OrderRow;
+  paymentId: string;
+  userId: string;
+  customerEmail: string;
+  serviceRoleClient: SupabaseClient;
+}): Promise<
+  | { ok: true; paymentUrl: string }
+  | { ok: false; status: number; error: "internal_error" }
+> {
+  const checkoutToken = createSignedCheckoutToken(input.orderRow.id).token;
+
+  try {
+    const tochkaPayment = await createTochkaPaymentOperation({
+      orderId: input.orderRow.id,
+      checkoutToken,
+      amountMinor: input.orderRow.amount_minor,
+      purpose: formatTochkaPaymentPurpose(
+        input.orderRow.id,
+        input.orderRow.practice_title_snapshot,
+      ),
+      consumerId: input.userId,
+      customerEmail: input.customerEmail,
+      itemName: input.orderRow.practice_title_snapshot,
+    });
+
+    const persisted = await persistTochkaPaymentMetadata(
+      input.serviceRoleClient,
+      input.paymentId,
+      checkoutToken,
+      tochkaPayment,
+    );
+
+    if (!persisted) {
+      return { ok: false, status: 500, error: "internal_error" };
+    }
+
+    return { ok: true, paymentUrl: tochkaPayment.paymentLink };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "tochka_create_payment_failed";
+
+    console.error("create_payment_tochka_error", message);
+    return { ok: false, status: 500, error: "internal_error" };
+  }
+}
 
 export async function POST(request: Request) {
   if (!getTochkaConfig()) {
@@ -128,8 +219,12 @@ export async function POST(request: Request) {
 
   if (pendingPayment) {
     const paymentUrl = getPaymentUrlFromMetadata(pendingPayment.provider_metadata);
+    const hasValidCheckoutToken = isStoredCheckoutTokenValidForOrder(
+      pendingPayment.provider_metadata,
+      orderRow.id,
+    );
 
-    if (paymentUrl) {
+    if (paymentUrl && hasValidCheckoutToken) {
       return NextResponse.json(
         toPaymentCreateBody(
           pendingPayment.id,
@@ -146,56 +241,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    try {
-      const tochkaPayment = await createTochkaPaymentOperation({
-        orderId: orderRow.id,
-        amountMinor: orderRow.amount_minor,
-        purpose: formatTochkaPaymentPurpose(
-          orderRow.id,
-          orderRow.practice_title_snapshot,
-        ),
-        consumerId: user.id,
-        customerEmail,
-        itemName: orderRow.practice_title_snapshot,
-      });
+    const recreated = await createTochkaPaymentForOrder({
+      orderRow,
+      paymentId: pendingPayment.id,
+      userId: user.id,
+      customerEmail,
+      serviceRoleClient,
+    });
 
-      const { error: updatePaymentError } = await serviceRoleClient
-        .from("payments")
-        .update({
-          provider_payment_id: tochkaPayment.operationId,
-          provider_metadata: {
-            payment_url: tochkaPayment.paymentLink,
-            payment_link_id: tochkaPayment.paymentLinkId,
-            provider_status: tochkaPayment.status,
-            create_response: tochkaPayment.rawResponse,
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", pendingPayment.id);
-
-      if (updatePaymentError) {
-        console.error(
-          "create_payment_pending_metadata_update_error",
-          updatePaymentError.message,
-        );
-        return NextResponse.json({ error: "internal_error" }, { status: 500 });
-      }
-
+    if (!recreated.ok) {
       return NextResponse.json(
-        toPaymentCreateBody(
-          pendingPayment.id,
-          pendingPayment.order_id,
-          tochkaPayment.paymentLink,
-        ),
-        { status: 200 },
+        { error: recreated.error },
+        { status: recreated.status },
       );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "tochka_create_payment_failed";
-
-      console.error("create_payment_pending_tochka_error", message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
+
+    return NextResponse.json(
+      toPaymentCreateBody(
+        pendingPayment.id,
+        pendingPayment.order_id,
+        recreated.paymentUrl,
+      ),
+      { status: 200 },
+    );
   }
 
   const succeededPayment = paymentRows.find((row) => row.status === "succeeded");
@@ -237,54 +305,15 @@ export async function POST(request: Request) {
   }
 
   const paymentRow = insertedPayment as PaymentRow;
+  const created = await createTochkaPaymentForOrder({
+    orderRow,
+    paymentId: paymentRow.id,
+    userId: user.id,
+    customerEmail,
+    serviceRoleClient,
+  });
 
-  try {
-    const tochkaPayment = await createTochkaPaymentOperation({
-      orderId: orderRow.id,
-      amountMinor: orderRow.amount_minor,
-      purpose: formatTochkaPaymentPurpose(
-        orderRow.id,
-        orderRow.practice_title_snapshot,
-      ),
-      consumerId: user.id,
-      customerEmail,
-      itemName: orderRow.practice_title_snapshot,
-    });
-
-    const { error: updatePaymentError } = await serviceRoleClient
-      .from("payments")
-      .update({
-        provider_payment_id: tochkaPayment.operationId,
-        provider_metadata: {
-          payment_url: tochkaPayment.paymentLink,
-          payment_link_id: tochkaPayment.paymentLinkId,
-          provider_status: tochkaPayment.status,
-          create_response: tochkaPayment.rawResponse,
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", paymentRow.id);
-
-    if (updatePaymentError) {
-      console.error(
-        "create_payment_metadata_update_error",
-        updatePaymentError.message,
-      );
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
-
-    return NextResponse.json(
-      toPaymentCreateBody(
-        paymentRow.id,
-        paymentRow.order_id,
-        tochkaPayment.paymentLink,
-      ),
-      { status: 201 },
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "tochka_create_payment_failed";
-
+  if (!created.ok) {
     await serviceRoleClient
       .from("payments")
       .update({
@@ -292,12 +321,20 @@ export async function POST(request: Request) {
         failed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         provider_metadata: {
-          error: message,
+          error: "tochka_create_payment_failed",
         },
       })
       .eq("id", paymentRow.id);
 
-    console.error("create_payment_tochka_error", message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ error: created.error }, { status: created.status });
   }
+
+  return NextResponse.json(
+    toPaymentCreateBody(
+      paymentRow.id,
+      paymentRow.order_id,
+      created.paymentUrl,
+    ),
+    { status: 201 },
+  );
 }

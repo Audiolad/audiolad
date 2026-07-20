@@ -39,6 +39,7 @@ export type LibraryCardItem = {
 type LibraryCardProps = {
   item: LibraryCardItem;
   index: number;
+  highlighted?: boolean;
 };
 
 function formatPracticeDuration(
@@ -74,7 +75,11 @@ function PlayIcon() {
 const focusRingClass =
   "focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
-export default function LibraryCard({ item, index }: LibraryCardProps) {
+export default function LibraryCard({
+  item,
+  index,
+  highlighted = false,
+}: LibraryCardProps) {
   const practice = item.practice;
   const isUnavailable = practice === null;
   const title = isUnavailable
@@ -96,7 +101,13 @@ export default function LibraryCard({ item, index }: LibraryCardProps) {
         : `/listen/${practice.slug}?${LISTEN_AUTOPLAY_QUERY_PARAM}=${LISTEN_AUTOPLAY_QUERY_VALUE}`
       : null;
   return (
-    <article className="relative flex gap-4 rounded-[24px] border border-[#eadff8] bg-white p-3 pb-14 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
+    <article
+      className={`relative flex gap-4 rounded-[24px] border bg-white p-3 pb-14 shadow-[0_8px_22px_rgba(91,62,145,0.06)] ${
+        highlighted
+          ? "border-[#7042c5] ring-2 ring-[#7042c5]/30"
+          : "border-[#eadff8]"
+      }`}
+    >
       {productHref ? (
         <Link
           href={productHref}

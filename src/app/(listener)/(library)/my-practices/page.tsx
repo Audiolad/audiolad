@@ -118,7 +118,14 @@ function mapLibraryItems(rows: LibraryRow[] | null): LibraryCardItem[] {
     });
 }
 
-export default async function MyPracticesPage() {
+export default async function MyPracticesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ purchased?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const purchasedSlug = resolvedSearchParams.purchased?.trim() || null;
+
   const supabase = await createClient();
 
   const {
@@ -175,7 +182,11 @@ export default async function MyPracticesPage() {
         </p>
       </div>
 
-      <MyPracticesLibrary items={libraryItems} error={Boolean(error)} />
+      <MyPracticesLibrary
+        items={libraryItems}
+        error={Boolean(error)}
+        purchasedSlug={purchasedSlug}
+      />
     </>
   );
 }

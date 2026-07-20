@@ -1,5 +1,6 @@
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { logCheckoutEvent } from "@/lib/payments/checkout-log";
 import type { OrderRow, PaymentRow } from "@/lib/payments/payment-api";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type FulfillPaymentInput = {
   paymentId: string;
@@ -37,6 +38,10 @@ export async function fulfillSucceededTochkaPayment(
   const paymentRow = payment as PaymentRow;
 
   if (paymentRow.status === "succeeded") {
+    logCheckoutEvent("fulfill_payment_already_processed", {
+      orderId: paymentRow.order_id,
+      paymentId: paymentRow.id,
+    });
     return {
       ok: true,
       alreadyProcessed: true,
@@ -64,6 +69,10 @@ export async function fulfillSucceededTochkaPayment(
   const orderRow = order as OrderRow;
 
   if (orderRow.status === "paid") {
+    logCheckoutEvent("fulfill_order_already_processed", {
+      orderId: orderRow.id,
+      paymentId: paymentRow.id,
+    });
     return {
       ok: true,
       alreadyProcessed: true,
@@ -120,8 +129,18 @@ export async function fulfillSucceededTochkaPayment(
 
   if (grantError) {
     console.error("fulfill_grant_access_error", grantError.message);
+    logCheckoutEvent("fulfill_grant_access_failed", {
+      orderId: orderRow.id,
+      paymentId: paymentRow.id,
+    });
     return { ok: false, reason: "grant_access_failed" };
   }
+
+  logCheckoutEvent("fulfill_payment_succeeded", {
+    orderId: orderRow.id,
+    paymentId: paymentRow.id,
+    alreadyProcessed: false,
+  });
 
   return {
     ok: true,

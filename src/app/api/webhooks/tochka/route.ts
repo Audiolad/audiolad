@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logCheckoutEvent } from "@/lib/payments/checkout-log";
 import {
   findPaymentByOrderId,
   findPaymentByProviderOperationId,
@@ -20,8 +21,14 @@ export async function POST(request: Request) {
 
   if (!payload) {
     console.error("tochka_webhook_invalid_signature");
+    logCheckoutEvent("tochka_webhook_signature_invalid");
     return new NextResponse(null, { status: 400 });
   }
+
+  logCheckoutEvent("tochka_webhook_verified", {
+    webhookType:
+      typeof payload.webhookType === "string" ? payload.webhookType : null,
+  });
 
   if (payload.webhookType !== "acquiringInternetPayment") {
     return new NextResponse(null, { status: 200 });
@@ -113,6 +120,15 @@ export async function POST(request: Request) {
 
   if (!result.ok) {
     console.error("tochka_webhook_fulfill_failed", result.reason);
+    logCheckoutEvent("tochka_webhook_fulfill_failed", {
+      orderId: payment.order_id,
+      reason: result.reason,
+    });
+  } else {
+    logCheckoutEvent("tochka_webhook_fulfill_ok", {
+      orderId: result.orderId,
+      alreadyProcessed: result.alreadyProcessed,
+    });
   }
 
   return new NextResponse(null, { status: 200 });

@@ -1,3 +1,4 @@
+import { buildCheckoutResultQuery } from "@/lib/payments/checkout-token";
 import {
   getTochkaConfig,
   minorToRubles,
@@ -11,6 +12,7 @@ import {
 
 export type CreateTochkaPaymentInput = {
   orderId: string;
+  checkoutToken: string;
   amountMinor: number;
   purpose: string;
   consumerId: string;
@@ -90,8 +92,12 @@ function buildCreatePaymentData(
   input: CreateTochkaPaymentInput,
 ): TochkaCreatePaymentData {
   const amount = minorToRubles(input.amountMinor);
-  const redirectUrl = `${config.siteUrl}/checkout/result?order_id=${input.orderId}`;
-  const failRedirectUrl = `${config.siteUrl}/checkout/result?order_id=${input.orderId}&status=failed`;
+  const checkoutQuery = buildCheckoutResultQuery(
+    input.orderId,
+    input.checkoutToken,
+  );
+  const redirectUrl = `${config.siteUrl}/checkout/result?${checkoutQuery}`;
+  const failRedirectUrl = `${config.siteUrl}/checkout/result?${buildCheckoutResultQuery(input.orderId, input.checkoutToken, { status: "failed" })}`;
 
   const data: TochkaCreatePaymentData = {
     customerCode: config.customerCode,
