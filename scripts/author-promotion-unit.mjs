@@ -259,6 +259,225 @@ function testArchivedCampaignHistory() {
   assert(migration.includes("utm_campaign = v_campaign.campaign_key"), "stats tied to campaign key history");
 }
 
+function normalizeUtmValue(value) {
+  return slugifyTitle(value);
+}
+
+const SYSTEM_UTM_MEDIUM_VALUES = new Set([
+  "social",
+  "messenger",
+  "messaging_bot",
+  "email",
+  "paid",
+  "partner",
+  "website",
+  "owned",
+]);
+
+const STANDARD_CHANNEL_TYPES = new Set([
+  "social",
+  "messenger",
+  "messaging_bot",
+  "email",
+  "paid",
+  "partner",
+  "website",
+]);
+
+function resolveCustomUtmMedium(label) {
+  const trimmed = label.trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (/^[a-z0-9._-]+$/.test(lower) && !/[а-яё]/i.test(trimmed)) {
+    return lower;
+  }
+  return normalizeUtmValue(trimmed);
+}
+
+function parseChannelTypeFormState(utmMedium) {
+  const trimmed = utmMedium.trim();
+  if (!trimmed) {
+    return { channelType: "social", customTypeLabel: "" };
+  }
+  const normalized = trimmed.toLowerCase();
+  if (STANDARD_CHANNEL_TYPES.has(normalized)) {
+    return { channelType: normalized, customTypeLabel: "" };
+  }
+  return { channelType: "other", customTypeLabel: trimmed };
+}
+
+function resolveUtmMediumFromForm(channelType, customTypeLabel) {
+  if (channelType === "other") {
+    return resolveCustomUtmMedium(customTypeLabel);
+  }
+  return channelType.trim().toLowerCase();
+}
+
+function buildUtmSourceFromLabel(label, currentSource, sourceEditedManually) {
+  if (sourceEditedManually) {
+    return currentSource;
+  }
+  return normalizeUtmValue(label);
+}
+
+function testUtmNormalization() {
+  assert(normalizeUtmValue("Ботхелп") === "bothelp", "cyrillic channel name transliterates");
+  assert(normalizeUtmValue("BotHelp") === "bothelp", "latin channel name lowercases");
+  assert(
+    normalizeUtmValue("Телеграм канал") === "telegram-kanal",
+    "spaces become hyphens",
+  );
+  assert(
+    normalizeUtmValue("Рассылка ВКонтакте") === "rassylka-vkontakte",
+    "cyrillic phrase transliterates",
+  );
+  assert(normalizeUtmValue("Мой канал № 2") === "moy-kanal-2", "numbers preserved");
+  assert(
+    normalizeUtmValue("  Новый__канал!!! ") === "novyy-kanal",
+    "underscore and specials normalized",
+  );
+  assert(normalizeUtmValue("!!!") === "", "special-only value rejected");
+}
+
+function testUtmSourceAutofill() {
+  assert(
+    buildUtmSourceFromLabel("BotHelp", "", false) === "bothelp",
+    "source auto-created from label",
+  );
+  assert(
+    buildUtmSourceFromLabel("Новое имя", "custom-source", false) === "novoe-imya",
+    "source updates with label before manual edit",
+  );
+  assert(
+    buildUtmSourceFromLabel("Новое имя", "custom-source", true) === "custom-source",
+    "source not overwritten after manual edit",
+  );
+}
+
+function testStandardChannelTypes() {
+  const types = readFileSync(
+    "/var/www/audiolad/src/lib/promotion/channel-types.ts",
+    "utf8",
+  );
+  assert(types.includes("messaging_bot"), "messaging bot type exists");
+  assert(types.includes("Бот рассылок"), "messaging bot label exists");
+  assert(resolveUtmMediumFromForm("social", "") === "social", "social medium");
+  assert(resolveUtmMediumFromForm("messenger", "") === "messenger", "messenger medium");
+  assert(
+    resolveUtmMediumFromForm("messaging_bot", "") === "messaging_bot",
+    "messaging bot medium",
+  );
+  assert(resolveUtmMediumFromForm("email", "") === "email", "email medium");
+  assert(resolveUtmMediumFromForm("paid", "") === "paid", "paid medium");
+  assert(resolveUtmMediumFromForm("partner", "") === "partner", "partner medium");
+  assert(resolveUtmMediumFromForm("website", "") === "website", "website medium");
+}
+
+function testCustomChannelTypeOther() {
+  assert(
+    resolveUtmMediumFromForm("other", "Автоворонка") === "avtovoronka",
+    "custom type transliterates",
+  );
+  assert(
+    resolveUtmMediumFromForm("other", "База клиентов") === "baza-klientov",
+    "custom phrase transliterates",
+  );
+  assert(
+    resolveUtmMediumFromForm("other", "Собственное приложение") === "sobstvennoe-prilozhenie",
+    "long custom type transliterates",
+  );
+  assert(
+    resolveUtmMediumFromForm("other", "Офлайн мероприятие") === "oflayn-meropriyatie",
+    "offline event transliterates",
+  );
+  assert(
+    resolveUtmMediumFromForm("other", "avtovoronka") === "avtovoronka",
+    "other does not save literal other token",
+  );
+}
+
+function testChannelTypeBackwardCompatibility() {
+  assert(parseChannelTypeFormState("social").channelType === "social", "social opens as standard");
+  assert(
+    parseChannelTypeFormState("messaging_bot").channelType === "messaging_bot",
+    "messaging_bot opens as standard",
+  );
+  const unknown = parseChannelTypeFormState("avtovoronka");
+  assert(unknown.channelType === "other", "unknown medium opens as other");
+  assert(unknown.customTypeLabel === "avtovoronka", "unknown medium preserved in custom field");
+  assert(
+    resolveCustomUtmMedium("legacy_value") === "legacy_value",
+    "legacy custom medium preserved unchanged",
+  );
+}
+
+function testPromotionLinksForCustomChannels() {
+  const bothelp = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "bothelp",
+    utmMedium: "messaging_bot",
+    utmContent: "main_post",
+  });
+  assert(bothelp.includes("utm_source=bothelp"), "bothelp source in link");
+  assert(bothelp.includes("utm_medium=messaging_bot"), "bothelp medium in link");
+  assert(
+    bothelp.includes("utm_campaign=zhenskie_dengi_launch"),
+    "campaign key preserved for bothelp",
+  );
+
+  const sendler = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "sendler",
+    utmMedium: "messaging_bot",
+    utmContent: "main_post",
+  });
+  assert(sendler.includes("utm_source=sendler"), "sendler source in link");
+  assert(sendler.includes("utm_medium=messaging_bot"), "sendler medium in link");
+
+  const custom = buildPromotionLink({
+    authorSlug: "zoya-petrova",
+    practiceSlug: "zhenskie-dengi",
+    campaignKey: "zhenskie_dengi_launch",
+    utmSource: "baza-postoyannyh-klientov",
+    utmMedium: "avtovoronka",
+    utmContent: "main_post",
+  });
+  assert(
+    custom.includes("utm_source=baza-postoyannyh-klientov"),
+    "custom source in link",
+  );
+  assert(custom.includes("utm_medium=avtovoronka"), "custom medium in link");
+  assert(!custom.includes("%25"), "params are not double-encoded");
+}
+
+function testCustomChannelFormUi() {
+  const client = readFileSync(
+    "/var/www/audiolad/src/components/author-dashboard/AuthorPromotionClient.tsx",
+    "utf8",
+  );
+  assert(client.includes("Тип канала"), "channel type label in form");
+  assert(client.includes("Будет использовано в ссылке как utm_medium"), "medium hint");
+  assert(client.includes("Будет использовано в ссылке как utm_source"), "source hint");
+  assert(client.includes("Укажите свой тип канала"), "custom type field label");
+  assert(client.includes("Сформировать из названия"), "reset source action");
+  assert(!client.includes('placeholder="utm_medium"'), "raw utm_medium input removed");
+  assert(client.includes("loadCustomChannelFromStats"), "stats row loads channel form");
+}
+
+function testCustomChannelModulesExist() {
+  for (const file of [
+    "/var/www/audiolad/src/lib/promotion/utm-normalize.ts",
+    "/var/www/audiolad/src/lib/promotion/channel-types.ts",
+    "/var/www/audiolad/src/lib/promotion/custom-channel.ts",
+  ]) {
+    assert(readFileSync(file, "utf8").includes("export"), `${file} exports helpers`);
+  }
+}
+
 function main() {
   testMigrationContract();
   testPromotionRoutes();
@@ -271,6 +490,14 @@ function main() {
   testPromoEventsUnchanged();
   testUnknownSourceLabel();
   testArchivedCampaignHistory();
+  testUtmNormalization();
+  testUtmSourceAutofill();
+  testStandardChannelTypes();
+  testCustomChannelTypeOther();
+  testChannelTypeBackwardCompatibility();
+  testPromotionLinksForCustomChannels();
+  testCustomChannelFormUi();
+  testCustomChannelModulesExist();
   console.log("author-promotion-unit: ok");
 }
 
