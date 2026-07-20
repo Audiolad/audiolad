@@ -29,6 +29,7 @@ const MIGRATION_FILES = [
   "supabase/migrations/20260715143000_personal_materials_foundation.sql",
   "supabase/migrations/20260720143000_personal_materials_clear_draft_audio.sql",
   "supabase/migrations/20260720180000_personal_materials_return_url.sql",
+  "supabase/migrations/20260720190000_personal_materials_owner_library.sql",
 ];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

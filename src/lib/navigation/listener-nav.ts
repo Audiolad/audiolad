@@ -47,6 +47,7 @@ export type ListenerSidebarNavItem = {
 export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
   { key: "catalog", title: "Каталог", href: "/catalog" },
   { key: "library", title: "Аудиотека", href: "/my-practices" },
+  { key: "my-materials", title: "Мои материалы", href: "/my-materials" },
   { key: "playlists", title: "Плейлисты", href: "/playlists" },
   { key: "history", title: "Недавно слушали", href: "/history" },
   { key: "profile", title: "Профиль", href: "/profile" },

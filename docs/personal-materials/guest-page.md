@@ -66,11 +66,10 @@ Reuses `PersonalMaterialReturnChatCta` below save CTA. Secondary styling, `targe
 
 Single column, 16px padding, full-width CTAs, `break-words` on long text. Verified layouts: 320, 375, 390 widths.
 
-## Current limitations
+## Client library
 
-- `/my-materials/[id]` is a minimal post-claim confirmation (full owner library UI is next phase)
-- No PDF viewer, playback analytics, or email delivery
-- Production DB/bucket not deployed yet
+See `docs/personal-materials/client-library.md` for `/my-materials` ownership, progress, and revoke/rotate semantics after claim.
+
 
 ## Tests
 
