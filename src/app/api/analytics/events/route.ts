@@ -10,12 +10,17 @@ import {
   sanitizeAnalyticsString,
   sanitizeAnalyticsTrackId,
 } from "@/lib/promo/analytics-events";
+import {
+  sanitizePromoPageAnalyticsPayload,
+  sanitizePromoPageId,
+} from "@/lib/promo-pages/analytics-events";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 type AnalyticsEventBody = {
   event_name?: unknown;
   practice_id?: unknown;
   track_id?: unknown;
+  promo_page_id?: unknown;
   anonymous_session_id?: unknown;
   utm_source?: unknown;
   utm_medium?: unknown;
@@ -82,8 +87,17 @@ export async function POST(request: Request) {
   const trackId = sanitizeAnalyticsTrackId(
     typeof parsed.track_id === "string" ? parsed.track_id : null,
   );
+  const promoPageId = sanitizePromoPageId(
+    typeof parsed.promo_page_id === "string" ? parsed.promo_page_id : null,
+  );
 
   let rpcPayload = sanitizeJsonPayload(parsed.payload);
+
+  if (eventName.startsWith("promo_page_")) {
+    rpcPayload = sanitizePromoPageAnalyticsPayload(
+      rpcPayload as Record<string, unknown>,
+    );
+  }
 
   if (isPwaAnalyticsEventName(eventName)) {
     const pwaPayload = sanitizePwaAnalyticsPayload({
@@ -146,6 +160,7 @@ export async function POST(request: Request) {
       typeof parsed.duration === "number" ? parsed.duration : null,
     ),
     p_payload: rpcPayload,
+    p_promo_page_id: promoPageId,
   });
 
   if (error) {

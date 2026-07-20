@@ -5,10 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolveAuthorAssetPublicUrl } from "@/lib/images/image-url";
 import type {
+  PublicPromoPageCtaBlock,
   PublicPromoPageDto,
   PublicPromoPageProductDto,
 } from "@/lib/promo-pages/types";
-import { isUnsafePromoPageCtaHref } from "@/lib/promo-pages/validation";
+import { resolvePublicPromoPageCta } from "@/lib/promo-pages/validation";
 
 export type LoadPublicPromoPageResult =
   | { ok: true; page: PublicPromoPageDto; bannerUrl: string | null }
@@ -55,6 +56,50 @@ function mapPublicPromoPageProduct(
   };
 }
 
+export function mapPublicPromoPageCtaBlock(
+  page: Pick<
+    PublicPromoPageDto,
+    | "cta_enabled"
+    | "cta_heading"
+    | "cta_description"
+    | "cta_label"
+    | "cta_href"
+    | "cta_open_in_new_tab"
+  > & {
+    promo_page_id?: string;
+    id?: string;
+  },
+): PublicPromoPageCtaBlock | null {
+  const resolved = resolvePublicPromoPageCta({
+    cta_enabled: page.cta_enabled,
+    cta_heading: page.cta_heading,
+    cta_description: page.cta_description,
+    cta_label: page.cta_label,
+    cta_href: page.cta_href,
+    cta_open_in_new_tab: page.cta_open_in_new_tab,
+  });
+
+  if (!resolved) {
+    if (page.cta_enabled) {
+      console.warn("promo_page_cta_invalid_hidden", {
+        promo_page_id: page.promo_page_id ?? page.id ?? null,
+      });
+    }
+
+    return null;
+  }
+
+  return {
+    heading: resolved.heading,
+    description: resolved.description,
+    label: resolved.label,
+    href: resolved.target.href,
+    kind: resolved.target.kind,
+    host: resolved.target.kind === "external" ? resolved.target.host : null,
+    openInNewTab: resolved.openInNewTab,
+  };
+}
+
 export function mapPublicPromoPageDto(
   raw: unknown,
   expectedAuthorSlug: string,
@@ -91,17 +136,6 @@ export function mapPublicPromoPageDto(
     return null;
   }
 
-  let ctaHref = typeof row.cta_href === "string" ? row.cta_href.trim() : null;
-
-  if (ctaHref && isUnsafePromoPageCtaHref(ctaHref)) {
-    ctaHref = null;
-  }
-
-  const ctaLabel =
-    typeof row.cta_label === "string" && row.cta_label.trim()
-      ? row.cta_label.trim()
-      : null;
-
   return {
     promo_page_id: String(row.promo_page_id ?? ""),
     author_slug: authorSlug,
@@ -114,8 +148,20 @@ export function mapPublicPromoPageDto(
     banner_path: typeof row.banner_path === "string" ? row.banner_path : null,
     footer_text:
       typeof row.footer_text === "string" ? row.footer_text : null,
-    cta_label: ctaLabel,
-    cta_href: ctaHref,
+    cta_enabled: row.cta_enabled === true,
+    cta_heading:
+      typeof row.cta_heading === "string" ? row.cta_heading : null,
+    cta_description:
+      typeof row.cta_description === "string" ? row.cta_description : null,
+    cta_label:
+      typeof row.cta_label === "string" && row.cta_label.trim()
+        ? row.cta_label.trim()
+        : null,
+    cta_href:
+      typeof row.cta_href === "string" && row.cta_href.trim()
+        ? row.cta_href.trim()
+        : null,
+    cta_open_in_new_tab: row.cta_open_in_new_tab === true,
     published_at:
       typeof row.published_at === "string" ? row.published_at : null,
     products,
