@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
@@ -98,7 +99,9 @@ export async function listEditorialPracticeOptions(
     return { practices: [], error: practicesError.message };
   }
 
-  const rows = (practiceRows as EditorialPracticeRow[] | null) ?? [];
+  const rows = filterPublicPracticeRows(
+    (practiceRows as EditorialPracticeRow[] | null) ?? [],
+  );
 
   const { data: existingItems, error: itemsError } = await supabase
     .from("playlist_items")

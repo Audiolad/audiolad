@@ -1,3 +1,4 @@
+import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PublicPracticeAuthor = {
@@ -101,8 +102,13 @@ export async function getPracticeByAuthorAndSlug(
     return { practice: null, error: true };
   }
 
+  const practice = (data as PublicPracticeRow | null) ?? null;
+  if (shouldBlockPublicPracticeAccess(practice)) {
+    return { practice: null, error: false };
+  }
+
   return {
-    practice: (data as PublicPracticeRow | null) ?? null,
+    practice,
     error: false,
   };
 }
@@ -152,6 +158,7 @@ export async function resolveLegacyPracticePath(
     .select(
       `
       slug,
+      cover_image,
       authors!practices_author_id_fkey (
         slug
       )
@@ -161,6 +168,10 @@ export async function resolveLegacyPracticePath(
     .maybeSingle();
 
   if (practiceError || !practice?.slug) {
+    return null;
+  }
+
+  if (shouldBlockPublicPracticeAccess(practice)) {
     return null;
   }
 

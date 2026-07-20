@@ -1,3 +1,4 @@
+import { hasFixtureMarker } from "@/lib/fixtures/test-fixture-marker";
 import { getAuthorAssetPublicUrl } from "@/lib/authors/assets";
 import { getCoverPublicUrl } from "@/lib/author-products/utils";
 import { buildCoverDisplayUrl } from "@/lib/author-products/utils";
@@ -45,6 +46,10 @@ export function resolveAuthorAvatarUrl(
   displayWidth = 104,
   variant?: ImageVariantKey,
 ): string | null {
+  if (hasFixtureMarker(row.avatar_image)) {
+    return null;
+  }
+
   return resolveAssetDisplayUrl(
     {
       legacyUrl: row.avatar_url,
@@ -88,6 +93,10 @@ export function resolveProductCoverUrl(
   displayWidth = 168,
   variant?: ImageVariantKey,
 ): string | null {
+  if (hasFixtureMarker(row.cover_image)) {
+    return null;
+  }
+
   const preferred = variant ?? pickResponsiveVariantKey(displayWidth);
   const manifest = parseImageManifest(row.cover_image);
   const fromManifest = buildCoverDisplayUrlFromManifest(

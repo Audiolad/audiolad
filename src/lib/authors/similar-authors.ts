@@ -4,6 +4,10 @@ import {
   mergeAuthorRecommendations,
   SIMILAR_AUTHORS_LIMIT,
 } from "@/lib/authors/author-recommendations";
+import {
+  isFixtureMarkedAuthor,
+  isFixtureMarkedPractice,
+} from "@/lib/fixtures/test-fixture-marker";
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 
@@ -39,12 +43,14 @@ export async function findSimilarAuthors(
       `
       id,
       author_id,
+      cover_image,
       authors!practices_author_id_fkey (
         id,
         name,
         slug,
         short_positioning,
-        avatar_url
+        avatar_url,
+        avatar_image
       )
     `,
     )
@@ -60,6 +66,7 @@ export async function findSimilarAuthors(
   for (const row of publishedPractices as Array<{
     id: string;
     author_id: string;
+    cover_image?: unknown;
     authors:
       | {
           id: string;
@@ -67,6 +74,7 @@ export async function findSimilarAuthors(
           slug: string;
           short_positioning: string | null;
           avatar_url: string | null;
+          avatar_image?: unknown;
         }
       | Array<{
           id: string;
@@ -74,11 +82,20 @@ export async function findSimilarAuthors(
           slug: string;
           short_positioning: string | null;
           avatar_url: string | null;
+          avatar_image?: unknown;
         }>;
   }>) {
+    if (isFixtureMarkedPractice(row)) {
+      continue;
+    }
+
     const author = Array.isArray(row.authors) ? row.authors[0] : row.authors;
 
     if (!author?.id || !author.slug?.trim() || !author.name?.trim()) {
+      continue;
+    }
+
+    if (isFixtureMarkedAuthor(author)) {
       continue;
     }
 

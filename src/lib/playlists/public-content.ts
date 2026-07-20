@@ -1,3 +1,4 @@
+import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { isPracticePublished } from "@/lib/products/access";
 
 export type PlaylistPublishPractice = {
@@ -6,6 +7,7 @@ export type PlaylistPublishPractice = {
   is_free: boolean | null;
   price: number | null;
   is_catalog_listed?: boolean | null;
+  cover_image?: unknown;
 };
 
 /**
@@ -16,6 +18,10 @@ export type PlaylistPublishPractice = {
 export function isPracticeEligibleForPublicPlaylist(
   practice: PlaylistPublishPractice,
 ): boolean {
+  if (isFixtureMarkedPractice(practice)) {
+    return false;
+  }
+
   if (!isPracticePublished(practice.status)) {
     return false;
   }

@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  filterPublicCatalogPracticeRows,
+} from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
@@ -12,6 +15,7 @@ import {
 
 type CatalogPracticeRow = {
   id: string;
+  author_id: string | null;
   title: string;
   slug: string;
   subtitle: string | null;
@@ -22,6 +26,8 @@ type CatalogPracticeRow = {
   is_free: boolean | null;
   cover_url: string | null;
   cover_image?: unknown;
+  status: string | null;
+  is_catalog_listed: boolean | null;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -182,6 +188,7 @@ export async function getPublishedCatalogProducts(
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       subtitle,
@@ -192,6 +199,8 @@ export async function getPublishedCatalogProducts(
       is_free,
       cover_url,
       cover_image,
+      status,
+      is_catalog_listed,
       updated_at,
       published_at,
       created_at,
@@ -216,7 +225,9 @@ export async function getPublishedCatalogProducts(
     return [];
   }
 
-  const practiceRows = (practices ?? []) as CatalogPracticeRow[];
+  const practiceRows = filterPublicCatalogPracticeRows(
+    (practices ?? []) as CatalogPracticeRow[],
+  );
 
   return mapPracticeRowsToCatalogProducts(supabase, practiceRows);
 }

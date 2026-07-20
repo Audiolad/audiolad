@@ -20,6 +20,7 @@ import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from
 import {
   resolveProductAccess,
 } from "@/lib/products/access";
+import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import {
   getPracticeAuthorSlug,
   type PublicPracticeRow,
@@ -278,6 +279,10 @@ export async function renderListenPage(
   }
 
   if (!practice) {
+    notFound();
+  }
+
+  if (shouldBlockPublicPracticeAccess(practice)) {
     notFound();
   }
 

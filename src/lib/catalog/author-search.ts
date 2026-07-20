@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import {
+  isFixtureMarkedPractice,
+} from "@/lib/fixtures/test-fixture-marker";
+import {
   escapeIlikePattern,
   normalizeCatalogSearchQuery,
 } from "@/lib/catalog/search";
@@ -30,6 +33,7 @@ export type CatalogAuthorPracticeVisibilityInput = {
   is_catalog_listed: boolean | null;
   slug: string | null;
   author_id: string | null;
+  cover_image?: unknown;
 };
 
 export type CatalogAuthorSearchRankInput = {
@@ -62,6 +66,10 @@ const AUTHOR_SEARCH_SELECT =
 export function isEligibleCatalogAuthorPractice(
   practice: CatalogAuthorPracticeVisibilityInput,
 ): boolean {
+  if (isFixtureMarkedPractice(practice)) {
+    return false;
+  }
+
   return (
     practice.status === "published" &&
     practice.is_catalog_listed === true &&
@@ -211,7 +219,7 @@ async function loadEligibleAuthorCounts(
 ): Promise<Map<string, number>> {
   let query = supabase
     .from("practices")
-    .select("author_id")
+    .select("author_id, cover_image")
     .eq("status", "published")
     .eq("is_catalog_listed", true)
     .not("slug", "is", null)
@@ -230,6 +238,10 @@ async function loadEligibleAuthorCounts(
   const counts = new Map<string, number>();
 
   for (const row of data ?? []) {
+    if (isFixtureMarkedPractice(row)) {
+      continue;
+    }
+
     const authorId = row.author_id as string;
 
     if (!authorId) {

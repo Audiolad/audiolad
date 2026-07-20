@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isValidPlaylistPublicSlug } from "@/lib/playlists/public-slug";
+import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { isValidPublicEntitySlug } from "@/lib/seo/public-slug";
 import { buildAuthorPublicPath, buildPracticePublicPath } from "@/lib/products/paths";
@@ -56,6 +57,7 @@ type PracticeSitemapRow = {
   slug: string;
   updated_at: string | null;
   created_at: string | null;
+  cover_image?: unknown;
   authors:
     | { slug: string }
     | { slug: string }[]
@@ -82,6 +84,7 @@ async function fetchProductSitemapEntries(
         slug,
         updated_at,
         created_at,
+        cover_image,
         authors!practices_author_id_fkey (
           slug
         )
@@ -100,6 +103,10 @@ async function fetchProductSitemapEntries(
     const seen = new Set<string>();
 
     return ((data ?? []) as PracticeSitemapRow[]).flatMap((row) => {
+      if (isFixtureMarkedPractice(row)) {
+        return [];
+      }
+
       const productSlug = row.slug?.trim();
 
       if (!productSlug || !isValidPublicEntitySlug(productSlug)) {

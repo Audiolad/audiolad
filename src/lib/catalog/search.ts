@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  isFixtureMarkedPractice,
+  isPublicCatalogPracticeRow,
+} from "@/lib/fixtures/test-fixture-marker";
+import {
   getPublishedPracticeIdsForTopicKey,
   mapPracticeRowsToCatalogProducts,
   type CatalogProduct,
@@ -15,6 +19,7 @@ export const CATALOG_SEARCH_SUGGEST_MIN_LENGTH = 2;
 
 const CATALOG_PRACTICE_SEARCH_SELECT = `
   id,
+  author_id,
   title,
   slug,
   subtitle,
@@ -25,6 +30,8 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   is_free,
   cover_url,
   cover_image,
+  status,
+  is_catalog_listed,
   updated_at,
   published_at,
   created_at,
@@ -39,6 +46,7 @@ export type PublicCatalogPracticeVisibilityInput = {
   is_catalog_listed: boolean | null;
   slug: string | null;
   author_id: string | null;
+  cover_image?: unknown;
 };
 
 export function normalizeCatalogSearchQuery(
@@ -84,13 +92,7 @@ export function buildPracticeFieldsOrIlikeFilter(pattern: string): string {
 export function isPublicCatalogSearchPractice(
   practice: PublicCatalogPracticeVisibilityInput,
 ): boolean {
-  return (
-    practice.status === "published" &&
-    practice.is_catalog_listed === true &&
-    typeof practice.slug === "string" &&
-    practice.slug.trim().length > 0 &&
-    practice.author_id != null
-  );
+  return isPublicCatalogPracticeRow(practice);
 }
 
 export function dedupePracticeRowsById<T extends { id: string }>(rows: T[]): T[] {
@@ -107,6 +109,7 @@ export function dedupePracticeRowsById<T extends { id: string }>(rows: T[]): T[]
 
 type CatalogPracticeSearchRow = {
   id: string;
+  author_id: string | null;
   title: string;
   slug: string;
   subtitle: string | null;
@@ -117,6 +120,8 @@ type CatalogPracticeSearchRow = {
   is_free: boolean | null;
   cover_url: string | null;
   cover_image?: unknown;
+  status: string | null;
+  is_catalog_listed: boolean | null;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -264,7 +269,9 @@ export async function searchPublishedCatalogProducts(
   const mergedRows = dedupePracticeRowsById([
     ...fieldMatches,
     ...authorMatches,
-  ]).slice(0, resultLimit);
+  ])
+    .filter((row) => !isFixtureMarkedPractice(row))
+    .slice(0, resultLimit);
 
   if (mergedRows.length === 0) {
     return [];

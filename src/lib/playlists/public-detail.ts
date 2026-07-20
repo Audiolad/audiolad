@@ -269,6 +269,7 @@ export const loadPublicPlaylistBySlug = cache(
         is_catalog_listed: practice.is_catalog_listed,
         is_free: practice.is_free,
         price: practice.price,
+        cover_image: practice.cover_image,
       });
 
       const author = normalizeOne(practice.authors);

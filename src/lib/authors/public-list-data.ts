@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isFixtureMarkedAuthor, isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { resolveAuthorAvatarUrl } from "@/lib/images/resolve-display";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
@@ -42,6 +43,7 @@ export async function loadPublicAuthorsList(
       `
       id,
       author_id,
+      cover_image,
       authors!practices_author_id_fkey (
         id,
         name,
@@ -76,11 +78,20 @@ export async function loadPublicAuthorsList(
 
   for (const row of practices as Array<{
     author_id: string;
+    cover_image?: unknown;
     authors: AuthorJoinRow | AuthorJoinRow[];
   }>) {
+    if (isFixtureMarkedPractice(row)) {
+      continue;
+    }
+
     const author = Array.isArray(row.authors) ? row.authors[0] : row.authors;
 
     if (!author?.id || !author.slug?.trim() || !author.name?.trim()) {
+      continue;
+    }
+
+    if (isFixtureMarkedAuthor(author)) {
       continue;
     }
 

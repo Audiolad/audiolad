@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  filterPublicPracticeRows,
+  isFixtureMarkedAuthor,
+} from "@/lib/fixtures/test-fixture-marker";
+
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 
@@ -35,7 +40,7 @@ export async function getAuthorBySlug(
   const { data, error } = await supabase
     .from("authors")
     .select(
-      "id, name, slug, author_type, description, short_bio, full_bio, avatar_url, banner_url",
+      "id, name, slug, author_type, description, short_bio, full_bio, avatar_url, banner_url, avatar_image",
     )
     .eq("slug", authorSlug)
     .maybeSingle();
@@ -44,7 +49,12 @@ export async function getAuthorBySlug(
     return { author: null, error: true };
   }
 
-  return { author: (data as PublicAuthorRow | null) ?? null, error: false };
+  const author = (data as (PublicAuthorRow & { avatar_image?: unknown }) | null) ?? null;
+  if (author && isFixtureMarkedAuthor(author)) {
+    return { author: null, error: false };
+  }
+
+  return { author, error: false };
 }
 
 function formatPracticePriceLabel(
@@ -62,7 +72,7 @@ export async function getAuthorPublishedPractices(
   const { data, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, subtitle, format, duration_minutes, price, is_free",
+      "id, title, slug, subtitle, format, duration_minutes, price, is_free, cover_image",
     )
     .eq("author_id", authorId)
     .eq("status", "published")
@@ -72,7 +82,7 @@ export async function getAuthorPublishedPractices(
     return { practices: [], error: true };
   }
 
-  const practices = (data ?? []).map((row) => ({
+  const practices = filterPublicPracticeRows(data ?? []).map((row) => ({
     id: row.id as string,
     title: row.title as string,
     slug: row.slug as string,

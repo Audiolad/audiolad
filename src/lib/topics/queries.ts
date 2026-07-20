@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
+
 import type {
   AssignedTopic,
   PracticeTopicsResult,
@@ -103,7 +105,7 @@ export async function listTopicsWithCatalogCounts(
 
   const { data: practiceRows, error: practicesError } = await supabase
     .from("practices")
-    .select("id")
+    .select("id, cover_image")
     .eq("status", "published")
     .eq("is_catalog_listed", true);
 
@@ -111,7 +113,9 @@ export async function listTopicsWithCatalogCounts(
     throw new Error("topics_catalog_counts_failed");
   }
 
-  const practiceIds = (practiceRows ?? []).map((row) => row.id as string);
+  const practiceIds = filterPublicPracticeRows(
+    (practiceRows ?? []) as Array<{ id: string; cover_image?: unknown }>,
+  ).map((row) => row.id);
 
   if (practiceIds.length === 0) {
     return topics.map((topic) => ({
