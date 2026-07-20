@@ -8,11 +8,8 @@
  *   AUDIOLAD_PERSONAL_MATERIALS_API_TEST=1
  */
 import { randomUUID } from "node:crypto";
-import { execSync } from "node:child_process";
 
 import {
-  DOCKER_CONTAINER,
-  PERSONAL_MATERIALS_TEST_DB,
   PERSONAL_MATERIALS_TEST_OPT_IN_ENV,
   TEST_DATABASE_ENV,
   assertPersonalMaterialsTestDbAllowed,
@@ -33,7 +30,7 @@ if (
 }
 
 assertPersonalMaterialsTestDbAllowed({ scriptName: SCRIPT_NAME });
-const { sqlFile, sqlScalar } = createPersonalMaterialsSqlHelpers();
+const { sqlFile, sqlScalar, runScript } = createPersonalMaterialsSqlHelpers();
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -41,13 +38,6 @@ function assert(condition, message) {
 
 function sqlLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
-}
-
-function runScript(content) {
-  return execSync(
-    `docker exec -i ${DOCKER_CONTAINER} psql -U postgres -q -d ${PERSONAL_MATERIALS_TEST_DB} -v ON_ERROR_STOP=1 -tA`,
-    { input: content, encoding: "utf8" },
-  ).trim();
 }
 
 function lastLine(output) {

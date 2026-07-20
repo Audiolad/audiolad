@@ -6,6 +6,7 @@ import { isPublicSeoIndexingEnabled } from "@/lib/seo/indexing";
 const DISALLOWED_PATHS = [
   "/api/",
   "/auth/",
+  "/d/",
   "/listen/",
   "/profile/",
   "/my-practices/",
