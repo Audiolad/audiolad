@@ -84,8 +84,8 @@ export default function BottomNav({
       aria-label="Основная навигация"
       className={
         isPlayerVariant
-          ? `bottom-nav bottom-nav--player ${className}`.trim()
-          : `bottom-nav bottom-nav--default border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)] ${className}`.trim()
+          ? `bottom-nav bottom-nav--player xl:hidden ${className}`.trim()
+          : `bottom-nav bottom-nav--default border-t border-[#eadff8] bg-white shadow-[0_-8px_30px_rgba(86,52,141,0.08)] xl:hidden ${className}`.trim()
       }
     >
       <div
