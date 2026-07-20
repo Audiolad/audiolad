@@ -4,11 +4,21 @@ This document describes how to apply the branded Russian recovery template for s
 
 Do **not** apply without an explicit rollout command. No secrets in this file.
 
+Shared layout documentation: `docs/email/brand-email-templates.md`.
+
 ## Template source in repository
 
 | File | Purpose |
 |------|---------|
-| `supabase/templates/recovery.html` | HTML body (Go template syntax) |
+| `src/lib/email/templates/brand-layout.ts` | Shared design source |
+| `src/lib/email/templates/recovery.ts` | Recovery content + GoTrue export |
+| `supabase/templates/recovery.html` | Generated HTML body (Go template syntax) |
+
+Regenerate before rollout:
+
+```bash
+npx tsx scripts/build-gotrue-email-templates.ts
+```
 
 ## GoTrue variables (v2.189.0)
 
@@ -81,12 +91,13 @@ Ensure `GOTRUE_URI_ALLOW_LIST` includes `https://audiolad.ru/**`.
 ## Rollout steps (controlled)
 
 1. Backup `/opt/supabase/docker/.env` and `docker-compose.yml`.
-2. Copy `recovery.html` into `volumes/templates/`.
-3. Add `templates-server` service and auth env vars.
-4. `docker compose up -d --force-recreate --no-deps auth templates-server`
-5. Health: `docker ps`, `curl -fsS http://127.0.0.1:3000/api/health/build`
-6. One recovery E2E on an approved test mailbox (Yandex/Mail.ru).
-7. Check `docker logs supabase-auth` for SMTP/template fetch errors (no tokens).
+2. Run `npx tsx scripts/build-gotrue-email-templates.ts`.
+3. Copy `recovery.html` into `volumes/templates/`.
+4. Add `templates-server` service and auth env vars.
+5. `docker compose up -d --force-recreate --no-deps auth templates-server`
+6. Health: `docker ps`, `curl -fsS http://127.0.0.1:3000/api/health/build`
+7. One recovery E2E on an approved test mailbox (Yandex/Mail.ru).
+8. Check `docker logs supabase-auth` for SMTP/template fetch errors (no tokens).
 
 ## Rollback
 
