@@ -636,6 +636,24 @@ function testCustomChannelModulesExist() {
   }
 }
 
+function testCampaignMapperExport() {
+  const campaignsApi = readFileSync("src/lib/promotion/campaigns-api.ts", "utf8");
+  const campaignUpdate = readFileSync("src/lib/promotion/campaign-update.ts", "utf8");
+
+  assert(
+    campaignsApi.includes("export function mapPromotionCampaignRow"),
+    "campaigns-api exports shared mapper",
+  );
+  assert(
+    campaignUpdate.includes('from "@/lib/promotion/campaigns-api"'),
+    "campaign update reuses campaigns-api mapper",
+  );
+  assert(
+    campaignsApi.includes("mapPromotionCampaignRow(row as Record<string, unknown>)"),
+    "list/create routes use shared mapper",
+  );
+}
+
 function main() {
   testMigrationContract();
   testPromotionRoutes();
@@ -661,6 +679,7 @@ function main() {
   testPromotionLinksWithoutUtmContentUi();
   testCustomChannelFormUi();
   testCustomChannelModulesExist();
+  testCampaignMapperExport();
   console.log("author-promotion-unit: ok");
 }
 
