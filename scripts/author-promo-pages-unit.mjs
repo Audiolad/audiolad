@@ -264,7 +264,8 @@ function testPromotionUi() {
   assert(form.includes("/unpublish"), "unpublish wired in form");
   assert(pagesClient.includes("buildPromoPagePath"), "list uses link helper");
   assert(form.includes("buildPromoPagePath"), "form uses link helper");
-  assert(form.includes("promo_page_edit_locked") || form.includes("isPublished"), "published read-only");
+  assert(form.includes("Действие после прослушивания"), "cta section renamed in form");
+  assert(form.includes("cta_open_in_new_tab"), "open mode field in form");
   assert(form.includes("Снять с публикации и редактировать"), "unpublish then edit action");
 }
 
@@ -292,6 +293,22 @@ function testSlugValidation() {
   assert(validation.includes("promo_page_slug_too_short"), "short slug error code");
 }
 
+function testEditSavePayloadOmitsAuthorId() {
+  const form = read("src/components/author-dashboard/AuthorPromoPageForm.tsx");
+
+  assert(
+    form.includes("const writePayload = {") &&
+      form.includes("const payload = isCreate") &&
+      form.includes("author_id: selectedAuthor.id,") &&
+      form.includes(": writePayload;"),
+    "edit PATCH payload must omit author_id rejected by pages-api",
+  );
+  assert(
+    form.includes('method: isCreate ? "POST" : "PATCH"'),
+    "create uses POST, edit uses PATCH",
+  );
+}
+
 function run() {
   testReplaceProductsMigration();
   testSecurityHardeningMigration();
@@ -307,6 +324,7 @@ function run() {
   testPublicPromoRouteExists();
   testPresentationComponent();
   testSlugValidation();
+  testEditSavePayloadOmitsAuthorId();
   console.log("author-promo-pages-unit: ok");
 }
 
