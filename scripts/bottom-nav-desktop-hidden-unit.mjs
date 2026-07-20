@@ -26,8 +26,8 @@ assert(
   "globals.css must force-hide bottom nav on desktop",
 );
 assert(
-  listenerShell.includes("xl:hidden"),
-  "ListenerAppShell keeps mobile-only BottomNav wrapper",
+  listenerShell.includes("config.showMobileBottomNav"),
+  "ListenerAppShell mobile bottom nav must be config-driven",
 );
 assert(
   /@media \(min-width: 1280px\)[\s\S]*platform-mobile-shell[\s\S]*padding-bottom:\s*0/.test(

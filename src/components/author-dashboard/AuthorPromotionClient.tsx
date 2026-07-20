@@ -765,12 +765,6 @@ export default function AuthorPromotionClient({
         </>
       ) : null}
 
-      <div>
-        <Link href="/profile" className="text-sm font-medium text-[#7042c5]">
-          Вернуться в пользовательскую часть платформы
-        </Link>
-      </div>
-
       {toast ? (
         <div
           className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4"

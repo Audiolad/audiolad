@@ -65,6 +65,12 @@
     height: 100%;
   }
 
+  .listener-app-shell__body--no-right-column {
+    grid-template-columns:
+      var(--listener-sidebar-width)
+      minmax(0, 1fr);
+  }
+
   .listener-app-shell__sidebar-slot,
   .listener-app-shell__now-playing-slot {
     min-height: 0;
@@ -79,6 +85,23 @@
   .listener-app-shell__center-scroll {
     min-height: 0;
   }
+
+  .listener-profile-content,
+  .listener-author-content {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1279px) {
+  .listener-app-shell__body--no-mobile-bottom-nav.platform-mobile-shell {
+    padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--bottom-nav-content-gap) +
+        var(--global-mini-player-height)
+    );
+  }
+}
+
+@media (min-width: 1280px) {
 
   .listener-home-content {
     --home-page-gutter: 0px;

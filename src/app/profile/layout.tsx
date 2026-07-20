@@ -1,7 +1,7 @@
 import { ListenerAppShell } from "@/components/listener/ListenerAppShell";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 
-export default async function ListenerLayout({
+export default async function ProfileRouteLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -9,7 +9,7 @@ export default async function ListenerLayout({
   const shellData = await getListenerShellData();
 
   return (
-    <ListenerAppShell shellData={shellData} mode="default">
+    <ListenerAppShell shellData={shellData} mode="profile">
       {children}
     </ListenerAppShell>
   );

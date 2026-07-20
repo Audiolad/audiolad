@@ -14,9 +14,9 @@ export default function ProfileError({ reset }: ProfileErrorProps) {
       <ProfilePageHeader />
 
       <div
-        className={`flex min-h-[50vh] flex-col items-center justify-center py-10 text-center lg:min-h-[40vh] ${profilePageFullWidthClassName}`}
+        className={`flex min-h-[50vh] flex-col items-center justify-center py-10 text-center xl:min-h-[40vh] ${profilePageFullWidthClassName}`}
       >
-        <p className="mt-6 text-sm leading-6 text-[#796ba0] lg:max-w-md">
+        <p className="mt-6 text-sm leading-6 text-[#796ba0] xl:max-w-md">
           Не удалось загрузить профиль.
           <br />
           Попробуйте обновить страницу.
