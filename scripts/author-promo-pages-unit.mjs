@@ -265,6 +265,12 @@ function testPromotionUi() {
   assert(pagesClient.includes("buildPromoPagePath"), "list uses link helper");
   assert(form.includes("buildPromoPagePath"), "form uses link helper");
   assert(form.includes("Действие после прослушивания"), "cta section renamed in form");
+  assert(form.includes("cta_enabled"), "cta enabled persisted in form");
+  assert(form.includes("buildAuthorPageCtaPreset"), "author preset wired in form");
+  assert(
+    !form.includes("Только безопасные внутренние ссылки платформы"),
+    "old internal-only cta hint removed",
+  );
   assert(form.includes("cta_open_in_new_tab"), "open mode field in form");
   assert(form.includes("Снять с публикации и редактировать"), "unpublish then edit action");
 }

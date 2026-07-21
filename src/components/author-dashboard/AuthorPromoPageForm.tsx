@@ -10,7 +10,10 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 import type { PromoEligibleProductOption } from "@/lib/promo-pages/eligible-products";
 import { getPromoPageCtaPreviewLabel } from "@/lib/promo-pages/cta-target";
 import { getPromoPageUiErrorMessage } from "@/lib/promo-pages/errors";
-import { buildPromoPagePath } from "@/lib/promo-pages/paths";
+import {
+  buildAuthorPageCtaPreset,
+  buildPromoPagePath,
+} from "@/lib/promo-pages/paths";
 import {
   getPromoPageStatusClassName,
   getPromoPageStatusLabel,
@@ -72,6 +75,11 @@ export default function AuthorPromoPageForm({
 
   const isPublished = status === "published";
   const isEditable = !isPublished;
+
+  const authorCtaPreset = useMemo(
+    () => buildAuthorPageCtaPreset(selectedAuthor.slug),
+    [selectedAuthor.slug],
+  );
 
   const publicPath = buildPromoPagePath(selectedAuthor.slug, slug || "slug");
   const ctaPreviewLabel = getPromoPageCtaPreviewLabel(ctaHref);
@@ -493,6 +501,30 @@ export default function AuthorPromoPageForm({
     setCtaLabel(label);
   }
 
+  function applyAuthorCtaPreset() {
+    if (!isEditable) {
+      return;
+    }
+
+    setCtaEnabled(true);
+    setCtaLabel(authorCtaPreset.label);
+    setCtaHref(authorCtaPreset.href);
+    setCtaOpenInNewTab(false);
+  }
+
+  function clearCtaAction() {
+    if (!isEditable) {
+      return;
+    }
+
+    setCtaEnabled(false);
+    setCtaHeading("");
+    setCtaDescription("");
+    setCtaLabel("");
+    setCtaHref("");
+    setCtaOpenInNewTab(false);
+  }
+
   if (loading) {
     return <p className="text-sm text-[#7d70a2]">Загрузка промостраницы…</p>;
   }
@@ -577,8 +609,8 @@ export default function AuthorPromoPageForm({
         </p>
       ) : (
         <p className="rounded-[18px] border border-[#eadff8] bg-[#fbf8ff] px-4 py-3 text-sm text-[#5f5484]">
-          Перед публикацией нужны публичный заголовок, slug и от 1 до 3 доступных гостям
-          продуктов.
+          Перед публикацией заполните внутреннее название, публичный заголовок и добавьте от 1
+          до 3 доступных гостям продуктов.
         </p>
       )}
 
@@ -607,7 +639,7 @@ export default function AuthorPromoPageForm({
           </label>
 
           <label className="block lg:col-span-2">
-            <span className="mb-2 block text-sm font-medium">Slug</span>
+            <span className="mb-2 block text-sm font-medium">Адрес страницы</span>
             <input
               value={slug}
               onChange={(event) => {
@@ -617,7 +649,10 @@ export default function AuthorPromoPageForm({
               disabled={!isEditable || saving}
               className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
             />
-            <p className="mt-2 break-all text-xs text-[#7d70a2]">
+            <p className="mt-2 text-xs text-[#7d70a2]">
+              Формируется автоматически. При необходимости его можно изменить.
+            </p>
+            <p className="mt-1 break-all text-xs text-[#7d70a2]">
               Будущий адрес: {publicPath}
             </p>
           </label>
@@ -652,8 +687,8 @@ export default function AuthorPromoPageForm({
             <div>
               <h3 className="text-[18px] font-semibold">Действие после прослушивания</h3>
               <p className="mt-1 text-sm text-[#7d70a2]">
-                Кнопка после списка практик для возврата во внешнюю воронку или на
-                внутреннюю страницу АудиоЛада.
+                Добавьте кнопку, которая поможет слушателю продолжить путь: перейти к вашим
+                практикам, в MAX, Telegram или на другую безопасную страницу.
               </p>
             </div>
             <label className="inline-flex items-center gap-2 text-sm font-medium text-[#2f2548]">
@@ -664,13 +699,32 @@ export default function AuthorPromoPageForm({
                 disabled={!isEditable || saving}
                 className="h-4 w-4 rounded border-[#c6afe6] text-[#7042c5]"
               />
-              Показывать кнопку после списка практик
+              Показывать кнопку после практик
             </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={applyAuthorCtaPreset}
+              disabled={!isEditable || saving}
+              className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Больше практик автора
+            </button>
+            <button
+              type="button"
+              onClick={clearCtaAction}
+              disabled={!isEditable || saving}
+              className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Очистить действие
+            </button>
           </div>
 
           <div className="mt-4 grid gap-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium">Заголовок блока</span>
+              <span className="mb-2 block text-sm font-medium">Заголовок</span>
               <input
                 value={ctaHeading}
                 onChange={(event) => setCtaHeading(event.target.value)}
@@ -727,13 +781,17 @@ export default function AuthorPromoPageForm({
                 placeholder="https://max.ru/..."
                 className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-[#faf6ff]"
               />
+              <p className="mt-2 text-xs text-[#7d70a2]">
+                Можно указать страницу АудиоЛада или безопасную внешнюю HTTPS-ссылку, например
+                MAX или Telegram.
+              </p>
               {ctaHref.trim() ? (
-                <p className="mt-2 text-xs text-[#7d70a2]">Откроется: {ctaPreviewLabel}</p>
+                <p className="mt-1 text-xs text-[#7d70a2]">Откроется: {ctaPreviewLabel}</p>
               ) : null}
             </label>
 
             <fieldset className="block">
-              <legend className="mb-2 text-sm font-medium">Открывать</legend>
+              <legend className="mb-2 text-sm font-medium">Режим открытия</legend>
               <div className="flex flex-wrap gap-4 text-sm text-[#2f2548]">
                 <label className="inline-flex items-center gap-2">
                   <input
@@ -744,7 +802,7 @@ export default function AuthorPromoPageForm({
                     disabled={!isEditable || saving}
                     className="h-4 w-4 border-[#c6afe6] text-[#7042c5]"
                   />
-                  В текущем окне
+                  В этом окне
                 </label>
                 <label className="inline-flex items-center gap-2">
                   <input
