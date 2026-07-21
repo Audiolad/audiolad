@@ -173,3 +173,111 @@ export function isPersonalMaterialClientError(
 ): error is PersonalMaterialClientError {
   return error instanceof PersonalMaterialClientError;
 }
+
+export type AuthorPersonalMaterialTemplate = {
+  id: string;
+  authorId: string;
+  internalName: string;
+  title: string | null;
+  description: string | null;
+  personalRecommendation: string | null;
+  returnUrl: string | null;
+  returnButtonLabel: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TemplateInput = {
+  authorId?: string;
+  internalName: string;
+  title: string | null;
+  description: string | null;
+  personalRecommendation: string | null;
+  returnUrl: string | null;
+  returnButtonLabel: string | null;
+};
+
+export async function listAuthorPersonalMaterialTemplates(
+  authorId: string,
+  signal?: AbortSignal,
+): Promise<AuthorPersonalMaterialTemplate[]> {
+  const response = await fetch(
+    `/api/author/personal-material-templates?author_id=${encodeURIComponent(authorId)}`,
+    { cache: "no-store", signal },
+  );
+  const payload = await parseJson<{ templates?: AuthorPersonalMaterialTemplate[] }>(
+    response,
+  );
+  return payload.templates ?? [];
+}
+
+export async function getAuthorPersonalMaterialTemplate(
+  id: string,
+): Promise<AuthorPersonalMaterialTemplate> {
+  const response = await fetch(
+    `/api/author/personal-material-templates/${encodeURIComponent(id)}`,
+    { cache: "no-store" },
+  );
+  const payload = await parseJson<{ template: AuthorPersonalMaterialTemplate }>(response);
+  return payload.template;
+}
+
+export async function createAuthorPersonalMaterialTemplate(
+  input: TemplateInput & { authorId: string },
+): Promise<AuthorPersonalMaterialTemplate> {
+  const response = await fetch("/api/author/personal-material-templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  const payload = await parseJson<{ template: AuthorPersonalMaterialTemplate }>(response);
+  return payload.template;
+}
+
+export async function updateAuthorPersonalMaterialTemplate(
+  id: string,
+  input: TemplateInput,
+): Promise<AuthorPersonalMaterialTemplate> {
+  const response = await fetch(
+    `/api/author/personal-material-templates/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(input),
+    },
+  );
+  const payload = await parseJson<{ template: AuthorPersonalMaterialTemplate }>(response);
+  return payload.template;
+}
+
+export async function deleteAuthorPersonalMaterialTemplate(id: string): Promise<void> {
+  const response = await fetch(
+    `/api/author/personal-material-templates/${encodeURIComponent(id)}`,
+    { method: "DELETE", cache: "no-store" },
+  );
+  await parseJson<{ ok: boolean }>(response);
+}
+
+export async function duplicateAuthorPersonalMaterialTemplate(
+  id: string,
+): Promise<AuthorPersonalMaterialTemplate> {
+  const response = await fetch(
+    `/api/author/personal-material-templates/${encodeURIComponent(id)}/duplicate`,
+    { method: "POST", cache: "no-store" },
+  );
+  const payload = await parseJson<{ template: AuthorPersonalMaterialTemplate }>(response);
+  return payload.template;
+}
+
+export async function instantiateAuthorPersonalMaterialTemplate(
+  id: string,
+): Promise<AuthorPersonalMaterial> {
+  const response = await fetch(
+    `/api/author/personal-material-templates/${encodeURIComponent(id)}/instantiate`,
+    { method: "POST", cache: "no-store" },
+  );
+  const payload = await parseJson<{ material: AuthorPersonalMaterial }>(response);
+  return payload.material;
+}

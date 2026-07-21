@@ -41,6 +41,8 @@ function testAuthorRoutes() {
   assert(audioRoute.includes("uploadPersonalMaterialAudio"), "audio upload helper");
   assert(audioRoute.includes("deletePersonalMaterialAudio"), "audio delete helper");
   assert(audioRoute.includes("assertAuthorEditable"), "audio editable after activate");
+  assert(audioRoute.includes("createAuthorAudioSignedUrl"), "author audio GET signed url");
+  assert(audioRoute.includes("export async function GET"), "author audio GET");
   assert(!audioRoute.includes("audio_path"), "audio route no path leak");
 
   assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");

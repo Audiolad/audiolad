@@ -5,8 +5,12 @@ import {
   assertAuthorEditable,
   requirePersonalMaterialAccess,
 } from "@/lib/personal-materials/server/auth";
+import { createAuthorAudioSignedUrl } from "@/lib/personal-materials/server/delivery";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
-import { handlePersonalMaterialRouteError } from "@/lib/personal-materials/server/errors";
+import {
+  handlePersonalMaterialRouteError,
+  privateNoStoreHeaders,
+} from "@/lib/personal-materials/server/errors";
 import { getAuthorPersonalMaterialById } from "@/lib/personal-materials/server/repository";
 import {
   deletePersonalMaterialAudio,
@@ -16,6 +20,27 @@ import {
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+export async function GET(_request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const { material } = await requirePersonalMaterialAccess(id);
+
+    if (material.status === "deleted") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    const signed = await createAuthorAudioSignedUrl(material);
+
+    return NextResponse.json(signed, { headers: privateNoStoreHeaders() });
+  } catch (error) {
+    try {
+      return handlePersonalMaterialRouteError(error);
+    } catch {
+      return handleAuthorRouteError(error);
+    }
+  }
+}
 
 export async function POST(request: Request, context: RouteContext) {
   try {

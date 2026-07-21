@@ -77,6 +77,23 @@ export async function createGuestAudioSignedUrl(
     throw new PersonalMaterialApiError("not_found", 404);
   }
 
+  return createPersonalMaterialAudioSignedUrl(material);
+}
+
+/** Author preview: signed URL without guest_access requirement. */
+export async function createAuthorAudioSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
+  if (material.status === "deleted" || material.deleted_at) {
+    throw new PersonalMaterialApiError("not_found", 404);
+  }
+
+  return createPersonalMaterialAudioSignedUrl(material);
+}
+
+async function createPersonalMaterialAudioSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
   const audioPath = material.audio_path?.trim();
 
   if (!audioPath || !isPathInsidePersonalMaterialRoot(audioPath)) {
@@ -92,7 +109,7 @@ export async function createGuestAudioSignedUrl(
     .createSignedUrl(audioPath, expiresIn);
 
   if (error || !data?.signedUrl) {
-    console.error("personal_material_guest_signed_url_error", error?.message);
+    console.error("personal_material_signed_url_error", error?.message);
     throw new PersonalMaterialApiError("internal_error", 500);
   }
 

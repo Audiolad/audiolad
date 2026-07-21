@@ -11,8 +11,8 @@ import {
 type PersonalMaterialAudioPlayerProps = {
   materialId: string;
   audioApiPath: string;
-  /** local = guest localStorage; server = callback only (owner library). */
-  progressMode?: "local" | "server";
+  /** local = guest localStorage; server = callback only; none = author preview. */
+  progressMode?: "local" | "server" | "none";
   initialPositionSeconds?: number;
   /** Throttled persist for server mode (default 12000ms). Local mode uses 500ms. */
   persistIntervalMs?: number;
@@ -91,6 +91,21 @@ export default function PersonalMaterialAudioPlayer({
   const onProgressPersistRef = useRef(onProgressPersist);
 
   useEffect(() => {
+    signedRef.current = null;
+    setFetchState("idle");
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setStatusMessage(null);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+  }, [audioApiPath, materialId]);
+
+  useEffect(() => {
     onProgressPersistRef.current = onProgressPersist;
   }, [onProgressPersist]);
 
@@ -113,6 +128,10 @@ export default function PersonalMaterialAudioPlayer({
   const persistNow = useCallback(
     (positionSeconds: number, durationSeconds: number, force = false) => {
       const completed = isNearComplete(positionSeconds, durationSeconds);
+
+      if (progressMode === "none") {
+        return;
+      }
 
       if (progressMode === "local") {
         writePersonalMaterialGuestProgress(materialId, {
@@ -245,7 +264,7 @@ export default function PersonalMaterialAudioPlayer({
   }, [fetchSignedAudio, isSignedUrlExpired]);
 
   const restoreSavedPosition = useCallback(() => {
-    if (progressMode === "server") {
+    if (progressMode === "server" || progressMode === "none") {
       return;
     }
 

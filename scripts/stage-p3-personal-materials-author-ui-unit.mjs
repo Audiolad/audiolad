@@ -76,7 +76,9 @@ function testCreateComponent() {
   assert(create.includes("Сначала сохраните основную информацию"), "upload gated until draft");
   assert(create.includes("Загрузить аудиофайл"), "create shows audio placeholder");
   assert(create.includes("#audio"), "redirect to editor audio anchor");
-  assert(!create.includes("Создать черновик"), "old draft-only submit removed");
+  assert(create.includes("Создать с нуля"), "create mode blank");
+  assert(create.includes("Создать из шаблона"), "create mode template");
+  assert(create.includes("instantiateAuthorPersonalMaterialTemplate"), "instantiate helper");
   assert(create.includes("submittingRef"), "double-submit guard");
   assert(create.includes("createAuthorPersonalMaterial"), "POST create");
   assert(create.includes("router.replace"), "redirect after create");

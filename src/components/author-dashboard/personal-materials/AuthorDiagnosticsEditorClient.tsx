@@ -10,6 +10,7 @@ import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/persona
 import AuthorDiagnosticsFormFields from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsFormFields";
 import AuthorDiagnosticsOneTimeLinkPanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsOneTimeLinkPanel";
 import AuthorDiagnosticsStatusBadge from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsStatusBadge";
+import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
 import {
   activateAuthorPersonalMaterial,
   deleteAuthorPersonalMaterial,
@@ -442,6 +443,23 @@ export default function AuthorDiagnosticsEditorClient({
             {saving ? "Сохранение…" : "Сохранить изменения"}
           </button>
         ) : null}
+      </section>
+
+      <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
+        <h3 className="text-[18px] font-semibold">Прослушивание</h3>
+        {material.hasAudio ? (
+          <div className="mt-4 min-w-0 overflow-x-hidden">
+            <PersonalMaterialAudioPlayer
+              materialId={material.id}
+              audioApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/audio?v=${encodeURIComponent(
+                `${material.audioOriginalFilename ?? ""}:${material.audioSizeBytes ?? 0}`,
+              )}`}
+              progressMode="none"
+            />
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-[#7d70a2]">Аудиофайл ещё не загружен</p>
+        )}
       </section>
 
       {isEditable ? (
