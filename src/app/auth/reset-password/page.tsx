@@ -1,6 +1,7 @@
 "use client";
 
 import BottomNav from "@/components/BottomNav";
+import PasswordInput from "@/components/ui/PasswordInput";
 import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_TOO_SHORT_MESSAGE,
@@ -165,8 +166,7 @@ function ResetPasswordForm() {
           <label className="block">
             <span className="text-sm font-medium">Новый пароль</span>
 
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -189,8 +189,7 @@ function ResetPasswordForm() {
           <label className="block">
             <span className="text-sm font-medium">Подтверждение пароля</span>
 
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required

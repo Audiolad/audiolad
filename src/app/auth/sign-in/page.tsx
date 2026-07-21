@@ -1,6 +1,7 @@
 "use client";
 
 import BottomNav from "@/components/BottomNav";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
 import { createClient } from "@/lib/supabase/client";
@@ -101,8 +102,7 @@ function SignInForm() {
           <label className="block">
             <span className="text-sm font-medium">Пароль</span>
 
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
