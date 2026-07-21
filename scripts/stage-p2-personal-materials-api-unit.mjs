@@ -48,13 +48,14 @@ function testAuthorRoutes() {
   assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");
   assert(activateRoute.includes("hasPdf"), "activate accepts pdf attachment");
   assert(activateRoute.includes("!hasAudio && !hasPdf"), "activate requires audio or pdf");
+  assert(activateRoute.includes("material_not_ready"), "activate readiness guard");
+  assert(activateRoute.includes("generateAccessToken"), "activate generates token");
 
   const pdfRoute = read("src/app/api/author/personal-materials/[id]/pdf/route.ts");
   const guestPdfRoute = read("src/app/api/d/[token]/pdf/route.ts");
   assert(pdfRoute.includes("uploadPersonalMaterialPdf"), "pdf upload helper");
   assert(pdfRoute.includes("createAuthorPdfSignedUrl"), "author pdf signed url");
   assert(guestPdfRoute.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
-  assert(activateRoute.includes("generateAccessToken"), "activate generates token");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");
   assert(activateRoute.includes("accessUrl:"), "activate returns accessUrl");
