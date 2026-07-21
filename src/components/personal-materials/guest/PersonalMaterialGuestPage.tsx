@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import PersonalMaterialReturnChatCta from "@/components/personal-materials/PersonalMaterialReturnChatCta";
 import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
+import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
 import PersonalMaterialDescription from "@/components/personal-materials/guest/PersonalMaterialDescription";
 import PersonalMaterialGuestFooter from "@/components/personal-materials/guest/PersonalMaterialGuestFooter";
 import PersonalMaterialHeader from "@/components/personal-materials/guest/PersonalMaterialHeader";
@@ -59,7 +60,15 @@ export default function PersonalMaterialGuestPage({
           <PersonalMaterialAudioPlayer
             materialId={material.id}
             audioApiPath={apiPaths.audio}
+            enabled={material.hasAudio}
           />
+
+          {material.hasPdf ? (
+            <PersonalMaterialPdfDocument
+              pdfApiPath={apiPaths.pdf}
+              filename={material.pdfOriginalFilename}
+            />
+          ) : null}
 
           {shouldRenderOptionalBlock(material.description) && (
             <PersonalMaterialDescription description={material.description} />

@@ -106,7 +106,8 @@ function testEditorComponent() {
   assert(upload.includes("Заменить файл"), "replace action");
   assert(upload.includes("Удалить файл"), "delete action");
   assert(upload.includes('id="personal-material-audio"'), "audio anchor id");
-  assert(editor.includes("Сначала загрузите аудиофайл"), "activate without audio hint");
+  assert(editor.includes("getPersonalMaterialActivationErrorMessage"), "activate without attachment hint");
+  assert(editor.includes("AuthorDiagnosticsPdfUpload"), "pdf upload block");
   assert(editor.includes('hash !== "#audio"'), "scroll to audio after create");
 
   assert(oneTime.includes("copyTextToClipboard"), "clipboard copy");

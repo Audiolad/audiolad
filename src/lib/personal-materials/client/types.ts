@@ -20,6 +20,8 @@ export type AuthorPersonalMaterial = {
   durationSeconds: number | null;
   audioOriginalFilename: string | null;
   audioSizeBytes: number | null;
+  pdfOriginalFilename: string | null;
+  pdfSizeBytes: number | null;
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
