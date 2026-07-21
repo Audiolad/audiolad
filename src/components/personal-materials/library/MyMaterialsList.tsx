@@ -12,11 +12,11 @@ export default function MyMaterialsList({ materials }: MyMaterialsListProps) {
     return (
       <div className="rounded-3xl border border-dashed border-[#ddd2ef] bg-white px-6 py-12 text-center">
         <h2 className="text-lg font-semibold text-[#2f2647]">
-          У вас пока нет персональных материалов
+          У вас пока нет личных материалов
         </h2>
         <p className="mt-3 text-sm leading-6 text-[#6d628f]">
-          Когда автор отправит вам диагностику или другой персональный материал, вы
-          сможете сохранить его здесь.
+          Когда автор подготовит для вас аудиоразбор, медитацию или другой
+          персональный материал, вы сможете сохранить его здесь.
         </p>
         <Link
           href="/"

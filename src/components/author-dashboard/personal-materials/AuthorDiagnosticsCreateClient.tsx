@@ -80,8 +80,9 @@ export default function AuthorDiagnosticsCreateClient({
         returnButtonLabel: values.returnButtonLabel.trim() || null,
       });
 
+      // Upload requires a material id — open editor and scroll to audio block.
       router.replace(
-        `/author-dashboard/diagnostics/${material.id}?author=${encodeURIComponent(selectedAuthor.slug)}`,
+        `/author-dashboard/diagnostics/${material.id}?author=${encodeURIComponent(selectedAuthor.slug)}#audio`,
       );
     } catch (error) {
       setSubmitError(getPersonalMaterialErrorMessage(error));
@@ -109,6 +110,29 @@ export default function AuthorDiagnosticsCreateClient({
         onChange={updateField}
       />
 
+      <section
+        className="mt-6 min-w-0 rounded-[24px] border border-dashed border-[#d8c7ef] bg-[#faf6ff] p-4 sm:p-5"
+        aria-labelledby="create-audio-heading"
+      >
+        <h3 id="create-audio-heading" className="text-[18px] font-semibold">
+          Аудиофайл
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+          Сначала сохраните основную информацию, после этого можно будет загрузить
+          аудиофайл.
+        </p>
+        <p className="mt-3 text-sm text-[#5f5484]">
+          Поддерживаемый формат: <span className="font-semibold">MP3</span>
+        </p>
+        <button
+          type="button"
+          disabled
+          className="mt-4 min-h-11 w-full rounded-full border border-[#e4d7f4] bg-white px-5 py-3 text-sm font-semibold text-[#9a91b8] sm:w-auto"
+        >
+          Загрузить аудиофайл
+        </button>
+      </section>
+
       {submitError ? (
         <p className="mt-4 text-sm text-[#b42318]" role="alert">
           {submitError}
@@ -119,9 +143,9 @@ export default function AuthorDiagnosticsCreateClient({
         <button
           type="submit"
           disabled={submitting}
-          className="min-h-11 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          className="min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
         >
-          {submitting ? "Создание…" : "Создать черновик"}
+          {submitting ? "Сохранение…" : "Сохранить и перейти к аудио"}
         </button>
       </div>
     </form>

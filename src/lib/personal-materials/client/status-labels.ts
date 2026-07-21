@@ -4,7 +4,7 @@ import type { PersonalMaterialUiStatus } from "./types";
 import type { AuthorPersonalMaterial } from "./types";
 
 export const PERSONAL_MATERIAL_TYPE_OPTIONS = [
-  { value: "diagnostic", label: "Аудиодиагностика по фото" },
+  { value: "diagnostic", label: "Диагностика" },
   { value: "audio_review", label: "Аудиоразбор" },
   { value: "personal_meditation", label: "Персональная медитация" },
   { value: "recommendation", label: "Персональная рекомендация" },

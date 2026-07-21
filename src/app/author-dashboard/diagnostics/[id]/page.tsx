@@ -41,10 +41,10 @@ export default async function AuthorDiagnosticEditorPage({
 
   return (
     <AuthorShell
-      title="Диагностика"
-      subtitle="Редактирование персональной аудиодиагностики"
+      title="Личная работа"
+      subtitle="Редактирование персонального материала для клиента"
       internalBackHref={backHref}
-      internalBackLabel="К списку диагностик"
+      internalBackLabel="К списку"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка редактора…</p>}>
         <AuthorDiagnosticsEditorClient materialId={id} authors={authors} />
