@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   getPersonalMaterialStatusLabel,
+  getPersonalMaterialTypeLabel,
   resolvePersonalMaterialUiStatus,
   PERSONAL_MATERIAL_TYPE_OPTIONS,
 } from "../src/lib/personal-materials/client/status-labels.ts";
@@ -15,7 +16,19 @@ import { mapPersonalMaterialClientError } from "../src/lib/personal-materials/cl
 import { assertOneTimeAccessNotPersisted } from "../src/lib/personal-materials/client/one-time-access.ts";
 import { copyTextToClipboard } from "../src/lib/personal-materials/client/clipboard.ts";
 
-assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS[0].label, "Аудиодиагностика по фото");
+assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS[0].label, "Диагностика");
+assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS[1].label, "Аудиоразбор");
+assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS[2].label, "Персональная медитация");
+assert.equal(
+  PERSONAL_MATERIAL_TYPE_OPTIONS.find((o) => o.value === "consultation_material")?.label,
+  "Материал после консультации",
+);
+assert.equal(
+  PERSONAL_MATERIAL_TYPE_OPTIONS.find((o) => o.value === "personal_music")?.label,
+  "Персональная музыка",
+);
+assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS.find((o) => o.value === "other")?.label, "Другое");
+assert.equal(getPersonalMaterialTypeLabel("diagnostic"), "Диагностика");
 assert.equal(PERSONAL_MATERIAL_TYPE_OPTIONS[0].value, "diagnostic");
 
 assert.equal(

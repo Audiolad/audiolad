@@ -21,6 +21,7 @@ import {
   clearPersonalMaterialGuestProgress,
   readPersonalMaterialGuestProgress,
 } from "@/lib/personal-materials/guest/progress";
+import PersonalMaterialPrivacyLabel from "@/components/personal-materials/PersonalMaterialPrivacyLabel";
 import { getPersonalMaterialTypeLabel } from "@/lib/personal-materials/client/status-labels";
 
 type MyMaterialDetailClientProps = {
@@ -141,9 +142,12 @@ export default function MyMaterialDetailClient({
         ← Назад
       </Link>
 
-      <p className="text-xs font-medium uppercase tracking-wide text-[#9a91b8]">
-        {typeLabel}
-      </p>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-[#9a91b8]">
+          {typeLabel}
+        </p>
+        <PersonalMaterialPrivacyLabel text="Этот материал доступен только вам" />
+      </div>
       <h1 className="break-words text-2xl font-semibold text-[#2f2647]">{title}</h1>
 
       <div className="flex items-center justify-between gap-3">

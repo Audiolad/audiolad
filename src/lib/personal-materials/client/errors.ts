@@ -12,14 +12,14 @@ export class PersonalMaterialClientError extends Error {
 const ERROR_MESSAGES: Record<string, string> = {
   unauthorized: "Войдите в аккаунт, чтобы продолжить.",
   forbidden: "У вас нет доступа к этому авторскому пространству.",
-  not_found: "Диагностика не найдена.",
+  not_found: "Материал не найден.",
   material_not_editable: "Черновик больше нельзя редактировать.",
   material_not_ready: "Сначала загрузите аудиофайл.",
   invalid_file_type: "Можно загрузить только MP3-файл.",
   invalid_file_size: "Файл слишком большой. Проверьте лимит размера.",
   invalid_request: "Проверьте правильность заполнения формы.",
   upload_failed: "Не удалось загрузить аудиофайл. Попробуйте ещё раз.",
-  conflict: "Действие сейчас недоступно для этой диагностики.",
+  conflict: "Действие сейчас недоступно для этого материала.",
   internal_error: "Не удалось выполнить действие. Попробуйте ещё раз.",
   load_failed: "Не удалось загрузить данные. Попробуйте ещё раз.",
 };
@@ -41,7 +41,7 @@ export function getPersonalMaterialErrorMessage(error: unknown): string {
 }
 
 export function getPersonalMaterialListErrorMessage(): string {
-  return "Не удалось загрузить диагностики. Попробуйте ещё раз.";
+  return "Не удалось загрузить список материалов. Попробуйте ещё раз.";
 }
 
 export function getPersonalMaterialUploadErrorMessage(code?: string): string {
@@ -57,5 +57,5 @@ export function getPersonalMaterialUploadErrorMessage(code?: string): string {
 }
 
 export function getPersonalMaterialActivationErrorMessage(): string {
-  return "Не удалось активировать диагностику. Убедитесь, что аудиофайл загружен.";
+  return "Сначала загрузите аудиофайл";
 }

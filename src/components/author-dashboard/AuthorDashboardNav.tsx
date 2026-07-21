@@ -87,7 +87,7 @@ export default function AuthorDashboardNav({
     },
     {
       href: `/author-dashboard/diagnostics${authorQuery}`,
-      label: "Диагностики",
+      label: "Личная работа",
       icon: DiagnosticsIcon,
       active: pathname.startsWith("/author-dashboard/diagnostics"),
     },
