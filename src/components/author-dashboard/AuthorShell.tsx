@@ -6,6 +6,9 @@ type AuthorShellProps = {
   subtitle?: string;
   backHref?: string;
   backLabel?: string;
+  /** Optional in-section back link used by personal diagnostics editor/create. */
+  internalBackHref?: string;
+  internalBackLabel?: string;
   children: ReactNode;
   actions?: ReactNode;
 };
@@ -29,16 +32,21 @@ export default function AuthorShell({
   subtitle,
   backHref = "/author-dashboard",
   backLabel = "Назад",
+  internalBackHref,
+  internalBackLabel = "Назад",
   children,
   actions,
 }: AuthorShellProps) {
+  const resolvedBackHref = internalBackHref ?? backHref;
+  const resolvedBackLabel = internalBackHref ? internalBackLabel : backLabel;
+
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div className="mx-auto min-h-screen w-full max-w-[720px] bg-platform-surface px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1.25rem+env(safe-area-inset-top,0px))]">
         <header className="flex items-start justify-between gap-3">
           <Link
-            href={backHref}
-            aria-label={backLabel}
+            href={resolvedBackHref}
+            aria-label={resolvedBackLabel}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
           >
             <BackIcon />
