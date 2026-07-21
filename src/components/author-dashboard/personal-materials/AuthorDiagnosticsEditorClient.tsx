@@ -450,10 +450,9 @@ export default function AuthorDiagnosticsEditorClient({
         {material.hasAudio ? (
           <div className="mt-4 min-w-0 overflow-x-hidden">
             <PersonalMaterialAudioPlayer
+              key={`${material.id}:${material.audioOriginalFilename ?? ""}:${material.audioSizeBytes ?? 0}`}
               materialId={material.id}
-              audioApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/audio?v=${encodeURIComponent(
-                `${material.audioOriginalFilename ?? ""}:${material.audioSizeBytes ?? 0}`,
-              )}`}
+              audioApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/audio`}
               progressMode="none"
             />
           </div>

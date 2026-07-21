@@ -90,25 +90,6 @@ export default function PersonalMaterialAudioPlayer({
   const lastPersistAtRef = useRef(0);
   const onProgressPersistRef = useRef(onProgressPersist);
 
-  useEffect(() => {
-    signedRef.current = null;
-    setFetchState("idle");
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setStatusMessage(null);
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    }
-  }, [audioApiPath, materialId]);
-
-  useEffect(() => {
-    onProgressPersistRef.current = onProgressPersist;
-  }, [onProgressPersist]);
-
   const [fetchState, setFetchState] = useState<AudioFetchState>("idle");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(
@@ -117,6 +98,10 @@ export default function PersonalMaterialAudioPlayer({
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    onProgressPersistRef.current = onProgressPersist;
+  }, [onProgressPersist]);
 
   const clearRetryTimeout = useCallback(() => {
     if (retryTimeoutRef.current !== null) {

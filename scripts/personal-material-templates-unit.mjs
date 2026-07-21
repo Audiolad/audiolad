@@ -78,10 +78,10 @@ function testAuthorPlayer() {
     "no guest_access gate",
   );
   assert(player.includes('progressMode?: "local" | "server" | "none"'), "progressMode none");
-  assert(player.includes("[audioApiPath, materialId]"), "reset on audio change");
   assert(player.includes("PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]"), "five speeds");
   assert(editor.includes("PersonalMaterialAudioPlayer"), "editor embeds player");
   assert(editor.includes('progressMode="none"'), "author preview mode");
+  assert(editor.includes("key={`${material.id}:"), "remount on audio replace");
   assert(editor.includes("Аудиофайл ещё не загружен"), "empty audio message");
 }
 
