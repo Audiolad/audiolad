@@ -89,6 +89,39 @@ function testGuestComponents() {
   assert(returnCta.includes('rel="noopener noreferrer"'), "return link rel");
 }
 
+function testOptionalTextBlocksWithoutHeadings() {
+  const description = read(
+    "src/components/personal-materials/guest/PersonalMaterialDescription.tsx",
+  );
+  const recommendation = read(
+    "src/components/personal-materials/guest/PersonalMaterialRecommendation.tsx",
+  );
+  const guestPage = read(
+    "src/components/personal-materials/guest/PersonalMaterialGuestPage.tsx",
+  );
+  const detail = read(
+    "src/components/personal-materials/library/MyMaterialDetailClient.tsx",
+  );
+
+  assert(description.includes("FormattedPlainText"), "description plain text");
+  assert(!description.includes("О диагностике"), "no description auto heading");
+  assert(!description.includes("<h2"), "description no h2");
+  assert(recommendation.includes("FormattedPlainText"), "recommendation plain text");
+  assert(recommendation.includes("rounded-2xl"), "recommendation highlight kept");
+  assert(!recommendation.includes("Персональная рекомендация"), "no recommendation heading");
+  assert(!recommendation.includes("✦"), "no decorative label");
+  assert(!recommendation.includes("<h2"), "recommendation no h2");
+  assert(guestPage.includes("shouldRenderOptionalBlock(material.description)"), "guest hide empty description");
+  assert(
+    guestPage.includes("shouldRenderOptionalBlock(material.personalRecommendation)"),
+    "guest hide empty recommendation",
+  );
+  assert(detail.includes("shouldRenderOptionalBlock(material.description)"), "cabinet hide empty description");
+  assert(detail.includes("shouldRenderOptionalBlock(material.recommendation)"), "cabinet hide empty recommendation");
+  assert(detail.includes("PersonalMaterialDescription"), "cabinet reuses description");
+  assert(detail.includes("PersonalMaterialRecommendation"), "cabinet reuses recommendation");
+}
+
 function testClaimFlow() {
   const claimContext = read("src/app/api/d/[token]/claim-context/route.ts");
   const claim = read("src/app/api/d/[token]/claim/route.ts");
@@ -142,6 +175,7 @@ async function runModuleTests() {
 async function main() {
   testRouteAndLayout();
   testGuestComponents();
+  testOptionalTextBlocksWithoutHeadings();
   testClaimFlow();
   testSecurityAndPrivacy();
   testResponsiveClasses();
