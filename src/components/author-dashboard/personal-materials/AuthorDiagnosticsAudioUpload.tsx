@@ -15,7 +15,7 @@ type AuthorDiagnosticsAudioUploadProps = {
   disabled?: boolean;
   uploading?: boolean;
   error?: string | null;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File) => Promise<boolean>;
   onDelete: () => Promise<void>;
 };
 
@@ -41,7 +41,7 @@ export default function AuthorDiagnosticsAudioUpload({
     }
 
     if (!isAllowedClientMp3File(file)) {
-      setLocalError("Можно загрузить только MP3-файл.");
+      setLocalError("Выберите аудиофайл в формате MP3.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
@@ -55,7 +55,7 @@ export default function AuthorDiagnosticsAudioUpload({
     }
 
     if (file.size > PERSONAL_MATERIAL_LIMITS.maxAudioBytes) {
-      setLocalError("Файл слишком большой. Максимальный размер — 50 МБ.");
+      setLocalError("Размер файла превышает 50 МБ.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
@@ -64,7 +64,12 @@ export default function AuthorDiagnosticsAudioUpload({
     setSelectedName(file.name);
     setSelectedSize(file.size);
     setLocalError(null);
-    await onUpload(file);
+    const uploaded = await onUpload(file);
+
+    if (!uploaded) {
+      setSelectedName(null);
+      setSelectedSize(null);
+    }
   }
 
   async function handleDelete() {
@@ -144,7 +149,7 @@ export default function AuthorDiagnosticsAudioUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,audio/mpeg"
+          accept=".mp3,audio/mpeg,audio/mp3,application/octet-stream"
           className="sr-only"
           disabled={disabled || uploading}
           onChange={(event) => {

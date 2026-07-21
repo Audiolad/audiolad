@@ -52,6 +52,19 @@ assert.equal(
   "Доступ отозван",
 );
 
+const validNoLastName = validatePersonalMaterialForm({
+  materialType: "diagnostic",
+  clientFirstName: "Райля",
+  clientLastName: "",
+  materialDate: "2026-07-15",
+  title: "",
+  description: "",
+  personalRecommendation: "",
+  returnUrl: "",
+  returnButtonLabel: "",
+});
+assert.equal(Object.keys(validNoLastName).length, 0);
+
 const valid = validatePersonalMaterialForm({
   materialType: "diagnostic",
   clientFirstName: "Anna",
@@ -79,6 +92,11 @@ const invalid = validatePersonalMaterialForm({
 assert.ok(invalid.clientFirstName);
 
 assert.equal(isAllowedClientMp3File({ name: "test.mp3", type: "audio/mpeg", size: 1000 }), true);
+assert.equal(isAllowedClientMp3File({ name: "Райля.mp3", type: "", size: 1000 }), true);
+assert.equal(
+  isAllowedClientMp3File({ name: "Райля.mp3", type: "application/octet-stream", size: 1000 }),
+  true,
+);
 assert.equal(isAllowedClientMp3File({ name: "test.pdf", type: "application/pdf", size: 1000 }), false);
 
 assert.equal(formatFileSize(1024 * 1024 * 2.5), "2.5 МБ");

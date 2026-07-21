@@ -43,10 +43,12 @@ export function validatePersonalMaterialForm(
     errors.clientFirstName = "Имя содержит недопустимые символы.";
   }
 
-  if (!lastName || lastName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
-    errors.clientLastName = "Укажите фамилию клиента.";
-  } else if (!CLIENT_NAME_PATTERN.test(lastName)) {
-    errors.clientLastName = "Фамилия содержит недопустимые символы.";
+  if (lastName) {
+    if (lastName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+      errors.clientLastName = "Фамилия слишком длинная.";
+    } else if (!CLIENT_NAME_PATTERN.test(lastName)) {
+      errors.clientLastName = "Фамилия содержит недопустимые символы.";
+    }
   }
 
   if (!DATE_PATTERN.test(materialDate)) {
@@ -92,7 +94,14 @@ export function isAllowedClientMp3File(file: File): boolean {
     return false;
   }
 
-  if (type && type !== "audio/mpeg" && type !== "audio/mp3") {
+  if (
+    type &&
+    type !== "audio/mpeg" &&
+    type !== "audio/mp3" &&
+    type !== "audio/x-mpeg" &&
+    type !== "audio/x-mp3" &&
+    type !== "application/octet-stream"
+  ) {
     return false;
   }
 

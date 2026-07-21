@@ -38,8 +38,12 @@ export async function uploadPersonalMaterialAudio(
     throw new PersonalMaterialApiError("invalid_file_type", 400);
   }
 
-  if (file.size <= 0 || file.size > PERSONAL_MATERIAL_LIMITS.maxAudioBytes) {
-    throw new PersonalMaterialApiError("invalid_file_size", 400);
+  if (file.size <= 0) {
+    throw new PersonalMaterialApiError("empty_file", 400);
+  }
+
+  if (file.size > PERSONAL_MATERIAL_LIMITS.maxAudioBytes) {
+    throw new PersonalMaterialApiError("file_too_large", 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -49,11 +53,7 @@ export async function uploadPersonalMaterialAudio(
     throw new PersonalMaterialApiError("invalid_audio_duration", 400);
   }
 
-  const storagePath = buildPersonalMaterialAudioPath(
-    material.author_id,
-    material.id,
-    file.name,
-  );
+  const storagePath = buildPersonalMaterialAudioPath(material.author_id, material.id);
 
   if (!isPathInsidePersonalMaterialRoot(storagePath)) {
     throw new PersonalMaterialApiError("invalid_request", 400);
@@ -70,8 +70,13 @@ export async function uploadPersonalMaterialAudio(
     });
 
   if (uploadError) {
-    console.error("personal_material_audio_upload_error", uploadError.message);
-    throw new PersonalMaterialApiError("upload_failed", 500);
+    console.error("personal_material_audio_upload_error", {
+      code: "storage_upload_failed",
+      materialId: material.id,
+      authorId: material.author_id,
+      message: uploadError.message,
+    });
+    throw new PersonalMaterialApiError("storage_upload_failed", 500);
   }
 
   const { error: updateError } = await service

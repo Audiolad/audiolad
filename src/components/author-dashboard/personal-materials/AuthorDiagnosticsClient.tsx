@@ -12,6 +12,7 @@ import {
   formatCreatedAtLabel,
   formatMaterialDateLabel,
 } from "@/lib/personal-materials/client/validation";
+import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import {
   getPersonalMaterialDisplayTitle,
   getPersonalMaterialTypeLabel,
@@ -30,7 +31,10 @@ function MaterialCard({
   material: AuthorPersonalMaterial;
   authorSlug: string;
 }) {
-  const clientName = `${material.clientFirstName} ${material.clientLastName}`.trim();
+  const clientName = formatClientDisplayName(
+    material.clientFirstName,
+    material.clientLastName,
+  );
   const displayTitle = getPersonalMaterialDisplayTitle(material);
 
   return (

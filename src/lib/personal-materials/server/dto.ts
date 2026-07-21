@@ -10,7 +10,7 @@ export type SafeAuthorPersonalMaterialDto = {
   materialType: PersonalMaterialType;
   title: string | null;
   clientFirstName: string;
-  clientLastName: string;
+  clientLastName: string | null;
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
