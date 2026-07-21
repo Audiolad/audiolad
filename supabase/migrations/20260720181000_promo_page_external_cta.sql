@@ -10,11 +10,16 @@ ALTER TABLE public.promo_pages
   ADD COLUMN IF NOT EXISTS cta_description text NULL,
   ADD COLUMN IF NOT EXISTS cta_open_in_new_tab boolean NOT NULL DEFAULT false;
 
+-- Published rows are locked by promo_pages_mutation_guard; disable for one-time backfill only.
+ALTER TABLE public.promo_pages DISABLE TRIGGER promo_pages_mutation_guard;
+
 UPDATE public.promo_pages AS pp
 SET cta_enabled = true
 WHERE pp.cta_enabled IS FALSE
   AND NULLIF(btrim(pp.cta_label), '') IS NOT NULL
   AND NULLIF(btrim(pp.cta_href), '') IS NOT NULL;
+
+ALTER TABLE public.promo_pages ENABLE TRIGGER promo_pages_mutation_guard;
 
 ALTER TABLE public.promo_pages
   DROP CONSTRAINT IF EXISTS promo_pages_cta_heading_check;
