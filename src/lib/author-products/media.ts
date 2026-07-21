@@ -39,15 +39,27 @@ export async function getMp3DurationSeconds(buffer: Buffer): Promise<number | nu
   }
 }
 
+const ALLOWED_MP3_MIME_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/x-mpeg",
+  "audio/x-mp3",
+  "application/octet-stream",
+]);
+
 export function isAllowedMp3File(file: File): boolean {
   const mime = file.type.trim().toLowerCase();
   const name = file.name.trim().toLowerCase();
 
-  if (mime !== "audio/mpeg" && mime !== "audio/mp3") {
+  if (!name.endsWith(".mp3")) {
     return false;
   }
 
-  return name.endsWith(".mp3");
+  if (!mime) {
+    return true;
+  }
+
+  return ALLOWED_MP3_MIME_TYPES.has(mime);
 }
 
 export { MAX_AUDIO_BYTES, MAX_COVER_BYTES };

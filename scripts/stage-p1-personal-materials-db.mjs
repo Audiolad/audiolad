@@ -332,6 +332,39 @@ COMMIT;
     );
     assert(update?.status === "draft", "update draft status");
 
+    const createNoLastName = rpcJsonAs(
+      state.ownerUserId,
+      `public.create_personal_material(
+        '${state.authorId}'::uuid,
+        'Райля', NULL, '2026-07-15'::date,
+        'diagnostic'
+      )`,
+    );
+    assert(createNoLastName?.material_id, "create without last name failed");
+
+    const lastNameIsNull = sqlScalar(
+      `SELECT client_last_name IS NULL FROM public.personal_materials WHERE id='${createNoLastName.material_id}'::uuid`,
+    );
+    assert(lastNameIsNull === "t", "client_last_name stored as null");
+
+    rpcJsonAs(
+      state.ownerUserId,
+      `public.update_personal_material_draft(
+        '${createNoLastName.material_id}'::uuid,
+        'Райля', '', '2026-07-15'::date
+      )`,
+    );
+    const clearedLastName = sqlScalar(
+      `SELECT client_last_name IS NULL FROM public.personal_materials WHERE id='${createNoLastName.material_id}'::uuid`,
+    );
+    assert(clearedLastName === "t", "empty last name normalized to null");
+
+    sqlFile(`
+      UPDATE public.personal_materials
+      SET status = 'deleted', deleted_at = now()
+      WHERE id = '${createNoLastName.material_id}'::uuid;
+    `);
+
     const token1 = generateAccessToken();
     const token2 = generateAccessToken();
     const wrongToken = generateAccessToken();

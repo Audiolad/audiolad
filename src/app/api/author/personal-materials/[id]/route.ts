@@ -59,7 +59,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     await updatePersonalMaterialDraft(supabase, {
       materialId: id,
       clientFirstName: patch.clientFirstName ?? material.client_first_name,
-      clientLastName: patch.clientLastName ?? material.client_last_name,
+      clientLastName:
+        patch.clientLastName !== undefined
+          ? patch.clientLastName
+          : material.client_last_name,
       materialDate: patch.materialDate ?? material.material_date,
       title: patch.title !== undefined ? patch.title : material.title,
       description:

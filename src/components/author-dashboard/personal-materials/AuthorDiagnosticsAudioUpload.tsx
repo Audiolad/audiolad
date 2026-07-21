@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 import {
@@ -35,13 +35,20 @@ export default function AuthorDiagnosticsAudioUpload({
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (error && !hasAudio) {
+      setSelectedName(null);
+      setSelectedSize(null);
+    }
+  }, [error, hasAudio]);
+
   async function handleFile(file: File | null) {
     if (!file || disabled || uploading) {
       return;
     }
 
     if (!isAllowedClientMp3File(file)) {
-      setLocalError("Можно загрузить только MP3-файл.");
+      setLocalError("Выберите аудиофайл в формате MP3.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
@@ -55,7 +62,7 @@ export default function AuthorDiagnosticsAudioUpload({
     }
 
     if (file.size > PERSONAL_MATERIAL_LIMITS.maxAudioBytes) {
-      setLocalError("Файл слишком большой. Максимальный размер — 50 МБ.");
+      setLocalError("Размер файла превышает 50 МБ.");
       setSelectedName(null);
       setSelectedSize(null);
       return;
@@ -144,7 +151,7 @@ export default function AuthorDiagnosticsAudioUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,audio/mpeg"
+          accept=".mp3,audio/mpeg,audio/mp3,application/octet-stream"
           className="sr-only"
           disabled={disabled || uploading}
           onChange={(event) => {

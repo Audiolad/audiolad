@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
 import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal";
@@ -49,7 +50,7 @@ function materialToFormValues(material: AuthorPersonalMaterial): PersonalMateria
   return {
     materialType: material.materialType,
     clientFirstName: material.clientFirstName,
-    clientLastName: material.clientLastName,
+    clientLastName: material.clientLastName ?? "",
     materialDate: material.materialDate,
     title: material.title ?? "",
     description: material.description ?? "",
@@ -201,7 +202,7 @@ export default function AuthorDiagnosticsEditorClient({
       const updated = await updateAuthorPersonalMaterial(material.id, {
         materialType: formValues.materialType as AuthorPersonalMaterial["materialType"],
         clientFirstName: formValues.clientFirstName.trim(),
-        clientLastName: formValues.clientLastName.trim(),
+        clientLastName: formValues.clientLastName.trim() || null,
         materialDate: formValues.materialDate,
         title: formValues.title.trim() || null,
         description: formValues.description.trim() || null,
@@ -333,7 +334,10 @@ export default function AuthorDiagnosticsEditorClient({
   const isDraft = uiStatus === "draft";
   const isReadOnly = !isDraft;
   const listHref = `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}`;
-  const clientName = `${material.clientFirstName} ${material.clientLastName}`.trim();
+  const clientName = formatClientDisplayName(
+    material.clientFirstName,
+    material.clientLastName,
+  );
 
   return (
     <div className="min-w-0">

@@ -94,6 +94,19 @@ const createBody = parseCreatePersonalMaterialBody({
   materialDate: "2026-07-15",
 });
 assert.equal(createBody.clientFirstName, "Anna");
+assert.equal(createBody.clientLastName, "Ivanova");
+
+const createWithoutLastName = parseCreatePersonalMaterialBody({
+  authorId: baseMaterial.author_id,
+  materialType: "diagnostic",
+  clientFirstName: "Райля",
+  clientLastName: "",
+  materialDate: "2026-07-15",
+});
+assert.equal(createWithoutLastName.clientLastName, null);
+
+const updateWithoutLastName = parseUpdatePersonalMaterialBody({ clientLastName: "  " });
+assert.equal(updateWithoutLastName.clientLastName, null);
 
 assert.throws(
   () =>

@@ -85,9 +85,13 @@ export default function AuthorDiagnosticsFormFields({
             value={values.clientLastName}
             disabled={disabled || readOnly}
             onChange={(event) => onChange("clientLastName", event.target.value)}
+            placeholder="Если есть"
             className={fieldClassName}
             autoComplete="off"
           />
+          {!errors.clientLastName ? (
+            <span className="mt-1 block text-xs text-[#7d70a2]">Необязательно</span>
+          ) : null}
           {errors.clientLastName ? (
             <span className="mt-1 block text-sm text-[#b42318]">{errors.clientLastName}</span>
           ) : null}

@@ -28,14 +28,11 @@ export function sanitizeStorageFilename(originalName: string): string {
 export function buildPersonalMaterialAudioPath(
   authorId: string,
   materialId: string,
-  originalFilename: string,
 ): string {
   assertUuid(authorId, "author_id");
   assertUuid(materialId, "material_id");
 
-  const safeFilename = sanitizeStorageFilename(originalFilename);
-
-  return `${authorId}/${materialId}/audio/${safeFilename}`;
+  return `${authorId}/${materialId}/audio/${randomUUID()}.mp3`;
 }
 
 export function buildPersonalMaterialDocumentPath(

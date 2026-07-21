@@ -99,7 +99,7 @@ function testEditorComponent() {
   assert(editor.includes("returnUrl"), "editor saves return url");
 
   assert(upload.includes("isAllowedClientMp3File"), "client mp3 validation");
-  assert(upload.includes("accept=\".mp3,audio/mpeg\""), "mp3 accept");
+  assert(upload.includes("accept=\".mp3,audio/mpeg,audio/mp3,application/octet-stream\""), "mp3 accept");
   assert(upload.includes("break-all"), "filename wrap");
   assert(upload.includes("Загрузить аудиофайл"), "upload CTA");
   assert(upload.includes("Аудиофайл загружен"), "upload success label");

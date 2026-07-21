@@ -6,7 +6,7 @@ export type AuthorPersonalMaterial = {
   materialType: PersonalMaterialType;
   title: string | null;
   clientFirstName: string;
-  clientLastName: string;
+  clientLastName: string | null;
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
@@ -30,7 +30,7 @@ export type CreateAuthorPersonalMaterialInput = {
   materialType: PersonalMaterialType;
   title?: string | null;
   clientFirstName: string;
-  clientLastName: string;
+  clientLastName: string | null;
   materialDate: string;
   description?: string | null;
   personalRecommendation?: string | null;
@@ -42,7 +42,7 @@ export type UpdateAuthorPersonalMaterialInput = {
   materialType?: PersonalMaterialType;
   title?: string | null;
   clientFirstName?: string;
-  clientLastName?: string;
+  clientLastName?: string | null;
   materialDate?: string;
   description?: string | null;
   personalRecommendation?: string | null;

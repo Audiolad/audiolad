@@ -71,7 +71,7 @@ export default function AuthorDiagnosticsCreateClient({
         authorId: selectedAuthor.id,
         materialType: values.materialType as PersonalMaterialType,
         clientFirstName: values.clientFirstName.trim(),
-        clientLastName: values.clientLastName.trim(),
+        clientLastName: values.clientLastName.trim() || null,
         materialDate: values.materialDate,
         title: values.title.trim() || null,
         description: values.description.trim() || null,
