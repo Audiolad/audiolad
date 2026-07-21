@@ -45,6 +45,7 @@ export function toMyPersonalMaterialListItemDto(
   const durationSeconds =
     typeof row.duration_seconds === "number" ? row.duration_seconds : null;
   const hasAudio = row.has_audio === true;
+  const hasPdf = row.has_pdf === true;
   const progress = mapProgress(
     (row.progress as RpcProgress | null | undefined) ?? null,
     durationSeconds,
@@ -63,8 +64,11 @@ export function toMyPersonalMaterialListItemDto(
           ? row.created_at
           : new Date(0).toISOString(),
     progress,
-    availability: hasAudio ? "available" : "unavailable",
+    availability: hasAudio || hasPdf ? "available" : "unavailable",
     hasAudio,
+    hasPdf,
+    pdfOriginalFilename:
+      typeof row.pdf_original_filename === "string" ? row.pdf_original_filename : null,
   };
 }
 

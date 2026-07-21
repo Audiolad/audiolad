@@ -110,6 +110,41 @@ export async function deleteAuthorPersonalMaterialAudio(
   return payload.material;
 }
 
+export async function uploadAuthorPersonalMaterialPdf(
+  id: string,
+  file: File,
+): Promise<AuthorPersonalMaterial> {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch(
+    `/api/author/personal-materials/${encodeURIComponent(id)}/pdf`,
+    {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    },
+  );
+
+  const payload = await parseJson<{ material: AuthorPersonalMaterial }>(response);
+  return payload.material;
+}
+
+export async function deleteAuthorPersonalMaterialPdf(
+  id: string,
+): Promise<AuthorPersonalMaterial> {
+  const response = await fetch(
+    `/api/author/personal-materials/${encodeURIComponent(id)}/pdf`,
+    {
+      method: "DELETE",
+      cache: "no-store",
+    },
+  );
+
+  const payload = await parseJson<{ material: AuthorPersonalMaterial }>(response);
+  return payload.material;
+}
+
 export async function activateAuthorPersonalMaterial(
   id: string,
   expiresAt?: string | null,

@@ -117,7 +117,10 @@ function testEditorComponent() {
     "activation copy allows edits",
   );
   assert(!editor.includes("больше нельзя будет редактировать"), "old lock copy removed");
-  assert(editor.includes("Сначала загрузите аудиофайл"), "activate without audio hint");
+  assert(editor.includes("getPersonalMaterialActivationErrorMessage"), "activate without attachment hint");
+  assert(editor.includes("AuthorDiagnosticsPdfUpload"), "pdf upload block");
+  assert(editor.includes('progressMode="none"'), "author audio preview player");
+  assert(editor.includes("Прослушивание"), "author preview section");
   assert(editor.includes('hash !== "#audio"'), "scroll to audio after create");
 
   assert(oneTime.includes("copyTextToClipboard"), "clipboard copy");

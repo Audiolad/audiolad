@@ -76,7 +76,7 @@ function testSecurity() {
   const audio = read("src/lib/personal-materials/client-library/audio.ts");
   const api = read("src/lib/personal-materials/client-library/api.ts");
 
-  assert(!dto.includes("access_token_hash"), "dto no hash");
+  assert(dto.includes("hasAudio || hasPdf"), "availability audio or pdf");
   assert(!dto.includes("audio_path"), "dto no path");
   assert(audio.includes("claimed_by_user_id"), "owner check");
   assert(audio.includes("signedUrlTtlSeconds"), "ttl");

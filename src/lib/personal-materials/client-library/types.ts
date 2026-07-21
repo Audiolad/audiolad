@@ -22,6 +22,8 @@ export type MyPersonalMaterialListItemDto = {
   progress: MyPersonalMaterialProgressDto;
   availability: MyPersonalMaterialAvailability;
   hasAudio: boolean;
+  hasPdf: boolean;
+  pdfOriginalFilename: string | null;
 };
 
 export type MyPersonalMaterialDetailDto = MyPersonalMaterialListItemDto & {

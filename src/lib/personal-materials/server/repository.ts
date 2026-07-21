@@ -224,6 +224,19 @@ export async function clearPersonalMaterialDraftAudio(
   }
 }
 
+export async function clearPersonalMaterialDraftPdf(
+  supabase: SupabaseClient,
+  materialId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("clear_personal_material_draft_pdf", {
+    p_material_id: materialId,
+  });
+
+  if (error) {
+    throwRpcError(error);
+  }
+}
+
 export async function setPersonalMaterialExpiresAt(
   service: SupabaseClient,
   materialId: string,

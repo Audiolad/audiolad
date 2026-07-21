@@ -11,6 +11,7 @@ import {
 type PersonalMaterialAudioPlayerProps = {
   materialId: string;
   audioApiPath: string;
+  enabled?: boolean;
   /** local = guest localStorage; server = callback only; none = author preview. */
   progressMode?: "local" | "server" | "none";
   initialPositionSeconds?: number;
@@ -75,6 +76,7 @@ function isNearComplete(positionSeconds: number, durationSeconds: number): boole
 export default function PersonalMaterialAudioPlayer({
   materialId,
   audioApiPath,
+  enabled = true,
   progressMode = "local",
   initialPositionSeconds = 0,
   persistIntervalMs,
@@ -430,6 +432,10 @@ export default function PersonalMaterialAudioPlayer({
 
   const progressMax = duration > 0 ? duration : 100;
   const progressValue = duration > 0 ? currentTime : 0;
+
+  if (!enabled) {
+    return null;
+  }
 
   return (
     <section

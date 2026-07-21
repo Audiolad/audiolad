@@ -46,6 +46,14 @@ function testAuthorRoutes() {
   assert(!audioRoute.includes("audio_path"), "audio route no path leak");
 
   assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");
+  assert(activateRoute.includes("hasPdf"), "activate accepts pdf attachment");
+  assert(activateRoute.includes("!hasAudio && !hasPdf"), "activate requires audio or pdf");
+
+  const pdfRoute = read("src/app/api/author/personal-materials/[id]/pdf/route.ts");
+  const guestPdfRoute = read("src/app/api/d/[token]/pdf/route.ts");
+  assert(pdfRoute.includes("uploadPersonalMaterialPdf"), "pdf upload helper");
+  assert(pdfRoute.includes("createAuthorPdfSignedUrl"), "author pdf signed url");
+  assert(guestPdfRoute.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
   assert(activateRoute.includes("generateAccessToken"), "activate generates token");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");
@@ -92,13 +100,16 @@ function testServerLayer() {
 
   assert(delivery.includes("redactTokenFromPath"), "token redaction helper");
   assert(delivery.includes("hashAccessToken"), "server-side hash");
-  assert(delivery.includes("createSignedUrl"), "signed url creation");
+  assert(delivery.includes("createGuestAudioSignedUrl"), "signed url creation");
+  assert(delivery.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
   assert(!delivery.includes("console.log(rawToken"), "no raw token logging");
 
   assert(uploads.includes("createServiceRoleClient"), "upload uses service role");
   assert(uploads.includes("PERSONAL_MATERIALS_BUCKET"), "private bucket");
   assert(uploads.includes("isAllowedMp3File"), "mp3 validation");
   assert(uploads.includes("clearPersonalMaterialDraftAudio"), "clear audio rpc");
+  assert(uploads.includes("uploadPersonalMaterialPdf"), "pdf upload");
+  assert(uploads.includes("clearPersonalMaterialDraftPdf"), "clear pdf rpc");
 
   assert(rateLimit.includes("pm-guest:"), "guest rate limit prefix");
   assert(!rateLimit.includes("rawToken"), "rate limit no raw token");

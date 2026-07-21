@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
+import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
 import PersonalMaterialDescription from "@/components/personal-materials/guest/PersonalMaterialDescription";
 import PersonalMaterialHeader from "@/components/personal-materials/guest/PersonalMaterialHeader";
 import PersonalMaterialRecommendation from "@/components/personal-materials/guest/PersonalMaterialRecommendation";
@@ -114,7 +115,7 @@ export default function MyMaterialDetailClient({
     ? `/authors/${encodeURIComponent(material.author.slug)}`
     : null;
 
-  if (!material.hasAudio || material.availability === "unavailable") {
+  if ((!material.hasAudio && !material.hasPdf) || material.availability === "unavailable") {
     return (
       <div className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
         <Link
@@ -168,17 +169,28 @@ export default function MyMaterialDetailClient({
         </p>
       )}
 
-      <p className="text-sm font-medium text-[#5f5484]" aria-live="polite">
-        {progressLabel}
-      </p>
+      {material.hasAudio ? (
+        <>
+          <p className="text-sm font-medium text-[#5f5484]" aria-live="polite">
+            {progressLabel}
+          </p>
 
-      <PersonalMaterialAudioPlayer
-        materialId={material.id}
-        audioApiPath={`/api/my-materials/${encodeURIComponent(material.id)}/audio`}
-        progressMode="server"
-        initialPositionSeconds={initialMerged.positionSeconds}
-        onProgressPersist={handlePersist}
-      />
+          <PersonalMaterialAudioPlayer
+            materialId={material.id}
+            audioApiPath={`/api/my-materials/${encodeURIComponent(material.id)}/audio`}
+            progressMode="server"
+            initialPositionSeconds={initialMerged.positionSeconds}
+            onProgressPersist={handlePersist}
+          />
+        </>
+      ) : null}
+
+      {material.hasPdf ? (
+        <PersonalMaterialPdfDocument
+          pdfApiPath={`/api/my-materials/${encodeURIComponent(material.id)}/pdf`}
+          filename={material.pdfOriginalFilename}
+        />
+      ) : null}
 
       {shouldRenderOptionalBlock(material.description) && (
         <PersonalMaterialDescription description={material.description} />

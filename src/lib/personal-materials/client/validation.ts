@@ -130,6 +130,36 @@ export function isAllowedClientMp3File(file: File): boolean {
   return true;
 }
 
+export function isAllowedClientPdfFile(file: File): boolean {
+  const type = file.type.toLowerCase();
+  return type === "application/pdf";
+}
+
+export async function validateClientPdfFile(
+  file: File,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!isAllowedClientPdfFile(file)) {
+    return { ok: false, message: "Можно загрузить только PDF-документ." };
+  }
+
+  if (file.size <= 0) {
+    return { ok: false, message: "Файл пустой. Выберите другой PDF-документ." };
+  }
+
+  if (file.size > PERSONAL_MATERIAL_LIMITS.maxPdfBytes) {
+    return { ok: false, message: "PDF слишком большой. Максимальный размер — 20 МБ." };
+  }
+
+  const buffer = await file.arrayBuffer();
+  const header = new TextDecoder("ascii").decode(new Uint8Array(buffer).slice(0, 5));
+
+  if (header !== "%PDF-") {
+    return { ok: false, message: "Можно загрузить только PDF-документ." };
+  }
+
+  return { ok: true };
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
   if (!bytes || bytes <= 0) {
     return "";

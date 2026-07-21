@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
+import AuthorDiagnosticsPdfUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsPdfUpload";
+import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
 import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal";
 import AuthorDiagnosticsFormFields from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsFormFields";
 import AuthorDiagnosticsOneTimeLinkPanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsOneTimeLinkPanel";
@@ -15,16 +17,19 @@ import {
   activateAuthorPersonalMaterial,
   deleteAuthorPersonalMaterial,
   deleteAuthorPersonalMaterialAudio,
+  deleteAuthorPersonalMaterialPdf,
   getAuthorPersonalMaterial,
   isPersonalMaterialClientError,
   revokeAuthorPersonalMaterial,
   rotateAuthorPersonalMaterial,
   updateAuthorPersonalMaterial,
   uploadAuthorPersonalMaterialAudio,
+  uploadAuthorPersonalMaterialPdf,
 } from "@/lib/personal-materials/client/api";
 import {
   getPersonalMaterialActivationErrorMessage,
   getPersonalMaterialErrorMessage,
+  getPersonalMaterialPdfUploadErrorMessage,
   getPersonalMaterialUploadErrorMessage,
 } from "@/lib/personal-materials/client/errors";
 import {
@@ -76,9 +81,11 @@ export default function AuthorDiagnosticsEditorClient({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pdfUploadError, setPdfUploadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [oneTimeAccessUrl, setOneTimeAccessUrl] = useState<string | null>(null);
@@ -279,6 +286,45 @@ export default function AuthorDiagnosticsEditorClient({
       setUploading(false);
     }
   }
+
+  async function handleUploadPdf(file: File) {
+    if (!material) {
+      return;
+    }
+
+    setUploadingPdf(true);
+    setPdfUploadError(null);
+
+    try {
+      const updated = await uploadAuthorPersonalMaterialPdf(material.id, file);
+      setMaterial(updated);
+    } catch (error) {
+      const code = isPersonalMaterialClientError(error) ? error.code : undefined;
+      setPdfUploadError(getPersonalMaterialPdfUploadErrorMessage(code));
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  async function handleDeletePdf() {
+    if (!material) {
+      return;
+    }
+
+    setUploadingPdf(true);
+    setPdfUploadError(null);
+
+    try {
+      const updated = await deleteAuthorPersonalMaterialPdf(material.id);
+      setMaterial(updated);
+    } catch (error) {
+      setPdfUploadError(getPersonalMaterialErrorMessage(error));
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  const hasAttachment = Boolean(material?.hasAudio || material?.hasPdf);
 
   async function handleConfirmAction() {
     if (!material || !confirmAction) {
@@ -482,18 +528,33 @@ export default function AuthorDiagnosticsEditorClient({
       </section>
 
       {isEditable ? (
-        <div className="mt-6">
-          <AuthorDiagnosticsAudioUpload
-            hasAudio={material.hasAudio}
-            audioOriginalFilename={material.audioOriginalFilename}
-            audioSizeBytes={material.audioSizeBytes}
-            disabled={actionLoading}
-            uploading={uploading}
-            error={uploadError}
-            onUpload={handleUpload}
-            onDelete={handleDeleteAudio}
-          />
-        </div>
+        <>
+          <div className="mt-6">
+            <AuthorDiagnosticsAudioUpload
+              hasAudio={material.hasAudio}
+              audioOriginalFilename={material.audioOriginalFilename}
+              audioSizeBytes={material.audioSizeBytes}
+              disabled={actionLoading || uploadingPdf}
+              uploading={uploading}
+              error={uploadError}
+              onUpload={handleUpload}
+              onDelete={handleDeleteAudio}
+            />
+          </div>
+
+          <div className="mt-6">
+            <AuthorDiagnosticsPdfUpload
+              hasPdf={material.hasPdf}
+              pdfOriginalFilename={material.pdfOriginalFilename}
+              pdfSizeBytes={material.pdfSizeBytes}
+              disabled={actionLoading || uploading}
+              uploading={uploadingPdf}
+              error={pdfUploadError}
+              onUpload={handleUploadPdf}
+              onDelete={handleDeletePdf}
+            />
+          </div>
+        </>
       ) : null}
 
       {isDraft ? (
@@ -505,7 +566,7 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
           <button
             type="button"
-            disabled={!material.hasAudio || actionLoading || uploading}
+            disabled={!hasAttachment || actionLoading || uploading || uploadingPdf}
             onClick={() => {
               if (!formValues) {
                 return;
@@ -530,9 +591,9 @@ export default function AuthorDiagnosticsEditorClient({
           >
             Активировать и получить ссылку
           </button>
-          {!material.hasAudio ? (
+          {!hasAttachment ? (
             <p className="mt-3 text-sm text-[#b67a1d]" role="status">
-              Сначала загрузите аудиофайл
+              {getPersonalMaterialActivationErrorMessage()}
             </p>
           ) : null}
         </section>
@@ -542,13 +603,26 @@ export default function AuthorDiagnosticsEditorClient({
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
             {uiStatus === "revoked"
               ? "Доступ по ссылке отозван."
-              : material.hasAudio
-                ? "Аудиофайл загружен."
-                : "Аудиофайл отсутствует."}
+              : null}
+            {uiStatus !== "revoked" ? (
+              <>
+                {material.hasAudio ? "Аудиофайл загружен." : "Аудиофайл отсутствует."}{" "}
+                {material.hasPdf ? "PDF-документ загружен." : "PDF-документ отсутствует."}
+              </>
+            ) : null}
             {material.claimed
               ? " Клиент уже сохранил материал в личном кабинете."
               : null}
           </p>
+
+          {material.hasPdf ? (
+            <div className="mt-4">
+              <PersonalMaterialPdfDocument
+                pdfApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/pdf`}
+                filename={material.pdfOriginalFilename}
+              />
+            </div>
+          ) : null}
 
           {!oneTimeAccessUrl ? (
             <p className="mt-3 text-sm leading-6 text-[#7d70a2]">

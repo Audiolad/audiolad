@@ -14,10 +14,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   forbidden: "У вас нет доступа к этому авторскому пространству.",
   not_found: "Материал не найден.",
   material_not_editable: "Черновик больше нельзя редактировать.",
-  material_not_ready: "Сначала загрузите аудиофайл.",
+  material_not_ready: "Добавьте аудиофайл или PDF-документ.",
   client_name_required: "Укажите имя клиента.",
   invalid_file_type: "Выберите аудиофайл в формате MP3.",
   file_too_large: "Размер файла превышает 50 МБ.",
+  invalid_file_size: "Файл слишком большой. Проверьте лимит размера.",
   empty_file: "Выбранный файл пустой.",
   invalid_audio_duration: "Не удалось определить длительность MP3-файла.",
   invalid_request: "Проверьте правильность заполнения формы.",
@@ -84,6 +85,18 @@ export function getPersonalMaterialUploadErrorMessage(code?: string): string {
   return "Не удалось загрузить файл из-за ошибки сервера. Повторите попытку позже.";
 }
 
+export function getPersonalMaterialPdfUploadErrorMessage(code?: string): string {
+  if (code === "invalid_file_type") {
+    return "Можно загрузить только PDF-документ.";
+  }
+
+  if (code === "invalid_file_size") {
+    return "PDF слишком большой. Максимальный размер — 20 МБ.";
+  }
+
+  return "Не удалось загрузить PDF. Проверьте формат и размер файла.";
+}
+
 export function getPersonalMaterialActivationErrorMessage(error?: unknown): string {
   if (error instanceof PersonalMaterialClientError) {
     if (error.code === "client_name_required") {
@@ -94,5 +107,5 @@ export function getPersonalMaterialActivationErrorMessage(error?: unknown): stri
     }
   }
 
-  return "Сначала загрузите аудиофайл";
+  return ERROR_MESSAGES.material_not_ready;
 }
