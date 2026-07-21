@@ -30,7 +30,7 @@ export async function uploadPersonalMaterialAudio(
   material: PersonalMaterialRow,
   file: File,
 ): Promise<UploadedAudioMetadata> {
-  if (material.status !== "draft") {
+  if (material.status !== "draft" && material.status !== "active") {
     throw new PersonalMaterialApiError("material_not_editable", 409);
   }
 
@@ -90,7 +90,7 @@ export async function uploadPersonalMaterialAudio(
       updated_at: new Date().toISOString(),
     })
     .eq("id", material.id)
-    .eq("status", "draft");
+    .in("status", ["draft", "active"]);
 
   if (updateError) {
     await service.storage.from(PERSONAL_MATERIALS_BUCKET).remove([storagePath]);
@@ -115,7 +115,7 @@ export async function deletePersonalMaterialAudio(
   supabase: SupabaseClient,
   material: PersonalMaterialRow,
 ): Promise<void> {
-  if (material.status !== "draft") {
+  if (material.status !== "draft" && material.status !== "active") {
     throw new PersonalMaterialApiError("material_not_editable", 409);
   }
 

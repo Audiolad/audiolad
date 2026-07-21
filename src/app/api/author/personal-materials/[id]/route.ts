@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import {
-  assertDraftEditable,
+  assertAuthorEditable,
   requirePersonalMaterialAccess,
 } from "@/lib/personal-materials/server/auth";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
@@ -52,7 +52,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, material } = await requirePersonalMaterialAccess(id);
-    assertDraftEditable(material);
+    assertAuthorEditable(material);
 
     const patch = parseUpdatePersonalMaterialBody(await request.json());
 

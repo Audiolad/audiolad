@@ -183,7 +183,12 @@ export default function AuthorDiagnosticsEditorClient({
   }
 
   async function handleSave() {
-    if (!material || !formValues || material.status !== "draft" || saveSubmitRef.current) {
+    if (
+      !material ||
+      !formValues ||
+      (material.status !== "draft" && material.status !== "active") ||
+      saveSubmitRef.current
+    ) {
       return;
     }
 
@@ -334,7 +339,8 @@ export default function AuthorDiagnosticsEditorClient({
 
   const uiStatus = resolvePersonalMaterialUiStatus(material);
   const isDraft = uiStatus === "draft";
-  const isReadOnly = !isDraft;
+  const isEditable = material.status === "draft" || material.status === "active";
+  const isReadOnly = !isEditable;
   const listHref = `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}`;
   const clientName = formatClientDisplayName(
     material.clientFirstName,
@@ -406,7 +412,7 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
         ) : null}
 
-        {isDraft ? (
+        {isEditable ? (
           <button
             type="button"
             onClick={() => void handleSave()}
@@ -418,42 +424,42 @@ export default function AuthorDiagnosticsEditorClient({
         ) : null}
       </section>
 
-      {isDraft ? (
-        <>
-          <div className="mt-6">
-            <AuthorDiagnosticsAudioUpload
-              hasAudio={material.hasAudio}
-              audioOriginalFilename={material.audioOriginalFilename}
-              audioSizeBytes={material.audioSizeBytes}
-              disabled={actionLoading}
-              uploading={uploading}
-              error={uploadError}
-              onUpload={handleUpload}
-              onDelete={handleDeleteAudio}
-            />
-          </div>
+      {isEditable ? (
+        <div className="mt-6">
+          <AuthorDiagnosticsAudioUpload
+            hasAudio={material.hasAudio}
+            audioOriginalFilename={material.audioOriginalFilename}
+            audioSizeBytes={material.audioSizeBytes}
+            disabled={actionLoading}
+            uploading={uploading}
+            error={uploadError}
+            onUpload={handleUpload}
+            onDelete={handleDeleteAudio}
+          />
+        </div>
+      ) : null}
 
-          <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
-            <h3 className="text-[18px] font-semibold">Активация</h3>
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              После активации вы получите персональную ссылку для клиента. Содержимое черновика
-              больше нельзя будет редактировать.
+      {isDraft ? (
+        <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
+          <h3 className="text-[18px] font-semibold">Активация</h3>
+          <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+            После активации вы получите персональную ссылку для клиента. Материал можно будет
+            редактировать и после активации.
+          </p>
+          <button
+            type="button"
+            disabled={!material.hasAudio || actionLoading || uploading}
+            onClick={() => setConfirmAction("activate")}
+            className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+          >
+            Активировать и получить ссылку
+          </button>
+          {!material.hasAudio ? (
+            <p className="mt-3 text-sm text-[#b67a1d]" role="status">
+              Сначала загрузите аудиофайл
             </p>
-            <button
-              type="button"
-              disabled={!material.hasAudio || actionLoading || uploading}
-              onClick={() => setConfirmAction("activate")}
-              className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
-            >
-              Активировать и получить ссылку
-            </button>
-            {!material.hasAudio ? (
-              <p className="mt-3 text-sm text-[#b67a1d]" role="status">
-                Сначала загрузите аудиофайл
-              </p>
-            ) : null}
-          </section>
-        </>
+          ) : null}
+        </section>
       ) : (
         <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
           <h3 className="text-[18px] font-semibold">Управление доступом</h3>
@@ -509,7 +515,7 @@ export default function AuthorDiagnosticsEditorClient({
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "activate"}
         title="Активировать материал?"
-        description="После активации черновик нельзя будет редактировать. Вы получите персональную ссылку для клиента."
+        description="После активации вы получите персональную ссылку для клиента. Материал можно будет редактировать и после активации."
         confirmLabel="Активировать"
         loading={actionLoading}
         onConfirm={() => void handleConfirmAction()}

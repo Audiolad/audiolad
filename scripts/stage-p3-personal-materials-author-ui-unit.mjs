@@ -106,6 +106,12 @@ function testEditorComponent() {
   assert(upload.includes("Заменить файл"), "replace action");
   assert(upload.includes("Удалить файл"), "delete action");
   assert(upload.includes('id="personal-material-audio"'), "audio anchor id");
+  assert(editor.includes("isEditable"), "active materials remain editable");
+  assert(
+    editor.includes("Материал можно будет редактировать и после активации"),
+    "activation copy allows edits",
+  );
+  assert(!editor.includes("больше нельзя будет редактировать"), "old lock copy removed");
   assert(editor.includes("Сначала загрузите аудиофайл"), "activate without audio hint");
   assert(editor.includes('hash !== "#audio"'), "scroll to audio after create");
 

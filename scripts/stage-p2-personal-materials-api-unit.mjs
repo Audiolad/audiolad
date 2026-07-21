@@ -34,14 +34,16 @@ function testAuthorRoutes() {
   assert(!listRoute.includes("access_token_hash"), "list route no token hash");
 
   assert(itemRoute.includes("requirePersonalMaterialAccess"), "item route access");
-  assert(itemRoute.includes("assertDraftEditable"), "patch draft guard");
+  assert(itemRoute.includes("assertAuthorEditable"), "patch editable after activate");
   assert(itemRoute.includes("softDeletePersonalMaterial"), "delete soft delete");
   assert(itemRoute.includes("removePersonalMaterialStorageFiles"), "delete storage cleanup");
 
   assert(audioRoute.includes("uploadPersonalMaterialAudio"), "audio upload helper");
   assert(audioRoute.includes("deletePersonalMaterialAudio"), "audio delete helper");
+  assert(audioRoute.includes("assertAuthorEditable"), "audio editable after activate");
   assert(!audioRoute.includes("audio_path"), "audio route no path leak");
 
+  assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");
   assert(activateRoute.includes("generateAccessToken"), "activate generates token");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");

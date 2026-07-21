@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import {
-  assertDraftEditable,
+  assertAuthorEditable,
   requirePersonalMaterialAccess,
 } from "@/lib/personal-materials/server/auth";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
@@ -21,7 +21,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, material } = await requirePersonalMaterialAccess(id);
-    assertDraftEditable(material);
+    assertAuthorEditable(material);
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -54,7 +54,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, material } = await requirePersonalMaterialAccess(id);
-    assertDraftEditable(material);
+    assertAuthorEditable(material);
 
     await deletePersonalMaterialAudio(supabase, material);
 

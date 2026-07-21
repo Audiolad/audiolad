@@ -64,6 +64,13 @@ export function assertDraftEditable(material: PersonalMaterialRow) {
   }
 }
 
+/** Draft and active materials remain editable by the author; tokens are unchanged. */
+export function assertAuthorEditable(material: PersonalMaterialRow) {
+  if (material.status !== "draft" && material.status !== "active") {
+    throw new PersonalMaterialApiError("material_not_editable", 409);
+  }
+}
+
 export async function requireAuthorMaterialListAccess(authorId: string) {
   return requireAuthorMembership(authorId);
 }
