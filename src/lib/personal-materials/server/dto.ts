@@ -25,6 +25,7 @@ export type SafeAuthorPersonalMaterialDto = {
   audioOriginalFilename: string | null;
   audioSizeBytes: number | null;
   pdfOriginalFilename: string | null;
+  pdfSizeBytes: number | null;
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -47,8 +48,9 @@ export type SafeGuestPersonalMaterialDto = {
     slug: string;
     avatarUrl: string | null;
   };
-  hasAudio: true;
+  hasAudio: boolean;
   hasPdf: boolean;
+  pdfOriginalFilename: string | null;
 };
 
 export function toSafeAuthorPersonalMaterialDto(
@@ -76,6 +78,7 @@ export function toSafeAuthorPersonalMaterialDto(
     audioOriginalFilename: row.audio_original_filename,
     audioSizeBytes: row.audio_size_bytes,
     pdfOriginalFilename: row.pdf_original_filename,
+    pdfSizeBytes: row.pdf_size_bytes,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -113,7 +116,8 @@ export function toSafeGuestPersonalMaterialDto(input: {
       slug: input.author.slug,
       avatarUrl: input.author.avatar_url,
     },
-    hasAudio: true,
+    hasAudio: input.material.audio_path !== null,
     hasPdf: input.material.pdf_path !== null,
+    pdfOriginalFilename: input.material.pdf_original_filename,
   };
 }

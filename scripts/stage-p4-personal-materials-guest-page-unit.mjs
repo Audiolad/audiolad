@@ -36,6 +36,8 @@ function testGuestComponents() {
   const returnCta = read("src/components/personal-materials/PersonalMaterialReturnChatCta.tsx");
 
   assert(guestPage.includes("PersonalMaterialAudioPlayer"), "player on page");
+  assert(guestPage.includes("PersonalMaterialPdfDocument"), "pdf block on page");
+  assert(guestPage.includes("material.hasPdf"), "conditional pdf");
   assert(guestPage.includes("PersonalMaterialSaveCta"), "save cta");
   assert(guestPage.includes("PersonalMaterialReturnChatCta"), "return cta reuse");
   assert(guestPage.includes("break-words"), "overflow protection");
