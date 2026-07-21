@@ -8,6 +8,9 @@ export const GUARDED_WRITE_SCRIPTS = [
   "scripts/platform-analytics-e2e.mjs",
   "scripts/stage-e-multi-publish-e2e.mjs",
   "scripts/stage-p1-personal-materials-db.mjs",
+  "scripts/stage-p2-personal-materials-api-db.mjs",
+  "scripts/stage-p3-personal-materials-return-url-db.mjs",
+  "scripts/stage-p5-personal-materials-client-library-db.mjs",
   "scripts/stage1-pr2-library-claim-db.mjs",
   "scripts/tmp-promo-staging-smoke.mjs",
   "scripts/.tmp-promo-integration-smoke.mjs",
@@ -47,6 +50,8 @@ export const REQUIRED_GUARD_MARKERS = [
   "bootstrapDataWriteScript",
   "assertProductionFixturesAllowed",
   "assertAdminInteractiveConfirmed",
+  // Isolated personal-materials test DB scripts use this production hard-fail.
+  "assertPersonalMaterialsTestDbAllowed",
 ];
 
 export const REQUIRED_ADMIN_MARKERS = [
