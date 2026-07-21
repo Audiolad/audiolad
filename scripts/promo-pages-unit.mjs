@@ -364,7 +364,7 @@ function testStage1CtaConstraintBaseline() {
 
 function testExternalCtaMigration() {
   const sql = read(
-    "supabase/migrations/20260720180000_promo_page_external_cta.sql",
+    "supabase/migrations/20260720181000_promo_page_external_cta.sql",
   );
 
   assert(sql.includes("cta_enabled boolean"), "cta_enabled column");
