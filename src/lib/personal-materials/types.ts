@@ -31,6 +31,8 @@ export type PersonalMaterialRow = {
   material_date: string;
   description: string | null;
   personal_recommendation: string | null;
+  return_url: string | null;
+  return_button_label: string | null;
   audio_path: string | null;
   audio_original_filename: string | null;
   audio_mime_type: string | null;
@@ -114,6 +116,8 @@ export const PERSONAL_MATERIAL_LIMITS = {
   descriptionMaxLength: 2000,
   recommendationMaxLength: 2000,
   authorNotesMaxLength: 4000,
+  returnUrlMaxLength: 2000,
+  returnButtonLabelMaxLength: 120,
   maxAudioBytes: 50 * 1024 * 1024,
   maxPdfBytes: 20 * 1024 * 1024,
   signedUrlTtlSeconds: 900,

@@ -628,6 +628,7 @@ function testCustomChannelFormUi() {
   assert(!linksSection.includes('placeholder="utm_medium"'), "raw utm_medium input removed");
   assert(client.includes("buildChannelFormSeedFromStats"), "stats row loads channel form seed");
   assert(client.includes("PromotionCampaignLinksSection"), "links section component wired");
+  assert(client.includes("AuthorPromoPagesClient"), "promo pages client wired");
 }
 
 function testCustomChannelModulesExist() {
@@ -799,6 +800,30 @@ function testCampaignSelectionUiAndChannelsState() {
   );
 }
 
+function testCampaignMapperExport() {
+  const campaignsApi = readFileSync(
+    join(ROOT, "src/lib/promotion/campaigns-api.ts"),
+    "utf8",
+  );
+  const campaignUpdate = readFileSync(
+    join(ROOT, "src/lib/promotion/campaign-update.ts"),
+    "utf8",
+  );
+
+  assert(
+    campaignsApi.includes("export function mapPromotionCampaignRow"),
+    "campaigns-api exports shared mapper",
+  );
+  assert(
+    campaignUpdate.includes('from "@/lib/promotion/campaigns-api"'),
+    "campaign update reuses campaigns-api mapper",
+  );
+  assert(
+    campaignsApi.includes("mapPromotionCampaignRow(row as Record<string, unknown>)"),
+    "list/create routes use shared mapper",
+  );
+}
+
 function main() {
   testMigrationContract();
   testPromotionRoutes();
@@ -826,6 +851,7 @@ function main() {
   testCustomChannelModulesExist();
   testCampaignSelectionLogic();
   testCampaignSelectionUiAndChannelsState();
+  testCampaignMapperExport();
   console.log("author-promotion-unit: ok");
 }
 

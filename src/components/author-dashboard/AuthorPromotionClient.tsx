@@ -1,21 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorPromoPagesClient from "@/components/author-dashboard/AuthorPromoPagesClient";
 import PromotionCampaignLinksSection, {
   type PromotionChannelFormSeed,
 } from "@/components/author-dashboard/PromotionCampaignLinksSection";
+import {
+  buildCampaignKeyFromName,
+  normalizeCampaignKey,
+} from "@/lib/promotion/campaign-key";
 import {
   buildPromotionPageQuery,
   resolveSelectedCampaignId,
 } from "@/lib/promotion/campaign-selection";
 import { parseChannelTypeFormState } from "@/lib/promotion/channel-types";
-import {
-  buildCampaignKeyFromName,
-  normalizeCampaignKey,
-} from "@/lib/promotion/campaign-key";
 import {
   getPromotionPeriodLabel,
   parsePromotionPeriod,
@@ -591,6 +593,10 @@ export default function AuthorPromotionClient({
         ) : null}
       </section>
 
+      <section className="space-y-4">
+        <AuthorPromoPagesClient selectedAuthor={selectedAuthor} />
+      </section>
+
       {createOpen ? (
         <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
           <h2 className="text-[21px] font-semibold">Создать кампанию</h2>
@@ -827,6 +833,12 @@ export default function AuthorPromotionClient({
           </section>
         </>
       ) : null}
+
+      <div>
+        <Link href="/profile" className="text-sm font-medium text-[#7042c5]">
+          Вернуться в пользовательскую часть платформы
+        </Link>
+      </div>
 
       {toast ? (
         <div

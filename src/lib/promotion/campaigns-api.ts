@@ -27,7 +27,9 @@ function parseAuthorId(request: Request): string | null {
   return authorId || null;
 }
 
-function mapCampaignRow(row: Record<string, unknown>): PromotionCampaignWithProduct {
+export function mapPromotionCampaignRow(
+  row: Record<string, unknown>,
+): PromotionCampaignWithProduct {
   const practice = Array.isArray(row.practices)
     ? row.practices[0]
     : row.practices;
@@ -97,7 +99,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       campaigns: (data ?? []).map((row) =>
-        mapCampaignRow(row as Record<string, unknown>),
+        mapPromotionCampaignRow(row as Record<string, unknown>),
       ),
     });
   } catch (error) {
@@ -213,7 +215,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { campaign: mapCampaignRow(data as Record<string, unknown>) },
+      { campaign: mapPromotionCampaignRow(data as Record<string, unknown>) },
       { status: 201 },
     );
   } catch (error) {

@@ -10,6 +10,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function assert(condition, message) {
   if (!condition) {
@@ -90,7 +94,7 @@ function testOptionalTitle() {
 
 function testPdfLimit() {
   const typesSource = readFileSync(
-    "/var/www/audiolad/src/lib/personal-materials/types.ts",
+    path.join(ROOT, "src/lib/personal-materials/types.ts"),
     "utf8",
   );
 
@@ -169,7 +173,7 @@ function testClaimContext() {
 
 function testMigrationFile() {
   const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260715143000_personal_materials_foundation.sql",
+    path.join(ROOT, "supabase/migrations/20260715143000_personal_materials_foundation.sql"),
     "utf8",
   );
 

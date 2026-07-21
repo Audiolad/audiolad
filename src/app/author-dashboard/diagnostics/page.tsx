@@ -1,0 +1,54 @@
+import { Suspense } from "react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import AuthorDiagnosticsClient from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsClient";
+import AuthorShell from "@/components/author-dashboard/AuthorShell";
+import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+function NoAuthorAccess() {
+  return (
+    <AuthorShell title="Диагностики">
+      <div className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-8 text-center">
+        <p className="text-[18px] font-semibold">
+          У вас пока нет доступа к кабинету автора.
+        </p>
+        <Link
+          href="/profile"
+          className="mt-6 inline-flex rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
+        >
+          Вернуться в профиль
+        </Link>
+      </div>
+    </AuthorShell>
+  );
+}
+
+export default async function AuthorDiagnosticsPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/sign-in?next=/author-dashboard/diagnostics");
+  }
+
+  const authors = await listAuthorWorkspacesForUser(user.id);
+
+  if (authors.length === 0) {
+    return <NoAuthorAccess />;
+  }
+
+  return (
+    <AuthorShell title="Диагностики">
+      <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка диагностик…</p>}>
+        <AuthorDiagnosticsClient authors={authors} />
+      </Suspense>
+    </AuthorShell>
+  );
+}

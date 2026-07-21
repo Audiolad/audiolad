@@ -1,45 +1,36 @@
 #!/usr/bin/env node
 /**
- * P1 database checks for personal materials.
+ * P1 database checks for personal materials (isolated test DB only).
  *
- * IMPORTANT:
- * - Run ONLY after migration 20260715143000_personal_materials_foundation.sql
- *   is applied to a non-production database.
- * - Do NOT run against production without explicit approval.
+ * Requires:
+ *   AUDIOLAD_TEST_DATABASE=1
+ *   AUDIOLAD_PERSONAL_MATERIALS_P1_TEST=1
+ *   audiolad_personal_materials_test prepared via personal-materials-p1-setup-test-db.mjs
  */
-import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+
 import {
-  bootstrapDataWriteScript,
-  assertProjectEnvLocalSafeForFixtures,
-} from "./lib/fixture-script-entry.mjs";
+  PERSONAL_MATERIALS_TEST_OPT_IN_ENV,
+  TEST_DATABASE_ENV,
+  assertPersonalMaterialsTestDbAllowed,
+  createPersonalMaterialsSqlHelpers,
+  describePersonalMaterialsTestTarget,
+} from "./lib/personal-materials-test-db.mjs";
 
 const SCRIPT_NAME = "scripts/stage-p1-personal-materials-db.mjs";
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const RUN_ID = randomUUID().slice(0, 8);
 
-const boot = bootstrapDataWriteScript({
-  scriptName: SCRIPT_NAME,
-  supabaseUrl: SUPABASE_URL,
-  dockerExec: false,
-});
-if (boot.skipped) {
+const bootSkipped =
+  process.env[TEST_DATABASE_ENV] !== "1" ||
+  process.env[PERSONAL_MATERIALS_TEST_OPT_IN_ENV] !== "1";
+
+if (bootSkipped) {
+  console.log(`${SCRIPT_NAME}: skipped (test DB opt-in env not set)`);
   process.exit(0);
 }
 
-function loadEnv() {
-  assertProjectEnvLocalSafeForFixtures({ envPath: "/var/www/audiolad/.env.local" });
-  return Object.fromEntries(
-    readFileSync("/var/www/audiolad/.env.local", "utf8")
-      .split("\n")
-      .filter((line) => line && line.includes("=") && !line.startsWith("#"))
-      .map((line) => {
-        const index = line.indexOf("=");
-        return [line.slice(0, index), line.slice(index + 1)];
-      }),
-  );
-}
+assertPersonalMaterialsTestDbAllowed({ scriptName: SCRIPT_NAME });
+const { sqlFile, sqlScalar, runScript } = createPersonalMaterialsSqlHelpers();
 
 function assert(condition, message) {
   if (!condition) {
@@ -47,8 +38,15 @@ function assert(condition, message) {
   }
 }
 
+function sqlLiteral(value) {
+  if (value === null || value === undefined) {
+    return "NULL";
+  }
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 function tokenHashToPostgresBytea(tokenHash) {
-  return `\\x${tokenHash.toString("hex")}`;
+  return `decode('${tokenHash.toString("hex")}', 'hex')`;
 }
 
 function generateAccessToken() {
@@ -57,180 +55,455 @@ function generateAccessToken() {
   return { rawToken, tokenHash };
 }
 
-async function getSession(env, email) {
-  const admin = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-  const pub = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+function lastResultLine(output) {
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => line !== "BEGIN" && line !== "COMMIT" && line !== "ROLLBACK");
 
-  const { data: linkData } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-  });
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line.startsWith("{") || line.startsWith("[") || /^-?\d+$/.test(line)) {
+      return line;
+    }
+  }
 
-  const { data } = await pub.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: "email",
-  });
+  return lines.at(-1) ?? "";
+}
 
-  return {
-    userId: data.session.user.id,
-    admin,
-    authed: createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-      {
-        global: { headers: { Authorization: `Bearer ${data.session.access_token}` } },
-        auth: { autoRefreshToken: false, persistSession: false },
-      },
+function withAuthUser(userId, body) {
+  return runScript(`
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', ${sqlLiteral(userId)}, true);
+${body}
+COMMIT;
+`);
+}
+
+function rpcAs(userId, fnSql) {
+  return lastResultLine(withAuthUser(userId, `${fnSql};`));
+}
+
+function rpcJsonAs(userId, fnSql) {
+  const raw = rpcAs(userId, `SELECT (${fnSql})::text;`);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function expectRpcError(userId, fnSql, fragment) {
+  try {
+    withAuthUser(userId, `${fnSql};`);
+    throw new Error(`expected rpc error containing "${fragment}"`);
+  } catch (error) {
+    const message = String(error?.message ?? error).toLowerCase();
+    assert(message.includes(fragment.toLowerCase()), `unexpected rpc error: ${message}`);
+  }
+}
+
+function createAuthUser(email) {
+  const userId = randomUUID();
+  sqlFile(`
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    INSERT INTO auth.users (
+      id, instance_id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at, is_super_admin
+    ) VALUES (
+      '${userId}'::uuid,
+      '00000000-0000-0000-0000-000000000000'::uuid,
+      'authenticated',
+      'authenticated',
+      ${sqlLiteral(email)},
+      crypt('test-password', gen_salt('bf')),
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{}'::jsonb,
+      now(),
+      now(),
+      false
+    );
+    INSERT INTO auth.identities (
+      id, user_id, identity_data, provider, provider_id,
+      last_sign_in_at, created_at, updated_at
+    ) VALUES (
+      '${randomUUID()}'::uuid,
+      '${userId}'::uuid,
+      jsonb_build_object('sub', '${userId}', 'email', ${sqlLiteral(email)}),
+      'email',
+      ${sqlLiteral(userId)},
+      now(), now(), now()
+    );
+  `);
+  return userId;
+}
+
+function createProfile(userId, fullName, email) {
+  sqlFile(`
+    INSERT INTO public.profiles (id, email, full_name, role)
+    VALUES (
+      '${userId}'::uuid,
+      ${sqlLiteral(email)},
+      ${sqlLiteral(fullName)},
+      'listener'
+    )
+    ON CONFLICT (id) DO NOTHING;
+  `);
+}
+
+function createAuthor(slug) {
+  const authorId = randomUUID();
+  sqlFile(`
+    INSERT INTO public.authors (id, slug, name, created_at, updated_at)
+    VALUES (
+      '${authorId}'::uuid,
+      ${sqlLiteral(slug)},
+      ${sqlLiteral(`PM Test Author ${RUN_ID}`)},
+      now(),
+      now()
+    );
+  `);
+  return authorId;
+}
+
+function addAuthorMember(authorId, userId, role) {
+  sqlFile(`
+    INSERT INTO public.author_members (author_id, user_id, role, created_at)
+    VALUES ('${authorId}'::uuid, '${userId}'::uuid, ${sqlLiteral(role)}, now())
+    ON CONFLICT DO NOTHING;
+  `);
+}
+
+function cleanupFixtures(state) {
+  if (!state?.ownerUserId) {
+    return;
+  }
+
+  if (state.materialId) {
+    sqlFile(`
+      DELETE FROM public.personal_material_progress
+      WHERE personal_material_id = '${state.materialId}'::uuid;
+
+      DELETE FROM public.personal_material_author_notes
+      WHERE personal_material_id = '${state.materialId}'::uuid;
+
+      DELETE FROM public.personal_materials
+      WHERE id = '${state.materialId}'::uuid;
+    `);
+  }
+
+  if (state.authorId) {
+    sqlFile(`
+      DELETE FROM public.author_members
+      WHERE author_id = '${state.authorId}'::uuid;
+
+      DELETE FROM public.authors
+      WHERE id = '${state.authorId}'::uuid;
+    `);
+  }
+
+  sqlFile(`
+    DELETE FROM public.user_practices
+    WHERE user_id IN (
+      '${state.ownerUserId}'::uuid,
+      '${state.buyerUserId}'::uuid,
+      '${state.strangerUserId}'::uuid
+    );
+
+    DELETE FROM public.profiles
+    WHERE id IN (
+      '${state.ownerUserId}'::uuid,
+      '${state.buyerUserId}'::uuid,
+      '${state.strangerUserId}'::uuid
+    );
+
+    DELETE FROM auth.identities
+    WHERE user_id IN (
+      '${state.ownerUserId}'::uuid,
+      '${state.buyerUserId}'::uuid,
+      '${state.strangerUserId}'::uuid
+    );
+
+    DELETE FROM auth.users
+    WHERE id IN (
+      '${state.ownerUserId}'::uuid,
+      '${state.buyerUserId}'::uuid,
+      '${state.strangerUserId}'::uuid
+    );
+  `);
+}
+
+function verifyCleanup(state) {
+  if (!state?.ownerUserId) {
+    return;
+  }
+
+  if (state.materialId) {
+    const remainingMaterials = Number(
+      sqlScalar(
+        `SELECT COUNT(*) FROM public.personal_materials WHERE id='${state.materialId}'::uuid`,
+      ),
+    );
+    assert(remainingMaterials === 0, "cleanup: personal_materials row remains");
+  }
+
+  const remainingUsers = Number(
+    sqlScalar(
+      `SELECT COUNT(*) FROM auth.users WHERE id IN ('${state.ownerUserId}'::uuid, '${state.buyerUserId}'::uuid, '${state.strangerUserId}'::uuid)`,
     ),
-  };
+  );
+  assert(remainingUsers === 0, "cleanup: auth users remain");
 }
 
 async function main() {
-  const env = loadEnv();
-  const owner = await getSession(env, "1@audiolad.ru");
-  const buyerEmail = `p1-buyer-${randomUUID()}@audiolad.test`;
-  const buyer = await getSession(env, buyerEmail);
+  const target = describePersonalMaterialsTestTarget();
+  console.log(`${SCRIPT_NAME}: run_id=${RUN_ID} target=${target.database}`);
 
-  const { data: author } = await owner.admin
-    .from("authors")
-    .select("id, name")
-    .eq("slug", "sergey-and-zoya")
-    .maybeSingle();
+  const state = {
+    ownerUserId: null,
+    buyerUserId: null,
+    strangerUserId: null,
+    authorId: null,
+    materialId: null,
+  };
 
-  assert(author?.id, "author workspace required");
+  try {
+    state.ownerUserId = createAuthUser(`pm-owner-${RUN_ID}@audiolad.test`);
+    state.buyerUserId = createAuthUser(`pm-buyer-${RUN_ID}@audiolad.test`);
+    state.strangerUserId = createAuthUser(`pm-stranger-${RUN_ID}@audiolad.test`);
+    createProfile(state.ownerUserId, "Owner Author", `pm-owner-${RUN_ID}@audiolad.test`);
+    createProfile(state.buyerUserId, "Buyer Client", `pm-buyer-${RUN_ID}@audiolad.test`);
+    createProfile(state.strangerUserId, "Stranger User", `pm-stranger-${RUN_ID}@audiolad.test`);
+    state.authorId = createAuthor(`pm-author-${RUN_ID}`);
+    addAuthorMember(state.authorId, state.ownerUserId, "owner");
 
-  const directInsert = await owner.authed.from("personal_materials").insert({
-    author_id: author.id,
-    created_by: owner.userId,
-    material_type: "diagnostic",
-    client_first_name: "X",
-    client_last_name: "Y",
-    material_date: "2026-07-15",
-  });
+    try {
+      runScript(`
+BEGIN;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '${state.ownerUserId}', true);
+INSERT INTO public.personal_materials (
+  author_id, created_by, material_type,
+  client_first_name, client_last_name, material_date
+) VALUES (
+  '${state.authorId}'::uuid,
+  '${state.ownerUserId}'::uuid,
+  'diagnostic',
+  'X', 'Y', '2026-07-15'
+);
+COMMIT;
+      `);
+      throw new Error("authenticated direct insert must be blocked");
+    } catch (error) {
+      assert(
+        String(error?.message ?? error).toLowerCase().includes("permission"),
+        `direct insert blocked: ${error?.message ?? error}`,
+      );
+    }
 
-  assert(directInsert.error, "authenticated direct insert must be blocked");
+    expectRpcError(
+      state.strangerUserId,
+      `SELECT public.create_personal_material(
+        '${state.authorId}'::uuid,
+        'Тест', 'Клиент', '2026-07-15'::date
+      )`,
+      "forbidden",
+    );
 
-  const create = await owner.authed.rpc("create_personal_material", {
-    p_author_id: author.id,
-    p_client_first_name: "Тест",
-    p_client_last_name: "Клиент",
-    p_material_date: "2026-07-15",
-    p_title: null,
-    p_description: null,
-    p_personal_recommendation: null,
-    p_author_notes: "Внутренняя заметка",
-  });
+    const create = rpcJsonAs(
+      state.ownerUserId,
+      `public.create_personal_material(
+        '${state.authorId}'::uuid,
+        'Тест', 'Клиент', '2026-07-15'::date,
+        'diagnostic', NULL, NULL, NULL,
+        'Внутренняя заметка'
+      )`,
+    );
+    assert(create?.material_id, "create draft failed");
+    assert(create.status === "draft", "create status draft");
+    state.materialId = create.material_id;
 
-  assert(!create.error, `create failed: ${create.error?.message}`);
-  const materialId = create.data.material_id;
+    const update = rpcJsonAs(
+      state.ownerUserId,
+      `public.update_personal_material_draft(
+        '${state.materialId}'::uuid,
+        'Тест2', 'Клиент2', '2026-07-16'::date,
+        'Заголовок', 'Описание', 'Рекомендация', 'Новая заметка'
+      )`,
+    );
+    assert(update?.status === "draft", "update draft status");
 
-  const token = generateAccessToken();
+    const token1 = generateAccessToken();
+    const token2 = generateAccessToken();
+    const wrongToken = generateAccessToken();
 
-  await owner.admin
-    .from("personal_materials")
-    .update({
-      audio_path: `${author.id}/${materialId}/audio/sample.mp3`,
-      audio_original_filename: "sample.mp3",
-      audio_mime_type: "audio/mpeg",
-      audio_size_bytes: 1024,
-      duration_seconds: 120,
-    })
-    .eq("id", materialId);
+    sqlFile(`
+      UPDATE public.personal_materials
+      SET
+        audio_path = '${state.authorId}/${state.materialId}/audio/sample.mp3',
+        audio_original_filename = 'sample.mp3',
+        audio_mime_type = 'audio/mpeg',
+        audio_size_bytes = 1024,
+        duration_seconds = 120
+      WHERE id = '${state.materialId}'::uuid;
+    `);
 
-  const activate = await owner.authed.rpc("activate_personal_material", {
-    p_material_id: materialId,
-    p_access_token_hash: tokenHashToPostgresBytea(token.tokenHash),
-  });
+    expectRpcError(
+      state.ownerUserId,
+      `SELECT public.activate_personal_material('${state.materialId}'::uuid, NULL)`,
+      "invalid_token_hash",
+    );
 
-  assert(!activate.error, `activate without title failed: ${activate.error?.message}`);
+    assert(token1.tokenHash.length === 32, "token hash length");
+    const activateSql = `public.activate_personal_material(
+        '${state.materialId}'::uuid,
+        ${tokenHashToPostgresBytea(token1.tokenHash)}
+      )`;
 
-  const claim = await buyer.authed.rpc("claim_personal_material", {
-    p_access_token_hash: tokenHashToPostgresBytea(token.tokenHash),
-  });
+    const activate = rpcJsonAs(state.ownerUserId, activateSql);
+    assert(activate?.status === "active", "activate status active");
 
-  assert(!claim.error, `claim failed: ${claim.error?.message}`);
+    const rawTokenCount = Number(
+      sqlScalar(
+        `SELECT COUNT(*) FROM public.personal_materials WHERE id='${state.materialId}'::uuid AND access_token_hash IS NOT NULL`,
+      ),
+    );
+    assert(rawTokenCount === 1, "token hash stored");
 
-  const ownerDirectSelect = await buyer.authed
-    .from("personal_materials")
-    .select("access_token_hash, audio_path")
-    .eq("id", materialId);
+    const serverLookup = sqlScalar(
+      `SELECT id::text FROM public.personal_materials WHERE access_token_hash=${tokenHashToPostgresBytea(token1.tokenHash)} AND status='active'`,
+    );
+    assert(serverLookup === state.materialId, "server-side token hash lookup");
 
-  assert(
-    ownerDirectSelect.error || (ownerDirectSelect.data ?? []).length === 0,
-    "owner direct select blocked",
-  );
+    expectRpcError(
+      state.buyerUserId,
+      `SELECT public.claim_personal_material(${tokenHashToPostgresBytea(wrongToken.tokenHash)})`,
+      "material_unavailable",
+    );
 
-  const ownerView = await buyer.authed.rpc("get_claimed_personal_material", {
-    p_material_id: materialId,
-  });
+    const rotate = rpcJsonAs(
+      state.ownerUserId,
+      `public.rotate_personal_material_access_token(
+        '${state.materialId}'::uuid,
+        ${tokenHashToPostgresBytea(token2.tokenHash)},
+        true
+      )`,
+    );
+    assert(rotate?.guest_access_enabled === true, "rotate keeps guest access");
 
-  assert(!ownerView.error, `owner read rpc failed: ${ownerView.error?.message}`);
-  assert(ownerView.data.author_name === author.name, "author name from authors table");
-  assert(!("access_token_hash" in ownerView.data), "owner must not receive token hash");
-  assert(!("audio_path" in ownerView.data), "owner must not receive storage path");
-  assert(!("author_notes" in ownerView.data), "owner must not receive author notes");
+    expectRpcError(
+      state.buyerUserId,
+      `SELECT public.claim_personal_material(${tokenHashToPostgresBytea(token1.tokenHash)})`,
+      "material_unavailable",
+    );
 
-  const notesForOwner = await buyer.authed
-    .from("personal_material_author_notes")
-    .select("author_notes")
-    .eq("personal_material_id", materialId);
+    const claim = rpcJsonAs(
+      state.buyerUserId,
+      `public.claim_personal_material(${tokenHashToPostgresBytea(token2.tokenHash)})`,
+    );
+    assert(claim?.claimed === true, "claim succeeded");
 
-  assert(
-    notesForOwner.error || (notesForOwner.data ?? []).length === 0,
-    "author notes hidden from owner",
-  );
+    const guestDisabled = sqlScalar(
+      `SELECT guest_access_enabled::text FROM public.personal_materials WHERE id='${state.materialId}'::uuid`,
+    );
+    assert(guestDisabled === "false", "guest access disabled after claim");
 
-  const notesForAuthor = await owner.authed
-    .from("personal_material_author_notes")
-    .select("author_notes")
-    .eq("personal_material_id", materialId)
-    .maybeSingle();
+    expectRpcError(
+      state.strangerUserId,
+      `SELECT public.claim_personal_material(${tokenHashToPostgresBytea(token2.tokenHash)})`,
+      "material_unavailable",
+    );
 
-  assert(
-    notesForAuthor.data?.author_notes === "Внутренняя заметка",
-    "author notes visible to author member",
-  );
+    const repeatClaim = rpcJsonAs(
+      state.buyerUserId,
+      `public.claim_personal_material(${tokenHashToPostgresBytea(token2.tokenHash)})`,
+    );
+    assert(repeatClaim?.claimed === true, "repeat claim idempotent");
 
-  const softDelete = await owner.authed.rpc("soft_delete_personal_material", {
-    p_material_id: materialId,
-  });
+    const ownerView = rpcJsonAs(
+      state.buyerUserId,
+      `public.get_claimed_personal_material('${state.materialId}'::uuid)`,
+    );
+    assert(ownerView?.author_name, "owner read rpc");
+    assert(!("access_token_hash" in ownerView), "owner must not receive token hash");
+    assert(!("audio_path" in ownerView), "owner must not receive storage path");
+    assert(!("author_notes" in ownerView), "owner must not receive author notes");
 
-  assert(!softDelete.error, `soft delete failed: ${softDelete.error?.message}`);
+    const ownerList = rpcJsonAs(state.buyerUserId, `public.list_claimed_personal_materials()`);
+    assert(Array.isArray(ownerList), "owner list is array");
+    assert(
+      ownerList.some((row) => row.id === state.materialId),
+      "owner list contains material",
+    );
 
-  const { data: afterDelete } = await owner.admin
-    .from("personal_materials")
-    .select("access_token_hash, status, guest_access_enabled")
-    .eq("id", materialId)
-    .maybeSingle();
+    const notesForOwner = Number(lastResultLine(
+      runScript(`
+BEGIN;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '${state.buyerUserId}', true);
+SELECT COUNT(*) FROM public.personal_material_author_notes
+WHERE personal_material_id='${state.materialId}'::uuid;
+COMMIT;
+      `),
+    ));
+    assert(notesForOwner === 0, "author notes hidden from owner");
 
-  assert(afterDelete?.access_token_hash, "soft delete preserves token hash");
-  assert(afterDelete?.status === "deleted", "soft delete status");
-  assert(afterDelete?.guest_access_enabled === false, "soft delete disables guest access");
+    const notesForAuthor = Number(lastResultLine(
+      runScript(`
+BEGIN;
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '${state.ownerUserId}', true);
+SELECT COUNT(*) FROM public.personal_material_author_notes
+WHERE personal_material_id='${state.materialId}'::uuid;
+COMMIT;
+      `),
+    ));
+    assert(notesForAuthor === 1, "author notes visible to author member");
 
-  const deletedClaim = await buyer.authed.rpc("claim_personal_material", {
-    p_access_token_hash: tokenHashToPostgresBytea(token.tokenHash),
-  });
+    const progressUpsert = rpcJsonAs(
+      state.buyerUserId,
+      `public.upsert_personal_material_progress('${state.materialId}'::uuid, 42, false)`,
+    );
+    assert(progressUpsert?.position_seconds === 42, "progress upsert");
 
-  assert(deletedClaim.error, "deleted material claim blocked");
+    expectRpcError(
+      state.strangerUserId,
+      `SELECT public.get_personal_material_progress('${state.materialId}'::uuid)`,
+      "not_found",
+    );
 
-  const deletedOwnerView = await buyer.authed.rpc("get_claimed_personal_material", {
-    p_material_id: materialId,
-  });
+    const progressRead = rpcJsonAs(
+      state.buyerUserId,
+      `public.get_personal_material_progress('${state.materialId}'::uuid)`,
+    );
+    assert(progressRead?.position_seconds === 42, "progress read");
 
-  assert(deletedOwnerView.error, "deleted material hidden from owner list/read");
+    const revoke = rpcJsonAs(
+      state.ownerUserId,
+      `public.revoke_personal_material('${state.materialId}'::uuid)`,
+    );
+    assert(revoke?.status === "revoked", "revoke status");
 
-  console.log("stage-p1-personal-materials-db: PASS");
+    const softDelete = rpcJsonAs(
+      state.ownerUserId,
+      `public.soft_delete_personal_material('${state.materialId}'::uuid)`,
+    );
+    assert(softDelete?.status === "deleted", "soft delete status");
+
+    expectRpcError(
+      state.buyerUserId,
+      `SELECT public.get_claimed_personal_material('${state.materialId}'::uuid)`,
+      "not_found",
+    );
+
+    console.log(`${SCRIPT_NAME}: PASS`);
+  } finally {
+    cleanupFixtures(state);
+    verifyCleanup(state);
+    console.log(`${SCRIPT_NAME}: cleanup verified`);
+  }
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(String(error?.message ?? error));
   process.exit(1);
 });
