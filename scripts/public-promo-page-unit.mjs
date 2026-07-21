@@ -9,6 +9,7 @@ import {
 } from "../src/lib/promo-pages/types.ts";
 import {
   mapPublicPromoPageDto,
+  mapPublicPromoPageCtaBlock,
   resolvePublicPromoBannerUrl,
 } from "../src/lib/promo-pages/public-page.ts";
 import {
@@ -62,8 +63,10 @@ function testPublicDtoMapper() {
       public_description: "Описание",
       banner_path: "authors/banners/test.jpg",
       footer_text: "Footer",
-      cta_label: "Больше практик",
-      cta_href: "/authors/sergey-petrov",
+      cta_enabled: true,
+      cta_label: "Продолжить в MAX",
+      cta_href: "https://max.ru/chat",
+      cta_open_in_new_tab: false,
       published_at: "2026-07-19T12:00:00.000Z",
       products: [
         {
@@ -122,27 +125,16 @@ function testPublicDtoMapper() {
   }
 
   assert(
-    mapPublicPromoPageDto(
-      {
-        author_slug: "a",
-        slug: "b",
-        public_title: "x",
-        cta_href: "/auth/sign-in",
-        products: [
-          {
-            practice_id: "1",
-            slug: "s",
-            title: "t",
-            author_name: "A",
-            author_slug: "a",
-            position: 0,
-          },
-        ],
-      },
-      "a",
-      "b",
-    )?.cta_href === null,
-    "unsafe cta stripped in mapper",
+    mapPublicPromoPageCtaBlock({
+      promo_page_id: "page-1",
+      cta_enabled: true,
+      cta_heading: null,
+      cta_description: null,
+      cta_label: "Go",
+      cta_href: "/auth/sign-in",
+      cta_open_in_new_tab: false,
+    }) === null,
+    "invalid enabled cta hidden in mapper",
   );
 }
 
@@ -182,8 +174,8 @@ function testPresentationAndCta() {
   const preview = read("src/components/promo-pages/PromoPagePreviewModal.tsx");
 
   assert(preview.includes("previewMode"), "stage 2 preview still uses previewMode");
-  assert(presentation.includes('href={`/authors/${authorSlug}`}'), "author link in public mode");
-  assert(presentation.includes("disabled={previewMode"), "preview disables play");
+  assert(presentation.includes("PromoPageCtaButton"), "cta block component");
+  assert(!presentation.includes("Больше практик автора"), "no author fallback cta");
   assert(
     buildPromoPagePath("sergey-petrov", "spring") ===
       "/promo/sergey-petrov/spring",

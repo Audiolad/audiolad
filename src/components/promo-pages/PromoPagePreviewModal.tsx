@@ -4,14 +4,15 @@ import PromoPagePresentation, {
   type PromoPagePresentationProduct,
 } from "@/components/promo-pages/PromoPagePresentation";
 
+import type { PublicPromoPageCtaBlock } from "@/lib/promo-pages/types";
+
 type PromoPagePreviewModalProps = {
   open: boolean;
   onClose: () => void;
   publicTitle: string;
   publicDescription: string | null;
   footerText: string | null;
-  ctaLabel: string | null;
-  ctaHref: string | null;
+  cta: PublicPromoPageCtaBlock | null;
   products: PromoPagePresentationProduct[];
   authorName: string;
 };
@@ -22,8 +23,7 @@ export default function PromoPagePreviewModal({
   publicTitle,
   publicDescription,
   footerText,
-  ctaLabel,
-  ctaHref,
+  cta,
   products,
   authorName,
 }: PromoPagePreviewModalProps) {
@@ -60,8 +60,7 @@ export default function PromoPagePreviewModal({
           publicTitle={publicTitle}
           publicDescription={publicDescription}
           footerText={footerText}
-          ctaLabel={ctaLabel}
-          ctaHref={ctaHref}
+          cta={cta}
           products={products}
           authorName={authorName}
           previewMode

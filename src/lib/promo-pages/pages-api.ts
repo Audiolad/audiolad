@@ -16,6 +16,9 @@ import type { PromoPageStatus } from "@/lib/promo-pages/types";
 import {
   normalizePromoPageProductIds,
   normalizePromoPageSlug,
+  validatePromoPageCtaDescription,
+  validatePromoPageCtaForPublish,
+  validatePromoPageCtaHeading,
   validatePromoPageCtaHref,
   validatePromoPageCtaLabel,
   validatePromoPageFooterText,
@@ -35,8 +38,12 @@ const PROMO_PAGE_CREATE_FIELDS = new Set([
   "public_title",
   "public_description",
   "footer_text",
+  "cta_enabled",
+  "cta_heading",
+  "cta_description",
   "cta_label",
   "cta_href",
+  "cta_open_in_new_tab",
   "practice_ids",
 ]);
 
@@ -46,8 +53,12 @@ const PROMO_PAGE_PATCH_FIELDS = new Set([
   "public_title",
   "public_description",
   "footer_text",
+  "cta_enabled",
+  "cta_heading",
+  "cta_description",
   "cta_label",
   "cta_href",
+  "cta_open_in_new_tab",
   "practice_ids",
 ]);
 
@@ -121,14 +132,26 @@ function parsePracticeIds(value: unknown): string[] | null | undefined {
   return normalizePromoPageProductIds(value.map(String));
 }
 
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value === true;
+}
+
 type PromoPageWriteInput = {
   internal_name?: string;
   slug?: string;
   public_title?: string;
   public_description?: string | null;
   footer_text?: string | null;
+  cta_enabled?: boolean;
+  cta_heading?: string | null;
+  cta_description?: string | null;
   cta_label?: string | null;
   cta_href?: string | null;
+  cta_open_in_new_tab?: boolean;
   practice_ids?: string[];
 };
 
@@ -217,6 +240,44 @@ function validateWriteInput(
     payload.footer_text = null;
   }
 
+  if (options.requireAll || input.cta_enabled !== undefined) {
+    payload.cta_enabled = input.cta_enabled === true;
+  } else if (options.requireAll) {
+    payload.cta_enabled = false;
+  }
+
+  if (input.cta_heading !== undefined) {
+    const ctaHeading = parseOptionalString(input.cta_heading);
+
+    if (ctaHeading !== null) {
+      const error = validatePromoPageCtaHeading(ctaHeading);
+
+      if (error) {
+        return { error };
+      }
+    }
+
+    payload.cta_heading = ctaHeading;
+  } else if (options.requireAll) {
+    payload.cta_heading = null;
+  }
+
+  if (input.cta_description !== undefined) {
+    const ctaDescription = parseOptionalString(input.cta_description);
+
+    if (ctaDescription !== null) {
+      const error = validatePromoPageCtaDescription(ctaDescription);
+
+      if (error) {
+        return { error };
+      }
+    }
+
+    payload.cta_description = ctaDescription;
+  } else if (options.requireAll) {
+    payload.cta_description = null;
+  }
+
   if (input.cta_label !== undefined) {
     const ctaLabel = parseOptionalString(input.cta_label);
 
@@ -249,6 +310,12 @@ function validateWriteInput(
     payload.cta_href = null;
   }
 
+  if (options.requireAll || input.cta_open_in_new_tab !== undefined) {
+    payload.cta_open_in_new_tab = input.cta_open_in_new_tab === true;
+  } else if (options.requireAll) {
+    payload.cta_open_in_new_tab = false;
+  }
+
   const practiceIds = parsePracticeIds(input.practice_ids);
 
   if (input.practice_ids !== undefined && practiceIds === null) {
@@ -260,6 +327,47 @@ function validateWriteInput(
   }
 
   return { payload };
+}
+
+function parsePromoPageWriteInput(record: JsonRecord): PromoPageWriteInput {
+  return {
+    internal_name:
+      typeof record.internal_name === "string" ? record.internal_name : undefined,
+    slug: typeof record.slug === "string" ? record.slug : undefined,
+    public_title:
+      typeof record.public_title === "string" ? record.public_title : undefined,
+    public_description:
+      typeof record.public_description === "string" ||
+      record.public_description === null
+        ? (record.public_description as string | null)
+        : undefined,
+    footer_text:
+      typeof record.footer_text === "string" || record.footer_text === null
+        ? (record.footer_text as string | null)
+        : undefined,
+    cta_enabled: parseOptionalBoolean(record.cta_enabled),
+    cta_heading:
+      typeof record.cta_heading === "string" || record.cta_heading === null
+        ? (record.cta_heading as string | null)
+        : undefined,
+    cta_description:
+      typeof record.cta_description === "string" ||
+      record.cta_description === null
+        ? (record.cta_description as string | null)
+        : undefined,
+    cta_label:
+      typeof record.cta_label === "string" || record.cta_label === null
+        ? (record.cta_label as string | null)
+        : undefined,
+    cta_href:
+      typeof record.cta_href === "string" || record.cta_href === null
+        ? (record.cta_href as string | null)
+        : undefined,
+    cta_open_in_new_tab: parseOptionalBoolean(record.cta_open_in_new_tab),
+    practice_ids: Array.isArray(record.practice_ids)
+      ? record.practice_ids.map(String)
+      : undefined,
+  };
 }
 
 async function updatePromoPageDraft(
@@ -276,8 +384,12 @@ async function updatePromoPageDraft(
     p_public_title: payload.public_title,
     p_public_description: payload.public_description,
     p_footer_text: payload.footer_text,
+    p_cta_enabled: payload.cta_enabled,
+    p_cta_heading: payload.cta_heading,
+    p_cta_description: payload.cta_description,
     p_cta_label: payload.cta_label,
     p_cta_href: payload.cta_href,
+    p_cta_open_in_new_tab: payload.cta_open_in_new_tab,
     p_practice_ids: payload.practice_ids,
   });
 
@@ -310,8 +422,12 @@ export async function GET(request: Request) {
         public_description,
         banner_path,
         footer_text,
+        cta_enabled,
+        cta_heading,
+        cta_description,
         cta_label,
         cta_href,
+        cta_open_in_new_tab,
         published_at,
         created_by,
         created_at,
@@ -378,31 +494,11 @@ export async function POST(request: Request) {
 
     const validated = validateWriteInput(
       {
+        ...parsePromoPageWriteInput(record),
         internal_name:
           typeof record.internal_name === "string" ? record.internal_name : "",
-        slug: typeof record.slug === "string" ? record.slug : undefined,
         public_title:
           typeof record.public_title === "string" ? record.public_title : "",
-        public_description:
-          typeof record.public_description === "string" ||
-          record.public_description === null
-            ? (record.public_description as string | null)
-            : undefined,
-        footer_text:
-          typeof record.footer_text === "string" || record.footer_text === null
-            ? (record.footer_text as string | null)
-            : undefined,
-        cta_label:
-          typeof record.cta_label === "string" || record.cta_label === null
-            ? (record.cta_label as string | null)
-            : undefined,
-        cta_href:
-          typeof record.cta_href === "string" || record.cta_href === null
-            ? (record.cta_href as string | null)
-            : undefined,
-        practice_ids: Array.isArray(record.practice_ids)
-          ? record.practice_ids.map(String)
-          : undefined,
       },
       { requireAll: true },
     );
@@ -424,8 +520,12 @@ export async function POST(request: Request) {
         p_public_title: validated.payload.public_title,
         p_public_description: validated.payload.public_description,
         p_footer_text: validated.payload.footer_text,
+        p_cta_enabled: validated.payload.cta_enabled,
+        p_cta_heading: validated.payload.cta_heading,
+        p_cta_description: validated.payload.cta_description,
         p_cta_label: validated.payload.cta_label,
         p_cta_href: validated.payload.cta_href,
+        p_cta_open_in_new_tab: validated.payload.cta_open_in_new_tab,
         p_practice_ids: practiceIds,
       },
     );
@@ -526,40 +626,9 @@ export async function PATCHPage(pageId: string, request: Request) {
 
     rejectPublishedEdit(current.status);
 
-    const validated = validateWriteInput(
-      {
-        internal_name:
-          typeof record.internal_name === "string"
-            ? record.internal_name
-            : undefined,
-        slug: typeof record.slug === "string" ? record.slug : undefined,
-        public_title:
-          typeof record.public_title === "string"
-            ? record.public_title
-            : undefined,
-        public_description:
-          typeof record.public_description === "string" ||
-          record.public_description === null
-            ? (record.public_description as string | null)
-            : undefined,
-        footer_text:
-          typeof record.footer_text === "string" || record.footer_text === null
-            ? (record.footer_text as string | null)
-            : undefined,
-        cta_label:
-          typeof record.cta_label === "string" || record.cta_label === null
-            ? (record.cta_label as string | null)
-            : undefined,
-        cta_href:
-          typeof record.cta_href === "string" || record.cta_href === null
-            ? (record.cta_href as string | null)
-            : undefined,
-        practice_ids: Array.isArray(record.practice_ids)
-          ? record.practice_ids.map(String)
-          : undefined,
-      },
-      { requireAll: false },
-    );
+    const validated = validateWriteInput(parsePromoPageWriteInput(record), {
+      requireAll: false,
+    });
 
     if ("error" in validated) {
       return NextResponse.json({ error: validated.error }, { status: 400 });
@@ -580,8 +649,20 @@ export async function PATCHPage(pageId: string, request: Request) {
           : current.public_description,
       footer_text:
         fields.footer_text !== undefined ? fields.footer_text : current.footer_text,
+      cta_enabled:
+        fields.cta_enabled !== undefined ? fields.cta_enabled : current.cta_enabled,
+      cta_heading:
+        fields.cta_heading !== undefined ? fields.cta_heading : current.cta_heading,
+      cta_description:
+        fields.cta_description !== undefined
+          ? fields.cta_description
+          : current.cta_description,
       cta_label: fields.cta_label !== undefined ? fields.cta_label : current.cta_label,
       cta_href: fields.cta_href !== undefined ? fields.cta_href : current.cta_href,
+      cta_open_in_new_tab:
+        fields.cta_open_in_new_tab !== undefined
+          ? fields.cta_open_in_new_tab
+          : current.cta_open_in_new_tab,
       practice_ids: mergedPracticeIds,
     };
 
@@ -610,7 +691,18 @@ export async function PATCHPage(pageId: string, request: Request) {
 
 export async function POSTPublish(pageId: string) {
   try {
-    const { supabase } = await requirePromoPageAccess(pageId);
+    const { supabase, page: pageRow } = await requirePromoPageAccess(pageId);
+    const current = mapPromoPageAdminDto(pageRow as JsonRecord);
+
+    const ctaError = validatePromoPageCtaForPublish({
+      cta_enabled: current.cta_enabled,
+      cta_label: current.cta_label,
+      cta_href: current.cta_href,
+    });
+
+    if (ctaError) {
+      return NextResponse.json({ error: ctaError }, { status: 400 });
+    }
 
     const { data, error } = await supabase.rpc("publish_promo_page", {
       p_promo_page_id: pageId,

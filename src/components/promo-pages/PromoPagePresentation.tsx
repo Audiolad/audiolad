@@ -5,6 +5,7 @@ import Link from "next/link";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { formatProductMeta } from "@/lib/products/duration";
+import type { PublicPromoPageCtaBlock } from "@/lib/promo-pages/types";
 
 export type PromoPagePresentationProduct = {
   practice_id: string;
@@ -22,8 +23,7 @@ export type PromoPagePresentationProps = {
   publicTitle: string;
   publicDescription?: string | null;
   footerText?: string | null;
-  ctaLabel?: string | null;
-  ctaHref?: string | null;
+  cta?: PublicPromoPageCtaBlock | null;
   products: PromoPagePresentationProduct[];
   authorName?: string | null;
   authorSlug?: string | null;
@@ -31,6 +31,7 @@ export type PromoPagePresentationProps = {
   previewMode?: boolean;
   interactiveMode?: boolean;
   onPlayProduct?: (product: PromoPagePresentationProduct) => void;
+  onCtaClick?: () => void;
   getPlayLabel?: (product: PromoPagePresentationProduct) => string;
   loadingProductId?: string | null;
   activeProductId?: string | null;
@@ -58,12 +59,52 @@ function getProductMeta(product: PromoPagePresentationProduct): string {
   return parts.join(" · ");
 }
 
+function PromoPageCtaButton({
+  cta,
+  previewMode,
+  onCtaClick,
+}: {
+  cta: PublicPromoPageCtaBlock;
+  previewMode: boolean;
+  onCtaClick?: () => void;
+}) {
+  const className =
+    "mt-4 inline-flex w-full min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white break-words text-center hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto";
+
+  if (previewMode) {
+    return (
+      <span className="mt-4 inline-flex w-full min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] sm:w-auto">
+        {cta.label}
+      </span>
+    );
+  }
+
+  if (cta.kind === "internal") {
+    return (
+      <Link href={cta.href} className={className} onClick={onCtaClick}>
+        {cta.label}
+      </Link>
+    );
+  }
+
+  return (
+    <a
+      href={cta.href}
+      className={className}
+      target={cta.openInNewTab ? "_blank" : undefined}
+      rel={cta.openInNewTab ? "noopener noreferrer" : undefined}
+      onClick={onCtaClick}
+    >
+      {cta.label}
+    </a>
+  );
+}
+
 export default function PromoPagePresentation({
   publicTitle,
   publicDescription,
   footerText,
-  ctaLabel,
-  ctaHref,
+  cta = null,
   products,
   authorName,
   authorSlug,
@@ -71,13 +112,13 @@ export default function PromoPagePresentation({
   previewMode = false,
   interactiveMode = false,
   onPlayProduct,
+  onCtaClick,
   getPlayLabel,
   loadingProductId = null,
   activeProductId = null,
   playErrorMessage = null,
   className = "",
 }: PromoPagePresentationProps) {
-  const showCta = Boolean(ctaLabel?.trim() && ctaHref?.trim());
   const isInteractive = interactiveMode && !previewMode && Boolean(onPlayProduct);
 
   return (
@@ -189,29 +230,36 @@ export default function PromoPagePresentation({
         </div>
       ) : null}
 
-      {(footerText || showCta) && (
-        <div className="border-t border-[#eadff8] bg-white px-5 py-6 sm:px-8">
-          {footerText ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#5f5484]">
-              {footerText}
+      {cta ? (
+        <section
+          className="border-t border-[#eadff8] bg-white px-5 py-6 sm:px-8"
+          aria-label="Действие после прослушивания"
+        >
+          {cta.heading ? (
+            <h2 className="text-[20px] font-semibold leading-snug text-[#2f2548] break-words">
+              {cta.heading}
+            </h2>
+          ) : null}
+          {cta.description ? (
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[#5f5484] break-words">
+              {cta.description}
             </p>
           ) : null}
-          {showCta ? (
-            previewMode ? (
-              <span className="mt-4 inline-flex rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
-                {ctaLabel}
-              </span>
-            ) : (
-              <Link
-                href={ctaHref ?? "#"}
-                className="mt-4 inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
-              >
-                {ctaLabel}
-              </Link>
-            )
-          ) : null}
+          <PromoPageCtaButton
+            cta={cta}
+            previewMode={previewMode}
+            onCtaClick={onCtaClick}
+          />
+        </section>
+      ) : null}
+
+      {footerText ? (
+        <div className="border-t border-[#eadff8] bg-white px-5 py-6 sm:px-8">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#5f5484] break-words">
+            {footerText}
+          </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

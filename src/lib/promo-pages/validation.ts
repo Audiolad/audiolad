@@ -1,4 +1,8 @@
 import { slugifyTitle } from "@/lib/author-products/utils";
+import {
+  isInvalidPromoPageCtaTarget,
+  resolvePromoPageCtaTarget,
+} from "@/lib/promo-pages/cta-target";
 
 export const PROMO_PAGE_SLUG_PATTERN = /^[a-z0-9-]{2,64}$/;
 export const PROMO_PAGE_SLUG_MAX_LENGTH = 64;
@@ -8,9 +12,9 @@ export const PROMO_PAGE_PUBLIC_DESCRIPTION_MAX_LENGTH = 2000;
 export const PROMO_PAGE_FOOTER_TEXT_MAX_LENGTH = 2000;
 export const PROMO_PAGE_CTA_LABEL_MAX_LENGTH = 80;
 export const PROMO_PAGE_CTA_HREF_MAX_LENGTH = 512;
+export const PROMO_PAGE_CTA_HEADING_MAX_LENGTH = 120;
+export const PROMO_PAGE_CTA_DESCRIPTION_MAX_LENGTH = 500;
 export const PROMO_PAGE_MAX_PRODUCTS = 3;
-
-const DISALLOWED_CTA_PREFIXES = ["/auth/sign-in", "/auth/sign-up"] as const;
 
 export function normalizePromoPageSlug(value: string): string {
   return slugifyTitle(value).slice(0, PROMO_PAGE_SLUG_MAX_LENGTH);
@@ -92,6 +96,32 @@ export function validatePromoPageFooterText(value: string | null | undefined): s
   return null;
 }
 
+export function validatePromoPageCtaHeading(value: string | null | undefined): string | null {
+  if (value == null || value.trim() === "") {
+    return null;
+  }
+
+  if (value.length > PROMO_PAGE_CTA_HEADING_MAX_LENGTH) {
+    return "promo_page_cta_heading_too_long";
+  }
+
+  return null;
+}
+
+export function validatePromoPageCtaDescription(
+  value: string | null | undefined,
+): string | null {
+  if (value == null || value.trim() === "") {
+    return null;
+  }
+
+  if (value.length > PROMO_PAGE_CTA_DESCRIPTION_MAX_LENGTH) {
+    return "promo_page_cta_description_too_long";
+  }
+
+  return null;
+}
+
 export function validatePromoPageCtaLabel(value: string | null | undefined): string | null {
   if (value == null || value.trim() === "") {
     return null;
@@ -104,61 +134,9 @@ export function validatePromoPageCtaLabel(value: string | null | undefined): str
   return null;
 }
 
-function getPathnameFromInternalHref(href: string): string {
-  const withoutHash = href.split("#")[0] ?? href;
-  return withoutHash.split("?")[0] ?? withoutHash;
-}
-
+/** @deprecated Use isInvalidPromoPageCtaTarget from cta-target.ts */
 export function isUnsafePromoPageCtaHref(value: string): boolean {
-  const trimmed = value.trim();
-
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return true;
-  }
-
-  if (trimmed.includes("\\")) {
-    return true;
-  }
-
-  if (/[\u0000-\u001F\u007F]/.test(trimmed)) {
-    return true;
-  }
-
-  const lower = trimmed.toLowerCase();
-
-  if (lower.includes("://")) {
-    return true;
-  }
-
-  if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
-    return true;
-  }
-
-  if (trimmed.length > PROMO_PAGE_CTA_HREF_MAX_LENGTH) {
-    return true;
-  }
-
-  let decoded = trimmed;
-
-  try {
-    decoded = decodeURIComponent(trimmed);
-  } catch {
-    return true;
-  }
-
-  if (decoded.startsWith("//")) {
-    return true;
-  }
-
-  const pathname = getPathnameFromInternalHref(decoded);
-
-  if (!pathname.startsWith("/") || pathname.startsWith("//")) {
-    return true;
-  }
-
-  return DISALLOWED_CTA_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  return isInvalidPromoPageCtaTarget(value);
 }
 
 export function validatePromoPageCtaHref(value: string | null | undefined): string | null {
@@ -166,11 +144,63 @@ export function validatePromoPageCtaHref(value: string | null | undefined): stri
     return null;
   }
 
-  if (isUnsafePromoPageCtaHref(value)) {
+  if (isInvalidPromoPageCtaTarget(value)) {
     return "promo_page_cta_href_invalid";
   }
 
   return null;
+}
+
+export type PromoPageCtaPublishInput = {
+  cta_enabled: boolean;
+  cta_label: string | null | undefined;
+  cta_href: string | null | undefined;
+};
+
+export function validatePromoPageCtaForPublish(input: PromoPageCtaPublishInput): string | null {
+  if (!input.cta_enabled) {
+    return null;
+  }
+
+  if (!input.cta_label?.trim()) {
+    return "promo_page_cta_label_required";
+  }
+
+  if (!input.cta_href?.trim()) {
+    return "promo_page_cta_href_required";
+  }
+
+  return validatePromoPageCtaHref(input.cta_href);
+}
+
+export type PublicPromoPageCtaInput = {
+  cta_enabled: boolean;
+  cta_label: string | null | undefined;
+  cta_href: string | null | undefined;
+  cta_heading?: string | null;
+  cta_description?: string | null;
+  cta_open_in_new_tab?: boolean;
+};
+
+export function resolvePublicPromoPageCta(input: PublicPromoPageCtaInput) {
+  if (!input.cta_enabled) {
+    return null;
+  }
+
+  const label = input.cta_label?.trim() ?? "";
+  const target = resolvePromoPageCtaTarget(input.cta_href);
+
+  if (!label || target == null || target === "invalid") {
+    return null;
+  }
+
+  return {
+    heading: input.cta_heading?.trim() || null,
+    description: input.cta_description?.trim() || null,
+    label,
+    target,
+    openInNewTab: input.cta_open_in_new_tab === true,
+  };
 }
 
 export function normalizePromoPageProductIds(

@@ -23,6 +23,7 @@ import {
 } from "@/lib/promotion/dates";
 import {
   aggregateAuthorSummaryTotals,
+  type PromotionStatsKind,
 } from "@/lib/promotion/stats";
 import type {
   PromotionCampaignSummaryRow,
@@ -47,6 +48,7 @@ type CampaignStatsPayload = {
     uniqueRegistrations: number;
     uniqueSaves: number;
     uniqueGiftsOpened: number;
+    uniqueCtaClicks: number;
   };
   conversions: {
     viewToPlay: number;
@@ -55,7 +57,10 @@ type CampaignStatsPayload = {
     viewToSignupClick: number;
     viewToRegistration: number;
     registrationToSave: number;
+    viewToCta: number;
+    playToCta: number;
   };
+  statsKind: PromotionStatsKind;
   channels: Array<{
     utm_source: string;
     utm_medium: string;
@@ -66,6 +71,7 @@ type CampaignStatsPayload = {
     uniqueCompleted: number;
     uniqueSignupClicked: number;
     uniqueRegistrations: number;
+    uniqueCtaClicks: number;
   }>;
 };
 
@@ -692,15 +698,24 @@ export default function AuthorPromotionClient({
 
             {campaignStats ? (
               <>
+                {(() => {
+                  const isPromoPageStats =
+                    campaignStats.statsKind === "promo_page" ||
+                    campaignStats.statsKind === "mixed";
+
+                  return (
+                    <>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <MetricCard
-                    label="Уникальные переходы"
+                    label={isPromoPageStats ? "Уникальные просмотры" : "Уникальные переходы"}
                     value={campaignStats.metrics.uniqueViews}
                   />
                   <MetricCard
                     label="Уникальные запуски"
                     value={campaignStats.metrics.uniquePlayStarts}
                   />
+                  {!isPromoPageStats ? (
+                    <>
                   <MetricCard
                     label="25%"
                     value={campaignStats.metrics.uniqueProgress25}
@@ -713,10 +728,21 @@ export default function AuthorPromotionClient({
                     label="75%"
                     value={campaignStats.metrics.uniqueProgress75}
                   />
+                    </>
+                  ) : null}
                   <MetricCard
                     label="Дослушали"
                     value={campaignStats.metrics.uniqueCompleted}
                   />
+                  {isPromoPageStats ? (
+                    <>
+                      <MetricCard
+                        label="Клики CTA"
+                        value={campaignStats.metrics.uniqueCtaClicks}
+                      />
+                    </>
+                  ) : (
+                    <>
                   <MetricCard
                     label="Предложение регистрации"
                     value={campaignStats.metrics.uniqueSignupPromptShown}
@@ -737,21 +763,40 @@ export default function AuthorPromotionClient({
                     label="Открыли подарки"
                     value={campaignStats.metrics.uniqueGiftsOpened}
                   />
+                    </>
+                  )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <MetricCard
-                    label="Переход → запуск"
+                    label={isPromoPageStats ? "Просмотр → запуск" : "Переход → запуск"}
                     value={`${campaignStats.conversions.viewToPlay}%`}
                   />
+                  {!isPromoPageStats ? (
+                    <>
                   <MetricCard
                     label="Запуск → 25%"
                     value={`${campaignStats.conversions.playTo25}%`}
                   />
+                    </>
+                  ) : null}
                   <MetricCard
                     label="Запуск → завершение"
                     value={`${campaignStats.conversions.playToComplete}%`}
                   />
+                  {isPromoPageStats ? (
+                    <>
+                      <MetricCard
+                        label="Просмотр → CTA"
+                        value={`${campaignStats.conversions.viewToCta}%`}
+                      />
+                      <MetricCard
+                        label="Запуск → CTA"
+                        value={`${campaignStats.conversions.playToCta}%`}
+                      />
+                    </>
+                  ) : (
+                    <>
                   <MetricCard
                     label="Переход → клик регистрации"
                     value={`${campaignStats.conversions.viewToSignupClick}%`}
@@ -764,7 +809,12 @@ export default function AuthorPromotionClient({
                     label="Регистрация → сохранение"
                     value={`${campaignStats.conversions.registrationToSave}%`}
                   />
+                    </>
+                  )}
                 </div>
+                    </>
+                  );
+                })()}
 
                 <div className="overflow-x-auto rounded-[20px] border border-[#eadff8] bg-white">
                   <table className="min-w-full text-left text-sm">
