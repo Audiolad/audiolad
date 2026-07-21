@@ -105,6 +105,18 @@ const createWithoutLastName = parseCreatePersonalMaterialBody({
 });
 assert.equal(createWithoutLastName.clientLastName, null);
 
+const createWithoutFirstName = parseCreatePersonalMaterialBody({
+  authorId: baseMaterial.author_id,
+  materialType: "diagnostic",
+  clientFirstName: "   ",
+  clientLastName: null,
+  materialDate: "2026-07-15",
+});
+assert.equal(createWithoutFirstName.clientFirstName, null);
+
+const updateEmptyFirstName = parseUpdatePersonalMaterialBody({ clientFirstName: "" });
+assert.equal(updateEmptyFirstName.clientFirstName, null);
+
 const updateWithoutLastName = parseUpdatePersonalMaterialBody({ clientLastName: "  " });
 assert.equal(updateWithoutLastName.clientLastName, null);
 
@@ -126,6 +138,8 @@ assert.equal(updateBody.clientFirstName, undefined);
 
 assert.equal(mapPersonalMaterialRpcError("material_not_editable").status, 409);
 assert.equal(mapPersonalMaterialRpcError("material_not_ready").status, 422);
+assert.equal(mapPersonalMaterialRpcError("client_name_required").code, "client_name_required");
+assert.equal(mapPersonalMaterialRpcError("client_name_required").status, 422);
 
 const token = "a".repeat(43);
 const redacted = redactTokenFromPath(`/api/d/${token}/audio`);

@@ -35,7 +35,7 @@ function MaterialCard({
   const clientName = formatClientDisplayName(
     material.clientFirstName,
     material.clientLastName,
-  );
+  ) || "Без имени";
   const displayTitle = getPersonalMaterialDisplayTitle(material);
 
   return (

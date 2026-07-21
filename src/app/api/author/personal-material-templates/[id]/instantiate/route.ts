@@ -42,7 +42,7 @@ export async function POST(_request: Request, context: RouteContext) {
       authorId: template.author_id,
       materialType: "diagnostic",
       title: template.title,
-      clientFirstName: "Клиент",
+      clientFirstName: null,
       clientLastName: null,
       materialDate,
       description: template.description,

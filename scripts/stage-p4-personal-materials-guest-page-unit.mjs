@@ -75,9 +75,14 @@ function testGuestComponents() {
   assert(player.includes("aria-label"), "player a11y");
 
   assert(saveCta.includes("claimContextApiPath"), "claim context api prop");
-  assert(saveCta.includes("Зарегистрироваться"), "inline register mode");
-  assert(saveCta.includes("Уже есть аккаунт"), "inline login mode");
+  assert(saveCta.includes(">Создать<") || saveCta.includes("\n          Создать\n"), "inline register mode");
+  assert(saveCta.includes(">Войти<") || saveCta.includes("\n          Войти\n"), "inline login mode");
   assert(saveCta.includes("Создать кабинет и сохранить диагностику"), "register submit");
+  assert(saveCta.includes("Войти и сохранить диагностику"), "login submit");
+  assert(!saveCta.includes("Зарегистрироваться"), "old register label removed");
+  assert(!saveCta.includes("Уже есть аккаунт"), "old login label removed");
+  assert(saveCta.includes("break-words"), "cta wrap on mobile");
+  assert(saveCta.includes("whitespace-normal"), "cta wrap on mobile");
   assert(saveCta.includes("Войти и сохранить диагностику"), "login submit");
   assert(saveCta.includes("Добавить в личный кабинет"), "authenticated claim");
   assert(saveCta.includes("PasswordInput"), "password visibility toggle");

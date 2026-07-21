@@ -115,7 +115,7 @@ export default function AuthorDiagnosticsCreateClient({
       const material = await createAuthorPersonalMaterial({
         authorId: selectedAuthor.id,
         materialType: values.materialType as PersonalMaterialType,
-        clientFirstName: values.clientFirstName.trim(),
+        clientFirstName: values.clientFirstName.trim() || null,
         clientLastName: values.clientLastName.trim() || null,
         materialDate: values.materialDate,
         title: values.title.trim() || null,
@@ -225,8 +225,7 @@ export default function AuthorDiagnosticsCreateClient({
           </select>
         </label>
         <p className="mt-3 text-sm text-[#7d70a2]">
-          Имя клиента и аудио нужно будет заполнить в редакторе. В черновике имя временно
-          «Клиент» — замените его перед активацией.
+          Имя клиента и аудио нужно будет заполнить в редакторе перед активацией.
         </p>
         {submitError ? (
           <p className="mt-4 text-sm text-[#b42318]" role="alert">

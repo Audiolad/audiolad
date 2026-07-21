@@ -154,7 +154,7 @@ export default function PersonalMaterialSaveCta({
 
         if (signIn.error || !signIn.data.session) {
           throw new Error(
-            "Аккаунт создан. Войдите в режиме «Уже есть аккаунт», чтобы сохранить диагностику.",
+            "Аккаунт создан. Войдите в режиме «Войти», чтобы сохранить диагностику.",
           );
         }
       }
@@ -273,7 +273,7 @@ export default function PersonalMaterialSaveCta({
               : "border border-[#e4d7f4] bg-white text-[#7042c5]"
           }`}
         >
-          Зарегистрироваться
+          Создать
         </button>
         <button
           type="button"
@@ -284,7 +284,7 @@ export default function PersonalMaterialSaveCta({
               : "border border-[#e4d7f4] bg-white text-[#7042c5]"
           }`}
         >
-          Уже есть аккаунт
+          Войти
         </button>
       </div>
 
@@ -364,7 +364,7 @@ export default function PersonalMaterialSaveCta({
           <button
             type="submit"
             disabled={state === "loading"}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-4 py-3 text-center text-sm font-semibold leading-snug text-white break-words whitespace-normal disabled:opacity-60 sm:px-5"
           >
             {state === "loading" ? "Сохраняем…" : "Создать кабинет и сохранить диагностику"}
           </button>
@@ -403,7 +403,7 @@ export default function PersonalMaterialSaveCta({
           <button
             type="submit"
             disabled={state === "loading"}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-4 py-3 text-center text-sm font-semibold leading-snug text-white break-words whitespace-normal disabled:opacity-60 sm:px-5"
           >
             {state === "loading" ? "Сохраняем…" : "Войти и сохранить диагностику"}
           </button>

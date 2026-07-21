@@ -44,24 +44,6 @@ function normalizeOptionalClientName(value: unknown, maxLength: number): string 
   return normalized;
 }
 
-function requireNonEmptyText(value: unknown, maxLength: number, field: string): string {
-  if (typeof value !== "string") {
-    throw new PersonalMaterialApiError("invalid_request", 400);
-  }
-
-  const trimmed = value.trim();
-
-  if (!trimmed || trimmed.length > maxLength) {
-    throw new PersonalMaterialApiError("invalid_request", 400);
-  }
-
-  if (field === "clientName" && !/^[\p{L}\p{M}\s'.-]+$/u.test(trimmed)) {
-    throw new PersonalMaterialApiError("invalid_request", 400);
-  }
-
-  return trimmed;
-}
-
 function parseMaterialDate(value: unknown): string {
   if (typeof value !== "string" || !DATE_PATTERN.test(value.trim())) {
     throw new PersonalMaterialApiError("invalid_request", 400);
@@ -117,10 +99,9 @@ export function parseCreatePersonalMaterialBody(body: unknown) {
     authorId,
     materialType: materialTypeRaw,
     title: normalizeOptionalText(record.title, PERSONAL_MATERIAL_LIMITS.titleMaxLength),
-    clientFirstName: requireNonEmptyText(
+    clientFirstName: normalizeOptionalClientName(
       record.clientFirstName,
       PERSONAL_MATERIAL_LIMITS.clientNameMaxLength,
-      "clientName",
     ),
     clientLastName: normalizeOptionalClientName(
       record.clientLastName,
@@ -166,10 +147,9 @@ export function parseUpdatePersonalMaterialBody(body: unknown) {
     clientFirstName:
       record.clientFirstName === undefined
         ? undefined
-        : requireNonEmptyText(
+        : normalizeOptionalClientName(
             record.clientFirstName,
             PERSONAL_MATERIAL_LIMITS.clientNameMaxLength,
-            "clientName",
           ),
     clientLastName:
       record.clientLastName === undefined

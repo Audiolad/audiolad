@@ -64,6 +64,7 @@ export default function AuthorDiagnosticsFormFields({
             value={values.clientFirstName}
             disabled={disabled || readOnly}
             onChange={(event) => onChange("clientFirstName", event.target.value)}
+            placeholder="Имя клиента"
             className={fieldClassName}
             autoComplete="off"
           />

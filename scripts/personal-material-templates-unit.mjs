@@ -51,8 +51,9 @@ function testTemplateApi() {
   assert(inst.includes("template.personal_recommendation"), "copies recommendation");
   assert(inst.includes("template.return_url"), "copies return url");
   assert(inst.includes("template.return_button_label"), "copies button label");
-  assert(inst.includes('clientFirstName: "Клиент"'), "placeholder first name");
+  assert(inst.includes("clientFirstName: null"), "empty first name from template");
   assert(inst.includes("clientLastName: null"), "no last name copy");
+  assert(!inst.includes('"Клиент"'), "no technical Клиент placeholder");
   assert(!inst.includes("audio"), "instantiate does not touch audio");
   assert(!inst.includes("access_token"), "instantiate no token");
   assert(server.includes("parseTemplateBody"), "parse body");

@@ -30,6 +30,7 @@ import {
 import {
   formatMaterialDateLabel,
   validatePersonalMaterialForm,
+  requireClientFirstName,
   type PersonalMaterialFormValues,
 } from "@/lib/personal-materials/client/validation";
 import {
@@ -196,6 +197,14 @@ export default function AuthorDiagnosticsEditorClient({
     }
 
     const nextErrors = validatePersonalMaterialForm(formValues);
+
+    if (material.status !== "draft") {
+      const nameError = requireClientFirstName(formValues);
+      if (nameError) {
+        nextErrors.clientFirstName = nameError;
+      }
+    }
+
     setFormErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -209,7 +218,7 @@ export default function AuthorDiagnosticsEditorClient({
     try {
       const updated = await updateAuthorPersonalMaterial(material.id, {
         materialType: formValues.materialType as AuthorPersonalMaterial["materialType"],
-        clientFirstName: formValues.clientFirstName.trim(),
+        clientFirstName: formValues.clientFirstName.trim() || null,
         clientLastName: formValues.clientLastName.trim() || null,
         materialDate: formValues.materialDate,
         title: formValues.title.trim() || null,
@@ -318,7 +327,18 @@ export default function AuthorDiagnosticsEditorClient({
       setConfirmAction(null);
     } catch (error) {
       if (confirmAction === "activate") {
-        setActionError(getPersonalMaterialActivationErrorMessage());
+        if (
+          isPersonalMaterialClientError(error) &&
+          error.code === "client_name_required"
+        ) {
+          setFormErrors((current) => ({
+            ...current,
+            clientFirstName: "Укажите имя клиента.",
+          }));
+          setActionError("Укажите имя клиента.");
+        } else {
+          setActionError(getPersonalMaterialActivationErrorMessage(error));
+        }
       } else {
         setActionError(getPersonalMaterialErrorMessage(error));
       }
@@ -486,7 +506,26 @@ export default function AuthorDiagnosticsEditorClient({
           <button
             type="button"
             disabled={!material.hasAudio || actionLoading || uploading}
-            onClick={() => setConfirmAction("activate")}
+            onClick={() => {
+              if (!formValues) {
+                return;
+              }
+
+              const nameError = requireClientFirstName(formValues);
+              if (nameError) {
+                setFormErrors((current) => ({
+                  ...current,
+                  clientFirstName: nameError,
+                }));
+                setActionError(nameError);
+                document
+                  .getElementById("edit-diagnostics-client-first-name")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+              }
+
+              setConfirmAction("activate");
+            }}
             className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
           >
             Активировать и получить ссылку

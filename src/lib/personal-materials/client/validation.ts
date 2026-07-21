@@ -37,7 +37,9 @@ export function validatePersonalMaterialForm(
   const returnUrl = (values.returnUrl ?? "").trim();
   const returnButtonLabel = (values.returnButtonLabel ?? "").trim();
 
-  if (!firstName || firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+  if (!firstName) {
+    // Draft may be saved without a name; activation enforces separately.
+  } else if (firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
     errors.clientFirstName = "Укажите имя клиента.";
   } else if (!CLIENT_NAME_PATTERN.test(firstName)) {
     errors.clientFirstName = "Имя содержит недопустимые символы.";
@@ -84,6 +86,26 @@ export function validatePersonalMaterialForm(
   }
 
   return errors;
+}
+
+export function requireClientFirstName(
+  values: Pick<PersonalMaterialFormValues, "clientFirstName">,
+): string | null {
+  const firstName = values.clientFirstName.trim();
+
+  if (!firstName) {
+    return "Укажите имя клиента.";
+  }
+
+  if (firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+    return "Укажите имя клиента.";
+  }
+
+  if (!CLIENT_NAME_PATTERN.test(firstName)) {
+    return "Имя содержит недопустимые символы.";
+  }
+
+  return null;
 }
 
 export function isAllowedClientMp3File(file: File): boolean {

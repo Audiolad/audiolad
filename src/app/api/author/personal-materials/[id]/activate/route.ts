@@ -37,6 +37,10 @@ export async function POST(request: Request, context: RouteContext) {
       throw new PersonalMaterialApiError("material_not_ready", 422);
     }
 
+    if (!material.client_first_name?.trim()) {
+      throw new PersonalMaterialApiError("client_name_required", 422);
+    }
+
     const { expiresAt } = parseActivateBody(await request.json().catch(() => null));
     const token = generateAccessToken();
 

@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   not_found: "Материал не найден.",
   material_not_editable: "Черновик больше нельзя редактировать.",
   material_not_ready: "Сначала загрузите аудиофайл.",
+  client_name_required: "Укажите имя клиента.",
   invalid_file_type: "Выберите аудиофайл в формате MP3.",
   file_too_large: "Размер файла превышает 50 МБ.",
   empty_file: "Выбранный файл пустой.",
@@ -83,6 +84,15 @@ export function getPersonalMaterialUploadErrorMessage(code?: string): string {
   return "Не удалось загрузить файл из-за ошибки сервера. Повторите попытку позже.";
 }
 
-export function getPersonalMaterialActivationErrorMessage(): string {
+export function getPersonalMaterialActivationErrorMessage(error?: unknown): string {
+  if (error instanceof PersonalMaterialClientError) {
+    if (error.code === "client_name_required") {
+      return ERROR_MESSAGES.client_name_required;
+    }
+    if (error.code === "material_not_ready") {
+      return ERROR_MESSAGES.material_not_ready;
+    }
+  }
+
   return "Сначала загрузите аудиофайл";
 }

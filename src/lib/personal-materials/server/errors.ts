@@ -39,6 +39,10 @@ export function mapPersonalMaterialRpcError(message: string): {
     return { status: 409, code: "material_not_editable" };
   }
 
+  if (normalized.includes("client_name_required")) {
+    return { status: 422, code: "client_name_required" };
+  }
+
   if (
     normalized.includes("material_not_ready") ||
     normalized.includes("invalid_client_fields") ||
