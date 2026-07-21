@@ -187,7 +187,7 @@ export default function MyMaterialDetailClient({
 
       {material.hasPdf ? (
         <PersonalMaterialPdfDocument
-          pdfApiPath={`/api/my-materials/${encodeURIComponent(material.id)}/pdf`}
+          pdfOpenPath={`/api/my-materials/${encodeURIComponent(material.id)}/pdf/open`}
           filename={material.pdfOriginalFilename}
         />
       ) : null}

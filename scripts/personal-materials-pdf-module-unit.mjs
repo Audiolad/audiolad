@@ -104,5 +104,6 @@ const paths = buildPersonalMaterialGuestApiPaths(
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 );
 assert.ok(paths?.pdf.endsWith("/pdf"));
+assert.ok(paths?.pdfOpen.endsWith("/pdf/open"));
 
 console.log("personal-materials-pdf-module-unit: PASS");

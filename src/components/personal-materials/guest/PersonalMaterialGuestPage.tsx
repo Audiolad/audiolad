@@ -65,7 +65,7 @@ export default function PersonalMaterialGuestPage({
 
           {material.hasPdf ? (
             <PersonalMaterialPdfDocument
-              pdfApiPath={apiPaths.pdf}
+              pdfOpenPath={apiPaths.pdfOpen}
               filename={material.pdfOriginalFilename}
             />
           ) : null}
@@ -86,8 +86,6 @@ export default function PersonalMaterialGuestPage({
             claimContextApiPath={apiPaths.claimContext}
             claimCompletePath={claimCompletePath}
             materialId={material.id}
-            clientFirstName={material.clientFirstName}
-            clientLastName={material.clientLastName}
           />
 
           <PersonalMaterialReturnChatCta

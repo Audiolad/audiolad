@@ -27,8 +27,12 @@ function testMigrationAndLimits() {
 
 function testRoutes() {
   const authorPdf = read("src/app/api/author/personal-materials/[id]/pdf/route.ts");
+  const authorPdfOpen = read("src/app/api/author/personal-materials/[id]/pdf/open/route.ts");
   const guestPdf = read("src/app/api/d/[token]/pdf/route.ts");
+  const guestPdfOpen = read("src/app/api/d/[token]/pdf/open/route.ts");
   const ownerPdf = read("src/app/api/my-materials/[id]/pdf/route.ts");
+  const ownerPdfOpen = read("src/app/api/my-materials/[id]/pdf/open/route.ts");
+  const delivery = read("src/lib/personal-materials/server/delivery.ts");
 
   assert.match(authorPdf, /uploadPersonalMaterialPdf/);
   assert.match(authorPdf, /deletePersonalMaterialPdf/);
@@ -36,6 +40,13 @@ function testRoutes() {
   assert.match(guestPdf, /createGuestPdfSignedUrl/);
   assert.match(guestPdf, /enforceGuestPdfRateLimit/);
   assert.match(ownerPdf, /createOwnerPdfSignedUrl/);
+  assert.match(authorPdfOpen, /requirePersonalMaterialAccess/);
+  assert.match(authorPdfOpen, /redirectToSignedPdfUrl/);
+  assert.match(guestPdfOpen, /createGuestPdfSignedUrl/);
+  assert.match(guestPdfOpen, /redirectToSignedPdfUrl/);
+  assert.match(ownerPdfOpen, /createOwnerPdfSignedUrl/);
+  assert.match(ownerPdfOpen, /redirectToSignedPdfUrl/);
+  assert.match(delivery, /NextResponse\.redirect\(signedUrl/);
   assert.doesNotMatch(authorPdf, /pdf_path/);
   assert.doesNotMatch(guestPdf, /pdf_path/);
 }
@@ -66,9 +77,14 @@ function testUi() {
   assert.match(detail, /material\.hasPdf/);
   assert.match(player, /if \(!enabled\)/);
   assert.doesNotMatch(pdfDocument, /Скачать PDF/);
-  assert.match(pdfDocument, /window\.open\("about:blank", "_blank", "noopener,noreferrer"\)/);
-  assert.match(pdfDocument, /previewWindow\.location\.href = payload\.url/);
-  assert.match(pdfDocument, /closePreviewWindow\(previewWindow\)/);
+  assert.doesNotMatch(pdfDocument, /about:blank/);
+  assert.doesNotMatch(pdfDocument, /window\.open/);
+  assert.match(pdfDocument, /pdfOpenPath/);
+  assert.match(pdfDocument, /target="_blank"/);
+  assert.match(pdfDocument, /rel="noopener noreferrer"/);
+  assert.match(guestPage, /pdfOpenPath=\{apiPaths\.pdfOpen\}/);
+  assert.match(detail, /\/pdf\/open/);
+  assert.match(editor, /\/pdf\/open/);
 }
 
 async function runModuleTests() {

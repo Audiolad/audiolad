@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { NextResponse } from "next/server";
+
 import { resolveGuestAccessState } from "@/lib/personal-materials/access";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -77,23 +79,6 @@ export async function createGuestAudioSignedUrl(
     throw new PersonalMaterialApiError("not_found", 404);
   }
 
-  return createPersonalMaterialAudioSignedUrl(material);
-}
-
-/** Author preview: signed URL without guest_access requirement. */
-export async function createAuthorAudioSignedUrl(
-  material: PersonalMaterialRow,
-): Promise<{ url: string; expiresAt: string }> {
-  if (material.status === "deleted" || material.deleted_at) {
-    throw new PersonalMaterialApiError("not_found", 404);
-  }
-
-  return createPersonalMaterialAudioSignedUrl(material);
-}
-
-async function createPersonalMaterialAudioSignedUrl(
-  material: PersonalMaterialRow,
-): Promise<{ url: string; expiresAt: string }> {
   const audioPath = material.audio_path?.trim();
 
   if (!audioPath || !isPathInsidePersonalMaterialRoot(audioPath)) {
@@ -109,7 +94,7 @@ async function createPersonalMaterialAudioSignedUrl(
     .createSignedUrl(audioPath, expiresIn);
 
   if (error || !data?.signedUrl) {
-    console.error("personal_material_signed_url_error", error?.message);
+    console.error("personal_material_guest_signed_url_error", error?.message);
     throw new PersonalMaterialApiError("internal_error", 500);
   }
 
@@ -186,6 +171,16 @@ export async function createAuthorPdfSignedUrl(
   }
 
   return { url, expiresAt };
+}
+
+export function redirectToSignedPdfUrl(
+  signedUrl: string,
+  headers?: HeadersInit,
+): NextResponse {
+  return NextResponse.redirect(signedUrl, {
+    status: 307,
+    headers,
+  });
 }
 
 export function buildPersonalMaterialAccessUrl(rawToken: string): string {
