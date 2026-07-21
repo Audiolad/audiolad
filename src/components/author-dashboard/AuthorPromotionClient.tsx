@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -833,12 +832,6 @@ export default function AuthorPromotionClient({
           </section>
         </>
       ) : null}
-
-      <div>
-        <Link href="/profile" className="text-sm font-medium text-[#7042c5]">
-          Вернуться в пользовательскую часть платформы
-        </Link>
-      </div>
 
       {toast ? (
         <div
