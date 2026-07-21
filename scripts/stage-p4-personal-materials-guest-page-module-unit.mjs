@@ -24,7 +24,7 @@ assert.equal(buildPersonalMaterialGuestApiPaths("bad"), null);
 assert.equal(getGuestGreeting("Anna"), "Для вас, Anna");
 assert.equal(
   getGuestDisplayTitle(null, "diagnostic"),
-  "Аудиодиагностика по фото",
+  "Диагностика",
 );
 assert.match(formatGuestMaterialDate("2026-07-20"), /20.*2026/);
 

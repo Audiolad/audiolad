@@ -181,13 +181,13 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
           href={createHref}
           className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
         >
-          Создать диагностику
+          Создать личный материал
         </Link>
       </div>
 
       <p className="mt-6 text-sm leading-6 text-[#7d70a2]">
-        Создавайте персональные аудиодиагностики и отправляйте клиентам безопасные ссылки для
-        прослушивания.
+        Создавайте персональные аудиоразборы, медитации и другие материалы для
+        отдельных клиентов.
       </p>
 
       <div className="mt-6 min-w-0">
@@ -208,15 +208,15 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
 
         {!loading && !error && materials.length === 0 ? (
           <div className="rounded-[24px] border border-dashed border-[#d8c7ef] bg-[#faf6ff] px-5 py-10 text-center">
-            <p className="text-[18px] font-semibold">Пока нет диагностик</p>
+            <p className="text-[18px] font-semibold">Пока нет личных материалов</p>
             <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-              Здесь появятся персональные аудиодиагностики, которые вы создадите для клиентов.
+              Здесь появятся персональные материалы, которые вы создадите для клиентов.
             </p>
             <Link
               href={createHref}
               className="mt-6 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
             >
-              Создать первую диагностику
+              Создать личный материал
             </Link>
           </div>
         ) : null}

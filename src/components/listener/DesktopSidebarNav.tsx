@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import PersonalMaterialLockIcon from "@/components/personal-materials/PersonalMaterialLockIcon";
 import {
   isListenerPrimaryNavItemActive,
   LISTENER_SIDEBAR_NAV_ITEMS,
@@ -24,13 +25,16 @@ export default function DesktopSidebarNav() {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
                   active
                     ? "bg-[#f3ebfc] font-semibold text-[#7042c5]"
                     : "font-medium text-[#4a3d6b] hover:bg-[#faf6ff] hover:text-[#7042c5]"
                 }`}
               >
-                {item.title}
+                {item.icon === "lock" ? (
+                  <PersonalMaterialLockIcon className="h-4 w-4 shrink-0" />
+                ) : null}
+                <span className="min-w-0 break-words">{item.title}</span>
               </Link>
             </li>
           );

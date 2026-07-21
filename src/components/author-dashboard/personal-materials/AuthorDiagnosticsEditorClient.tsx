@@ -119,11 +119,11 @@ export default function AuthorDiagnosticsEditorClient({
         }
 
         if (isPersonalMaterialClientError(error) && error.status === 403) {
-          setLoadError("У вас нет доступа к этой диагностике.");
+          setLoadError("У вас нет доступа к этому материалу.");
         } else if (isPersonalMaterialClientError(error) && error.status === 404) {
-          setLoadError("Диагностика не найдена.");
+          setLoadError("Материал не найден.");
         } else {
-          setLoadError("Не удалось загрузить диагностику. Попробуйте ещё раз.");
+          setLoadError("Не удалось загрузить материал. Попробуйте ещё раз.");
         }
 
         setMaterial(null);
@@ -141,6 +141,29 @@ export default function AuthorDiagnosticsEditorClient({
       controller.abort();
     };
   }, [materialId, reloadKey]);
+
+  useEffect(() => {
+    if (loading || !material) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.location.hash !== "#audio") {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("personal-material-audio")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, material]);
 
   useEffect(() => {
     if (!material || !selectedAuthor) {
@@ -288,13 +311,13 @@ export default function AuthorDiagnosticsEditorClient({
   }
 
   if (loading) {
-    return <p className="text-sm text-[#7d70a2]">Загрузка диагностики…</p>;
+    return <p className="text-sm text-[#7d70a2]">Загрузка материала…</p>;
   }
 
   if (loadError || !material || !formValues) {
     return (
       <div className="rounded-[24px] border border-[#f3d9d9] bg-[#fff7f7] px-5 py-6">
-        <p className="text-sm text-[#8b2f2f]">{loadError ?? "Диагностика недоступна."}</p>
+        <p className="text-sm text-[#8b2f2f]">{loadError ?? "Материал недоступен."}</p>
         <button
           type="button"
           onClick={() => setReloadKey((value) => value + 1)}
@@ -356,7 +379,7 @@ export default function AuthorDiagnosticsEditorClient({
 
       <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[18px] font-semibold">Данные диагностики</h3>
+          <h3 className="text-[18px] font-semibold">Данные материала</h3>
           {isDirty ? <span className="text-xs text-[#b67a1d]">Есть несохранённые изменения</span> : null}
         </div>
 
@@ -414,10 +437,15 @@ export default function AuthorDiagnosticsEditorClient({
               type="button"
               disabled={!material.hasAudio || actionLoading || uploading}
               onClick={() => setConfirmAction("activate")}
-              className="mt-4 min-h-11 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
             >
               Активировать и получить ссылку
             </button>
+            {!material.hasAudio ? (
+              <p className="mt-3 text-sm text-[#b67a1d]" role="status">
+                Сначала загрузите аудиофайл
+              </p>
+            ) : null}
           </section>
         </>
       ) : (
@@ -425,7 +453,9 @@ export default function AuthorDiagnosticsEditorClient({
           <h3 className="text-[18px] font-semibold">Управление доступом</h3>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
             {material.hasAudio ? "Аудиофайл загружен." : "Аудиофайл отсутствует."}
-            {material.claimed ? " Клиент уже сохранил диагностику в личном кабинете." : null}
+            {material.claimed
+              ? " Клиент уже сохранил материал в личном кабинете."
+              : null}
           </p>
 
           {!oneTimeAccessUrl ? (
@@ -472,7 +502,7 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "activate"}
-        title="Активировать диагностику?"
+        title="Активировать материал?"
         description="После активации черновик нельзя будет редактировать. Вы получите персональную ссылку для клиента."
         confirmLabel="Активировать"
         loading={actionLoading}
@@ -495,8 +525,8 @@ export default function AuthorDiagnosticsEditorClient({
         title="Отозвать доступ?"
         description={
           material.claimed
-            ? "Клиент больше не сможет открыть диагностику по персональной ссылке. Ссылка будет отключена, но сохранённый доступ клиента останется."
-            : "Клиент больше не сможет открыть диагностику по персональной ссылке."
+            ? "Клиент больше не сможет открыть материал по персональной ссылке. Ссылка будет отключена, но сохранённый доступ клиента останется."
+            : "Клиент больше не сможет открыть материал по персональной ссылке."
         }
         confirmLabel="Отозвать доступ"
         confirmTone="danger"
@@ -507,8 +537,8 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "delete"}
-        title="Удалить диагностику?"
-        description={`Диагностика для ${clientName} будет удалена. Доступ по ссылке будет отключён.`}
+        title="Удалить материал?"
+        description={`Материал для ${clientName} будет удалён. Доступ по ссылке будет отключён.`}
         confirmLabel="Удалить"
         confirmTone="danger"
         loading={actionLoading}
@@ -522,7 +552,7 @@ export default function AuthorDiagnosticsEditorClient({
           onClick={() => router.push(listHref)}
           className="min-h-11 text-sm font-medium text-[#7042c5]"
         >
-          ← К списку диагностик
+          ← К списку
         </button>
       </div>
     </div>
