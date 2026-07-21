@@ -186,7 +186,9 @@ export default function AuthorDiagnosticsEditorClient({
     if (
       !material ||
       !formValues ||
-      (material.status !== "draft" && material.status !== "active") ||
+      (material.status !== "draft" &&
+        material.status !== "active" &&
+        material.status !== "revoked") ||
       saveSubmitRef.current
     ) {
       return;
@@ -289,6 +291,12 @@ export default function AuthorDiagnosticsEditorClient({
         const result = await rotateAuthorPersonalMaterial(material.id);
         setMaterial(result.material);
         setOneTimeAccessUrl(result.accessUrl);
+        window.requestAnimationFrame(() => {
+          document.getElementById("personal-material-one-time-link")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
       }
 
       if (confirmAction === "revoke") {
@@ -339,8 +347,19 @@ export default function AuthorDiagnosticsEditorClient({
 
   const uiStatus = resolvePersonalMaterialUiStatus(material);
   const isDraft = uiStatus === "draft";
-  const isEditable = material.status === "draft" || material.status === "active";
+  const isEditable =
+    material.status === "draft" ||
+    material.status === "active" ||
+    material.status === "revoked";
   const isReadOnly = !isEditable;
+  const linkInactive =
+    !material.claimed &&
+    (material.status === "revoked" || !material.guestAccessEnabled);
+  const canRotateLink = linkInactive;
+  const canRevokeLink =
+    !material.claimed &&
+    material.status === "active" &&
+    material.guestAccessEnabled;
   const listHref = `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}`;
   const clientName = formatClientDisplayName(
     material.clientFirstName,
@@ -374,8 +393,9 @@ export default function AuthorDiagnosticsEditorClient({
         ) : null}
 
         {oneTimeAccessUrl ? (
-          <div className="mt-5">
+          <div className="mt-5" id="personal-material-one-time-link">
             <AuthorDiagnosticsOneTimeLinkPanel
+              key={oneTimeAccessUrl}
               accessUrl={oneTimeAccessUrl}
               onDismiss={() => setOneTimeAccessUrl(null)}
             />
@@ -464,7 +484,11 @@ export default function AuthorDiagnosticsEditorClient({
         <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
           <h3 className="text-[18px] font-semibold">Управление доступом</h3>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            {material.hasAudio ? "Аудиофайл загружен." : "Аудиофайл отсутствует."}
+            {uiStatus === "revoked"
+              ? "Доступ по ссылке отозван."
+              : material.hasAudio
+                ? "Аудиофайл загружен."
+                : "Аудиофайл отсутствует."}
             {material.claimed
               ? " Клиент уже сохранил материал в личном кабинете."
               : null}
@@ -478,7 +502,7 @@ export default function AuthorDiagnosticsEditorClient({
           ) : null}
 
           <div className="mt-4 flex flex-col gap-3">
-            {uiStatus === "active" || uiStatus === "claimed" || uiStatus === "revoked" ? (
+            {canRotateLink ? (
               <button
                 type="button"
                 disabled={actionLoading}
@@ -486,17 +510,6 @@ export default function AuthorDiagnosticsEditorClient({
                 className="min-h-11 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
               >
                 Создать новую ссылку
-              </button>
-            ) : null}
-
-            {uiStatus === "active" || uiStatus === "claimed" ? (
-              <button
-                type="button"
-                disabled={actionLoading}
-                onClick={() => setConfirmAction("revoke")}
-                className="min-h-11 rounded-full border border-[#e4d7f4] px-5 py-3 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
-              >
-                Отозвать доступ
               </button>
             ) : null}
 
@@ -509,6 +522,26 @@ export default function AuthorDiagnosticsEditorClient({
               Удалить
             </button>
           </div>
+
+          {canRevokeLink ? (
+            <details className="mt-5 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-[#5f5484]">
+                Дополнительные действия
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                Отзыв доступа — аварийное действие. Обычное редактирование материала его не
+                требует.
+              </p>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmAction("revoke")}
+                className="mt-3 min-h-11 rounded-full border border-[#e4d7f4] bg-white px-5 py-3 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+              >
+                Отозвать доступ
+              </button>
+            </details>
+          ) : null}
         </section>
       )}
 
@@ -534,12 +567,8 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "revoke"}
-        title="Отозвать доступ?"
-        description={
-          material.claimed
-            ? "Клиент больше не сможет открыть материал по персональной ссылке. Ссылка будет отключена, но сохранённый доступ клиента останется."
-            : "Клиент больше не сможет открыть материал по персональной ссылке."
-        }
+        title="Отозвать доступ по ссылке?"
+        description="Клиент больше не сможет открыть материал по этой ссылке. Материал, уже добавленный в его личный кабинет, останется доступен."
         confirmLabel="Отозвать доступ"
         confirmTone="danger"
         loading={actionLoading}

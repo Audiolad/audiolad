@@ -64,9 +64,13 @@ export function assertDraftEditable(material: PersonalMaterialRow) {
   }
 }
 
-/** Draft and active materials remain editable by the author; tokens are unchanged. */
+/** Author may edit draft, active, and revoked materials; tokens unchanged on edit. */
 export function assertAuthorEditable(material: PersonalMaterialRow) {
-  if (material.status !== "draft" && material.status !== "active") {
+  if (
+    material.status !== "draft" &&
+    material.status !== "active" &&
+    material.status !== "revoked"
+  ) {
     throw new PersonalMaterialApiError("material_not_editable", 409);
   }
 }

@@ -66,7 +66,6 @@ function testGuestRoutes() {
   assert(metaRoute.includes("guestPrivacyHeaders"), "privacy headers");
   assert(metaRoute.includes("enforceGuestMetadataRateLimit"), "metadata rate limit");
   assert(metaRoute.includes("logGuestRouteAccess"), "redacted logging");
-  assert(!metaRoute.includes("clientLastName"), "guest dto excludes last name in route");
 
   assert(audioRoute.includes("createGuestAudioSignedUrl"), "signed url helper");
   assert(audioRoute.includes("enforceGuestAudioRateLimit"), "audio rate limit");
@@ -87,7 +86,7 @@ function testServerLayer() {
   assert(!dto.includes("audio_path:"), "author dto excludes audio path field");
   assert(dto.includes("hasAudio: row.audio_path"), "hasAudio derived without exposing path");
   assert(dto.includes("clientFirstName"), "guest dto client first name");
-  assert(!dto.includes("clientLastName: input.material.client_last_name"), "guest dto no last name");
+  assert(dto.includes("clientLastName: input.material.client_last_name"), "guest dto last name for prefills");
 
   assert(delivery.includes("redactTokenFromPath"), "token redaction helper");
   assert(delivery.includes("hashAccessToken"), "server-side hash");

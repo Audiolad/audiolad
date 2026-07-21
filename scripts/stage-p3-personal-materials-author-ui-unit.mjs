@@ -106,6 +106,9 @@ function testEditorComponent() {
   assert(upload.includes("Заменить файл"), "replace action");
   assert(upload.includes("Удалить файл"), "delete action");
   assert(upload.includes('id="personal-material-audio"'), "audio anchor id");
+  assert(editor.includes("canRotateLink"), "rotate only when link inactive");
+  assert(editor.includes("Дополнительные действия"), "revoke in extra actions");
+  assert(editor.includes("Отозвать доступ по ссылке?"), "revoke confirm title");
   assert(editor.includes("isEditable"), "active materials remain editable");
   assert(
     editor.includes("Материал можно будет редактировать и после активации"),

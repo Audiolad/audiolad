@@ -40,7 +40,7 @@ function testGuestComponents() {
   assert(guestPage.includes("PersonalMaterialReturnChatCta"), "return cta reuse");
   assert(guestPage.includes("break-words"), "overflow protection");
   assert(guestPage.includes("max-w-[820px]"), "center column");
-  assert(!guestPage.includes("clientLastName"), "no last name");
+  assert(guestPage.includes("clientLastName"), "pass last name for save prefills");
   assert(!guestPage.includes("dangerouslySetInnerHTML"), "plain text only");
 
   assert(player.includes('cache: "no-store"'), "audio fetch no-store");
@@ -52,7 +52,12 @@ function testGuestComponents() {
   assert(player.includes("aria-label"), "player a11y");
 
   assert(saveCta.includes("claimContextApiPath"), "claim context api prop");
-  assert(saveCta.includes("buildAuthRouteHref"), "auth redirect without raw token in next");
+  assert(saveCta.includes("Зарегистрироваться"), "inline register mode");
+  assert(saveCta.includes("Уже есть аккаунт"), "inline login mode");
+  assert(saveCta.includes("Создать кабинет и сохранить диагностику"), "register submit");
+  assert(saveCta.includes("Войти и сохранить диагностику"), "login submit");
+  assert(saveCta.includes("Добавить в личный кабинет"), "authenticated claim");
+  assert(saveCta.includes("PasswordInput"), "password visibility toggle");
   assert(!saveCta.includes("localStorage"), "no token storage");
   assert(!saveCta.includes("sessionStorage"), "no session storage");
 

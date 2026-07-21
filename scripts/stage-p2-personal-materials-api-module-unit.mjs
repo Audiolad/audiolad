@@ -66,7 +66,7 @@ const guestDto = toSafeGuestPersonalMaterialDto({
   },
 });
 assert.equal(guestDto.clientFirstName, "Anna");
-assert.equal("clientLastName" in guestDto, false);
+assert.equal(guestDto.clientLastName, "Secret");
 assert.equal(guestDto.hasAudio, true);
 
 assert.equal(resolveGuestAccessState(baseMaterial), "available");

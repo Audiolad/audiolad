@@ -77,6 +77,8 @@ export default function PersonalMaterialGuestPage({
             claimContextApiPath={apiPaths.claimContext}
             claimCompletePath={claimCompletePath}
             materialId={material.id}
+            clientFirstName={material.clientFirstName}
+            clientLastName={material.clientLastName}
           />
 
           <PersonalMaterialReturnChatCta

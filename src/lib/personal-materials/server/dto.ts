@@ -36,6 +36,7 @@ export type SafeGuestPersonalMaterialDto = {
   materialType: PersonalMaterialType;
   title: string | null;
   clientFirstName: string;
+  clientLastName: string | null;
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
@@ -102,6 +103,7 @@ export function toSafeGuestPersonalMaterialDto(input: {
     materialType: input.material.material_type,
     title: input.material.title,
     clientFirstName: input.material.client_first_name,
+    clientLastName: input.material.client_last_name,
     materialDate: input.material.material_date,
     description: input.material.description,
     personalRecommendation: input.material.personal_recommendation,
