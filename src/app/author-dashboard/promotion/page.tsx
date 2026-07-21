@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 function NoAuthorAccess() {
   return (
-    <AuthorShell title="Продвижение" backHref="/profile" backLabel="В профиль">
+    <AuthorShell title="Продвижение">
       <div className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-8 text-center">
         <p className="text-[18px] font-semibold">
           У вас пока нет доступа к кабинету автора.
@@ -51,8 +51,6 @@ export default async function AuthorPromotionPage() {
     <AuthorShell
       title="Продвижение"
       subtitle="Ссылки с UTM и статистика promo-воронки"
-      backHref="/author-dashboard"
-      backLabel="В кабинет автора"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
         <AuthorPromotionClient authors={authors} />

@@ -78,7 +78,7 @@ export default async function EditAuthorProductPage({ params }: PageProps) {
     <AuthorShell
       title="Редактировать аудиопродукт"
       subtitle={product.practice.title}
-      backHref="/author-dashboard"
+      internalBackHref="/author-dashboard"
     >
       <AuthorProductForm
         authors={authors}

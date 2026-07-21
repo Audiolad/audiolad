@@ -1,4 +1,5 @@
 import ProfileAvatarEditor from "@/components/profile/ProfileAvatarEditor";
+import { profileEditPaddingClassName } from "@/lib/profile/layout";
 import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -135,107 +136,99 @@ export default async function EditProfilePage({
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface pb-10">
-        <div className="px-5 pt-5">
-          <header className="flex items-center justify-between">
-            <Link
-              href="/profile"
-              aria-label="Назад"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
-            >
-              <BackIcon />
-            </Link>
+    <div className={profileEditPaddingClassName}>
+      <header className="flex items-center justify-between">
+        <Link
+          href="/profile"
+          aria-label="Назад"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
+        >
+          <BackIcon />
+        </Link>
 
-            <div className="text-center">
-              <h1 className="text-[24px] font-semibold">
-                Редактировать профиль
-              </h1>
-              <p className="mt-1 text-xs text-[#7d70a2]">
-                Личные данные слушателя
-              </p>
-            </div>
-
-            <div className="h-11 w-11" />
-          </header>
-
-          {errorMessage && (
-            <div className="mt-6 rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-4 text-sm leading-6 text-[#b34f63]">
-              {errorMessage}
-            </div>
-          )}
-
-          <ProfileAvatarEditor initialAvatarUrl={avatarUrl} initial={initial} />
-
-          <form action={updateProfile}>
-            <section className="mt-8 space-y-5">
-              <label className="block">
-                <span className="text-sm font-medium">Имя</span>
-
-                <input
-                  type="text"
-                  name="firstName"
-                  defaultValue={firstName}
-                  autoComplete="given-name"
-                  className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none focus:border-[#7042c5]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium">Фамилия</span>
-
-                <input
-                  type="text"
-                  name="lastName"
-                  defaultValue={lastName}
-                  autoComplete="family-name"
-                  className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none focus:border-[#7042c5]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium">Электронная почта</span>
-
-                <input
-                  type="email"
-                  name="email"
-                  defaultValue={email}
-                  readOnly
-                  disabled
-                  className={disabledFieldClass}
-                />
-
-                <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
-                  Email нельзя изменить в профиле. Для смены пароля используйте{" "}
-                  <Link
-                    href="/auth/forgot-password"
-                    className="font-medium text-[#7042c5]"
-                  >
-                    восстановление доступа
-                  </Link>
-                  .
-                </p>
-              </label>
-            </section>
-
-            <section className="mt-8 grid grid-cols-2 gap-3">
-              <Link
-                href="/profile"
-                className="flex items-center justify-center rounded-[20px] border border-[#c6afe6] bg-white px-4 py-4 font-semibold text-[#7042c5]"
-              >
-                Отмена
-              </Link>
-
-              <button
-                type="submit"
-                className="flex items-center justify-center rounded-[20px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-4 py-4 font-semibold text-white shadow-[0_12px_28px_rgba(96,59,168,0.22)]"
-              >
-                Сохранить
-              </button>
-            </section>
-          </form>
+        <div className="text-center">
+          <h1 className="text-[24px] font-semibold">Редактировать профиль</h1>
+          <p className="mt-1 text-xs text-[#7d70a2]">Личные данные слушателя</p>
         </div>
-      </div>
-    </main>
+
+        <div className="h-11 w-11" />
+      </header>
+
+      {errorMessage && (
+        <div className="mt-6 rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-4 text-sm leading-6 text-[#b34f63]">
+          {errorMessage}
+        </div>
+      )}
+
+      <ProfileAvatarEditor initialAvatarUrl={avatarUrl} initial={initial} />
+
+      <form action={updateProfile}>
+        <section className="mt-8 space-y-5">
+          <label className="block">
+            <span className="text-sm font-medium">Имя</span>
+
+            <input
+              type="text"
+              name="firstName"
+              defaultValue={firstName}
+              autoComplete="given-name"
+              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none focus:border-[#7042c5]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium">Фамилия</span>
+
+            <input
+              type="text"
+              name="lastName"
+              defaultValue={lastName}
+              autoComplete="family-name"
+              className="mt-3 w-full rounded-[20px] border border-[#ddcfef] bg-white px-4 py-4 outline-none focus:border-[#7042c5]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium">Электронная почта</span>
+
+            <input
+              type="email"
+              name="email"
+              defaultValue={email}
+              readOnly
+              disabled
+              className={disabledFieldClass}
+            />
+
+            <p className="mt-2 text-xs leading-5 text-[#8a7ca9]">
+              Email нельзя изменить в профиле. Для смены пароля используйте{" "}
+              <Link
+                href="/auth/forgot-password"
+                className="font-medium text-[#7042c5]"
+              >
+                восстановление доступа
+              </Link>
+              .
+            </p>
+          </label>
+        </section>
+
+        <section className="mt-8 grid grid-cols-2 gap-3">
+          <Link
+            href="/profile"
+            className="flex items-center justify-center rounded-[20px] border border-[#c6afe6] bg-white px-4 py-4 font-semibold text-[#7042c5]"
+          >
+            Отмена
+          </Link>
+
+          <button
+            type="submit"
+            className="flex items-center justify-center rounded-[20px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-4 py-4 font-semibold text-white shadow-[0_12px_28px_rgba(96,59,168,0.22)]"
+          >
+            Сохранить
+          </button>
+        </section>
+      </form>
+    </div>
   );
 }

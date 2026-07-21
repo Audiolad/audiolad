@@ -9,10 +9,7 @@ const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/auth/sign-up",
 ]);
 
-const BOTTOM_NAV_HIDDEN_PREFIXES = [
-  "/checkout/",
-  "/author-dashboard/",
-] as const;
+const BOTTOM_NAV_HIDDEN_PREFIXES = ["/checkout/"] as const;
 
 /** Основная зона меню без нижнего safe area (иконки + подписи). */
 export const BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
