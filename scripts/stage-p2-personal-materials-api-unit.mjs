@@ -48,7 +48,8 @@ function testAuthorRoutes() {
   assert(pdfRoute.includes("createAuthorPdfSignedUrl"), "author pdf signed url");
   assert(guestPdfRoute.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
 
-  assert(activateRoute.includes("generateAccessToken"), "activate generates token");
+  assert(activateRoute.includes("material_not_ready"), "activate readiness guard");
+  assert(activateRoute.includes("hasPdf"), "activate allows pdf-only");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");
   assert(activateRoute.includes("accessUrl:"), "activate returns accessUrl");

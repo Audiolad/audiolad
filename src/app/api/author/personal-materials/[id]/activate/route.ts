@@ -33,7 +33,13 @@ export async function POST(request: Request, context: RouteContext) {
     const { supabase, material } = await requirePersonalMaterialAccess(id);
     assertDraftEditable(material);
 
-    if (!material.audio_path || !material.duration_seconds) {
+    const hasAudio =
+      Boolean(material.audio_path?.trim()) &&
+      typeof material.duration_seconds === "number" &&
+      material.duration_seconds > 0;
+    const hasPdf = Boolean(material.pdf_path?.trim());
+
+    if (!hasAudio && !hasPdf) {
       throw new PersonalMaterialApiError("material_not_ready", 422);
     }
 
