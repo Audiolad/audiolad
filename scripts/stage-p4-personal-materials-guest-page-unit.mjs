@@ -18,6 +18,10 @@ function testRouteAndLayout() {
   const robots = read("src/app/robots.ts");
 
   assert(page.includes("findGuestMaterialByRawToken"), "server metadata lookup");
+  assert(page.includes("claimed_by_user_id"), "claimed landing branch");
+  assert(page.includes("PersonalMaterialClaimedLanding"), "claimed landing component");
+  assert(page.includes("canOwnerAccessMaterial"), "owner redirect guard");
+  assert(page.includes("/my-materials/"), "owner redirect path");
   assert(page.includes("notFound()"), "404 unavailable");
   assert(!page.includes("ListenerAppShell"), "no listener shell");
   assert(!page.includes("console.log"), "no console logging");
@@ -42,6 +46,25 @@ function testGuestComponents() {
   assert(guestPage.includes("max-w-[820px]"), "center column");
   assert(guestPage.includes("clientLastName"), "pass last name for save prefills");
   assert(!guestPage.includes("dangerouslySetInnerHTML"), "plain text only");
+
+  const claimedLanding = read(
+    "src/components/personal-materials/guest/PersonalMaterialClaimedLanding.tsx",
+  );
+  assert(
+    claimedLanding.includes("Материал сохранён в вашем личном кабинете"),
+    "claimed login title",
+  );
+  assert(
+    claimedLanding.includes("Войти и открыть диагностику"),
+    "claimed login submit",
+  );
+  assert(
+    claimedLanding.includes("Этот материал сохранён в другом аккаунте"),
+    "wrong account message",
+  );
+  assert(claimedLanding.includes("PasswordInput"), "claimed login password toggle");
+  assert(!claimedLanding.includes("audioApiPath"), "no audio on claimed landing");
+  assert(!claimedLanding.includes("clientFirstName"), "no client name on claimed landing");
 
   assert(player.includes('cache: "no-store"'), "audio fetch no-store");
   assert(player.includes("preload=\"none\""), "no autoplay preload");
