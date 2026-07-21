@@ -8,8 +8,7 @@ export default function PersonalMaterialDescription({
   description,
 }: PersonalMaterialDescriptionProps) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-base font-semibold text-[#2f2647]">О диагностике</h2>
+    <section>
       <FormattedPlainText
         text={description}
         className="text-sm leading-6 text-[#5f5484]"

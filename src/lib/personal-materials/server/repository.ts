@@ -79,8 +79,8 @@ export type CreatePersonalMaterialInput = {
   authorId: string;
   materialType: PersonalMaterialType;
   title?: string | null;
-  clientFirstName: string;
-  clientLastName: string;
+  clientFirstName: string | null;
+  clientLastName: string | null;
   materialDate: string;
   description?: string | null;
   personalRecommendation?: string | null;
@@ -121,8 +121,8 @@ export async function createPersonalMaterialDraft(
 
 export type UpdatePersonalMaterialDraftInput = {
   materialId: string;
-  clientFirstName: string;
-  clientLastName: string;
+  clientFirstName: string | null;
+  clientLastName: string | null;
   materialDate: string;
   title?: string | null;
   description?: string | null;

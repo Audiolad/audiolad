@@ -34,22 +34,28 @@ function testAuthorRoutes() {
   assert(!listRoute.includes("access_token_hash"), "list route no token hash");
 
   assert(itemRoute.includes("requirePersonalMaterialAccess"), "item route access");
-  assert(itemRoute.includes("assertDraftEditable"), "patch draft guard");
+  assert(itemRoute.includes("assertAuthorEditable"), "patch editable after activate");
   assert(itemRoute.includes("softDeletePersonalMaterial"), "delete soft delete");
   assert(itemRoute.includes("removePersonalMaterialStorageFiles"), "delete storage cleanup");
 
   assert(audioRoute.includes("uploadPersonalMaterialAudio"), "audio upload helper");
   assert(audioRoute.includes("deletePersonalMaterialAudio"), "audio delete helper");
+  assert(audioRoute.includes("assertAuthorEditable"), "audio editable after activate");
+  assert(audioRoute.includes("createAuthorAudioSignedUrl"), "author audio GET signed url");
+  assert(audioRoute.includes("export async function GET"), "author audio GET");
   assert(!audioRoute.includes("audio_path"), "audio route no path leak");
+
+  assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");
+  assert(activateRoute.includes("hasPdf"), "activate accepts pdf attachment");
+  assert(activateRoute.includes("!hasAudio && !hasPdf"), "activate requires audio or pdf");
+  assert(activateRoute.includes("material_not_ready"), "activate readiness guard");
+  assert(activateRoute.includes("generateAccessToken"), "activate generates token");
 
   const pdfRoute = read("src/app/api/author/personal-materials/[id]/pdf/route.ts");
   const guestPdfRoute = read("src/app/api/d/[token]/pdf/route.ts");
   assert(pdfRoute.includes("uploadPersonalMaterialPdf"), "pdf upload helper");
   assert(pdfRoute.includes("createAuthorPdfSignedUrl"), "author pdf signed url");
   assert(guestPdfRoute.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
-
-  assert(activateRoute.includes("material_not_ready"), "activate readiness guard");
-  assert(activateRoute.includes("hasPdf"), "activate allows pdf-only");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");
   assert(activateRoute.includes("accessUrl:"), "activate returns accessUrl");
@@ -71,7 +77,6 @@ function testGuestRoutes() {
   assert(metaRoute.includes("guestPrivacyHeaders"), "privacy headers");
   assert(metaRoute.includes("enforceGuestMetadataRateLimit"), "metadata rate limit");
   assert(metaRoute.includes("logGuestRouteAccess"), "redacted logging");
-  assert(!metaRoute.includes("clientLastName"), "guest dto excludes last name in route");
 
   assert(audioRoute.includes("createGuestAudioSignedUrl"), "signed url helper");
   assert(audioRoute.includes("enforceGuestAudioRateLimit"), "audio rate limit");
@@ -92,7 +97,7 @@ function testServerLayer() {
   assert(!dto.includes("audio_path:"), "author dto excludes audio path field");
   assert(dto.includes("hasAudio: row.audio_path"), "hasAudio derived without exposing path");
   assert(dto.includes("clientFirstName"), "guest dto client first name");
-  assert(!dto.includes("clientLastName: input.material.client_last_name"), "guest dto no last name");
+  assert(dto.includes("clientLastName: input.material.client_last_name"), "guest dto last name for prefills");
 
   assert(delivery.includes("redactTokenFromPath"), "token redaction helper");
   assert(delivery.includes("hashAccessToken"), "server-side hash");

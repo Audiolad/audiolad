@@ -204,14 +204,32 @@ function testEditorAndPublicUi() {
 
   assert(form.includes("Действие после прослушивания"), "editor section renamed");
   assert(form.includes("cta_enabled"), "editor persists cta_enabled");
+  assert(form.includes("cta_heading"), "editor has heading field");
+  assert(form.includes("cta_description"), "editor has description field");
+  assert(form.includes("Показывать кнопку после практик"), "toggle label");
+  assert(form.includes("Режим открытия"), "open mode fieldset");
+  assert(form.includes("В этом окне"), "same tab label");
+  assert(form.includes("В новой вкладке"), "new tab label");
+  assert(form.includes("MAX или Telegram"), "https help text");
   assert(form.includes("Продолжить в MAX"), "label preset present");
   assert(form.includes("getPromoPageCtaPreviewLabel"), "url preview wired");
-  assert(!form.includes("buildAuthorPageCtaPreset"), "author fallback preset removed");
+  assert(form.includes("buildAuthorPageCtaPreset"), "author preset helper wired");
+  assert(form.includes("Больше практик автора"), "author preset button");
+  assert(form.includes("Очистить действие"), "clear action button");
+  assert(form.includes("Адрес страницы"), "slug field renamed");
+  assert(
+    form.includes("Формируется автоматически. При необходимости его можно изменить."),
+    "slug auto hint",
+  );
+  assert(!form.includes("Нижняя CTA"), "old section title removed");
+  assert(
+    !form.includes("Только безопасные внутренние ссылки платформы"),
+    "old internal-only hint removed",
+  );
   assert(!client.includes("buildAuthorPageCtaPreset"), "public fallback removed");
   assert(client.includes("trackPromoPageViewedOnce"), "page view analytics wired");
   assert(client.includes("trackPromoPageCtaClicked"), "cta click analytics wired");
   assert(presentation.includes("PromoPageCtaButton"), "dedicated cta button block");
-  assert(!presentation.includes("Больше практик автора"), "fallback label removed");
 }
 
 const tests = [

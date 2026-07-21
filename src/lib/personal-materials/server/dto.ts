@@ -10,7 +10,7 @@ export type SafeAuthorPersonalMaterialDto = {
   materialType: PersonalMaterialType;
   title: string | null;
   clientFirstName: string;
-  clientLastName: string;
+  clientLastName: string | null;
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
@@ -37,6 +37,7 @@ export type SafeGuestPersonalMaterialDto = {
   materialType: PersonalMaterialType;
   title: string | null;
   clientFirstName: string;
+  clientLastName: string | null;
   materialDate: string;
   description: string | null;
   personalRecommendation: string | null;
@@ -62,7 +63,7 @@ export function toSafeAuthorPersonalMaterialDto(
     authorId: row.author_id,
     materialType: row.material_type,
     title: row.title,
-    clientFirstName: row.client_first_name,
+    clientFirstName: row.client_first_name ?? "",
     clientLastName: row.client_last_name,
     materialDate: row.material_date,
     description: row.description,
@@ -104,7 +105,8 @@ export function toSafeGuestPersonalMaterialDto(input: {
     id: input.material.id,
     materialType: input.material.material_type,
     title: input.material.title,
-    clientFirstName: input.material.client_first_name,
+    clientFirstName: input.material.client_first_name ?? "",
+    clientLastName: input.material.client_last_name,
     materialDate: input.material.material_date,
     description: input.material.description,
     personalRecommendation: input.material.personal_recommendation,

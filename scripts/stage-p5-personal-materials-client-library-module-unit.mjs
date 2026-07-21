@@ -17,7 +17,7 @@ import {
 
 assert.equal(
   getMyMaterialDisplayTitle(null, "diagnostic"),
-  "Аудиодиагностика по фото",
+  "Диагностика",
 );
 
 assert.equal(

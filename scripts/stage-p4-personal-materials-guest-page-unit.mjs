@@ -18,6 +18,10 @@ function testRouteAndLayout() {
   const robots = read("src/app/robots.ts");
 
   assert(page.includes("findGuestMaterialByRawToken"), "server metadata lookup");
+  assert(page.includes("claimed_by_user_id"), "claimed landing branch");
+  assert(page.includes("PersonalMaterialClaimedLanding"), "claimed landing component");
+  assert(page.includes("canOwnerAccessMaterial"), "owner redirect guard");
+  assert(page.includes("/my-materials/"), "owner redirect path");
   assert(page.includes("notFound()"), "404 unavailable");
   assert(!page.includes("ListenerAppShell"), "no listener shell");
   assert(!page.includes("console.log"), "no console logging");
@@ -42,8 +46,27 @@ function testGuestComponents() {
   assert(guestPage.includes("PersonalMaterialReturnChatCta"), "return cta reuse");
   assert(guestPage.includes("break-words"), "overflow protection");
   assert(guestPage.includes("max-w-[820px]"), "center column");
-  assert(!guestPage.includes("clientLastName"), "no last name");
+  assert(guestPage.includes("clientLastName"), "pass last name for save prefills");
   assert(!guestPage.includes("dangerouslySetInnerHTML"), "plain text only");
+
+  const claimedLanding = read(
+    "src/components/personal-materials/guest/PersonalMaterialClaimedLanding.tsx",
+  );
+  assert(
+    claimedLanding.includes("Материал сохранён в вашем личном кабинете"),
+    "claimed login title",
+  );
+  assert(
+    claimedLanding.includes("Войти и открыть диагностику"),
+    "claimed login submit",
+  );
+  assert(
+    claimedLanding.includes("Этот материал сохранён в другом аккаунте"),
+    "wrong account message",
+  );
+  assert(claimedLanding.includes("PasswordInput"), "claimed login password toggle");
+  assert(!claimedLanding.includes("audioApiPath"), "no audio on claimed landing");
+  assert(!claimedLanding.includes("clientFirstName"), "no client name on claimed landing");
 
   assert(player.includes('cache: "no-store"'), "audio fetch no-store");
   assert(player.includes("preload=\"none\""), "no autoplay preload");
@@ -54,13 +77,56 @@ function testGuestComponents() {
   assert(player.includes("aria-label"), "player a11y");
 
   assert(saveCta.includes("claimContextApiPath"), "claim context api prop");
-  assert(saveCta.includes("buildAuthRouteHref"), "auth redirect without raw token in next");
+  assert(saveCta.includes(">Создать<") || saveCta.includes("\n          Создать\n"), "inline register mode");
+  assert(saveCta.includes(">Войти<") || saveCta.includes("\n          Войти\n"), "inline login mode");
+  assert(saveCta.includes("Создать кабинет и сохранить диагностику"), "register submit");
+  assert(saveCta.includes("Войти и сохранить диагностику"), "login submit");
+  assert(!saveCta.includes("Зарегистрироваться"), "old register label removed");
+  assert(!saveCta.includes("Уже есть аккаунт"), "old login label removed");
+  assert(saveCta.includes("break-words"), "cta wrap on mobile");
+  assert(saveCta.includes("whitespace-normal"), "cta wrap on mobile");
+  assert(saveCta.includes("Войти и сохранить диагностику"), "login submit");
+  assert(saveCta.includes("Добавить в личный кабинет"), "authenticated claim");
+  assert(saveCta.includes("PasswordInput"), "password visibility toggle");
   assert(!saveCta.includes("localStorage"), "no token storage");
   assert(!saveCta.includes("sessionStorage"), "no session storage");
 
   assert(unavailable.includes("Материал недоступен"), "neutral title");
   assert(!unavailable.includes("revoked"), "no reason leak");
   assert(returnCta.includes('rel="noopener noreferrer"'), "return link rel");
+}
+
+function testOptionalTextBlocksWithoutHeadings() {
+  const description = read(
+    "src/components/personal-materials/guest/PersonalMaterialDescription.tsx",
+  );
+  const recommendation = read(
+    "src/components/personal-materials/guest/PersonalMaterialRecommendation.tsx",
+  );
+  const guestPage = read(
+    "src/components/personal-materials/guest/PersonalMaterialGuestPage.tsx",
+  );
+  const detail = read(
+    "src/components/personal-materials/library/MyMaterialDetailClient.tsx",
+  );
+
+  assert(description.includes("FormattedPlainText"), "description plain text");
+  assert(!description.includes("О диагностике"), "no description auto heading");
+  assert(!description.includes("<h2"), "description no h2");
+  assert(recommendation.includes("FormattedPlainText"), "recommendation plain text");
+  assert(recommendation.includes("rounded-2xl"), "recommendation highlight kept");
+  assert(!recommendation.includes("Персональная рекомендация"), "no recommendation heading");
+  assert(!recommendation.includes("✦"), "no decorative label");
+  assert(!recommendation.includes("<h2"), "recommendation no h2");
+  assert(guestPage.includes("shouldRenderOptionalBlock(material.description)"), "guest hide empty description");
+  assert(
+    guestPage.includes("shouldRenderOptionalBlock(material.personalRecommendation)"),
+    "guest hide empty recommendation",
+  );
+  assert(detail.includes("shouldRenderOptionalBlock(material.description)"), "cabinet hide empty description");
+  assert(detail.includes("shouldRenderOptionalBlock(material.recommendation)"), "cabinet hide empty recommendation");
+  assert(detail.includes("PersonalMaterialDescription"), "cabinet reuses description");
+  assert(detail.includes("PersonalMaterialRecommendation"), "cabinet reuses recommendation");
 }
 
 function testClaimFlow() {
@@ -116,6 +182,7 @@ async function runModuleTests() {
 async function main() {
   testRouteAndLayout();
   testGuestComponents();
+  testOptionalTextBlocksWithoutHeadings();
   testClaimFlow();
   testSecurityAndPrivacy();
   testResponsiveClasses();

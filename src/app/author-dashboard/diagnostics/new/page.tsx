@@ -36,10 +36,10 @@ export default async function NewAuthorDiagnosticPage({ searchParams }: PageProp
 
   return (
     <AuthorShell
-      title="Создать диагностику"
-      subtitle="Заполните данные клиента и сохраните черновик"
+      title="Новая личная работа"
+      subtitle="Заполните данные клиента, затем сохраните и загрузите аудиофайл"
       internalBackHref={backHref}
-      internalBackLabel="К списку диагностик"
+      internalBackLabel="К списку"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка формы…</p>}>
         <AuthorDiagnosticsCreateClient authors={authors} />

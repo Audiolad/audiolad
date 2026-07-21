@@ -23,7 +23,10 @@ function testRoutes() {
   );
 
   assert(listPage.includes("listMyPersonalMaterials"), "list server fetch");
-  assert(listPage.includes("Мои материалы"), "list title");
+  assert(listPage.includes("Личные материалы"), "list title");
+  assert(!listPage.includes("Мои материалы"), "old list title removed");
+  assert(listPage.includes("Только для вас"), "privacy label on list");
+  assert(listPage.includes("доступны только в вашем аккаунте"), "privacy description");
   assert(detailPage.includes("MyMaterialDetailClient"), "detail client");
   assert(detailPage.includes("notFound"), "neutral not found");
   assert(listApi.includes("unauthorized"), "list auth");
@@ -48,19 +51,24 @@ function testUiAndNav() {
 
   assert(card.includes("Открыть"), "card cta");
   assert(card.includes("break-words"), "overflow");
-  assert(list.includes("У вас пока нет персональных материалов"), "empty");
+  assert(list.includes("У вас пока нет личных материалов"), "empty");
   assert(detail.includes("progressMode=\"server\""), "server progress mode");
   assert(detail.includes("mergeGuestAndServerProgress"), "guest migrate");
   assert(detail.includes("PersonalMaterialReturnChatCta"), "return cta reuse");
+  assert(detail.includes("Этот материал доступен только вам"), "detail privacy");
   assert(detail.includes("clearPersonalMaterialGuestProgress"), "clear local");
   assert(!detail.includes("dangerouslySetInnerHTML"), "plain text");
   assert(!detail.includes("synced &&"), "player mounts without sync gate");
-  assert(nav.includes('title: "Мои материалы"'), "sidebar nav");
+  assert(nav.includes('title: "Личные материалы"'), "sidebar nav");
+  assert(nav.includes('icon: "lock"'), "sidebar lock icon");
+  assert(!nav.includes('title: "Мои материалы"'), "old sidebar title removed");
   assert(auth.includes('"/my-materials"'), "private route");
   assert(player.includes('progressMode === "server"'), "player server mode");
   assert(player.includes("visibilitychange"), "visibility save");
   assert(robots.includes('"/my-materials/"'), "robots disallow");
   assert(profile.includes("/my-materials"), "profile quick link");
+  assert(profile.includes("Личные материалы"), "profile label");
+  assert(!profile.includes("Мои материалы"), "old profile label removed");
 }
 
 function testSecurity() {

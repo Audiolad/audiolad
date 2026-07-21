@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
 import AuthorDiagnosticsPdfUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsPdfUpload";
@@ -11,6 +12,7 @@ import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/persona
 import AuthorDiagnosticsFormFields from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsFormFields";
 import AuthorDiagnosticsOneTimeLinkPanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsOneTimeLinkPanel";
 import AuthorDiagnosticsStatusBadge from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsStatusBadge";
+import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
 import {
   activateAuthorPersonalMaterial,
   deleteAuthorPersonalMaterial,
@@ -33,6 +35,7 @@ import {
 import {
   formatMaterialDateLabel,
   validatePersonalMaterialForm,
+  requireClientFirstName,
   type PersonalMaterialFormValues,
 } from "@/lib/personal-materials/client/validation";
 import {
@@ -54,7 +57,7 @@ function materialToFormValues(material: AuthorPersonalMaterial): PersonalMateria
   return {
     materialType: material.materialType,
     clientFirstName: material.clientFirstName,
-    clientLastName: material.clientLastName,
+    clientLastName: material.clientLastName ?? "",
     materialDate: material.materialDate,
     title: material.title ?? "",
     description: material.description ?? "",
@@ -126,11 +129,11 @@ export default function AuthorDiagnosticsEditorClient({
         }
 
         if (isPersonalMaterialClientError(error) && error.status === 403) {
-          setLoadError("У вас нет доступа к этой диагностике.");
+          setLoadError("У вас нет доступа к этому материалу.");
         } else if (isPersonalMaterialClientError(error) && error.status === 404) {
-          setLoadError("Диагностика не найдена.");
+          setLoadError("Материал не найден.");
         } else {
-          setLoadError("Не удалось загрузить диагностику. Попробуйте ещё раз.");
+          setLoadError("Не удалось загрузить материал. Попробуйте ещё раз.");
         }
 
         setMaterial(null);
@@ -150,6 +153,29 @@ export default function AuthorDiagnosticsEditorClient({
   }, [materialId, reloadKey]);
 
   useEffect(() => {
+    if (loading || !material) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.location.hash !== "#audio") {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("personal-material-audio")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, material]);
+
+  useEffect(() => {
     if (!material || !selectedAuthor) {
       return;
     }
@@ -166,11 +192,26 @@ export default function AuthorDiagnosticsEditorClient({
   }
 
   async function handleSave() {
-    if (!material || !formValues || material.status !== "draft" || saveSubmitRef.current) {
+    if (
+      !material ||
+      !formValues ||
+      (material.status !== "draft" &&
+        material.status !== "active" &&
+        material.status !== "revoked") ||
+      saveSubmitRef.current
+    ) {
       return;
     }
 
     const nextErrors = validatePersonalMaterialForm(formValues);
+
+    if (material.status !== "draft") {
+      const nameError = requireClientFirstName(formValues);
+      if (nameError) {
+        nextErrors.clientFirstName = nameError;
+      }
+    }
+
     setFormErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -184,8 +225,8 @@ export default function AuthorDiagnosticsEditorClient({
     try {
       const updated = await updateAuthorPersonalMaterial(material.id, {
         materialType: formValues.materialType as AuthorPersonalMaterial["materialType"],
-        clientFirstName: formValues.clientFirstName.trim(),
-        clientLastName: formValues.clientLastName.trim(),
+        clientFirstName: formValues.clientFirstName.trim() || null,
+        clientLastName: formValues.clientLastName.trim() || null,
         materialDate: formValues.materialDate,
         title: formValues.title.trim() || null,
         description: formValues.description.trim() || null,
@@ -207,9 +248,9 @@ export default function AuthorDiagnosticsEditorClient({
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(file: File): Promise<boolean> {
     if (!material) {
-      return;
+      return false;
     }
 
     setUploading(true);
@@ -218,9 +259,11 @@ export default function AuthorDiagnosticsEditorClient({
     try {
       const updated = await uploadAuthorPersonalMaterialAudio(material.id, file);
       setMaterial(updated);
+      return true;
     } catch (error) {
       const code = isPersonalMaterialClientError(error) ? error.code : undefined;
       setUploadError(getPersonalMaterialUploadErrorMessage(code));
+      return false;
     } finally {
       setUploading(false);
     }
@@ -304,6 +347,12 @@ export default function AuthorDiagnosticsEditorClient({
         const result = await rotateAuthorPersonalMaterial(material.id);
         setMaterial(result.material);
         setOneTimeAccessUrl(result.accessUrl);
+        window.requestAnimationFrame(() => {
+          document.getElementById("personal-material-one-time-link")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
       }
 
       if (confirmAction === "revoke") {
@@ -324,7 +373,18 @@ export default function AuthorDiagnosticsEditorClient({
       setConfirmAction(null);
     } catch (error) {
       if (confirmAction === "activate") {
-        setActionError(getPersonalMaterialActivationErrorMessage());
+        if (
+          isPersonalMaterialClientError(error) &&
+          error.code === "client_name_required"
+        ) {
+          setFormErrors((current) => ({
+            ...current,
+            clientFirstName: "Укажите имя клиента.",
+          }));
+          setActionError("Укажите имя клиента.");
+        } else {
+          setActionError(getPersonalMaterialActivationErrorMessage(error));
+        }
       } else {
         setActionError(getPersonalMaterialErrorMessage(error));
       }
@@ -334,13 +394,13 @@ export default function AuthorDiagnosticsEditorClient({
   }
 
   if (loading) {
-    return <p className="text-sm text-[#7d70a2]">Загрузка диагностики…</p>;
+    return <p className="text-sm text-[#7d70a2]">Загрузка материала…</p>;
   }
 
   if (loadError || !material || !formValues) {
     return (
       <div className="rounded-[24px] border border-[#f3d9d9] bg-[#fff7f7] px-5 py-6">
-        <p className="text-sm text-[#8b2f2f]">{loadError ?? "Диагностика недоступна."}</p>
+        <p className="text-sm text-[#8b2f2f]">{loadError ?? "Материал недоступен."}</p>
         <button
           type="button"
           onClick={() => setReloadKey((value) => value + 1)}
@@ -354,9 +414,24 @@ export default function AuthorDiagnosticsEditorClient({
 
   const uiStatus = resolvePersonalMaterialUiStatus(material);
   const isDraft = uiStatus === "draft";
-  const isReadOnly = !isDraft;
+  const isEditable =
+    material.status === "draft" ||
+    material.status === "active" ||
+    material.status === "revoked";
+  const isReadOnly = !isEditable;
+  const linkInactive =
+    !material.claimed &&
+    (material.status === "revoked" || !material.guestAccessEnabled);
+  const canRotateLink = linkInactive;
+  const canRevokeLink =
+    !material.claimed &&
+    material.status === "active" &&
+    material.guestAccessEnabled;
   const listHref = `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}`;
-  const clientName = `${material.clientFirstName} ${material.clientLastName}`.trim();
+  const clientName = formatClientDisplayName(
+    material.clientFirstName,
+    material.clientLastName,
+  );
 
   return (
     <div className="min-w-0">
@@ -385,8 +460,9 @@ export default function AuthorDiagnosticsEditorClient({
         ) : null}
 
         {oneTimeAccessUrl ? (
-          <div className="mt-5">
+          <div className="mt-5" id="personal-material-one-time-link">
             <AuthorDiagnosticsOneTimeLinkPanel
+              key={oneTimeAccessUrl}
               accessUrl={oneTimeAccessUrl}
               onDismiss={() => setOneTimeAccessUrl(null)}
             />
@@ -402,7 +478,7 @@ export default function AuthorDiagnosticsEditorClient({
 
       <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[18px] font-semibold">Данные диагностики</h3>
+          <h3 className="text-[18px] font-semibold">Данные материала</h3>
           {isDirty ? <span className="text-xs text-[#b67a1d]">Есть несохранённые изменения</span> : null}
         </div>
 
@@ -423,7 +499,7 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
         ) : null}
 
-        {isDraft ? (
+        {isEditable ? (
           <button
             type="button"
             onClick={() => void handleSave()}
@@ -435,7 +511,23 @@ export default function AuthorDiagnosticsEditorClient({
         ) : null}
       </section>
 
-      {isDraft ? (
+      <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
+        <h3 className="text-[18px] font-semibold">Прослушивание</h3>
+        {material.hasAudio ? (
+          <div className="mt-4 min-w-0 overflow-x-hidden">
+            <PersonalMaterialAudioPlayer
+              key={`${material.id}:${material.audioOriginalFilename ?? ""}:${material.audioSizeBytes ?? 0}`}
+              materialId={material.id}
+              audioApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/audio`}
+              progressMode="none"
+            />
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-[#7d70a2]">Аудиофайл ещё не загружен</p>
+        )}
+      </section>
+
+      {isEditable ? (
         <>
           <div className="mt-6">
             <AuthorDiagnosticsAudioUpload
@@ -462,34 +554,62 @@ export default function AuthorDiagnosticsEditorClient({
               onDelete={handleDeletePdf}
             />
           </div>
-
-          <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
-            <h3 className="text-[18px] font-semibold">Активация</h3>
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              После активации вы получите персональную ссылку для клиента. Содержимое черновика
-              больше нельзя будет редактировать.
-            </p>
-            <button
-              type="button"
-              disabled={!hasAttachment || actionLoading || uploading || uploadingPdf}
-              onClick={() => setConfirmAction("activate")}
-              className="mt-4 min-h-11 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              Активировать и получить ссылку
-            </button>
-            {!hasAttachment ? (
-              <p className="mt-3 text-sm text-[#b67a1d]" role="status">
-                {getPersonalMaterialActivationErrorMessage()}
-              </p>
-            ) : null}
-          </section>
         </>
+      ) : null}
+
+      {isDraft ? (
+        <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
+          <h3 className="text-[18px] font-semibold">Активация</h3>
+          <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+            После активации вы получите персональную ссылку для клиента. Материал можно будет
+            редактировать и после активации.
+          </p>
+          <button
+            type="button"
+            disabled={!hasAttachment || actionLoading || uploading || uploadingPdf}
+            onClick={() => {
+              if (!formValues) {
+                return;
+              }
+
+              const nameError = requireClientFirstName(formValues);
+              if (nameError) {
+                setFormErrors((current) => ({
+                  ...current,
+                  clientFirstName: nameError,
+                }));
+                setActionError(nameError);
+                document
+                  .getElementById("edit-diagnostics-client-first-name")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+              }
+
+              setConfirmAction("activate");
+            }}
+            className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+          >
+            Активировать и получить ссылку
+          </button>
+          {!hasAttachment ? (
+            <p className="mt-3 text-sm text-[#b67a1d]" role="status">
+              {getPersonalMaterialActivationErrorMessage()}
+            </p>
+          ) : null}
+        </section>
       ) : (
         <section className="mt-6 min-w-0 rounded-[24px] border border-[#eadff8] bg-white p-4 sm:p-5">
           <h3 className="text-[18px] font-semibold">Управление доступом</h3>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            {material.hasAudio ? "Аудиофайл загружен." : "Аудиофайл отсутствует."}{" "}
-            {material.hasPdf ? "PDF-документ загружен." : "PDF-документ отсутствует."}
+            {uiStatus === "revoked"
+              ? "Доступ по ссылке отозван."
+              : null}
+            {uiStatus !== "revoked" ? (
+              <>
+                {material.hasAudio ? "Аудиофайл загружен." : "Аудиофайл отсутствует."}{" "}
+                {material.hasPdf ? "PDF-документ загружен." : "PDF-документ отсутствует."}
+              </>
+            ) : null}
             {material.claimed
               ? " Клиент уже сохранил материал в личном кабинете."
               : null}
@@ -512,7 +632,7 @@ export default function AuthorDiagnosticsEditorClient({
           ) : null}
 
           <div className="mt-4 flex flex-col gap-3">
-            {uiStatus === "active" || uiStatus === "claimed" || uiStatus === "revoked" ? (
+            {canRotateLink ? (
               <button
                 type="button"
                 disabled={actionLoading}
@@ -520,17 +640,6 @@ export default function AuthorDiagnosticsEditorClient({
                 className="min-h-11 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
               >
                 Создать новую ссылку
-              </button>
-            ) : null}
-
-            {uiStatus === "active" || uiStatus === "claimed" ? (
-              <button
-                type="button"
-                disabled={actionLoading}
-                onClick={() => setConfirmAction("revoke")}
-                className="min-h-11 rounded-full border border-[#e4d7f4] px-5 py-3 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
-              >
-                Отозвать доступ
               </button>
             ) : null}
 
@@ -543,13 +652,33 @@ export default function AuthorDiagnosticsEditorClient({
               Удалить
             </button>
           </div>
+
+          {canRevokeLink ? (
+            <details className="mt-5 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-[#5f5484]">
+                Дополнительные действия
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                Отзыв доступа — аварийное действие. Обычное редактирование материала его не
+                требует.
+              </p>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => setConfirmAction("revoke")}
+                className="mt-3 min-h-11 rounded-full border border-[#e4d7f4] bg-white px-5 py-3 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+              >
+                Отозвать доступ
+              </button>
+            </details>
+          ) : null}
         </section>
       )}
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "activate"}
-        title="Активировать диагностику?"
-        description="После активации черновик нельзя будет редактировать. Вы получите персональную ссылку для клиента."
+        title="Активировать материал?"
+        description="После активации вы получите персональную ссылку для клиента. Материал можно будет редактировать и после активации."
         confirmLabel="Активировать"
         loading={actionLoading}
         onConfirm={() => void handleConfirmAction()}
@@ -568,12 +697,8 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "revoke"}
-        title="Отозвать доступ?"
-        description={
-          material.claimed
-            ? "Клиент больше не сможет открыть диагностику по персональной ссылке. Ссылка будет отключена, но сохранённый доступ клиента останется."
-            : "Клиент больше не сможет открыть диагностику по персональной ссылке."
-        }
+        title="Отозвать доступ по ссылке?"
+        description="Клиент больше не сможет открыть материал по этой ссылке. Материал, уже добавленный в его личный кабинет, останется доступен."
         confirmLabel="Отозвать доступ"
         confirmTone="danger"
         loading={actionLoading}
@@ -583,8 +708,8 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "delete"}
-        title="Удалить диагностику?"
-        description={`Диагностика для ${clientName} будет удалена. Доступ по ссылке будет отключён.`}
+        title="Удалить материал?"
+        description={`Материал для ${clientName} будет удалён. Доступ по ссылке будет отключён.`}
         confirmLabel="Удалить"
         confirmTone="danger"
         loading={actionLoading}
@@ -598,7 +723,7 @@ export default function AuthorDiagnosticsEditorClient({
           onClick={() => router.push(listHref)}
           className="min-h-11 text-sm font-medium text-[#7042c5]"
         >
-          ← К списку диагностик
+          ← К списку
         </button>
       </div>
     </div>

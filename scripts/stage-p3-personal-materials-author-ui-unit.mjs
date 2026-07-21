@@ -24,10 +24,11 @@ function testRoutesAndNav() {
   const newPage = read("src/app/author-dashboard/diagnostics/new/page.tsx");
   const editPage = read("src/app/author-dashboard/diagnostics/[id]/page.tsx");
 
-  assert(nav.includes('label: "Диагностики"'), "nav diagnostics item");
+  assert(nav.includes('label: "Личная работа"'), "nav personal work item");
   assert(nav.includes("/author-dashboard/diagnostics"), "nav diagnostics href");
-  assert(nav.indexOf("Продукты") < nav.indexOf("Диагностики"), "nav order products before diagnostics");
-  assert(nav.indexOf("Диагностики") < nav.indexOf("Страница автора"), "nav order diagnostics before profile");
+  assert(nav.indexOf("Продукты") < nav.indexOf("Личная работа"), "nav order products before personal work");
+  assert(nav.indexOf("Личная работа") < nav.indexOf("Страница автора"), "nav order personal work before profile");
+  assert(!nav.includes('label: "Диагностики"'), "old diagnostics section label removed");
 
   assert(listPage.includes("AuthorDiagnosticsClient"), "list page client");
   assert(newPage.includes("AuthorDiagnosticsCreateClient"), "new page client");
@@ -57,8 +58,11 @@ function testListComponent() {
   const list = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsClient.tsx");
 
   assert(list.includes("listAuthorPersonalMaterials"), "list fetch");
-  assert(list.includes("Здесь появятся персональные аудиодиагностики"), "empty state");
-  assert(list.includes("Создать первую диагностику"), "empty CTA");
+  assert(list.includes("Здесь появятся персональные материалы"), "empty state");
+  assert(list.includes("Создать личный материал"), "empty CTA");
+  assert(list.includes("Создать личный материал"), "create button");
+  assert(!list.includes("Создать диагностику"), "old create label removed");
+  assert(!list.includes("Пока нет диагностик"), "old empty title removed");
   assert(list.includes("LoadingSkeleton"), "loading skeleton");
   assert(list.includes("Повторить"), "retry");
   assert(list.includes("break-words"), "long name wrapping");
@@ -68,7 +72,13 @@ function testListComponent() {
 function testCreateComponent() {
   const create = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsCreateClient.tsx");
 
-  assert(create.includes("Создать черновик"), "draft-first submit");
+  assert(create.includes("Сохранить и перейти к аудио"), "draft-first submit to audio");
+  assert(create.includes("Сначала сохраните основную информацию"), "upload gated until draft");
+  assert(create.includes("Загрузить аудиофайл"), "create shows audio placeholder");
+  assert(create.includes("#audio"), "redirect to editor audio anchor");
+  assert(create.includes("Создать с нуля"), "create mode blank");
+  assert(create.includes("Создать из шаблона"), "create mode template");
+  assert(create.includes("instantiateAuthorPersonalMaterialTemplate"), "instantiate helper");
   assert(create.includes("submittingRef"), "double-submit guard");
   assert(create.includes("createAuthorPersonalMaterial"), "POST create");
   assert(create.includes("router.replace"), "redirect after create");
@@ -91,15 +101,26 @@ function testEditorComponent() {
   assert(editor.includes("returnUrl"), "editor saves return url");
 
   assert(upload.includes("isAllowedClientMp3File"), "client mp3 validation");
-  assert(upload.includes("accept=\".mp3,audio/mpeg\""), "mp3 accept");
+  assert(upload.includes("accept=\".mp3,audio/mpeg,audio/mp3,application/octet-stream\""), "mp3 accept");
   assert(upload.includes("break-all"), "filename wrap");
   assert(upload.includes("Загрузить аудиофайл"), "upload CTA");
   assert(upload.includes("Аудиофайл загружен"), "upload success label");
   assert(upload.includes("Заменить файл"), "replace action");
   assert(upload.includes("Удалить файл"), "delete action");
   assert(upload.includes('id="personal-material-audio"'), "audio anchor id");
+  assert(editor.includes("canRotateLink"), "rotate only when link inactive");
+  assert(editor.includes("Дополнительные действия"), "revoke in extra actions");
+  assert(editor.includes("Отозвать доступ по ссылке?"), "revoke confirm title");
+  assert(editor.includes("isEditable"), "active materials remain editable");
+  assert(
+    editor.includes("Материал можно будет редактировать и после активации"),
+    "activation copy allows edits",
+  );
+  assert(!editor.includes("больше нельзя будет редактировать"), "old lock copy removed");
   assert(editor.includes("getPersonalMaterialActivationErrorMessage"), "activate without attachment hint");
   assert(editor.includes("AuthorDiagnosticsPdfUpload"), "pdf upload block");
+  assert(editor.includes('progressMode="none"'), "author audio preview player");
+  assert(editor.includes("Прослушивание"), "author preview section");
   assert(editor.includes('hash !== "#audio"'), "scroll to audio after create");
 
   assert(oneTime.includes("copyTextToClipboard"), "clipboard copy");

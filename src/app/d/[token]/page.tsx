@@ -1,6 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
+import PersonalMaterialClaimedLanding from "@/components/personal-materials/guest/PersonalMaterialClaimedLanding";
 import PersonalMaterialGuestPage from "@/components/personal-materials/guest/PersonalMaterialGuestPage";
+import { canOwnerAccessMaterial } from "@/lib/personal-materials/access";
 import { buildPersonalMaterialGuestApiPaths } from "@/lib/personal-materials/guest/api-paths";
 import { buildPersonalMaterialGuestMetadata } from "@/lib/personal-materials/guest/privacy";
 import {
@@ -31,7 +33,32 @@ export default async function PersonalMaterialGuestRoutePage({ params }: PagePro
 
   const material = await findGuestMaterialByRawToken(token);
 
-  if (!material || !isGuestMaterialAvailable(material)) {
+  if (!material) {
+    notFound();
+  }
+
+  // Claimed landing uses retained token hash only as a safe entry point.
+  // Content/audio stay closed (guest APIs still require available guest access).
+  if (material.claimed_by_user_id && material.status !== "deleted") {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user && canOwnerAccessMaterial(material, user.id)) {
+      redirect(`/my-materials/${encodeURIComponent(material.id)}`);
+    }
+
+    if (user) {
+      return (
+        <PersonalMaterialClaimedLanding mode="wrong_account" />
+      );
+    }
+
+    return <PersonalMaterialClaimedLanding mode="login" />;
+  }
+
+  if (!isGuestMaterialAvailable(material)) {
     notFound();
   }
 

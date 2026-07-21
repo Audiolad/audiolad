@@ -26,8 +26,8 @@ export type PersonalMaterialRow = {
   created_by: string;
   material_type: PersonalMaterialType;
   title: string | null;
-  client_first_name: string;
-  client_last_name: string;
+  client_first_name: string | null;
+  client_last_name: string | null;
   material_date: string;
   description: string | null;
   personal_recommendation: string | null;
@@ -72,7 +72,7 @@ export type PersonalMaterialOwnerView = {
   material_type: PersonalMaterialType;
   title: string | null;
   client_first_name: string;
-  client_last_name: string;
+  client_last_name: string | null;
   material_date: string;
   description: string | null;
   personal_recommendation: string | null;

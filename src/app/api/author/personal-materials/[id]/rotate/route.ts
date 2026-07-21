@@ -31,13 +31,18 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     const enableGuestAccess = material.claimed_by_user_id === null;
+
+    if (!enableGuestAccess) {
+      throw new PersonalMaterialApiError("conflict", 409);
+    }
+
     const token = generateAccessToken();
 
     await rotatePersonalMaterialAccessToken(
       supabase,
       id,
       token.tokenHash,
-      enableGuestAccess,
+      true,
     );
 
     const updated = await getAuthorPersonalMaterialById(supabase, id);

@@ -1,10 +1,11 @@
+import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import { PERSONAL_MATERIAL_TYPES } from "@/lib/personal-materials/types";
 
 import type { PersonalMaterialUiStatus } from "./types";
 import type { AuthorPersonalMaterial } from "./types";
 
 export const PERSONAL_MATERIAL_TYPE_OPTIONS = [
-  { value: "diagnostic", label: "Аудиодиагностика по фото" },
+  { value: "diagnostic", label: "Диагностика" },
   { value: "audio_review", label: "Аудиоразбор" },
   { value: "personal_meditation", label: "Персональная медитация" },
   { value: "recommendation", label: "Персональная рекомендация" },
@@ -88,11 +89,11 @@ export function getPersonalMaterialDisplayTitle(material: {
   title: string | null;
   materialType: string;
   clientFirstName: string;
-  clientLastName: string;
+  clientLastName: string | null;
 }): string {
   if (material.title?.trim()) {
     return material.title.trim();
   }
 
-  return `${material.clientFirstName} ${material.clientLastName}`.trim();
+  return formatClientDisplayName(material.clientFirstName, material.clientLastName);
 }

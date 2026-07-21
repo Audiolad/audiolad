@@ -12,8 +12,8 @@ type PersonalMaterialAudioPlayerProps = {
   materialId: string;
   audioApiPath: string;
   enabled?: boolean;
-  /** local = guest localStorage; server = callback only (owner library). */
-  progressMode?: "local" | "server";
+  /** local = guest localStorage; server = callback only; none = author preview. */
+  progressMode?: "local" | "server" | "none";
   initialPositionSeconds?: number;
   /** Throttled persist for server mode (default 12000ms). Local mode uses 500ms. */
   persistIntervalMs?: number;
@@ -92,10 +92,6 @@ export default function PersonalMaterialAudioPlayer({
   const lastPersistAtRef = useRef(0);
   const onProgressPersistRef = useRef(onProgressPersist);
 
-  useEffect(() => {
-    onProgressPersistRef.current = onProgressPersist;
-  }, [onProgressPersist]);
-
   const [fetchState, setFetchState] = useState<AudioFetchState>("idle");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(
@@ -104,6 +100,10 @@ export default function PersonalMaterialAudioPlayer({
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    onProgressPersistRef.current = onProgressPersist;
+  }, [onProgressPersist]);
 
   const clearRetryTimeout = useCallback(() => {
     if (retryTimeoutRef.current !== null) {
@@ -115,6 +115,10 @@ export default function PersonalMaterialAudioPlayer({
   const persistNow = useCallback(
     (positionSeconds: number, durationSeconds: number, force = false) => {
       const completed = isNearComplete(positionSeconds, durationSeconds);
+
+      if (progressMode === "none") {
+        return;
+      }
 
       if (progressMode === "local") {
         writePersonalMaterialGuestProgress(materialId, {
@@ -247,7 +251,7 @@ export default function PersonalMaterialAudioPlayer({
   }, [fetchSignedAudio, isSignedUrlExpired]);
 
   const restoreSavedPosition = useCallback(() => {
-    if (progressMode === "server") {
+    if (progressMode === "server" || progressMode === "none") {
       return;
     }
 

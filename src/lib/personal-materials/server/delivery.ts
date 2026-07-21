@@ -77,6 +77,23 @@ export async function createGuestAudioSignedUrl(
     throw new PersonalMaterialApiError("not_found", 404);
   }
 
+  return createPersonalMaterialAudioSignedUrl(material);
+}
+
+/** Author preview: signed URL without guest_access requirement. */
+export async function createAuthorAudioSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
+  if (material.status === "deleted" || material.deleted_at) {
+    throw new PersonalMaterialApiError("not_found", 404);
+  }
+
+  return createPersonalMaterialAudioSignedUrl(material);
+}
+
+async function createPersonalMaterialAudioSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
   const audioPath = material.audio_path?.trim();
 
   if (!audioPath || !isPathInsidePersonalMaterialRoot(audioPath)) {
@@ -92,7 +109,73 @@ export async function createGuestAudioSignedUrl(
     .createSignedUrl(audioPath, expiresIn);
 
   if (error || !data?.signedUrl) {
-    console.error("personal_material_guest_signed_url_error", error?.message);
+    console.error("personal_material_signed_url_error", error?.message);
+    throw new PersonalMaterialApiError("internal_error", 500);
+  }
+
+  const url = normalizeStorageSignedUrl(data.signedUrl);
+
+  if (!url) {
+    throw new PersonalMaterialApiError("internal_error", 500);
+  }
+
+  return { url, expiresAt };
+}
+
+export async function createGuestPdfSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
+  if (!isGuestMaterialAvailable(material)) {
+    throw new PersonalMaterialApiError("not_found", 404);
+  }
+
+  const pdfPath = material.pdf_path?.trim();
+
+  if (!pdfPath || !isPathInsidePersonalMaterialRoot(pdfPath)) {
+    throw new PersonalMaterialApiError("not_found", 404);
+  }
+
+  const service = createServiceRoleClient();
+  const expiresIn = PERSONAL_MATERIAL_LIMITS.signedUrlTtlSeconds;
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  const { data, error } = await service.storage
+    .from(PERSONAL_MATERIALS_BUCKET)
+    .createSignedUrl(pdfPath, expiresIn);
+
+  if (error || !data?.signedUrl) {
+    console.error("personal_material_guest_pdf_signed_url_error", error?.message);
+    throw new PersonalMaterialApiError("internal_error", 500);
+  }
+
+  const url = normalizeStorageSignedUrl(data.signedUrl);
+
+  if (!url) {
+    throw new PersonalMaterialApiError("internal_error", 500);
+  }
+
+  return { url, expiresAt };
+}
+
+export async function createAuthorPdfSignedUrl(
+  material: PersonalMaterialRow,
+): Promise<{ url: string; expiresAt: string }> {
+  const pdfPath = material.pdf_path?.trim();
+
+  if (!pdfPath || !isPathInsidePersonalMaterialRoot(pdfPath)) {
+    throw new PersonalMaterialApiError("not_found", 404);
+  }
+
+  const service = createServiceRoleClient();
+  const expiresIn = PERSONAL_MATERIAL_LIMITS.signedUrlTtlSeconds;
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  const { data, error } = await service.storage
+    .from(PERSONAL_MATERIALS_BUCKET)
+    .createSignedUrl(pdfPath, expiresIn);
+
+  if (error || !data?.signedUrl) {
+    console.error("personal_material_author_pdf_signed_url_error", error?.message);
     throw new PersonalMaterialApiError("internal_error", 500);
   }
 

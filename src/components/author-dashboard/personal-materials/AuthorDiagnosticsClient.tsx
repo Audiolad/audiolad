@@ -6,12 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorDiagnosticsStatusBadge from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsStatusBadge";
+import AuthorDiagnosticsTemplatesPanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsTemplatesPanel";
 import { listAuthorPersonalMaterials } from "@/lib/personal-materials/client/api";
 import { getPersonalMaterialListErrorMessage } from "@/lib/personal-materials/client/errors";
 import {
   formatCreatedAtLabel,
   formatMaterialDateLabel,
 } from "@/lib/personal-materials/client/validation";
+import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import {
   getPersonalMaterialDisplayTitle,
   getPersonalMaterialTypeLabel,
@@ -30,7 +32,10 @@ function MaterialCard({
   material: AuthorPersonalMaterial;
   authorSlug: string;
 }) {
-  const clientName = `${material.clientFirstName} ${material.clientLastName}`.trim();
+  const clientName = formatClientDisplayName(
+    material.clientFirstName,
+    material.clientLastName,
+  ) || "Без имени";
   const displayTitle = getPersonalMaterialDisplayTitle(material);
 
   return (
@@ -96,8 +101,10 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
     return authors.find((author) => author.slug === slug) ?? authors[0] ?? null;
   }, [authors, searchParams]);
 
+  const activeTab = searchParams.get("tab") === "templates" ? "templates" : "materials";
+
   useEffect(() => {
-    if (!selectedAuthor) {
+    if (!selectedAuthor || activeTab !== "materials") {
       return;
     }
 
@@ -134,11 +141,21 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
       cancelled = true;
       controller.abort();
     };
-  }, [selectedAuthor, refreshToken]);
+  }, [selectedAuthor, refreshToken, activeTab]);
 
   function handleAuthorChange(slug: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("author", slug);
+    router.replace(`/author-dashboard/diagnostics?${params.toString()}`);
+  }
+
+  function setTab(tab: "materials" | "templates") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "templates") {
+      params.set("tab", "templates");
+    } else {
+      params.delete("tab");
+    }
     router.replace(`/author-dashboard/diagnostics?${params.toString()}`);
   }
 
@@ -177,20 +194,54 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
           </select>
         </label>
 
-        <Link
-          href={createHref}
-          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
-        >
-          Создать диагностику
-        </Link>
+        {activeTab === "materials" ? (
+          <Link
+            href={createHref}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
+          >
+            Создать личный материал
+          </Link>
+        ) : null}
       </div>
 
-      <p className="mt-6 text-sm leading-6 text-[#7d70a2]">
-        Создавайте персональные аудиодиагностики и отправляйте клиентам безопасные ссылки для
-        прослушивания.
-      </p>
+      <div className="mt-6 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("materials")}
+          className={`min-h-11 rounded-full px-4 text-sm font-semibold ${
+            activeTab === "materials"
+              ? "bg-[#7042c5] text-white"
+              : "border border-[#e4d7f4] text-[#7042c5]"
+          }`}
+        >
+          Материалы
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("templates")}
+          className={`min-h-11 rounded-full px-4 text-sm font-semibold ${
+            activeTab === "templates"
+              ? "bg-[#7042c5] text-white"
+              : "border border-[#e4d7f4] text-[#7042c5]"
+          }`}
+        >
+          Шаблоны
+        </button>
+      </div>
 
+      {activeTab === "templates" ? (
+        <div className="mt-6">
+          <AuthorDiagnosticsTemplatesPanel
+            authorId={selectedAuthor.id}
+            authorSlug={selectedAuthor.slug}
+          />
+        </div>
+      ) : (
       <div className="mt-6 min-w-0">
+        <p className="mb-6 text-sm leading-6 text-[#7d70a2]">
+          Создавайте персональные аудиоразборы, медитации и другие материалы для
+          отдельных клиентов.
+        </p>
         {loading ? <LoadingSkeleton /> : null}
 
         {!loading && error ? (
@@ -208,16 +259,25 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
 
         {!loading && !error && materials.length === 0 ? (
           <div className="rounded-[24px] border border-dashed border-[#d8c7ef] bg-[#faf6ff] px-5 py-10 text-center">
-            <p className="text-[18px] font-semibold">Пока нет диагностик</p>
+            <p className="text-[18px] font-semibold">Пока нет личных материалов</p>
             <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-              Здесь появятся персональные аудиодиагностики, которые вы создадите для клиентов.
+              Здесь появятся персональные материалы, которые вы создадите для клиентов.
             </p>
             <Link
               href={createHref}
               className="mt-6 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
             >
-              Создать первую диагностику
+              Создать личный материал
             </Link>
+            <p className="mt-4 text-sm text-[#7d70a2]">
+              <button
+                type="button"
+                onClick={() => setTab("templates")}
+                className="font-semibold text-[#7042c5]"
+              >
+                Создать первый шаблон
+              </button>
+            </p>
           </div>
         ) : null}
 
@@ -233,6 +293,7 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
           </div>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

@@ -37,16 +37,20 @@ export function validatePersonalMaterialForm(
   const returnUrl = (values.returnUrl ?? "").trim();
   const returnButtonLabel = (values.returnButtonLabel ?? "").trim();
 
-  if (!firstName || firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+  if (!firstName) {
+    // Draft may be saved without a name; activation enforces separately.
+  } else if (firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
     errors.clientFirstName = "Укажите имя клиента.";
   } else if (!CLIENT_NAME_PATTERN.test(firstName)) {
     errors.clientFirstName = "Имя содержит недопустимые символы.";
   }
 
-  if (!lastName || lastName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
-    errors.clientLastName = "Укажите фамилию клиента.";
-  } else if (!CLIENT_NAME_PATTERN.test(lastName)) {
-    errors.clientLastName = "Фамилия содержит недопустимые символы.";
+  if (lastName) {
+    if (lastName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+      errors.clientLastName = "Фамилия слишком длинная.";
+    } else if (!CLIENT_NAME_PATTERN.test(lastName)) {
+      errors.clientLastName = "Фамилия содержит недопустимые символы.";
+    }
   }
 
   if (!DATE_PATTERN.test(materialDate)) {
@@ -84,6 +88,26 @@ export function validatePersonalMaterialForm(
   return errors;
 }
 
+export function requireClientFirstName(
+  values: Pick<PersonalMaterialFormValues, "clientFirstName">,
+): string | null {
+  const firstName = values.clientFirstName.trim();
+
+  if (!firstName) {
+    return "Укажите имя клиента.";
+  }
+
+  if (firstName.length > PERSONAL_MATERIAL_LIMITS.clientNameMaxLength) {
+    return "Укажите имя клиента.";
+  }
+
+  if (!CLIENT_NAME_PATTERN.test(firstName)) {
+    return "Имя содержит недопустимые символы.";
+  }
+
+  return null;
+}
+
 export function isAllowedClientMp3File(file: File): boolean {
   const name = file.name.toLowerCase();
   const type = file.type.toLowerCase();
@@ -92,7 +116,14 @@ export function isAllowedClientMp3File(file: File): boolean {
     return false;
   }
 
-  if (type && type !== "audio/mpeg" && type !== "audio/mp3") {
+  if (
+    type &&
+    type !== "audio/mpeg" &&
+    type !== "audio/mp3" &&
+    type !== "audio/x-mpeg" &&
+    type !== "audio/x-mp3" &&
+    type !== "application/octet-stream"
+  ) {
     return false;
   }
 

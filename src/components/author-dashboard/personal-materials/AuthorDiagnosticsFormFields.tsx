@@ -64,6 +64,7 @@ export default function AuthorDiagnosticsFormFields({
             value={values.clientFirstName}
             disabled={disabled || readOnly}
             onChange={(event) => onChange("clientFirstName", event.target.value)}
+            placeholder="Имя клиента"
             className={fieldClassName}
             autoComplete="off"
           />
@@ -85,9 +86,13 @@ export default function AuthorDiagnosticsFormFields({
             value={values.clientLastName}
             disabled={disabled || readOnly}
             onChange={(event) => onChange("clientLastName", event.target.value)}
+            placeholder="Если есть"
             className={fieldClassName}
             autoComplete="off"
           />
+          {!errors.clientLastName ? (
+            <span className="mt-1 block text-xs text-[#7d70a2]">Необязательно</span>
+          ) : null}
           {errors.clientLastName ? (
             <span className="mt-1 block text-sm text-[#b42318]">{errors.clientLastName}</span>
           ) : null}
@@ -99,7 +104,7 @@ export default function AuthorDiagnosticsFormFields({
           htmlFor={`${idPrefix}-material-date`}
           className="mb-2 block text-sm font-medium text-[#5f5484]"
         >
-          Дата диагностики
+          Дата материала
         </label>
         <input
           id={`${idPrefix}-material-date`}
@@ -124,7 +129,7 @@ export default function AuthorDiagnosticsFormFields({
           value={values.title}
           disabled={disabled || readOnly}
           onChange={(event) => onChange("title", event.target.value)}
-          placeholder="Например: Энергетическая диагностика"
+          placeholder="Например: Личный аудиоразбор"
           className={fieldClassName}
         />
         {errors.title ? (
@@ -165,7 +170,7 @@ export default function AuthorDiagnosticsFormFields({
           value={values.personalRecommendation}
           disabled={disabled || readOnly}
           onChange={(event) => onChange("personalRecommendation", event.target.value)}
-          placeholder="Можно добавить краткую персональную рекомендацию после диагностики."
+          placeholder="Можно добавить краткую персональную рекомендацию."
           rows={4}
           className={`${fieldClassName} resize-y`}
         />
