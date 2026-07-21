@@ -57,6 +57,7 @@ function testUi() {
   const editor = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsEditorClient.tsx");
   const detail = read("src/components/personal-materials/library/MyMaterialDetailClient.tsx");
   const player = read("src/components/personal-materials/guest/PersonalMaterialAudioPlayer.tsx");
+  const pdfDocument = read("src/components/personal-materials/PersonalMaterialPdfDocument.tsx");
 
   assert.match(guestPage, /material\.hasPdf/);
   assert.match(guestPage, /material\.hasAudio/);
@@ -64,6 +65,10 @@ function testUi() {
   assert.match(editor, /hasAttachment/);
   assert.match(detail, /material\.hasPdf/);
   assert.match(player, /if \(!enabled\)/);
+  assert.doesNotMatch(pdfDocument, /Скачать PDF/);
+  assert.match(pdfDocument, /window\.open\("about:blank", "_blank", "noopener,noreferrer"\)/);
+  assert.match(pdfDocument, /previewWindow\.location\.href = payload\.url/);
+  assert.match(pdfDocument, /closePreviewWindow\(previewWindow\)/);
 }
 
 async function runModuleTests() {
