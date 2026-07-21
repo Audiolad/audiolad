@@ -37,25 +37,24 @@ export default function AuthorShell({
   children,
   actions,
 }: AuthorShellProps) {
-  const resolvedBackHref = internalBackHref ?? backHref;
-  const resolvedBackLabel = internalBackHref ? internalBackLabel : backLabel;
-
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
-      <div className="mx-auto min-h-screen w-full max-w-[720px] bg-platform-surface px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1.25rem+env(safe-area-inset-top,0px))]">
-        <header className="flex items-start justify-between gap-3">
+      <div className="mx-auto min-h-screen w-full min-w-0 max-w-[720px] bg-platform-surface px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(1.25rem+env(safe-area-inset-top,0px))]">
+        <header className="flex min-w-0 items-start justify-between gap-3">
           <Link
-            href={resolvedBackHref}
-            aria-label={resolvedBackLabel}
+            href={backHref}
+            aria-label={backLabel}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#e4d7f4] text-[#7042c5]"
           >
             <BackIcon />
           </Link>
 
-          <div className="min-w-0 flex-1 text-center">
-            <h1 className="text-[22px] font-semibold leading-tight">{title}</h1>
+          <div className="min-w-0 flex-1 overflow-hidden text-center">
+            <h1 className="truncate text-[22px] font-semibold leading-tight">
+              {title}
+            </h1>
             {subtitle ? (
-              <p className="mt-1 text-xs text-[#7d70a2]">{subtitle}</p>
+              <p className="mt-1 truncate text-xs text-[#7d70a2]">{subtitle}</p>
             ) : null}
           </div>
 
@@ -64,7 +63,19 @@ export default function AuthorShell({
           </div>
         </header>
 
-        <div className="mt-6">{children}</div>
+        {internalBackHref ? (
+          <div className="mt-4 min-w-0">
+            <Link
+              href={internalBackHref}
+              className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#7042c5]"
+            >
+              <BackIcon />
+              {internalBackLabel}
+            </Link>
+          </div>
+        ) : null}
+
+        <div className="mt-6 min-w-0">{children}</div>
       </div>
     </main>
   );
