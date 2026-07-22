@@ -5,6 +5,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 
+import type { AuthorAccessStatus } from "@/lib/authors/access";
+import {
+  authorAccessAllowsContentMutations,
+  authorAccessAllowsPaidProducts,
+} from "@/lib/authors/access";
+
 import type { AuthorMemberRole, AuthorWorkspace } from "./types";
 
 export class AuthorAccessError extends Error {
@@ -82,7 +88,8 @@ export async function listAuthorWorkspacesForUser(
       authors!author_members_author_id_fkey (
         id,
         name,
-        slug
+        slug,
+        access_status
       )
     `,
     )
@@ -111,12 +118,31 @@ export async function listAuthorWorkspacesForUser(
       name: author.name,
       slug: author.slug,
       role: row.role as AuthorMemberRole,
+      accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
     });
   }
 
   workspaces.sort((left, right) => left.name.localeCompare(right.name, "ru"));
 
   return workspaces;
+}
+
+export async function getAuthorAccessStatusForMembership(
+  supabase: SupabaseClient,
+  authorId: string,
+): Promise<AuthorAccessStatus> {
+  const { data, error } = await supabase
+    .from("authors")
+    .select("access_status")
+    .eq("id", authorId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("author_access_status_error", error.message);
+    throw new AuthorAccessError("internal_error", 500);
+  }
+
+  return (data?.access_status ?? "free") as AuthorAccessStatus;
 }
 
 export async function requireAuthorMembership(authorId: string) {
@@ -138,7 +164,26 @@ export async function requireAuthorMembership(authorId: string) {
     throw new AuthorAccessError("forbidden", 403);
   }
 
-  return { supabase, user, role: data.role as AuthorMemberRole };
+  const accessStatus = await getAuthorAccessStatusForMembership(supabase, authorId);
+
+  return {
+    supabase,
+    user,
+    role: data.role as AuthorMemberRole,
+    accessStatus,
+  };
+}
+
+export function assertAuthorContentMutationsAllowed(accessStatus: AuthorAccessStatus) {
+  if (!authorAccessAllowsContentMutations(accessStatus)) {
+    throw new AuthorAccessError("author_content_mutations_blocked", 403);
+  }
+}
+
+export function assertAuthorPaidProductsAllowed(accessStatus: AuthorAccessStatus) {
+  if (!authorAccessAllowsPaidProducts(accessStatus)) {
+    throw new AuthorAccessError("paid_products_not_allowed", 403);
+  }
 }
 
 export async function requirePracticeAccess(practiceId: string) {
@@ -171,6 +216,11 @@ export async function requirePracticeAccess(practiceId: string) {
     throw new AuthorAccessError("internal_error", 500);
   }
 
+  const accessStatus = await getAuthorAccessStatusForMembership(
+    supabase,
+    practice.author_id,
+  );
+
   if (
     !membership ||
     (membership.role !== "owner" && membership.role !== "editor")
@@ -190,6 +240,7 @@ export async function requirePracticeAccess(practiceId: string) {
       use_shared_cover: boolean;
     },
     role: membership.role as AuthorMemberRole,
+    accessStatus,
   };
 }
 

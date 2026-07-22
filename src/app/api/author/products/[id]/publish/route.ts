@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  assertAuthorContentMutationsAllowed,
   handleAuthorRouteError,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
@@ -18,7 +19,8 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice } = await requirePracticeAccess(id);
+    const { supabase, practice, accessStatus } = await requirePracticeAccess(id);
+    assertAuthorContentMutationsAllowed(accessStatus);
     const detail = await getAuthorProductDetail(supabase, id);
 
     if (!detail) {
@@ -28,6 +30,7 @@ export async function POST(_request: Request, context: RouteContext) {
     const validation = validatePublishRequirements(
       detail.practice,
       detail.audio_items,
+      accessStatus,
     );
 
     if (!validation.ok) {

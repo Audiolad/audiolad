@@ -1,4 +1,9 @@
 import { getProductPriceLabel } from "@/lib/products/price-format";
+import type { AuthorAccessStatus } from "@/lib/authors/access";
+import {
+  authorAccessAllowsContentMutations,
+  authorAccessAllowsPaidProducts,
+} from "@/lib/authors/access";
 
 export const PAID_PRICE_OPTIONS = [99, 199, 299, 444, 888, 1888, 2888] as const;
 
@@ -19,6 +24,7 @@ export type AuthorWorkspace = {
   name: string;
   slug: string;
   role: AuthorMemberRole;
+  accessStatus: AuthorAccessStatus;
 };
 
 export type AudioItemRow = {
@@ -127,3 +133,8 @@ export function formatUpdatedAt(value: string): string {
     year: "numeric",
   });
 }
+
+export {
+  authorAccessAllowsContentMutations,
+  authorAccessAllowsPaidProducts,
+};

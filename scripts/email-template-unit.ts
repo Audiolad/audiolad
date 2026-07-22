@@ -8,6 +8,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
+  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorAccessGrantedEmailHtml,
+} from "../src/lib/email/templates/author-access-granted";
+import {
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
   renderRecoveryEmailHtml,
@@ -113,9 +119,31 @@ function testSignupSendsWelcome() {
   assert.match(signUpAction, /userName: firstName/);
 }
 
+async function testAuthorAccessGrantedTemplate() {
+  const html = renderAuthorAccessGrantedEmailHtml({
+    userName: "Анна",
+    siteOrigin: "https://audiolad.ru",
+  });
+
+  assert.match(html, /кабинет автора/i);
+  assert.match(html, /author-dashboard/);
+
+  const rendered = await brandEmailTemplateRenderer.render({
+    templateKey: AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
+    templateVersion: AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
+    payload: { userName: "Анна" },
+  });
+
+  assert.equal(rendered.ok, true);
+  if (rendered.ok) {
+    assert.equal(rendered.subject, AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT);
+  }
+}
+
 async function main() {
   testSharedLayoutFiles();
   await testWelcomeTemplate();
+  await testAuthorAccessGrantedTemplate();
   await testRecoveryTemplateStillWorks();
   testSignupSendsWelcome();
   console.log("email-template-unit: ok");

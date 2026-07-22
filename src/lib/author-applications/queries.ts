@@ -31,6 +31,9 @@ export const AUTHOR_APPLICATION_COLUMNS = `
   reviewed_by,
   review_comment,
   admin_note,
+  author_id,
+  approved_at,
+  approved_by,
   created_at,
   updated_at
 `;

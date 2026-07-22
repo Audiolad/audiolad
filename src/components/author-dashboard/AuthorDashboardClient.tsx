@@ -7,9 +7,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
+import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
 import {
   formatPriceLabel,
   formatUpdatedAt,
@@ -181,9 +183,14 @@ export default function AuthorDashboardClient({
   const archivedProducts = products.filter((product) => product.status === "archived");
   const visibleProducts = listView === "archive" ? archivedProducts : activeProducts;
 
+  const canMutateContent = authorAccessAllowsContentMutations(
+    selectedAuthor.accessStatus,
+  );
+
   return (
     <div>
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+      <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="block flex-1">
@@ -205,7 +212,12 @@ export default function AuthorDashboardClient({
 
         <Link
           href={newProductHref}
-          className="inline-flex items-center justify-center gap-2 rounded-[22px] bg-[#7042c5] px-5 py-4 text-center font-semibold text-white"
+          aria-disabled={!canMutateContent}
+          className={`inline-flex items-center justify-center gap-2 rounded-[22px] px-5 py-4 text-center font-semibold text-white ${
+            canMutateContent
+              ? "bg-[#7042c5]"
+              : "pointer-events-none bg-[#b7a5df] opacity-70"
+          }`}
         >
           <PlusIcon />
           Создать аудиопродукт

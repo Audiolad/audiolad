@@ -1,19 +1,27 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import { useActionState, useState } from "react";
 
 import {
-  updateAuthorApplicationReview,
-  type UpdateAuthorApplicationState,
+  ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  approveAuthorApplication,
+  rejectAuthorApplication,
+  requestAuthorApplicationChanges,
+  restoreLinkedAuthorAccess,
+  returnAuthorApplicationToReview,
+  suspendLinkedAuthorAccess,
+  takeAuthorApplicationInReview,
+  updateAuthorApplicationAdminNote,
+  type AdminAuthorApplicationActionState,
 } from "@/app/admin/author-applications/actions";
-import { ADMIN_APPLICATION_STATUS_OPTIONS } from "@/lib/admin/application-status";
-import type { AuthorApplicationRow } from "@/lib/author-applications/types";
+import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
+import { getAuthorAccessStatusLabel } from "@/lib/authors/access";
+import type { AdminAuthorApplicationDetail } from "@/lib/author-applications/types";
 
 type AuthorApplicationReviewFormProps = {
-  application: AuthorApplicationRow;
+  application: AdminAuthorApplicationDetail;
 };
-
-const INITIAL_STATE: UpdateAuthorApplicationState = { ok: false };
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -42,13 +50,159 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ActionFeedback({ state }: { state: AdminAuthorApplicationActionState }) {
+  if (state.ok && state.message) {
+    return (
+      <div className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm text-[#3d8d65]">
+        {state.message}
+        {state.warning ? (
+          <p className="mt-2 text-[#8a6a1f]">{state.warning}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (state.error) {
+    return (
+      <div className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
+        {state.error}
+      </div>
+    );
+  }
+
+  if (state.warning) {
+    return (
+      <div className="rounded-[18px] border border-[#f0dfab] bg-[#fffaf0] px-4 py-3 text-sm text-[#8a6a1f]">
+        {state.warning}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function StatusEventList({
+  application,
+}: {
+  application: AdminAuthorApplicationDetail;
+}) {
+  const events = [
+    ...application.applicationEvents.map((event) => ({
+      id: event.id,
+      createdAt: event.created_at,
+      label: `${event.from_status ?? "—"} → ${event.to_status}`,
+      staffComment: event.staff_comment,
+      applicantComment: event.applicant_comment,
+      kind: "application" as const,
+    })),
+    ...application.accessEvents.map((event) => ({
+      id: event.id,
+      createdAt: event.created_at,
+      label: `access: ${event.from_status ?? "—"} → ${event.to_status}`,
+      staffComment: event.reason,
+      applicantComment: null,
+      kind: "access" as const,
+    })),
+  ].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+
+  if (events.length === 0) {
+    return (
+      <p className="text-sm text-[#796ba0]">История решений пока пуста.</p>
+    );
+  }
+
+  return (
+    <ul className="space-y-3">
+      {events.map((event) => (
+        <li
+          key={`${event.kind}-${event.id}`}
+          className="rounded-[16px] border border-[#efe6fa] bg-[#faf6ff] px-4 py-3"
+        >
+          <p className="text-sm font-medium text-[#25135c]">{event.label}</p>
+          <p className="mt-1 text-xs text-[#796ba0]">
+            {formatDateTime(event.createdAt)}
+          </p>
+          {event.staffComment ? (
+            <p className="mt-2 text-sm text-[#5f5484]">
+              Внутренний комментарий: {event.staffComment}
+            </p>
+          ) : null}
+          {event.applicantComment ? (
+            <p className="mt-2 text-sm text-[#5f5484]">
+              Комментарий заявителю: {event.applicantComment}
+            </p>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function AuthorApplicationReviewForm({
   application,
 }: AuthorApplicationReviewFormProps) {
-  const [state, formAction, isPending] = useActionState(
-    updateAuthorApplicationReview,
-    INITIAL_STATE,
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [adminNote, setAdminNote] = useState(application.admin_note ?? "");
+  const [reviewComment, setReviewComment] = useState(
+    application.review_comment ?? "",
   );
+  const [suspendReason, setSuspendReason] = useState("");
+
+  const [takeState, takeAction, takePending] = useActionState(
+    takeAuthorApplicationInReview,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [changesState, changesAction, changesPending] = useActionState(
+    requestAuthorApplicationChanges,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [returnState, returnAction, returnPending] = useActionState(
+    returnAuthorApplicationToReview,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [rejectState, rejectAction, rejectPending] = useActionState(
+    rejectAuthorApplication,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [approveState, approveAction, approvePending] = useActionState(
+    approveAuthorApplication,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [suspendState, suspendAction, suspendPending] = useActionState(
+    suspendLinkedAuthorAccess,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [restoreState, restoreAction, restorePending] = useActionState(
+    restoreLinkedAuthorAccess,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+  const [noteState, noteAction, notePending] = useActionState(
+    updateAuthorApplicationAdminNote,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
+
+  const feedbackState =
+    approveState.ok || approveState.error || approveState.warning
+      ? approveState
+      : rejectState.ok || rejectState.error
+        ? rejectState
+        : changesState.ok || changesState.error
+          ? changesState
+          : takeState.ok || takeState.error
+            ? takeState
+            : returnState.ok || returnState.error
+              ? returnState
+              : suspendState.ok || suspendState.error
+                ? suspendState
+                : restoreState.ok || restoreState.error
+                  ? restoreState
+                  : noteState.ok || noteState.error
+                    ? noteState
+                    : ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE;
+
   const contactEmail = application.contact_email?.trim() ?? "";
   const contactDetails = application.contact_details?.trim() ?? "";
   const copyText = [contactEmail, contactDetails].filter(Boolean).join("\n");
@@ -61,9 +215,24 @@ export default function AuthorApplicationReviewForm({
     try {
       await navigator.clipboard.writeText(copyText);
     } catch {
-      // Clipboard may be unavailable in some browsers.
+      // Clipboard may be unavailable.
     }
   }
+
+  const linkedAuthor = application.linkedAuthor;
+  const canTake = application.status === "submitted";
+  const canRequestChanges = application.status === "in_review";
+  const canReturnToReview = application.status === "needs_changes";
+  const canApprove = ["submitted", "in_review", "needs_changes"].includes(
+    application.status,
+  );
+  const canReject = canApprove;
+  const canSuspend =
+    linkedAuthor &&
+    ["free", "commercial_pending", "commercial"].includes(
+      linkedAuthor.accessStatus,
+    );
+  const canRestore = linkedAuthor?.accessStatus === "suspended";
 
   return (
     <div className="space-y-5">
@@ -74,7 +243,15 @@ export default function AuthorApplicationReviewForm({
           <InfoRow label="Имя" value={application.display_name} />
           <InfoRow
             label="Электронная почта"
-            value={contactEmail || "—"}
+            value={contactEmail || application.userEmail || "—"}
+          />
+          <InfoRow
+            label="Пользователь"
+            value={
+              application.userDisplayName
+                ? `${application.userDisplayName} (${application.user_id})`
+                : application.user_id
+            }
           />
           <InfoRow
             label="Телефон, MAX или другой способ связи"
@@ -89,21 +266,42 @@ export default function AuthorApplicationReviewForm({
           <InfoRow label="Опыт" value={application.experience?.trim() || "—"} />
           <InfoRow label="Ссылки" value={application.links?.trim() || "—"} />
           <InfoRow
-            label="Согласие на обработку данных"
-            value={application.consent_personal_data ? "Дано" : "Не дано"}
+            label="Текущий статус"
+            value={getAdminApplicationStatusLabel(application.status)}
           />
           <InfoRow
-            label="Есть готовые материалы"
-            value={application.has_ready_materials ? "Да" : "Нет"}
+            label="Связанное авторское пространство"
+            value={
+              linkedAuthor
+                ? `${linkedAuthor.name} (${linkedAuthor.slug})`
+                : "—"
+            }
           />
           <InfoRow
-            label="Интерес к обучению"
-            value={application.wants_training ? "Да" : "Нет"}
+            label="Статус авторского доступа"
+            value={
+              linkedAuthor
+                ? getAuthorAccessStatusLabel(
+                    linkedAuthor.accessStatus as Parameters<
+                      typeof getAuthorAccessStatusLabel
+                    >[0],
+                  )
+                : "—"
+            }
           />
-          <InfoRow
-            label="Интерес к школе авторов"
-            value={application.interested_in_school ? "Да" : "Нет"}
-          />
+          {linkedAuthor ? (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#9485b4]">
+                Публичная страница автора
+              </p>
+              <Link
+                href={`/authors/${linkedAuthor.slug}`}
+                className="mt-1 inline-block text-sm font-medium text-[#7042c5]"
+              >
+                /authors/{linkedAuthor.slug}
+              </Link>
+            </div>
+          ) : null}
           <InfoRow
             label="Создана"
             value={formatDateTime(application.created_at)}
@@ -112,6 +310,16 @@ export default function AuthorApplicationReviewForm({
             label="Отправлена"
             value={formatDateTime(application.submitted_at)}
           />
+          <InfoRow
+            label="Одобрена"
+            value={formatDateTime(application.approved_at)}
+          />
+          {application.review_comment ? (
+            <InfoRow
+              label="Комментарий заявителю"
+              value={application.review_comment}
+            />
+          ) : null}
         </div>
 
         {copyText ? (
@@ -128,36 +336,8 @@ export default function AuthorApplicationReviewForm({
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">Рассмотрение</h2>
 
-        {state.ok ? (
-          <div className="mt-4 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm text-[#3d8d65]">
-            Изменения сохранены.
-          </div>
-        ) : null}
-
-        {state.error ? (
-          <div className="mt-4 rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
-            {state.error}
-          </div>
-        ) : null}
-
-        <form action={formAction} className="mt-4 space-y-4">
-          <input type="hidden" name="applicationId" value={application.id} />
-
-          <label className="block">
-            <span className="text-sm font-medium text-[#25135c]">Статус</span>
-            <select
-              name="status"
-              defaultValue={application.status}
-              disabled={isPending}
-              className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#25135c]"
-            >
-              {ADMIN_APPLICATION_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-4 space-y-4">
+          <ActionFeedback state={feedbackState} />
 
           <label className="block">
             <span className="text-sm font-medium text-[#25135c]">
@@ -165,22 +345,203 @@ export default function AuthorApplicationReviewForm({
             </span>
             <textarea
               name="adminNote"
-              defaultValue={application.admin_note ?? ""}
-              rows={5}
-              disabled={isPending}
+              value={adminNote}
+              onChange={(event) => setAdminNote(event.target.value)}
+              rows={4}
               placeholder="Заметка видна только команде платформы"
               className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c]"
             />
           </label>
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {isPending ? "Сохранение…" : "Сохранить изменения"}
-          </button>
-        </form>
+          <form action={noteAction}>
+            <input type="hidden" name="applicationId" value={application.id} />
+            <input type="hidden" name="adminNote" value={adminNote} />
+            <button
+              type="submit"
+              disabled={notePending}
+              className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+            >
+              {notePending ? "Сохранение…" : "Сохранить внутреннюю заметку"}
+            </button>
+          </form>
+
+          {(canRequestChanges || canReject) && (
+            <label className="block">
+              <span className="text-sm font-medium text-[#25135c]">
+                Комментарий для заявителя
+              </span>
+              <textarea
+                name="reviewComment"
+                value={reviewComment}
+                onChange={(event) => setReviewComment(event.target.value)}
+                rows={4}
+                placeholder="Этот текст увидит заявитель при запросе изменений или отклонении"
+                className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c]"
+              />
+            </label>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {canTake ? (
+              <form action={takeAction} className="contents">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="adminNote" value={adminNote} />
+                <button
+                  type="submit"
+                  disabled={takePending}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {takePending ? "Обработка…" : "Взять в работу"}
+                </button>
+              </form>
+            ) : null}
+
+            {canRequestChanges ? (
+              <form action={changesAction} className="contents">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="adminNote" value={adminNote} />
+                <input type="hidden" name="reviewComment" value={reviewComment} />
+                <button
+                  type="submit"
+                  disabled={changesPending}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                >
+                  {changesPending ? "Обработка…" : "Запросить изменения"}
+                </button>
+              </form>
+            ) : null}
+
+            {canReturnToReview ? (
+              <form action={returnAction} className="contents">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="adminNote" value={adminNote} />
+                <button
+                  type="submit"
+                  disabled={returnPending}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                >
+                  {returnPending ? "Обработка…" : "Вернуть на рассмотрение"}
+                </button>
+              </form>
+            ) : null}
+
+            {canApprove ? (
+              <>
+                {!showApproveConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowApproveConfirm(true)}
+                    className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3d8d65] px-5 text-sm font-medium text-white"
+                  >
+                    Одобрить
+                  </button>
+                ) : (
+                  <div className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4">
+                    <p className="text-sm leading-6 text-[#2f5f45]">
+                      Будет создано новое авторское пространство и открыт
+                      бесплатный кабинет автора. Автор сможет публиковать только
+                      бесплатные продукты.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <form action={approveAction}>
+                        <input
+                          type="hidden"
+                          name="applicationId"
+                          value={application.id}
+                        />
+                        <input type="hidden" name="adminNote" value={adminNote} />
+                        <button
+                          type="submit"
+                          disabled={approvePending}
+                          className="inline-flex min-h-11 items-center rounded-full bg-[#3d8d65] px-5 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          {approvePending ? "Одобрение…" : "Подтвердить одобрение"}
+                        </button>
+                      </form>
+                      <button
+                        type="button"
+                        onClick={() => setShowApproveConfirm(false)}
+                        className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {canReject ? (
+              <form action={rejectAction} className="contents">
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="adminNote" value={adminNote} />
+                <input type="hidden" name="reviewComment" value={reviewComment} />
+                <button
+                  type="submit"
+                  disabled={rejectPending}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#efc7cf] px-5 text-sm font-medium text-[#b34f63] disabled:opacity-60"
+                >
+                  {rejectPending ? "Обработка…" : "Отклонить"}
+                </button>
+              </form>
+            ) : null}
+          </div>
+
+          {linkedAuthor && (canSuspend || canRestore) ? (
+            <div className="border-t border-[#efe6fa] pt-4">
+              <h3 className="text-sm font-semibold text-[#25135c]">
+                Управление авторским доступом
+              </h3>
+
+              {canSuspend ? (
+                <form action={suspendAction} className="mt-3 space-y-3">
+                  <input type="hidden" name="applicationId" value={application.id} />
+                  <input type="hidden" name="authorId" value={linkedAuthor.id} />
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      Причина приостановки
+                    </span>
+                    <textarea
+                      name="reason"
+                      value={suspendReason}
+                      onChange={(event) => setSuspendReason(event.target.value)}
+                      rows={3}
+                      className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c]"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={suspendPending}
+                    className="inline-flex min-h-11 items-center rounded-full border border-[#efc7cf] px-5 text-sm font-medium text-[#b34f63] disabled:opacity-60"
+                  >
+                    {suspendPending ? "Обработка…" : "Приостановить доступ"}
+                  </button>
+                </form>
+              ) : null}
+
+              {canRestore ? (
+                <form action={restoreAction} className="mt-3">
+                  <input type="hidden" name="applicationId" value={application.id} />
+                  <input type="hidden" name="authorId" value={linkedAuthor.id} />
+                  <button
+                    type="submit"
+                    disabled={restorePending}
+                    className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                  >
+                    {restorePending ? "Обработка…" : "Восстановить доступ"}
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
+        <h2 className="text-lg font-semibold text-[#25135c]">История решений</h2>
+        <div className="mt-4">
+          <StatusEventList application={application} />
+        </div>
       </section>
     </div>
   );

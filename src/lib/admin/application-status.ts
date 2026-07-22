@@ -10,7 +10,7 @@ export const ADMIN_APPLICATION_STATUS_OPTIONS: {
   { value: "needs_changes", label: "Нужно связаться", filterKey: "contact_required" },
   { value: "approved", label: "Одобрена", filterKey: "approved" },
   { value: "rejected", label: "Отклонена", filterKey: "rejected" },
-  { value: "withdrawn", label: "Архив", filterKey: "archived" },
+  { value: "withdrawn", label: "Отменена", filterKey: "archived" },
 ];
 
 const STATUS_LABEL_MAP = new Map(

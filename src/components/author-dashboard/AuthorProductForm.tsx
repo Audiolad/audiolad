@@ -43,6 +43,12 @@ import {
   resolveAudioItemIdAfterDraftCreate,
 } from "@/lib/author-products/form-merge";
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
+import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
+import {
+  authorAccessAllowsContentMutations,
+  authorAccessAllowsPaidProducts,
+  getPaidPricingDisabledReason,
+} from "@/lib/authors/access";
 import { formatRubles } from "@/lib/products/price-format";
 import {
   createDefaultListeningNoticeFormState,
@@ -528,6 +534,16 @@ export default function AuthorProductForm({
   const selectedAuthor = useMemo(
     () => authors.find((author) => author.id === form.authorId) ?? null,
     [authors, form.authorId],
+  );
+  const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
+  const canMutateContent = authorAccessAllowsContentMutations(
+    selectedAuthorAccessStatus,
+  );
+  const canUsePaidPricing = authorAccessAllowsPaidProducts(
+    selectedAuthorAccessStatus,
+  );
+  const paidPricingDisabledReason = getPaidPricingDisabledReason(
+    selectedAuthorAccessStatus,
   );
 
   const publicPath =
@@ -1644,6 +1660,10 @@ export default function AuthorProductForm({
 
   return (
     <div className="min-w-0 space-y-8">
+      {selectedAuthor ? (
+        <AuthorAccessStatusBanner accessStatus={selectedAuthorAccessStatus} />
+      ) : null}
+
       {message ? (
         <p className="rounded-[18px] border border-[#d7ebdf] bg-[#f3fbf6] px-4 py-3 text-sm text-[#2f7a55]">
           {message}
@@ -1904,16 +1924,18 @@ export default function AuthorProductForm({
             <button
               type="button"
               onClick={() => setForm((current) => ({ ...current, isFree: true }))}
+              disabled={!canMutateContent}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 form.isFree
                   ? "bg-[#7042c5] text-white"
                   : "border border-[#c6afe6] text-[#7042c5]"
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               В подарок
             </button>
             <button
               type="button"
+              disabled={!canMutateContent || !canUsePaidPricing}
               onClick={() =>
                 setForm((current) => ({ ...current, isFree: false, price: 99 }))
               }
@@ -1921,11 +1943,17 @@ export default function AuthorProductForm({
                 !form.isFree
                   ? "bg-[#7042c5] text-white"
                   : "border border-[#c6afe6] text-[#7042c5]"
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               Платно
             </button>
           </div>
+
+          {!canUsePaidPricing && paidPricingDisabledReason ? (
+            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+              {paidPricingDisabledReason}
+            </p>
+          ) : null}
 
           {!form.isFree ? (
             <select
@@ -2390,7 +2418,7 @@ export default function AuthorProductForm({
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !canMutateContent}
           onClick={() => void saveDraft()}
           className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
         >
@@ -2424,7 +2452,7 @@ export default function AuthorProductForm({
           <>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !canMutateContent}
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
