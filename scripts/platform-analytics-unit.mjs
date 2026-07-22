@@ -71,6 +71,8 @@ function testAdminDashboard() {
   assert(page.includes("AdminAnalyticsPeriodPicker"), "period picker in admin page");
   assert(queries.includes("audio_play_started"), "play starts in admin queries");
   assert(queries.includes("isTestAnalyticsSession"), "test traffic filter in admin queries");
+  assert(queries.includes("fetchRegisteredProfiles"), "registrations from profiles");
+  assert(queries.includes("profiles.created_at"), "registration hint uses profiles.created_at");
 }
 
 function testIntegrations() {

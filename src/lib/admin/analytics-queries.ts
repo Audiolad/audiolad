@@ -87,6 +87,12 @@ type SessionRow = {
   utm_source: string | null;
   utm_campaign: string | null;
   referrer_domain: string | null;
+  started_at?: string;
+};
+
+type RegisteredProfileRow = {
+  id: string;
+  created_at: string;
 };
 
 function filterIncludedEvents(
@@ -208,9 +214,131 @@ async function fetchEvents(range: { from: string | null; to: string | null }) {
   return (data ?? []) as EventRow[];
 }
 
+async function fetchRegisteredProfiles(range: {
+  from: string | null;
+  to: string | null;
+}): Promise<RegisteredProfileRow[]> {
+  const service = createServiceRoleClient();
+
+  let query = service.from("profiles").select("id, created_at");
+
+  if (range.from) {
+    query = query.gte("created_at", range.from);
+  }
+
+  if (range.to) {
+    query = query.lt("created_at", range.to);
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: true })
+    .limit(50_000);
+
+  if (error) {
+    throw new Error("admin_analytics_registrations_failed");
+  }
+
+  return (data ?? []) as RegisteredProfileRow[];
+}
+
+async function fetchRegistrationSessions(
+  userIds: string[],
+): Promise<(SessionRow & { started_at: string })[]> {
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const service = createServiceRoleClient();
+  const { data, error } = await service
+    .from("analytics_sessions")
+    .select(
+      "id, anonymous_id, user_id, utm_source, utm_campaign, referrer_domain, started_at",
+    )
+    .in("user_id", userIds)
+    .order("started_at", { ascending: true })
+    .limit(50_000);
+
+  if (error) {
+    throw new Error("admin_analytics_registration_sessions_failed");
+  }
+
+  return (data ?? []) as (SessionRow & { started_at: string })[];
+}
+
+function groupSessionsByUserId(
+  sessions: (SessionRow & { started_at: string })[],
+): Map<string, (SessionRow & { started_at: string })[]> {
+  const grouped = new Map<string, (SessionRow & { started_at: string })[]>();
+
+  for (const session of sessions) {
+    if (!session.user_id) {
+      continue;
+    }
+
+    const bucket = grouped.get(session.user_id) ?? [];
+    bucket.push(session);
+    grouped.set(session.user_id, bucket);
+  }
+
+  return grouped;
+}
+
+function resolveRegistrationSession(
+  sessions: (SessionRow & { started_at: string })[],
+  includeTest: boolean,
+): (SessionRow & { started_at: string }) | null {
+  if (sessions.length === 0) {
+    return null;
+  }
+
+  if (includeTest) {
+    return sessions[0] ?? null;
+  }
+
+  return sessions.find((session) => !isTestAnalyticsSession(session)) ?? null;
+}
+
+function shouldIncludeRegisteredProfile(
+  sessions: (SessionRow & { started_at: string })[],
+  includeTest: boolean,
+): boolean {
+  if (includeTest || sessions.length === 0) {
+    return true;
+  }
+
+  return sessions.some((session) => !isTestAnalyticsSession(session));
+}
+
+function resolveRegistrationSource(
+  session: (SessionRow & { started_at: string }) | null,
+): AdminSourceGroup {
+  return groupAdminSource(
+    resolveTrafficSource({
+      utmSource: session?.utm_source ?? null,
+      referrerDomain: session?.referrer_domain ?? null,
+    }),
+  );
+}
+
+function filterRegisteredProfiles(
+  profiles: RegisteredProfileRow[],
+  sessionsByUserId: Map<string, (SessionRow & { started_at: string })[]>,
+  includeTest: boolean,
+): RegisteredProfileRow[] {
+  return profiles.filter((profile) =>
+    shouldIncludeRegisteredProfile(
+      sessionsByUserId.get(profile.id) ?? [],
+      includeTest,
+    ),
+  );
+}
+
 function buildSourceRows(
   sessions: SessionRow[],
   events: EventRow[],
+  registeredProfiles: RegisteredProfileRow[],
+  registrationSessionsByUserId: Map<string, (SessionRow & { started_at: string })[]>,
+  includeTest: boolean,
 ): AdminAnalyticsSourceRow[] {
   const sessionMap = new Map(sessions.map((session) => [session.id, session]));
   const grouped = new Map<
@@ -260,10 +388,6 @@ function buildSourceRows(
 
     const key = eventVisitorKey(event, sessionMap);
 
-    if (event.event_name === "signup_completed") {
-      bucket.registrations.add(key);
-    }
-
     if (event.event_name === "audio_play_started") {
       bucket.playStarts.add(key);
     }
@@ -275,6 +399,15 @@ function buildSourceRows(
     if (event.event_name === "author_application_submitted") {
       bucket.applications.add(key);
     }
+  }
+
+  for (const profile of registeredProfiles) {
+    const registrationSession = resolveRegistrationSession(
+      registrationSessionsByUserId.get(profile.id) ?? [],
+      includeTest,
+    );
+    const source = resolveRegistrationSource(registrationSession);
+    grouped.get(source)?.registrations.add(profile.id);
   }
 
   return (Object.keys(ADMIN_SOURCE_LABELS) as AdminSourceGroup[]).map((source) => {
@@ -346,10 +479,20 @@ export async function getAdminAnalyticsDashboard(input?: {
   const range = resolveAdminAnalyticsPeriodRange(period);
   const generatedAt = new Date().toISOString();
 
-  const [allSessions, allEvents] = await Promise.all([
+  const [allSessions, allEvents, registeredProfiles] = await Promise.all([
     fetchSessions(range),
     fetchEvents(range),
+    fetchRegisteredProfiles(range),
   ]);
+
+  const registrationSessionsByUserId = groupSessionsByUserId(
+    await fetchRegistrationSessions(registeredProfiles.map((profile) => profile.id)),
+  );
+  const includedRegisteredProfiles = filterRegisteredProfiles(
+    registeredProfiles,
+    registrationSessionsByUserId,
+    includeTest,
+  );
 
   const testSessions = allSessions.filter((session) => isTestAnalyticsSession(session));
   const excludedTestSessions = testSessions.length;
@@ -367,13 +510,13 @@ export async function getAdminAnalyticsDashboard(input?: {
   const practiceViewSessions = new Set<string>();
   const playSessions = new Set<string>();
   const completionSessions = new Set<string>();
-  const signupSessions = new Set<string>();
 
   let practiceViews = 0;
   let playStarts = 0;
   let completions = 0;
-  let registrations = 0;
   let authorApplications = 0;
+
+  const registrations = includedRegisteredProfiles.length;
 
   const listenerSet = new Set<string>();
   const practiceStats = new Map<
@@ -404,11 +547,6 @@ export async function getAdminAnalyticsDashboard(input?: {
     if (event.event_name === "audio_completed") {
       completions += 1;
       completionSessions.add(sessionId);
-    }
-
-    if (event.event_name === "signup_completed") {
-      registrations += 1;
-      signupSessions.add(sessionId);
     }
 
     if (event.event_name === "author_application_submitted") {
@@ -459,13 +597,13 @@ export async function getAdminAnalyticsDashboard(input?: {
     {
       key: "registrations",
       label: "Регистрации",
-      hint: "Подтверждённые события signup_completed.",
+      hint: "Новые профили пользователей за период (profiles.created_at).",
       value: registrations,
     },
     {
       key: "registration_rate",
       label: "Конверсия посетитель → регистрация",
-      hint: "Регистрации / уникальные посетители.",
+      hint: "Новые регистрации / уникальные посетители.",
       value: registrations,
       formatted: formatAdminPercent(registrations, visitorSet.size),
     },
@@ -532,7 +670,7 @@ export async function getAdminAnalyticsDashboard(input?: {
     {
       key: "registered",
       label: "Зарегистрировались",
-      value: signupSessions.size,
+      value: registrations,
     },
   ];
 
@@ -556,10 +694,20 @@ export async function getAdminAnalyticsDashboard(input?: {
     .sort((left, right) => right.playStarts - left.playStarts)
     .slice(0, 10);
 
-  const recentEvents = events
+  const recentRegistrationItems: AdminRecentActivityItem[] = includedRegisteredProfiles
+    .slice()
+    .sort((left, right) => right.created_at.localeCompare(left.created_at))
+    .slice(0, 6)
+    .map((profile) => ({
+      id: `registration:${profile.id}`,
+      occurredAt: profile.created_at,
+      kind: "registration" as const,
+      practiceTitle: null,
+    }));
+
+  const recentBehaviorEvents = events
     .filter((event) =>
       [
-        "signup_completed",
         "author_application_submitted",
         "audio_play_started",
         "audio_completed",
@@ -569,31 +717,35 @@ export async function getAdminAnalyticsDashboard(input?: {
     .slice(0, 12);
 
   const recentPracticeMeta = await fetchPracticeMeta(
-    recentEvents
+    recentBehaviorEvents
       .map((event) => event.practice_id)
       .filter((value): value is string => Boolean(value)),
   );
 
-  const recentActivity: AdminRecentActivityItem[] = recentEvents.map((event) => {
-    let kind: AdminRecentActivityItem["kind"] = "audio_play";
+  const recentBehaviorItems: AdminRecentActivityItem[] = recentBehaviorEvents.map(
+    (event) => {
+      let kind: AdminRecentActivityItem["kind"] = "audio_play";
 
-    if (event.event_name === "signup_completed") {
-      kind = "registration";
-    } else if (event.event_name === "author_application_submitted") {
-      kind = "author_application";
-    } else if (event.event_name === "audio_completed") {
-      kind = "audio_completed";
-    }
+      if (event.event_name === "author_application_submitted") {
+        kind = "author_application";
+      } else if (event.event_name === "audio_completed") {
+        kind = "audio_completed";
+      }
 
-    return {
-      id: event.id,
-      occurredAt: event.occurred_at,
-      kind,
-      practiceTitle: event.practice_id
-        ? recentPracticeMeta.get(event.practice_id)?.title ?? null
-        : null,
-    };
-  });
+      return {
+        id: event.id,
+        occurredAt: event.occurred_at,
+        kind,
+        practiceTitle: event.practice_id
+          ? recentPracticeMeta.get(event.practice_id)?.title ?? null
+          : null,
+      };
+    },
+  );
+
+  const recentActivity = [...recentRegistrationItems, ...recentBehaviorItems]
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+    .slice(0, 12);
 
   return {
     period,
@@ -604,7 +756,13 @@ export async function getAdminAnalyticsDashboard(input?: {
     excludedTestSessions,
     metrics,
     funnel,
-    sources: buildSourceRows(sessions, events),
+    sources: buildSourceRows(
+      sessions,
+      events,
+      includedRegisteredProfiles,
+      registrationSessionsByUserId,
+      includeTest,
+    ),
     popularPractices,
     recentActivity,
   };
