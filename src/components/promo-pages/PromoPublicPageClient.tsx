@@ -56,6 +56,12 @@ export default function PromoPublicPageClient({
   const { showMiniPlayer } = useGlobalAudioPlayer();
   const lastStartedPracticeRef = useRef<string | null>(null);
 
+  const products = useMemo(() => mapProducts(page), [page]);
+  const productSlugs = useMemo(
+    () => products.map((product) => product.slug),
+    [products],
+  );
+
   const handlePlayStarted = useCallback(
     ({ practiceId, trackId }: { practiceId: string; trackId: string | null }) => {
       if (lastStartedPracticeRef.current === practiceId) {
@@ -80,12 +86,13 @@ export default function PromoPublicPageClient({
     errorMessage,
     clearErrorMessage,
     activePracticeId,
+    isPlaying,
+    needsGesturePlay,
   } = usePromoPagePlayback({
     authorSlug: page.author_slug,
+    productSlugs,
     onPlayStarted: handlePlayStarted,
   });
-
-  const products = useMemo(() => mapProducts(page), [page]);
   const authorName = page.products[0]?.author_name ?? null;
   const authorSlug = page.author_slug;
   const cta = useMemo(() => mapPublicPromoPageCtaBlock(page), [page]);
@@ -178,6 +185,12 @@ export default function PromoPublicPageClient({
             product.practice_id,
             activePracticeId,
             loadingProductId === product.practice_id,
+            {
+              isPlaying:
+                isPlaying && activePracticeId === product.practice_id,
+              needsGesturePlay:
+                needsGesturePlay && activePracticeId === product.practice_id,
+            },
           )
         }
         loadingProductId={loadingProductId}

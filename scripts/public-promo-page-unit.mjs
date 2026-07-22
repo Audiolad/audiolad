@@ -149,6 +149,12 @@ function testPlaybackWiring() {
   assert(hook.includes("loadSession"), "hook uses global player loadSession");
   assert(hook.includes("requestAutoplay: true"), "autoplay after click");
   assert(hook.includes("requestLockRef"), "repeated click guarded");
+  assert(hook.includes("pendingPlayPracticeRef") || hook.includes("intentPracticeId"), "pending play intent");
+  assert(hook.includes("needsGesturePlay"), "gesture fallback exposed");
+  assert(
+    hook.includes("resumeActiveProduct") || hook.includes("handlePlayTrackAtIndex"),
+    "same-track resume path",
+  );
   assert(!presentation.includes("<audio"), "no separate audio element");
   assert(presentation.includes("interactiveMode"), "public interactive mode supported");
   assert(presentation.includes("previewMode"), "preview mode preserved");
@@ -210,8 +216,13 @@ function testPlaybackErrors() {
     "generic retry message",
   );
   assert(
-    getPromoProductPlayLabel("p1", "p1", false) === "Слушаете",
-    "active product label",
+    getPromoProductPlayLabel("p1", "p1", false, { isPlaying: true }) ===
+      "Слушаете",
+    "active playing label",
+  );
+  assert(
+    getPromoProductPlayLabel("p1", "p1", false) === "Воспроизвести",
+    "active paused label invites play",
   );
   assert(
     getPromoProductPlayLabel("p1", null, true) === "Запуск…",

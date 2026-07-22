@@ -1073,12 +1073,26 @@ export function useSequentialPlayer({
 
       if (audio?.paused && src) {
         userWantsPlaybackRef.current = true;
+        setAutoplayHint(null);
 
         try {
           await audio.play();
-        } catch {
+          setPlayerError(null);
+        } catch (error: unknown) {
+          const name =
+            error && typeof error === "object" && "name" in error
+              ? String((error as { name?: string }).name)
+              : "unknown";
+          debugSnapshot("play-at-index", `blocked:${name}`);
+          userWantsPlaybackRef.current = false;
           setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
         }
+      } else if (!src && currentTrack?.id) {
+        // Source still preparing — keep play intent for canplay.
+        userWantsPlaybackRef.current = true;
+        wasPlayingBeforeSwitchRef.current = true;
+        initialAutoplayPendingRef.current = true;
+        void loadSignedUrl(currentTrack.id);
       }
 
       return;
