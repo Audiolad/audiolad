@@ -315,23 +315,5 @@ get_release_name() {
   date -u +"%Y%m%d-%H%M%S-${short}"
 }
 
-prune_old_releases() {
-  local keep="${1:-3}"
-  mapfile -t releases < <(ls -1dt "$DEPLOY_ROOT/releases"/* 2>/dev/null || true)
-  local current_target previous_target
-  current_target="$(readlink -f "$DEPLOY_ROOT/current" 2>/dev/null || true)"
-  previous_target="$(readlink -f "$DEPLOY_ROOT/previous" 2>/dev/null || true)"
-
-  local count=0
-  for release in "${releases[@]}"; do
-    [[ -d "$release" ]] || continue
-    if [[ "$release" == "$current_target" || "$release" == "$previous_target" ]]; then
-      continue
-    fi
-    count=$((count + 1))
-    if (( count > keep )); then
-      log_info "Removing old release: $release"
-      rm -rf "$release"
-    fi
-  done
-}
+# shellcheck source=release-retention.sh
+source "$(dirname "${BASH_SOURCE[0]}")/release-retention.sh"
