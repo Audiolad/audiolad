@@ -1,3 +1,5 @@
+import { formatMimeFromAddress } from "./mime";
+
 export type SenderIdentityKey =
   | "auth_security"
   | "support"
@@ -24,6 +26,7 @@ const DEFAULT_SENDER_IDENTITIES: Record<SenderIdentityKey, SenderIdentity> = {
   },
   authors: {
     from: "authors@audiolad.ru",
+    replyTo: "authors@audiolad.ru",
     displayName: "АудиоЛад для авторов",
   },
   news: {
@@ -53,4 +56,23 @@ export function formatSenderAddress(identity: SenderIdentity): string {
   }
 
   return identity.from;
+}
+
+/** Visible From uses the identity address; envelope-from stays on the authenticated SMTP mailbox. */
+export function resolveAuthorsSendHeaders(smtpMailbox: string): {
+  from: string;
+  envelopeFrom: string;
+  replyTo: string;
+} {
+  const sender = getSenderIdentity("authors");
+  const envelopeFrom = smtpMailbox.trim().toLowerCase();
+
+  return {
+    from: formatMimeFromAddress(
+      sender.displayName ?? "АудиоЛад для авторов",
+      sender.from,
+    ),
+    envelopeFrom,
+    replyTo: sender.replyTo ?? sender.from,
+  };
 }

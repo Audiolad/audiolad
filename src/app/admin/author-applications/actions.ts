@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
 import { requireAdminPanelAccess } from "@/lib/admin/guard";
-import { sendAuthorAccessGrantedEmail } from "@/lib/email/send-author-access-granted-email";
+import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";
 import { createClient } from "@/lib/supabase/server";
 
 export type AdminAuthorApplicationActionState = {
@@ -165,42 +165,30 @@ export async function approveAuthorApplication(
   if (!rpc.result.idempotent) {
     const { data: application } = await supabase
       .from("author_applications")
-      .select("display_name, contact_email, user_id")
+      .select("contact_email, author_id")
       .eq("id", applicationId)
       .maybeSingle();
 
-    const { data: profile } = application?.user_id
-      ? await supabase
-          .from("profiles")
-          .select("email")
-          .eq("id", application.user_id)
-          .maybeSingle()
-      : { data: null };
+    const recipientEmail = application?.contact_email?.trim().toLowerCase() || null;
 
-    const recipientEmail =
-      application?.contact_email?.trim() ||
-      profile?.email?.trim() ||
-      null;
-
-    if (recipientEmail) {
-      const emailResult = await sendAuthorAccessGrantedEmail({
+    if (recipientEmail && application?.author_id) {
+      const emailResult = await sendAuthorApplicationApprovedEmail({
         toEmail: recipientEmail,
-        userName: application?.display_name?.trim() || "автор",
         applicationId,
       });
 
       if (!emailResult.ok) {
         console.error(
-          "author_access_granted_email_failed",
+          "author_application_approved_email_failed",
           applicationId,
           emailResult.code,
         );
         warning =
           "Доступ выдан, но письмо автору не удалось отправить. Проверьте SMTP и при необходимости сообщите автору вручную.";
       }
-    } else {
+    } else if (!recipientEmail) {
       warning =
-        "Доступ выдан, но email получателя не найден — письмо не отправлено.";
+        "Доступ выдан, но контактный email в заявке не указан — письмо не отправлено.";
     }
   }
 
@@ -213,7 +201,7 @@ export async function approveAuthorApplication(
   };
 }
 
-export async function resendAuthorAccessGrantedEmail(
+export async function resendAuthorApplicationApprovedEmail(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
@@ -230,7 +218,7 @@ export async function resendAuthorAccessGrantedEmail(
 
   const { data: application } = await supabase
     .from("author_applications")
-    .select("status, display_name, contact_email, user_id, author_id")
+    .select("status, contact_email, author_id")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -241,24 +229,14 @@ export async function resendAuthorAccessGrantedEmail(
     };
   }
 
-  const { data: profile } = application.user_id
-    ? await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", application.user_id)
-        .maybeSingle()
-    : { data: null };
-
-  const recipientEmail =
-    application.contact_email?.trim() || profile?.email?.trim() || null;
+  const recipientEmail = application.contact_email?.trim().toLowerCase() || null;
 
   if (!recipientEmail) {
-    return { ok: false, error: "Email получателя не найден." };
+    return { ok: false, error: "Контактный email в заявке не указан." };
   }
 
-  const emailResult = await sendAuthorAccessGrantedEmail({
+  const emailResult = await sendAuthorApplicationApprovedEmail({
     toEmail: recipientEmail,
-    userName: application.display_name?.trim() || "автор",
     applicationId,
     forceResend,
   });

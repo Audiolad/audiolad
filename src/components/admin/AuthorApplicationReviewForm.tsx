@@ -9,7 +9,7 @@ import {
   rejectAuthorApplication,
   requestAuthorApplicationChanges,
   restoreLinkedAuthorAccess,
-  resendAuthorAccessGrantedEmail,
+  resendAuthorApplicationApprovedEmail,
   returnAuthorApplicationToReview,
   suspendLinkedAuthorAccess,
   takeAuthorApplicationInReview,
@@ -186,7 +186,7 @@ export default function AuthorApplicationReviewForm({
     ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   );
   const [resendState, resendAction, resendPending] = useActionState(
-    resendAuthorAccessGrantedEmail,
+    resendAuthorApplicationApprovedEmail,
     ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   );
 

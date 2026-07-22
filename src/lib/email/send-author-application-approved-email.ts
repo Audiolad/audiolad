@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAuthorsSendHeaders } from "@/lib/email/sender-identities";
 import {
   acquireOperationalEmailDelivery,
+  AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
   markOperationalEmailDeliveryAttempt,
   markOperationalEmailDeliveryFailed,
   markOperationalEmailDeliverySent,
@@ -10,20 +11,19 @@ import {
 import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import {
-  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
-  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
-} from "@/lib/email/templates/author-access-granted";
+  AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
+} from "@/lib/email/templates/author-application-approved";
 import { brandEmailTemplateRenderer } from "@/lib/email/templates/renderer";
 
-export type SendAuthorAccessGrantedEmailInput = {
+export type SendAuthorApplicationApprovedEmailInput = {
   toEmail: string;
-  userName: string;
   applicationId: string;
   forceResend?: boolean;
   supabase?: SupabaseClient;
 };
 
-export type SendAuthorAccessGrantedEmailResult =
+export type SendAuthorApplicationApprovedEmailResult =
   | { ok: true; providerMessageId?: string; skipped?: boolean }
   | {
       ok: false;
@@ -38,22 +38,20 @@ export type SendAuthorAccessGrantedEmailResult =
 
 function mapSendFailureCode(
   code: string,
-): Extract<
-  SendAuthorAccessGrantedEmailResult,
-  { ok: false }
->["code"] {
+): Extract<SendAuthorApplicationApprovedEmailResult, { ok: false }>["code"] {
   if (code === "smtp_not_configured") return "smtp_not_configured";
   if (code === "template_render_failed") return "template_render_failed";
   return "send_failed";
 }
 
-export async function sendAuthorAccessGrantedEmail(
-  input: SendAuthorAccessGrantedEmailInput,
-): Promise<SendAuthorAccessGrantedEmailResult> {
+export async function sendAuthorApplicationApprovedEmail(
+  input: SendAuthorApplicationApprovedEmailInput,
+): Promise<SendAuthorApplicationApprovedEmailResult> {
   const acquired = await acquireOperationalEmailDelivery(
     {
       applicationId: input.applicationId,
       recipientEmail: input.toEmail,
+      messageType: AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
       forceResend: input.forceResend === true,
     },
     input.supabase,
@@ -71,11 +69,9 @@ export async function sendAuthorAccessGrantedEmail(
   await markOperationalEmailDeliveryAttempt(delivery.id, input.supabase);
 
   const rendered = await brandEmailTemplateRenderer.render({
-    templateKey: AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
-    templateVersion: AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
-    payload: {
-      userName: input.userName,
-    },
+    templateKey: AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
+    templateVersion: AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
+    payload: {},
   });
 
   if (!rendered.ok) {
@@ -84,7 +80,7 @@ export async function sendAuthorAccessGrantedEmail(
       `template_render_failed:${rendered.code}`,
       input.supabase,
     );
-    console.error("author_access_granted_email_render_failed", rendered.code);
+    console.error("author_application_approved_email_render_failed", rendered.code);
     return { ok: false, code: "template_render_failed" };
   }
 
@@ -96,7 +92,7 @@ export async function sendAuthorAccessGrantedEmail(
       "smtp_not_configured",
       input.supabase,
     );
-    console.error("author_access_granted_email_smtp_not_configured");
+    console.error("author_application_approved_email_smtp_not_configured");
     return { ok: false, code: "smtp_not_configured" };
   }
 
@@ -107,7 +103,7 @@ export async function sendAuthorAccessGrantedEmail(
     from,
     envelopeFrom,
     replyTo,
-    to: input.toEmail,
+    to: input.toEmail.trim().toLowerCase(),
     subject: rendered.subject,
     html: rendered.html,
   });
@@ -120,7 +116,7 @@ export async function sendAuthorAccessGrantedEmail(
       input.supabase,
     );
     console.error(
-      "author_access_granted_email_send_failed",
+      "author_application_approved_email_send_failed",
       result.code,
       result.message,
     );
