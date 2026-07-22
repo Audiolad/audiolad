@@ -4,6 +4,7 @@ import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import {
   assertAuthorEditable,
   requirePersonalMaterialAccess,
+  requirePersonalMaterialReadAccess,
 } from "@/lib/personal-materials/server/auth";
 import { createAuthorAudioSignedUrl } from "@/lib/personal-materials/server/delivery";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";

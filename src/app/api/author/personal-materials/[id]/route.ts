@@ -4,6 +4,7 @@ import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import {
   assertAuthorEditable,
   requirePersonalMaterialAccess,
+  requirePersonalMaterialReadAccess,
 } from "@/lib/personal-materials/server/auth";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
 import {
@@ -27,7 +28,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePersonalMaterialAccess(id);
+    const { supabase } = await requirePersonalMaterialReadAccess(id);
     const material = await getAuthorPersonalMaterialById(supabase, id);
 
     if (!material || material.status === "deleted") {

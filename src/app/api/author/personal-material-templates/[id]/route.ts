@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
-import { requireAuthorMaterialListAccess } from "@/lib/personal-materials/server/auth";
+import { requireAuthorMaterialListAccess, requireAuthorMaterialListReadAccess } from "@/lib/personal-materials/server/auth";
 import {
   handlePersonalMaterialRouteError,
   PersonalMaterialApiError,
@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    await requireAuthorMaterialListAccess(template.author_id);
+    await requireAuthorMaterialListReadAccess(template.author_id);
 
     return NextResponse.json({
       template: toSafePersonalMaterialTemplateDto(template),

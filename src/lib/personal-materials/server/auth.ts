@@ -95,3 +95,7 @@ export function assertAuthorEditable(material: PersonalMaterialRow) {
 export async function requireAuthorMaterialListAccess(authorId: string) {
   return requireAuthorMutationMembership(authorId);
 }
+
+export async function requireAuthorMaterialListReadAccess(authorId: string) {
+  return requireAuthorMembership(authorId);
+}

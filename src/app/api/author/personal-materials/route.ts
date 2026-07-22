@@ -10,6 +10,7 @@ import type { PersonalMaterialRow } from "@/lib/personal-materials/types";
 import { handlePersonalMaterialRouteError } from "@/lib/personal-materials/server/errors";
 import {
   requireAuthorMaterialListAccess,
+  requireAuthorMaterialListReadAccess,
 } from "@/lib/personal-materials/server/auth";
 import { parseCreatePersonalMaterialBody } from "@/lib/personal-materials/server/validation";
 
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMaterialListAccess(authorId);
+    const { supabase } = await requireAuthorMaterialListReadAccess(authorId);
     const materials = await listAuthorPersonalMaterials(supabase, authorId);
 
     return NextResponse.json({

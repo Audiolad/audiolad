@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
-import { requireAuthorMaterialListAccess } from "@/lib/personal-materials/server/auth";
+import { requireAuthorMaterialListAccess, requireAuthorMaterialListReadAccess } from "@/lib/personal-materials/server/auth";
 import { handlePersonalMaterialRouteError } from "@/lib/personal-materials/server/errors";
 import {
   createPersonalMaterialTemplate,
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMaterialListAccess(authorId);
+    const { supabase } = await requireAuthorMaterialListReadAccess(authorId);
     const templates = await listPersonalMaterialTemplates(supabase, authorId);
 
     return NextResponse.json({

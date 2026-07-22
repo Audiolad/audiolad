@@ -4,6 +4,7 @@ import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import {
   assertDraftEditable,
   requirePersonalMaterialAccess,
+  requirePersonalMaterialReadAccess,
 } from "@/lib/personal-materials/server/auth";
 import { createAuthorPdfSignedUrl } from "@/lib/personal-materials/server/delivery";
 import { toSafeAuthorPersonalMaterialDto } from "@/lib/personal-materials/server/dto";
@@ -24,7 +25,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { material } = await requirePersonalMaterialAccess(id);
+    const { material } = await requirePersonalMaterialReadAccess(id);
 
     const signed = await createAuthorPdfSignedUrl(material);
 
