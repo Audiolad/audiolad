@@ -1,75 +1,96 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
 import {
-  renderBrandEmailBulletLinks,
   renderBrandEmailButton,
   renderBrandEmailDivider,
-  renderBrandEmailHeading,
+  renderBrandEmailInfoBlock,
   renderBrandEmailParagraph,
   renderBrandEmailShell,
 } from "./brand-layout";
 import { escapeHtml } from "./escape-html";
 
-export const WELCOME_EMAIL_SUBJECT = "Добро пожаловать в АудиоЛад 🎉";
+export const WELCOME_EMAIL_SUBJECT = "Ваш доступ к АудиоЛаду";
+export const WELCOME_EMAIL_PREHEADER =
+  "Все ваши практики будут храниться в личной Аудиотеке.";
 export const WELCOME_EMAIL_TEMPLATE_KEY = "welcome";
-export const WELCOME_EMAIL_TEMPLATE_VERSION = "typography-v4-20260720";
+export const WELCOME_EMAIL_TEMPLATE_VERSION = "library-access-v1-20260722";
 
 export type WelcomeEmailInput = {
   userName: string;
   siteOrigin?: string;
 };
 
-export function getWelcomeEmailLinks(siteOrigin: string) {
-  return [
-    { label: "Каталог", href: `${siteOrigin}/catalog` },
-    { label: "Моя аудиотека", href: `${siteOrigin}/my-practices` },
-    { label: "Плейлисты", href: `${siteOrigin}/playlists` },
-    { label: "Страница авторов", href: `${siteOrigin}/authors` },
-  ];
+export function getWelcomeEmailLibraryUrl(siteOrigin: string): string {
+  return `${siteOrigin.replace(/\/$/, "")}/my-practices`;
+}
+
+function renderWelcomeLibraryFooterBlock(libraryUrl: string): string {
+  return renderBrandEmailInfoBlock(
+    [
+      renderBrandEmailParagraph(
+        "<strong>Все ваши практики хранятся в АудиоЛаде</strong>",
+        "email-body",
+        "0 0 10px",
+      ),
+      renderBrandEmailParagraph(
+        "Открывайте свою Аудиотеку в любое время на <strong>audiolad.ru</strong>",
+        "email-body",
+        "0 0 10px",
+      ),
+      renderBrandEmailParagraph(
+        `<a href="${escapeHtml(libraryUrl)}" style="color: #5e2ca5; text-decoration: none; font-weight: 600">${escapeHtml(libraryUrl)}</a>`,
+        "email-body",
+        "0",
+      ),
+    ].join("\n                      "),
+  );
 }
 
 export function renderWelcomeEmailHtml(input: WelcomeEmailInput): string {
   const siteOrigin = (input.siteOrigin ?? getAppOrigin()).replace(/\/$/, "");
   const userName = input.userName.trim() || "друг";
+  const libraryUrl = getWelcomeEmailLibraryUrl(siteOrigin);
   const logoUrl = `${siteOrigin}/brand/audiolad-logo-horizontal.png`;
 
   const bodyHtml = [
-    renderBrandEmailHeading("Добро пожаловать в АудиоЛад!"),
     renderBrandEmailParagraph(
       `Здравствуйте, <strong>${escapeHtml(userName)}</strong>!`,
       "email-greeting",
     ),
     renderBrandEmailParagraph(
-      "Спасибо за регистрацию в сервисе <strong>АудиоЛад</strong>.",
+      "Добро пожаловать в <strong>АудиоЛад</strong>.",
       "email-body",
     ),
     renderBrandEmailParagraph(
-      "Мы очень рады видеть вас среди наших пользователей.",
+      "Мы сохранили ваши практики в личной Аудиотеке. Теперь вы сможете открыть их с телефона или компьютера, войдя с тем же email, который использовали при регистрации.",
       "email-body",
     ),
     renderBrandEmailParagraph(
-      "В вашем аккаунте уже доступны бесплатные практики, плейлисты и каталог аудиопрограмм.",
-      "email-body",
-    ),
-    renderBrandEmailParagraph(
-      "Начать прослушивание можно прямо сейчас.",
+      "Сохраните это письмо — через него вы всегда сможете вернуться к своим практикам.",
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton(siteOrigin, "Открыть АудиоЛад", { msoWidth: 320 }),
-    renderBrandEmailDivider(),
-    renderBrandEmailBulletLinks("Полезные ссылки", getWelcomeEmailLinks(siteOrigin)),
+    renderBrandEmailButton(libraryUrl, "Открыть мою Аудиотеку", {
+      msoWidth: 360,
+    }),
     renderBrandEmailParagraph(
-      "Если у вас появятся вопросы или предложения — просто ответьте на это письмо.",
+      "Чтобы АудиоЛад не потерялся среди сообщений и ссылок, добавьте его на главный экран телефона. После входа в личном кабинете появится подсказка по установке.",
       "email-body",
+      "24px 0 24px",
     ),
-    renderBrandEmailParagraph("Желаем приятного прослушивания!", "email-body"),
-    renderBrandEmailParagraph("<strong>Команда АудиоЛад</strong>", "email-body", "0"),
+    renderBrandEmailDivider(),
+    renderWelcomeLibraryFooterBlock(libraryUrl),
+    renderBrandEmailParagraph("С заботой,", "email-body", "24px 0 0"),
+    renderBrandEmailParagraph(
+      "<strong>команда АудиоЛада</strong>",
+      "email-body",
+      "0",
+    ),
   ].join("\n\n                ");
 
   return renderBrandEmailShell({
-    title: "Добро пожаловать в АудиоЛад",
-    preheader: WELCOME_EMAIL_SUBJECT,
+    title: WELCOME_EMAIL_SUBJECT,
+    preheader: WELCOME_EMAIL_PREHEADER,
     logoUrl,
     bodyHtml,
     footerLines: [
@@ -82,31 +103,31 @@ export function renderWelcomeEmailHtml(input: WelcomeEmailInput): string {
 export function renderWelcomeEmailText(input: WelcomeEmailInput): string {
   const siteOrigin = (input.siteOrigin ?? getAppOrigin()).replace(/\/$/, "");
   const userName = input.userName.trim() || "друг";
-
-  const links = getWelcomeEmailLinks(siteOrigin)
-    .map((link) => `• ${link.label}: ${link.href}`)
-    .join("\n");
+  const libraryUrl = getWelcomeEmailLibraryUrl(siteOrigin);
 
   return [
-    "Добро пожаловать в АудиоЛад!",
+    WELCOME_EMAIL_SUBJECT,
     "",
     `Здравствуйте, ${userName}!`,
     "",
-    "Спасибо за регистрацию в сервисе АудиоЛад.",
-    "Мы очень рады видеть вас среди наших пользователей.",
+    "Добро пожаловать в АудиоЛад.",
     "",
-    "В вашем аккаунте уже доступны бесплатные практики, плейлисты и каталог аудиопрограмм.",
-    "Начать прослушивание можно прямо сейчас.",
+    "Мы сохранили ваши практики в личной Аудиотеке. Теперь вы сможете открыть их с телефона или компьютера, войдя с тем же email, который использовали при регистрации.",
     "",
-    `Открыть АудиоЛад: ${siteOrigin}`,
+    "Сохраните это письмо — через него вы всегда сможете вернуться к своим практикам.",
     "",
-    "Полезные ссылки",
-    links,
+    "Открыть мою Аудиотеку:",
+    libraryUrl,
     "",
-    "Если у вас появятся вопросы или предложения — просто ответьте на это письмо.",
-    "Желаем приятного прослушивания!",
+    "Чтобы АудиоЛад не потерялся среди сообщений и ссылок, добавьте его на главный экран телефона. После входа в личном кабинете появится подсказка по установке.",
     "",
-    "Команда АудиоЛад",
+    "Все ваши практики хранятся в АудиоЛаде",
+    "",
+    "Открывайте свою Аудиотеку в любое время на audiolad.ru",
+    libraryUrl,
+    "",
+    "С заботой,",
+    "команда АудиоЛада",
     "",
     "© АудиоЛад, 2026. Все права защищены.",
     "Вы получили это письмо, потому что зарегистрировались в АудиоЛад.",
