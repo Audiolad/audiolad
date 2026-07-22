@@ -1,5 +1,4 @@
-import { getSenderIdentity } from "@/lib/email/sender-identities";
-import { formatMimeFromAddress } from "@/lib/email/mime";
+import { resolveAuthorsSendHeaders } from "@/lib/email/sender-identities";
 import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import {
@@ -40,15 +39,13 @@ export async function sendAuthorApplicationSubmittedEmail(
     return { ok: false, code: "smtp_not_configured" };
   }
 
-  const fromEmail = smtpConfig.user.trim().toLowerCase();
-  const sender = getSenderIdentity("authors");
-  const from = formatMimeFromAddress(sender.displayName ?? "АудиоЛад", fromEmail);
+  const { from, envelopeFrom, replyTo } = resolveAuthorsSendHeaders(smtpConfig.user);
   const provider = createSmtpEmailProvider(smtpConfig);
 
   const result = await provider.send({
     from,
-    envelopeFrom: fromEmail,
-    replyTo: sender.replyTo,
+    envelopeFrom,
+    replyTo,
     to: input.toEmail,
     subject: rendered.subject,
     html: rendered.html,

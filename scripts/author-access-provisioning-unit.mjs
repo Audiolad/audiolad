@@ -13,11 +13,11 @@ import {
   getPaidPricingDisabledReason,
 } from "../src/lib/authors/access.ts";
 import {
-  AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
+  AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
   getAuthorDashboardUrl,
-  renderAuthorAccessGrantedEmailHtml,
-  renderAuthorAccessGrantedEmailText,
-} from "../src/lib/email/templates/author-access-granted.ts";
+  renderAuthorApplicationApprovedEmailHtml,
+  renderAuthorApplicationApprovedEmailText,
+} from "../src/lib/email/templates/author-application-approved.ts";
 import { brandEmailTemplateRenderer } from "../src/lib/email/templates/renderer.ts";
 
 function testSubmittedDisplayedAsNew() {
@@ -67,23 +67,20 @@ function testApplicationColumnsIncludeProvisioningFields() {
 }
 
 function testEmailTemplate() {
-  const html = renderAuthorAccessGrantedEmailHtml({
-    userName: "Анна Автор",
+  const html = renderAuthorApplicationApprovedEmailHtml({
     siteOrigin: "https://audiolad.ru",
   });
-  const text = renderAuthorAccessGrantedEmailText({
-    userName: "Анна Автор",
+  const text = renderAuthorApplicationApprovedEmailText({
     siteOrigin: "https://audiolad.ru",
   });
 
   assert.equal(
-    AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
-    "Вам открыт кабинет автора АудиоЛада",
+    AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
+    "Поздравляем! Ваша заявка одобрена 🎉",
   );
-  assert.match(html, /заявка на авторство одобрена/i);
-  assert.match(html, /бесплатный авторский аккаунт/i);
-  assert.match(html, /коммерческого подключения/i);
-  assert.match(html, /Перейти в кабинет автора/);
+  assert.match(html, /С чего начать/);
+  assert.match(html, /✅ /);
+  assert.match(html, /просто ответьте на это письмо/);
   assert.match(html, /https:\/\/audiolad\.ru\/author-dashboard/);
   assert.match(text, /https:\/\/audiolad\.ru\/author-dashboard/);
   assert.equal(
@@ -94,14 +91,14 @@ function testEmailTemplate() {
 
 async function testRendererRegistration() {
   const rendered = await brandEmailTemplateRenderer.render({
-    templateKey: "author_access_granted",
-    templateVersion: "author-access-granted-v1-20260722",
-    payload: { userName: "Анна" },
+    templateKey: "author_application_approved",
+    templateVersion: "author-application-approved-v1-20260722",
+    payload: {},
   });
 
   assert.equal(rendered.ok, true);
   if (rendered.ok) {
-    assert.equal(rendered.subject, AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT);
+    assert.equal(rendered.subject, AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT);
     assert.match(rendered.html, /author-dashboard/);
   }
 }

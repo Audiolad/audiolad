@@ -27,9 +27,28 @@ export type OperationalEmailDeliveryRow = {
 };
 
 export const AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE = "author_access_granted";
+export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
+  "author_application_approved";
 
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
   return `author_access_granted:${applicationId.trim()}`;
+}
+
+export function buildAuthorApplicationApprovedDedupKey(
+  applicationId: string,
+): string {
+  return `author_application_approved:${applicationId.trim()}`;
+}
+
+function resolveOperationalEmailDedupKey(
+  applicationId: string,
+  messageType: string,
+): string {
+  if (messageType === AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE) {
+    return buildAuthorApplicationApprovedDedupKey(applicationId);
+  }
+
+  return buildAuthorAccessGrantedDedupKey(applicationId);
 }
 
 export type AcquireOperationalEmailDeliveryInput = {
@@ -53,6 +72,30 @@ export type AcquireOperationalEmailDeliveryResult =
     }
   | { ok: false; code: "invalid_input" | "delivery_persist_failed" };
 
+export type OperationalEmailDeliverySendIntent =
+  | { kind: "skip"; reason: "already_sent" }
+  | { kind: "send"; mode: "insert" | "retry" | "force_resend" };
+
+/** Pure decision helper: only `sent` blocks resend unless forceResend is true. */
+export function resolveOperationalEmailDeliverySendIntent(
+  existing: Pick<OperationalEmailDeliveryRow, "status"> | null | undefined,
+  forceResend: boolean,
+): OperationalEmailDeliverySendIntent {
+  if (existing?.status === "sent" && !forceResend) {
+    return { kind: "skip", reason: "already_sent" };
+  }
+
+  if (!existing) {
+    return { kind: "send", mode: "insert" };
+  }
+
+  if (existing.status === "sent" && forceResend) {
+    return { kind: "send", mode: "force_resend" };
+  }
+
+  return { kind: "send", mode: "retry" };
+}
+
 function getServiceClient(supabase?: SupabaseClient): SupabaseClient {
   return supabase ?? createServiceRoleClient();
 }
@@ -64,7 +107,7 @@ export async function acquireOperationalEmailDelivery(
   const applicationId = input.applicationId.trim();
   const recipientEmail = input.recipientEmail.trim().toLowerCase();
   const messageType = input.messageType?.trim() || AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE;
-  const dedupKey = buildAuthorAccessGrantedDedupKey(applicationId);
+  const dedupKey = resolveOperationalEmailDedupKey(applicationId, messageType);
 
   if (!applicationId || !recipientEmail) {
     return { ok: false, code: "invalid_input" };
@@ -83,16 +126,21 @@ export async function acquireOperationalEmailDelivery(
     return { ok: false, code: "delivery_persist_failed" };
   }
 
-  if (existing?.status === "sent" && !input.forceResend) {
+  const intent = resolveOperationalEmailDeliverySendIntent(
+    existing as OperationalEmailDeliveryRow | null,
+    input.forceResend === true,
+  );
+
+  if (intent.kind === "skip") {
     return {
       ok: true,
       delivery: existing as OperationalEmailDeliveryRow,
       shouldSend: false,
-      reason: "already_sent",
+      reason: intent.reason,
     };
   }
 
-  if (!existing) {
+  if (intent.mode === "insert") {
     const { data: inserted, error: insertError } = await client
       .from("operational_email_deliveries")
       .insert({
@@ -117,7 +165,7 @@ export async function acquireOperationalEmailDelivery(
     };
   }
 
-  if (existing.status === "sent" && input.forceResend) {
+  if (intent.mode === "force_resend") {
     const { data: reset, error: resetError } = await client
       .from("operational_email_deliveries")
       .update({
@@ -222,23 +270,36 @@ export async function markOperationalEmailDeliveryFailed(
 
 export async function getOperationalEmailDeliveryForApplication(
   applicationId: string,
-  messageType: string = AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE,
+  messageType?: string,
   supabase?: SupabaseClient,
 ): Promise<OperationalEmailDeliveryRow | null> {
   const client = getServiceClient(supabase);
-  const dedupKey = buildAuthorAccessGrantedDedupKey(applicationId);
+  const messageTypes = messageType
+    ? [messageType.trim()]
+    : [
+        AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
+        AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE,
+      ];
 
-  const { data, error } = await client
-    .from("operational_email_deliveries")
-    .select("*")
-    .eq("dedup_key", dedupKey)
-    .eq("message_type", messageType)
-    .maybeSingle();
+  for (const type of messageTypes) {
+    const dedupKey = resolveOperationalEmailDedupKey(applicationId, type);
 
-  if (error) {
-    console.error("operational_email_delivery_lookup_error", error.message);
-    return null;
+    const { data, error } = await client
+      .from("operational_email_deliveries")
+      .select("*")
+      .eq("dedup_key", dedupKey)
+      .eq("message_type", type)
+      .maybeSingle();
+
+    if (error) {
+      console.error("operational_email_delivery_lookup_error", error.message);
+      return null;
+    }
+
+    if (data) {
+      return data as OperationalEmailDeliveryRow;
+    }
   }
 
-  return (data as OperationalEmailDeliveryRow | null) ?? null;
+  return null;
 }
