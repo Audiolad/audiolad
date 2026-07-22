@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { HistoryPageHeader } from "@/components/history/HistorySections";
+import { PRIVATE_PAGE_ROBOTS } from "@/lib/seo/private-robots";
+
+export const metadata: Metadata = {
+  robots: PRIVATE_PAGE_ROBOTS,
+};
 
 export default function HistoryListenerLayout({
   children,

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import BottomNav from "@/components/BottomNav";
 import PwaSettingsSection from "@/components/pwa/PwaSettingsSection";
 import AnalyticsPrivacySection from "@/components/settings/AnalyticsPrivacySection";
@@ -15,9 +17,14 @@ import {
   SETTINGS_LEGAL_SECTION_ID,
 } from "@/lib/profile/constants";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { PRIVATE_PAGE_ROBOTS } from "@/lib/seo/private-robots";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  robots: PRIVATE_PAGE_ROBOTS,
+};
 
 export const dynamic = "force-dynamic";
 

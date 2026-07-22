@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import BottomNav from "@/components/BottomNav";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { PRIVATE_PAGE_ROBOTS } from "@/lib/seo/private-robots";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  robots: PRIVATE_PAGE_ROBOTS,
+};
 
 const favoritePractices = [
   {

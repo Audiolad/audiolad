@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import AuthorApplicationPanel from "@/components/become-author/AuthorApplicationPanel";
 import BecomeAuthorShell from "@/components/become-author/BecomeAuthorShell";
 import BecomeAuthorHeader, {
@@ -7,9 +9,19 @@ import BecomeAuthorHeader, {
 import { getBecomeAuthorPageView } from "@/lib/author-applications/queries";
 import { rowToFormValues } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Стать автором – АудиоЛад",
+  description:
+    "Подайте заявку и начните публиковать аудиопрактики, медитации и программы на платформе АудиоЛад.",
+  alternates: {
+    canonical: `${getAppOrigin()}/become-author`,
+  },
+};
 
 const EMPTY_FORM_VALUES = {
   displayName: "",

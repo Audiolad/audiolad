@@ -41,7 +41,7 @@ function testPublicRoute() {
   assert(page.includes("loadPublicPromoPageCached"), "page uses cached public loader");
   assert(page.includes('dynamic = "force-dynamic"'), "page is force-dynamic");
   assert(page.includes("notFound()"), "page returns notFound for missing data");
-  assert(page.includes("index: false"), "noindex metadata in page");
+  assert(page.includes("index: true"), "index metadata in page");
   assert(page.includes("follow: true"), "follow metadata in page");
   assert(page.includes("buildPromoPageCanonicalUrl"), "canonical metadata");
   assert(page.includes("PromoPublicPageClient"), "client presentation wired");
@@ -191,7 +191,7 @@ function testPresentationAndCta() {
 
 function testSeoAndSitemap() {
   const page = read("src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
-  const sitemap = read("src/app/sitemap.ts");
+  const sitemapData = read("src/lib/seo/sitemap-data.ts");
 
   assert(
     buildPromoPageCanonicalUrl("sergey-petrov", "spring").includes(
@@ -199,7 +199,7 @@ function testSeoAndSitemap() {
     ),
     "canonical url uses promo path",
   );
-  assert(page.includes("index: false"), "noindex metadata");
+  assert(page.includes("index: true"), "index metadata for published promo pages");
   assert(page.includes("follow: true"), "follow metadata");
   assert(
     page.includes("resolvePromoPageSocialPreviewImage"),
@@ -208,7 +208,10 @@ function testSeoAndSitemap() {
   assert(page.includes("openGraph"), "openGraph metadata");
   assert(page.includes('card: "summary_large_image"'), "twitter large image card");
   assert(page.includes("images: socialImages"), "og/twitter images set");
-  assert(!sitemap.includes("/promo/"), "sitemap unchanged for promo pages");
+  assert(
+    sitemapData.includes("mapPromoPageRowsToSitemapEntries"),
+    "sitemap includes promo page mapper",
+  );
 }
 
 function testPlaybackErrors() {
