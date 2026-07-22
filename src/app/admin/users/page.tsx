@@ -1,6 +1,10 @@
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
+import TestUserResetPanel from "@/components/admin/TestUserResetPanel";
 import { requireAdminPanelAccess } from "@/lib/admin/guard";
+import { getPlatformOwnerSessionIfOwner } from "@/lib/admin/require-platform-owner";
+import { getTestUserResetPreflight } from "@/lib/admin/test-user-reset/reset";
 import { listAdminUsers } from "@/lib/admin/queries";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
@@ -10,18 +14,34 @@ export default async function AdminUsersPage({
   searchParams: Promise<{ q?: string; role?: string; page?: string }>;
 }) {
   const session = await requireAdminPanelAccess();
+  const ownerSession = await getPlatformOwnerSessionIfOwner();
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10);
 
   let data;
+  let testResetPreflight = null;
 
   try {
-    data = await listAdminUsers({
-      page: Number.isFinite(page) ? page : 1,
-      query: params.q,
-      roleFilter: params.role,
-      actorUserId: session.userId,
-    });
+    const tasks: [
+      ReturnType<typeof listAdminUsers>,
+      ReturnType<typeof getTestUserResetPreflight> | Promise<null>,
+    ] = [
+      listAdminUsers({
+        page: Number.isFinite(page) ? page : 1,
+        query: params.q,
+        roleFilter: params.role,
+        actorUserId: session.userId,
+      }),
+      ownerSession
+        ? getTestUserResetPreflight(createServiceRoleClient(), {
+            actorUserId: ownerSession.userId,
+          })
+        : Promise.resolve(null),
+    ];
+
+    const [usersData, preflightData] = await Promise.all(tasks);
+    data = usersData;
+    testResetPreflight = preflightData;
   } catch (error) {
     console.error("admin_users_page_error", error);
 
@@ -44,6 +64,10 @@ export default async function AdminUsersPage({
       <div className="mt-5">
         <AdminUsersTable data={data} />
       </div>
+
+      {ownerSession && testResetPreflight ? (
+        <TestUserResetPanel initialPreflight={testResetPreflight} />
+      ) : null}
     </section>
   );
 }
