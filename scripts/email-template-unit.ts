@@ -15,6 +15,13 @@ import {
   renderAuthorAccessGrantedEmailHtml,
 } from "../src/lib/email/templates/author-access-granted";
 import {
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_SUBJECT,
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorApplicationSubmittedEmailHtml,
+  renderAuthorApplicationSubmittedEmailText,
+} from "../src/lib/email/templates/author-application-submitted";
+import {
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
   renderRecoveryEmailHtml,
@@ -196,12 +203,63 @@ async function testAuthorAccessGrantedTemplate() {
   }
 }
 
+async function testAuthorApplicationSubmittedTemplate() {
+  const html = renderAuthorApplicationSubmittedEmailHtml({
+    siteOrigin: "https://audiolad.ru",
+  });
+  const text = renderAuthorApplicationSubmittedEmailText({
+    siteOrigin: "https://audiolad.ru",
+  });
+
+  assert.match(html, /Мы получили вашу заявку/);
+  assert.match(html, /Здравствуйте!/);
+  assert.match(html, /Перейти в АудиоЛад/);
+  assert.match(html, /href="https:\/\/audiolad\.ru"/);
+  assert.match(html, /Команда АудиоЛад/);
+  assert.match(html, /P\.S\. Пока заявка рассматривается/);
+  assert.match(html, /#f4f1ff/);
+  assert.match(html, /Важно/);
+  assert.match(html, /отличный от email вашего аккаунта/);
+
+  assert.match(text, /Мы получили вашу заявку на авторство в АудиоЛаде/);
+  assert.match(text, /Важно/);
+  assert.match(text, /отличный от email вашего аккаунта/);
+  assert.match(text, /Перейти в АудиоЛад: https:\/\/audiolad\.ru/);
+
+  const rendered = await brandEmailTemplateRenderer.render({
+    templateKey: AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY,
+    templateVersion: AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_VERSION,
+    payload: {},
+  });
+
+  assert.equal(rendered.ok, true);
+  if (rendered.ok) {
+    assert.equal(rendered.subject, AUTHOR_APPLICATION_SUBMITTED_EMAIL_SUBJECT);
+  }
+}
+
+function testAuthorApplicationSubmitSendsConfirmationEmail() {
+  const submitAction = readRepoFile(
+    "src",
+    "app",
+    "become-author",
+    "actions.ts",
+  );
+
+  assert.match(submitAction, /sendAuthorApplicationSubmittedEmail\(/);
+  assert.match(submitAction, /author_application_submitted_email_failed/);
+  assert.match(submitAction, /toEmail: values\.contactEmail\.trim\(\)/);
+  assert.match(submitAction, /successState\(values, "contact_update"\)/);
+}
+
 async function main() {
   testSharedLayoutFiles();
   await testWelcomeTemplate();
   await testAuthorAccessGrantedTemplate();
+  await testAuthorApplicationSubmittedTemplate();
   await testRecoveryTemplateStillWorks();
   testSignupSendsWelcome();
+  testAuthorApplicationSubmitSendsConfirmationEmail();
   console.log("email-template-unit: ok");
 }
 

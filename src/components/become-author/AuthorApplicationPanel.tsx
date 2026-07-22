@@ -34,6 +34,7 @@ import type {
   AuthorApplicationFormState,
   AuthorApplicationFormValues,
   AuthorApplicationRow,
+  AuthorApplicationSubmissionKind,
   AuthorApplicationSubmittedContacts,
   BecomeAuthorAudience,
 } from "@/lib/author-applications/types";
@@ -87,11 +88,15 @@ function AuthorApplicationSuccessScreen({
   contacts,
   sectionRef,
   onEditContacts,
+  submissionKind = "initial",
 }: {
   contacts: AuthorApplicationSubmittedContacts;
   sectionRef?: RefObject<HTMLElement | null>;
   onEditContacts: () => void;
+  submissionKind?: AuthorApplicationSubmissionKind;
 }) {
+  const isInitialSubmit = submissionKind === "initial";
+
   return (
     <section
       ref={sectionRef}
@@ -100,11 +105,29 @@ function AuthorApplicationSuccessScreen({
       aria-live="polite"
     >
       <h2 className="text-[21px] font-semibold text-[#25135c]">
-        Спасибо! Ваша заявка принята
+        {isInitialSubmit
+          ? "Заявка успешно отправлена!"
+          : "Контакты для связи обновлены"}
       </h2>
-      <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-        Мы рассмотрим её и свяжемся с вами по указанным контактам.
-      </p>
+      {isInitialSubmit ? (
+        <>
+          <p className={`mt-3 ${becomeAuthorBodyClass}`}>Спасибо!</p>
+          <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+            Мы получили вашу заявку и уже отправили подтверждение на указанный
+            вами email.
+          </p>
+          <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+            После рассмотрения заявки мы отправим ещё одно письмо с результатом.
+          </p>
+          <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+            Обычно проверка занимает немного времени.
+          </p>
+        </>
+      ) : (
+        <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+          Мы сохранили новые контакты для связи по вашей заявке.
+        </p>
+      )}
       <div
         className={`mt-4 rounded-[18px] border border-[#cfe8d9] bg-white px-4 py-3 ${becomeAuthorBodyClass}`}
       >
@@ -127,8 +150,7 @@ function AuthorApplicationSuccessScreen({
         </div>
       </div>
       <p className={`mt-4 ${becomeAuthorBodyClass}`}>
-        Мы свяжемся с вами по указанным контактам. Проверьте, пожалуйста, что они
-        указаны без ошибок.
+        Проверьте, пожалуйста, что контакты указаны без ошибок.
       </p>
       <p className={`mt-3 ${becomeAuthorBodyClass}`}>
         Статус заявки всегда можно посмотреть в вашем профиле.
@@ -787,6 +809,7 @@ export default function AuthorApplicationPanel({
         contacts={resolvedSuccessContacts}
         sectionRef={successSectionRef}
         onEditContacts={handleEditContacts}
+        submissionKind={state.submissionKind ?? "initial"}
       />
     );
   }

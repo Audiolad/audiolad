@@ -111,9 +111,12 @@ export type AuthorApplicationFieldErrors = Partial<
   >
 >;
 
+export type AuthorApplicationSubmissionKind = "initial" | "contact_update";
+
 export type AuthorApplicationFormState = {
   ok: boolean;
   submitted?: boolean;
+  submissionKind?: AuthorApplicationSubmissionKind;
   submittedContacts?: AuthorApplicationSubmittedContacts;
   errors: AuthorApplicationFieldErrors;
   values?: AuthorApplicationFormValues;

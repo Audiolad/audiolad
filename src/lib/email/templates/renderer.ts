@@ -6,6 +6,13 @@ import {
   renderAuthorAccessGrantedEmailText,
 } from "./author-access-granted";
 import {
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_SUBJECT,
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorApplicationSubmittedEmailHtml,
+  renderAuthorApplicationSubmittedEmailText,
+} from "./author-application-submitted";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -91,6 +98,17 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (input.templateKey === AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY) {
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: AUTHOR_APPLICATION_SUBMITTED_EMAIL_SUBJECT,
+        html: renderAuthorApplicationSubmittedEmailHtml({ siteOrigin }),
+        text: renderAuthorApplicationSubmittedEmailText({ siteOrigin }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -106,6 +124,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY) {
     return AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

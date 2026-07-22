@@ -27,6 +27,7 @@ import {
   validateAuthorApplicationFormValues,
 } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
 import { createClient } from "@/lib/supabase/server";
 
 function failureState(
@@ -42,12 +43,14 @@ function failureState(
 
 function successState(
   values: AuthorApplicationFormState["values"],
+  submissionKind: AuthorApplicationFormState["submissionKind"] = "initial",
 ): AuthorApplicationFormState {
   const contacts = buildSubmittedContacts(values!);
 
   return {
     ok: true,
     submitted: true,
+    submissionKind,
     submittedContacts: contacts,
     errors: {},
     values,
@@ -145,7 +148,7 @@ export async function submitAuthorApplication(
 
       await persistProfileContactEmail(supabase, user.id, values.contactEmail);
 
-      return successState(values);
+      return successState(values, "contact_update");
     }
 
     const errors = validateAuthorApplicationFormValues(values, {
@@ -222,7 +225,18 @@ export async function submitAuthorApplication(
 
     await persistProfileContactEmail(supabase, user.id, values.contactEmail);
 
-    return successState(values);
+    const emailResult = await sendAuthorApplicationSubmittedEmail({
+      toEmail: values.contactEmail.trim(),
+    });
+
+    if (!emailResult.ok) {
+      console.error(
+        "author_application_submitted_email_failed",
+        emailResult.code,
+      );
+    }
+
+    return successState(values, "initial");
   } catch (error) {
     console.error("author_application_submit_unexpected", error);
 
