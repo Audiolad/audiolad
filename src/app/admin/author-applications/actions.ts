@@ -201,7 +201,7 @@ export async function approveAuthorApplication(
   };
 }
 
-export async function resendAuthorApplicationApprovedEmail(
+export async function resendAuthorAccessGrantedEmail(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {

@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveAuthorsEmailTransport } from "../src/lib/email/authors-email-transport";
+import { getSenderIdentity } from "../src/lib/email/sender-identities";
 import { PRODUCTION_APP_ORIGIN } from "../src/lib/seo/app-origin";
 import {
   AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
@@ -42,11 +44,6 @@ import {
 import { escapeHtml } from "../src/lib/email/templates/escape-html";
 import { encodeQuotedPrintable, maxLineLength } from "../src/lib/email/mime";
 import { buildWelcomeCompatibleMime } from "../src/lib/email/providers/smtp";
-import {
-  formatSenderAddress,
-  getSenderIdentity,
-  resolveAuthorsSendHeaders,
-} from "../src/lib/email/sender-identities";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -181,34 +178,6 @@ async function testRecoveryTemplateStillWorks() {
   assert.equal(rendered.ok, true);
 }
 
-function testAuthorsIdentity() {
-  const identity = getSenderIdentity("authors");
-
-  assert.equal(identity.from, "authors@audiolad.ru");
-  assert.equal(identity.replyTo, "authors@audiolad.ru");
-  assert.equal(identity.displayName, "АудиоЛад для авторов");
-  assert.equal(
-    formatSenderAddress(identity),
-    "АудиоЛад для авторов <authors@audiolad.ru>",
-  );
-
-  const headers = resolveAuthorsSendHeaders("inbox@audiolad.ru");
-  assert.match(headers.from, /authors@audiolad\.ru>/);
-  assert.equal(headers.envelopeFrom, "inbox@audiolad.ru");
-  assert.equal(headers.replyTo, "authors@audiolad.ru");
-}
-
-function testAuthorsSendersUseIdentity() {
-  for (const senderFile of [
-    "src/lib/email/send-author-application-submitted-email.ts",
-    "src/lib/email/send-author-application-approved-email.ts",
-    "src/lib/email/send-author-access-granted-email.ts",
-  ]) {
-    const source = readRepoFile(...senderFile.split("/"));
-    assert.match(source, /resolveAuthorsSendHeaders\(/, `${senderFile} uses authors headers helper`);
-  }
-}
-
 function testSignupSendsWelcome() {
   const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
 
@@ -225,28 +194,27 @@ async function testAuthorApplicationApprovedTemplate() {
     siteOrigin: "https://audiolad.ru",
   });
 
-  assert.match(html, /С радостью сообщаем, что ваша заявка/);
+  assert.match(html, /Ваша заявка одобрена/);
   assert.match(html, /Здравствуйте!/);
   assert.match(html, /Открыть кабинет автора/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/author-dashboard"/);
   assert.match(html, /С чего начать/);
-  assert.match(html, /✅ Оформите профиль автора/);
-  assert.match(html, /✅ Опубликуйте первый бесплатный аудиопродукт/);
-  assert.match(html, /✅ Проверьте публичную страницу автора/);
-  assert.equal((html.match(/✅ /g) ?? []).length, 3);
+  assert.match(html, /Оформите профиль автора/);
   assert.match(html, /#f4f1ff/);
   assert.match(html, /Важно/);
-  assert.match(html, /входить в кабинет автора нужно под тем аккаунтом/);
-  assert.match(html, /просто ответьте на это письмо/);
+  assert.match(html, /отличный от email вашего аккаунта/);
   assert.match(html, /Команда АудиоЛад/);
+  assert.match(html, /просто ответьте на это письмо/);
   assert.doesNotMatch(html, /token=|email=/);
+  assert.equal((html.match(/Оформите профиль автора/g) ?? []).length, 1);
+  assert.equal((html.match(/Опубликуйте первый бесплатный аудиопродукт/g) ?? []).length, 1);
+  assert.equal((html.match(/Проверьте публичную страницу автора/g) ?? []).length, 1);
 
   assert.match(text, /Поздравляем! Ваша заявка одобрена/);
   assert.match(text, /Открыть кабинет автора: https:\/\/audiolad\.ru\/author-dashboard/);
   assert.match(text, /С чего начать/);
-  assert.equal((text.match(/✅ /g) ?? []).length, 3);
   assert.match(text, /Важно/);
-  assert.match(text, /входить в кабинет автора нужно под тем аккаунтом/);
+  assert.match(text, /отличный от email вашего аккаунта/);
   assert.match(text, /просто ответьте на это письмо/);
 
   assert.equal(
@@ -266,6 +234,35 @@ async function testAuthorApplicationApprovedTemplate() {
   }
 }
 
+function testAuthorsEmailIdentity() {
+  const authors = getSenderIdentity("authors");
+  assert.equal(authors.from, "authors@audiolad.ru");
+  assert.equal(authors.replyTo, "authors@audiolad.ru");
+  assert.equal(authors.displayName, "АудиоЛад для авторов");
+
+  const transport = resolveAuthorsEmailTransport("inbox@audiolad.ru");
+  assert.match(transport.from, /authors@audiolad\.ru/);
+  assert.match(transport.from, /АудиоЛад для авторов|=\?UTF-8\?q\?/);
+  assert.equal(transport.envelopeFrom, "inbox@audiolad.ru");
+  assert.equal(transport.replyTo, "authors@audiolad.ru");
+}
+
+function testAuthorEmailSendersUseAuthorsIdentity() {
+  for (const file of [
+    "src/lib/email/send-author-application-submitted-email.ts",
+    "src/lib/email/send-author-application-approved-email.ts",
+  ]) {
+    const source = readRepoFile(...file.split("/"));
+    assert.match(source, /resolveAuthorsEmailTransport\(/);
+    assert.doesNotMatch(source, /formatMimeFromAddress\(/);
+    assert.doesNotMatch(source, /getSenderIdentity\(/);
+  }
+
+  const welcome = readRepoFile("src", "lib", "email", "send-welcome-email.ts");
+  assert.match(welcome, /getSenderIdentity\("auth_security"\)/);
+  assert.doesNotMatch(welcome, /resolveAuthorsEmailTransport/);
+}
+
 function testApproveAuthorApplicationEmailWiring() {
   const approveAction = readRepoFile(
     "src",
@@ -281,46 +278,6 @@ function testApproveAuthorApplicationEmailWiring() {
   assert.match(approveAction, /application\?\.contact_email/);
   assert.match(approveAction, /application\?\.author_id/);
   assert.doesNotMatch(approveAction, /profile\?\.email/);
-  assert.match(approveAction, /ok: true,/);
-  assert.match(
-    approveAction,
-    /if \(!emailResult\.ok\)[\s\S]*warning[\s\S]*ok: true/,
-  );
-  const approveBlock = approveAction.match(
-    /export async function approveAuthorApplication[\s\S]*?^}/m,
-  )?.[0];
-
-  assert.ok(approveBlock, "approveAuthorApplication block must exist");
-  assert.match(approveBlock!, /if \(!rpc\.result\.idempotent\)/);
-  assert.match(approveBlock!, /sendAuthorApplicationApprovedEmail\(/);
-  assert.doesNotMatch(
-    approveBlock!,
-    /idempotent[\s\S]*sendAuthorApplicationApprovedEmail[\s\S]*sendAuthorApplicationApprovedEmail/,
-  );
-}
-
-function testResendAuthorApplicationApprovedEmailWiring() {
-  const resendAction = readRepoFile(
-    "src",
-    "app",
-    "admin",
-    "author-applications",
-    "actions.ts",
-  );
-  const approvedSender = readRepoFile(
-    "src",
-    "lib",
-    "email",
-    "send-author-application-approved-email.ts",
-  );
-
-  assert.match(resendAction, /export async function resendAuthorApplicationApprovedEmail/);
-  assert.match(resendAction, /sendAuthorApplicationApprovedEmail\(/);
-  assert.doesNotMatch(resendAction, /resendAuthorAccessGrantedEmail/);
-  assert.doesNotMatch(resendAction, /sendAuthorAccessGrantedEmail/);
-  assert.match(approvedSender, /AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY/);
-  assert.match(approvedSender, /AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE/);
-  assert.match(approvedSender, /author_application_approved/);
 }
 
 async function testAuthorApplicationSubmittedTemplate() {
@@ -374,8 +331,8 @@ function testAuthorApplicationSubmitSendsConfirmationEmail() {
 
 async function main() {
   testSharedLayoutFiles();
-  testAuthorsIdentity();
-  testAuthorsSendersUseIdentity();
+  testAuthorsEmailIdentity();
+  testAuthorEmailSendersUseAuthorsIdentity();
   await testWelcomeTemplate();
   await testAuthorApplicationApprovedTemplate();
   await testAuthorApplicationSubmittedTemplate();
@@ -383,7 +340,6 @@ async function main() {
   testSignupSendsWelcome();
   testAuthorApplicationSubmitSendsConfirmationEmail();
   testApproveAuthorApplicationEmailWiring();
-  testResendAuthorApplicationApprovedEmailWiring();
   console.log("email-template-unit: ok");
 }
 

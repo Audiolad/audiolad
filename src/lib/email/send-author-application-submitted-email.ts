@@ -1,4 +1,4 @@
-import { resolveAuthorsSendHeaders } from "@/lib/email/sender-identities";
+import { resolveAuthorsEmailTransport } from "@/lib/email/authors-email-transport";
 import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import {
@@ -39,14 +39,14 @@ export async function sendAuthorApplicationSubmittedEmail(
     return { ok: false, code: "smtp_not_configured" };
   }
 
-  const { from, envelopeFrom, replyTo } = resolveAuthorsSendHeaders(smtpConfig.user);
+  const transport = resolveAuthorsEmailTransport(smtpConfig.user);
   const provider = createSmtpEmailProvider(smtpConfig);
 
   const result = await provider.send({
-    from,
-    envelopeFrom,
-    replyTo,
-    to: input.toEmail,
+    from: transport.from,
+    envelopeFrom: transport.envelopeFrom,
+    replyTo: transport.replyTo,
+    to: input.toEmail.trim().toLowerCase(),
     subject: rendered.subject,
     html: rendered.html,
   });

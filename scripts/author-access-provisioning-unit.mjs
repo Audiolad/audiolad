@@ -78,9 +78,9 @@ function testEmailTemplate() {
     AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
     "Поздравляем! Ваша заявка одобрена 🎉",
   );
+  assert.match(html, /заявка.*одобрена/i);
+  assert.match(html, /Открыть кабинет автора/);
   assert.match(html, /С чего начать/);
-  assert.match(html, /✅ /);
-  assert.match(html, /просто ответьте на это письмо/);
   assert.match(html, /https:\/\/audiolad\.ru\/author-dashboard/);
   assert.match(text, /https:\/\/audiolad\.ru\/author-dashboard/);
   assert.equal(
@@ -92,7 +92,7 @@ function testEmailTemplate() {
 async function testRendererRegistration() {
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: "author_application_approved",
-    templateVersion: "author-application-approved-v1-20260722",
+    templateVersion: "author-application-approved-v2-20260722",
     payload: {},
   });
 

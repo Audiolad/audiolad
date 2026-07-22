@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { resolveAuthorsSendHeaders } from "@/lib/email/sender-identities";
+import { resolveAuthorsEmailTransport } from "@/lib/email/authors-email-transport";
 import {
   acquireOperationalEmailDelivery,
   AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
@@ -96,13 +96,13 @@ export async function sendAuthorApplicationApprovedEmail(
     return { ok: false, code: "smtp_not_configured" };
   }
 
-  const { from, envelopeFrom, replyTo } = resolveAuthorsSendHeaders(smtpConfig.user);
+  const transport = resolveAuthorsEmailTransport(smtpConfig.user);
   const provider = createSmtpEmailProvider(smtpConfig);
 
   const result = await provider.send({
-    from,
-    envelopeFrom,
-    replyTo,
+    from: transport.from,
+    envelopeFrom: transport.envelopeFrom,
+    replyTo: transport.replyTo,
     to: input.toEmail.trim().toLowerCase(),
     subject: rendered.subject,
     html: rendered.html,
