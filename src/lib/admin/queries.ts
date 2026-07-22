@@ -11,6 +11,7 @@ import {
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { getOperationalEmailDeliveryForApplication } from "@/lib/email/operational-deliveries";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 
 export type AdminStatCard =
@@ -303,7 +304,7 @@ export async function getAdminAuthorApplication(
     return null;
   }
 
-  const [profileResult, authorResult, applicationEventsResult, accessEventsResult] =
+  const [profileResult, authorResult, applicationEventsResult, accessEventsResult, emailDeliveryResult] =
     await Promise.all([
       service
         .from("profiles")
@@ -333,7 +334,12 @@ export async function getAdminAuthorApplication(
             .eq("author_id", application.author_id)
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] as AuthorAccessStatusEventRow[], error: null }),
+      application.status === "approved"
+        ? getOperationalEmailDeliveryForApplication(applicationId)
+        : Promise.resolve(null),
     ]);
+
+  const emailDelivery = emailDeliveryResult;
 
   return {
     ...application,
@@ -345,6 +351,15 @@ export async function getAdminAuthorApplication(
           name: authorResult.data.name,
           slug: authorResult.data.slug,
           accessStatus: authorResult.data.access_status,
+        }
+      : null,
+    accessGrantedEmailDelivery: emailDelivery
+      ? {
+          status: emailDelivery.status,
+          sentAt: emailDelivery.sent_at,
+          lastError: emailDelivery.last_error,
+          attemptCount: emailDelivery.attempt_count,
+          lastAttemptAt: emailDelivery.last_attempt_at,
         }
       : null,
     applicationEvents: (applicationEventsResult.data ??

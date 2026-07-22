@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requireAuthorMembership,
+  requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 import { normalizeBannerPositionPair } from "@/lib/authors/banner-position";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
@@ -29,7 +29,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { supabase } = await requireAuthorMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId);
 
     const { data: existing, error: lookupError } = await supabase
       .from("authors")

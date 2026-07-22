@@ -1,6 +1,9 @@
 import {
   AuthorAccessError,
+  assertAuthorContentMutationsAllowed,
+  getAuthorAccessStatusForMembership,
   requireAuthenticatedUser,
+  requireAuthorMutationMembership,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 
@@ -13,7 +16,7 @@ export { requireAuthenticatedUser, requireAuthorMembership };
 const MATERIAL_SELECT =
   "id, author_id, created_by, material_type, title, client_first_name, client_last_name, material_date, description, personal_recommendation, return_url, return_button_label, audio_path, audio_original_filename, audio_mime_type, audio_size_bytes, duration_seconds, pdf_path, pdf_original_filename, pdf_mime_type, pdf_size_bytes, status, guest_access_enabled, expires_at, claimed_by_user_id, claimed_at, first_opened_at, first_audio_started_at, revoked_at, deleted_at, created_at, updated_at";
 
-export async function requirePersonalMaterialAccess(materialId: string) {
+export async function requirePersonalMaterialReadAccess(materialId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
 
   const { data: material, error } = await supabase
@@ -58,6 +61,20 @@ export async function requirePersonalMaterialAccess(materialId: string) {
   };
 }
 
+export async function requirePersonalMaterialAccess(materialId: string) {
+  const context = await requirePersonalMaterialReadAccess(materialId);
+  const accessStatus = await getAuthorAccessStatusForMembership(
+    context.supabase,
+    context.material.author_id,
+  );
+  assertAuthorContentMutationsAllowed(accessStatus);
+
+  return {
+    ...context,
+    accessStatus,
+  };
+}
+
 export function assertDraftEditable(material: PersonalMaterialRow) {
   if (material.status !== "draft") {
     throw new PersonalMaterialApiError("material_not_editable", 409);
@@ -76,5 +93,5 @@ export function assertAuthorEditable(material: PersonalMaterialRow) {
 }
 
 export async function requireAuthorMaterialListAccess(authorId: string) {
-  return requireAuthorMembership(authorId);
+  return requireAuthorMutationMembership(authorId);
 }

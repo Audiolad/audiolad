@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   handleAuthorRouteError,
   requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { setPracticeTopics } from "@/lib/topics/sync";
@@ -30,7 +31,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice, user } = await requirePracticeAccess(id);
+    const { supabase, practice, user } = await requirePracticeMutationAccess(id);
 
     let body: unknown;
 

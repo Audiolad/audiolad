@@ -186,6 +186,18 @@ export function assertAuthorPaidProductsAllowed(accessStatus: AuthorAccessStatus
   }
 }
 
+export async function requireAuthorMutationMembership(authorId: string) {
+  const context = await requireAuthorMembership(authorId);
+  assertAuthorContentMutationsAllowed(context.accessStatus);
+  return context;
+}
+
+export async function requirePracticeMutationAccess(practiceId: string) {
+  const context = await requirePracticeAccess(practiceId);
+  assertAuthorContentMutationsAllowed(context.accessStatus);
+  return context;
+}
+
 export async function requirePracticeAccess(practiceId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
 

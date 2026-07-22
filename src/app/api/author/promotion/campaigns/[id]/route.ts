@@ -5,7 +5,7 @@ import {
   getPromotionPeriodBounds,
   parsePromotionPeriod,
 } from "@/lib/promotion/dates";
-import { requirePromotionCampaignAccess } from "@/lib/promotion/access";
+import { requirePromotionCampaignAccess, requirePromotionCampaignMutationAccess } from "@/lib/promotion/access";
 import {
   aggregatePromotionFunnelMetrics,
   buildPromotionChannelBreakdown,
@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requirePromotionCampaignAccess(id);
+    const { supabase } = await requirePromotionCampaignMutationAccess(id);
 
     const { data, error } = await supabase
       .from("promotion_campaigns")

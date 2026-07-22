@@ -3,7 +3,7 @@ import {
   createAuthorPdfSignedUrl,
   redirectToSignedPdfUrl,
 } from "@/lib/personal-materials/server/delivery";
-import { requirePersonalMaterialAccess } from "@/lib/personal-materials/server/auth";
+import { requirePersonalMaterialReadAccess } from "@/lib/personal-materials/server/auth";
 import {
   handlePersonalMaterialRouteError,
   privateNoStoreHeaders,
@@ -16,7 +16,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { material } = await requirePersonalMaterialAccess(id);
+    const { material } = await requirePersonalMaterialReadAccess(id);
 
     const signed = await createAuthorPdfSignedUrl(material);
 

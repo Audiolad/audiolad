@@ -213,6 +213,84 @@ export async function approveAuthorApplication(
   };
 }
 
+export async function resendAuthorAccessGrantedEmail(
+  _prevState: AdminAuthorApplicationActionState,
+  formData: FormData,
+): Promise<AdminAuthorApplicationActionState> {
+  await requireAdminPanelAccess();
+
+  const applicationId = String(formData.get("applicationId") ?? "").trim();
+  const forceResend = String(formData.get("forceResend") ?? "") === "1";
+
+  if (!applicationId) {
+    return { ok: false, error: "Не удалось определить заявку." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: application } = await supabase
+    .from("author_applications")
+    .select("status, display_name, contact_email, user_id, author_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (!application?.author_id || application.status !== "approved") {
+    return {
+      ok: false,
+      error: "Письмо можно отправить только для одобренной заявки с авторским пространством.",
+    };
+  }
+
+  const { data: profile } = application.user_id
+    ? await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", application.user_id)
+        .maybeSingle()
+    : { data: null };
+
+  const recipientEmail =
+    application.contact_email?.trim() || profile?.email?.trim() || null;
+
+  if (!recipientEmail) {
+    return { ok: false, error: "Email получателя не найден." };
+  }
+
+  const emailResult = await sendAuthorAccessGrantedEmail({
+    toEmail: recipientEmail,
+    userName: application.display_name?.trim() || "автор",
+    applicationId,
+    forceResend,
+  });
+
+  revalidateApplicationPaths(applicationId);
+
+  if (!emailResult.ok) {
+    return {
+      ok: false,
+      error:
+        emailResult.code === "already_sent"
+          ? "Письмо уже было отправлено. Для повторной отправки подтвердите действие явно."
+          : "Не удалось отправить письмо. Проверьте SMTP и попробуйте снова.",
+    };
+  }
+
+  if (emailResult.skipped) {
+    return {
+      ok: false,
+      error:
+        "Письмо уже было отправлено ранее. Для повторной отправки подтвердите действие явно.",
+    };
+  }
+
+  return {
+    ok: true,
+    message: forceResend
+      ? "Письмо повторно отправлено."
+      : "Письмо отправлено.",
+  };
+}
+
 export async function suspendLinkedAuthorAccess(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,

@@ -4,7 +4,7 @@ import {
   AuthorAccessError,
   handleAuthorRouteError,
 } from "@/lib/author-products/auth";
-import { PROMO_PAGE_DETAIL_SELECT, requirePromoPageAccess } from "@/lib/promo-pages/access";
+import { PROMO_PAGE_DETAIL_SELECT, requirePromoPageAccess, requirePromoPageMutationAccess } from "@/lib/promo-pages/access";
 import { listPromoEligibleProducts } from "@/lib/promo-pages/eligible-products";
 import { mapPromoPageRpcErrorMessage } from "@/lib/promo-pages/errors";
 import {
@@ -27,7 +27,7 @@ import {
   validatePromoPagePublicTitle,
   validatePromoPageSlug,
 } from "@/lib/promo-pages/validation";
-import { requireAuthorPromotionAccess } from "@/lib/promotion/access";
+import { requireAuthorPromotionAccess, requireAuthorPromotionMutationAccess } from "@/lib/promotion/access";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -507,7 +507,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validated.error }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorPromotionAccess(authorId);
+    const { supabase } = await requireAuthorPromotionMutationAccess(authorId);
 
     const practiceIds = validated.payload.practice_ids ?? [];
 
@@ -621,7 +621,7 @@ export async function PATCHPage(pageId: string, request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase, page } = await requirePromoPageAccess(pageId);
+    const { supabase, page } = await requirePromoPageMutationAccess(pageId);
     const current = mapPromoPageAdminDto(page as JsonRecord);
 
     rejectPublishedEdit(current.status);
@@ -691,7 +691,7 @@ export async function PATCHPage(pageId: string, request: Request) {
 
 export async function POSTPublish(pageId: string) {
   try {
-    const { supabase, page: pageRow } = await requirePromoPageAccess(pageId);
+    const { supabase, page: pageRow } = await requirePromoPageMutationAccess(pageId);
     const current = mapPromoPageAdminDto(pageRow as JsonRecord);
 
     const ctaError = validatePromoPageCtaForPublish({
@@ -723,7 +723,7 @@ export async function POSTPublish(pageId: string) {
 
 export async function POSTUnpublish(pageId: string) {
   try {
-    const { supabase } = await requirePromoPageAccess(pageId);
+    const { supabase } = await requirePromoPageMutationAccess(pageId);
 
     const { data, error } = await supabase.rpc("unpublish_promo_page", {
       p_promo_page_id: pageId,

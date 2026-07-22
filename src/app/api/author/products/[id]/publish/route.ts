@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
 import {
-  assertAuthorContentMutationsAllowed,
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
@@ -19,8 +18,7 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice, accessStatus } = await requirePracticeAccess(id);
-    assertAuthorContentMutationsAllowed(accessStatus);
+    const { supabase, practice, accessStatus } = await requirePracticeMutationAccess(id);
     const detail = await getAuthorProductDetail(supabase, id);
 
     if (!detail) {

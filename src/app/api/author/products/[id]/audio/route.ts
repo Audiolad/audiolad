@@ -5,7 +5,7 @@ import {
 } from "@/lib/author-products/limits";
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import {
   AUDIO_ITEM_DETAIL_SELECT,
@@ -20,7 +20,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     let body: unknown;
 

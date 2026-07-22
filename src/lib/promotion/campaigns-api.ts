@@ -15,6 +15,7 @@ import {
 } from "@/lib/promotion/dates";
 import {
   requireAuthorPromotionAccess,
+  requireAuthorPromotionMutationAccess,
 } from "@/lib/promotion/access";
 import type {
   PromotionCampaignSummaryRow,
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase, user } = await requireAuthorPromotionAccess(authorId);
+    const { supabase, user } = await requireAuthorPromotionMutationAccess(authorId);
 
     const { data: practice, error: practiceError } = await supabase
       .from("practices")

@@ -9,6 +9,7 @@ import {
   rejectAuthorApplication,
   requestAuthorApplicationChanges,
   restoreLinkedAuthorAccess,
+  resendAuthorAccessGrantedEmail,
   returnAuthorApplicationToReview,
   suspendLinkedAuthorAccess,
   takeAuthorApplicationInReview,
@@ -145,6 +146,7 @@ export default function AuthorApplicationReviewForm({
   application,
 }: AuthorApplicationReviewFormProps) {
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [showResendConfirm, setShowResendConfirm] = useState(false);
   const [adminNote, setAdminNote] = useState(application.admin_note ?? "");
   const [reviewComment, setReviewComment] = useState(
     application.review_comment ?? "",
@@ -183,6 +185,10 @@ export default function AuthorApplicationReviewForm({
     updateAuthorApplicationAdminNote,
     ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   );
+  const [resendState, resendAction, resendPending] = useActionState(
+    resendAuthorAccessGrantedEmail,
+    ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
+  );
 
   const feedbackState =
     approveState.ok || approveState.error || approveState.warning
@@ -201,7 +207,9 @@ export default function AuthorApplicationReviewForm({
                   ? restoreState
                   : noteState.ok || noteState.error
                     ? noteState
-                    : ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE;
+                    : resendState.ok || resendState.error
+                      ? resendState
+                      : ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE;
 
   const contactEmail = application.contact_email?.trim() ?? "";
   const contactDetails = application.contact_details?.trim() ?? "";
@@ -233,6 +241,50 @@ export default function AuthorApplicationReviewForm({
       linkedAuthor.accessStatus,
     );
   const canRestore = linkedAuthor?.accessStatus === "suspended";
+  const emailDelivery = application.accessGrantedEmailDelivery;
+  const canSendAccessEmail =
+    application.status === "approved" && Boolean(linkedAuthor);
+  const emailAlreadySent = emailDelivery?.status === "sent";
+
+  function renderEmailDeliveryStatus() {
+    if (!canSendAccessEmail) {
+      return null;
+    }
+
+    if (!emailDelivery) {
+      return (
+        <p className="text-sm text-[#796ba0]">Отправка ещё не выполнялась.</p>
+      );
+    }
+
+    if (emailDelivery.status === "sent") {
+      return (
+        <p className="text-sm text-[#3d8d65]">
+          Письмо отправлено
+          {emailDelivery.sentAt
+            ? `: ${formatDateTime(emailDelivery.sentAt)}`
+            : "."}
+        </p>
+      );
+    }
+
+    if (emailDelivery.status === "failed") {
+      return (
+        <div className="space-y-1">
+          <p className="text-sm text-[#b34f63]">Письмо не отправлено.</p>
+          {emailDelivery.lastError ? (
+            <p className="text-sm text-[#796ba0]">{emailDelivery.lastError}</p>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <p className="text-sm text-[#796ba0]">
+        Отправка ещё не завершена (статус: ожидание).
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -536,6 +588,78 @@ export default function AuthorApplicationReviewForm({
           ) : null}
         </div>
       </section>
+
+      {canSendAccessEmail ? (
+        <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
+          <h2 className="text-lg font-semibold text-[#25135c]">
+            Письмо об открытии кабинета
+          </h2>
+          <div className="mt-4 space-y-4">
+            {renderEmailDeliveryStatus()}
+
+            {emailAlreadySent ? (
+              <>
+                {!showResendConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowResendConfirm(true)}
+                    className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
+                  >
+                    Отправить повторно
+                  </button>
+                ) : (
+                  <div className="rounded-[18px] border border-[#f0dfab] bg-[#fffaf0] px-4 py-4">
+                    <p className="text-sm leading-6 text-[#8a6a1f]">
+                      Письмо уже было успешно отправлено. Повторная отправка
+                      создаст новое письмо получателю.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <form action={resendAction}>
+                        <input
+                          type="hidden"
+                          name="applicationId"
+                          value={application.id}
+                        />
+                        <input type="hidden" name="forceResend" value="1" />
+                        <button
+                          type="submit"
+                          disabled={resendPending}
+                          className="inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          {resendPending ? "Отправка…" : "Подтвердить повторную отправку"}
+                        </button>
+                      </form>
+                      <button
+                        type="button"
+                        onClick={() => setShowResendConfirm(false)}
+                        className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <form action={resendAction}>
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="forceResend" value="0" />
+                <button
+                  type="submit"
+                  disabled={resendPending}
+                  className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                >
+                  {resendPending
+                    ? "Отправка…"
+                    : emailDelivery?.status === "failed"
+                      ? "Отправить повторно"
+                      : "Отправить письмо"}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">История решений</h2>

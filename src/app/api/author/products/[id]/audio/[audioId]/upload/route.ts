@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import {
   getMp3DurationSeconds,
@@ -20,7 +20,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase, practice } = await requirePracticeAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
 
     const { data: audioItem, error: audioLookupError } = await supabase
       .from("audio_items")

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
@@ -24,7 +24,7 @@ const PRACTICE_COVERS_BUCKET = "practice-covers";
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     const { data: existing } = await supabase
       .from("practices")
@@ -67,7 +67,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     const formData = await request.formData();
     const file = formData.get("file");

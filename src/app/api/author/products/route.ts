@@ -4,9 +4,9 @@ import {
   validateTitleLength,
 } from "@/lib/author-products/limits";
 import {
-  assertAuthorContentMutationsAllowed,
   handleAuthorRouteError,
   requireAuthorMembership,
+  requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 import {
   createDraftProduct,
@@ -68,8 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: titleError }, { status: 400 });
     }
 
-    const { supabase, accessStatus } = await requireAuthorMembership(authorId);
-    assertAuthorContentMutationsAllowed(accessStatus);
+    const { supabase } = await requireAuthorMutationMembership(authorId);
     const product = await createDraftProduct(supabase, {
       authorId,
       title,

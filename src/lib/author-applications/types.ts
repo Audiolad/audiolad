@@ -69,6 +69,13 @@ export type AdminAuthorApplicationDetail = AuthorApplicationRow & {
     slug: string;
     accessStatus: string;
   } | null;
+  accessGrantedEmailDelivery: {
+    status: "pending" | "sent" | "failed";
+    sentAt: string | null;
+    lastError: string | null;
+    attemptCount: number;
+    lastAttemptAt: string | null;
+  } | null;
   applicationEvents: AuthorApplicationStatusEventRow[];
   accessEvents: AuthorAccessStatusEventRow[];
 };

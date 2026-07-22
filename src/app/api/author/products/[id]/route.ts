@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
-  assertAuthorContentMutationsAllowed,
   assertAuthorPaidProductsAllowed,
   handleAuthorRouteError,
-  requireAuthorMembership,
   requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import {
   validateDescriptionLength,
@@ -133,9 +132,8 @@ function applyListeningNoticeTextField(
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice, user, accessStatus } = await requirePracticeAccess(id);
-
-    assertAuthorContentMutationsAllowed(accessStatus);
+    const { supabase, practice, user, accessStatus } =
+      await requirePracticeMutationAccess(id);
 
     let body: unknown;
 
@@ -374,8 +372,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { accessStatus } = await requirePracticeAccess(id);
-    assertAuthorContentMutationsAllowed(accessStatus);
+    await requirePracticeMutationAccess(id);
     const serviceSupabase = createServiceRoleClient();
 
     const blockers = getDeleteBlockers(

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
@@ -27,7 +27,7 @@ const SHARED_COVER_ENABLED_MESSAGE =
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     const { data: audioItem, error: lookupError } = await supabase
       .from("audio_items")
@@ -83,7 +83,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase, practice } = await requirePracticeAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
 
     if (practice.use_shared_cover !== false) {
       return NextResponse.json(

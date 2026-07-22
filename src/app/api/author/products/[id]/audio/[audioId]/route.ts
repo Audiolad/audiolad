@@ -6,7 +6,7 @@ import {
 } from "@/lib/author-products/limits";
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
@@ -20,7 +20,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     let body: unknown;
 
@@ -102,7 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     const { count, error: countError } = await supabase
       .from("audio_items")

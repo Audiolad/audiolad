@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requireAuthorMembership,
+  requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
 import { AUTHOR_BANNER_ERROR_MESSAGES } from "@/lib/authors/banner-validation-client";
@@ -68,7 +68,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId);
 
     const { data: existing } = await supabase
       .from("authors")
@@ -140,7 +140,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId);
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { data: existing } = await supabase

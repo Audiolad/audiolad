@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   handleAuthorRouteError,
-  requirePracticeAccess,
+  requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { restorePracticeFromArchive } from "@/lib/author-products/lifecycle";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
@@ -14,7 +14,7 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
 
     try {
       await restorePracticeFromArchive(supabase, id);

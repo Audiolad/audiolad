@@ -2,7 +2,10 @@ import {
   AuthorAccessError,
   requireAuthenticatedUser,
 } from "@/lib/author-products/auth";
-import { requireAuthorPromotionAccess } from "@/lib/promotion/access";
+import {
+  requireAuthorPromotionAccess,
+  requireAuthorPromotionMutationAccess,
+} from "@/lib/promotion/access";
 
 const PROMO_PAGE_DETAIL_SELECT = `
   id,
@@ -60,6 +63,29 @@ export async function requirePromoPageAccess(promoPageId: string) {
   }
 
   await requireAuthorPromotionAccess(page.author_id);
+
+  return { supabase, user, page };
+}
+
+export async function requirePromoPageMutationAccess(promoPageId: string) {
+  const { supabase, user } = await requireAuthenticatedUser();
+
+  const { data: page, error } = await supabase
+    .from("promo_pages")
+    .select(PROMO_PAGE_DETAIL_SELECT)
+    .eq("id", promoPageId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("promo_page_lookup_error", error.message);
+    throw new AuthorAccessError("internal_error", 500);
+  }
+
+  if (!page?.id) {
+    throw new AuthorAccessError("not_found", 404);
+  }
+
+  await requireAuthorPromotionMutationAccess(page.author_id);
 
   return { supabase, user, page };
 }

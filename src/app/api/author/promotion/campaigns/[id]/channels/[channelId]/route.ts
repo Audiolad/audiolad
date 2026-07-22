@@ -6,7 +6,7 @@ import {
   parseCampaignChannelFormBody,
   updateCampaignChannel,
 } from "@/lib/promotion/campaign-channels-api";
-import { requirePromotionCampaignAccess } from "@/lib/promotion/access";
+import { requirePromotionCampaignMutationAccess } from "@/lib/promotion/access";
 
 type RouteContext = {
   params: Promise<{ id: string; channelId: string }>;
@@ -28,7 +28,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requirePromotionCampaignAccess(id);
+    const { supabase } = await requirePromotionCampaignMutationAccess(id);
     const result = await updateCampaignChannel(supabase, id, channelId, parsed);
 
     if (!result.ok) {
@@ -44,7 +44,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, channelId } = await context.params;
-    const { supabase } = await requirePromotionCampaignAccess(id);
+    const { supabase } = await requirePromotionCampaignMutationAccess(id);
     const result = await deleteCampaignChannel(supabase, id, channelId);
 
     if (!result.ok) {

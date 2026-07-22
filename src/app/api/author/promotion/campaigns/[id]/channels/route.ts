@@ -6,7 +6,7 @@ import {
   listCampaignChannels,
   parseCampaignChannelFormBody,
 } from "@/lib/promotion/campaign-channels-api";
-import { requirePromotionCampaignAccess } from "@/lib/promotion/access";
+import { requirePromotionCampaignAccess, requirePromotionCampaignMutationAccess } from "@/lib/promotion/access";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -40,7 +40,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requirePromotionCampaignAccess(id);
+    const { supabase } = await requirePromotionCampaignMutationAccess(id);
     const result = await createCampaignChannel(supabase, id, parsed);
 
     if (!result.ok) {
