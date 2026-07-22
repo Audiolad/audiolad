@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   getTestUserResetPreflightAction,
@@ -112,6 +112,7 @@ export default function TestUserResetPanel({
   const [localClearMessage, setLocalClearMessage] = useState<string | null>(null);
   const [isRefreshing, startRefresh] = useTransition();
   const [isSubmitting, startSubmit] = useTransition();
+  const submitLockRef = useRef(false);
 
   const phraseMatches = useMemo(
     () => confirmationPhrase.trim() === TEST_USER_RESET_CONFIRMATION_PHRASE,
@@ -133,58 +134,68 @@ export default function TestUserResetPanel({
   }, []);
 
   const handleReset = useCallback(() => {
+    if (submitLockRef.current || isSubmitting || isRefreshing) {
+      return;
+    }
+
+    submitLockRef.current = true;
+
     startSubmit(async () => {
-      setFormError(null);
-      setReport(null);
-      setLocalClearMessage(null);
+      try {
+        setFormError(null);
+        setReport(null);
+        setLocalClearMessage(null);
 
-      const result = await resetAllowlistedTestUserAction({
-        confirmationPhrase,
-      });
+        const result = await resetAllowlistedTestUserAction({
+          confirmationPhrase,
+        });
 
-      setReport(result.result);
+        setReport(result.result);
 
-      if (!result.ok) {
-        if (result.forbidden) {
-          setFormError("Недостаточно прав.");
+        if (!result.ok) {
+          if (result.forbidden) {
+            setFormError("Недостаточно прав.");
+            return;
+          }
+
+          if (result.invalidConfirmation) {
+            setFormError("Неверная фраза подтверждения.");
+            return;
+          }
+
+          setFormError(result.result.message ?? "Не удалось выполнить сброс.");
           return;
         }
 
-        if (result.invalidConfirmation) {
-          setFormError("Неверная фраза подтверждения.");
-          return;
+        if (result.result.status === "failed") {
+          setFormError(result.result.message ?? "Сброс заблокирован.");
         }
 
-        setFormError(result.result.message ?? "Не удалось выполнить сброс.");
-        return;
+        if (result.result.status === "partial") {
+          setFormError(
+            result.result.message ??
+              "Операция завершилась частично. Проверьте отчёт и при необходимости повторите.",
+          );
+        }
+
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (
+          user?.email &&
+          user.email.toLowerCase() === TEST_USER_RESET_EMAIL.toLowerCase()
+        ) {
+          await supabase.auth.signOut();
+        }
+
+        refreshPreflight();
+      } finally {
+        submitLockRef.current = false;
       }
-
-      if (result.result.status === "failed") {
-        setFormError(result.result.message ?? "Сброс заблокирован.");
-      }
-
-      if (result.result.status === "partial") {
-        setFormError(
-          result.result.message ??
-            "Операция завершилась частично. Проверьте отчёт и при необходимости повторите.",
-        );
-      }
-
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (
-        user?.email &&
-        user.email.toLowerCase() === TEST_USER_RESET_EMAIL.toLowerCase()
-      ) {
-        await supabase.auth.signOut();
-      }
-
-      refreshPreflight();
     });
-  }, [confirmationPhrase, refreshPreflight]);
+  }, [confirmationPhrase, isRefreshing, isSubmitting, refreshPreflight]);
 
   const handleClearLocal = useCallback(() => {
     const cleared = clearAudioladLocalTestData();

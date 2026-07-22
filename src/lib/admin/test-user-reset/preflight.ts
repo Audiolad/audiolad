@@ -130,50 +130,6 @@ async function findAuthUserIdByAllowlistedEmail(
   return { id: authMatch.id, email: authMatch.email };
 }
 
-async function hasAuthorWorkspaceReferences(
-  service: ServiceClient,
-  userId: string,
-): Promise<boolean> {
-  const checks = await Promise.all([
-    service
-      .from("author_applications")
-      .select("id", { count: "exact", head: true })
-      .eq("reviewed_by", userId),
-    service
-      .from("author_applications")
-      .select("id", { count: "exact", head: true })
-      .eq("approved_by", userId),
-    service
-      .from("authors")
-      .select("id", { count: "exact", head: true })
-      .eq("access_status_changed_by", userId),
-    service
-      .from("author_application_status_events")
-      .select("id", { count: "exact", head: true })
-      .eq("changed_by", userId),
-    service
-      .from("author_access_status_events")
-      .select("id", { count: "exact", head: true })
-      .eq("changed_by", userId),
-    service
-      .from("personal_material_author_notes")
-      .select("personal_material_id", { count: "exact", head: true })
-      .eq("updated_by", userId),
-  ]);
-
-  for (const result of checks) {
-    if (result.error) {
-      throw new Error("test_user_reset_preflight_author_refs_failed");
-    }
-
-    if ((result.count ?? 0) > 0) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 async function loadEmailContacts(service: ServiceClient) {
   const { data, error } = await service
     .from("email_contacts")
@@ -457,15 +413,10 @@ export async function getTestUserResetPreflight(
   const resolvedEmail =
     authUser?.email ?? emailContacts[0]?.email ?? TEST_USER_RESET_EMAIL;
 
-  const authorWorkspaceReferencesPresent = authUserId
-    ? await hasAuthorWorkspaceReferences(service, authUserId)
-    : false;
-
   const blockers = evaluateTestUserResetBlockers({
     resolvedEmail,
     profileRole: profile?.role ?? null,
     counts,
-    hasAuthorWorkspaceReferences: authorWorkspaceReferencesPresent,
   });
 
   if (

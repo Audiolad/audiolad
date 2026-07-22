@@ -34,6 +34,8 @@ COMMENT ON COLUMN public.admin_operation_log.target_email_hash IS
 ALTER TABLE public.admin_operation_log ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.admin_operation_log FROM PUBLIC;
+REVOKE ALL ON TABLE public.admin_operation_log FROM anon;
+REVOKE ALL ON TABLE public.admin_operation_log FROM authenticated;
 GRANT ALL ON TABLE public.admin_operation_log TO service_role;
 
 COMMIT;

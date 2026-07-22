@@ -111,7 +111,6 @@ export function evaluateTestUserResetBlockers(input: {
   resolvedEmail: string | null;
   profileRole: string | null;
   counts: TestUserResetPreflightCounts;
-  hasAuthorWorkspaceReferences: boolean;
 }): TestUserResetBlocker[] {
   const blockers: TestUserResetBlocker[] = [];
 
@@ -185,14 +184,6 @@ export function evaluateTestUserResetBlockers(input: {
     blockers.push(
       buildTestUserResetBlocker(
         TEST_USER_RESET_BLOCK_CODES.personal_material_templates,
-      ),
-    );
-  }
-
-  if (input.hasAuthorWorkspaceReferences) {
-    blockers.push(
-      buildTestUserResetBlocker(
-        TEST_USER_RESET_BLOCK_CODES.author_workspace_references,
       ),
     );
   }

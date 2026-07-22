@@ -168,6 +168,10 @@ function testStaticWiring() {
   assert(!reset.includes("DELETE FROM auth.users"), "no direct auth sql delete");
   assert(page.includes("TestUserResetPanel"), "panel on users page");
   assert(page.includes("getPlatformOwnerSessionIfOwner"), "owner-only render gate");
+  assert(panel.includes("submitLockRef"), "double submit lock in UI");
+  assert(!panel.includes("createServiceRoleClient"), "service role stays server-side");
+  assert(reset.includes('update({ reviewed_by: null })'), "reviewed_by cleared like admin delete");
+  assert(!reset.includes("approved_by: null"), "approved_by not auto-cleared");
 }
 
 async function getOwnerActor(service) {
@@ -314,6 +318,23 @@ async function testIntegration() {
         confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
       });
       assert(idempotent.ok, "idempotent reset ok");
+      assert(idempotent.result.alreadyReset, "idempotent reset flagged alreadyReset");
+
+      const { count: auditAfterIdempotent } = await service
+        .from("admin_operation_log")
+        .select("id", { count: "exact", head: true })
+        .eq("operation", "test_user_reset");
+      assert(
+        (auditAfterIdempotent ?? 0) === (auditCount ?? 0),
+        "idempotent reset skips duplicate audit",
+      );
+    } else if (!preflightBefore.authUserFound && preflightBefore.canReset) {
+      const idempotent = await resetAllowlistedTestUser(service, {
+        actorUserId: owner.id,
+        confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+      });
+      assert(idempotent.ok, "already-reset path ok");
+      assert(idempotent.result.alreadyReset, "already-reset path flagged");
     } else if (preflightBefore.blockers.length > 0) {
       const blocked = await resetAllowlistedTestUser(service, {
         actorUserId: owner.id,

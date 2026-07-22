@@ -105,37 +105,13 @@ async function clearReviewedByReferences(
   service: ServiceClient,
   userId: string,
 ): Promise<void> {
-  const updates = await Promise.all([
-    service
-      .from("author_applications")
-      .update({ reviewed_by: null })
-      .eq("reviewed_by", userId),
-    service
-      .from("author_applications")
-      .update({ approved_by: null })
-      .eq("approved_by", userId),
-    service
-      .from("authors")
-      .update({ access_status_changed_by: null })
-      .eq("access_status_changed_by", userId),
-    service
-      .from("author_application_status_events")
-      .update({ changed_by: null })
-      .eq("changed_by", userId),
-    service
-      .from("author_access_status_events")
-      .update({ changed_by: null })
-      .eq("changed_by", userId),
-    service
-      .from("personal_material_author_notes")
-      .update({ updated_by: null })
-      .eq("updated_by", userId),
-  ]);
+  const { error } = await service
+    .from("author_applications")
+    .update({ reviewed_by: null })
+    .eq("reviewed_by", userId);
 
-  for (const result of updates) {
-    if (result.error) {
-      throw new Error("test_user_reset_author_refs_clear_failed");
-    }
+  if (error) {
+    throw new Error("test_user_reset_reviewed_by_clear_failed");
   }
 }
 
@@ -465,6 +441,27 @@ export async function resetAllowlistedTestUser(
         errorCode: "blocked",
         message: "Сброс заблокирован. Устраните блокеры и повторите.",
         browserHint: BROWSER_HINT,
+      },
+    };
+  }
+
+  const alreadyFullyReset =
+    !preflight.authUserFound &&
+    preflight.counts.emailContacts === 0 &&
+    preflight.counts.analyticsEvents === 0 &&
+    preflight.counts.analyticsSessions === 0;
+
+  if (alreadyFullyReset) {
+    return {
+      ok: true,
+      result: {
+        status: "success",
+        authUserId: null,
+        deletedCounts: emptyDeletedCounts(),
+        notDeleted: [...NOT_DELETED_ITEMS],
+        message: "Тестовый пользователь уже сброшен. Можно регистрироваться заново.",
+        browserHint: BROWSER_HINT,
+        alreadyReset: true,
       },
     };
   }
