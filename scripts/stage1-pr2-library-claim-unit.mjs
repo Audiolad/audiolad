@@ -50,6 +50,7 @@ function isClaimFreePracticeRpcResult(value) {
     typeof value.practice_slug === "string" &&
     typeof value.inserted === "boolean" &&
     typeof value.access_source === "string" &&
+    typeof value.show_first_save_prompt === "boolean" &&
     value.in_library === true
   );
 }
@@ -62,6 +63,9 @@ function toClaimLibrarySuccessBody(row) {
       access_source: row.access_source,
       inserted: row.inserted,
       in_library: true,
+    },
+    retention: {
+      show_first_save_prompt: row.inserted && row.show_first_save_prompt,
     },
   };
 }
@@ -114,12 +118,14 @@ function testSuccessBody() {
     inserted: false,
     access_source: "starter",
     in_library: true,
+    show_first_save_prompt: false,
   };
 
   assert(isClaimFreePracticeRpcResult(row), "rpc result guard");
   const body = toClaimLibrarySuccessBody(row);
   assert(body.library.access_source === "starter", "preserve existing source");
   assert(body.library.in_library === true, "in library flag");
+  assert(body.retention.show_first_save_prompt === false, "no retention on repeat");
 }
 
 function testMigrationFile() {
