@@ -56,6 +56,7 @@ main() {
 
   ensure_dirs
   acquire_deploy_lock
+  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-3}"
   check_disk_space 2048
 
   if [[ ! -f "$DEPLOY_ROOT/shared/.env.production" ]]; then
