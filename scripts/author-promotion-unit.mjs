@@ -69,6 +69,22 @@ function buildCampaignKeyFromName(name) {
   return slugifyTitle(name).replace(/-/g, "_").slice(0, 64);
 }
 
+function buildCampaignKeyFromNameForForm(name, currentKey, keyEditedManually) {
+  if (keyEditedManually) {
+    return currentKey;
+  }
+
+  return buildCampaignKeyFromName(name);
+}
+
+function resolveCampaignKeyForSubmit(name, currentKey, keyEditedManually) {
+  if (keyEditedManually) {
+    return currentKey;
+  }
+
+  return buildCampaignKeyFromName(name);
+}
+
 function normalizeCampaignKey(value) {
   return value
     .trim()
@@ -157,9 +173,45 @@ function testStatsDoNotExposePii() {
 }
 
 function testCampaignKeyModule() {
+  assert(buildCampaignKeyFromName("Бастет") === "bastet", "transliterates single-word cyrillic title");
+  assert(
+    buildCampaignKeyFromName("Женские деньги") === "zhenskie_dengi",
+    "transliterates multi-word cyrillic title",
+  );
+  assert(
+    buildCampaignKeyFromName("Код Изобилия") === "kod_izobiliya",
+    "transliterates mixed-case cyrillic title",
+  );
+  assert(
+    buildCampaignKeyFromName("Сергей и Зоя — Telegram") === "sergey_i_zoya_telegram",
+    "transliterates mixed cyrillic-latin title with punctuation",
+  );
+
   const generated = buildCampaignKeyFromName("Женские деньги — запуск");
   assert(generated.includes("zhenskie"), "transliterates cyrillic title");
   assert(!generated.includes("-"), "campaign key uses underscores not dashes");
+
+  assert(
+    buildCampaignKeyFromNameForForm("Бастет", "b", false) === "bastet",
+    "form autofill rebuilds key from full title while typing",
+  );
+  assert(
+    buildCampaignKeyFromNameForForm("Новое имя", "custom_key", true) === "custom_key",
+    "manual campaign key is preserved while title changes",
+  );
+  assert(
+    resolveCampaignKeyForSubmit("Бастет", "b", false) === "bastet",
+    "submit uses full title when key was not edited manually",
+  );
+  assert(
+    resolveCampaignKeyForSubmit("Бастет", "custom_key", true) === "custom_key",
+    "submit keeps manual campaign key",
+  );
+
+  assert(buildCampaignKeyFromName("") === "", "empty title yields empty key");
+  assert(buildCampaignKeyFromName("   ") === "", "whitespace-only title yields empty key");
+  assert(buildCampaignKeyFromName("!!!") === "", "special-only title yields empty key");
+  assert(validateCampaignKey(buildCampaignKeyFromName("!!!")) === "campaign_key_required", "empty generated key rejected");
 
   assert(
     normalizeCampaignKey("  Zhenskie-Dengi Launch!! ") === "zhenskie_dengi_launch",
@@ -765,9 +817,14 @@ function testCampaignSelectionUiAndChannelsState() {
   assert(client.includes("buildPromotionPageQuery"), "client builds promotion query");
   assert(client.includes("selectCampaign"), "explicit campaign selection helper");
   assert(client.includes("router.replace"), "URL updated without full reload");
+  assert(client.includes("campaignKeyEditedManually"), "campaign key manual-edit guard");
   assert(
-    client.includes("campaign: null"),
-    "author switch clears campaign param",
+    client.includes("buildCampaignKeyFromNameForForm"),
+    "campaign key autofill uses shared helper",
+  );
+  assert(
+    client.includes("resolveCampaignKeyForSubmit"),
+    "campaign create submit resolves key from title when auto mode",
   );
 
   assert(linksSection.includes("Ссылки для кампании"), "campaign context heading");

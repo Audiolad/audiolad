@@ -9,8 +9,9 @@ import PromotionCampaignLinksSection, {
   type PromotionChannelFormSeed,
 } from "@/components/author-dashboard/PromotionCampaignLinksSection";
 import {
-  buildCampaignKeyFromName,
+  buildCampaignKeyFromNameForForm,
   normalizeCampaignKey,
+  resolveCampaignKeyForSubmit,
 } from "@/lib/promotion/campaign-key";
 import {
   buildPromotionPageQuery,
@@ -141,6 +142,7 @@ export default function AuthorPromotionClient({
   const [createError, setCreateError] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState("");
   const [campaignKey, setCampaignKey] = useState("");
+  const [campaignKeyEditedManually, setCampaignKeyEditedManually] = useState(false);
   const [practiceId, setPracticeId] = useState("");
   const [channelFormSeed, setChannelFormSeed] = useState<PromotionChannelFormSeed | null>(
     null,
@@ -387,6 +389,18 @@ export default function AuthorPromotionClient({
     router.replace(`/author-dashboard/promotion?${params.toString()}`);
   }
 
+  function openCreateCampaignForm() {
+    setCreateOpen(true);
+    setCreateError(null);
+    setCampaignKeyEditedManually(false);
+  }
+
+  function closeCreateCampaignForm() {
+    setCreateOpen(false);
+    setCreateError(null);
+    setCampaignKeyEditedManually(false);
+  }
+
   async function handleCreateCampaign(event: React.FormEvent) {
     event.preventDefault();
 
@@ -405,7 +419,11 @@ export default function AuthorPromotionClient({
           author_id: selectedAuthor.id,
           practice_id: practiceId,
           name: campaignName,
-          campaign_key: campaignKey || buildCampaignKeyFromName(campaignName),
+          campaign_key: resolveCampaignKeyForSubmit(
+            campaignName,
+            campaignKey,
+            campaignKeyEditedManually,
+          ),
         }),
       });
 
@@ -421,6 +439,7 @@ export default function AuthorPromotionClient({
       setCreateOpen(false);
       setCampaignName("");
       setCampaignKey("");
+      setCampaignKeyEditedManually(false);
       setPracticeId("");
 
       if (payload.campaign?.id) {
@@ -522,7 +541,7 @@ export default function AuthorPromotionClient({
           <h2 className="text-[21px] font-semibold">Кампании</h2>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => openCreateCampaignForm()}
             className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
           >
             Создать кампанию
@@ -548,7 +567,7 @@ export default function AuthorPromotionClient({
             </p>
             <button
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={() => openCreateCampaignForm()}
               className="mt-6 rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
             >
               Создать кампанию
@@ -615,9 +634,13 @@ export default function AuthorPromotionClient({
                 onChange={(event) => {
                   const nextName = event.target.value;
                   setCampaignName(nextName);
-                  if (!campaignKey.trim()) {
-                    setCampaignKey(buildCampaignKeyFromName(nextName));
-                  }
+                  setCampaignKey((currentKey) =>
+                    buildCampaignKeyFromNameForForm(
+                      nextName,
+                      currentKey,
+                      campaignKeyEditedManually,
+                    ),
+                  );
                 }}
                 className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
                 placeholder="Женские деньги — запуск"
@@ -648,9 +671,10 @@ export default function AuthorPromotionClient({
               </span>
               <input
                 value={campaignKey}
-                onChange={(event) =>
-                  setCampaignKey(normalizeCampaignKey(event.target.value))
-                }
+                onChange={(event) => {
+                  setCampaignKeyEditedManually(true);
+                  setCampaignKey(normalizeCampaignKey(event.target.value));
+                }}
                 className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
                 placeholder="zhenskie_dengi_launch"
               />
@@ -670,7 +694,7 @@ export default function AuthorPromotionClient({
               </button>
               <button
                 type="button"
-                onClick={() => setCreateOpen(false)}
+                onClick={() => closeCreateCampaignForm()}
                 className="rounded-full border border-[#c6afe6] px-5 py-3 text-sm font-semibold text-[#7042c5]"
               >
                 Отмена
