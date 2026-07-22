@@ -14,6 +14,30 @@ export function buildCampaignKeyFromName(name: string): string {
   return slug.slice(0, CAMPAIGN_KEY_MAX_LENGTH);
 }
 
+export function buildCampaignKeyFromNameForForm(
+  name: string,
+  currentKey: string,
+  keyEditedManually: boolean,
+): string {
+  if (keyEditedManually) {
+    return currentKey;
+  }
+
+  return buildCampaignKeyFromName(name);
+}
+
+export function resolveCampaignKeyForSubmit(
+  name: string,
+  currentKey: string,
+  keyEditedManually: boolean,
+): string {
+  if (keyEditedManually) {
+    return currentKey;
+  }
+
+  return buildCampaignKeyFromName(name);
+}
+
 export function normalizeCampaignKey(value: string): string {
   return value
     .trim()
