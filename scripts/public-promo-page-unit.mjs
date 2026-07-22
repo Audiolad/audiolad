@@ -201,6 +201,13 @@ function testSeoAndSitemap() {
   );
   assert(page.includes("index: false"), "noindex metadata");
   assert(page.includes("follow: true"), "follow metadata");
+  assert(
+    page.includes("resolvePromoPageSocialPreviewImage"),
+    "social preview image resolver wired",
+  );
+  assert(page.includes("openGraph"), "openGraph metadata");
+  assert(page.includes('card: "summary_large_image"'), "twitter large image card");
+  assert(page.includes("images: socialImages"), "og/twitter images set");
   assert(!sitemap.includes("/promo/"), "sitemap unchanged for promo pages");
 }
 

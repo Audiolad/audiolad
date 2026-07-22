@@ -7,6 +7,7 @@ import {
   buildPromoPagePath,
 } from "@/lib/promo-pages/paths";
 import { loadPublicPromoPageCached } from "@/lib/promo-pages/public-page";
+import { resolvePromoPageSocialPreviewImage } from "@/lib/promo-pages/social-preview";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -56,13 +57,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { page } = loaded;
   const canonical = buildPromoPageCanonicalUrl(page.author_slug, page.slug);
+  const title = `${page.public_title} — АудиоЛад`;
+  const description = buildSafeDescription(
+    page.public_description,
+    page.public_title,
+  );
+  const previewImage = resolvePromoPageSocialPreviewImage(page.products, {
+    publicTitle: page.public_title,
+  });
+  const socialImages = [{ url: previewImage.url, alt: previewImage.alt }];
 
   return {
-    title: `${page.public_title} — АудиоЛад`,
-    description: buildSafeDescription(
-      page.public_description,
-      page.public_title,
-    ),
+    title,
+    description,
     alternates: {
       canonical,
     },
@@ -71,14 +78,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       follow: true,
     },
     openGraph: {
-      title: `${page.public_title} — АудиоЛад`,
-      description: buildSafeDescription(
-        page.public_description,
-        page.public_title,
-      ),
+      title,
+      description,
       url: canonical,
       type: "website",
       siteName: "АудиоЛад",
+      images: socialImages,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: socialImages,
     },
   };
 }
