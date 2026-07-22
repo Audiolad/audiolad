@@ -4,6 +4,7 @@ import {
   requireAuthenticatedUser,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorMemberRole, AuthorWorkspace } from "@/lib/author-products/types";
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 
@@ -19,7 +20,7 @@ export async function listPromotionWorkspaces(
 
   const { data, error } = await supabase
     .from("authors")
-    .select("id, name, slug")
+    .select("id, name, slug, access_status")
     .order("name", { ascending: true });
 
   if (error) {
@@ -34,6 +35,7 @@ export async function listPromotionWorkspaces(
       name: author.name,
       slug: author.slug,
       role: "owner" as AuthorMemberRole,
+      accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
     }));
 }
 

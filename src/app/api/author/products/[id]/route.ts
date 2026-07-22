@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  assertAuthorContentMutationsAllowed,
+  assertAuthorPaidProductsAllowed,
   handleAuthorRouteError,
+  requireAuthorMembership,
   requirePracticeAccess,
 } from "@/lib/author-products/auth";
 import {
@@ -130,7 +133,9 @@ function applyListeningNoticeTextField(
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice, user } = await requirePracticeAccess(id);
+    const { supabase, practice, user, accessStatus } = await requirePracticeAccess(id);
+
+    assertAuthorContentMutationsAllowed(accessStatus);
 
     let body: unknown;
 
@@ -209,6 +214,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       body.is_free;
 
     if ("is_free" in body && typeof body.is_free === "boolean") {
+      if (!body.is_free) {
+        assertAuthorPaidProductsAllowed(accessStatus);
+      }
+
       updates.is_free = body.is_free;
 
       if (body.is_free) {
@@ -222,6 +231,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.price === "number" &&
       Number.isInteger(body.price)
     ) {
+      assertAuthorPaidProductsAllowed(accessStatus);
+
       if (!PAID_PRICE_OPTIONS.includes(body.price as (typeof PAID_PRICE_OPTIONS)[number])) {
         return NextResponse.json({ error: "invalid_price" }, { status: 400 });
       }
@@ -363,7 +374,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    await requirePracticeAccess(id);
+    const { accessStatus } = await requirePracticeAccess(id);
+    assertAuthorContentMutationsAllowed(accessStatus);
     const serviceSupabase = createServiceRoleClient();
 
     const blockers = getDeleteBlockers(

@@ -1,4 +1,11 @@
 import {
+  AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
+  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorAccessGrantedEmailHtml,
+  renderAuthorAccessGrantedEmailText,
+} from "./author-access-granted";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -67,6 +74,23 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (input.templateKey === AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY) {
+      const userName = readString(input.payload, "userName");
+
+      if (!userName) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
+        html: renderAuthorAccessGrantedEmailHtml({ userName, siteOrigin }),
+        text: renderAuthorAccessGrantedEmailText({ userName, siteOrigin }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -78,6 +102,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === RECOVERY_EMAIL_TEMPLATE_KEY) {
     return RECOVERY_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

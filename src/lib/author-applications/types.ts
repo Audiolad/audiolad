@@ -31,8 +31,46 @@ export type AuthorApplicationRow = {
   reviewed_by: string | null;
   review_comment: string | null;
   admin_note: string | null;
+  author_id: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AuthorApplicationStatusEventRow = {
+  id: string;
+  application_id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  staff_comment: string | null;
+  applicant_comment: string | null;
+  created_at: string;
+};
+
+export type AuthorAccessStatusEventRow = {
+  id: string;
+  author_id: string;
+  application_id: string | null;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
+export type AdminAuthorApplicationDetail = AuthorApplicationRow & {
+  userEmail: string | null;
+  userDisplayName: string | null;
+  linkedAuthor: {
+    id: string;
+    name: string;
+    slug: string;
+    accessStatus: string;
+  } | null;
+  applicationEvents: AuthorApplicationStatusEventRow[];
+  accessEvents: AuthorAccessStatusEventRow[];
 };
 
 export type AuthorApplicationFormValues = {

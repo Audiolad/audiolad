@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { mapTopicRpcError } from "@/lib/topics/errors";
 
+import type { AuthorAccessStatus } from "@/lib/authors/access";
+import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
+
 import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
 import { minutesFromSeconds } from "./utils";
@@ -89,6 +92,7 @@ export function validateAudioItemsStructure(
 export function validatePublishRequirements(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
+  accessStatus?: AuthorAccessStatus,
 ): PublishValidationResult {
   if (!practice.author_id) {
     return {
@@ -155,6 +159,16 @@ export function validatePublishRequirements(
 
   if (!structureValidation.ok) {
     return structureValidation;
+  }
+
+  if (accessStatus && !authorAccessAllowsPaidProducts(accessStatus)) {
+    if (!practice.is_free || practice.price > 0) {
+      return {
+        ok: false,
+        code: "paid_products_not_allowed",
+        message: "Продажи станут доступны после коммерческого подключения.",
+      };
+    }
   }
 
   if (practice.is_free) {

@@ -1,4 +1,9 @@
-import type { AuthorApplicationRow } from "@/lib/author-applications/types";
+import type {
+  AdminAuthorApplicationDetail,
+  AuthorAccessStatusEventRow,
+  AuthorApplicationRow,
+  AuthorApplicationStatusEventRow,
+} from "@/lib/author-applications/types";
 import {
   AUTHOR_APPLICATION_COLUMNS,
   formatApplicationContactSummary,
@@ -279,7 +284,7 @@ export async function listAdminAuthorApplications(input?: {
 
 export async function getAdminAuthorApplication(
   applicationId: string,
-): Promise<AuthorApplicationRow | null> {
+): Promise<AdminAuthorApplicationDetail | null> {
   const service = createServiceRoleClient();
 
   const { data, error } = await service
@@ -292,7 +297,60 @@ export async function getAdminAuthorApplication(
     throw new Error("admin_application_load_failed");
   }
 
-  return (data as AuthorApplicationRow | null) ?? null;
+  const application = (data as AuthorApplicationRow | null) ?? null;
+
+  if (!application) {
+    return null;
+  }
+
+  const [profileResult, authorResult, applicationEventsResult, accessEventsResult] =
+    await Promise.all([
+      service
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", application.user_id)
+        .maybeSingle(),
+      application.author_id
+        ? service
+            .from("authors")
+            .select("id, name, slug, access_status")
+            .eq("id", application.author_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      service
+        .from("author_application_status_events")
+        .select(
+          "id, application_id, from_status, to_status, changed_by, staff_comment, applicant_comment, created_at",
+        )
+        .eq("application_id", applicationId)
+        .order("created_at", { ascending: false }),
+      application.author_id
+        ? service
+            .from("author_access_status_events")
+            .select(
+              "id, author_id, application_id, from_status, to_status, changed_by, reason, created_at",
+            )
+            .eq("author_id", application.author_id)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] as AuthorAccessStatusEventRow[], error: null }),
+    ]);
+
+  return {
+    ...application,
+    userEmail: profileResult.data?.email ?? null,
+    userDisplayName: profileResult.data?.full_name ?? null,
+    linkedAuthor: authorResult.data
+      ? {
+          id: authorResult.data.id,
+          name: authorResult.data.name,
+          slug: authorResult.data.slug,
+          accessStatus: authorResult.data.access_status,
+        }
+      : null,
+    applicationEvents: (applicationEventsResult.data ??
+      []) as AuthorApplicationStatusEventRow[],
+    accessEvents: (accessEventsResult.data ?? []) as AuthorAccessStatusEventRow[],
+  };
 }
 
 function buildDisplayName(

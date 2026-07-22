@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  assertAuthorContentMutationsAllowed,
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
@@ -58,7 +59,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMembership(authorId);
+    const { supabase, accessStatus } = await requireAuthorMembership(authorId);
+    assertAuthorContentMutationsAllowed(accessStatus);
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
