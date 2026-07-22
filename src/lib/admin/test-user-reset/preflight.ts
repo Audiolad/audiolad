@@ -12,6 +12,11 @@ import {
   type TestUserResetPreflight,
   TestUserResetPreflightCounts,
 } from "@/lib/admin/test-user-reset/types";
+import {
+  buildScopedAnalyticsEventFilters,
+  buildScopedAnalyticsSessionFilters,
+  joinScopedAnalyticsFilters,
+} from "@/lib/admin/test-user-reset/analytics-scope";
 import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type ServiceClient = ReturnType<typeof createServiceRoleClient>;
@@ -197,24 +202,18 @@ async function countAnalyticsScope(
     ),
   ];
 
-  const analyticsSessionFilters = [`user_id.eq.${userId}`];
-  const analyticsEventFilters = [`user_id.eq.${userId}`];
-
-  for (const anonymousId of anonymousIds) {
-    analyticsSessionFilters.push(`anonymous_id.eq.${anonymousId}`);
-    analyticsEventFilters.push(`anonymous_session_id.eq.${anonymousId}`);
-  }
-
-  for (const sessionId of analyticsSessionIds) {
-    analyticsSessionFilters.push(`id.eq.${sessionId}`);
-    analyticsEventFilters.push(`session_id.eq.${sessionId}`);
-  }
+  const analyticsSessionFilter = joinScopedAnalyticsFilters(
+    buildScopedAnalyticsSessionFilters(userId, anonymousIds, analyticsSessionIds),
+  );
+  const analyticsEventFilter = joinScopedAnalyticsFilters(
+    buildScopedAnalyticsEventFilters(userId, anonymousIds, analyticsSessionIds),
+  );
 
   const { count: analyticsSessions, error: analyticsSessionsCountError } =
     await service
       .from("analytics_sessions")
       .select("id", { count: "exact", head: true })
-      .or(analyticsSessionFilters.join(","));
+      .or(analyticsSessionFilter ?? `user_id.eq.${userId}`);
 
   if (analyticsSessionsCountError) {
     throw new Error("test_user_reset_preflight_analytics_sessions_count_failed");
@@ -224,7 +223,7 @@ async function countAnalyticsScope(
     await service
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
-      .or(analyticsEventFilters.join(","));
+      .or(analyticsEventFilter ?? `user_id.eq.${userId}`);
 
   if (analyticsEventsCountError) {
     throw new Error("test_user_reset_preflight_analytics_events_count_failed");

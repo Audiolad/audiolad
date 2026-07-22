@@ -19,6 +19,11 @@ import type {
   TestUserResetPreflight,
   TestUserResetResult,
 } from "@/lib/admin/test-user-reset/types";
+import {
+  buildScopedAnalyticsEventFilters,
+  buildScopedAnalyticsSessionFilters,
+  joinScopedAnalyticsFilters,
+} from "@/lib/admin/test-user-reset/analytics-scope";
 import { fetchUserPlatformRole } from "@/lib/auth/platform-admin";
 import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -257,29 +262,26 @@ async function cleanupNonFkData(
     deleted.emailContacts = contactsByEmailCount ?? 0;
   }
 
-  const analyticsEventFilters: string[] = [];
-  const analyticsSessionFilters: string[] = [];
+  const analyticsEventFilter = joinScopedAnalyticsFilters(
+    buildScopedAnalyticsEventFilters(
+      userId,
+      context.anonymousIds,
+      context.analyticsSessionIds,
+    ),
+  );
+  const analyticsSessionFilter = joinScopedAnalyticsFilters(
+    buildScopedAnalyticsSessionFilters(
+      userId,
+      context.anonymousIds,
+      context.analyticsSessionIds,
+    ),
+  );
 
-  if (userId) {
-    analyticsEventFilters.push(`user_id.eq.${userId}`);
-    analyticsSessionFilters.push(`user_id.eq.${userId}`);
-  }
-
-  for (const anonymousId of context.anonymousIds) {
-    analyticsEventFilters.push(`anonymous_session_id.eq.${anonymousId}`);
-    analyticsSessionFilters.push(`anonymous_id.eq.${anonymousId}`);
-  }
-
-  for (const sessionId of context.analyticsSessionIds) {
-    analyticsEventFilters.push(`session_id.eq.${sessionId}`);
-    analyticsSessionFilters.push(`id.eq.${sessionId}`);
-  }
-
-  if (analyticsEventFilters.length > 0) {
+  if (analyticsEventFilter) {
     const { count: eventsCount, error: eventsDeleteError } = await service
       .from("analytics_events")
       .delete({ count: "exact" })
-      .or(analyticsEventFilters.join(","));
+      .or(analyticsEventFilter);
 
     if (eventsDeleteError) {
       throw new Error("test_user_reset_analytics_events_delete_failed");
@@ -288,11 +290,11 @@ async function cleanupNonFkData(
     deleted.analyticsEvents = eventsCount ?? 0;
   }
 
-  if (analyticsSessionFilters.length > 0) {
+  if (analyticsSessionFilter) {
     const { count: sessionsCount, error: sessionsDeleteError } = await service
       .from("analytics_sessions")
       .delete({ count: "exact" })
-      .or(analyticsSessionFilters.join(","));
+      .or(analyticsSessionFilter);
 
     if (sessionsDeleteError) {
       throw new Error("test_user_reset_analytics_sessions_delete_failed");
