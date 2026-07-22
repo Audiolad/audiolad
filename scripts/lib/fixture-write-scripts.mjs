@@ -54,6 +54,7 @@ export const UNIT_MOCK_WRITE_SCRIPTS = [
 export const REQUIRED_GUARD_MARKERS = [
   "assertFixtureWritesAllowed",
   "bootstrapDataWriteScript",
+  "bootstrapTestUserResetDockerIntegration",
   "assertProductionFixturesAllowed",
   "assertAdminInteractiveConfirmed",
   // Isolated personal-materials test DB scripts use this production hard-fail.
