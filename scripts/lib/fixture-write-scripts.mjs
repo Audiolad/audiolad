@@ -2,7 +2,10 @@
  * Canonical inventory of data-writing scripts for static audit.
  */
 export const GUARDED_WRITE_SCRIPTS = [
+  "scripts/author-access-provisioning-integration.mjs",
   "scripts/author-promotion-practice-change-integration.mjs",
+  "scripts/test-user-reset-integration.mjs",
+  "scripts/admin-operation-log-migration-validation.mjs",
   "scripts/platform-analytics-fixture.mjs",
   "scripts/platform-analytics-http-e2e.mjs",
   "scripts/platform-analytics-e2e.mjs",
@@ -43,6 +46,9 @@ export const ADMIN_INTERACTIVE_SCRIPTS = [
 
 export const UNIT_MOCK_WRITE_SCRIPTS = [
   "scripts/admin-user-deletion-unit.mjs",
+  "scripts/test-user-reset-unit.mjs",
+  "scripts/test-user-reset-guard-unit.mjs",
+  "scripts/test-user-reset-service-mock-unit.mjs",
 ];
 
 export const REQUIRED_GUARD_MARKERS = [

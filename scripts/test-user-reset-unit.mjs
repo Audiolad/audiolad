@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * Unit and integration checks for allowlisted test user reset.
+ * Read-only unit/static checks for allowlisted test user reset.
  *
  * Usage:
- *   node scripts/test-user-reset-unit.mjs
+ *   npx tsx scripts/test-user-reset-unit.mjs
+ *
+ * Mutating integration tests live in scripts/test-user-reset-integration.mjs
+ * and require explicit opt-in (see npm run test:test-user-reset:integration).
  */
-import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   TEST_USER_RESET_CONFIRMATION_PHRASE,
   TEST_USER_RESET_EMAIL,
   TEST_USER_RESET_NORMALIZED_EMAIL,
 } from "../src/lib/admin/test-user-reset/constants.ts";
+import {
+  buildScopedAnalyticsEventFilters,
+  buildScopedAnalyticsSessionFilters,
+} from "../src/lib/admin/test-user-reset/analytics-scope.ts";
 import {
   canActorResetTestUser,
   evaluateTestUserResetBlockers,
@@ -22,28 +29,13 @@ import {
   normalizeAllowlistedTestEmail,
 } from "../src/lib/admin/test-user-reset/policy.ts";
 import {
-  authorizeTestUserReset,
-  getTestUserResetPreflight,
-  resetAllowlistedTestUser,
-} from "../src/lib/admin/test-user-reset/reset.ts";
-import {
   PLATFORM_ADMIN_ROLE,
   PLATFORM_OWNER_ROLE,
   LISTENER_ROLE,
 } from "../src/lib/auth/platform-admin.ts";
 import { TEST_USER_RESET_BLOCK_CODES } from "../src/lib/admin/test-user-reset/types.ts";
 
-function loadEnv() {
-  return Object.fromEntries(
-    readFileSync("/var/www/audiolad/.env.local", "utf8")
-      .split("\n")
-      .filter((line) => line && line.includes("=") && !line.startsWith("#"))
-      .map((line) => {
-        const index = line.indexOf("=");
-        return [line.slice(0, index), line.slice(index + 1)];
-      }),
-  );
-}
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function assert(condition, message) {
   if (!condition) {
@@ -52,7 +44,7 @@ function assert(condition, message) {
 }
 
 function readRepoFile(...segments) {
-  return readFileSync(`/var/www/audiolad/.worktrees/feat-test-user-reset/${segments.join("/")}`, "utf8");
+  return readFileSync(path.join(ROOT, ...segments), "utf8");
 }
 
 function testPolicy() {
@@ -64,10 +56,7 @@ function testPolicy() {
     isAllowlistedTestUserEmail("Audiolad@Mail.RU"),
     "case-insensitive domain accepted",
   );
-  assert(
-    !isAllowlistedTestUserEmail("other@mail.ru"),
-    "other email rejected",
-  );
+  assert(!isAllowlistedTestUserEmail("other@mail.ru"), "other email rejected");
   assert(
     normalizeAllowlistedTestEmail(" Audiolad@Mail.RU ") ===
       TEST_USER_RESET_NORMALIZED_EMAIL,
@@ -110,7 +99,6 @@ function testPolicy() {
       promotionCampaigns: 0,
       personalMaterialTemplates: 0,
     },
-    hasAuthorWorkspaceReferences: false,
   });
   assert(
     ordersBlock.some((row) => row.code === TEST_USER_RESET_BLOCK_CODES.orders),
@@ -142,7 +130,6 @@ function testPolicy() {
       promotionCampaigns: 0,
       personalMaterialTemplates: 0,
     },
-    hasAuthorWorkspaceReferences: false,
   });
   assert(
     wrongEmail.some(
@@ -172,212 +159,61 @@ function testStaticWiring() {
   assert(!panel.includes("createServiceRoleClient"), "service role stays server-side");
   assert(reset.includes('update({ reviewed_by: null })'), "reviewed_by cleared like admin delete");
   assert(!reset.includes("approved_by: null"), "approved_by not auto-cleared");
+  assert(reset.includes("buildScopedAnalyticsEventFilters"), "scoped analytics event filters");
+  assert(reset.includes("buildScopedAnalyticsSessionFilters"), "scoped analytics session filters");
 }
 
-async function getOwnerActor(service) {
-  const { data, error } = await service
-    .from("profiles")
-    .select("id, role")
-    .eq("role", PLATFORM_OWNER_ROLE)
-    .limit(1)
-    .maybeSingle();
+function testAnalyticsScopeFilters() {
+  const targetUserId = "11111111-1111-1111-1111-111111111111";
+  const otherUserId = "22222222-2222-2222-2222-222222222222";
+  const sharedAnonymous = "anon-shared-123";
+  const sharedSession = "33333333-3333-3333-3333-333333333333";
 
-  if (error || !data?.id) {
-    throw new Error("platform_owner_not_found_for_tests");
-  }
+  const eventFilters = buildScopedAnalyticsEventFilters(
+    targetUserId,
+    [sharedAnonymous],
+    [sharedSession],
+  );
 
-  return data;
-}
+  assert(
+    eventFilters.some((filter) => filter === `user_id.eq.${targetUserId}`),
+    "target user_id filter present",
+  );
+  assert(
+    eventFilters.some(
+      (filter) =>
+        filter.includes(`anonymous_session_id.eq.${sharedAnonymous}`) &&
+        filter.includes(`user_id.eq.${targetUserId}`) &&
+        filter.includes("user_id.is.null"),
+    ),
+    "shared anonymous event filter scoped to target/null only",
+  );
+  assert(
+    !eventFilters.some((filter) => filter.includes(`user_id.eq.${otherUserId}`)),
+    "other registered user never included in delete scope",
+  );
 
-async function getAdminActor(service) {
-  const { data, error } = await service
-    .from("profiles")
-    .select("id, role")
-    .eq("role", PLATFORM_ADMIN_ROLE)
-    .limit(1)
-    .maybeSingle();
+  const sessionFilters = buildScopedAnalyticsSessionFilters(
+    targetUserId,
+    [sharedAnonymous],
+    [sharedSession],
+  );
 
-  if (error || !data?.id) {
-    return null;
-  }
-
-  return data;
-}
-
-async function createTempListener(service, prefix) {
-  const email = `${prefix}-${randomUUID()}@audiolad.test`;
-  const password = `Temp-${randomUUID()}-Aa1!`;
-
-  const { data, error } = await service.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: "Reset",
-      last_name: "Test",
-      full_name: "Reset Test",
-    },
-  });
-
-  if (error || !data.user?.id) {
-    throw new Error(`temp_user_create_failed:${error?.message ?? "missing_user"}`);
-  }
-
-  return { userId: data.user.id, email };
-}
-
-async function deleteTempUserSafe(service, userId) {
-  if (!userId) return;
-  await service.auth.admin.deleteUser(userId).catch(() => {});
-}
-
-async function ensureAuditTable(service) {
-  const { error } = await service.from("admin_operation_log").select("id").limit(1);
-  if (!error) return;
-
-  throw new Error(
-    "admin_operation_log_missing:apply migration 20260722180000_test_user_reset_audit_log.sql before integration tests",
+  assert(
+    sessionFilters.some(
+      (filter) =>
+        filter.includes(`anonymous_id.eq.${sharedAnonymous}`) &&
+        filter.includes("user_id.is.null"),
+    ),
+    "shared anonymous session filter scoped to target/null only",
   );
 }
 
-async function testIntegration() {
-  const env = loadEnv();
-  const service = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
-  await ensureAuditTable(service);
-
-  const owner = await getOwnerActor(service);
-  const admin = await getAdminActor(service);
-  const tempUsers = [];
-
-  try {
-    const forbiddenOwnerCheck = await authorizeTestUserReset(service, owner.id);
-    assert(forbiddenOwnerCheck.ok, "owner authorized");
-
-    if (admin?.id) {
-      const adminForbidden = await authorizeTestUserReset(service, admin.id);
-      assert(!adminForbidden.ok && adminForbidden.status === 403, "admin forbidden");
-    }
-
-    const listener = await createTempListener(service, "test-reset-listener");
-    tempUsers.push(listener.userId);
-    const listenerForbidden = await authorizeTestUserReset(service, listener.userId);
-    assert(!listenerForbidden.ok && listenerForbidden.status === 403, "listener forbidden");
-
-    const invalidPhrase = await resetAllowlistedTestUser(service, {
-      actorUserId: owner.id,
-      confirmationPhrase: "wrong phrase",
-    });
-    assert(invalidPhrase.invalidConfirmation, "invalid phrase rejected");
-    assert(invalidPhrase.result.status === "failed", "invalid phrase failed status");
-
-    const preflightBefore = await getTestUserResetPreflight(service, {
-      actorUserId: owner.id,
-    });
-    assert(
-      preflightBefore.allowlistedEmail === TEST_USER_RESET_EMAIL,
-      "preflight email constant",
-    );
-
-    if (preflightBefore.authUserFound && preflightBefore.canReset) {
-      const resetResult = await resetAllowlistedTestUser(service, {
-        actorUserId: owner.id,
-        confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-      });
-
-      assert(resetResult.ok, "reset ok wrapper");
-      assert(
-        resetResult.result.status === "success" ||
-          resetResult.result.status === "partial",
-        "reset completed",
-      );
-
-      const preflightAfter = await getTestUserResetPreflight(service, {
-        actorUserId: owner.id,
-      });
-      assert(!preflightAfter.authUserFound, "auth user removed after reset");
-
-      const { data: contactsAfter } = await service
-        .from("email_contacts")
-        .select("id")
-        .eq("normalized_email", TEST_USER_RESET_NORMALIZED_EMAIL);
-      assert((contactsAfter ?? []).length === 0, "email contacts cleared");
-
-      const { count: auditCount } = await service
-        .from("admin_operation_log")
-        .select("id", { count: "exact", head: true })
-        .eq("operation", "test_user_reset");
-      assert((auditCount ?? 0) > 0, "audit log written");
-
-      const idempotent = await resetAllowlistedTestUser(service, {
-        actorUserId: owner.id,
-        confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-      });
-      assert(idempotent.ok, "idempotent reset ok");
-      assert(idempotent.result.alreadyReset, "idempotent reset flagged alreadyReset");
-
-      const { count: auditAfterIdempotent } = await service
-        .from("admin_operation_log")
-        .select("id", { count: "exact", head: true })
-        .eq("operation", "test_user_reset");
-      assert(
-        (auditAfterIdempotent ?? 0) === (auditCount ?? 0),
-        "idempotent reset skips duplicate audit",
-      );
-    } else if (!preflightBefore.authUserFound && preflightBefore.canReset) {
-      const idempotent = await resetAllowlistedTestUser(service, {
-        actorUserId: owner.id,
-        confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-      });
-      assert(idempotent.ok, "already-reset path ok");
-      assert(idempotent.result.alreadyReset, "already-reset path flagged");
-    } else if (preflightBefore.blockers.length > 0) {
-      const blocked = await resetAllowlistedTestUser(service, {
-        actorUserId: owner.id,
-        confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-      });
-      assert(blocked.result.status === "failed", "blocked reset stays failed");
-      assert(blocked.result.blockers?.length, "blocked reasons returned");
-    }
-
-    const other = await createTempListener(service, "test-reset-other");
-    tempUsers.push(other.userId);
-
-    const otherPreflightBefore = await getTestUserResetPreflight(service, {
-      actorUserId: owner.id,
-    });
-    const otherPracticesBefore = await service
-      .from("user_practices")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", other.userId);
-
-    assert((otherPracticesBefore.count ?? 0) >= 0, "other user practices readable");
-
-    if (preflightBefore.authUserFound && preflightBefore.canReset) {
-      void otherPreflightBefore;
-    }
-
-    await deleteTempUserSafe(service, other.userId);
-    tempUsers.pop();
-  } finally {
-    for (const userId of tempUsers) {
-      await deleteTempUserSafe(service, userId);
-    }
-  }
-}
-
-async function main() {
+function main() {
   testPolicy();
   testStaticWiring();
-  await testIntegration();
+  testAnalyticsScopeFilters();
   console.log("test-user-reset-unit: ok");
 }
 
-main().catch((error) => {
-  console.error("test-user-reset-unit failed:", error.message ?? error);
-  process.exit(1);
-});
+main();
