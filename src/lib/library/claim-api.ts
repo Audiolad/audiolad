@@ -9,6 +9,7 @@ export type ClaimFreePracticeRpcResult = {
   inserted: boolean;
   access_source: string;
   in_library: boolean;
+  show_first_save_prompt: boolean;
 };
 
 export type ClaimLibrarySuccessBody = {
@@ -18,6 +19,9 @@ export type ClaimLibrarySuccessBody = {
     access_source: string;
     inserted: boolean;
     in_library: true;
+  };
+  retention: {
+    show_first_save_prompt: boolean;
   };
 };
 
@@ -82,6 +86,7 @@ export function isClaimFreePracticeRpcResult(
     typeof row.practice_slug === "string" &&
     typeof row.inserted === "boolean" &&
     typeof row.access_source === "string" &&
+    typeof row.show_first_save_prompt === "boolean" &&
     row.in_library === true
   );
 }
@@ -97,5 +102,24 @@ export function toClaimLibrarySuccessBody(
       inserted: row.inserted,
       in_library: true,
     },
+    retention: {
+      show_first_save_prompt: row.inserted && row.show_first_save_prompt,
+    },
   };
+}
+
+export function isClaimLibrarySuccessBody(
+  body: unknown,
+): body is ClaimLibrarySuccessBody {
+  if (typeof body !== "object" || body === null) {
+    return false;
+  }
+
+  const record = body as ClaimLibrarySuccessBody;
+
+  return (
+    typeof record.library?.in_library === "boolean" &&
+    record.library.in_library === true &&
+    typeof record.retention?.show_first_save_prompt === "boolean"
+  );
 }
