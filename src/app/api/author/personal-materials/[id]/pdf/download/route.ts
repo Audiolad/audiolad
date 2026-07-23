@@ -2,7 +2,7 @@ import { handleAuthorRouteError } from "@/lib/author-products/auth";
 import { requirePersonalMaterialAccess } from "@/lib/personal-materials/server/auth";
 import {
   createAuthorAttachmentDownloadSignedUrl,
-  redirectToAttachmentDownload,
+  toAuthorAttachmentDownloadJsonResponse,
 } from "@/lib/personal-materials/server/download";
 import {
   handlePersonalMaterialRouteError,
@@ -20,7 +20,14 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const signed = await createAuthorAttachmentDownloadSignedUrl(material, "pdf");
 
-    return redirectToAttachmentDownload(signed.url, privateNoStoreHeaders());
+    return toAuthorAttachmentDownloadJsonResponse(
+      {
+        downloadUrl: signed.url,
+        filename: signed.filename,
+        expiresAt: signed.expiresAt,
+      },
+      privateNoStoreHeaders(),
+    );
   } catch (error) {
     try {
       return handlePersonalMaterialRouteError(error);

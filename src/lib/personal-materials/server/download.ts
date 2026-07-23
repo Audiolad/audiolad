@@ -92,12 +92,15 @@ export async function createAuthorAttachmentDownloadSignedUrl(
   return { url, expiresAt, filename };
 }
 
-export function redirectToAttachmentDownload(
-  signedUrl: string,
+export type AuthorAttachmentDownloadPayload = {
+  downloadUrl: string;
+  filename: string;
+  expiresAt: string;
+};
+
+export function toAuthorAttachmentDownloadJsonResponse(
+  signed: AuthorAttachmentDownloadPayload,
   headers?: HeadersInit,
 ): NextResponse {
-  return NextResponse.redirect(signedUrl, {
-    status: 307,
-    headers,
-  });
+  return NextResponse.json(signed, { headers });
 }

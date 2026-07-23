@@ -28,13 +28,17 @@ function testDownloadRoutes() {
 
   assert(audioDownload.includes("requirePersonalMaterialAccess"), "audio download auth");
   assert(audioDownload.includes('createAuthorAttachmentDownloadSignedUrl(material, "audio")'), "audio kind from db");
-  assert(audioDownload.includes("redirectToAttachmentDownload"), "audio redirect download");
+  assert(audioDownload.includes("toAuthorAttachmentDownloadJsonResponse"), "audio json download");
+  assert(audioDownload.includes("downloadUrl"), "audio downloadUrl field");
+  assert(!audioDownload.includes("redirectToAttachmentDownload"), "audio no redirect for fetch client");
   assert(!audioDownload.includes("searchParams"), "audio no client path param");
   assert(!audioDownload.includes("storagePath"), "audio no client storage path");
 
   assert(pdfDownload.includes("requirePersonalMaterialAccess"), "pdf download auth");
   assert(pdfDownload.includes('createAuthorAttachmentDownloadSignedUrl(material, "pdf")'), "pdf kind from db");
-  assert(pdfDownload.includes("redirectToAttachmentDownload"), "pdf redirect download");
+  assert(pdfDownload.includes("toAuthorAttachmentDownloadJsonResponse"), "pdf json download");
+  assert(pdfDownload.includes("downloadUrl"), "pdf downloadUrl field");
+  assert(!pdfDownload.includes("redirectToAttachmentDownload"), "pdf no redirect for fetch client");
   assert(!pdfDownload.includes("searchParams"), "pdf no client path param");
 }
 
@@ -87,7 +91,12 @@ function testClientDownloadLayer() {
 
   assert(clientDownload.includes("downloadAuthorPersonalMaterialAudio"), "audio client download");
   assert(clientDownload.includes("downloadAuthorPersonalMaterialPdf"), "pdf client download");
-  assert(clientDownload.includes('redirect: "manual"'), "manual redirect for errors");
+  assert(clientDownload.includes('Accept: "application/json"'), "json download contract");
+  assert(clientDownload.includes("downloadUrl"), "client reads downloadUrl");
+  assert(clientDownload.includes("triggerBrowserDownload"), "browser navigation not fetch blob");
+  assert(clientDownload.includes('document.createElement("a")'), "anchor download trigger");
+  assert(!clientDownload.includes('redirect: "manual"'), "no opaque redirect fetch");
+  assert(!clientDownload.includes("response.blob"), "no blob download");
   assert(clientDownload.includes("/audio/download"), "audio download endpoint");
   assert(clientDownload.includes("/pdf/download"), "pdf download endpoint");
   assert(!clientDownload.includes("storage"), "client no storage path");
@@ -135,16 +144,20 @@ function testAccessAndErrors() {
 
   assert(errors.includes("unauthorized"), "unauthorized message");
   assert(errors.includes("forbidden"), "forbidden message");
-  assert(errors.includes("not_found"), "not found message");
+  assert(errors.includes("getPersonalMaterialDownloadErrorMessage"), "download error helper");
+  assert(errors.includes("Сессия истекла"), "401 download message");
+  assert(errors.includes("Файл не найден"), "404 download message");
 }
 
 async function runModuleTests() {
   const { execSync } = await import("node:child_process");
-  const output = execSync(
-    `npx --yes tsx ${path.join(ROOT, "scripts/personal-materials-author-download-module-unit.mjs")}`,
-    { encoding: "utf8" },
-  );
-  process.stdout.write(output);
+  for (const script of [
+    "scripts/personal-materials-author-download-module-unit.mjs",
+    "scripts/personal-materials-author-download-client-module-unit.mjs",
+  ]) {
+    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, { encoding: "utf8" });
+    process.stdout.write(output);
+  }
 }
 
 async function main() {

@@ -97,6 +97,34 @@ export function getPersonalMaterialPdfUploadErrorMessage(code?: string): string 
   return "Не удалось загрузить PDF. Проверьте формат и размер файла.";
 }
 
+export function isPersonalMaterialClientError(
+  error: unknown,
+): error is PersonalMaterialClientError {
+  return error instanceof PersonalMaterialClientError;
+}
+
+export function getPersonalMaterialDownloadErrorMessage(error: unknown): string {
+  if (error instanceof PersonalMaterialClientError) {
+    if (error.status === 401 || error.code === "unauthorized") {
+      return "Сессия истекла. Войдите снова.";
+    }
+
+    if (error.status === 403 || error.code === "forbidden") {
+      return "Нет доступа к этому материалу.";
+    }
+
+    if (error.status === 404 || error.code === "not_found") {
+      return "Файл не найден.";
+    }
+
+    if (error.status >= 500 || error.code === "internal_error") {
+      return "Не удалось подготовить файл к скачиванию.";
+    }
+  }
+
+  return "Не удалось подготовить файл к скачиванию.";
+}
+
 export function getPersonalMaterialActivationErrorMessage(error?: unknown): string {
   if (error instanceof PersonalMaterialClientError) {
     if (error.code === "client_name_required") {

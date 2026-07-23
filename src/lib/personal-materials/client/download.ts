@@ -1,26 +1,32 @@
 import {
+  getPersonalMaterialDownloadErrorMessage,
   mapPersonalMaterialClientError,
   PersonalMaterialClientError,
 } from "./errors";
 
-async function triggerAuthorPersonalMaterialDownload(
+export type AuthorAttachmentDownloadResponse = {
+  downloadUrl: string;
+  filename: string;
+  expiresAt: string;
+};
+
+function triggerBrowserDownload(downloadUrl: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = downloadUrl;
+  anchor.rel = "noopener noreferrer";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+async function fetchAuthorPersonalMaterialDownloadUrl(
   path: string,
-): Promise<void> {
+): Promise<AuthorAttachmentDownloadResponse> {
   const response = await fetch(path, {
-    redirect: "manual",
+    headers: { Accept: "application/json" },
     cache: "no-store",
   });
-
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers.get("Location");
-
-    if (location) {
-      window.location.assign(location);
-      return;
-    }
-
-    throw new PersonalMaterialClientError("internal_error", 500);
-  }
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as {
@@ -30,7 +36,24 @@ async function triggerAuthorPersonalMaterialDownload(
     throw mapPersonalMaterialClientError(payload.error, response.status);
   }
 
-  throw new PersonalMaterialClientError("internal_error", 500);
+  const payload = (await response.json()) as Partial<AuthorAttachmentDownloadResponse>;
+
+  if (!payload.downloadUrl?.trim()) {
+    throw new PersonalMaterialClientError("internal_error", 500);
+  }
+
+  return {
+    downloadUrl: payload.downloadUrl.trim(),
+    filename: payload.filename?.trim() || "download",
+    expiresAt: payload.expiresAt?.trim() || "",
+  };
+}
+
+async function triggerAuthorPersonalMaterialDownload(
+  path: string,
+): Promise<void> {
+  const payload = await fetchAuthorPersonalMaterialDownloadUrl(path);
+  triggerBrowserDownload(payload.downloadUrl);
 }
 
 export async function downloadAuthorPersonalMaterialAudio(
@@ -48,3 +71,8 @@ export async function downloadAuthorPersonalMaterialPdf(
     `/api/author/personal-materials/${encodeURIComponent(materialId)}/pdf/download`,
   );
 }
+
+export {
+  fetchAuthorPersonalMaterialDownloadUrl,
+  triggerBrowserDownload,
+};

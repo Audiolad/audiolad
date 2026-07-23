@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { getPersonalMaterialDownloadErrorMessage } from "@/lib/personal-materials/client/errors";
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 import {
   formatFileSize,
@@ -85,8 +86,8 @@ export default function AuthorDiagnosticsAudioUpload({
 
     try {
       await onDownload();
-    } catch {
-      setLocalError("Не удалось скачать аудиофайл. Попробуйте ещё раз.");
+    } catch (error) {
+      setLocalError(getPersonalMaterialDownloadErrorMessage(error));
     } finally {
       setDownloading(false);
     }

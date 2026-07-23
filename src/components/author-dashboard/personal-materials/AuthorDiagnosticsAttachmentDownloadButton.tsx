@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { getPersonalMaterialDownloadErrorMessage } from "@/lib/personal-materials/client/errors";
+
 type AuthorDiagnosticsAttachmentDownloadButtonProps = {
   label: string;
   downloadingLabel?: string;
@@ -35,8 +37,8 @@ export default function AuthorDiagnosticsAttachmentDownloadButton({
 
     try {
       await onDownload();
-    } catch {
-      setError(fallbackErrorMessage);
+    } catch (error) {
+      setError(getPersonalMaterialDownloadErrorMessage(error));
     } finally {
       setDownloading(false);
     }
