@@ -59,6 +59,10 @@ export type ActivateAuthorPersonalMaterialResponse = {
 
 export type RotateAuthorPersonalMaterialResponse = ActivateAuthorPersonalMaterialResponse;
 
+export type AuthorPersonalMaterialSettings = {
+  clientMessageTemplate: string | null;
+};
+
 export type PersonalMaterialUiStatus =
   | "draft"
   | "active"

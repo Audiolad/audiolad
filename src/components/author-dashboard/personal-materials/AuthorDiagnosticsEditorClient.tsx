@@ -8,8 +8,10 @@ import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
 import AuthorDiagnosticsPdfUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsPdfUpload";
 import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
+import AuthorDiagnosticsClientMessagePanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsClientMessagePanel";
 import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal";
 import AuthorDiagnosticsFormFields from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsFormFields";
+import AuthorDiagnosticsMessageTemplateEditor from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsMessageTemplateEditor";
 import AuthorDiagnosticsOneTimeLinkPanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsOneTimeLinkPanel";
 import AuthorDiagnosticsStatusBadge from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsStatusBadge";
 import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
@@ -43,6 +45,7 @@ import {
   getPersonalMaterialTypeLabel,
   resolvePersonalMaterialUiStatus,
 } from "@/lib/personal-materials/client/status-labels";
+import { scrollElementIntoView } from "@/lib/personal-materials/client-message-template";
 import type { AuthorPersonalMaterial } from "@/lib/personal-materials/client/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
@@ -89,9 +92,11 @@ export default function AuthorDiagnosticsEditorClient({
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [oneTimeAccessUrl, setOneTimeAccessUrl] = useState<string | null>(null);
+  const [clientMessageTemplate, setClientMessageTemplate] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const saveSubmitRef = useRef(false);
+  const linkResultRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAuthor = useMemo(() => {
     const slug = searchParams.get("author");
@@ -174,6 +179,18 @@ export default function AuthorDiagnosticsEditorClient({
 
     return () => window.cancelAnimationFrame(frame);
   }, [loading, material]);
+
+  useEffect(() => {
+    if (!oneTimeAccessUrl) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollElementIntoView(linkResultRef.current);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [oneTimeAccessUrl]);
 
   useEffect(() => {
     if (!material || !selectedAuthor) {
@@ -459,16 +476,6 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
         ) : null}
 
-        {oneTimeAccessUrl ? (
-          <div className="mt-5" id="personal-material-one-time-link">
-            <AuthorDiagnosticsOneTimeLinkPanel
-              key={oneTimeAccessUrl}
-              accessUrl={oneTimeAccessUrl}
-              onDismiss={() => setOneTimeAccessUrl(null)}
-            />
-          </div>
-        ) : null}
-
         {actionError ? (
           <p className="mt-4 text-sm text-[#b42318]" role="alert">
             {actionError}
@@ -674,6 +681,30 @@ export default function AuthorDiagnosticsEditorClient({
           ) : null}
         </section>
       )}
+
+      {selectedAuthor ? (
+        <AuthorDiagnosticsMessageTemplateEditor
+          authorId={selectedAuthor.id}
+          disabled={actionLoading || saving || uploading || uploadingPdf}
+          onTemplateChange={setClientMessageTemplate}
+        />
+      ) : null}
+
+      {oneTimeAccessUrl ? (
+        <div ref={linkResultRef} className="mt-6 min-w-0">
+          <AuthorDiagnosticsOneTimeLinkPanel
+            accessUrl={oneTimeAccessUrl}
+            onDismiss={() => setOneTimeAccessUrl(null)}
+          />
+          <AuthorDiagnosticsClientMessagePanel
+            key={oneTimeAccessUrl}
+            clientFirstName={material.clientFirstName}
+            clientLastName={material.clientLastName}
+            publicUrl={oneTimeAccessUrl}
+            messageTemplate={clientMessageTemplate}
+          />
+        </div>
+      ) : null}
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "activate"}

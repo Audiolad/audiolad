@@ -96,6 +96,11 @@ function testEditorComponent() {
   assert(editor.includes("revokeAuthorPersonalMaterial"), "revoke");
   assert(editor.includes("deleteAuthorPersonalMaterial"), "delete");
   assert(editor.includes("setOneTimeAccessUrl"), "one-time url in state only");
+  assert(editor.includes("linkResultRef"), "one-time url scroll target");
+  assert(editor.includes("scrollElementIntoView"), "scroll to link result");
+  assert(editor.includes("AuthorDiagnosticsClientMessagePanel"), "client message panel");
+  assert(editor.includes("AuthorDiagnosticsMessageTemplateEditor"), "template editor");
+  assert(!editor.includes("window.scrollTo"), "no hard-coded scroll coordinates");
   assert(editor.includes("Персональная ссылка показывается только один раз"), "no fake link on reload");
   assert(editor.includes("material.authorId !== selectedAuthor.id"), "author workspace guard");
   assert(editor.includes("returnUrl"), "editor saves return url");

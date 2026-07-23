@@ -5,6 +5,7 @@ import {
 import type {
   ActivateAuthorPersonalMaterialResponse,
   AuthorPersonalMaterial,
+  AuthorPersonalMaterialSettings,
   CreateAuthorPersonalMaterialInput,
   RotateAuthorPersonalMaterialResponse,
   UpdateAuthorPersonalMaterialInput,
@@ -201,6 +202,37 @@ export async function deleteAuthorPersonalMaterial(
 
   const payload = await parseJson<{ material: AuthorPersonalMaterial }>(response);
   return payload.material;
+}
+
+export async function getAuthorPersonalMaterialSettings(
+  authorId: string,
+  signal?: AbortSignal,
+): Promise<AuthorPersonalMaterialSettings> {
+  const response = await fetch(
+    `/api/author/personal-materials/settings?author_id=${encodeURIComponent(authorId)}`,
+    { cache: "no-store", signal },
+  );
+
+  const payload = await parseJson<{ settings: AuthorPersonalMaterialSettings }>(response);
+  return payload.settings;
+}
+
+export async function updateAuthorPersonalMaterialSettings(
+  authorId: string,
+  input: Pick<AuthorPersonalMaterialSettings, "clientMessageTemplate">,
+): Promise<AuthorPersonalMaterialSettings> {
+  const response = await fetch("/api/author/personal-materials/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({
+      authorId,
+      clientMessageTemplate: input.clientMessageTemplate,
+    }),
+  });
+
+  const payload = await parseJson<{ settings: AuthorPersonalMaterialSettings }>(response);
+  return payload.settings;
 }
 
 export function isPersonalMaterialClientError(
