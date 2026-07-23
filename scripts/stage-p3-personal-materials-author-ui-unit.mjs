@@ -116,7 +116,12 @@ function testEditorComponent() {
   assert(upload.includes("Загрузить аудиофайл"), "upload CTA");
   assert(upload.includes("Аудиофайл загружен"), "upload success label");
   assert(upload.includes("Заменить файл"), "replace action");
+  assert(upload.includes("Скачать файл"), "download action");
   assert(upload.includes("Удалить файл"), "delete action");
+  assert(upload.includes("onDownload"), "download callback");
+  assert(upload.indexOf("Заменить файл") < upload.indexOf("Скачать файл"), "replace before download");
+  assert(upload.indexOf("Скачать файл") < upload.indexOf("Удалить файл"), "download before delete");
+  assert(upload.includes("flex-wrap"), "action buttons wrap");
   assert(upload.includes('id="personal-material-audio"'), "audio anchor id");
   assert(editor.includes("canRotateLink"), "rotate only when link inactive");
   assert(editor.includes("Дополнительные действия"), "revoke in extra actions");

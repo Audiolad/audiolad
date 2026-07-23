@@ -16,6 +16,7 @@ type AuthorDiagnosticsAudioUploadProps = {
   uploading?: boolean;
   error?: string | null;
   onUpload: (file: File) => Promise<boolean>;
+  onDownload: () => Promise<void>;
   onDelete: () => Promise<void>;
 };
 
@@ -27,11 +28,13 @@ export default function AuthorDiagnosticsAudioUpload({
   uploading = false,
   error,
   onUpload,
+  onDownload,
   onDelete,
 }: AuthorDiagnosticsAudioUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<number | null>(null);
 
@@ -72,8 +75,25 @@ export default function AuthorDiagnosticsAudioUpload({
     }
   }
 
+  async function handleDownload() {
+    if (disabled || uploading || deleting || downloading || !hasAudio) {
+      return;
+    }
+
+    setDownloading(true);
+    setLocalError(null);
+
+    try {
+      await onDownload();
+    } catch {
+      setLocalError("Не удалось скачать аудиофайл. Попробуйте ещё раз.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   async function handleDelete() {
-    if (disabled || uploading || deleting || !hasAudio) {
+    if (disabled || uploading || deleting || downloading || !hasAudio) {
       return;
     }
 
@@ -173,20 +193,28 @@ export default function AuthorDiagnosticsAudioUpload({
             <p className="mt-1 text-xs text-[#7d70a2]">{formatFileSize(displaySize)}</p>
           ) : null}
           {hasAudio ? (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-3 flex min-w-0 flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                disabled={disabled || uploading || deleting}
-                className="min-h-11 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                disabled={disabled || uploading || deleting || downloading}
+                className="min-h-11 shrink-0 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
               >
                 Заменить файл
               </button>
               <button
                 type="button"
+                onClick={() => void handleDownload()}
+                disabled={disabled || uploading || deleting || downloading}
+                className="min-h-11 shrink-0 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+              >
+                {downloading ? "Скачивание…" : "Скачать файл"}
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleDelete()}
-                disabled={disabled || uploading || deleting}
-                className="min-h-11 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                disabled={disabled || uploading || deleting || downloading}
+                className="min-h-11 shrink-0 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
               >
                 {deleting ? "Удаление…" : "Удалить файл"}
               </button>

@@ -45,6 +45,12 @@ function testAuthorRoutes() {
   assert(audioRoute.includes("export async function GET"), "author audio GET");
   assert(!audioRoute.includes("audio_path"), "audio route no path leak");
 
+  const audioDownloadRoute = read(
+    "src/app/api/author/personal-materials/[id]/audio/download/route.ts",
+  );
+  assert(audioDownloadRoute.includes("requirePersonalMaterialAccess"), "audio download access");
+  assert(audioDownloadRoute.includes("createAuthorAttachmentDownloadSignedUrl"), "audio download signed url");
+
   assert(activateRoute.includes("assertDraftEditable"), "activate still draft-only");
   assert(activateRoute.includes("hasPdf"), "activate accepts pdf attachment");
   assert(activateRoute.includes("!hasAudio && !hasPdf"), "activate requires audio or pdf");
@@ -55,6 +61,11 @@ function testAuthorRoutes() {
   const guestPdfRoute = read("src/app/api/d/[token]/pdf/route.ts");
   assert(pdfRoute.includes("uploadPersonalMaterialPdf"), "pdf upload helper");
   assert(pdfRoute.includes("createAuthorPdfSignedUrl"), "author pdf signed url");
+  const pdfDownloadRoute = read(
+    "src/app/api/author/personal-materials/[id]/pdf/download/route.ts",
+  );
+  assert(pdfDownloadRoute.includes("requirePersonalMaterialAccess"), "pdf download access");
+  assert(pdfDownloadRoute.includes("createAuthorAttachmentDownloadSignedUrl"), "pdf download signed url");
   assert(guestPdfRoute.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
   assert(activateRoute.includes("privateNoStoreHeaders"), "activate no-store");
   assert(activateRoute.includes("buildPersonalMaterialAccessUrl"), "activate access url");
@@ -104,6 +115,11 @@ function testServerLayer() {
   assert(delivery.includes("createGuestAudioSignedUrl"), "signed url creation");
   assert(delivery.includes("createGuestPdfSignedUrl"), "guest pdf signed url");
   assert(!delivery.includes("console.log(rawToken"), "no raw token logging");
+
+  const download = read("src/lib/personal-materials/server/download.ts");
+  assert(download.includes("resolvePersonalMaterialDownloadFilename"), "download filename helper");
+  assert(download.includes("getTrustedAttachmentPath"), "trusted storage path");
+  assert(download.includes('download: filename'), "attachment signed url");
 
   assert(uploads.includes("createServiceRoleClient"), "upload uses service role");
   assert(uploads.includes("PERSONAL_MATERIALS_BUCKET"), "private bucket");

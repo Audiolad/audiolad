@@ -29,6 +29,10 @@ import {
   uploadAuthorPersonalMaterialPdf,
 } from "@/lib/personal-materials/client/api";
 import {
+  downloadAuthorPersonalMaterialAudio,
+  downloadAuthorPersonalMaterialPdf,
+} from "@/lib/personal-materials/client/download";
+import {
   getPersonalMaterialActivationErrorMessage,
   getPersonalMaterialErrorMessage,
   getPersonalMaterialPdfUploadErrorMessage,
@@ -310,6 +314,14 @@ export default function AuthorDiagnosticsEditorClient({
     }
   }
 
+  async function handleDownloadAudio() {
+    if (!material) {
+      return;
+    }
+
+    await downloadAuthorPersonalMaterialAudio(material.id);
+  }
+
   async function handleUploadPdf(file: File) {
     if (!material) {
       return;
@@ -345,6 +357,14 @@ export default function AuthorDiagnosticsEditorClient({
     } finally {
       setUploadingPdf(false);
     }
+  }
+
+  async function handleDownloadPdf() {
+    if (!material) {
+      return;
+    }
+
+    await downloadAuthorPersonalMaterialPdf(material.id);
   }
 
   const hasAttachment = Boolean(material?.hasAudio || material?.hasPdf);
@@ -569,6 +589,7 @@ export default function AuthorDiagnosticsEditorClient({
               uploading={uploading}
               error={uploadError}
               onUpload={handleUpload}
+              onDownload={handleDownloadAudio}
               onDelete={handleDeleteAudio}
             />
           </div>
@@ -582,6 +603,7 @@ export default function AuthorDiagnosticsEditorClient({
               uploading={uploadingPdf}
               error={pdfUploadError}
               onUpload={handleUploadPdf}
+              onDownload={handleDownloadPdf}
               onDelete={handleDeletePdf}
             />
           </div>
