@@ -2,7 +2,7 @@ import { getPersonalMaterialTypeLabel } from "@/lib/personal-materials/client/st
 import { normalizeOptionalText } from "@/lib/personal-materials/access";
 
 export const PERSONAL_MATERIAL_GUEST_PAGE_TITLE =
-  "Персональный аудиоматериал — АудиоЛад" as const;
+  "Персональный аудиоматериал – АудиоЛад" as const;
 
 export function getGuestDisplayTitle(
   title: string | null | undefined,

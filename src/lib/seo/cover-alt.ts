@@ -15,7 +15,7 @@ function normalizeTitle(title: string): string {
 function authorSuffix(authorName?: string | null): string {
   const trimmed = authorName?.trim();
 
-  return trimmed ? ` — ${trimmed}` : "";
+  return trimmed ? ` – ${trimmed}` : "";
 }
 
 /** Alt text for product / program cover images on public pages. */

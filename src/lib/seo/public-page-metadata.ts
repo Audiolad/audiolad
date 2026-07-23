@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
 
 import { getAppOrigin } from "@/lib/seo/app-origin";
+import {
+  HOME_SEO_DESCRIPTION,
+  HOME_SEO_TITLE,
+  SITE_BRAND,
+  SITE_TITLE,
+} from "@/lib/seo/site-copy";
 
-export const SITE_TITLE = "АудиоЛад";
-export const SITE_DESCRIPTION =
-  "Платформа аудиопрактик, медитаций и энергетических программ";
+export {
+  HOME_SEO_DESCRIPTION,
+  HOME_SEO_TITLE,
+  SITE_BRAND,
+  SITE_PLATFORM_POSITIONING,
+  SITE_TITLE,
+} from "@/lib/seo/site-copy";
 
 export function buildSiteCanonicalUrl(path = "/"): string {
   const origin = getAppOrigin().replace(/\/$/, "");
@@ -21,17 +31,22 @@ export function buildHomeMetadata(): Metadata {
   const canonical = buildSiteCanonicalUrl("/");
 
   return {
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
+    title: HOME_SEO_TITLE,
+    description: HOME_SEO_DESCRIPTION,
     alternates: {
       canonical,
     },
     openGraph: {
-      title: SITE_TITLE,
-      description: SITE_DESCRIPTION,
+      title: HOME_SEO_TITLE,
+      description: HOME_SEO_DESCRIPTION,
       url: canonical,
       type: "website",
-      siteName: SITE_TITLE,
+      siteName: SITE_BRAND,
+    },
+    twitter: {
+      card: "summary",
+      title: HOME_SEO_TITLE,
+      description: HOME_SEO_DESCRIPTION,
     },
   };
 }
@@ -54,7 +69,7 @@ export function buildCatalogMetadata(options?: {
         "Опубликованные аудиопрактики и программы авторов платформы АудиоЛад.",
       url: canonical,
       type: "website",
-      siteName: SITE_TITLE,
+      siteName: SITE_BRAND,
     },
     robots: options?.robotsNoIndex
       ? {
@@ -81,7 +96,7 @@ export function buildAuthorsIndexMetadata(): Metadata {
         "Практики от проверенных авторов платформы АудиоЛад: медитации, программы и аудиокурсы.",
       url: canonical,
       type: "website",
-      siteName: SITE_TITLE,
+      siteName: SITE_BRAND,
     },
   };
 }

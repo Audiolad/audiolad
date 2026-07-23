@@ -104,8 +104,7 @@ export default function RequisitesPage() {
             </h2>
 
             <p className="mt-4 text-[15px] leading-6 text-[#6f61a3]">
-              АудиоЛад – сайт авторских образовательных аудиолекций Сергея
-              Петрова.
+              АудиоЛад – платформа авторских аудиопрактик, медитаций и программ.
             </p>
           </section>
     </LegalPageShell>

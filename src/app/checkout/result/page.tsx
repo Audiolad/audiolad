@@ -9,7 +9,7 @@ import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 export const metadata: Metadata = {
   title: "Результат оплаты – АудиоЛад",
-  description: "Проверка статуса оплаты и открытие доступа к аудиолекции.",
+  description: "Проверка статуса оплаты и открытие доступа к аудиопрактике.",
   robots: {
     index: false,
     follow: false,

@@ -43,8 +43,8 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         </h1>
 
         <p className="mt-3 max-w-[720px] text-lg font-medium leading-7 text-[#7042c5] lg:text-xl xl:max-w-none xl:text-[17px] xl:leading-7">
-          Авторские аудиопрактики, медитации, лекции, подкасты и программы в
-          одном спокойном пространстве.
+          АудиоЛад – платформа авторских аудиопрактик, медитаций и программ.
+          Находите любимых авторов и слушайте в одном спокойном пространстве.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">

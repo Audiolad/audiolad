@@ -119,7 +119,7 @@ export function resolvePromoPageSocialPreviewImage(
       PROMO_PAGE_SOCIAL_FALLBACK_IMAGE_PATH,
       origin,
     )!,
-    alt: `АудиоЛад — ${fallbackTitle}`,
+    alt: `АудиоЛад – ${fallbackTitle}`,
     source: "fallback",
     practiceId: null,
   };

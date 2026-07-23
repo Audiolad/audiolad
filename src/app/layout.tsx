@@ -5,6 +5,11 @@ import {
   PLATFORM_LIGHT_THEME_COLOR,
 } from "@/lib/navigation/bottom-nav";
 import { getAppOriginUrl } from "@/lib/seo/app-origin";
+import {
+  HOME_SEO_DESCRIPTION,
+  HOME_SEO_TITLE,
+  SITE_BRAND,
+} from "@/lib/seo/site-copy";
 
 import "./globals.css";
 
@@ -17,9 +22,9 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: getAppOriginUrl(),
-  title: "АудиоЛад",
-  description: "Платформа аудиопрактик, медитаций и энергетических программ",
-  applicationName: "АудиоЛад",
+  title: HOME_SEO_TITLE,
+  description: HOME_SEO_DESCRIPTION,
+  applicationName: SITE_BRAND,
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -33,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "АудиоЛад",
+    title: SITE_BRAND,
     statusBarStyle: "default",
   },
   other: {

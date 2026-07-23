@@ -20,6 +20,8 @@ import {
   buildCatalogMetadata,
   buildHomeMetadata,
   buildSiteCanonicalUrl,
+  HOME_SEO_DESCRIPTION,
+  HOME_SEO_TITLE,
 } from "../src/lib/seo/public-page-metadata.ts";
 import { PRIVATE_PAGE_ROBOTS } from "../src/lib/seo/private-robots.ts";
 import {
@@ -86,6 +88,10 @@ function testHomeOrganizationAndWebsite() {
 
   assert(organization?.url === `${ORIGIN}/`, "organization uses production URL");
   assert(organization?.logo === `${ORIGIN}/audiolad-logo.png`, "organization logo is public");
+  assert(
+    organization?.description === HOME_SEO_DESCRIPTION,
+    "organization description uses canonical SEO description",
+  );
   assert(website?.publisher?.["@id"] === `${ORIGIN}/#organization`, "website links organization");
   assert(website?.inLanguage === "ru-RU", "website language set");
   assert(!JSON.stringify(graph).includes("SearchAction"), "SearchAction not added");
@@ -299,6 +305,11 @@ function testCanonicalMetadata() {
   const catalogSearch = buildCatalogMetadata({ robotsNoIndex: true });
 
   assert(home.alternates.canonical === `${ORIGIN}/`, "home metadata canonical");
+  assert(home.title === HOME_SEO_TITLE, "home metadata title");
+  assert(home.description === HOME_SEO_DESCRIPTION, "home metadata description");
+  assert(home.openGraph?.title === HOME_SEO_TITLE, "home openGraph title");
+  assert(home.openGraph?.description === HOME_SEO_DESCRIPTION, "home openGraph description");
+  assert(home.twitter?.title === HOME_SEO_TITLE, "home twitter title");
   assert(catalog.alternates.canonical === `${ORIGIN}/catalog`, "catalog metadata canonical");
   assert(catalogSearch.robots.index === false, "catalog search stays noindex");
   assert(PRIVATE_PAGE_ROBOTS.index === false, "private pages stay noindex");

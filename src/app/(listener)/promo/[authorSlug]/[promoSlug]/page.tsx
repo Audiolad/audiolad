@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { page } = loaded;
   const canonical = buildPromoPageCanonicalUrl(page.author_slug, page.slug);
-  const title = `${page.public_title} — АудиоЛад`;
+  const title = `${page.public_title} – АудиоЛад`;
   const description = buildSafeDescription(
     page.public_description,
     page.public_title,

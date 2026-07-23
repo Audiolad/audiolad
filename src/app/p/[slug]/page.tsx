@@ -52,14 +52,14 @@ export async function generateMetadata({
         : `Подборка из ${count} практик в подарок на АудиоЛаде.`;
 
   return {
-    title: `${title} — АудиоЛад`,
+    title: `${title} – АудиоЛад`,
     description: countLabel,
     alternates: {
       canonical: buildPublicPlaylistCanonicalUrl(slug),
     },
     robots: { index: true, follow: true },
     openGraph: {
-      title: `${title} — АудиоЛад`,
+      title: `${title} – АудиоЛад`,
       description: countLabel,
       url: buildPublicPlaylistCanonicalUrl(slug),
       type: "website",

@@ -9,6 +9,10 @@ import {
 import { buildPromoPageUrl } from "@/lib/promo-pages/paths";
 import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
 import { getAppOrigin } from "@/lib/seo/app-origin";
+import {
+  HOME_SEO_DESCRIPTION,
+  SITE_BRAND,
+} from "@/lib/seo/site-copy";
 
 import { secondsToIso8601Duration } from "./duration";
 import { resolveJsonLdImageUrl } from "./url-policy";
@@ -82,9 +86,8 @@ export type PlaylistJsonLdInput = {
   origin?: string;
 };
 
-const SITE_NAME = "АудиоЛад";
-const SITE_DESCRIPTION =
-  "Платформа аудиопрактик, медитаций и энергетических программ";
+const SITE_NAME = SITE_BRAND;
+const SITE_DESCRIPTION = HOME_SEO_DESCRIPTION;
 
 function originUrl(origin = getAppOrigin()): string {
   return origin.replace(/\/$/, "");

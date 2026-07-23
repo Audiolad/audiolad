@@ -14,7 +14,7 @@ type PageProps = {
 
 export async function generateMetadata() {
   return {
-    title: "Личные материалы — АудиоЛад",
+    title: "Личные материалы – АудиоЛад",
     robots: { index: false, follow: false, noarchive: true },
   };
 }
