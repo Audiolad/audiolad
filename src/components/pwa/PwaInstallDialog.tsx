@@ -366,7 +366,7 @@ function InstallDialogInstructions({
     return (
       <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">1.</strong> Откройте меню браузера — значок ⋮
+          <strong className="font-medium">1.</strong> Откройте меню браузера – значок ⋮
           или ≡.
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
