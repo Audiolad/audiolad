@@ -8,11 +8,13 @@ import AuthorFeaturedSection, {
 } from "@/components/authors/AuthorPublicSections";
 import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
+import JsonLd from "@/components/seo/JsonLd";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
 import {
   DEFAULT_AUTHOR_SHORT_POSITIONING,
 } from "@/lib/authors/brand-assets";
 import { getAppOrigin } from "@/lib/seo/app-origin";
+import { buildAuthorJsonLd, shouldEmitAuthorJsonLd } from "@/lib/seo/json-ld";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,8 +72,24 @@ export default async function AuthorPublicPage({ params }: PageProps) {
     notFound();
   }
 
+  const authorDescription =
+    data.shortPositioning !== DEFAULT_AUTHOR_SHORT_POSITIONING
+      ? data.shortPositioning
+      : data.fullBio;
+  const structuredData = shouldEmitAuthorJsonLd({ isFixtureMarked: false })
+    ? buildAuthorJsonLd({
+        name: data.name,
+        slug: data.slug,
+        authorType: data.authorType,
+        description: authorDescription,
+        imageUrl: data.bannerUrl || data.avatarUrl,
+        topics: data.topics,
+      })
+    : null;
+
   return (
     <>
+      <JsonLd data={structuredData} />
       <div className="hidden px-5 pt-2 xl:block xl:px-6">
         <Link
           href="/authors"

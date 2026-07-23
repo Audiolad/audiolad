@@ -6,10 +6,16 @@ import {
 } from "@/lib/authors/public-list";
 import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { buildAuthorsIndexMetadata } from "@/lib/seo/public-page-metadata";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export function generateMetadata(): Metadata {
+  return buildAuthorsIndexMetadata();
+}
 
 function BackIcon() {
   return (

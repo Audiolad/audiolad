@@ -14,6 +14,7 @@ import {
 } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery, searchPublishedCatalogProducts } from "@/lib/catalog/search";
 import { getPublishedCatalogSections } from "@/lib/products/catalog";
+import { buildCatalogMetadata } from "@/lib/seo/public-page-metadata";
 import { listTopicsWithCatalogCounts } from "@/lib/topics/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,15 +31,10 @@ export async function generateMetadata({
   const searchQuery = normalizeCatalogSearchQuery(params.q);
 
   if (searchQuery) {
-    return {
-      robots: {
-        index: false,
-        follow: true,
-      },
-    };
+    return buildCatalogMetadata({ robotsNoIndex: true });
   }
 
-  return {};
+  return buildCatalogMetadata();
 }
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {

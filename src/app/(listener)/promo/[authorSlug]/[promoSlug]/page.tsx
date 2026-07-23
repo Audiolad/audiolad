@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PromoPublicPageClient from "@/components/promo-pages/PromoPublicPageClient";
+import JsonLd from "@/components/seo/JsonLd";
 import {
   buildPromoPageCanonicalUrl,
   buildPromoPagePath,
 } from "@/lib/promo-pages/paths";
+import { buildPromoPageJsonLd } from "@/lib/seo/json-ld";
 import { loadPublicPromoPageCached } from "@/lib/promo-pages/public-page";
 import { resolvePromoPageSocialPreviewImage } from "@/lib/promo-pages/social-preview";
 import { createClient } from "@/lib/supabase/server";
@@ -136,6 +138,22 @@ export default async function PublicPromoPage({ params }: PageProps) {
   }
 
   return (
-    <PromoPublicPageClient page={loaded.page} bannerUrl={loaded.bannerUrl} />
+    <>
+      <JsonLd
+        data={buildPromoPageJsonLd({
+          title: loaded.page.public_title,
+          description: loaded.page.public_description,
+          authorSlug: loaded.page.author_slug,
+          promoSlug: loaded.page.slug,
+          products: loaded.page.products.map((product) => ({
+            title: product.title,
+            authorSlug: product.author_slug,
+            productSlug: product.slug,
+            position: product.position,
+          })),
+        })}
+      />
+      <PromoPublicPageClient page={loaded.page} bannerUrl={loaded.bannerUrl} />
+    </>
   );
 }

@@ -6,6 +6,7 @@ import PracticePageDesktop from "@/components/products/practice-page/PracticePag
 import PracticePageErrorState from "@/components/products/practice-page/PracticePageErrorState";
 import PracticePageMobile from "@/components/products/practice-page/PracticePageMobile";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
+import JsonLd from "@/components/seo/JsonLd";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
 import PromoPostSignupHandler from "@/components/promo/PromoPostSignupHandler";
 import {
@@ -14,6 +15,7 @@ import {
   getProductCoverGradient,
   getProductCoverSymbol,
 } from "@/lib/products/cover-display";
+import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
@@ -21,6 +23,7 @@ import {
   canUseBuyerPreviewMode,
 } from "@/lib/products/practice-access-ui";
 import { resolveProductAccess } from "@/lib/products/access";
+import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { shouldShowPromoConversionFlow } from "@/lib/promo/access";
 import {
@@ -37,6 +40,7 @@ import {
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
+import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -365,8 +369,39 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     },
   };
 
+  const practiceCoverUrl = resolveProductCoverUrl(
+    {
+      cover_url: practice.cover_url,
+      cover_image: practice.cover_image,
+      updated_at: practice.updated_at,
+    },
+    DESKTOP_COVER_DISPLAY_WIDTH,
+    "lg",
+  );
+  const structuredData = shouldEmitPracticeJsonLd({
+    status: practice.status,
+    isFixtureMarked: isFixtureMarkedPractice(practice),
+  })
+    ? buildPracticeJsonLd({
+        title: practice.title,
+        description: practice.description,
+        authorSlug: resolvedAuthorSlug,
+        authorName: authorName ?? resolvedAuthorSlug,
+        productSlug: practice.slug,
+        imageUrl: practiceCoverUrl,
+        isFree: practice.is_free,
+        price: practice.price,
+        tracks: publicAudioItems.map((item) => ({
+          name: item.title,
+          position: item.position,
+          durationSeconds: item.durationSeconds,
+        })),
+      })
+    : null;
+
   return (
     <>
+      <JsonLd data={structuredData} />
       {user ? (
         <PromoPostSignupHandler
           practiceId={practice.id}

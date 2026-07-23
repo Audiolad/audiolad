@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import BottomNav from "@/components/BottomNav";
 import PublicPlaylistPageView from "@/components/playlists/PublicPlaylistPageView";
+import JsonLd from "@/components/seo/JsonLd";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { loadPublicPlaylistBySlug } from "@/lib/playlists/public-detail";
 import {
@@ -10,6 +11,7 @@ import {
   normalizePlaylistPublicSlug,
 } from "@/lib/playlists/public-slug";
 import { buildPublicPlaylistCanonicalUrl } from "@/lib/playlists/public-url";
+import { buildPublicPlaylistJsonLd } from "@/lib/seo/json-ld";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -107,6 +109,23 @@ export default async function PublicPlaylistPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <JsonLd
+        data={buildPublicPlaylistJsonLd({
+          title: loaded.detail.playlist.title,
+          slug,
+          description:
+            loaded.detail.itemsCount === 0
+              ? "Подборка практик в подарок на АудиоЛаде."
+              : loaded.detail.itemsCount === 1
+                ? "Подборка из 1 практики в подарок на АудиоЛаде."
+                : `Подборка из ${loaded.detail.itemsCount} практик в подарок на АудиоЛаде.`,
+          items: loaded.detail.items.map((item) => ({
+            title: item.title,
+            href: item.href,
+            position: item.position,
+          })),
+        })}
+      />
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
       >
