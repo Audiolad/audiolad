@@ -1,7 +1,15 @@
 import type { EmailValidationErrorCode } from "./types";
 
+export const SIGNUP_EMAIL_LABEL = "Email";
+
 export const EMAIL_FIELD_HINT =
   "Для регистрации используйте Яндекс Почту или Mail.ru.";
+
+export const SIGNUP_PASSWORD_LABEL = "Придумайте пароль";
+
+export const PASSWORD_MIN_LENGTH = 8;
+
+export const SIGNUP_PASSWORD_HINT = `Минимум ${PASSWORD_MIN_LENGTH} символов.`;
 
 export const EMAIL_VALIDATION_MESSAGES: Record<EmailValidationErrorCode, string> =
   {
@@ -21,8 +29,6 @@ export const EMAIL_VALIDATION_MESSAGES: Record<EmailValidationErrorCode, string>
 export function getEmailValidationMessage(code: EmailValidationErrorCode): string {
   return EMAIL_VALIDATION_MESSAGES[code];
 }
-
-export const PASSWORD_MIN_LENGTH = 8;
 
 export const PASSWORD_TOO_SHORT_MESSAGE = `Пароль должен содержать не менее ${PASSWORD_MIN_LENGTH} символов.`;
 

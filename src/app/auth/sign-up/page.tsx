@@ -7,6 +7,9 @@ import {
   getEmailValidationMessage,
   PASSWORD_MIN_LENGTH,
   PASSWORD_TOO_SHORT_MESSAGE,
+  SIGNUP_EMAIL_LABEL,
+  SIGNUP_PASSWORD_HINT,
+  SIGNUP_PASSWORD_LABEL,
   validateEmailForRegistrationClient,
 } from "@/lib/auth/email";
 import {
@@ -344,7 +347,7 @@ function SignUpForm() {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium">Электронная почта</span>
+            <span className="text-sm font-medium">{SIGNUP_EMAIL_LABEL}</span>
 
             <input
               type="email"
@@ -393,7 +396,7 @@ function SignUpForm() {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium">Пароль</span>
+            <span className="text-sm font-medium">{SIGNUP_PASSWORD_LABEL}</span>
 
             <PasswordInput
               value={password}
@@ -408,12 +411,11 @@ function SignUpForm() {
               required
               minLength={PASSWORD_MIN_LENGTH}
               autoComplete="new-password"
-              placeholder={`Минимум ${PASSWORD_MIN_LENGTH} символов`}
               aria-invalid={formState.passwordFieldInvalid}
               aria-describedby={
                 formState.passwordErrorMessage
                   ? fieldErrorId("password")
-                  : undefined
+                  : "sign-up-password-hint"
               }
               className={`mt-3 w-full rounded-[20px] border bg-white px-4 py-4 outline-none placeholder:text-[#a99db9] focus:border-[#7042c5] ${
                 formState.passwordFieldInvalid
@@ -421,6 +423,13 @@ function SignUpForm() {
                   : "border-[#ddcfef]"
               }`}
             />
+
+            <p
+              id="sign-up-password-hint"
+              className="mt-2 text-xs leading-5 text-[#8a7ca9]"
+            >
+              {SIGNUP_PASSWORD_HINT}
+            </p>
 
             {formState.passwordErrorMessage ? (
               <p

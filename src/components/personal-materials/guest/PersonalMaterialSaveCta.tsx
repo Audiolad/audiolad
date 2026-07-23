@@ -9,6 +9,8 @@ import {
   getEmailValidationMessage,
   PASSWORD_MIN_LENGTH,
   PASSWORD_TOO_SHORT_MESSAGE,
+  SIGNUP_PASSWORD_HINT,
+  SIGNUP_PASSWORD_LABEL,
   validateEmailForRegistrationClient,
 } from "@/lib/auth/email";
 import { createClient } from "@/lib/supabase/client";
@@ -332,14 +334,23 @@ export default function PersonalMaterialSaveCta({
             <span className="mt-1 block text-xs text-[#7d70a2]">{EMAIL_FIELD_HINT}</span>
           </label>
           <label className="block min-w-0">
-            <span className="mb-1 block text-sm font-medium text-[#5f5484]">Пароль</span>
+            <span className="mb-1 block text-sm font-medium text-[#5f5484]">
+              {SIGNUP_PASSWORD_LABEL}
+            </span>
             <PasswordInput
               className={fieldClassName}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
               disabled={state === "loading"}
+              aria-describedby="personal-material-save-password-hint"
             />
+            <span
+              id="personal-material-save-password-hint"
+              className="mt-1 block text-xs text-[#7d70a2]"
+            >
+              {SIGNUP_PASSWORD_HINT}
+            </span>
           </label>
           <label className="flex items-start gap-3 text-sm leading-6 text-[#5f5484]">
             <input
