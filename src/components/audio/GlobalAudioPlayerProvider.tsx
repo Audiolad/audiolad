@@ -28,7 +28,7 @@ import {
   readDesktopPlayerLastSession,
   writeDesktopPlayerLastSession,
 } from "@/lib/listen/desktop-player-persistence";
-import { isListenPlayerPathname } from "@/lib/navigation/bottom-nav";
+import { isListenPlayerPathname, isWorkspaceDashboardPathname } from "@/lib/navigation/bottom-nav";
 import {
   guestProgressToListenEntries,
   readGuestPracticeProgress,
@@ -963,8 +963,17 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     session &&
       session.tracks.length > 0 &&
       !isListenPlayerPathname(pathname) &&
+      !isWorkspaceDashboardPathname(pathname) &&
       !queueCompleted,
   );
+
+  useEffect(() => {
+    if (!isWorkspaceDashboardPathname(pathname)) {
+      return;
+    }
+
+    stopAndClear();
+  }, [pathname, stopAndClear]);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -990,7 +999,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    if (isListenPlayerPathname(pathname)) {
+    if (isListenPlayerPathname(pathname) || isWorkspaceDashboardPathname(pathname)) {
       desktopPlayerRestoreAttemptedRef.current = true;
       queueMicrotask(() => {
         setDesktopPlayerRestoreState("ready");
@@ -1138,7 +1147,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         playsInline
         className="global-audio-element"
       />
-      {session ? (
+      {session && !isWorkspaceDashboardPathname(pathname) ? (
         <GlobalPlayerEngine
           key={`${session.practiceId}:${playbackInstanceId}`}
           session={session}

@@ -97,3 +97,29 @@ export function getPersonalMaterialDisplayTitle(material: {
 
   return formatClientDisplayName(material.clientFirstName, material.clientLastName);
 }
+
+export function isPersonalMaterialDiagnostic(materialType: string): boolean {
+  return materialType === "diagnostic";
+}
+
+export function getPersonalMaterialDeleteButtonLabel(materialType: string): string {
+  return isPersonalMaterialDiagnostic(materialType)
+    ? "Удалить диагностику"
+    : "Удалить материал";
+}
+
+export function getPersonalMaterialDeleteConfirmTitle(materialType: string): string {
+  return isPersonalMaterialDiagnostic(materialType)
+    ? "Удалить диагностику?"
+    : "Удалить материал?";
+}
+
+export function getPersonalMaterialDeleteSuccessToast(materialType: string): string {
+  return isPersonalMaterialDiagnostic(materialType)
+    ? "Диагностика удалена"
+    : "Материал удалён";
+}
+
+export function getPersonalMaterialDeleteConfirmDescription(materialTitle: string): string {
+  return `Материал „${materialTitle}“ будет удалён. Отменить это действие будет невозможно.`;
+}

@@ -48,11 +48,11 @@ assert(
 );
 
 const authorConfig = shellConfig.match(
-  /author:[\s\S]*?showRightColumn: false[\s\S]*?showMobileBottomNav: false/,
+  /author:[\s\S]*?showRightColumn: false[\s\S]*?showDesktopPlayerBar: false[\s\S]*?showMobileBottomNav: false/,
 );
 assert(
   authorConfig,
-  "author mode must hide right column and mobile bottom nav wrapper",
+  "author mode must hide right column, desktop player bar and mobile bottom nav wrapper",
 );
 
 assert(
@@ -100,6 +100,11 @@ assert(
 );
 
 assert(
+  listenerShell.includes("xl:pb-4"),
+  "ListenerAppShell must drop player padding when desktop bar is hidden",
+);
+
+assert(
   listenerShell.includes("listener-app-shell__body--no-right-column"),
   "ListenerAppShell must mark layouts without right column",
 );
@@ -114,6 +119,11 @@ assert(
 assert(
   bottomNav.includes('"/author-dashboard/"'),
   "author-dashboard routes must remain in bottom nav hidden prefixes",
+);
+
+assert(
+  bottomNav.includes("isWorkspaceDashboardPathname"),
+  "bottom-nav exports workspace dashboard pathname helper",
 );
 
 assert(

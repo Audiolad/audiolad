@@ -15,6 +15,7 @@ import {
 } from "@/lib/personal-materials/client/validation";
 import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import {
+  getPersonalMaterialDeleteSuccessToast,
   getPersonalMaterialDisplayTitle,
   getPersonalMaterialTypeLabel,
 } from "@/lib/personal-materials/client/status-labels";
@@ -102,6 +103,27 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
   }, [authors, searchParams]);
 
   const activeTab = searchParams.get("tab") === "templates" ? "templates" : "materials";
+  const deletedKind = searchParams.get("deleted");
+  const deleteSuccessToast =
+    deletedKind === "diagnostic" || deletedKind === "material"
+      ? getPersonalMaterialDeleteSuccessToast(
+          deletedKind === "diagnostic" ? "diagnostic" : "audio_review",
+        )
+      : null;
+
+  useEffect(() => {
+    if (!deleteSuccessToast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("deleted");
+      router.replace(`/author-dashboard/diagnostics?${params.toString()}`);
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [deleteSuccessToast, router, searchParams]);
 
   useEffect(() => {
     if (!selectedAuthor || activeTab !== "materials") {
@@ -238,6 +260,11 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
         </div>
       ) : (
       <div className="mt-6 min-w-0">
+        {deleteSuccessToast ? (
+          <p className="mb-4 text-sm font-medium text-[#3d8d65]" role="status">
+            {deleteSuccessToast}
+          </p>
+        ) : null}
         <p className="mb-6 text-sm leading-6 text-[#7d70a2]">
           Создавайте персональные аудиоразборы, медитации и другие материалы для
           отдельных клиентов.

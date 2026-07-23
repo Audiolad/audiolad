@@ -431,6 +431,27 @@ async function main() {
     assert(revoke?.status === "revoked", "revoke material");
     assert(guestLookupAvailable(reactivateToken.tokenHash) === "0", "revoke blocks guest");
 
+    expectRpcError(
+      state.strangerUserId,
+      `SELECT public.soft_delete_personal_material('${state.materialId}'::uuid)`,
+      "forbidden",
+    );
+
+    const draftDelete = rpcJsonAs(
+      state.ownerUserId,
+      `public.create_personal_material(
+        '${state.authorId}'::uuid,
+        'Черновик', 'Клиент', '2026-07-15'::date,
+        'diagnostic', NULL, NULL, NULL, NULL
+      )`,
+    );
+    assert(draftDelete?.material_id, "create draft for delete");
+    const draftDeleteResult = rpcJsonAs(
+      state.ownerUserId,
+      `public.soft_delete_personal_material('${draftDelete.material_id}'::uuid)`,
+    );
+    assert(draftDeleteResult?.status === "deleted", "draft diagnostic soft delete");
+
     const deleteResult = rpcJsonAs(
       state.ownerUserId,
       `public.soft_delete_personal_material('${state.materialId}'::uuid)`,

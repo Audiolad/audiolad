@@ -41,8 +41,12 @@ import {
   type PersonalMaterialFormValues,
 } from "@/lib/personal-materials/client/validation";
 import {
+  getPersonalMaterialDeleteButtonLabel,
+  getPersonalMaterialDeleteConfirmDescription,
+  getPersonalMaterialDeleteConfirmTitle,
   getPersonalMaterialDisplayTitle,
   getPersonalMaterialTypeLabel,
+  isPersonalMaterialDiagnostic,
   resolvePersonalMaterialUiStatus,
 } from "@/lib/personal-materials/client/status-labels";
 import { scrollElementIntoView } from "@/lib/personal-materials/client-message-template";
@@ -94,6 +98,7 @@ export default function AuthorDiagnosticsEditorClient({
   const [oneTimeAccessUrl, setOneTimeAccessUrl] = useState<string | null>(null);
   const [clientMessageTemplate, setClientMessageTemplate] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"success" | "error">("success");
   const [reloadKey, setReloadKey] = useState(0);
   const saveSubmitRef = useRef(false);
   const linkResultRef = useRef<HTMLDivElement | null>(null);
@@ -256,6 +261,7 @@ export default function AuthorDiagnosticsEditorClient({
       setMaterial(updated);
       setFormValues(nextValues);
       setInitialValues(nextValues);
+      setToastTone("success");
       setToast("Изменения сохранены");
     } catch (error) {
       setSaveError(getPersonalMaterialErrorMessage(error));
@@ -376,13 +382,17 @@ export default function AuthorDiagnosticsEditorClient({
         const updated = await revokeAuthorPersonalMaterial(material.id);
         setMaterial(updated);
         setOneTimeAccessUrl(null);
+        setToastTone("success");
         setToast("Доступ по ссылке отозван");
       }
 
       if (confirmAction === "delete") {
         await deleteAuthorPersonalMaterial(material.id);
+        const deletedParam = isPersonalMaterialDiagnostic(material.materialType)
+          ? "diagnostic"
+          : "material";
         router.replace(
-          `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}&deleted=1`,
+          `/author-dashboard/diagnostics?author=${encodeURIComponent(selectedAuthor?.slug ?? "")}&deleted=${deletedParam}`,
         );
         return;
       }
@@ -402,6 +412,10 @@ export default function AuthorDiagnosticsEditorClient({
         } else {
           setActionError(getPersonalMaterialActivationErrorMessage(error));
         }
+      } else if (confirmAction === "delete") {
+        setConfirmAction(null);
+        setToastTone("error");
+        setToast(getPersonalMaterialErrorMessage(error));
       } else {
         setActionError(getPersonalMaterialErrorMessage(error));
       }
@@ -449,6 +463,11 @@ export default function AuthorDiagnosticsEditorClient({
     material.clientFirstName,
     material.clientLastName,
   );
+  const materialDisplayTitle = getPersonalMaterialDisplayTitle(material);
+  const deleteButtonLabel = getPersonalMaterialDeleteButtonLabel(material.materialType);
+  const deleteConfirmTitle = getPersonalMaterialDeleteConfirmTitle(material.materialType);
+  const deleteConfirmDescription =
+    getPersonalMaterialDeleteConfirmDescription(materialDisplayTitle);
 
   return (
     <div className="min-w-0">
@@ -471,7 +490,12 @@ export default function AuthorDiagnosticsEditorClient({
         </div>
 
         {toast ? (
-          <p className="mt-4 text-sm font-medium text-[#3d8d65]" role="status">
+          <p
+            className={`mt-4 text-sm font-medium ${
+              toastTone === "error" ? "text-[#b42318]" : "text-[#3d8d65]"
+            }`}
+            role={toastTone === "error" ? "alert" : "status"}
+          >
             {toast}
           </p>
         ) : null}
@@ -650,14 +674,6 @@ export default function AuthorDiagnosticsEditorClient({
               </button>
             ) : null}
 
-            <button
-              type="button"
-              disabled={actionLoading}
-              onClick={() => setConfirmAction("delete")}
-              className="min-h-11 rounded-full border border-[#f0c7c7] px-5 py-3 text-sm font-semibold text-[#b42318] disabled:opacity-60"
-            >
-              Удалить
-            </button>
           </div>
 
           {canRevokeLink ? (
@@ -741,14 +757,34 @@ export default function AuthorDiagnosticsEditorClient({
 
       <AuthorDiagnosticsConfirmModal
         open={confirmAction === "delete"}
-        title="Удалить материал?"
-        description={`Материал для ${clientName} будет удалён. Доступ по ссылке будет отключён.`}
-        confirmLabel="Удалить"
+        title={deleteConfirmTitle}
+        description={deleteConfirmDescription}
+        confirmLabel={deleteButtonLabel}
         confirmTone="danger"
         loading={actionLoading}
         onConfirm={() => void handleConfirmAction()}
         onCancel={() => setConfirmAction(null)}
       />
+
+      <section
+        aria-labelledby="personal-material-delete-heading"
+        className="mt-8 rounded-[24px] border border-[#f3d9d9] bg-[#fff7f7] p-4 sm:p-5"
+      >
+        <h3 id="personal-material-delete-heading" className="text-[18px] font-semibold text-[#8b2f2f]">
+          Удаление
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+          Материал будет удалён без возможности восстановления. Аккаунт клиента не затрагивается.
+        </p>
+        <button
+          type="button"
+          disabled={actionLoading}
+          onClick={() => setConfirmAction("delete")}
+          className="mt-4 min-h-11 rounded-full bg-[#d64545] px-5 py-3 text-sm font-semibold text-white hover:bg-[#bf3a3a] disabled:opacity-60"
+        >
+          {deleteButtonLabel}
+        </button>
+      </section>
 
       <div className="mt-6">
         <button

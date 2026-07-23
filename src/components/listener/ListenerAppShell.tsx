@@ -48,7 +48,14 @@ export function ListenerAppShell({
         ) : null}
 
         <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-          <div className="listener-app-shell__center-scroll xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-y-auto xl:pb-[calc(1rem+var(--listener-desktop-player-height,0px))]">
+          <div
+            className={[
+              "listener-app-shell__center-scroll xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-y-auto",
+              config.showDesktopPlayerBar
+                ? "xl:pb-[calc(1rem+var(--listener-desktop-player-height,0px))]"
+                : "xl:pb-4",
+            ].join(" ")}
+          >
             {config.showDesktopSearch ? (
               <div className="hidden shrink-0 xl:block xl:min-h-[58px] xl:px-6 xl:pb-0 xl:pt-0">
                 <DesktopShellSearch />

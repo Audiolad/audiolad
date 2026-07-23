@@ -67,6 +67,7 @@ function testListComponent() {
   assert(list.includes("Повторить"), "retry");
   assert(list.includes("break-words"), "long name wrapping");
   assert(list.includes("router.replace(`/author-dashboard/diagnostics"), "author switch reloads list");
+  assert(list.includes('searchParams.get("deleted")'), "list shows delete success toast");
 }
 
 function testCreateComponent() {
@@ -95,6 +96,10 @@ function testEditorComponent() {
   assert(editor.includes("rotateAuthorPersonalMaterial"), "rotate");
   assert(editor.includes("revokeAuthorPersonalMaterial"), "revoke");
   assert(editor.includes("deleteAuthorPersonalMaterial"), "delete");
+  assert(editor.includes("getPersonalMaterialDeleteButtonLabel"), "typed delete button label");
+  assert(editor.includes("getPersonalMaterialDeleteConfirmDescription"), "delete confirm copy");
+  assert(editor.includes("toastTone"), "delete error toast support");
+  assert(editor.includes("bg-[#d64545]"), "destructive delete section");
   assert(editor.includes("setOneTimeAccessUrl"), "one-time url in state only");
   assert(editor.includes("linkResultRef"), "one-time url scroll target");
   assert(editor.includes("scrollElementIntoView"), "scroll to link result");

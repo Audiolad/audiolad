@@ -15,6 +15,18 @@ const BOTTOM_NAV_HIDDEN_PREFIXES = [
   "/author-dashboard/",
 ] as const;
 
+/** Author cabinet and admin/owner panel — no global playback chrome. */
+export const WORKSPACE_DASHBOARD_PREFIXES = [
+  "/author-dashboard",
+  "/admin",
+] as const;
+
+export function isWorkspaceDashboardPathname(pathname: string): boolean {
+  return WORKSPACE_DASHBOARD_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
 /** Основная зона меню без нижнего safe area (иконки + подписи). */
 export const BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
 

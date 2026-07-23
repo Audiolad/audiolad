@@ -48,7 +48,7 @@ export const LISTENER_SHELL_CONFIGS: Record<
     mode: "author",
     showDesktopSidebar: true,
     showRightColumn: false,
-    showDesktopPlayerBar: true,
+    showDesktopPlayerBar: false,
     showDesktopSearch: true,
     showMobileBottomNav: false,
     bodyClassName: AUTHOR_MOBILE_BODY_CLASS,
