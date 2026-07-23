@@ -1,11 +1,4 @@
 import {
-  AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
-  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY,
-  AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION,
-  renderAuthorAccessGrantedEmailHtml,
-  renderAuthorAccessGrantedEmailText,
-} from "./author-access-granted";
-import {
   AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
@@ -88,23 +81,6 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
-    if (input.templateKey === AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY) {
-      const userName = readString(input.payload, "userName");
-
-      if (!userName) {
-        return { ok: false, code: "invalid_payload" };
-      }
-
-      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
-
-      return {
-        ok: true,
-        subject: AUTHOR_ACCESS_GRANTED_EMAIL_SUBJECT,
-        html: renderAuthorAccessGrantedEmailHtml({ userName, siteOrigin }),
-        text: renderAuthorAccessGrantedEmailText({ userName, siteOrigin }),
-      };
-    }
-
     if (input.templateKey === AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY) {
       const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
 
@@ -138,10 +114,6 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === RECOVERY_EMAIL_TEMPLATE_KEY) {
     return RECOVERY_EMAIL_TEMPLATE_VERSION;
-  }
-
-  if (templateKey === AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_KEY) {
-    return AUTHOR_ACCESS_GRANTED_EMAIL_TEMPLATE_VERSION;
   }
 
   if (templateKey === AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY) {

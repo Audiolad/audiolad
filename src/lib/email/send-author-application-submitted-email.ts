@@ -1,5 +1,4 @@
-import { resolveAuthorsEmailTransport } from "@/lib/email/authors-email-transport";
-import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
+import { resolveAuthorsEmailDeliveryFromEnv } from "@/lib/email/authors-email-transport";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import {
   AUTHOR_APPLICATION_SUBMITTED_EMAIL_TEMPLATE_KEY,
@@ -15,7 +14,10 @@ export type SendAuthorApplicationSubmittedEmailResult =
   | { ok: true; providerMessageId?: string }
   | {
       ok: false;
-      code: "smtp_not_configured" | "template_render_failed" | "send_failed";
+      code:
+        | "authors_smtp_not_configured"
+        | "template_render_failed"
+        | "send_failed";
     };
 
 export async function sendAuthorApplicationSubmittedEmail(
@@ -32,14 +34,14 @@ export async function sendAuthorApplicationSubmittedEmail(
     return { ok: false, code: "template_render_failed" };
   }
 
-  const smtpConfig = getSmtpConfigFromEnv();
+  const deliveryContext = resolveAuthorsEmailDeliveryFromEnv();
 
-  if (!smtpConfig) {
-    console.error("author_application_submitted_email_smtp_not_configured");
-    return { ok: false, code: "smtp_not_configured" };
+  if (!deliveryContext.ok) {
+    console.error("author_application_submitted_email_authors_smtp_not_configured");
+    return { ok: false, code: "authors_smtp_not_configured" };
   }
 
-  const transport = resolveAuthorsEmailTransport(smtpConfig.user);
+  const { smtpConfig, transport } = deliveryContext.delivery;
   const provider = createSmtpEmailProvider(smtpConfig);
 
   const result = await provider.send({

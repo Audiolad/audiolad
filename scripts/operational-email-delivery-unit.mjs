@@ -42,17 +42,47 @@ function testMigrationDefinesTable() {
 }
 
 function testSenderUsesPersistentDelivery() {
-  for (const file of [
-    "../src/lib/email/send-author-access-granted-email.ts",
-    "../src/lib/email/send-author-application-approved-email.ts",
-  ]) {
-    const sender = readFileSync(new URL(file, import.meta.url), "utf8");
+  const sender = readFileSync(
+    new URL("../src/lib/email/send-author-application-approved-email.ts", import.meta.url),
+    "utf8",
+  );
 
-    assert.match(sender, /acquireOperationalEmailDelivery/);
-    assert.match(sender, /markOperationalEmailDeliverySent/);
-    assert.match(sender, /markOperationalEmailDeliveryFailed/);
-    assert.doesNotMatch(sender, /new Set\(/);
+  assert.match(sender, /acquireOperationalEmailDelivery/);
+  assert.match(sender, /markOperationalEmailDeliverySent/);
+  assert.match(sender, /markOperationalEmailDeliveryFailed/);
+  assert.doesNotMatch(sender, /new Set\(/);
+}
+
+function testLegacyAccessGrantedSenderRemoved() {
+  const actions = readFileSync(
+    new URL("../src/app/admin/author-applications/actions.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(actions, /\bsendAuthorAccessGrantedEmail\b/);
+  assert.match(actions, /\bsendAuthorApplicationApprovedEmail\b\(/);
+
+  try {
+    readFileSync(
+      new URL("../src/lib/email/send-author-access-granted-email.ts", import.meta.url),
+      "utf8",
+    );
+    assert.fail("legacy send-author-access-granted-email.ts must be removed");
+  } catch (error) {
+    assert.match(String(error), /ENOENT|no such file/i);
   }
+}
+
+function testApprovedSenderUsesAuthorsSmtp() {
+  const sender = readFileSync(
+    new URL("../src/lib/email/send-author-application-approved-email.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(sender, /resolveAuthorsEmailDeliveryFromEnv\(/);
+  assert.match(sender, /authors_smtp_not_configured/);
+  assert.match(sender, /markOperationalEmailDeliveryFailed\([\s\S]*authors_smtp_not_configured/);
+  assert.doesNotMatch(sender, /getSmtpConfigFromEnv\(/);
 }
 
 function testMessageTypeConstant() {
@@ -67,6 +97,8 @@ async function main() {
   testDedupKeyFormat();
   testMigrationDefinesTable();
   testSenderUsesPersistentDelivery();
+  testLegacyAccessGrantedSenderRemoved();
+  testApprovedSenderUsesAuthorsSmtp();
   testMessageTypeConstant();
   console.log("operational-email-delivery-unit: ok");
 }

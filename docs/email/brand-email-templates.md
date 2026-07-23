@@ -63,6 +63,7 @@ Site links use `getAppOrigin()` (`NEXT_PUBLIC_APP_URL` with fallback `https://au
 
 ```bash
 node scripts/email-template-unit.mjs
+npx tsx scripts/authors-smtp-unit.mjs
 npx tsx scripts/build-gotrue-email-templates.ts
 node scripts/email-policy-unit.mjs
 ```
