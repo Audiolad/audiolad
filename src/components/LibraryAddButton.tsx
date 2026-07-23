@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useFirstSaveRetention } from "@/components/retention/FirstSaveRetentionProvider";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
+import { isClaimLibrarySuccessBody } from "@/lib/library/claim-api";
 import {
   buildPromoSignUpHref,
   buildPromoSignupContext,
@@ -27,22 +29,6 @@ type LibraryAddButtonProps = {
 type ApiErrorBody = {
   error?: string;
 };
-
-type ClaimLibrarySuccessBody = {
-  library: {
-    in_library: boolean;
-  };
-};
-
-function isClaimLibrarySuccessBody(body: unknown): body is ClaimLibrarySuccessBody {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "library" in body &&
-    typeof (body as ClaimLibrarySuccessBody).library?.in_library === "boolean" &&
-    (body as ClaimLibrarySuccessBody).library.in_library === true
-  );
-}
 
 function getLibraryButtonLabel(
   action: Exclude<PracticeLibraryAction, "hidden">,
@@ -76,6 +62,7 @@ export default function LibraryAddButton({
   promoSignup = false,
 }: LibraryAddButtonProps) {
   const router = useRouter();
+  const { showFirstSaveRetention } = useFirstSaveRetention();
   const [action, setAction] = useState(initialAction);
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -115,7 +102,15 @@ export default function LibraryAddButton({
         isClaimLibrarySuccessBody(body)
       ) {
         setAction(resolveLibraryActionAfterClaimSuccess());
-        router.refresh();
+
+        if (body.retention.show_first_save_prompt) {
+          showFirstSaveRetention({
+            practiceId: body.library.practice_id,
+          });
+        } else {
+          router.refresh();
+        }
+
         return;
       }
 

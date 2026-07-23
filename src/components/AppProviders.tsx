@@ -8,6 +8,7 @@ import PlatformAnalyticsProvider from "@/components/analytics/PlatformAnalyticsP
 import AnalyticsConsentBanner from "@/components/analytics/AnalyticsConsentBanner";
 import YandexMetrika from "@/components/analytics/YandexMetrika";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
+import FirstSaveRetentionProvider from "@/components/retention/FirstSaveRetentionProvider";
 import PwaInstallErrorBoundary from "@/components/pwa/PwaInstallErrorBoundary";
 import PwaInstallProvider from "@/components/pwa/PwaInstallProvider";
 
@@ -25,7 +26,9 @@ export default function AppProviders({
         <AnalyticsAuthLinker />
         <ClientErrorReporter />
         <PwaInstallErrorBoundary appChildren={children}>
-          <PwaInstallProvider>{children}</PwaInstallProvider>
+          <PwaInstallProvider>
+            <FirstSaveRetentionProvider>{children}</FirstSaveRetentionProvider>
+          </PwaInstallProvider>
         </PwaInstallErrorBoundary>
       </GlobalAudioPlayerProvider>
       <AnalyticsConsentBanner />
