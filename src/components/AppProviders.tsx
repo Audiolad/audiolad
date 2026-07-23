@@ -25,11 +25,11 @@ export default function AppProviders({
       <GlobalAudioPlayerProvider>
         <AnalyticsAuthLinker />
         <ClientErrorReporter />
-        <PwaInstallErrorBoundary appChildren={children}>
-          <PwaInstallProvider>
-            <FirstSaveRetentionProvider>{children}</FirstSaveRetentionProvider>
-          </PwaInstallProvider>
-        </PwaInstallErrorBoundary>
+        <FirstSaveRetentionProvider>
+          <PwaInstallErrorBoundary appChildren={children}>
+            <PwaInstallProvider>{children}</PwaInstallProvider>
+          </PwaInstallErrorBoundary>
+        </FirstSaveRetentionProvider>
       </GlobalAudioPlayerProvider>
       <AnalyticsConsentBanner />
     </PlatformAnalyticsProvider>

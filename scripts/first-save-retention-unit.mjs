@@ -88,6 +88,11 @@ function testUiWiring() {
     providers.includes("FirstSaveRetentionProvider"),
     "provider mounted globally",
   );
+  assert(
+    providers.indexOf("FirstSaveRetentionProvider") <
+      providers.indexOf("PwaInstallErrorBoundary"),
+    "retention provider survives PWA error-boundary fallback",
+  );
   assert(card.includes("Практика сохранена ✓"), "title copy");
   assert(card.includes("–"), "medium dash in copy");
   assert(!card.includes("—"), "no em dash in copy");
