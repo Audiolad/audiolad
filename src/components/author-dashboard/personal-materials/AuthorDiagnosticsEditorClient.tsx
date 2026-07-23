@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatClientDisplayName } from "@/lib/personal-materials/display-name";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorDiagnosticsAttachmentDownloadButton from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAttachmentDownloadButton";
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
 import AuthorDiagnosticsPdfUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsPdfUpload";
 import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
@@ -572,6 +573,16 @@ export default function AuthorDiagnosticsEditorClient({
               audioApiPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/audio`}
               progressMode="none"
             />
+            {!isDraft ? (
+              <div className="mt-4 flex min-w-0 flex-wrap gap-2">
+                <AuthorDiagnosticsAttachmentDownloadButton
+                  label="Скачать аудиофайл"
+                  disabled={actionLoading}
+                  onDownload={handleDownloadAudio}
+                  fallbackErrorMessage="Не удалось скачать аудиофайл. Попробуйте ещё раз."
+                />
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="mt-3 text-sm text-[#7d70a2]">Аудиофайл ещё не загружен</p>
@@ -669,11 +680,19 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
 
           {material.hasPdf ? (
-            <div className="mt-4">
+            <div className="mt-4 min-w-0">
               <PersonalMaterialPdfDocument
                 pdfOpenPath={`/api/author/personal-materials/${encodeURIComponent(material.id)}/pdf/open`}
                 filename={material.pdfOriginalFilename}
               />
+              <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+                <AuthorDiagnosticsAttachmentDownloadButton
+                  label="Скачать PDF"
+                  disabled={actionLoading}
+                  onDownload={handleDownloadPdf}
+                  fallbackErrorMessage="Не удалось скачать PDF. Попробуйте ещё раз."
+                />
+              </div>
             </div>
           ) : null}
 

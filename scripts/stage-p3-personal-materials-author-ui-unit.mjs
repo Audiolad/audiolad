@@ -136,6 +136,10 @@ function testEditorComponent() {
   assert(editor.includes("AuthorDiagnosticsPdfUpload"), "pdf upload block");
   assert(editor.includes('progressMode="none"'), "author audio preview player");
   assert(editor.includes("Прослушивание"), "author preview section");
+  assert(editor.includes("AuthorDiagnosticsAttachmentDownloadButton"), "existing material download");
+  assert(editor.includes("Скачать аудиофайл"), "active audio download");
+  assert(editor.includes("Скачать PDF"), "active pdf download");
+  assert(editor.includes("!isDraft"), "download outside draft-only upload");
   assert(editor.includes('hash !== "#audio"'), "scroll to audio after create");
 
   assert(oneTime.includes("copyTextToClipboard"), "clipboard copy");

@@ -51,6 +51,35 @@ function testDownloadServerLayer() {
   assert(download.includes("createServiceRoleClient"), "service role signing");
   assert(download.includes('material.status === "deleted"'), "deleted guard");
   assert(!download.includes("service_role"), "no secret leak");
+  assert(!download.includes('material.status === "draft"'), "download not draft-only");
+  assert(!download.includes('material.status === "active"'), "download not active-only");
+}
+
+function testExistingMaterialDownloadUi() {
+  const editor = read(
+    "src/components/author-dashboard/personal-materials/AuthorDiagnosticsEditorClient.tsx",
+  );
+  const downloadButton = read(
+    "src/components/author-dashboard/personal-materials/AuthorDiagnosticsAttachmentDownloadButton.tsx",
+  );
+
+  assert(downloadButton.includes("Скачивание…"), "shared download loading state");
+  assert(downloadButton.includes("disabled || downloading"), "shared download debounce");
+
+  assert(editor.includes("AuthorDiagnosticsAttachmentDownloadButton"), "shared download button");
+  assert(editor.includes("Скачать аудиофайл"), "active material audio download label");
+  assert(editor.includes("Скачать PDF"), "active material pdf download label");
+  assert(editor.includes("!isDraft"), "existing material download gated by non-draft");
+  assert(editor.includes("Управление доступом"), "access management section");
+  assert(
+    editor.indexOf("Управление доступом") < editor.indexOf("Скачать PDF"),
+    "pdf download in access management area",
+  );
+  assert(editor.includes("handleDownloadAudio"), "active audio uses author endpoint handler");
+  assert(editor.includes("handleDownloadPdf"), "active pdf uses author endpoint handler");
+  assert(editor.includes("canRotateLink"), "access management actions preserved");
+  assert(editor.includes("canRevokeLink"), "revoke flow preserved");
+  assert(editor.includes("onDelete={handleDeleteAudio}"), "draft delete preserved");
 }
 
 function testClientDownloadLayer() {
@@ -123,6 +152,7 @@ async function main() {
   testDownloadServerLayer();
   testClientDownloadLayer();
   testUploadUi();
+  testExistingMaterialDownloadUi();
   testAccessAndErrors();
   await runModuleTests();
   console.log("personal-materials-author-download-unit: PASS");
