@@ -15,6 +15,8 @@ const clientDownload = readFileSync(
 
 assert.ok(clientDownload.includes('Accept: "application/json"'));
 assert.ok(clientDownload.includes("triggerBrowserDownload"));
+assert.ok(clientDownload.includes("anchor.download = filename"));
+assert.ok(clientDownload.includes("sanitizePersonalMaterialDownloadFilename"));
 assert.ok(!clientDownload.includes('redirect: "manual"'));
 assert.ok(!clientDownload.includes("response.blob"));
 

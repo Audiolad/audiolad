@@ -1,5 +1,5 @@
+import { sanitizePersonalMaterialDownloadFilename } from "@/lib/personal-materials/download-filename";
 import {
-  getPersonalMaterialDownloadErrorMessage,
   mapPersonalMaterialClientError,
   PersonalMaterialClientError,
 } from "./errors";
@@ -10,9 +10,10 @@ export type AuthorAttachmentDownloadResponse = {
   expiresAt: string;
 };
 
-function triggerBrowserDownload(downloadUrl: string): void {
+function triggerBrowserDownload(downloadUrl: string, filename: string): void {
   const anchor = document.createElement("a");
   anchor.href = downloadUrl;
+  anchor.download = filename;
   anchor.rel = "noopener noreferrer";
   anchor.style.display = "none";
   document.body.appendChild(anchor);
@@ -42,9 +43,14 @@ async function fetchAuthorPersonalMaterialDownloadUrl(
     throw new PersonalMaterialClientError("internal_error", 500);
   }
 
+  const fallbackFilename = path.includes("/pdf/download") ? "document.pdf" : "audio.mp3";
+
   return {
     downloadUrl: payload.downloadUrl.trim(),
-    filename: payload.filename?.trim() || "download",
+    filename: sanitizePersonalMaterialDownloadFilename(
+      payload.filename?.trim() || fallbackFilename,
+      fallbackFilename,
+    ),
     expiresAt: payload.expiresAt?.trim() || "",
   };
 }
@@ -53,7 +59,7 @@ async function triggerAuthorPersonalMaterialDownload(
   path: string,
 ): Promise<void> {
   const payload = await fetchAuthorPersonalMaterialDownloadUrl(path);
-  triggerBrowserDownload(payload.downloadUrl);
+  triggerBrowserDownload(payload.downloadUrl, payload.filename);
 }
 
 export async function downloadAuthorPersonalMaterialAudio(

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
+import { sanitizePersonalMaterialDownloadFilename } from "@/lib/personal-materials/download-filename";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   isPathInsidePersonalMaterialRoot,
@@ -59,14 +60,17 @@ export async function createAuthorAttachmentDownloadSignedUrl(
     throw new PersonalMaterialApiError("not_found", 404);
   }
 
-  const filename = resolvePersonalMaterialDownloadFilename(material, kind);
+  const filename = sanitizePersonalMaterialDownloadFilename(
+    resolvePersonalMaterialDownloadFilename(material, kind),
+    kind === "audio" ? "audio.mp3" : "document.pdf",
+  );
   const service = createServiceRoleClient();
   const expiresIn = PERSONAL_MATERIAL_LIMITS.signedUrlTtlSeconds;
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
   const { data, error } = await service.storage
     .from(PERSONAL_MATERIALS_BUCKET)
-    .createSignedUrl(storagePath, expiresIn, { download: filename });
+    .createSignedUrl(storagePath, expiresIn);
 
   if (error) {
     const message = error.message?.toLowerCase() ?? "";

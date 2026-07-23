@@ -50,7 +50,9 @@ function testDownloadServerLayer() {
   assert(download.includes("pdf_original_filename"), "pdf original filename");
   assert(download.includes("getTrustedAttachmentPath"), "trusted path only");
   assert(download.includes("isPathInsidePersonalMaterialRoot"), "path guard");
-  assert(download.includes('download: filename'), "signed url download disposition");
+  assert(download.includes("sanitizePersonalMaterialDownloadFilename"), "filename sanitization");
+  assert(download.includes("createSignedUrl(storagePath, expiresIn)"), "signed url without storage download param");
+  assert(!download.includes("download: filename"), "no storage download disposition param");
   assert(download.includes("PERSONAL_MATERIALS_BUCKET"), "private bucket");
   assert(download.includes("createServiceRoleClient"), "service role signing");
   assert(download.includes('material.status === "deleted"'), "deleted guard");
@@ -95,6 +97,8 @@ function testClientDownloadLayer() {
   assert(clientDownload.includes("downloadUrl"), "client reads downloadUrl");
   assert(clientDownload.includes("triggerBrowserDownload"), "browser navigation not fetch blob");
   assert(clientDownload.includes('document.createElement("a")'), "anchor download trigger");
+  assert(clientDownload.includes("anchor.download = filename"), "unicode filename on anchor");
+  assert(clientDownload.includes("sanitizePersonalMaterialDownloadFilename"), "client filename sanitization");
   assert(!clientDownload.includes('redirect: "manual"'), "no opaque redirect fetch");
   assert(!clientDownload.includes("response.blob"), "no blob download");
   assert(clientDownload.includes("/audio/download"), "audio download endpoint");
@@ -154,6 +158,7 @@ async function runModuleTests() {
   for (const script of [
     "scripts/personal-materials-author-download-module-unit.mjs",
     "scripts/personal-materials-author-download-client-module-unit.mjs",
+    "scripts/personal-materials-download-filename-unit.mjs",
   ]) {
     const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, { encoding: "utf8" });
     process.stdout.write(output);
