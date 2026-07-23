@@ -205,6 +205,7 @@ export async function resendAuthorAccessGrantedEmail(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
+  // Legacy action name retained for the admin form; sends author_application_approved mail.
   await requireAdminPanelAccess();
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();

@@ -10,21 +10,28 @@ This document describes how to connect self-hosted GoTrue to Timeweb mail **when
 
 ## Mailboxes and aliases to verify in Timeweb panel
 
-Confirm these addresses exist or will exist on the primary mailbox:
+Confirm these addresses exist on the primary mailbox or as dedicated mailboxes:
 
 | Address | Purpose |
 |---------|---------|
-| `no-reply@audiolad.ru` | GoTrue auth sender (`MAIL_FROM`) |
+| `inbox@audiolad.ru` | Primary application SMTP (welcome, legacy operational mail) |
+| `no-reply@audiolad.ru` | GoTrue auth sender (`MAIL_FROM`) when relay allows |
 | `support@audiolad.ru` | Reply-To for auth/security messages |
 | `info@audiolad.ru` | Future product/news sender |
-| `authors@audiolad.ru` | Future author communications |
+| `authors@audiolad.ru` | **Dedicated mailbox** for author application emails |
 
-MVP assumes one real mailbox with aliases. Typical setup:
+### Timeweb SMTP constraint (verified 2026-07-22)
 
-- **SMTP user:** the primary mailbox login (for example the main `@audiolad.ru` account created in Timeweb).
-- **From addresses:** aliases on that mailbox (`no-reply@`, `support@`, etc.).
+Timeweb SMTP **rewrites visible From to the authenticated mailbox**. Aliases do **not** work as SMTP send-as from third-party apps — alias send is only available in Timeweb.MAIL web UI.
 
-Do not create new Timeweb resources during code rollout — only verify/plan here.
+Therefore:
+
+- **Do not** rely on `MIME From: authors@` while authenticating as `inbox@`.
+- **`authors@audiolad.ru` must be a full mailbox** with its own SMTP login/password.
+- **`author_application_submitted`** and **`author_application_approved`** use the authors mailbox SMTP credentials.
+- Welcome, recovery (GoTrue), and other general mail stay on `inbox@audiolad.ru`.
+
+Do not create new Timeweb resources during code rollout without owner approval — verify/plan in panel first.
 
 ## GoTrue environment (self-hosted Supabase)
 
@@ -201,6 +208,31 @@ AUDIOLAD_SMTP_USER=<primary-mailbox-login>
 AUDIOLAD_SMTP_PASS=<mailbox-password>
 AUDIOLAD_SMTP_SECURE=true
 ```
+
+Author application emails (`author_application_submitted`, `author_application_approved`):
+
+```env
+# Required — dedicated authors mailbox credentials (no fallback to inbox@)
+AUDIOLAD_SMTP_AUTHORS_USER=authors@audiolad.ru
+AUDIOLAD_SMTP_AUTHORS_PASS=<authors-mailbox-password>
+
+# Optional overrides; inherit primary SMTP when omitted
+AUDIOLAD_SMTP_AUTHORS_HOST=smtp.timeweb.ru
+AUDIOLAD_SMTP_AUTHORS_PORT=465
+AUDIOLAD_SMTP_AUTHORS_SECURE=true
+```
+
+If `AUDIOLAD_SMTP_AUTHORS_USER` / `AUDIOLAD_SMTP_AUTHORS_PASS` are missing, author emails fail with `authors_smtp_not_configured` (approve is **not** rolled back; delivery row is marked `failed`).
+
+### Author email smoke (after env + deploy)
+
+1. Set production env with authors mailbox credentials (password entered manually by owner; never commit).
+2. Send **one** controlled message to owner inbox with subject prefix `[SMOKE]`.
+3. In Yandex Mail (or target client) verify:
+   - display name: `АудиоЛад для авторов`
+   - From address: `authors@audiolad.ru` (not `inbox@`)
+   - Reply-To: `authors@audiolad.ru`
+4. Do not smoke-test on real applicant addresses.
 
 See `docs/email/brand-email-templates.md`.
 
