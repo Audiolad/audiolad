@@ -102,6 +102,18 @@ function testProvidersAndSettings() {
   assert(privacy.includes("Вебвизор"), "privacy mentions webvisor");
 }
 
+function testPrivacyContract() {
+  const privacy = readFileSync(
+    "/var/www/audiolad/.worktrees/yandex-metrika-privacy-leaf/src/lib/analytics/yandex-metrika-privacy.ts",
+    "utf8",
+  );
+
+  assert(
+    privacy.includes("root.matches(INPUT_SELECTOR)"),
+    "privacy masks root leaf input nodes",
+  );
+}
+
 function testNoDuplicateEmitters() {
   const tracker = readFileSync(
     "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/ListenAnalyticsTracker.tsx",
@@ -120,6 +132,7 @@ testLibraryContract();
 testComponentContract();
 testClientHooks();
 testProvidersAndSettings();
+testPrivacyContract();
 testNoDuplicateEmitters();
 
 console.log("yandex-metrika-unit: ok");
