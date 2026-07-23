@@ -1,11 +1,33 @@
-import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
 import { isAnalyticsConsentGranted } from "@/lib/analytics/analytics-consent";
+import { shouldEnableYandexMetrika } from "@/lib/analytics/yandex-metrika-environment";
+import {
+  isYandexMetrikaGoalName,
+  YANDEX_METRIKA_CORE_GOALS,
+  YANDEX_METRIKA_PWA_GOALS,
+  YANDEX_METRIKA_RETENTION_GOALS,
+  type YandexMetrikaGoalName,
+} from "@/lib/analytics/yandex-metrika-goals";
+import {
+  inferRetentionMetrikaSource,
+  sanitizeYandexMetrikaGoalParams,
+  type YandexMetrikaGoalParams,
+} from "@/lib/analytics/yandex-metrika-params";
+import { setupYandexMetrikaPrivacyMasking } from "@/lib/analytics/yandex-metrika-privacy";
+import { sanitizeMetrikaPageUrl } from "@/lib/analytics/yandex-metrika-url";
+import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
 
-export const YANDEX_METRIKA_GOALS = new Set<PlatformAnalyticsEventName>([
-  "signup_completed",
-  "audio_play_started",
-  "audio_completed",
-  "author_application_submitted",
+export {
+  isYandexMetrikaGoalName,
+  YANDEX_METRIKA_CORE_GOALS,
+  YANDEX_METRIKA_PWA_GOALS,
+  YANDEX_METRIKA_RETENTION_GOALS,
+  type YandexMetrikaGoalName,
+};
+
+export const YANDEX_METRIKA_GOALS = new Set<YandexMetrikaGoalName>([
+  ...YANDEX_METRIKA_CORE_GOALS,
+  ...YANDEX_METRIKA_RETENTION_GOALS,
+  ...YANDEX_METRIKA_PWA_GOALS,
 ]);
 
 let initializedCounterId: number | null = null;
@@ -26,12 +48,37 @@ export function getYandexMetrikaCounterId(): number | null {
   return counterId;
 }
 
-export function initYandexMetrika(counterId: number): void {
-  if (typeof window === "undefined" || typeof window.ym !== "function") {
-    return;
-  }
+function canUseYandexMetrika(pathname?: string | null): boolean {
+  try {
+    if (!getYandexMetrikaCounterId()) {
+      return false;
+    }
 
-  if (!isAnalyticsConsentGranted()) {
+    if (typeof window === "undefined" || typeof window.ym !== "function") {
+      return false;
+    }
+
+    if (!isAnalyticsConsentGranted()) {
+      return false;
+    }
+
+    if (
+      !shouldEnableYandexMetrika({
+        pathname,
+        hostname: window.location.hostname,
+      })
+    ) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function initYandexMetrika(counterId: number, pathname?: string | null): void {
+  if (!canUseYandexMetrika(pathname)) {
     return;
   }
 
@@ -39,48 +86,77 @@ export function initYandexMetrika(counterId: number): void {
     return;
   }
 
-  window.ym(counterId, "init", {
-    clickmap: false,
+  window.ym!(counterId, "init", {
+    clickmap: true,
     trackLinks: true,
     accurateTrackBounce: true,
-    webvisor: false,
+    webvisor: true,
   });
 
+  setupYandexMetrikaPrivacyMasking();
   initializedCounterId = counterId;
 }
 
-export function reachYandexMetrikaHit(url: string): void {
+export function reachYandexMetrikaHit(
+  pathname: string,
+  searchParams?: URLSearchParams | string | null,
+): void {
   const counterId = getYandexMetrikaCounterId();
 
-  if (!counterId || typeof window === "undefined" || typeof window.ym !== "function") {
+  if (!counterId || !canUseYandexMetrika(pathname)) {
     return;
   }
 
-  if (!isAnalyticsConsentGranted()) {
+  const url = sanitizeMetrikaPageUrl(pathname, searchParams);
+
+  try {
+    window.ym!(counterId, "hit", url, {
+      title: document.title,
+    });
+  } catch {
+    // Analytics must not break UX
+  }
+}
+
+export function sendYandexGoal(
+  goalName: string,
+  params?: YandexMetrikaGoalParams | Record<string, unknown> | null,
+): void {
+  if (!isYandexMetrikaGoalName(goalName)) {
     return;
   }
 
-  window.ym(counterId, "hit", url, {
-    title: document.title,
-  });
+  const counterId = getYandexMetrikaCounterId();
+
+  if (!counterId || !canUseYandexMetrika()) {
+    return;
+  }
+
+  const sanitizedParams = sanitizeYandexMetrikaGoalParams(params);
+  const inferredSource = inferRetentionMetrikaSource(goalName);
+
+  if (inferredSource && !sanitizedParams.source) {
+    sanitizedParams.source = inferredSource;
+  }
+
+  try {
+    if (Object.keys(sanitizedParams).length === 0) {
+      window.ym!(counterId, "reachGoal", goalName);
+      return;
+    }
+
+    window.ym!(counterId, "reachGoal", goalName, sanitizedParams);
+  } catch {
+    // Analytics must not break UX
+  }
 }
 
 export function reachYandexMetrikaGoal(eventName: PlatformAnalyticsEventName): void {
-  if (!YANDEX_METRIKA_GOALS.has(eventName)) {
-    return;
-  }
+  sendYandexGoal(eventName);
+}
 
-  const counterId = getYandexMetrikaCounterId();
-
-  if (!counterId || typeof window === "undefined" || typeof window.ym !== "function") {
-    return;
-  }
-
-  if (!isAnalyticsConsentGranted()) {
-    return;
-  }
-
-  window.ym(counterId, "reachGoal", eventName);
+export function resetYandexMetrikaForTests(): void {
+  initializedCounterId = null;
 }
 
 declare global {

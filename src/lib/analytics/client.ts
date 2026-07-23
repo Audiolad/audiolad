@@ -1,7 +1,7 @@
 import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
 import {
-  reachYandexMetrikaGoal,
-  YANDEX_METRIKA_GOALS,
+  isYandexMetrikaGoalName,
+  sendYandexGoal,
 } from "@/lib/analytics/yandex-metrika";
 import { getOrCreateAnonymousSessionId } from "@/lib/promo/analytics-events";
 
@@ -125,7 +125,7 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
   const recorded = Boolean(result?.recorded);
 
   if (recorded) {
-    reachYandexMetrikaGoal("signup_completed");
+    sendYandexGoal("signup_completed");
   }
 
   return recorded;
@@ -144,8 +144,8 @@ export async function trackPlatformEvent(input: TrackEventInput): Promise<void> 
     properties: input.properties ?? {},
   });
 
-  if (YANDEX_METRIKA_GOALS.has(input.event_name)) {
-    reachYandexMetrikaGoal(input.event_name);
+  if (isYandexMetrikaGoalName(input.event_name)) {
+    sendYandexGoal(input.event_name);
   }
 }
 

@@ -291,6 +291,8 @@ function testRecovery() {
 function testAvatar() {
   const avatarLib = readRepoFile("src", "lib", "profile", "avatar.ts");
   const avatarImage = readRepoFile("src", "lib", "profile", "avatar-image.ts");
+  const imageProfiles = readRepoFile("src", "lib", "images", "image-profiles.ts");
+  const validateImage = readRepoFile("src", "lib", "images", "validate-image.ts");
   const avatarRoute = readRepoFile(
     "src",
     "app",
@@ -299,12 +301,16 @@ function testAvatar() {
     "avatar",
     "route.ts",
   );
+  const avatarSources = [avatarLib, avatarImage, imageProfiles, validateImage].join("\n");
 
   assert(avatarLib.includes("user-avatars"), "avatar bucket constant");
-  assert(avatarLib.includes("5242880") || avatarLib.includes("5 * 1024 * 1024"), "5MB limit");
-  assert(avatarImage.includes("image/jpeg"), "jpeg allowed");
-  assert(avatarImage.includes("image/png"), "png allowed");
-  assert(avatarImage.includes("image/webp"), "webp allowed");
+  assert(
+    avatarSources.includes("5242880") || avatarSources.includes("5 * 1024 * 1024"),
+    "5MB limit",
+  );
+  assert(avatarSources.includes("image/jpeg"), "jpeg allowed");
+  assert(avatarSources.includes("image/png"), "png allowed");
+  assert(avatarSources.includes("image/webp"), "webp allowed");
   assert(avatarRoute.includes("removeUserAvatarObject"), "avatar replacement cleanup");
   assert(avatarRoute.includes("DELETE"), "avatar deletion endpoint");
 }
