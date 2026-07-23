@@ -1,5 +1,7 @@
 "use client";
 
+import { sendYandexGoal } from "@/lib/analytics/yandex-metrika";
+import { buildPwaYandexMetrikaParams } from "@/lib/analytics/yandex-metrika-params";
 import {
   getOrCreateAnonymousSessionId,
   sanitizePwaAnalyticsPayload,
@@ -52,6 +54,15 @@ export async function trackPwaEvent(
   } catch {
     // Analytics must not break UX
   }
+
+  sendYandexGoal(
+    payload.event_name,
+    buildPwaYandexMetrikaParams({
+      platform: payload.platform,
+      source: payload.source,
+      isStandalone: payload.event_name === "pwa_opened_standalone",
+    }),
+  );
 }
 
 export function trackPwaEventOnce(

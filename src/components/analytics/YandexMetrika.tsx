@@ -5,10 +5,12 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAnalyticsConsentGranted } from "@/lib/analytics/use-analytics-consent";
+import { shouldEnableYandexMetrika } from "@/lib/analytics/yandex-metrika-environment";
 import {
   getYandexMetrikaCounterId,
   initYandexMetrika,
   reachYandexMetrikaHit,
+  resetYandexMetrikaForTests,
 } from "@/lib/analytics/yandex-metrika";
 
 function YandexMetrikaTracker({ scriptReady }: { scriptReady: boolean }) {
@@ -16,11 +18,7 @@ function YandexMetrikaTracker({ scriptReady }: { scriptReady: boolean }) {
   const searchParams = useSearchParams();
   const skipInitialHit = useRef(true);
 
-  const pageUrl = useMemo(() => {
-    const query = searchParams.toString();
-
-    return query ? `${pathname}?${query}` : pathname;
-  }, [pathname, searchParams]);
+  const pagePath = useMemo(() => pathname || "/", [pathname]);
 
   useEffect(() => {
     if (!scriptReady) {
@@ -32,18 +30,31 @@ function YandexMetrikaTracker({ scriptReady }: { scriptReady: boolean }) {
       return;
     }
 
-    reachYandexMetrikaHit(pageUrl);
-  }, [pageUrl, scriptReady]);
+    reachYandexMetrikaHit(pagePath, searchParams);
+  }, [pagePath, scriptReady, searchParams]);
 
   return null;
 }
 
 export default function YandexMetrika() {
+  const pathname = usePathname();
   const counterId = getYandexMetrikaCounterId();
   const consentGranted = useAnalyticsConsentGranted();
   const [scriptReady, setScriptReady] = useState(false);
+  const metrikaEnabled = shouldEnableYandexMetrika({
+    pathname,
+    hostname: typeof window !== "undefined" ? window.location.hostname : null,
+  });
 
-  if (!counterId || !consentGranted) {
+  useEffect(() => {
+    if (!scriptReady || !counterId || !consentGranted || !metrikaEnabled) {
+      return;
+    }
+
+    initYandexMetrika(counterId, pathname);
+  }, [consentGranted, counterId, metrikaEnabled, pathname, scriptReady]);
+
+  if (!counterId || !consentGranted || !metrikaEnabled) {
     return null;
   }
 
@@ -60,7 +71,7 @@ window.ym.l=Date.now();
         src="https://mc.yandex.ru/metrika/tag.js"
         strategy="afterInteractive"
         onLoad={() => {
-          initYandexMetrika(counterId);
+          initYandexMetrika(counterId, pathname);
           setScriptReady(true);
         }}
       />
@@ -78,3 +89,5 @@ window.ym.l=Date.now();
     </>
   );
 }
+
+export { resetYandexMetrikaForTests };

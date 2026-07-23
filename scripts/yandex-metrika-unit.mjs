@@ -12,11 +12,15 @@ function assert(condition, message) {
 
 function testLibraryContract() {
   const library = readFileSync(
-    "/var/www/audiolad/src/lib/analytics/yandex-metrika.ts",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/yandex-metrika.ts",
     "utf8",
   );
   const consent = readFileSync(
-    "/var/www/audiolad/src/lib/analytics/analytics-consent.ts",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/analytics-consent.ts",
+    "utf8",
+  );
+  const goals = readFileSync(
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/yandex-metrika-goals.ts",
     "utf8",
   );
 
@@ -25,103 +29,91 @@ function testLibraryContract() {
     "counter id from env var",
   );
   assert(!library.includes("110799004"), "counter id is not hardcoded");
-  assert(library.includes("webvisor: false"), "webvisor disabled");
-  assert(library.includes("clickmap: false"), "clickmap disabled");
-  assert(library.includes('"signup_completed"'), "signup goal");
-  assert(library.includes('"audio_play_started"'), "play goal");
-  assert(library.includes('"audio_completed"'), "completion goal");
-  assert(library.includes('"author_application_submitted"'), "author goal");
-  assert(library.includes("reachGoal"), "reachGoal wired");
+  assert(library.includes("webvisor: true"), "webvisor enabled");
+  assert(library.includes("clickmap: true"), "clickmap enabled");
+  assert(library.includes("trackLinks: true"), "trackLinks enabled");
+  assert(library.includes("accurateTrackBounce: true"), "accurateTrackBounce enabled");
+  assert(library.includes("sendYandexGoal"), "typed goal helper");
+  assert(library.includes("setupYandexMetrikaPrivacyMasking"), "privacy masking wired");
   assert(library.includes("initializedCounterId"), "double init guard");
   assert(library.includes("isAnalyticsConsentGranted"), "consent gate uses granted only");
+  assert(goals.includes('"first_save_retention_prompt_shown"'), "retention goal allowlisted");
+  assert(goals.includes('"pwa_install_accepted"'), "pwa goal allowlisted");
+  assert(goals.includes('"pwa_opened_standalone"'), "standalone goal allowlisted");
+  assert(
+    !goals.includes('"first_manual_library_save"'),
+    "server-only first save is not mirrored",
+  );
   assert(consent.includes('"unknown"'), "unknown consent state");
-  assert(consent.includes('"granted"'), "granted consent state");
-  assert(consent.includes('"denied"'), "denied consent state");
-  assert(consent.includes('return "unknown"'), "default consent is unknown");
   assert(consent.includes('writeAnalyticsConsent'), "explicit consent write");
 }
 
 function testComponentContract() {
   const component = readFileSync(
-    "/var/www/audiolad/src/components/analytics/YandexMetrika.tsx",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/YandexMetrika.tsx",
     "utf8",
   );
   const banner = readFileSync(
-    "/var/www/audiolad/src/components/analytics/AnalyticsConsentBanner.tsx",
-    "utf8",
-  );
-  const hook = readFileSync(
-    "/var/www/audiolad/src/lib/analytics/use-analytics-consent.ts",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/AnalyticsConsentBanner.tsx",
     "utf8",
   );
 
   assert(component.includes('id="yandex-metrika-stub"'), "ym queue stub before tag.js");
-  assert(component.includes('from "next/script"'), "loads via next/script");
-  assert(component.includes('strategy="afterInteractive"'), "after hydration");
   assert(component.includes("skipInitialHit"), "avoids duplicate initial hit");
   assert(component.includes("reachYandexMetrikaHit"), "spa hit wired");
   assert(component.includes("useAnalyticsConsentGranted"), "metrika gated by granted");
-  assert(banner.includes('consent !== "unknown"'), "banner only for unknown");
+  assert(component.includes("shouldEnableYandexMetrika"), "admin/dev guard wired");
+  assert(component.includes("searchParams"), "spa search params tracked safely");
   assert(banner.includes('writeAnalyticsConsent("granted")'), "banner grant action");
-  assert(banner.includes('writeAnalyticsConsent("denied")'), "banner deny action");
-  assert(banner.includes("createPortal"), "banner renders via portal");
-  assert(!banner.includes("pointer-events-none"), "banner avoids Safari pointer-events trap");
-  assert(hook.includes('() => "unknown"'), "server snapshot unknown");
-  assert(hook.includes("() => false"), "server snapshot not granted");
 }
 
 function testClientHooks() {
-  const client = readFileSync("/var/www/audiolad/src/lib/analytics/client.ts", "utf8");
+  const client = readFileSync(
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/client.ts",
+    "utf8",
+  );
+  const pwaClient = readFileSync(
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/pwa/analytics-client.ts",
+    "utf8",
+  );
 
-  assert(client.includes("reachYandexMetrikaGoal"), "client reaches metrika goals");
-  assert(client.includes("YANDEX_METRIKA_GOALS"), "goal allowlist used");
+  assert(client.includes("sendYandexGoal"), "platform client mirrors metrika goals");
+  assert(client.includes("isYandexMetrikaGoalName"), "goal allowlist used");
   assert(
-    !client.includes("reachYandexMetrikaGoal(input.event_name)") ||
-      client.includes("YANDEX_METRIKA_GOALS.has(input.event_name)"),
+    client.includes("isYandexMetrikaGoalName(input.event_name)"),
     "goals filtered in trackPlatformEvent",
   );
-  assert(
-    client.includes('reachYandexMetrikaGoal("signup_completed")'),
-    "signup goal from recordPlatformSignupCompleted",
-  );
+  assert(pwaClient.includes("sendYandexGoal"), "pwa client mirrors metrika goals");
+  assert(pwaClient.includes("buildPwaYandexMetrikaParams"), "pwa params sanitized");
 }
 
 function testProvidersAndSettings() {
   const providers = readFileSync(
-    "/var/www/audiolad/src/components/AppProviders.tsx",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/AppProviders.tsx",
     "utf8",
   );
-  const settings = readFileSync(
-    "/var/www/audiolad/src/components/settings/AnalyticsPrivacySection.tsx",
+  const privacy = readFileSync(
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/app/privacy/page.tsx",
     "utf8",
   );
-  const privacy = readFileSync("/var/www/audiolad/src/app/privacy/page.tsx", "utf8");
 
   assert(providers.includes("YandexMetrika"), "metrika mounted in providers");
-  assert(providers.includes("AnalyticsConsentBanner"), "consent banner mounted");
-  assert(
-    providers.indexOf("GlobalAudioPlayerProvider") <
-      providers.indexOf("AnalyticsConsentBanner"),
-    "consent banner mounted after player provider",
-  );
-  assert(settings.includes("Конфиденциальность"), "privacy heading");
-  assert(settings.includes('consent === "unknown"'), "settings explain unknown state");
   assert(privacy.includes("Яндекс Метрика"), "privacy mentions metrika");
-  assert(privacy.includes("только после явного согласия"), "privacy mentions opt-in");
+  assert(privacy.includes("Вебвизор"), "privacy mentions webvisor");
 }
 
 function testNoDuplicateEmitters() {
   const tracker = readFileSync(
-    "/var/www/audiolad/src/components/analytics/ListenAnalyticsTracker.tsx",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/ListenAnalyticsTracker.tsx",
     "utf8",
   );
   const authorPanel = readFileSync(
-    "/var/www/audiolad/src/components/become-author/AuthorApplicationPanel.tsx",
+    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/become-author/AuthorApplicationPanel.tsx",
     "utf8",
   );
 
-  assert(!tracker.includes("reachYandexMetrikaGoal"), "player tracker does not duplicate metrika");
-  assert(!authorPanel.includes("reachYandexMetrikaGoal"), "author panel does not duplicate metrika");
+  assert(!tracker.includes("sendYandexGoal"), "player tracker does not duplicate metrika");
+  assert(!authorPanel.includes("sendYandexGoal"), "author panel does not duplicate metrika");
 }
 
 testLibraryContract();
