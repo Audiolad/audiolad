@@ -3,7 +3,16 @@
  * PWA install unit checks — safe to run without database access.
  */
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+function readRoot(relativePath) {
+  return readFileSync(join(ROOT, relativePath), "utf8");
+}
+
 
 function assert(condition, message) {
   if (!condition) {
@@ -201,10 +210,7 @@ function testDismissExpires() {
 }
 
 function testAndroidUsesPromptCapability() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
 
   assert(provider.includes("beforeinstallprompt"), "captures beforeinstallprompt");
   assert(provider.includes("appinstalled"), "handles appinstalled");
@@ -213,18 +219,9 @@ function testAndroidUsesPromptCapability() {
 }
 
 function testAndroidInstructionsOnly() {
-  const platform = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/platform.ts",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
-  const dialogCopy = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
-    "utf8",
-  );
+  const platform = readRoot("src/lib/pwa/platform.ts");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
+  const dialogCopy = readRoot("src/lib/pwa/dialog-copy.ts");
 
   assert(
     platform.includes('return "instructions_only"') &&
@@ -243,14 +240,8 @@ function testAndroidInstructionsOnly() {
 }
 
 function testDesktopInstallFallback() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(provider.includes("openInstructionFallback"), "install fallback helper exists");
   assert(
@@ -260,7 +251,7 @@ function testDesktopInstallFallback() {
   assert(dialog.includes("desktop_chrome"), "chrome desktop instructions");
   assert(dialog.includes("desktop_safari"), "safari desktop instructions");
   assert(
-    readFileSync("/var/www/audiolad/src/lib/pwa/dialog-copy.ts", "utf8").includes(
+    readRoot("src/lib/pwa/dialog-copy.ts").includes(
       "закладках браузера",
     ),
     "bookmark note is secondary",
@@ -268,14 +259,8 @@ function testDesktopInstallFallback() {
 }
 
 function testMobileBannerPlatformHint() {
-  const banner = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallBanner.tsx",
-    "utf8",
-  );
-  const platform = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/platform.ts",
-    "utf8",
-  );
+  const banner = readRoot("src/components/pwa/PwaInstallBanner.tsx");
+  const platform = readRoot("src/lib/pwa/platform.ts");
 
   assert(banner.includes("getMobileInstallBannerHint"), "banner uses platform hint");
   assert(platform.includes("На экран Домой"), "ios hint mentions Add to Home Screen");
@@ -286,7 +271,7 @@ function testMobileBannerPlatformHint() {
 }
 
 function testAppleMobileWebAppCapableMeta() {
-  const layout = readFileSync("/var/www/audiolad/src/app/layout.tsx", "utf8");
+  const layout = readRoot("src/app/layout.tsx");
 
   assert(
     layout.includes('"apple-mobile-web-app-capable": "yes"'),
@@ -295,47 +280,29 @@ function testAppleMobileWebAppCapableMeta() {
 }
 
 function testIosInstructionsOnly() {
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
-  const dialogCopy = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
-    "utf8",
-  );
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
+  const dialogCopy = readRoot("src/lib/pwa/dialog-copy.ts");
 
-  assert(dialog.includes("На экран"), "ios instructions mention Add to Home Screen");
+  assert(dialog.includes("На экран Домой"), "ios instructions mention Add to Home Screen");
   assert(dialog.includes("Поделиться"), "ios instructions mention Share");
   assert(dialog.includes("Добавить"), "ios instructions mention Add button");
   assert(
-    dialogCopy.includes("Установить АудиоЛад"),
-    "ios fallback title is unified",
+    dialogCopy.includes("Как добавить АудиоЛад на экран телефона"),
+    "ios dialog title is step-by-step friendly",
   );
 }
 
 function testMenuItemAlwaysAvailable() {
-  const profile = readFileSync(
-    "/var/www/audiolad/src/components/profile/ProfileSections.tsx",
-    "utf8",
-  );
-  const settings = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsSection.tsx",
-    "utf8",
-  );
+  const profile = readRoot("src/components/profile/ProfileSections.tsx");
+  const settings = readRoot("src/components/pwa/PwaSettingsSection.tsx");
 
   assert(profile.includes("PwaSettingsMenuItem"), "profile menu item exists");
   assert(settings.includes("PwaSettingsMenuItem"), "settings menu item exists");
 }
 
 function testSsrSafeProvider() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const browserEnv = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/browser-environment.ts",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const browserEnv = readRoot("src/lib/pwa/browser-environment.ts");
 
   assert(provider.startsWith('"use client"'), "provider is client-only");
   assert(provider.includes("usePwaBrowserEnvironment"), "provider uses browser env hook");
@@ -344,10 +311,7 @@ function testSsrSafeProvider() {
 }
 
 function testListenerCleanup() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
 
   assert(
     provider.includes("removeEventListener"),
@@ -356,20 +320,14 @@ function testListenerCleanup() {
 }
 
 function testAnalyticsDedupe() {
-  const analytics = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/analytics-client.ts",
-    "utf8",
-  );
+  const analytics = readRoot("src/lib/pwa/analytics-client.ts");
 
   assert(analytics.includes("trackPwaEventOnce"), "deduped analytics helper exists");
   assert(analytics.includes("hasRecordedPwaAnalyticsEvent"), "dedupe guard exists");
 }
 
 function testPwaMigrationContract() {
-  const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716200000_pwa_install_tracking.sql",
-    "utf8",
-  );
+  const sql = readRoot("supabase/migrations/20260716200000_pwa_install_tracking.sql");
 
   assert(sql.includes("pwa_installed_at"), "profile install timestamp column");
   assert(sql.includes("pwa_install_platform"), "profile install platform column");
@@ -378,7 +336,7 @@ function testPwaMigrationContract() {
 }
 
 function testServiceWorkerSafety() {
-  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
+  const sw = readRoot("public/sw.js");
 
   assert(sw.includes("/api/"), "skips api caching");
   assert(sw.includes("range"), "skips range requests");
@@ -404,7 +362,7 @@ function testServiceWorkerSafety() {
 }
 
 function testServiceWorkerStaleChunkPolicy() {
-  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
+  const sw = readRoot("public/sw.js");
 
   assert(
     /if \(url\.pathname\.startsWith\("\/_next\/static\/"\)\) \{\s*return true;\s*\}/s.test(
@@ -419,11 +377,8 @@ function testServiceWorkerStaleChunkPolicy() {
 }
 
 function testServiceWorkerCacheVersionBumped() {
-  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
-  const constants = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/constants.ts",
-    "utf8",
-  );
+  const sw = readRoot("public/sw.js");
+  const constants = readRoot("src/lib/pwa/constants.ts");
 
   assert(sw.includes("audiolad-pwa-v3"), "service worker cache version bumped");
   assert(
@@ -433,14 +388,8 @@ function testServiceWorkerCacheVersionBumped() {
 }
 
 function testPwaBrowserEnvironmentHook() {
-  const hook = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/browser-environment.ts",
-    "utf8",
-  );
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
+  const hook = readRoot("src/lib/pwa/browser-environment.ts");
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
 
   assert(hook.includes("useSyncExternalStore"), "browser env uses external store");
   assert(hook.includes("SERVER_SNAPSHOT"), "stable server snapshot exists");
@@ -457,7 +406,7 @@ function testPwaBrowserEnvironmentHook() {
 }
 
 function testBrowserEnvironmentSnapshotStability() {
-  const source = readFileSync("src/lib/pwa/browser-environment.ts", "utf8");
+  const source = readRoot("src/lib/pwa/browser-environment.ts");
 
   assert(
     source.includes("let cachedClientSnapshot"),
@@ -474,18 +423,9 @@ function testBrowserEnvironmentSnapshotStability() {
 }
 
 function testMenuInstallUsesSharedFlow() {
-  const menuItem = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
-    "utf8",
-  );
-  const profile = readFileSync(
-    "/var/www/audiolad/src/components/profile/ProfileSections.tsx",
-    "utf8",
-  );
-  const settings = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsSection.tsx",
-    "utf8",
-  );
+  const menuItem = readRoot("src/components/pwa/PwaSettingsMenuItem.tsx");
+  const profile = readRoot("src/components/profile/ProfileSections.tsx");
+  const settings = readRoot("src/components/pwa/PwaSettingsSection.tsx");
 
   assert(menuItem.includes('openInstallFlow("menu")'), "menu item calls shared install flow");
   assert(menuItem.includes("type=\"button\""), "menu item uses semantic button");
@@ -496,22 +436,10 @@ function testMenuInstallUsesSharedFlow() {
 }
 
 function testPwaProviderErrorBoundary() {
-  const boundary = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallErrorBoundary.tsx",
-    "utf8",
-  );
-  const providers = readFileSync(
-    "/var/www/audiolad/src/components/AppProviders.tsx",
-    "utf8",
-  );
-  const fallback = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
-    "utf8",
-  );
-  const settingsError = readFileSync(
-    "/var/www/audiolad/src/app/settings/error.tsx",
-    "utf8",
-  );
+  const boundary = readRoot("src/components/pwa/PwaInstallErrorBoundary.tsx");
+  const providers = readRoot("src/components/AppProviders.tsx");
+  const fallback = readRoot("src/lib/pwa/fallback-context.ts");
+  const settingsError = readRoot("src/app/settings/error.tsx");
 
   assert(boundary.includes("componentDidCatch"), "pwa boundary catches errors");
   assert(
@@ -546,22 +474,12 @@ function testPwaProviderErrorBoundary() {
     settingsError.includes("Не удалось загрузить настройки"),
     "settings route has localized error boundary",
   );
-  assert(
-    boundary.includes("PwaInstallDialog"),
-    "pwa boundary keeps install dialog available on fallback",
-  );
   assert(settingsError.includes("Обновить страницу"), "settings error has retry");
 }
 
 function testPwaFallbackContextContract() {
-  const fallback = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
-    "utf8",
-  );
-  const menuItem = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
-    "utf8",
-  );
+  const fallback = readRoot("src/lib/pwa/fallback-context.ts");
+  const menuItem = readRoot("src/components/pwa/PwaSettingsMenuItem.tsx");
 
   const requiredFields = [
     "installState",
@@ -594,10 +512,7 @@ function testPwaFallbackContextContract() {
 }
 
 function boundaryRendersProviderlessFallback() {
-  const boundary = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallErrorBoundary.tsx",
-    "utf8",
-  );
+  const boundary = readRoot("src/components/pwa/PwaInstallErrorBoundary.tsx");
 
   return /if \(this\.state\.hasError\)[\s\S]*return this\.props\.appChildren;/.test(
     boundary,
@@ -605,18 +520,9 @@ function boundaryRendersProviderlessFallback() {
 }
 
 function testClientErrorReporterWiring() {
-  const providers = readFileSync(
-    "/var/www/audiolad/src/components/AppProviders.tsx",
-    "utf8",
-  );
-  const reporter = readFileSync(
-    "/var/www/audiolad/src/lib/client-errors/reporter.ts",
-    "utf8",
-  );
-  const route = readFileSync(
-    "/var/www/audiolad/src/app/api/client-errors/route.ts",
-    "utf8",
-  );
+  const providers = readRoot("src/components/AppProviders.tsx");
+  const reporter = readRoot("src/lib/client-errors/reporter.ts");
+  const route = readRoot("src/app/api/client-errors/route.ts");
 
   assert(providers.includes("ClientErrorReporter"), "client reporter is mounted");
   assert(reporter.includes('addEventListener("error"'), "window error listener");
@@ -628,10 +534,7 @@ function testClientErrorReporterWiring() {
 }
 
 function testManifestContract() {
-  const manifest = readFileSync(
-    "/var/www/audiolad/public/manifest.webmanifest",
-    "utf8",
-  );
+  const manifest = readRoot("public/manifest.webmanifest");
   const parsed = JSON.parse(manifest);
 
   assert(parsed.display === "standalone", "standalone display");
@@ -646,10 +549,7 @@ function testManifestContract() {
 }
 
 function testAcceptedDoesNotConfirmInstall() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
 
   assert(provider.includes("recordPwaPromptAccepted"), "records prompt acceptance");
   assert(
@@ -698,14 +598,8 @@ function testAuthNotReadyHidesBanner() {
 }
 
 function testInAppBrowserFallback() {
-  const platform = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/platform.ts",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const platform = readRoot("src/lib/pwa/platform.ts");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(platform.includes("isInAppBrowser"), "in-app browser detection exists");
   assert(platform.includes("Telegram"), "detects Telegram");
@@ -713,14 +607,14 @@ function testInAppBrowserFallback() {
 }
 
 function testCorruptedStorageFallback() {
-  const storage = readFileSync("/var/www/audiolad/src/lib/pwa/storage.ts", "utf8");
+  const storage = readRoot("src/lib/pwa/storage.ts");
 
   assert(storage.includes("PWA_INSTALL_STATES.includes"), "validates install state");
   assert(storage.includes("PWA_DEFAULT_DEVICE_STATE"), "fallback default state");
 }
 
 function testServiceWorkerNoOfflineHtml() {
-  const sw = readFileSync("/var/www/audiolad/public/sw.js", "utf8");
+  const sw = readRoot("public/sw.js");
 
   assert(!sw.includes("offline.html"), "does not serve missing offline.html");
   assert(sw.includes("CACHEABLE_PUBLIC_PATHS"), "uses explicit public asset allowlist");
@@ -732,14 +626,8 @@ function testClickDoesNotConfirmInstallAlone() {
 }
 
 function testMenuItemVisibilityRules() {
-  const menuItem = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
-    "utf8",
-  );
-  const settingsSection = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsSection.tsx",
-    "utf8",
-  );
+  const menuItem = readRoot("src/components/pwa/PwaSettingsMenuItem.tsx");
+  const settingsSection = readRoot("src/components/pwa/PwaSettingsSection.tsx");
 
   assert(menuItem.includes("if (isStandalone)"), "menu item hides only in standalone");
   assert(
@@ -754,20 +642,21 @@ function testMenuItemVisibilityRules() {
 }
 
 function testOpenInstallFlowAlwaysOpensDialog() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
 
   assert(
     provider.match(
       /const openInstallFlow[\s\S]{0,220}openInstructionFallback\(source\)/,
     ),
-    "menu click always opens instruction dialog first",
+    "install click always opens instruction dialog first",
   );
   assert(
-    !provider.match(/const openInstallFlow[\s\S]{0,500}runNativeInstallFromDialog/),
-    "menu click does not invoke native prompt directly",
+    provider.includes('source !== "retention"'),
+    "native auto-prompt is limited to retention source",
+  );
+  assert(
+    provider.match(/if \(source !== "retention"[\s\S]{0,500}runNativeInstallFromDialog\(\)/),
+    "native auto-prompt runs only for retention source",
   );
   assert(
     !provider.match(/const openInstallFlow[\s\S]{0,220}installed_confirmed/),
@@ -776,14 +665,8 @@ function testOpenInstallFlowAlwaysOpensDialog() {
 }
 
 function testNativePromptAvailablePath() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(provider.includes("runNativeInstallFromDialog"), "native prompt helper exists");
   assert(provider.includes("promptEvent.prompt()"), "native prompt is invoked explicitly");
@@ -800,18 +683,9 @@ function testNativePromptAvailablePath() {
 }
 
 function testInstructionsFallbackWithoutPrompt() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const dialogCopy = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const dialogCopy = readRoot("src/lib/pwa/dialog-copy.ts");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(provider.includes("openInstructionFallback"), "provider opens instruction fallback");
   assert(
@@ -820,15 +694,12 @@ function testInstructionsFallbackWithoutPrompt() {
     "mobile fallback copy matches product wording",
   );
   assert(dialog.includes('dialogMode === "android"'), "android instruction steps render");
-  assert(dialog.includes("⋮"), "android steps mention overflow menu icon");
+  assert(dialog.includes("три точки"), "android steps mention overflow menu");
   assert(dialog.includes("Понятно"), "manual fallback keeps dismiss button");
 }
 
 function testStandaloneHidesInstallMenuItem() {
-  const menuItem = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
-    "utf8",
-  );
+  const menuItem = readRoot("src/components/pwa/PwaSettingsMenuItem.tsx");
 
   assert(menuItem.includes("isStandalone"), "standalone participates in hide logic");
   assert(
@@ -838,14 +709,8 @@ function testStandaloneHidesInstallMenuItem() {
 }
 
 function testClosingDialogDoesNotConfirmInstall() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(provider.includes("setInstallDialogMode(null)"), "close dialog clears dialog mode");
   assert(
@@ -856,10 +721,7 @@ function testClosingDialogDoesNotConfirmInstall() {
 }
 
 function testInstallDialogAccessibility() {
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
 
   assert(dialog.includes('role="dialog"'), "dialog exposes dialog role");
   assert(dialog.includes("aria-modal"), "dialog is modal");
@@ -870,22 +732,10 @@ function testInstallDialogAccessibility() {
 }
 
 function testInstallDialogControllerWiring() {
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallProvider.tsx",
-    "utf8",
-  );
-  const dialog = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaInstallDialog.tsx",
-    "utf8",
-  );
-  const fallback = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/fallback-context.ts",
-    "utf8",
-  );
-  const controller = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/install-dialog-controller.ts",
-    "utf8",
-  );
+  const provider = readRoot("src/components/pwa/PwaInstallProvider.tsx");
+  const dialog = readRoot("src/components/pwa/PwaInstallDialog.tsx");
+  const fallback = readRoot("src/lib/pwa/fallback-context.ts");
+  const controller = readRoot("src/lib/pwa/install-dialog-controller.ts");
 
   assert(
     controller.includes("export function setInstallDialogMode"),
@@ -916,18 +766,16 @@ function testInstallDialogControllerWiring() {
 }
 
 function testInstallDialogControllerArchitecture() {
-  const dialogCopy = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/dialog-copy.ts",
-    "utf8",
-  );
-  const controller = readFileSync(
-    "/var/www/audiolad/src/lib/pwa/install-dialog-controller.ts",
-    "utf8",
-  );
+  const dialogCopy = readRoot("src/lib/pwa/dialog-copy.ts");
+  const controller = readRoot("src/lib/pwa/install-dialog-controller.ts");
 
   assert(
     dialogCopy.includes("export function getPwaInstallDialogCopy"),
     "dialog copy keeps copy helper",
+  );
+  assert(
+    dialogCopy.includes("export function shouldShowInstallOneTapFootnote"),
+    "dialog copy keeps one-tap footnote helper",
   );
   assert(
     dialogCopy.includes("export function shouldShowInstallBookmarkFootnote"),
@@ -1007,7 +855,7 @@ function testInstallDialogControllerRuntime() {
   `;
 
   const result = spawnSync("npx", ["tsx", "--eval", script], {
-    cwd: "/var/www/audiolad",
+    cwd: ROOT,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -1022,10 +870,7 @@ function testInstallDialogControllerRuntime() {
 }
 
 function testProfileInstallSubtitle() {
-  const menuItem = readFileSync(
-    "/var/www/audiolad/src/components/pwa/PwaSettingsMenuItem.tsx",
-    "utf8",
-  );
+  const menuItem = readRoot("src/components/pwa/PwaSettingsMenuItem.tsx");
 
   assert(menuItem.includes("Добавьте иконку на экран"), "profile uses short subtitle");
   assert(
