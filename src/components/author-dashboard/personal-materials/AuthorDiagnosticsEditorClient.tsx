@@ -702,6 +702,8 @@ export default function AuthorDiagnosticsEditorClient({
             clientLastName={material.clientLastName}
             publicUrl={oneTimeAccessUrl}
             messageTemplate={clientMessageTemplate}
+            hasAudio={material.hasAudio}
+            hasPdf={material.hasPdf}
           />
         </div>
       ) : null}

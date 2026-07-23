@@ -13,6 +13,8 @@ type AuthorDiagnosticsClientMessagePanelProps = {
   clientLastName: string | null;
   publicUrl: string;
   messageTemplate: string | null;
+  hasAudio: boolean;
+  hasPdf: boolean;
 };
 
 export default function AuthorDiagnosticsClientMessagePanel({
@@ -20,6 +22,8 @@ export default function AuthorDiagnosticsClientMessagePanel({
   clientLastName,
   publicUrl,
   messageTemplate,
+  hasAudio,
+  hasPdf,
 }: AuthorDiagnosticsClientMessagePanelProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
@@ -28,8 +32,10 @@ export default function AuthorDiagnosticsClientMessagePanel({
       renderClientMessageTemplate(messageTemplate, {
         clientName: resolveClientNameForMessage(clientFirstName, clientLastName),
         publicUrl,
+        hasAudio,
+        hasPdf,
       }),
-    [clientFirstName, clientLastName, messageTemplate, publicUrl],
+    [clientFirstName, clientLastName, messageTemplate, publicUrl, hasAudio, hasPdf],
   );
 
   async function handleCopyMessage() {

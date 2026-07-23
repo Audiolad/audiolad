@@ -1,18 +1,45 @@
-export const CLIENT_MESSAGE_TEMPLATE_VARIABLES = ["{clientName}", "{publicUrl}"] as const;
+export const CLIENT_MESSAGE_TEMPLATE_VARIABLES = [
+  "{clientName}",
+  "{publicUrl}",
+  "{contentAction}",
+] as const;
 
 export const DEFAULT_CLIENT_MESSAGE_TEMPLATE = `{clientName}, ваша диагностика готова:
 {publicUrl}
 
-После прослушивания её можно сохранить в личном кабинете.
+После {contentAction} её можно сохранить в личном кабинете.
 
 Ждём обратную связь 🙏`;
 
 export const CLIENT_MESSAGE_TEMPLATE_MAX_LENGTH = 4000;
 
+export type ClientMessageContent = {
+  hasAudio: boolean;
+  hasPdf: boolean;
+};
+
 export type ClientMessageTemplateContext = {
   clientName: string;
   publicUrl: string;
+  hasAudio?: boolean;
+  hasPdf?: boolean;
 };
+
+export function resolveContentActionForMessage(content: ClientMessageContent): string {
+  if (content.hasAudio && content.hasPdf) {
+    return "прослушивания и просмотра";
+  }
+
+  if (content.hasAudio) {
+    return "прослушивания";
+  }
+
+  if (content.hasPdf) {
+    return "просмотра";
+  }
+
+  return "ознакомления";
+}
 
 export function resolveClientNameForMessage(
   clientFirstName: string,
@@ -67,10 +94,15 @@ export function renderClientMessageTemplate(
   context: ClientMessageTemplateContext,
 ): string {
   const resolvedTemplate = resolveClientMessageTemplate(template);
+  const contentAction = resolveContentActionForMessage({
+    hasAudio: context.hasAudio ?? false,
+    hasPdf: context.hasPdf ?? false,
+  });
 
   return resolvedTemplate
     .split("{clientName}").join(context.clientName)
-    .split("{publicUrl}").join(context.publicUrl);
+    .split("{publicUrl}").join(context.publicUrl)
+    .split("{contentAction}").join(contentAction);
 }
 
 export function prefersReducedMotion(): boolean {

@@ -112,10 +112,26 @@ export default function AuthorDiagnosticsMessageTemplateEditor({
     }
   }
 
-  function handleResetToDefault() {
-    setDraftTemplate(DEFAULT_CLIENT_MESSAGE_TEMPLATE);
-    setValidationError(null);
+  async function handleRestoreDefault() {
+    setSaving(true);
+    setSaveError(null);
     setSavedNotice(null);
+    setValidationError(null);
+
+    try {
+      const settings = await updateAuthorPersonalMaterialSettings(authorId, {
+        clientMessageTemplate: null,
+      });
+
+      setSavedTemplate(settings.clientMessageTemplate);
+      setDraftTemplate(settings.clientMessageTemplate ?? DEFAULT_CLIENT_MESSAGE_TEMPLATE);
+      onTemplateChange?.(settings.clientMessageTemplate);
+      setSavedNotice("Стандартный шаблон восстановлен");
+    } catch (error) {
+      setSaveError(getPersonalMaterialErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const isDirty =
@@ -148,7 +164,7 @@ export default function AuthorDiagnosticsMessageTemplateEditor({
                 Шаблон сообщения клиенту
               </label>
               <p className="mt-1 text-sm text-[#7d70a2]">
-                Доступные переменные: {"{clientName}"}, {"{publicUrl}"}
+                Доступные переменные: {"{clientName}"}, {"{publicUrl}"}, {"{contentAction}"}
               </p>
               <textarea
                 id="client-message-template"
@@ -187,10 +203,10 @@ export default function AuthorDiagnosticsMessageTemplateEditor({
                 <button
                   type="button"
                   disabled={disabled || saving}
-                  onClick={handleResetToDefault}
+                  onClick={() => void handleRestoreDefault()}
                   className="min-h-11 rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
                 >
-                  Стандартный шаблон
+                  Вернуть стандартный шаблон
                 </button>
               </div>
             </>

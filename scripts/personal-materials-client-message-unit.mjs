@@ -9,9 +9,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_CLIENT_MESSAGE_TEMPLATE,
+  normalizeStoredClientMessageTemplate,
   renderClientMessageTemplate,
   resolveClientMessageTemplate,
   resolveClientNameForMessage,
+  resolveContentActionForMessage,
   scrollElementIntoView,
   validateClientMessageTemplate,
 } from "../src/lib/personal-materials/client-message-template.ts";
@@ -58,22 +60,113 @@ function testTemplateSubstitution() {
   const message = renderClientMessageTemplate(null, {
     clientName: "Анна",
     publicUrl: "https://audiolad.ru/d/test-token",
+    hasAudio: true,
+    hasPdf: false,
   });
 
   assert.match(message, /^Анна, ваша диагностика готова:/);
   assert.match(message, /https:\/\/audiolad\.ru\/d\/test-token/);
+  assert.match(message, /После прослушивания её можно сохранить/);
   assert.match(message, /Ждём обратную связь 🙏/);
   assert.equal(resolveClientNameForMessage("Анна", "Иванова"), "Анна");
   assert.equal(resolveClientNameForMessage("", "Иванова"), "Иванова");
+}
+
+function testContentActionVariants() {
+  assert.equal(
+    resolveContentActionForMessage({ hasAudio: true, hasPdf: false }),
+    "прослушивания",
+  );
+  assert.equal(resolveContentActionForMessage({ hasAudio: false, hasPdf: true }), "просмотра");
+  assert.equal(
+    resolveContentActionForMessage({ hasAudio: true, hasPdf: true }),
+    "прослушивания и просмотра",
+  );
+  assert.equal(
+    resolveContentActionForMessage({ hasAudio: false, hasPdf: false }),
+    "ознакомления",
+  );
+
+  const audioMessage = renderClientMessageTemplate(null, {
+    clientName: "Anna",
+    publicUrl: "https://audiolad.ru/d/a",
+    hasAudio: true,
+    hasPdf: false,
+  });
+  assert.match(audioMessage, /После прослушивания её можно сохранить/);
+
+  const pdfMessage = renderClientMessageTemplate(null, {
+    clientName: "Anna",
+    publicUrl: "https://audiolad.ru/d/p",
+    hasAudio: false,
+    hasPdf: true,
+  });
+  assert.match(pdfMessage, /После просмотра её можно сохранить/);
+
+  const bothMessage = renderClientMessageTemplate(null, {
+    clientName: "Anna",
+    publicUrl: "https://audiolad.ru/d/b",
+    hasAudio: true,
+    hasPdf: true,
+  });
+  assert.match(bothMessage, /После прослушивания и просмотра её можно сохранить/);
+
+  const neutralMessage = renderClientMessageTemplate(null, {
+    clientName: "Anna",
+    publicUrl: "https://audiolad.ru/d/n",
+    hasAudio: false,
+    hasPdf: false,
+  });
+  assert.match(neutralMessage, /После ознакомления её можно сохранить/);
+}
+
+function testCustomTemplateWithContentAction() {
+  const custom = "После {contentAction} откройте:\n{publicUrl}";
+  const message = renderClientMessageTemplate(custom, {
+    clientName: "Olga",
+    publicUrl: "https://audiolad.ru/d/new",
+    hasAudio: false,
+    hasPdf: true,
+  });
+
+  assert.equal(message, "После просмотра откройте:\nhttps://audiolad.ru/d/new");
+}
+
+function testLegacyTemplateWithoutContentAction() {
+  const legacy =
+    "{clientName}, ваша диагностика готова:\n{publicUrl}\n\nПосле прослушивания её можно сохранить в личном кабинете.";
+  const message = renderClientMessageTemplate(legacy, {
+    clientName: "Olga",
+    publicUrl: "https://audiolad.ru/d/legacy",
+    hasAudio: false,
+    hasPdf: true,
+  });
+
+  assert.match(message, /После прослушивания её можно сохранить/);
+  assert.doesNotMatch(message, /просмотра/);
+}
+
+function testRestoreDefaultUsesNullFallback() {
+  const templateEditor = read(
+    "src/components/author-dashboard/personal-materials/AuthorDiagnosticsMessageTemplateEditor.tsx",
+  );
+
+  assert.equal(normalizeStoredClientMessageTemplate("   "), null);
+  assert.equal(resolveClientMessageTemplate(null), DEFAULT_CLIENT_MESSAGE_TEMPLATE);
+  assert.match(DEFAULT_CLIENT_MESSAGE_TEMPLATE, /{contentAction}/);
+  assert.match(templateEditor, /clientMessageTemplate: null/);
+  assert.match(templateEditor, /Вернуть стандартный шаблон/);
 }
 
 function testCopyPreservesFormatting() {
   const message = renderClientMessageTemplate(DEFAULT_CLIENT_MESSAGE_TEMPLATE, {
     clientName: "Maria",
     publicUrl: "https://example.test/d/abc",
+    hasAudio: true,
+    hasPdf: false,
   });
 
-  assert.match(message, /\n\nПосле прослушивания/);
+  assert.match(message, /\n\nПосле прослушивания её можно сохранить/);
   assert.match(message, /🙏$/);
   assert.doesNotMatch(message, /^\s+Maria/m, "no leading spaces on lines");
 }
@@ -117,10 +210,14 @@ function testRotateUsesNewUrl() {
   const oldMessage = renderClientMessageTemplate(null, {
     clientName: "Anna",
     publicUrl: oldUrl,
+    hasAudio: true,
+    hasPdf: false,
   });
   const newMessage = renderClientMessageTemplate(null, {
     clientName: "Anna",
     publicUrl: newUrl,
+    hasAudio: true,
+    hasPdf: false,
   });
 
   assert.match(oldMessage, /old-token/);
@@ -173,6 +270,8 @@ function testUiStructure() {
   assert.match(templateEditor, /Настроить шаблон сообщения/);
   assert.match(templateEditor, /Шаблон сообщения клиенту/);
   assert.match(templateEditor, /Доступные переменные/);
+  assert.match(templateEditor, /{contentAction}/);
+  assert.match(templateEditor, /Вернуть стандартный шаблон/);
 }
 
 function testScrollHelper() {
@@ -189,6 +288,10 @@ function testScrollHelper() {
 testLinkBlockPlacement();
 testScrollAfterLinkCreation();
 testTemplateSubstitution();
+testContentActionVariants();
+testCustomTemplateWithContentAction();
+testLegacyTemplateWithoutContentAction();
+testRestoreDefaultUsesNullFallback();
 testCopyPreservesFormatting();
 await testClipboardFallback();
 testCustomTemplateApplied();
