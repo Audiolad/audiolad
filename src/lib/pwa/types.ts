@@ -10,6 +10,8 @@ export interface BeforeInstallPromptEvent extends Event {
 
 export type PwaInstallUiVariant = "mobile" | "desktop";
 
+export type PwaInstallFlowSource = "banner" | "menu" | "retention";
+
 export type PwaInstallDialogMode =
   | "ios"
   | "android"
@@ -39,7 +41,7 @@ export type PwaInstallContextValue = {
   isMenuDialogOpen: boolean;
   hasNativeInstallPrompt: boolean;
   remindLater: () => void;
-  openInstallFlow: (source: "banner" | "menu") => Promise<void>;
+  openInstallFlow: (source: PwaInstallFlowSource) => Promise<void>;
   openMenuInstall: () => void;
   runNativeInstallFromDialog: () => Promise<void>;
   closeDialog: () => void;

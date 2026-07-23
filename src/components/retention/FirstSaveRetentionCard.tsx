@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
+import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 import {
   getCachedAnalyticsSessionId,
   trackPlatformEvent,
@@ -12,7 +13,6 @@ import {
   BOTTOM_NAV_CONTENT_GAP_PX,
   BOTTOM_NAV_MAIN_HEIGHT_PX,
 } from "@/lib/navigation/bottom-nav";
-import { usePwaBrowserEnvironment } from "@/lib/pwa/browser-environment";
 
 type FirstSaveRetentionCardProps = {
   practiceId: string;
@@ -37,7 +37,8 @@ export default function FirstSaveRetentionCard({
   onDismiss,
 }: FirstSaveRetentionCardProps) {
   const pathname = usePathname() ?? "/";
-  const { isStandalone } = usePwaBrowserEnvironment();
+  const { isStandalone, uiVariant, openInstallFlow } = usePwaInstall();
+  const isMobile = uiVariant === "mobile";
   const shownTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -96,8 +97,25 @@ export default function FirstSaveRetentionCard({
     }
   }
 
+  function handleInstallClick(): void {
+    const sessionId = getCachedAnalyticsSessionId();
+
+    if (sessionId) {
+      void trackPlatformEvent({
+        sessionId,
+        event_name: "first_save_retention_prompt_install_clicked",
+        path: pathname,
+        practice_id: practiceId,
+      });
+    }
+
+    void openInstallFlow("retention");
+  }
+
   const bottomOffset =
     "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px))";
+
+  const installButtonLabel = isMobile ? "Добавить на телефон" : "Установить АудиоЛад";
 
   return (
     <aside
@@ -127,10 +145,10 @@ export default function FirstSaveRetentionCard({
           будет ждать вас.
         </p>
 
-        {!isStandalone ? (
+        {!isStandalone && isMobile ? (
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            Чтобы АудиоЛад всегда был под рукой, позже вы сможете добавить его на
-            главный экран телефона.
+            Добавьте АудиоЛад на главный экран телефона – так он всегда будет под
+            рукой.
           </p>
         ) : null}
 
@@ -143,13 +161,15 @@ export default function FirstSaveRetentionCard({
             Открыть мою Аудиотеку
           </Link>
 
-          <button
-            type="button"
-            onClick={trackDismiss}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#dcccf5] px-4 py-2.5 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            Хорошо
-          </button>
+          {!isStandalone ? (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#dcccf5] px-4 py-2.5 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              {installButtonLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </aside>

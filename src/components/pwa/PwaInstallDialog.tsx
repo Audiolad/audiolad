@@ -6,7 +6,9 @@ import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 import {
   getPwaInstallDialogCopy,
   PWA_INSTALL_BOOKMARK_FOOTNOTE,
+  PWA_INSTALL_ONE_TAP_FOOTNOTE,
   shouldShowInstallBookmarkFootnote,
+  shouldShowInstallOneTapFootnote,
 } from "@/lib/pwa/dialog-copy";
 import {
   getInstallDialogMode,
@@ -208,7 +210,7 @@ export default function PwaInstallDialog() {
             </h2>
             <p
               id="pwa-install-dialog-description"
-              className="mt-2 text-sm leading-6 text-[#796ba0]"
+              className="mt-2 text-base leading-7 text-[#796ba0]"
             >
               {description}
             </p>
@@ -228,6 +230,12 @@ export default function PwaInstallDialog() {
           dialogMode={dialogMode}
           onOpenExternalBrowser={openInExternalBrowser}
         />
+
+        {shouldShowInstallOneTapFootnote(dialogMode) ? (
+          <p className="mt-4 text-base leading-7 text-[#5f4a8f]">
+            {PWA_INSTALL_ONE_TAP_FOOTNOTE}
+          </p>
+        ) : null}
 
         {shouldShowInstallBookmarkFootnote(dialogMode) ? (
           <p className="mt-4 text-xs leading-5 text-[#9a8cb8]">
@@ -275,20 +283,25 @@ function InstallDialogInstructions({
   if (dialogMode === "in_app_browser") {
     return (
       <>
-        <ul className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+        <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
           <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-            Нажмите «Поделиться» или «⋯» и выберите «Открыть в Safari» / «Открыть в
-            браузере».
+            <strong className="font-medium">1.</strong> Нажмите три точки или кнопку
+            меню и выберите «Открыть в Safari» или «Открыть в браузере».
           </li>
           <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-            Если пункта нет — скопируйте ссылку и вставьте её в Safari или Chrome.
+            <strong className="font-medium">2.</strong> Если такого пункта нет –
+            скопируйте ссылку и вставьте её в Safari или Chrome.
           </li>
-        </ul>
+          <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+            <strong className="font-medium">3.</strong> После перехода в браузер
+            снова нажмите «Добавить на телефон» или «Установить АудиоЛад».
+          </li>
+        </ol>
 
         <button
           type="button"
           onClick={onOpenExternalBrowser}
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d9c6f2] bg-[#faf6ff] px-5 py-2.5 text-base font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
           <ExternalLinkIcon />
           Открыть в браузере
@@ -299,20 +312,29 @@ function InstallDialogInstructions({
 
   if (dialogMode === "ios") {
     return (
-      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+      <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="flex items-start gap-3 rounded-[18px] bg-[#faf6ff] px-4 py-3">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
             <ShareIcon />
           </span>
           <span>
-            <strong className="font-medium">1.</strong> Нажмите кнопку «Поделиться».
+            <strong className="font-medium">1.</strong> Нажмите кнопку «Поделиться» внизу
+            экрана. Она выглядит как квадрат со стрелкой вверх.
           </span>
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">2.</strong> Выберите «На экран &quot;Домой&quot;».
+          <strong className="font-medium">2.</strong> Прокрутите открывшееся меню вниз.
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">3.</strong> Нажмите «Добавить».
+          <strong className="font-medium">3.</strong> Нажмите «На экран Домой».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">4.</strong> Нажмите «Добавить» в правом верхнем
+          углу.
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">5.</strong> На экране телефона появится значок
+          АудиоЛада.
         </li>
       </ol>
     );
@@ -320,17 +342,21 @@ function InstallDialogInstructions({
 
   if (dialogMode === "android") {
     return (
-      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+      <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">1.</strong> Откройте меню браузера — значок ⋮
-          или ≡.
+          <strong className="font-medium">1.</strong> Нажмите три точки в правом верхнем
+          углу браузера.
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">2.</strong> Выберите «Установить приложение»
-          или «Добавить на главный экран».
+          <strong className="font-medium">2.</strong> Выберите «Установить приложение» или
+          «Добавить на главный экран».
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">3.</strong> Подтвердите добавление иконки.
+          <strong className="font-medium">3.</strong> Нажмите «Установить» или «Добавить».
+        </li>
+        <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
+          <strong className="font-medium">4.</strong> На главном экране появится значок
+          АудиоЛада.
         </li>
       </ol>
     );
@@ -338,9 +364,9 @@ function InstallDialogInstructions({
 
   if (dialogMode === "desktop_chrome" || dialogMode === "desktop_edge") {
     return (
-      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+      <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
-          <strong className="font-medium">1.</strong> Откройте меню браузера — значок ⋮
+          <strong className="font-medium">1.</strong> Откройте меню браузера – значок ⋮
           или ≡.
         </li>
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
@@ -356,7 +382,7 @@ function InstallDialogInstructions({
 
   if (dialogMode === "desktop_safari") {
     return (
-      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+      <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
           <strong className="font-medium">1.</strong> В меню «Файл» выберите «Добавить в
           Dock».
@@ -370,7 +396,7 @@ function InstallDialogInstructions({
 
   if (dialogMode === "desktop_bookmark") {
     return (
-      <ol className="mt-5 space-y-3 text-sm leading-6 text-[#25135c]">
+      <ol className="mt-5 space-y-3 text-base leading-7 text-[#25135c]">
         <li className="rounded-[18px] bg-[#faf6ff] px-4 py-3">
           <strong className="font-medium">1.</strong> Откройте АудиоЛад в Chrome или Edge.
         </li>

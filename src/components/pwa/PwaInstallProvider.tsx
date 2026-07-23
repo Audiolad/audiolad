@@ -50,6 +50,7 @@ import type {
   BeforeInstallPromptEvent,
   PwaInstallContextValue,
   PwaInstallDialogMode,
+  PwaInstallFlowSource,
 } from "@/lib/pwa/types";
 import {
   usePwaBannerShownThisSession,
@@ -90,6 +91,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   const pathname = usePathname() ?? "/";
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const analyticsSessionRef = useRef("pwa-session");
+  const installSourceRef = useRef<PwaInstallFlowSource>("banner");
   const standaloneTrackedRef = useRef(false);
   const bannerAnalyticsTrackedRef = useRef(false);
 
@@ -251,7 +253,8 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   }, [platform]);
 
   const openInstructions = useCallback(
-    (mode: PwaInstallDialogMode, source: "banner" | "menu") => {
+    (mode: PwaInstallDialogMode, source: PwaInstallFlowSource) => {
+      installSourceRef.current = source;
       setInstallDialogMode(mode);
       setIsMenuDialogOpen(source === "menu");
 
@@ -280,7 +283,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
   );
 
   const openInstructionFallback = useCallback(
-    (source: "banner" | "menu") => {
+    (source: PwaInstallFlowSource) => {
       openInstructions(
         resolveInstallDialogMode({
           userAgent: browserEnvironment.userAgent,
@@ -300,7 +303,7 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       return;
     }
 
-    const source: "banner" | "menu" = isMenuDialogOpen ? "menu" : "banner";
+    const source = installSourceRef.current;
 
     trackPwaEventOnce(
       `${analyticsSessionRef.current}:install-click:${source}`,
@@ -371,17 +374,43 @@ export default function PwaInstallProvider({ children }: PwaInstallProviderProps
       "pwa_install_dismissed",
       { platform, source },
     );
-  }, [isMenuDialogOpen, platform]);
+  }, [platform]);
+
+  function canAutoRunNativeInstall(mode: PwaInstallDialogMode): boolean {
+    return (
+      mode === "android" ||
+      mode === "desktop_chrome" ||
+      mode === "desktop_edge"
+    );
+  }
 
   const openInstallFlow = useCallback(
-    async (source: "banner" | "menu") => {
+    async (source: PwaInstallFlowSource) => {
       if (isStandalone) {
         return;
       }
 
       openInstructionFallback(source);
+
+      if (source !== "retention" || !hasDeferredPrompt) {
+        return;
+      }
+
+      const mode = getInstallDialogMode();
+
+      if (!mode || !canAutoRunNativeInstall(mode)) {
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await runNativeInstallFromDialog();
     },
-    [isStandalone, openInstructionFallback],
+    [hasDeferredPrompt, isStandalone, openInstructionFallback, runNativeInstallFromDialog],
   );
 
   const openMenuInstall = useCallback(() => {
