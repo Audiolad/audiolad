@@ -15,6 +15,7 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "first_manual_library_save",
   "first_save_retention_prompt_shown",
   "first_save_retention_prompt_library_clicked",
+  "first_save_retention_prompt_install_clicked",
   "first_save_retention_prompt_dismissed",
 ] as const;
 

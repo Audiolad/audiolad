@@ -82,7 +82,7 @@ const ALLOWED_PLATFORMS = new Set([
   "unknown",
 ]);
 
-const ALLOWED_SOURCES = new Set(["banner", "menu"]);
+const ALLOWED_SOURCES = new Set(["banner", "menu", "retention"]);
 
 export function sanitizePwaAnalyticsPayload(
   input: Partial<PwaAnalyticsEventPayload>,

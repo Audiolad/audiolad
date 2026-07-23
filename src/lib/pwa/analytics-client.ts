@@ -5,6 +5,7 @@ import {
   sanitizePwaAnalyticsPayload,
   type PwaAnalyticsEventName,
 } from "@/lib/pwa/analytics-events";
+import type { PwaInstallFlowSource } from "@/lib/pwa/types";
 
 const recordedEvents = new Set<string>();
 
@@ -20,7 +21,7 @@ export async function trackPwaEvent(
   eventName: PwaAnalyticsEventName,
   input?: {
     platform?: string | null;
-    source?: "banner" | "menu" | null;
+    source?: PwaInstallFlowSource | null;
   },
 ): Promise<void> {
   const payload = sanitizePwaAnalyticsPayload({
@@ -58,7 +59,7 @@ export function trackPwaEventOnce(
   eventName: PwaAnalyticsEventName,
   input?: {
     platform?: string | null;
-    source?: "banner" | "menu" | null;
+    source?: PwaInstallFlowSource | null;
   },
 ): void {
   if (hasRecordedPwaAnalyticsEvent(dedupeKey)) {

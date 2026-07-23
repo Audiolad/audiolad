@@ -8,8 +8,11 @@ export type PwaInstallDialogCopy = {
 export const PWA_INSTALL_BOOKMARK_FOOTNOTE =
   "Также вы можете сохранить страницу в закладках браузера.";
 
-const MOBILE_INSTALL_TITLE = "Установить АудиоЛад";
-const MOBILE_INSTALL_DESCRIPTION =
+export const PWA_INSTALL_ONE_TAP_FOOTNOTE =
+  "Теперь вы сможете открывать АудиоЛад одним нажатием – как обычное приложение.";
+
+const ANDROID_INSTALL_TITLE = "Установить АудиоЛад";
+const ANDROID_INSTALL_DESCRIPTION =
   "Добавьте АудиоЛад на главный экран, чтобы открывать его как обычное приложение.";
 
 export function getPwaInstallDialogCopy(
@@ -17,16 +20,20 @@ export function getPwaInstallDialogCopy(
 ): PwaInstallDialogCopy {
   switch (mode) {
     case "ios":
+      return {
+        title: "Как добавить АудиоЛад на экран телефона",
+        description: "Это займёт меньше минуты.",
+      };
     case "android":
       return {
-        title: MOBILE_INSTALL_TITLE,
-        description: MOBILE_INSTALL_DESCRIPTION,
+        title: ANDROID_INSTALL_TITLE,
+        description: ANDROID_INSTALL_DESCRIPTION,
       };
     case "in_app_browser":
       return {
-        title: "Откройте АудиоЛад во внешнем браузере",
+        title: "Как добавить АудиоЛад на экран телефона",
         description:
-          "Во встроенном браузере MAX, Telegram и других приложений установка обычно недоступна. Продолжите установку в Safari или Chrome.",
+          "Сейчас АудиоЛад открыт внутри другого приложения. Сначала откройте его в Safari или Chrome.",
       };
     case "desktop_chrome":
     case "desktop_edge":
@@ -71,4 +78,10 @@ export function shouldShowInstallBookmarkFootnote(
     mode === "desktop_safari" ||
     mode === "desktop_bookmark"
   );
+}
+
+export function shouldShowInstallOneTapFootnote(
+  mode: PwaInstallDialogMode,
+): boolean {
+  return mode === "ios" || mode === "android";
 }

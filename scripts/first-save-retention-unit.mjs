@@ -92,10 +92,14 @@ function testUiWiring() {
   assert(card.includes("–"), "medium dash in copy");
   assert(!card.includes("—"), "no em dash in copy");
   assert(card.includes('aria-label="Закрыть"'), "close label");
-  assert(card.includes("Хорошо"), "secondary action");
+  assert(card.includes("Добавить на телефон"), "mobile install action");
+  assert(card.includes("Установить АудиоЛад"), "desktop install action");
+  assert(card.includes('openInstallFlow("retention")'), "retention install flow wired");
+  assert(!card.includes("Хорошо"), "legacy dismiss button removed");
   assert(card.includes('role="region"'), "not modal dialog");
   assert(!card.includes("aria-modal"), "no focus trap");
-  assert(card.includes("isStandalone"), "standalone hides pwa hint");
+  assert(card.includes("isStandalone"), "standalone hides install affordances");
+  assert(card.includes("isMobile"), "mobile-only install hint");
   assert(card.includes("z-[20]"), "above mini player stack");
 }
 
@@ -109,8 +113,23 @@ function testAnalyticsConstants() {
     "library click event",
   );
   assert(
+    source.includes('"first_save_retention_prompt_install_clicked"'),
+    "install click event",
+  );
+  assert(
     source.includes('"first_save_retention_prompt_dismissed"'),
     "dismiss event",
+  );
+}
+
+function testInstallAnalyticsMigration() {
+  const sql = readRoot(
+    "supabase/migrations/20260723103000_first_save_retention_install_analytics.sql",
+  );
+
+  assert(
+    sql.includes("'first_save_retention_prompt_install_clicked'"),
+    "install click allowlist migration",
   );
 }
 
@@ -179,6 +198,7 @@ function main() {
   testRouteContract();
   testUiWiring();
   testAnalyticsConstants();
+  testInstallAnalyticsMigration();
   testClaimApiSuccessBody();
   console.log("first-save-retention-unit: PASS");
 }
