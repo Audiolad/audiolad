@@ -26,6 +26,7 @@ export type OperationalEmailDeliveryRow = {
   updated_at: string;
 };
 
+/** @deprecated Legacy message type kept for historical delivery row lookup only. */
 export const AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE = "author_access_granted";
 export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
   "author_application_approved";
@@ -106,7 +107,8 @@ export async function acquireOperationalEmailDelivery(
 ): Promise<AcquireOperationalEmailDeliveryResult> {
   const applicationId = input.applicationId.trim();
   const recipientEmail = input.recipientEmail.trim().toLowerCase();
-  const messageType = input.messageType?.trim() || AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE;
+  const messageType =
+    input.messageType?.trim() || AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE;
   const dedupKey = resolveOperationalEmailDedupKey(applicationId, messageType);
 
   if (!applicationId || !recipientEmail) {

@@ -240,10 +240,10 @@ function testAuthorsEmailIdentity() {
   assert.equal(authors.replyTo, "authors@audiolad.ru");
   assert.equal(authors.displayName, "АудиоЛад для авторов");
 
-  const transport = resolveAuthorsEmailTransport("inbox@audiolad.ru");
+  const transport = resolveAuthorsEmailTransport("authors@audiolad.ru");
   assert.match(transport.from, /authors@audiolad\.ru/);
   assert.match(transport.from, /АудиоЛад для авторов|=\?UTF-8\?q\?/);
-  assert.equal(transport.envelopeFrom, "inbox@audiolad.ru");
+  assert.equal(transport.envelopeFrom, "authors@audiolad.ru");
   assert.equal(transport.replyTo, "authors@audiolad.ru");
 }
 
@@ -253,14 +253,17 @@ function testAuthorEmailSendersUseAuthorsIdentity() {
     "src/lib/email/send-author-application-approved-email.ts",
   ]) {
     const source = readRepoFile(...file.split("/"));
-    assert.match(source, /resolveAuthorsEmailTransport\(/);
+    assert.match(source, /resolveAuthorsEmailDeliveryFromEnv\(/);
+    assert.match(source, /authors_smtp_not_configured/);
+    assert.doesNotMatch(source, /getSmtpConfigFromEnv\(/);
     assert.doesNotMatch(source, /formatMimeFromAddress\(/);
     assert.doesNotMatch(source, /getSenderIdentity\(/);
   }
 
   const welcome = readRepoFile("src", "lib", "email", "send-welcome-email.ts");
   assert.match(welcome, /getSenderIdentity\("auth_security"\)/);
-  assert.doesNotMatch(welcome, /resolveAuthorsEmailTransport/);
+  assert.match(welcome, /getSmtpConfigFromEnv\(/);
+  assert.doesNotMatch(welcome, /resolveAuthorsEmailDeliveryFromEnv/);
 }
 
 function testApproveAuthorApplicationEmailWiring() {
