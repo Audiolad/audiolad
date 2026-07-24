@@ -10,7 +10,8 @@ import { shouldTrackPageView } from "@/lib/analytics/dedup";
 
 type TopicHubViewTrackerProps = {
   path: string;
-  topicKey: string;
+  /** Platform topics.key when hub is topic-bound; omit for cross-topic hubs */
+  topicKey?: string | null;
   hubSlug: string;
   productCount: number;
 };
@@ -36,17 +37,24 @@ export default function TopicHubViewTracker({
 
     trackedRef.current = true;
 
+    const properties: Record<string, string | number | boolean> = {
+      // Public SEO hub slug – primary dimension for hub reporting.
+      topic_slug: hubSlug,
+      hub_slug: hubSlug,
+      product_count: productCount,
+    };
+
+    const normalizedTopicKey = topicKey?.trim();
+
+    if (normalizedTopicKey) {
+      properties.topic_key = normalizedTopicKey;
+    }
+
     void trackPlatformEvent({
       sessionId,
       event_name: "topic_page_viewed",
       path,
-      properties: {
-        topic_key: topicKey,
-        // Public SEO hub slug – distinguishes hubs that share topic_key.
-        topic_slug: hubSlug,
-        hub_slug: hubSlug,
-        product_count: productCount,
-      },
+      properties,
     });
   }, [hubSlug, path, productCount, topicKey]);
 

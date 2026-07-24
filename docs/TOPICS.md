@@ -173,20 +173,21 @@ src/lib/topics/
 |------|---------------|--------|
 | Platform topic | `topics.key` | `self-worth` |
 | Platform title | `topics.title` | Уверенность и самоценность |
-| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya` |
-| SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия |
+| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya`, `besplatnye-meditatsii` |
+| SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия / Бесплатные медитации |
 | URL | `/topics/{hub.slug}` | `/topics/lyubov-k-sebe` |
 
 Правила:
 
-- Практики на хабе собираются автоматически: published + catalog-listed + `practice_topics` → `topics.key = hub.topicKey`.
-- Опционально `practiceSlugAllowlist` сужает подборку, если один `topicKey` обслуживает несколько SEO-хабов.
-- `resolveTopicChips: false` – хаб не перехватывает ProductTopicLinks для shared `topicKey` (primary остаётся «Любовь к себе» для `self-worth`).
-- `topics.slug` в БД **не обязан** совпадать с SEO slug; analytics/API всегда используют `topic_key`.
-- Активные хабы: «Любовь к себе»; «Женская энергия» (shared `self-worth` + allowlist; отдельного platform key нет).
+- Тематические хабы: published + catalog-listed + `practice_topics` → `topics.key = hub.topicKey`.
+- Кросс-топиковые хабы могут не иметь `topicKey` и использовать `freeOnly` (только бесплатные практики каталога).
+- Опционально `practiceSlugAllowlist` сужает подборку и задаёт порядок.
+- `resolveTopicChips: false` – хаб не перехватывает ProductTopicLinks (для shared `topicKey` или хабов без key).
+- `topics.slug` в БД **не обязан** совпадать с SEO slug.
+- Активные хабы: «Любовь к себе»; «Женская энергия»; «Бесплатные медитации» (`freeOnly` + allowlist, без platform key).
 - Metadata, canonical, Open Graph, JSON-LD (CollectionPage + ItemList + FAQPage + BreadcrumbList), FAQ и перелинковка – в шаблоне хаба.
-- Sitemap включает хаб только если есть ≥ 1 опубликованная практика темы.
-- Каталог `/catalog?topic=self-worth` остаётся фильтром UI; canonical у хабов – их `/topics/{slug}`.
+- Sitemap включает хаб только если есть ≥ 1 подходящая опубликованная практика.
+- Каталог `/catalog?topic=…` остаётся фильтром UI; canonical у хабов – их `/topics/{slug}`.
 
 Код:
 
@@ -200,16 +201,15 @@ src/components/topics/TopicHubPageView.tsx
 
 ## Analytics
 
-Использовать **`topic_key`**, не `topic_title`.
-
 События хаба:
 
-- `topic_page_viewed` – свойства: `topic_key`, `hub_slug`, `product_count`
-- `topic_product_clicked` – свойства: `topic_key`, `hub_slug`; `practice_id` в корне события
+- `topic_page_viewed` / `topic_product_clicked`
+- Обязательно в properties: **`topic_slug`** (публичный SEO slug хаба) – основной ключ отчётности по хабам
+- Опционально: `topic_key` (только если хаб привязан к platform topic; не подделывать)
+- Также: `hub_slug` (синоним `topic_slug`), `product_count` (для view)
 
 TS allowlist: `src/lib/analytics/constants.ts`  
-SQL allowlist: миграция `20260724160000_platform_analytics_topic_hub_events.sql`  
-(миграция **не применяется** без отдельного согласования deploy).
+SQL allowlist: миграция `20260724160000_platform_analytics_topic_hub_events.sql`
 
 ---
 

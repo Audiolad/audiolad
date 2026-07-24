@@ -16,7 +16,10 @@ import {
   buildTopicHubPath,
   listTopicHubDefinitions,
 } from "@/lib/seo/topic-hubs";
-import { getPublishedPracticeIdsForTopicKey } from "@/lib/products/catalog";
+import {
+  getPublishedCatalogProducts,
+  getPublishedPracticeIdsForTopicKey,
+} from "@/lib/products/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -548,12 +551,33 @@ async function fetchTopicHubSitemapEntries(
     const eligible: Array<{ slug: string }> = [];
 
     for (const hub of hubs) {
-      const practiceIds = await getPublishedPracticeIdsForTopicKey(
-        supabase,
-        hub.topicKey,
-      );
+      let hasProducts = false;
 
-      if (practiceIds.length > 0) {
+      if (hub.topicKey) {
+        const practiceIds = await getPublishedPracticeIdsForTopicKey(
+          supabase,
+          hub.topicKey,
+        );
+        hasProducts = practiceIds.length > 0;
+      } else {
+        const products = await getPublishedCatalogProducts(
+          supabase,
+          undefined,
+        );
+        const filtered = hub.freeOnly
+          ? products.filter((product) => product.isFree)
+          : products;
+        const allowlist = hub.practiceSlugAllowlist;
+
+        if (allowlist && allowlist.length > 0) {
+          const allowed = new Set(allowlist);
+          hasProducts = filtered.some((product) => allowed.has(product.slug));
+        } else {
+          hasProducts = filtered.length > 0;
+        }
+      }
+
+      if (hasProducts) {
         eligible.push({ slug: hub.slug });
       }
     }
