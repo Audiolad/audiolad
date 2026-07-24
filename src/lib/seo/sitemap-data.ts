@@ -12,6 +12,11 @@ import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
 import { buildAuthorPublicPath, buildPracticePublicPath } from "@/lib/products/paths";
 import { PRODUCTION_APP_ORIGIN, getAppOrigin } from "@/lib/seo/app-origin";
 import { isValidPublicEntitySlug } from "@/lib/seo/public-slug";
+import {
+  buildTopicHubPath,
+  listTopicHubDefinitions,
+} from "@/lib/seo/topic-hubs";
+import { getPublishedPracticeIdsForTopicKey } from "@/lib/products/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -524,12 +529,50 @@ async function fetchPromoPageSitemapEntries(): Promise<SitemapEntry[]> {
   }
 }
 
+export function mapTopicHubDefinitionsToSitemapEntries(
+  hubs: ReadonlyArray<{ slug: string }> = listTopicHubDefinitions(),
+  origin: string = getAppOrigin(),
+): SitemapEntry[] {
+  return hubs.map((hub) => ({
+    url: toAbsoluteSitemapUrl(buildTopicHubPath(hub.slug), origin),
+    changeFrequency: "weekly" as const,
+    priority: 0.75,
+  }));
+}
+
+async function fetchTopicHubSitemapEntries(
+  supabase: SupabaseClient,
+): Promise<SitemapEntry[]> {
+  try {
+    const hubs = listTopicHubDefinitions();
+    const eligible: Array<{ slug: string }> = [];
+
+    for (const hub of hubs) {
+      const practiceIds = await getPublishedPracticeIdsForTopicKey(
+        supabase,
+        hub.topicKey,
+      );
+
+      if (practiceIds.length > 0) {
+        eligible.push({ slug: hub.slug });
+      }
+    }
+
+    return mapTopicHubDefinitionsToSitemapEntries(eligible);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[sitemap] topic hubs query unexpected error:", message);
+    return [];
+  }
+}
+
 export type SitemapBuildStats = {
   static: number;
   products: number;
   authors: number;
   playlists: number;
   promos: number;
+  topicHubs: number;
   total: number;
 };
 
@@ -543,16 +586,23 @@ export async function buildSitemapEntries(): Promise<{
   let authorEntries: SitemapEntry[] = [];
   let playlistEntries: SitemapEntry[] = [];
   let promoEntries: SitemapEntry[] = [];
+  let topicHubEntries: SitemapEntry[] = [];
 
   try {
     const supabase = await createClient();
-    [productEntries, authorEntries, playlistEntries, promoEntries] =
-      await Promise.all([
-        fetchProductSitemapEntries(supabase),
-        fetchAuthorSitemapEntries(supabase),
-        fetchPublicPlaylistSitemapEntries(supabase),
-        fetchPromoPageSitemapEntries(),
-      ]);
+    [
+      productEntries,
+      authorEntries,
+      playlistEntries,
+      promoEntries,
+      topicHubEntries,
+    ] = await Promise.all([
+      fetchProductSitemapEntries(supabase),
+      fetchAuthorSitemapEntries(supabase),
+      fetchPublicPlaylistSitemapEntries(supabase),
+      fetchPromoPageSitemapEntries(),
+      fetchTopicHubSitemapEntries(supabase),
+    ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[sitemap] supabase client unavailable:", message);
@@ -564,6 +614,7 @@ export async function buildSitemapEntries(): Promise<{
     authorEntries,
     playlistEntries,
     promoEntries,
+    topicHubEntries,
   );
 
   return {
@@ -574,6 +625,7 @@ export async function buildSitemapEntries(): Promise<{
       authors: authorEntries.length,
       playlists: playlistEntries.length,
       promos: promoEntries.length,
+      topicHubs: topicHubEntries.length,
       total: entries.length,
     },
   };

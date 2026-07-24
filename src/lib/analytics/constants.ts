@@ -17,6 +17,8 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "first_save_retention_prompt_library_clicked",
   "first_save_retention_prompt_install_clicked",
   "first_save_retention_prompt_dismissed",
+  "topic_page_viewed",
+  "topic_product_clicked",
 ] as const;
 
 export type PlatformAnalyticsEventName =
