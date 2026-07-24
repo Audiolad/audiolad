@@ -345,7 +345,11 @@ assert(
   !moneyHub?.practiceSlugAllowlist?.includes("klyuch-k-izobiliyu") &&
     !moneyHub?.practiceSlugAllowlist?.includes("koding-izobiliya") &&
     !moneyHub?.practiceSlugAllowlist?.includes("aktivatsiya-kanala-izobiliya"),
-  "abundance practices reserved for future izobilie hub",
+  "abundance practices reserved for izobilie hub",
+);
+assert(
+  moneyHub?.relatedLinks?.some((link) => link.href === "/topics/izobilie"),
+  "money hub links to izobilie hub",
 );
 
 const moneyOrdered = selectTopicHubProducts(
@@ -428,5 +432,109 @@ assert(
       ?.length === 10,
   "regression: free hub unchanged",
 );
+assert(
+  getTopicHubBySlug("meditatsii-na-dengi")?.practiceSlugAllowlist?.length === 7,
+  "regression: money allowlist unchanged",
+);
+
+const abundanceHub = getTopicHubBySlug("izobilie");
+assert(abundanceHub?.topicKey === "money", "izobilie honest topicKey");
+assert(
+  abundanceHub?.resolveTopicChips === false,
+  "izobilie does not steal money chips",
+);
+assert(
+  abundanceHub?.practiceSlugAllowlist?.join(",") ===
+    "klyuch-k-izobiliyu,aktivatsiya-kanala-izobiliya,koding-izobiliya",
+  "izobilie allowlist order",
+);
+assert(abundanceHub?.title === "Изобилие", "izobilie H1");
+assert(
+  !String(abundanceHub?.metaDescription || "").includes("гарант"),
+  "izobilie meta avoids guarantee wording",
+);
+assert(
+  !String(abundanceHub?.intro || "").includes("Медитации на деньги –"),
+  "izobilie intro is not a money-hub copy",
+);
+assert(listTopicHubSlugs().includes("izobilie"), "izobilie registered");
+assert(
+  sitemapEntries.some((entry) => entry.url.endsWith("/topics/izobilie")),
+  "sitemap includes izobilie",
+);
+assert(
+  abundanceHub?.relatedLinks?.some(
+    (link) => link.href === "/topics/meditatsii-na-dengi",
+  ),
+  "izobilie links to money hub",
+);
+assert(
+  resolveTopicPublicHref("money") === "/catalog?topic=money",
+  "regression: money chips still catalog",
+);
+
+const abundanceOrdered = selectTopicHubProducts(
+  [
+    {
+      id: "a3",
+      title: "Program",
+      slug: "koding-izobiliya",
+      isFree: false,
+      sortTimestamp: 9,
+    },
+    {
+      id: "a1",
+      title: "Key",
+      slug: "klyuch-k-izobiliyu",
+      isFree: true,
+      sortTimestamp: 1,
+    },
+    {
+      id: "a2",
+      title: "Money out",
+      slug: "dengi-prihodyat-segodnya",
+      isFree: true,
+      sortTimestamp: 5,
+    },
+    {
+      id: "a4",
+      title: "Channel",
+      slug: "aktivatsiya-kanala-izobiliya",
+      isFree: false,
+      sortTimestamp: 3,
+    },
+  ],
+  abundanceHub,
+);
+assert(
+  abundanceOrdered.map((p) => p.slug).join(",") ===
+    "klyuch-k-izobiliyu,aktivatsiya-kanala-izobiliya,koding-izobiliya",
+  "izobilie allowlist order; money slug excluded",
+);
+
+const abundancePageData = {
+  hub: abundanceHub,
+  path: "/topics/izobilie",
+  canonicalUrl: "https://audiolad.ru/topics/izobilie",
+  products: pageData.products,
+  freeProducts: pageData.products,
+  paidProducts: [],
+  platformTopicTitle: "Деньги",
+};
+const abundanceMeta = buildTopicHubMetadata(abundancePageData);
+assert(
+  abundanceMeta.alternates?.canonical === "https://audiolad.ru/topics/izobilie",
+  "izobilie canonical",
+);
+assert(String(abundanceMeta.title).includes("Изобилие"), "izobilie title");
+const abundanceJson = JSON.stringify(
+  buildTopicHubJsonLdGraph(abundancePageData),
+);
+assert(abundanceJson.includes("CollectionPage"), "izobilie JSON-LD CollectionPage");
+assert(abundanceJson.includes("ItemList"), "izobilie JSON-LD ItemList");
+assert(abundanceJson.includes("FAQPage"), "izobilie JSON-LD FAQPage");
+assert(abundanceJson.includes("BreadcrumbList"), "izobilie JSON-LD BreadcrumbList");
+
+assert(topicsDoc.includes("izobilie"), "TOPICS.md mentions izobilie");
 
 console.log("seo-topic-hub-unit: ok");
