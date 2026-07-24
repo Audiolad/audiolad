@@ -225,6 +225,10 @@ assert_true "rollback.sh uses cutover_nginx_to_port" \
   grep -q 'cutover_nginx_to_port' "$SCRIPT_DIR/rollback.sh"
 assert_true "deploy keeps old process until after smoke" \
   grep -q 'previous_process_stopped' "$SCRIPT_DIR/deploy.sh"
+assert_true "candidate ecosystem uses *.config.cjs name" \
+  grep -q 'ecosystem.candidate.config.cjs' "$SCRIPT_DIR/lib/zero-downtime.sh"
+assert_false "candidate must not assign ecosystem-<app>.cjs path" \
+  grep -q 'eco_file="$DEPLOY_ROOT/shared/ecosystem-${app_name}.cjs"' "$SCRIPT_DIR/lib/zero-downtime.sh"
 
 echo "=== results: pass=${PASS} fail=${FAIL} ==="
 if (( FAIL > 0 )); then

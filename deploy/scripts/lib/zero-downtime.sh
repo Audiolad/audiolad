@@ -291,10 +291,18 @@ start_release_on_port() {
   local release_dir="$1"
   local port="$2"
   local app_name="$3"
-  local eco_file="$DEPLOY_ROOT/shared/ecosystem-${app_name}.cjs"
+  # PM2 only treats *.config.cjs / ecosystem.config.* as ecosystem files.
+  # A name like ecosystem-audiolad-p3001.cjs is started as a raw script and
+  # never binds Next.js to the candidate port.
+  local eco_file="$DEPLOY_ROOT/shared/ecosystem.candidate.config.cjs"
 
   if [[ ! -d "$release_dir/.next" ]]; then
     log_error "Release missing .next: $release_dir"
+    return 1
+  fi
+
+  if [[ ! -f "$release_dir/node_modules/next/dist/bin/next" ]]; then
+    log_error "Next.js binary missing in release: $release_dir/node_modules/next/dist/bin/next"
     return 1
   fi
 
@@ -312,8 +320,21 @@ start_release_on_port() {
     wait_for_port_free "$port" 20 1 || true
   fi
 
+  # Clean any previous mis-started ecosystem script process from older builds.
+  if pm2 describe "ecosystem-${app_name}" >/dev/null 2>&1; then
+    log_warn "Removing legacy mis-started PM2 process ecosystem-${app_name}"
+    pm2 delete "ecosystem-${app_name}" >/dev/null 2>&1 || true
+  fi
+
   log_info "candidate_process_started app=${app_name} port=${port} release=${release_dir}"
   pm2 start "$eco_file" --only "$app_name"
+
+  if ! pm2 describe "$app_name" >/dev/null 2>&1; then
+    log_error "PM2 did not register candidate app ${app_name} after start"
+    pm2 status || true
+    return 1
+  fi
+
   CANDIDATE_PM2_APP="$app_name"
   CANDIDATE_PORT_ACTIVE="$port"
 }
