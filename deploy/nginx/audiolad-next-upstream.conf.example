@@ -1,0 +1,5 @@
+# Managed by Audiolad deploy/rollback — example only.
+# Live file: /etc/nginx/conf.d/audiolad-next-upstream.conf
+upstream audiolad_next {
+    server 127.0.0.1:3000;
+}

@@ -3,7 +3,10 @@ set -Eeuo pipefail
 
 DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
 DEPLOY_LOG_DIR="${DEPLOY_LOG_DIR:-$DEPLOY_ROOT/logs}"
-DEPLOY_SCRIPTS_DIR="${DEPLOY_SCRIPTS_DIR:-$DEPLOY_ROOT/scripts}"
+# Prefer the scripts tree that sourced this file (worktree or deploy-root copy).
+_AUDIOLAD_SCRIPTS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_AUDIOLAD_SCRIPTS_DIR="$(cd "${_AUDIOLAD_SCRIPTS_LIB_DIR}/.." && pwd)"
+DEPLOY_SCRIPTS_DIR="${DEPLOY_SCRIPTS_DIR:-$_AUDIOLAD_SCRIPTS_DIR}"
 GIT_REPO="${GIT_REPO:-git@github-audiolad:Audiolad/audiolad.git}"
 GIT_WORKDIR="${GIT_WORKDIR:-/var/www/audiolad}"
 PRODUCTION_PORT="${PRODUCTION_PORT:-3000}"
@@ -13,7 +16,8 @@ HEALTH_PATH="${HEALTH_PATH:-/api/health/build}"
 SMOKE_TIMEOUT_MS="${SMOKE_TIMEOUT_MS:-120000}"
 READINESS_ATTEMPTS="${READINESS_ATTEMPTS:-30}"
 READINESS_DELAY="${READINESS_DELAY:-2}"
-READINESS_PROBE_SCRIPT="${READINESS_PROBE_SCRIPT:-$DEPLOY_SCRIPTS_DIR/lib/readiness-check.mjs}"
+READINESS_CONSECUTIVE="${READINESS_CONSECUTIVE:-3}"
+READINESS_PROBE_SCRIPT="${READINESS_PROBE_SCRIPT:-$_AUDIOLAD_SCRIPTS_LIB_DIR/readiness-check.mjs}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://audiolad.ru}"
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/audiolad-deploy.lock}"
 DEPLOY_LOCK_FD="${DEPLOY_LOCK_FD:-9}"
@@ -129,9 +133,11 @@ wait_for_production_readiness() {
   local attempts="${3:-$READINESS_ATTEMPTS}"
   local delay="${4:-$READINESS_DELAY}"
   local label="${5:-$base_url}"
+  local required_consecutive="${6:-$READINESS_CONSECUTIVE}"
   local probe_json http_status reason build_id
+  local consecutive=0
 
-  log_info "Waiting for production readiness at ${label} (max ${attempts} attempts, ${delay}s delay)"
+  log_info "Waiting for readiness at ${label} (max ${attempts} attempts, ${delay}s delay, need ${required_consecutive} consecutive successes)"
 
   for ((i = 1; i <= attempts; i++)); do
     probe_json="$(probe_readiness_once "$base_url" "$expected_build_id" || true)"
@@ -146,21 +152,28 @@ process.stdout.write(`${payload.httpStatus ?? "null"}\t${payload.reason ?? "unkn
 let payload={};
 try { payload=JSON.parse(input); } catch {}
 process.exit(payload.ready===true?0:1);'; then
-      log_info "Production readiness confirmed at ${label} on attempt ${i} (http=${http_status}, buildId=${build_id})"
-      return 0
+      consecutive=$((consecutive + 1))
+      log_info "Readiness success ${consecutive}/${required_consecutive} at ${label} on attempt ${i} (http=${http_status}, buildId=${build_id})"
+      if (( consecutive >= required_consecutive )); then
+        log_info "Readiness confirmed at ${label} after ${consecutive} consecutive successes (buildId=${build_id})"
+        return 0
+      fi
+    else
+      consecutive=0
+      log_warn "Readiness attempt ${i}/${attempts} at ${label}: http=${http_status}, reason=${reason}, buildId=${build_id}"
     fi
 
-    log_warn "Readiness attempt ${i}/${attempts} at ${label}: http=${http_status}, reason=${reason}, buildId=${build_id}"
     sleep "$delay"
   done
 
-  log_error "Production readiness timeout at ${label} after ${attempts} attempts (last http=${http_status}, reason=${reason})"
+  log_error "Readiness timeout at ${label} after ${attempts} attempts (last http=${http_status}, reason=${reason})"
   return 1
 }
 
 wait_for_release_readiness() {
   local release_dir="$1"
   local expected_build_id
+  local local_port="${2:-$PRODUCTION_PORT}"
 
   expected_build_id="$(read_build_id "$release_dir")"
   if [[ "$expected_build_id" == "missing" ]]; then
@@ -168,7 +181,7 @@ wait_for_release_readiness() {
     return 1
   fi
 
-  if ! wait_for_production_readiness "http://127.0.0.1:${PRODUCTION_PORT}" "$expected_build_id"; then
+  if ! wait_for_production_readiness "http://127.0.0.1:${local_port}" "$expected_build_id"; then
     return 1
   fi
 
@@ -228,34 +241,14 @@ cleanup_orphan_next_servers() {
   done < <(pgrep -f 'next-server' 2>/dev/null || true)
 }
 
-ensure_production_port_ready() {
-  log_info "Preparing port ${PRODUCTION_PORT} for PM2 sync"
-  pm2 stop "$PM2_APP_NAME" >/dev/null 2>&1 || true
-
-  if ! wait_for_port_free "$PRODUCTION_PORT" 20 1; then
-    log_warn "Port ${PRODUCTION_PORT} still busy after PM2 stop; clearing stale listeners"
-    fuser -k "${PRODUCTION_PORT}/tcp" >/dev/null 2>&1 || true
-    sleep 2
-    wait_for_port_free "$PRODUCTION_PORT" 10 1 || {
-      log_error "Port ${PRODUCTION_PORT} is still in use"
-      ss -lntp 2>/dev/null | grep ":${PRODUCTION_PORT} " || true
-      return 1
-    }
-  fi
-
-  cleanup_orphan_next_servers "$PRODUCTION_PORT"
-  sleep 1
-}
+# Legacy same-port PM2 reload intentionally removed: it stopped the live
+# upstream before the replacement listener was ready (listener-gap / 502).
+# Use start_release_on_port + cutover_nginx_to_port instead.
 
 sync_pm2_audiolad() {
-  ensure_production_port_ready || return 1
-
-  if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-    pm2 startOrReload "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
-  else
-    pm2 start "$DEPLOY_ROOT/ecosystem.config.cjs" --only "$PM2_APP_NAME"
-  fi
-  pm2 save
+  log_error "sync_pm2_audiolad is disabled (causes upstream downtime)."
+  log_error "Use zero-downtime cutover: candidate port + Nginx upstream switch."
+  return 1
 }
 
 send_deploy_alert() {
@@ -317,3 +310,5 @@ get_release_name() {
 
 # shellcheck source=release-retention.sh
 source "$(dirname "${BASH_SOURCE[0]}")/release-retention.sh"
+# shellcheck source=zero-downtime.sh
+source "$(dirname "${BASH_SOURCE[0]}")/zero-downtime.sh"

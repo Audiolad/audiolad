@@ -18,19 +18,21 @@ MAX_PID_CHANGES="${HEALTH_WATCH_MAX_PID_CHANGES:-1}"
 failures=0
 expected_build_id=""
 watch_log="$DEPLOY_LOG_DIR/health-watch-$(date -u +"%Y%m%d-%H%M%S").log"
-error_log_path="/root/.pm2/logs/audiolad-error.log"
 error_log_offset=0
 baseline_file="${PM2_HEALTH_BASELINE_FILE:-}"
 last_pid=""
 pid_changes=0
 
+exec > >(tee -a "$watch_log") 2>&1
+
+load_runtime_state
+error_log_path="/root/.pm2/logs/${PM2_APP_NAME}-error.log"
 if [[ -f "$error_log_path" ]]; then
   error_log_offset="$(wc -c < "$error_log_path" | tr -d ' ')"
 fi
 
-exec > >(tee -a "$watch_log") 2>&1
-
 log_info "Health watch started for ${WATCH_SECONDS}s (interval ${INTERVAL_SECONDS}s)"
+log_info "Health watch target: app=${PM2_APP_NAME} port=${PRODUCTION_PORT}"
 log_info "Health watch restart policy: max_restart_delta=${MAX_RESTART_DELTA}"
 
 if [[ -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then

@@ -1,16 +1,17 @@
 module.exports = {
   apps: [
     {
-      name: "audiolad",
+      name: "audiolad-p3000",
       cwd: "/var/www/audiolad-deploy/current",
-      // Run Next directly so PM2 signal handling releases :3000 on reload.
+      // Run Next directly so PM2 signal handling releases the port cleanly.
       // npm start leaves orphan next-server processes and causes EADDRINUSE loops.
       script: "node_modules/next/dist/bin/next",
-      args: "start",
+      args: "start -H 127.0.0.1",
       interpreter: "node",
       env: {
         NODE_ENV: "production",
         PORT: "3000",
+        HOSTNAME: "127.0.0.1",
         AUDIOLAD_PRODUCTION_SERVER: "1",
       },
       instances: 1,
