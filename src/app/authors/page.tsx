@@ -6,6 +6,7 @@ import {
 } from "@/lib/authors/public-list";
 import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
 import { buildAuthorsIndexMetadata } from "@/lib/seo/public-page-metadata";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -143,7 +144,7 @@ export default async function AuthorsPage() {
             </p>
 
             <Link
-              href="/profile"
+              href={BECOME_AUTHOR_HREF}
               className="mt-4 inline-flex min-h-11 items-center rounded-[16px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               Узнать подробнее
