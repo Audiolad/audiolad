@@ -102,7 +102,8 @@ export function buildArticleJsonLdGraph(
   ];
 
   if (breadcrumbs) {
-    const { ["@context"]: _context, ...breadcrumbNode } = breadcrumbs;
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
     graph.push(breadcrumbNode);
   }
 
