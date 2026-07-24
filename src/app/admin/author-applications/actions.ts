@@ -2,19 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { AdminAuthorApplicationActionState } from "@/app/admin/author-applications/action-state";
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
 import { requireAdminPanelAccess } from "@/lib/admin/guard";
 import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";
 import { createClient } from "@/lib/supabase/server";
-
-export type AdminAuthorApplicationActionState = {
-  ok: boolean;
-  error?: string;
-  warning?: string;
-  message?: string;
-};
-
-const INITIAL_STATE: AdminAuthorApplicationActionState = { ok: false };
 
 function revalidateApplicationPaths(applicationId: string) {
   revalidatePath("/admin/author-applications");
@@ -370,5 +362,3 @@ export async function updateAuthorApplicationAdminNote(
 
   return { ok: true, message: "Внутренняя заметка сохранена." };
 }
-
-export { INITIAL_STATE as ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE };

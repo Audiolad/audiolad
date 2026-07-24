@@ -111,6 +111,45 @@ function testRpcErrorMapping() {
   );
 }
 
+function testAuthorApplicationActionsModuleExportsOnlyAsyncFunctions() {
+  const actionsSource = readFileSync(
+    new URL("../src/app/admin/author-applications/actions.ts", import.meta.url),
+    "utf8",
+  );
+  const formSource = readFileSync(
+    new URL(
+      "../src/components/admin/AuthorApplicationReviewForm.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const actionStateSource = readFileSync(
+    new URL(
+      "../src/app/admin/author-applications/action-state.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(actionsSource, /^"use server";/m);
+  assert.doesNotMatch(actionsSource, /^export (const|type|enum|class|\{)/m);
+  assert.match(
+    actionsSource,
+    /export async function approveAuthorApplication\(/,
+  );
+  assert.match(
+    formSource,
+    /ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE/,
+  );
+  assert.match(formSource, /from "@\/app\/admin\/author-applications\/action-state"/);
+  assert.match(formSource, /from "@\/app\/admin\/author-applications\/actions"/);
+  assert.doesNotMatch(actionsSource, /export \{ INITIAL_STATE/);
+  assert.match(
+    actionStateSource,
+    /export const ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE/,
+  );
+}
+
 async function main() {
   testSubmittedDisplayedAsNew();
   testWithdrawnDisplayedAsCancelled();
@@ -119,6 +158,7 @@ async function main() {
   testEmailTemplate();
   await testRendererRegistration();
   testRpcErrorMapping();
+  testAuthorApplicationActionsModuleExportsOnlyAsyncFunctions();
   console.log("author-access-provisioning-unit: ok");
 }
 
