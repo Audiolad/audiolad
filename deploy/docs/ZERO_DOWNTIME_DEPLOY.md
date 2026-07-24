@@ -32,12 +32,37 @@ Previous process is stopped only after public readiness + smoke + health-watch s
 
 ## Rollback infra (this deploy-flow)
 
-Backups created automatically when the site file is migrated:
+Known backups from 2026-07-24 rollout:
 
-```bash
-ls -1 /etc/nginx/sites-available/audiolad.ru.backup-*-zdt-upstream
+```text
+/var/www/audiolad-deploy/scripts.bak-20260724-180253-pre-zdt
+/var/www/audiolad-deploy/ecosystem.config.cjs.bak-20260724-180253-pre-zdt
+/etc/nginx/sites-available/audiolad.ru.backup-20260724-180253-pre-zdt
+/etc/nginx/sites-available/audiolad.ru.backup-20260724-180326-zdt-upstream
 ```
 
-Restore previous deploy scripts from git / backup copy under `/var/www/audiolad-deploy/scripts.bak-*`.
+Restore old deploy scripts without stopping the live app:
+
+```bash
+# 1) keep current healthy PM2 process untouched
+pm2 status
+curl -sS https://audiolad.ru/api/health/build
+
+# 2) restore scripts/ecosystem from backup
+rm -rf /var/www/audiolad-deploy/scripts
+cp -a /var/www/audiolad-deploy/scripts.bak-20260724-180253-pre-zdt \
+  /var/www/audiolad-deploy/scripts
+cp -a /var/www/audiolad-deploy/ecosystem.config.cjs.bak-20260724-180253-pre-zdt \
+  /var/www/audiolad-deploy/ecosystem.config.cjs
+
+# 3) optional: restore pre-named-upstream nginx site
+sudo cp -a /etc/nginx/sites-available/audiolad.ru.backup-20260724-180253-pre-zdt \
+  /etc/nginx/sites-available/audiolad.ru
+sudo rm -f /etc/nginx/conf.d/audiolad-next-upstream.conf
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4) verify
+curl -sS https://audiolad.ru/api/health/build
+```
 
 Do **not** stop the healthy production PM2 app while restoring scripts.
