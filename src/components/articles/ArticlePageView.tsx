@@ -99,7 +99,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
           </nav>
 
           <header className="mt-3 sm:mt-5">
-            <h1 className="text-[1.65rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.75rem] sm:text-3xl sm:leading-tight md:text-4xl">
+            <h1 className="text-[1.5rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.625rem] sm:text-[1.75rem] sm:leading-tight md:text-[2rem]">
               {article.title}
             </h1>
             <p className="mt-2.5 text-base leading-7 text-[#4a3d73] sm:mt-3 sm:text-[17px] sm:leading-8">
@@ -110,15 +110,29 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             </p>
           </header>
 
-          <div className="mt-4 sm:mt-5">
-            <ArticleAudioBlock
-              placement="top_player"
-              product={primaryPractice}
-              accessLabel={accessLabel}
-              libraryAction={data.libraryAction}
-              signInReturnPath={data.path}
-            />
-          </div>
+          <section
+            aria-labelledby="article-primary-practice-heading"
+            className="mt-4 sm:mt-5"
+          >
+            <h2
+              id="article-primary-practice-heading"
+              className="text-[15px] font-semibold leading-snug tracking-tight text-[#25135c] sm:text-base"
+            >
+              {article.primaryPracticeEyebrow}
+            </h2>
+            <p className="mt-1.5 text-sm leading-6 text-[#4a3d73] sm:text-[15px] sm:leading-7">
+              {article.primaryPracticeIntro}
+            </p>
+            <div className="mt-2.5 sm:mt-3">
+              <ArticleAudioBlock
+                placement="top_player"
+                product={primaryPractice}
+                accessLabel={accessLabel}
+                libraryAction={data.libraryAction}
+                signInReturnPath={data.path}
+              />
+            </div>
+          </section>
 
           <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
             {article.captionAfterAudio}

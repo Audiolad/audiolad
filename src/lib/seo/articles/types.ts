@@ -40,6 +40,13 @@ export type ArticleDefinition = {
   leadBeforeAudio: string;
   /** Caption under top audio block */
   captionAfterAudio: string;
+  /**
+   * Small heading above the primary audio card.
+   * Article-specific copy that frames the practice as part of the material.
+   */
+  primaryPracticeEyebrow: string;
+  /** Short intro paragraph immediately before the primary audio card */
+  primaryPracticeIntro: string;
   shortAnswer: string;
   authorLabel: string;
   topicSlug: string;

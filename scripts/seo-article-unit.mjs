@@ -52,9 +52,20 @@ assert(
 assert(article.topicSlug === "lyubov-k-sebe", "topic slug");
 assert(article.topicHref === "/topics/lyubov-k-sebe", "topic href");
 assert(
-  article.primaryPractice.practiceKey ===
-    "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+  article.primaryPractice.practiceKey === "elixir-molodosti",
   "primary practice key is data-driven slot",
+);
+assert(
+  article.primaryPracticeEyebrow === "Практика по теме статьи",
+  "primary practice eyebrow is article-specific",
+);
+assert(
+  article.primaryPracticeIntro.includes("Эликсир Молодости"),
+  "primary practice intro frames the practice",
+);
+assert(
+  !article.primaryPracticeIntro.includes("—"),
+  "primary practice intro uses medium dash, not em dash",
 );
 assert(
   article.relatedPractices.every((item) => item.practiceKey && item.blurb),
@@ -87,19 +98,19 @@ assert(listArticleSlugs().includes("kak-razvit-lyubov-k-sebe"), "slug list");
 const catalogIndex = buildCatalogPracticeKeyIndex([
   {
     id: "p1",
-    title: "Бастет",
-    slug: "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+    title: "Эликсир Молодости",
+    slug: "elixir-molodosti",
     subtitle: null,
     description: null,
-    format: "Практика",
+    format: "Квант-Медитация",
     price: 0,
     isFree: true,
-    authorName: "Сергей Петров",
-    authorSlug: "sergey-petrov",
-    href: "/authors/sergey-petrov/bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+    authorName: "Сергей и Зоя",
+    authorSlug: "sergey-and-zoya",
+    href: "/authors/sergey-and-zoya/elixir-molodosti",
     meta: null,
-    statsLabel: "24 мин",
-    productTypeLabel: "Практика",
+    statsLabel: "5 мин",
+    productTypeLabel: "Квант-Медитация",
     priceLabel: "Бесплатно",
     sortTimestamp: 0,
     coverUrl: null,
@@ -144,22 +155,22 @@ const pageData = {
   readingTimeMinutes: readingMinutes,
   primaryPractice: {
     id: "p1",
-    title: "Бастет – Богиня радости, любви и женской силы",
+    title: "Эликсир Молодости",
     slug: article.primaryPractice.practiceKey,
     subtitle: null,
     description: null,
-    format: "Практика",
+    format: "Квант-Медитация",
     price: 0,
     isFree: true,
-    authorName: "Сергей Петров",
-    authorSlug: "sergey-petrov",
-    href: `/authors/sergey-petrov/${article.primaryPractice.practiceKey}`,
+    authorName: "Сергей и Зоя",
+    authorSlug: "sergey-and-zoya",
+    href: `/authors/sergey-and-zoya/${article.primaryPractice.practiceKey}`,
     meta: null,
-    statsLabel: "24 мин",
-    productTypeLabel: "Практика",
+    statsLabel: "5 мин",
+    productTypeLabel: "Квант-Медитация",
     priceLabel: "Бесплатно",
     sortTimestamp: 0,
-    coverUrl: "https://audiolad.ru/covers/bastet.jpg",
+    coverUrl: "https://audiolad.ru/covers/elixir-molodosti.jpg",
     coverImage: null,
     updatedAt: null,
   },
@@ -244,13 +255,33 @@ assert(viewSource.includes("ArticleAudioBlock"), "audio blocks");
 assert(viewSource.includes("placement=\"final_audio\""), "final audio placement");
 assert(viewSource.includes("Частые вопросы"), "visible FAQ");
 assert(viewSource.includes("ArticleFaqList"), "FAQ list component");
+assert(
+  viewSource.includes("article.primaryPracticeEyebrow"),
+  "renders article-specific practice eyebrow from data",
+);
+assert(
+  viewSource.includes("article.primaryPracticeIntro"),
+  "renders article-specific practice intro from data",
+);
+assert(
+  viewSource.includes('id="article-primary-practice-heading"'),
+  "practice intro has accessible heading id",
+);
 assert(!viewSource.includes("[Включить аудиопрактику]"), "no text stub player");
 assert(!viewSource.includes("bastet-"), "page view has no hard practice slug");
+assert(
+  !viewSource.includes("Эликсир Молодости"),
+  "page view does not hardcode practice title",
+);
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
 assert(!audioSource.includes("bastet-"), "audio block has no hard practice slug");
+assert(
+  !audioSource.includes("primaryPracticeEyebrow"),
+  "audio block does not own practice intro copy",
+);
 
 const consentSource = read("src/components/analytics/AnalyticsConsentBanner.tsx");
 assert(

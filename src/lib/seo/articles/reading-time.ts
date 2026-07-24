@@ -15,6 +15,8 @@ export function estimateArticleReadingTimeMinutes(
   const chunks = [
     article.leadBeforeAudio,
     article.captionAfterAudio,
+    article.primaryPracticeEyebrow,
+    article.primaryPracticeIntro,
     article.shortAnswer,
     ...article.introAfterAudio,
     ...article.sections.flatMap((section) => [
