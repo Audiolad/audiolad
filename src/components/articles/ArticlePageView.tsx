@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ArticleAudioBlock from "@/components/articles/ArticleAudioBlock";
+import ArticleFaqList from "@/components/articles/ArticleFaqList";
 import { ArticlePlaybackProvider } from "@/components/articles/ArticlePlaybackProvider";
 import ArticleRelatedPracticeClickTracker from "@/components/articles/ArticleRelatedPracticeClickTracker";
 import ArticleToc from "@/components/articles/ArticleToc";
@@ -67,9 +68,12 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
         practiceSlug={primaryPractice.slug}
         authorSlug={authorSlug}
       >
-        <article className="mx-auto max-w-[40rem] pb-10 pt-4 xl:pt-2">
-          <nav aria-label="Хлебные крошки" className="text-sm text-[#7d70a2]">
-            <ol className="flex flex-wrap items-center gap-1.5">
+        <article className="mx-auto max-w-[40rem] pb-10 pt-3 xl:pt-2">
+          <nav
+            aria-label="Хлебные крошки"
+            className="text-[13px] leading-5 text-[#7d70a2] sm:text-sm sm:leading-6"
+          >
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
               <li>
                 <Link
                   href="/"
@@ -89,24 +93,24 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
               </li>
               <li aria-hidden="true">→</li>
               <li className="text-[#25135c]" aria-current="page">
-                Как развить любовь к себе
+                {article.breadcrumbTitle}
               </li>
             </ol>
           </nav>
 
-          <header className="mt-6">
-            <h1 className="text-3xl font-semibold tracking-tight text-[#25135c] sm:text-4xl">
+          <header className="mt-3 sm:mt-5">
+            <h1 className="text-[1.65rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.75rem] sm:text-3xl sm:leading-tight md:text-4xl">
               {article.title}
             </h1>
-            <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            <p className="mt-2.5 text-base leading-7 text-[#4a3d73] sm:mt-3 sm:text-[17px] sm:leading-8">
               {article.leadBeforeAudio}
             </p>
-            <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
               {article.authorLabel} · {readingTimeLabel(data.readingTimeMinutes)}
             </p>
           </header>
 
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-5">
             <ArticleAudioBlock
               placement="top_player"
               product={primaryPractice}
@@ -192,29 +196,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
               Частые вопросы
             </h2>
-            <div className="mt-4 space-y-3">
-              {article.faq.map((item) => (
-                <details
-                  key={item.question}
-                  className="group rounded-[20px] border border-[#e8def5] bg-white px-5 py-4 shadow-sm open:shadow-md"
-                >
-                  <summary className="cursor-pointer list-none text-base font-semibold text-[#25135c] marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-start justify-between gap-3">
-                      {item.question}
-                      <span
-                        aria-hidden
-                        className="mt-0.5 shrink-0 text-[#7042c5] transition group-open:rotate-45"
-                      >
-                        +
-                      </span>
-                    </span>
-                  </summary>
-                  <p className="mt-3 text-sm leading-6 text-[#4a3d73] sm:text-[15px] sm:leading-7">
-                    {item.answer}
-                  </p>
-                </details>
-              ))}
-            </div>
+            <ArticleFaqList items={article.faq} />
           </section>
 
           {data.relatedPractices.length > 0 ? (
@@ -222,10 +204,10 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
               <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
                 Связанные практики
               </h2>
-              <ul className="mt-4 grid list-none gap-4 p-0">
+              <ul className="mt-4 grid list-none gap-5 p-0">
                 {data.relatedPractices.map(({ product, blurb }) => (
                   <li key={product.id}>
-                    <p className="mb-2 text-sm leading-6 text-[#7d70a2]">
+                    <p className="mb-2.5 text-[15px] font-medium leading-6 text-[#4a3d73]">
                       {blurb}
                     </p>
                     <ArticleRelatedPracticeClickTracker

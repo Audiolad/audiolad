@@ -22,6 +22,22 @@ function formatClock(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+function PlayIcon({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
+    </svg>
+  );
+}
+
+function PauseIcon({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M7 5.5h3.2c.4 0 .8.4.8.8v11.4c0 .4-.4.8-.8.8H7c-.4 0-.8-.4-.8-.8V6.3c0-.4.4-.8.8-.8Zm6.8 0H17c.4 0 .8.4.8.8v11.4c0 .4-.4.8-.8.8h-3.2c-.4 0-.8-.4-.8-.8V6.3c0-.4.4-.8.8-.8Z" />
+    </svg>
+  );
+}
+
 type ArticleAudioBlockProps = {
   placement: Extract<ArticleAudioPlacement, "top_player" | "final_audio">;
   product: CatalogProduct;
@@ -60,24 +76,29 @@ export default function ArticleAudioBlock({
     trackEvent,
   } = useArticlePlayback();
 
+  const isPrimary = placement === "top_player";
   const progressRatio =
     isActive && duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
-  let primaryLabel = playLabel;
+  let statusLabel = playLabel;
 
   if (placement === "final_audio") {
     if (isCompleted && !isActive) {
-      primaryLabel = "Начать заново";
+      statusLabel = "Начать заново";
     } else if (isActive && isPlaying) {
-      primaryLabel = "Пауза";
+      statusLabel = "Пауза";
     } else if (isActive || playLabel.includes("Продолжить")) {
-      primaryLabel = "Продолжить";
+      statusLabel = "Продолжить";
     } else {
-      primaryLabel = "Включить";
+      statusLabel = "Начать слушать";
     }
   } else if (isActive && isPlaying) {
-    primaryLabel = "Пауза";
+    statusLabel = "Пауза";
+  } else if (!isActive && !playLabel.includes("Продолжить")) {
+    statusLabel = "Начать слушать";
   }
+
+  const showPauseIcon = isActive && isPlaying;
 
   function handlePrimaryClick() {
     if (isActive && isPlaying) {
@@ -88,18 +109,32 @@ export default function ArticleAudioBlock({
     play(placement);
   }
 
+  const ariaLabel = showPauseIcon
+    ? `Пауза: ${title}`
+    : isLoading
+      ? `Запуск: ${title}`
+      : `${statusLabel}: ${title}`;
+
   return (
     <section
-      id={placement === "top_player" ? "article-top-audio" : "article-final-audio"}
+      id={isPrimary ? "article-top-audio" : "article-final-audio"}
       aria-label={
-        placement === "top_player"
+        isPrimary
           ? "Основная аудиопрактика статьи"
           : "Повторное предложение аудиопрактики"
       }
-      className="scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))] rounded-[24px] border border-[#e8def5] bg-white p-4 shadow-sm sm:p-5"
+      className={[
+        "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))] rounded-[28px] border border-[#dfd0f3] bg-white shadow-[0_10px_28px_rgba(99,61,163,0.08)]",
+        isPrimary ? "p-5 sm:p-6" : "p-4 sm:p-5",
+      ].join(" ")}
     >
-      <div className="flex gap-4">
-        <div className="aspect-square w-[96px] shrink-0 sm:w-[112px]">
+      <div className={`flex ${isPrimary ? "gap-4 sm:gap-5" : "gap-3.5"}`}>
+        <div
+          className={[
+            "aspect-square shrink-0 overflow-hidden rounded-[20px] bg-[#f4ecfb]",
+            isPrimary ? "w-[112px] sm:w-[128px]" : "w-[96px] sm:w-[108px]",
+          ].join(" ")}
+        >
           <ProductCoverThumbnail
             slug={product.slug}
             title={product.title}
@@ -108,15 +143,20 @@ export default function ArticleAudioBlock({
             updatedAt={product.updatedAt}
             authorName={product.authorName}
             format={product.format}
-            className="aspect-square w-full rounded-[18px]"
+            className="aspect-square w-full rounded-[20px]"
           />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-[0.06em] text-[#7d70a2]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#7d70a2]">
             Аудиопрактика
           </p>
-          <h3 className="mt-1 text-lg font-semibold leading-snug text-[#25135c] sm:text-xl">
+          <h3
+            className={[
+              "mt-1.5 font-semibold leading-snug text-[#25135c]",
+              isPrimary ? "text-[1.15rem] sm:text-xl" : "text-lg sm:text-[1.15rem]",
+            ].join(" ")}
+          >
             <Link
               href={href}
               className="hover:text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
@@ -128,30 +168,33 @@ export default function ArticleAudioBlock({
             </Link>
           </h3>
           {authorName ? (
-            <p className="mt-1 text-sm text-[#7d70a2]">{authorName}</p>
+            <p className="mt-1.5 text-sm text-[#7d70a2]">{authorName}</p>
           ) : null}
-          <p className="mt-2 text-sm text-[#4a3d73]">
+          <p className="mt-2 text-sm font-medium text-[#4a3d73]">
             {[accessLabel, durationLabel].filter(Boolean).join(" · ")}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className={`mt-5 flex flex-wrap items-center ${isPrimary ? "gap-3" : "gap-2.5"}`}>
         <button
           type="button"
           onClick={handlePrimaryClick}
           disabled={isLoading}
-          aria-label={
-            isActive && isPlaying
-              ? "Пауза"
-              : primaryLabel === "Пауза"
-                ? "Пауза"
-                : `Воспроизвести: ${title}`
-          }
-          aria-pressed={isActive && isPlaying}
-          className="inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+          aria-label={ariaLabel}
+          aria-pressed={showPauseIcon}
+          className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[#7042c5] py-1.5 pl-1.5 pr-5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(112,66,197,0.28)] hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
         >
-          {isLoading ? "Запуск…" : primaryLabel}
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/18">
+            {isLoading ? (
+              <span className="text-xs font-semibold">…</span>
+            ) : showPauseIcon ? (
+              <PauseIcon />
+            ) : (
+              <PlayIcon />
+            )}
+          </span>
+          <span>{isLoading ? "Запуск…" : statusLabel}</span>
         </button>
 
         {placement === "final_audio" && !isActive ? (
@@ -178,7 +221,7 @@ export default function ArticleAudioBlock({
             onClaimSuccess={() =>
               trackEvent("article_practice_save", { placement })
             }
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#c6afe6] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
           />
         ) : null}
       </div>
@@ -194,7 +237,7 @@ export default function ArticleAudioBlock({
             aria-label="Прогресс прослушивания"
           >
             <div
-              className="h-full rounded-full bg-[#7042c5] transition-[width] duration-200"
+              className="h-full rounded-full bg-[#7042c5] transition-[width] duration-200 motion-reduce:transition-none"
               style={{ width: `${progressRatio * 100}%` }}
             />
           </div>

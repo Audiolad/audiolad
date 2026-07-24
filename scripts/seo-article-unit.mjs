@@ -8,13 +8,18 @@ import { fileURLToPath } from "node:url";
 
 import { isPlatformAnalyticsEventName } from "../src/lib/analytics/constants.ts";
 import {
+  buildAnalyticsConsentBannerBottomOffset,
+} from "../src/lib/analytics/consent-banner-layout.ts";
+import {
   buildArticleJsonLdGraph,
   buildArticleMetadata,
   buildArticlePath,
+  buildCatalogPracticeKeyIndex,
   estimateArticleReadingTimeMinutes,
   getArticleBySlug,
   isValidArticleSlug,
   listArticleSlugs,
+  resolveArticlePrimaryPractice,
 } from "../src/lib/seo/articles/index.ts";
 import { mapArticleDefinitionsToSitemapEntries } from "../src/lib/seo/sitemap-data.ts";
 
@@ -47,12 +52,27 @@ assert(
 assert(article.topicSlug === "lyubov-k-sebe", "topic slug");
 assert(article.topicHref === "/topics/lyubov-k-sebe", "topic href");
 assert(
-  article.primaryPracticeSlug ===
+  article.primaryPractice.practiceKey ===
     "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
-  "primary practice slug",
+  "primary practice key is data-driven slot",
+);
+assert(
+  article.relatedPractices.every((item) => item.practiceKey && item.blurb),
+  "related practices use practiceKey slots",
 );
 assert(article.faq.length === 5, "faq count");
 assert(article.authorLabel === "Редакция АудиоЛада", "editorial author");
+assert(
+  article.leadBeforeAudio ===
+    "Любовь к себе редко начинается с громких обещаний. Иногда достаточно сделать один небольшой шаг навстречу себе.",
+  "short lead for first screen",
+);
+assert(
+  article.introAfterAudio.some((paragraph) =>
+    paragraph.includes("когда мы замечаем, что устали"),
+  ),
+  "full former lead meaning kept in body intro",
+);
 assert(
   !article.leadBeforeAudio.includes("—"),
   "lead uses medium dash, not em dash",
@@ -63,6 +83,56 @@ assert(
   "caption uses medium dash",
 );
 assert(listArticleSlugs().includes("kak-razvit-lyubov-k-sebe"), "slug list");
+
+const catalogIndex = buildCatalogPracticeKeyIndex([
+  {
+    id: "p1",
+    title: "Бастет",
+    slug: "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+    subtitle: null,
+    description: null,
+    format: "Практика",
+    price: 0,
+    isFree: true,
+    authorName: "Сергей Петров",
+    authorSlug: "sergey-petrov",
+    href: "/authors/sergey-petrov/bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+    meta: null,
+    statsLabel: "24 мин",
+    productTypeLabel: "Практика",
+    priceLabel: "Бесплатно",
+    sortTimestamp: 0,
+    coverUrl: null,
+    coverImage: null,
+    updatedAt: null,
+  },
+]);
+assert(
+  resolveArticlePrimaryPractice(article, catalogIndex)?.slug ===
+    article.primaryPractice.practiceKey,
+  "primary practice resolves via catalog key",
+);
+assert(
+  buildAnalyticsConsentBannerBottomOffset().includes(
+    "--global-mini-player-height",
+  ),
+  "consent banner clears mini-player",
+);
+assert(
+  buildAnalyticsConsentBannerBottomOffset().includes(
+    "--bottom-nav-main-height",
+  ),
+  "consent banner clears BottomNav",
+);
+const globalsCss = read("src/app/globals.css");
+assert(
+  globalsCss.includes(".analytics-consent-banner"),
+  "consent banner layout class in globals",
+);
+assert(
+  globalsCss.includes("--global-mini-player-height"),
+  "globals consent offset uses mini-player var",
+);
 
 const readingMinutes = estimateArticleReadingTimeMinutes(article);
 assert(readingMinutes >= 5 && readingMinutes <= 20, `reading time ${readingMinutes}`);
@@ -75,7 +145,7 @@ const pageData = {
   primaryPractice: {
     id: "p1",
     title: "Бастет – Богиня радости, любви и женской силы",
-    slug: article.primaryPracticeSlug,
+    slug: article.primaryPractice.practiceKey,
     subtitle: null,
     description: null,
     format: "Практика",
@@ -83,7 +153,7 @@ const pageData = {
     isFree: true,
     authorName: "Сергей Петров",
     authorSlug: "sergey-petrov",
-    href: `/authors/sergey-petrov/${article.primaryPracticeSlug}`,
+    href: `/authors/sergey-petrov/${article.primaryPractice.practiceKey}`,
     meta: null,
     statsLabel: "24 мин",
     productTypeLabel: "Практика",
@@ -173,7 +243,25 @@ assert(viewSource.includes("Короткий ответ"), "short answer block")
 assert(viewSource.includes("ArticleAudioBlock"), "audio blocks");
 assert(viewSource.includes("placement=\"final_audio\""), "final audio placement");
 assert(viewSource.includes("Частые вопросы"), "visible FAQ");
+assert(viewSource.includes("ArticleFaqList"), "FAQ list component");
 assert(!viewSource.includes("[Включить аудиопрактику]"), "no text stub player");
+assert(!viewSource.includes("bastet-"), "page view has no hard practice slug");
+
+const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
+assert(audioSource.includes("PlayIcon"), "circular play icon");
+assert(audioSource.includes("PauseIcon"), "circular pause icon");
+assert(!audioSource.includes("bastet-"), "audio block has no hard practice slug");
+
+const consentSource = read("src/components/analytics/AnalyticsConsentBanner.tsx");
+assert(
+  consentSource.includes("ANALYTICS_CONSENT_BANNER_CLASS"),
+  "consent uses chrome-aware layout class",
+);
+assert(
+  consentSource.includes("ANALYTICS_CONSENT_BANNER_Z_INDEX_CLASS") ||
+    consentSource.includes("z-40"),
+  "consent above mini-player",
+);
 
 const playbackSource = read("src/components/articles/ArticlePlaybackProvider.tsx");
 assert(

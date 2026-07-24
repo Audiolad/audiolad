@@ -8,10 +8,17 @@ export {
   listArticleDefinitions,
   listArticleSlugs,
 } from "./registry";
+export {
+  buildCatalogPracticeKeyIndex,
+  resolveArticlePrimaryPractice,
+  resolveArticleRelatedPractices,
+  resolveCatalogPracticeByKey,
+} from "./resolve-practices";
 export type {
   ArticleDefinition,
   ArticleFaqItem,
   ArticlePageData,
-  ArticleRelatedPracticeRef,
+  ArticlePracticeSlot,
+  ArticleRelatedPracticeSlot,
   ArticleSection,
 } from "./types";

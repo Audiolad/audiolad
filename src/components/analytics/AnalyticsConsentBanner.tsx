@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  ANALYTICS_CONSENT_BANNER_CLASS,
+  ANALYTICS_CONSENT_BANNER_Z_INDEX_CLASS,
+} from "@/lib/analytics/consent-banner-layout";
 import { writeAnalyticsConsent } from "@/lib/analytics/analytics-consent";
 import { useAnalyticsConsent } from "@/lib/analytics/use-analytics-consent";
 
@@ -28,7 +32,7 @@ export default function AnalyticsConsentBanner() {
       role="dialog"
       aria-labelledby="analytics-consent-heading"
       aria-describedby="analytics-consent-description"
-      className="fixed bottom-0 left-1/2 z-[21] w-[min(100%-2rem,430px)] -translate-x-1/2 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]"
+      className={`fixed left-1/2 ${ANALYTICS_CONSENT_BANNER_CLASS} ${ANALYTICS_CONSENT_BANNER_Z_INDEX_CLASS} w-[min(100%-2rem,430px)] -translate-x-1/2 px-4`}
     >
       <div className="w-full rounded-[22px] border border-[#eadff8] bg-white p-5 shadow-[0_12px_30px_rgba(90,60,145,0.16)]">
         <h2

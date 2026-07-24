@@ -11,6 +11,11 @@ import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 import { buildArticlePath } from "./paths";
 import { estimateArticleReadingTimeMinutes } from "./reading-time";
 import { getArticleBySlug } from "./registry";
+import {
+  buildCatalogPracticeKeyIndex,
+  resolveArticlePrimaryPractice,
+  resolveArticleRelatedPractices,
+} from "./resolve-practices";
 import type { ArticlePageData } from "./types";
 
 async function resolvePrimaryLibraryAction(
@@ -72,27 +77,18 @@ export async function loadArticlePageData(
   }
 
   const catalog = await getPublishedCatalogProducts(supabase);
-  const bySlug = new Map(catalog.map((product) => [product.slug, product]));
-  const primaryPractice = bySlug.get(article.primaryPracticeSlug);
+  const catalogByKey = buildCatalogPracticeKeyIndex(catalog);
+  const primaryPractice = resolveArticlePrimaryPractice(article, catalogByKey);
 
   if (!primaryPractice || !primaryPractice.authorSlug) {
     return null;
   }
 
-  const relatedPractices = article.relatedPractices
-    .map((ref) => {
-      const product = bySlug.get(ref.slug);
-
-      if (!product || product.slug === primaryPractice.slug) {
-        return null;
-      }
-
-      return { product, blurb: ref.blurb };
-    })
-    .filter((item): item is { product: CatalogProduct; blurb: string } =>
-      Boolean(item),
-    )
-    .slice(0, 3);
+  const relatedPractices = resolveArticleRelatedPractices(
+    article,
+    catalogByKey,
+    primaryPractice.id,
+  ).map(({ product, blurb }) => ({ product, blurb }));
 
   const path = buildArticlePath(article.slug);
   const libraryAction = await resolvePrimaryLibraryAction(

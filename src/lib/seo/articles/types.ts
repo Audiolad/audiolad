@@ -11,14 +11,29 @@ export type ArticleSection = {
   paragraphs: string[];
 };
 
-export type ArticleRelatedPracticeRef = {
-  slug: string;
+/**
+ * Stable catalog identity for an editorial practice slot.
+ * Current registry uses the public practice slug as `practiceKey`.
+ * A future DB/CMS row can store the same key (or map UUID → key) without
+ * rewriting article renderer / audio components.
+ */
+export type ArticlePracticeSlot = {
+  practiceKey: string;
+};
+
+export type ArticleRelatedPracticeSlot = ArticlePracticeSlot & {
   blurb: string;
 };
 
+/**
+ * Serializable article document. Safe to load from registry today and from DB later.
+ * Keep this shape free of React nodes and runtime-only fields.
+ */
 export type ArticleDefinition = {
   slug: string;
   title: string;
+  /** Shorter label for breadcrumbs / compact UI */
+  breadcrumbTitle: string;
   metaTitle: string;
   metaDescription: string;
   /** Short lead before top audio block */
@@ -30,8 +45,8 @@ export type ArticleDefinition = {
   topicSlug: string;
   topicTitle: string;
   topicHref: string;
-  primaryPracticeSlug: string;
-  relatedPractices: readonly ArticleRelatedPracticeRef[];
+  primaryPractice: ArticlePracticeSlot;
+  relatedPractices: readonly ArticleRelatedPracticeSlot[];
   faq: readonly ArticleFaqItem[];
   /** Body sections after short answer / TOC (each becomes h2) */
   sections: readonly ArticleSection[];
