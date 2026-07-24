@@ -173,8 +173,8 @@ src/lib/topics/
 |------|---------------|--------|
 | Platform topic | `topics.key` | `self-worth` |
 | Platform title | `topics.title` | Уверенность и самоценность |
-| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya`, `besplatnye-meditatsii` |
-| SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия / Бесплатные медитации |
+| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya`, `besplatnye-meditatsii`, `meditatsii-na-dengi` |
+| SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия / Бесплатные медитации / Медитации на деньги |
 | URL | `/topics/{hub.slug}` | `/topics/lyubov-k-sebe` |
 
 Правила:
@@ -184,7 +184,7 @@ src/lib/topics/
 - Опционально `practiceSlugAllowlist` сужает подборку и задаёт порядок.
 - `resolveTopicChips: false` – хаб не перехватывает ProductTopicLinks (для shared `topicKey` или хабов без key).
 - `topics.slug` в БД **не обязан** совпадать с SEO slug.
-- Активные хабы: «Любовь к себе»; «Женская энергия»; «Бесплатные медитации» (`freeOnly` + allowlist, без platform key).
+- Активные хабы: «Любовь к себе»; «Женская энергия»; «Бесплатные медитации» (`freeOnly` + allowlist, без platform key); «Медитации на деньги» (`topicKey=money` + allowlist, chips off – topic шире денежного SEO-интента).
 - Metadata, canonical, Open Graph, JSON-LD (CollectionPage + ItemList + FAQPage + BreadcrumbList), FAQ и перелинковка – в шаблоне хаба.
 - Sitemap включает хаб только если есть ≥ 1 подходящая опубликованная практика.
 - Каталог `/catalog?topic=…` остаётся фильтром UI; canonical у хабов – их `/topics/{slug}`.
@@ -216,7 +216,7 @@ SQL allowlist: миграция `20260724160000_platform_analytics_topic_hub_eve
 ## Future (не в Stage A)
 
 - `/admin/topics` — CRUD для platform staff
-- Расширение реестра SEO-хабов (деньги, энергия, …)
+- Расширение реестра SEO-хабов (`/topics/izobilie`, энергия, …)
 - `merged_into_topic_id`, slug redirects
 - Ranking / editorial weight
 - Author plans table
