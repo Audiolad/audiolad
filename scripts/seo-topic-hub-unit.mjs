@@ -51,7 +51,7 @@ assert(
 );
 assert(
   resolveTopicPublicHref("money") === "/catalog?topic=money",
-  "unmapped topic falls back to catalog",
+  "money chips stay on catalog while money hub has resolveTopicChips=false",
 );
 
 const femaleHub = getTopicHubBySlug("zhenskaya-energiya");
@@ -297,6 +297,136 @@ assert(topicsDoc.includes("lyubov-k-sebe"), "TOPICS.md mentions pilot slug");
 assert(
   topicsDoc.includes("besplatnye-meditatsii"),
   "TOPICS.md mentions free hub",
+);
+assert(
+  topicsDoc.includes("meditatsii-na-dengi"),
+  "TOPICS.md mentions money hub",
+);
+
+const moneyHub = getTopicHubBySlug("meditatsii-na-dengi");
+assert(moneyHub?.topicKey === "money", "money hub honest topicKey");
+assert(moneyHub?.resolveTopicChips === false, "money hub does not steal chips");
+assert(
+  moneyHub?.practiceSlugAllowlist?.length === 7,
+  "money hub editorial allowlist of 7",
+);
+assert(moneyHub?.title === "Медитации на деньги", "money hub H1");
+assert(
+  !String(moneyHub?.metaDescription || "").includes("гарант"),
+  "money meta avoids guarantee wording",
+);
+assert(
+  listTopicHubSlugs().includes("meditatsii-na-dengi"),
+  "money hub registered",
+);
+assert(
+  sitemapEntries.some((entry) =>
+    entry.url.endsWith("/topics/meditatsii-na-dengi"),
+  ),
+  "sitemap includes money hub",
+);
+assert(
+  getTopicHubByTopicKey("money") === null,
+  "money topicKey does not reverse-map to hub chips",
+);
+assert(
+  moneyHub?.relatedLinks?.some(
+    (link) => link.href === "/topics/besplatnye-meditatsii",
+  ),
+  "money hub links to free hub",
+);
+assert(
+  freeHub?.relatedLinks?.some(
+    (link) => link.href === "/topics/meditatsii-na-dengi",
+  ),
+  "free hub links to money hub",
+);
+assert(
+  !moneyHub?.practiceSlugAllowlist?.includes("klyuch-k-izobiliyu") &&
+    !moneyHub?.practiceSlugAllowlist?.includes("koding-izobiliya") &&
+    !moneyHub?.practiceSlugAllowlist?.includes("aktivatsiya-kanala-izobiliya"),
+  "abundance practices reserved for future izobilie hub",
+);
+
+const moneyOrdered = selectTopicHubProducts(
+  [
+    {
+      id: "m3",
+      title: "Paid deep",
+      slug: "energiya-deneg",
+      isFree: false,
+      sortTimestamp: 9,
+    },
+    {
+      id: "m1",
+      title: "Free entry",
+      slug: "dengi-prihodyat-segodnya",
+      isFree: true,
+      sortTimestamp: 1,
+    },
+    {
+      id: "m2",
+      title: "Abundance out",
+      slug: "klyuch-k-izobiliyu",
+      isFree: true,
+      sortTimestamp: 5,
+    },
+    {
+      id: "m4",
+      title: "Attraction",
+      slug: "prityanut-dengi-legko",
+      isFree: true,
+      sortTimestamp: 3,
+    },
+  ],
+  moneyHub,
+);
+assert(
+  moneyOrdered.map((p) => p.slug).join(",") ===
+    "dengi-prihodyat-segodnya,prityanut-dengi-legko,energiya-deneg",
+  "money allowlist order; abundance slug excluded",
+);
+
+const moneyPageData = {
+  hub: moneyHub,
+  path: "/topics/meditatsii-na-dengi",
+  canonicalUrl: "https://audiolad.ru/topics/meditatsii-na-dengi",
+  products: pageData.products,
+  freeProducts: pageData.products,
+  paidProducts: [],
+  platformTopicTitle: "Деньги",
+};
+const moneyMeta = buildTopicHubMetadata(moneyPageData);
+assert(
+  moneyMeta.alternates?.canonical ===
+    "https://audiolad.ru/topics/meditatsii-na-dengi",
+  "money canonical",
+);
+assert(String(moneyMeta.title).includes("Медитации на деньги"), "money title");
+
+const moneyJson = JSON.stringify(buildTopicHubJsonLdGraph(moneyPageData));
+assert(moneyJson.includes("CollectionPage"), "money JSON-LD CollectionPage");
+assert(moneyJson.includes("ItemList"), "money JSON-LD ItemList");
+assert(moneyJson.includes("FAQPage"), "money JSON-LD FAQPage");
+assert(moneyJson.includes("BreadcrumbList"), "money JSON-LD BreadcrumbList");
+
+assert(
+  getTopicHubByTopicKey("self-worth")?.slug === "lyubov-k-sebe",
+  "regression after money hub: self-worth -> love",
+);
+assert(
+  getTopicHubBySlug("lyubov-k-sebe")?.practiceSlugAllowlist == null,
+  "regression: love hub still topic-wide",
+);
+assert(
+  getTopicHubBySlug("zhenskaya-energiya")?.practiceSlugAllowlist?.length === 6,
+  "regression: female allowlist unchanged",
+);
+assert(
+  getTopicHubBySlug("besplatnye-meditatsii")?.freeOnly === true &&
+    getTopicHubBySlug("besplatnye-meditatsii")?.practiceSlugAllowlist
+      ?.length === 10,
+  "regression: free hub unchanged",
 );
 
 console.log("seo-topic-hub-unit: ok");
