@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
+import BecomeAuthorScrollReset from "@/components/become-author/BecomeAuthorScrollReset";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 export const becomeAuthorShellClassName = [
@@ -17,6 +18,7 @@ type BecomeAuthorShellProps = {
 export default function BecomeAuthorShell({ children }: BecomeAuthorShellProps) {
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <BecomeAuthorScrollReset />
       <div className={becomeAuthorShellClassName}>
         <div className={becomeAuthorPaddingClassName}>{children}</div>
         <BottomNav />
