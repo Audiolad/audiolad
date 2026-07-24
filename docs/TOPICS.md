@@ -159,10 +159,40 @@ src/lib/topics/
 - Публичная страница продукта (`/practice/{authorSlug}/{productSlug}`) показывает **активные** темы через `loadPublicPracticeTopicsSafe()` → `getActivePracticeTopics()`.
 - Inactive/архивные темы публично **не показываются** (фильтр в query layer этапа A).
 - UI: `ProductTopicLinks` — компактные navigation chips, не overlay на cover.
-- Ссылки: `/catalog?topic=<key>` через `buildCatalogTopicHref()`.
+- Ссылки: `resolveTopicPublicHref(topic.key)` – SEO-хаб `/topics/{slug}`, если он есть в реестре; иначе `/catalog?topic=<key>`.
 - При ошибке загрузки тем блок скрывается; страница продукта не падает.
 - Темы на карточках Главной, Каталога, Аудиотеки и Плейлистов **не реализованы** (отдельная задача).
-- `/topics/[slug]` **не используется**.
+
+---
+
+## SEO topic hubs (`/topics/{slug}`)
+
+Редакционные посадочные страницы **не заменяют** справочник `topics`.
+
+| Слой | Идентификатор | Пример |
+|------|---------------|--------|
+| Platform topic | `topics.key` | `self-worth` |
+| Platform title | `topics.title` | Уверенность и самоценность |
+| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe` |
+| SEO hub H1 | editorial `title` | Любовь к себе |
+| URL | `/topics/{hub.slug}` | `/topics/lyubov-k-sebe` |
+
+Правила:
+
+- Практики на хабе собираются автоматически: published + catalog-listed + `practice_topics` → `topics.key = hub.topicKey`.
+- `topics.slug` в БД **не обязан** совпадать с SEO slug; analytics/API всегда используют `topic_key`.
+- Пилот: «Любовь к себе» → `self-worth`.
+- Metadata, canonical, Open Graph, JSON-LD (CollectionPage + ItemList + FAQPage + BreadcrumbList), FAQ и перелинковка – в шаблоне хаба.
+- Sitemap включает хаб только если есть ≥ 1 опубликованная практика темы.
+- Каталог `/catalog?topic=self-worth` остаётся фильтром UI; canonical у хаба – `/topics/lyubov-k-sebe`.
+
+Код:
+
+```
+src/lib/seo/topic-hubs/     — registry, load, metadata, json-ld, paths
+src/app/(listener)/topics/[slug]/page.tsx
+src/components/topics/TopicHubPageView.tsx
+```
 
 ---
 
@@ -170,14 +200,21 @@ src/lib/topics/
 
 Использовать **`topic_key`**, не `topic_title`.
 
-Future events: `topic_page_viewed`, `topic_product_clicked`, …
+События хаба:
+
+- `topic_page_viewed` – свойства: `topic_key`, `hub_slug`, `product_count`
+- `topic_product_clicked` – свойства: `topic_key`, `hub_slug`; `practice_id` в корне события
+
+TS allowlist: `src/lib/analytics/constants.ts`  
+SQL allowlist: миграция `20260724160000_platform_analytics_topic_hub_events.sql`  
+(миграция **не применяется** без отдельного согласования deploy).
 
 ---
 
 ## Future (не в Stage A)
 
 - `/admin/topics` — CRUD для platform staff
-- `/topics/[slug]` — SEO landing pages
+- Расширение реестра SEO-хабов (деньги, энергия, …)
 - `merged_into_topic_id`, slug redirects
 - Ranking / editorial weight
 - Author plans table

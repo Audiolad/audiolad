@@ -42,10 +42,14 @@ assert(component.includes("topics"), "component receives topics via props");
 assert(!component.includes("useEffect"), "no client fetch/useEffect");
 assert(!component.includes("useState"), "no client state fetch");
 assert(component.includes('from "next/link"'), "uses Link");
-assert(component.includes("buildCatalogTopicHref"), "uses buildCatalogTopicHref");
+assert(component.includes("resolveTopicPublicHref"), "uses resolveTopicPublicHref");
 assert(
   buildCatalogTopicHref("money") === "/catalog?topic=money",
-  "money href uses topic key",
+  "money catalog href uses topic key",
+);
+assert(
+  component.includes("@/lib/seo/topic-hubs"),
+  "topic links resolve via SEO topic hubs helper",
 );
 assert(!component.includes("?need="), "no legacy need links");
 assert(!component.includes("HOME_NEED"), "no hardcoded topic list");
