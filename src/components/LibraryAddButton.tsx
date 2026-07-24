@@ -24,6 +24,8 @@ type LibraryAddButtonProps = {
   className?: string;
   practiceId?: string;
   promoSignup?: boolean;
+  /** Fires only after a confirmed successful library claim. */
+  onClaimSuccess?: () => void;
 };
 
 type ApiErrorBody = {
@@ -60,6 +62,7 @@ export default function LibraryAddButton({
   className,
   practiceId,
   promoSignup = false,
+  onClaimSuccess,
 }: LibraryAddButtonProps) {
   const router = useRouter();
   const { showFirstSaveRetention } = useFirstSaveRetention();
@@ -102,6 +105,7 @@ export default function LibraryAddButton({
         isClaimLibrarySuccessBody(body)
       ) {
         setAction(resolveLibraryActionAfterClaimSuccess());
+        onClaimSuccess?.();
 
         if (body.retention.show_first_save_prompt) {
           showFirstSaveRetention({

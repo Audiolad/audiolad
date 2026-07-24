@@ -44,7 +44,12 @@ export function shouldShowBottomNav(pathname: string): boolean {
 }
 
 export function isBottomNavNeutralPathname(pathname: string): boolean {
-  return BOTTOM_NAV_NEUTRAL_EXACT.has(pathname);
+  if (BOTTOM_NAV_NEUTRAL_EXACT.has(pathname)) {
+    return true;
+  }
+
+  // Editorial SEO articles are not primary tabs – keep BottomNav visible without an active item.
+  return pathname === "/articles" || pathname.startsWith("/articles/");
 }
 
 export const platformTopSafePaddingClass = "platform-top-safe-padding";

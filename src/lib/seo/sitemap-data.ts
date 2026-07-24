@@ -13,6 +13,10 @@ import { buildAuthorPublicPath, buildPracticePublicPath } from "@/lib/products/p
 import { PRODUCTION_APP_ORIGIN, getAppOrigin } from "@/lib/seo/app-origin";
 import { isValidPublicEntitySlug } from "@/lib/seo/public-slug";
 import {
+  buildArticlePath,
+  listArticleDefinitions,
+} from "@/lib/seo/articles";
+import {
   buildTopicHubPath,
   listTopicHubDefinitions,
 } from "@/lib/seo/topic-hubs";
@@ -543,6 +547,25 @@ export function mapTopicHubDefinitionsToSitemapEntries(
   }));
 }
 
+export function mapArticleDefinitionsToSitemapEntries(
+  articles: ReadonlyArray<{
+    slug: string;
+    updatedAt?: string;
+    publishedAt?: string;
+  }> = listArticleDefinitions(),
+  origin: string = getAppOrigin(),
+): SitemapEntry[] {
+  return articles.map((article) => ({
+    url: toAbsoluteSitemapUrl(buildArticlePath(article.slug), origin),
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+    lastModified: resolveContentLastModified(
+      article.updatedAt,
+      article.publishedAt,
+    ),
+  }));
+}
+
 async function fetchTopicHubSitemapEntries(
   supabase: SupabaseClient,
 ): Promise<SitemapEntry[]> {
@@ -597,6 +620,7 @@ export type SitemapBuildStats = {
   playlists: number;
   promos: number;
   topicHubs: number;
+  articles: number;
   total: number;
 };
 
@@ -611,6 +635,7 @@ export async function buildSitemapEntries(): Promise<{
   let playlistEntries: SitemapEntry[] = [];
   let promoEntries: SitemapEntry[] = [];
   let topicHubEntries: SitemapEntry[] = [];
+  const articleEntries = mapArticleDefinitionsToSitemapEntries();
 
   try {
     const supabase = await createClient();
@@ -639,6 +664,7 @@ export async function buildSitemapEntries(): Promise<{
     playlistEntries,
     promoEntries,
     topicHubEntries,
+    articleEntries,
   );
 
   return {
@@ -650,6 +676,7 @@ export async function buildSitemapEntries(): Promise<{
       playlists: playlistEntries.length,
       promos: promoEntries.length,
       topicHubs: topicHubEntries.length,
+      articles: articleEntries.length,
       total: entries.length,
     },
   };
