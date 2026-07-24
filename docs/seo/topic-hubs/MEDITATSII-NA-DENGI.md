@@ -30,7 +30,7 @@ Published money-related (topic `money` и/или денежный текст): 1
 | 6 | `energiya-deneg` | paid | Программа квант-медитаций | глубокая программа |
 | 7 | `ishod-denezhnyy-kalibr` | paid | Энергетический сеанс | точечный сеанс |
 
-### Исключены → будущий `/topics/izobilie`
+### Исключены → `/topics/izobilie`
 
 - `klyuch-k-izobiliyu` (free)
 - `aktivatsiya-kanala-izobiliya` (paid)
