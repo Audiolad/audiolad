@@ -46,11 +46,41 @@ assert(listTopicHubSlugs().includes("lyubov-k-sebe"), "slug list");
 
 assert(
   resolveTopicPublicHref("self-worth") === "/topics/lyubov-k-sebe",
-  "self-worth prefers SEO hub",
+  "self-worth prefers primary SEO hub",
 );
 assert(
   resolveTopicPublicHref("money") === "/catalog?topic=money",
   "unmapped topic falls back to catalog",
+);
+
+const femaleHub = getTopicHubBySlug("zhenskaya-energiya");
+assert(femaleHub?.topicKey === "self-worth", "female hub uses factual self-worth key");
+assert(femaleHub?.resolveTopicChips === false, "female hub does not steal topic chips");
+assert(
+  Array.isArray(femaleHub?.practiceSlugAllowlist) &&
+    femaleHub.practiceSlugAllowlist.length >= 4,
+  "female hub has editorial allowlist",
+);
+assert(femaleHub?.title === "Женская энергия", "female hub H1");
+assert(
+  !String(femaleHub?.metaDescription || "").includes("любовь к себе"),
+  "female meta is not a copy of love hub",
+);
+assert(
+  listTopicHubSlugs().includes("zhenskaya-energiya"),
+  "female hub slug registered",
+);
+assert(
+  getTopicHubByTopicKey("self-worth")?.slug === "lyubov-k-sebe",
+  "primary reverse map stays love hub",
+);
+assert(
+  femaleHub?.relatedLinks?.some((link) => link.href === "/topics/lyubov-k-sebe"),
+  "female hub links to love hub",
+);
+assert(
+  hub?.relatedLinks?.some((link) => link.href === "/topics/zhenskaya-energiya"),
+  "love hub links to female hub",
 );
 
 const pageData = {
@@ -112,7 +142,39 @@ assert(
   sitemapEntries.some((entry) =>
     entry.url.endsWith("/topics/lyubov-k-sebe"),
   ),
-  "sitemap includes hub",
+  "sitemap includes love hub",
+);
+assert(
+  sitemapEntries.some((entry) =>
+    entry.url.endsWith("/topics/zhenskaya-energiya"),
+  ),
+  "sitemap includes female hub",
+);
+
+const femalePageData = {
+  hub: femaleHub,
+  path: "/topics/zhenskaya-energiya",
+  canonicalUrl: "https://audiolad.ru/topics/zhenskaya-energiya",
+  products: pageData.products,
+  freeProducts: [],
+  paidProducts: [],
+  platformTopicTitle: "Уверенность и самоценность",
+};
+const femaleMeta = buildTopicHubMetadata(femalePageData);
+assert(
+  femaleMeta.alternates?.canonical ===
+    "https://audiolad.ru/topics/zhenskaya-energiya",
+  "female canonical",
+);
+assert(String(femaleMeta.title).includes("Женская энергия"), "female title");
+const femaleJsonLd = buildTopicHubJsonLdGraph(
+  femalePageData,
+  "https://audiolad.ru",
+);
+assert(
+  Array.isArray(femaleJsonLd["@graph"]) &&
+    femaleJsonLd["@graph"].some((node) => node["@type"] === "FAQPage"),
+  "female FAQ JSON-LD",
 );
 
 assert(isPlatformAnalyticsEventName("topic_page_viewed"), "topic_page_viewed allowlisted in TS");
@@ -130,6 +192,15 @@ assert(viewSource.includes("JsonLdScript"), "renders JSON-LD");
 assert(viewSource.includes("TopicHubViewTracker"), "view tracker");
 assert(viewSource.includes("Хлебные крошки"), "breadcrumbs");
 assert(viewSource.includes("Частые вопросы"), "FAQ section");
+
+const viewTracker = read("src/components/topics/TopicHubViewTracker.tsx");
+const clickTracker = read(
+  "src/components/topics/TopicHubProductClickTracker.tsx",
+);
+assert(viewTracker.includes("topic_slug: hubSlug"), "view sends topic_slug");
+assert(clickTracker.includes("topic_slug: hubSlug"), "click sends topic_slug");
+assert(viewTracker.includes("hub_slug: hubSlug"), "view keeps hub_slug");
+assert(clickTracker.includes("hub_slug: hubSlug"), "click keeps hub_slug");
 
 const migration = read(
   "supabase/migrations/20260724160000_platform_analytics_topic_hub_events.sql",

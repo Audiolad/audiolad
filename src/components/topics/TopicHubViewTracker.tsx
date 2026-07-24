@@ -42,6 +42,8 @@ export default function TopicHubViewTracker({
       path,
       properties: {
         topic_key: topicKey,
+        // Public SEO hub slug – distinguishes hubs that share topic_key.
+        topic_slug: hubSlug,
         hub_slug: hubSlug,
         product_count: productCount,
       },

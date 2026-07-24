@@ -173,18 +173,20 @@ src/lib/topics/
 |------|---------------|--------|
 | Platform topic | `topics.key` | `self-worth` |
 | Platform title | `topics.title` | Уверенность и самоценность |
-| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe` |
-| SEO hub H1 | editorial `title` | Любовь к себе |
+| SEO hub slug | реестр `src/lib/seo/topic-hubs/registry.ts` | `lyubov-k-sebe`, `zhenskaya-energiya` |
+| SEO hub H1 | editorial `title` | Любовь к себе / Женская энергия |
 | URL | `/topics/{hub.slug}` | `/topics/lyubov-k-sebe` |
 
 Правила:
 
 - Практики на хабе собираются автоматически: published + catalog-listed + `practice_topics` → `topics.key = hub.topicKey`.
+- Опционально `practiceSlugAllowlist` сужает подборку, если один `topicKey` обслуживает несколько SEO-хабов.
+- `resolveTopicChips: false` – хаб не перехватывает ProductTopicLinks для shared `topicKey` (primary остаётся «Любовь к себе» для `self-worth`).
 - `topics.slug` в БД **не обязан** совпадать с SEO slug; analytics/API всегда используют `topic_key`.
-- Пилот: «Любовь к себе» → `self-worth`.
+- Активные хабы: «Любовь к себе»; «Женская энергия» (shared `self-worth` + allowlist; отдельного platform key нет).
 - Metadata, canonical, Open Graph, JSON-LD (CollectionPage + ItemList + FAQPage + BreadcrumbList), FAQ и перелинковка – в шаблоне хаба.
 - Sitemap включает хаб только если есть ≥ 1 опубликованная практика темы.
-- Каталог `/catalog?topic=self-worth` остаётся фильтром UI; canonical у хаба – `/topics/lyubov-k-sebe`.
+- Каталог `/catalog?topic=self-worth` остаётся фильтром UI; canonical у хабов – их `/topics/{slug}`.
 
 Код:
 

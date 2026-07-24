@@ -18,7 +18,10 @@ export type TopicHubRelatedLink = {
 export type TopicHubDefinition = {
   /** Public URL slug: /topics/{slug} */
   slug: string;
-  /** Stable analytics / platform topics.key */
+  /**
+   * Platform `topics.key` used to load published catalog practices
+   * and as analytics `topic_key`.
+   */
   topicKey: string;
   /** H1 and primary SEO title stem */
   title: string;
@@ -30,6 +33,16 @@ export type TopicHubDefinition = {
   body: string[];
   faq: TopicHubFaqItem[];
   relatedLinks: TopicHubRelatedLink[];
+  /**
+   * Optional editorial subset of practice slugs after topicKey filter.
+   * Used when one platform topic powers several SEO hubs (anti-cannibalization).
+   */
+  practiceSlugAllowlist?: readonly string[];
+  /**
+   * When true (default), ProductTopicLinks resolve this topicKey to the hub.
+   * Set false for secondary hubs that share a topicKey with a primary hub.
+   */
+  resolveTopicChips?: boolean;
   /** Index only when at least one published catalog practice is assigned */
   indexWhenEmpty?: boolean;
 };
