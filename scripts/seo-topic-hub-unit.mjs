@@ -15,6 +15,7 @@ import {
   isValidTopicHubSlug,
   listTopicHubSlugs,
   resolveTopicPublicHref,
+  selectTopicHubProducts,
 } from "../src/lib/seo/topic-hubs/index.ts";
 import { mapTopicHubDefinitionsToSitemapEntries } from "../src/lib/seo/sitemap-data.ts";
 import { isPlatformAnalyticsEventName } from "../src/lib/analytics/constants.ts";
@@ -201,20 +202,101 @@ assert(viewTracker.includes("topic_slug: hubSlug"), "view sends topic_slug");
 assert(clickTracker.includes("topic_slug: hubSlug"), "click sends topic_slug");
 assert(viewTracker.includes("hub_slug: hubSlug"), "view keeps hub_slug");
 assert(clickTracker.includes("hub_slug: hubSlug"), "click keeps hub_slug");
+assert(
+  viewTracker.includes("normalizedTopicKey") &&
+    viewTracker.includes("properties.topic_key"),
+  "view sends topic_key only when present",
+);
+
+const freeHub = getTopicHubBySlug("besplatnye-meditatsii");
+assert(freeHub?.freeOnly === true, "free hub freeOnly");
+assert(!freeHub?.topicKey, "free hub has no fake topicKey");
+assert(freeHub?.resolveTopicChips === false, "free hub does not steal chips");
+assert(
+  freeHub?.practiceSlugAllowlist?.length === 10,
+  "free hub editorial allowlist of 10",
+);
+assert(freeHub?.title === "Бесплатные медитации", "free hub H1");
+assert(
+  listTopicHubSlugs().includes("besplatnye-meditatsii"),
+  "free hub registered",
+);
+assert(
+  sitemapEntries.some((entry) =>
+    entry.url.endsWith("/topics/besplatnye-meditatsii"),
+  ),
+  "sitemap includes free hub",
+);
+assert(
+  getTopicHubByTopicKey("self-worth")?.slug === "lyubov-k-sebe",
+  "regression: self-worth still maps to love hub",
+);
+assert(
+  resolveTopicPublicHref("self-worth") === "/topics/lyubov-k-sebe",
+  "regression: chips still go to love hub",
+);
+
+const freeOrdered = selectTopicHubProducts(
+  [
+    {
+      id: "2",
+      title: "B",
+      slug: "velikie-zhenschiny-mira",
+      isFree: true,
+      sortTimestamp: 9,
+    },
+    {
+      id: "1",
+      title: "A",
+      slug: "kod-prityazheniya",
+      isFree: true,
+      sortTimestamp: 1,
+    },
+    {
+      id: "3",
+      title: "Paid",
+      slug: "sila-zhenstvennosti",
+      isFree: false,
+      sortTimestamp: 5,
+    },
+  ],
+  freeHub,
+);
+assert(
+  freeOrdered.map((p) => p.slug).join(",") ===
+    "kod-prityazheniya,velikie-zhenschiny-mira",
+  "freeOnly + allowlist order; paid excluded",
+);
+
+const freePageData = {
+  hub: freeHub,
+  path: "/topics/besplatnye-meditatsii",
+  canonicalUrl: "https://audiolad.ru/topics/besplatnye-meditatsii",
+  products: pageData.products,
+  freeProducts: pageData.products,
+  paidProducts: [],
+  platformTopicTitle: null,
+};
+const freeMeta = buildTopicHubMetadata(freePageData);
+assert(
+  freeMeta.alternates?.canonical ===
+    "https://audiolad.ru/topics/besplatnye-meditatsii",
+  "free canonical",
+);
+assert(String(freeMeta.title).includes("Бесплатные медитации"), "free title");
 
 const migration = read(
   "supabase/migrations/20260724160000_platform_analytics_topic_hub_events.sql",
 );
 assert(migration.includes("topic_page_viewed"), "migration adds topic_page_viewed");
 assert(migration.includes("topic_product_clicked"), "migration adds topic_product_clicked");
-assert(
-  migration.includes("NOT applied in this task") ||
-    migration.includes("apply only after explicit"),
-  "migration marked as not auto-applied",
-);
 
 const topicsDoc = read("docs/TOPICS.md");
 assert(topicsDoc.includes("/topics/"), "TOPICS.md documents topic hubs");
 assert(topicsDoc.includes("lyubov-k-sebe"), "TOPICS.md mentions pilot slug");
+assert(
+  topicsDoc.includes("besplatnye-meditatsii"),
+  "TOPICS.md mentions free hub",
+);
 
 console.log("seo-topic-hub-unit: ok");

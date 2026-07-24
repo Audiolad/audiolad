@@ -8,7 +8,7 @@ import {
 } from "@/lib/analytics/client";
 
 type TopicHubProductClickTrackerProps = {
-  topicKey: string;
+  topicKey?: string | null;
   hubSlug: string;
   practiceId: string;
   path: string;
@@ -34,17 +34,23 @@ export default function TopicHubProductClickTracker({
           return;
         }
 
+        const properties: Record<string, string | number | boolean> = {
+          topic_slug: hubSlug,
+          hub_slug: hubSlug,
+        };
+
+        const normalizedTopicKey = topicKey?.trim();
+
+        if (normalizedTopicKey) {
+          properties.topic_key = normalizedTopicKey;
+        }
+
         void trackPlatformEvent({
           sessionId,
           event_name: "topic_product_clicked",
           path,
           practice_id: practiceId,
-          properties: {
-            topic_key: topicKey,
-            // Public SEO hub slug – distinguishes hubs that share topic_key.
-            topic_slug: hubSlug,
-            hub_slug: hubSlug,
-          },
+          properties,
         });
       }}
     >

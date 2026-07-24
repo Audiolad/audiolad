@@ -1,5 +1,5 @@
 export { buildTopicHubJsonLdGraph } from "./json-ld";
-export { loadTopicHubPageData } from "./load";
+export { loadTopicHubPageData, selectTopicHubProducts } from "./load";
 export { buildTopicHubMetadata } from "./metadata";
 export { buildTopicHubPath, isValidTopicHubSlug } from "./paths";
 export { resolveTopicPublicHref } from "./public-href";

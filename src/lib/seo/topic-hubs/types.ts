@@ -13,16 +13,19 @@ export type TopicHubRelatedLink = {
 
 /**
  * Editorial SEO topic hub.
- * Practices are collected via platform `topicKey` (topics.key), not via hub slug.
+ * Practices are collected from published catalog via topicKey and/or freeOnly,
+ * then optionally narrowed/ordered by practiceSlugAllowlist.
  */
 export type TopicHubDefinition = {
   /** Public URL slug: /topics/{slug} */
   slug: string;
   /**
-   * Platform `topics.key` used to load published catalog practices
-   * and as analytics `topic_key`.
+   * Optional platform `topics.key`.
+   * Omit for cross-topic hubs (e.g. free entry) – do not invent a fake key.
    */
-  topicKey: string;
+  topicKey?: string;
+  /** When true, keep only free published catalog practices */
+  freeOnly?: boolean;
   /** H1 and primary SEO title stem */
   title: string;
   /** Meta description (unique per hub) */
@@ -34,13 +37,13 @@ export type TopicHubDefinition = {
   faq: TopicHubFaqItem[];
   relatedLinks: TopicHubRelatedLink[];
   /**
-   * Optional editorial subset of practice slugs after topicKey filter.
-   * Used when one platform topic powers several SEO hubs (anti-cannibalization).
+   * Optional editorial subset + order of practice slugs.
+   * Applied after topicKey / freeOnly filters. Order is preserved.
    */
   practiceSlugAllowlist?: readonly string[];
   /**
    * When true (default), ProductTopicLinks resolve this topicKey to the hub.
-   * Set false for secondary hubs that share a topicKey with a primary hub.
+   * Requires topicKey. Set false for secondary / cross-topic hubs.
    */
   resolveTopicChips?: boolean;
   /** Index only when at least one published catalog practice is assigned */

@@ -34,7 +34,7 @@ function ProductSection({
         {products.map((product) => (
           <li key={product.id}>
             <TopicHubProductClickTracker
-              topicKey={data.hub.topicKey}
+              topicKey={data.hub.topicKey ?? null}
               hubSlug={data.hub.slug}
               practiceId={product.id}
               path={data.path}
@@ -56,7 +56,7 @@ export default function TopicHubPageView({ data }: TopicHubPageViewProps) {
       <JsonLdScript data={jsonLd} />
       <TopicHubViewTracker
         path={data.path}
-        topicKey={data.hub.topicKey}
+        topicKey={data.hub.topicKey ?? null}
         hubSlug={data.hub.slug}
         productCount={data.products.length}
       />
@@ -108,6 +108,16 @@ export default function TopicHubPageView({ data }: TopicHubPageViewProps) {
                   ? "практики"
                   : "практик"}
               .
+            </p>
+          ) : data.hub.freeOnly ? (
+            <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+              Только бесплатные практики публичного каталога – {data.products.length}{" "}
+              {data.products.length === 1
+                ? "материал"
+                : data.products.length < 5
+                  ? "материала"
+                  : "материалов"}
+              . Платных программ в этой подборке нет.
             </p>
           ) : null}
         </header>

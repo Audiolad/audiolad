@@ -49,6 +49,11 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
         description: "Другой угол: женственность, наполнение и мягкая сила",
       },
       {
+        href: "/topics/besplatnye-meditatsii",
+        title: "Бесплатные медитации",
+        description: "Слушать бесплатные аудиопрактики онлайн без покупки",
+      },
+      {
         href: "/catalog?topic=self-worth",
         title: "Все практики темы в каталоге",
         description: "Фильтр каталога по теме «Уверенность и самоценность»",
@@ -115,6 +120,11 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
         description: "Принятие себя, самоценность и бережное отношение к себе",
       },
       {
+        href: "/topics/besplatnye-meditatsii",
+        title: "Бесплатные медитации",
+        description: "Слушать бесплатные аудиопрактики онлайн без покупки",
+      },
+      {
         href: "/catalog?topic=self-worth",
         title: "Тема «Уверенность и самоценность» в каталоге",
         description: "Полный фильтр платформенной темы, включая смежные практики",
@@ -131,6 +141,86 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
       },
     ],
   },
+  {
+    slug: "besplatnye-meditatsii",
+    freeOnly: true,
+    resolveTopicChips: false,
+    practiceSlugAllowlist: [
+      "kod-prityazheniya",
+      "dengi-prihodyat-segodnya",
+      "prityanut-dengi-legko",
+      "zhenskie-dengi",
+      "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+      "elixir-molodosti",
+      "klyuch-k-izobiliyu",
+      "dengi-menya-obozhayut",
+      "energiya-denezhnogo-puti",
+      "velikie-zhenschiny-mira",
+    ],
+    title: "Бесплатные медитации",
+    metaDescription:
+      "Бесплатные медитации и аудиопрактики на АудиоЛаде для прослушивания онлайн без покупки. Подборка бесплатных практик для мягкого старта.",
+    intro:
+      "Подборка бесплатных медитаций и аудиопрактик для прослушивания онлайн без покупки. Платных материалов в этой подборке нет. Для прослушивания или сохранения в Аудиотеку может понадобиться вход в аккаунт.",
+    body: [
+      "Люди ищут «бесплатные медитации», «медитацию слушать бесплатно» и «медитации онлайн бесплатно», когда хотят попробовать формат без оплаты. Здесь собраны опубликованные бесплатные практики каталога АудиоЛада – не полный архив интернета и не раздел «скачать».",
+      "Основной сценарий – прослушивание онлайн на сайте. Бесплатность означает отсутствие покупки, а не обязательный доступ без аккаунта: для прослушивания или сохранения практики в Аудиотеку может потребоваться вход.",
+    ],
+    faq: [
+      {
+        question: "Практика действительно бесплатная?",
+        answer:
+          "Да. В этой подборке только опубликованные бесплатные практики каталога – платных программ здесь нет. Бесплатность означает отсутствие покупки.",
+      },
+      {
+        question: "Нужна ли регистрация, чтобы слушать?",
+        answer:
+          "Для прослушивания или сохранения практики в Аудиотеку может понадобиться вход в аккаунт. Мы не обещаем доступ без регистрации – условия зависят от конкретной практики и сценария на платформе.",
+      },
+      {
+        question: "Можно ли скачать медитацию?",
+        answer:
+          "Эта страница про слушание онлайн на АудиоЛаде. Мы не обещаем скачивание файлов – фокус на безопасном прослушивании в плеере платформы.",
+      },
+      {
+        question: "Почему здесь не все медитации мира?",
+        answer:
+          "Это подборка бесплатных практик авторов АудиоЛада из публичного каталога, а не полный каталог всех медитаций в интернете. Список обновляется по мере публикации новых бесплатных практик.",
+      },
+      {
+        question: "Чем эта страница отличается от каталога?",
+        answer:
+          "Каталог показывает весь ассортимент, включая платное. Здесь – подборка бесплатных медитаций и аудиопрактик для прослушивания онлайн без покупки.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/catalog",
+        title: "Полный каталог АудиоЛада",
+        description: "Бесплатные и платные практики в одном месте",
+      },
+      {
+        href: "/topics/lyubov-k-sebe",
+        title: "Любовь к себе",
+        description: "Тематическая подборка про принятие и самоценность",
+      },
+      {
+        href: "/topics/zhenskaya-energiya",
+        title: "Женская энергия",
+        description: "Женственность, наполнение и мягкая сила",
+      },
+      {
+        href: "/p/denezhnyy-potok-9288",
+        title: "Плейлист «Денежный Поток»",
+        description: "Отдельная подборка денежных практик",
+      },
+      {
+        href: "/authors",
+        title: "Авторы АудиоЛада",
+        description: "Выбрать автора и его каталог",
+      },
+    ],
+  },
 ] as const;
 
 const HUBS_BY_SLUG = new Map(
@@ -138,9 +228,9 @@ const HUBS_BY_SLUG = new Map(
 );
 
 const HUBS_BY_TOPIC_KEY = new Map(
-  TOPIC_HUB_DEFINITIONS.filter((hub) => hub.resolveTopicChips !== false).map(
-    (hub) => [hub.topicKey, hub] as const,
-  ),
+  TOPIC_HUB_DEFINITIONS.filter(
+    (hub) => hub.resolveTopicChips !== false && Boolean(hub.topicKey),
+  ).map((hub) => [hub.topicKey as string, hub] as const),
 );
 
 export function listTopicHubDefinitions(): readonly TopicHubDefinition[] {
