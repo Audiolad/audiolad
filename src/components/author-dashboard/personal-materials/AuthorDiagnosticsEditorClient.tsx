@@ -43,6 +43,7 @@ import {
   formatMaterialDateLabel,
   validatePersonalMaterialForm,
   requireClientFirstName,
+  type PersonalMaterialFormErrors,
   type PersonalMaterialFormValues,
 } from "@/lib/personal-materials/client/validation";
 import {
@@ -65,6 +66,32 @@ type AuthorDiagnosticsEditorClientProps = {
 
 type ConfirmAction = "activate" | "rotate" | "revoke" | "delete" | null;
 
+const EDIT_FORM_ID_PREFIX = "edit-diagnostics";
+
+const FORM_FIELD_FOCUS_ORDER: (keyof PersonalMaterialFormValues)[] = [
+  "materialType",
+  "clientFirstName",
+  "clientLastName",
+  "materialDate",
+  "title",
+  "description",
+  "personalRecommendation",
+  "returnUrl",
+  "returnButtonLabel",
+];
+
+const FORM_FIELD_ID_SUFFIX: Record<keyof PersonalMaterialFormValues, string> = {
+  materialType: "material-type",
+  clientFirstName: "client-first-name",
+  clientLastName: "client-last-name",
+  materialDate: "material-date",
+  title: "title",
+  description: "description",
+  personalRecommendation: "recommendation",
+  returnUrl: "return-url",
+  returnButtonLabel: "return-button-label",
+};
+
 function materialToFormValues(material: AuthorPersonalMaterial): PersonalMaterialFormValues {
   return {
     materialType: material.materialType,
@@ -77,6 +104,44 @@ function materialToFormValues(material: AuthorPersonalMaterial): PersonalMateria
     returnUrl: material.returnUrl ?? "",
     returnButtonLabel: material.returnButtonLabel ?? "",
   };
+}
+
+function buildPersonalMaterialUpdatePayload(values: PersonalMaterialFormValues) {
+  return {
+    materialType: values.materialType as AuthorPersonalMaterial["materialType"],
+    clientFirstName: values.clientFirstName.trim() || null,
+    clientLastName: values.clientLastName.trim() || null,
+    materialDate: values.materialDate,
+    title: values.title.trim() || null,
+    description: values.description.trim() || null,
+    personalRecommendation: values.personalRecommendation.trim() || null,
+    returnUrl: values.returnUrl.trim() || null,
+    returnButtonLabel: values.returnButtonLabel.trim() || null,
+  };
+}
+
+function focusFirstFormError(errors: PersonalMaterialFormErrors) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  for (const field of FORM_FIELD_FOCUS_ORDER) {
+    if (!errors[field]) {
+      continue;
+    }
+
+    const element = document.getElementById(
+      `${EDIT_FORM_ID_PREFIX}-${FORM_FIELD_ID_SUFFIX[field]}`,
+    );
+
+    if (!(element instanceof HTMLElement)) {
+      return;
+    }
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.focus({ preventScroll: true });
+    return;
+  }
 }
 
 export default function AuthorDiagnosticsEditorClient({
@@ -106,6 +171,7 @@ export default function AuthorDiagnosticsEditorClient({
   const [toastTone, setToastTone] = useState<"success" | "error">("success");
   const [reloadKey, setReloadKey] = useState(0);
   const saveSubmitRef = useRef(false);
+  const actionSubmitRef = useRef(false);
   const linkResultRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAuthor = useMemo(() => {
@@ -218,6 +284,54 @@ export default function AuthorDiagnosticsEditorClient({
     setFormValues((current) => (current ? { ...current, [field]: value } : current));
   }
 
+  function showFormValidationErrors(errors: PersonalMaterialFormErrors) {
+    setFormErrors(errors);
+    focusFirstFormError(errors);
+  }
+
+  function syncSavedMaterial(updated: AuthorPersonalMaterial) {
+    const nextValues = materialToFormValues(updated);
+    setMaterial(updated);
+    setFormValues(nextValues);
+    setInitialValues(nextValues);
+    return nextValues;
+  }
+
+  async function persistDraft(values: PersonalMaterialFormValues) {
+    if (!material) {
+      throw new Error("material_missing");
+    }
+
+    const updated = await updateAuthorPersonalMaterial(
+      material.id,
+      buildPersonalMaterialUpdatePayload(values),
+    );
+    return syncSavedMaterial(updated);
+  }
+
+  function handleActivateClick() {
+    if (!formValues || actionLoading || actionSubmitRef.current || saving || saveSubmitRef.current) {
+      return;
+    }
+
+    const nextErrors = validatePersonalMaterialForm(formValues);
+    const nameError = requireClientFirstName(formValues);
+    if (nameError) {
+      nextErrors.clientFirstName = nameError;
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setActionError(nameError ?? "Проверьте правильность заполнения формы.");
+      showFormValidationErrors(nextErrors);
+      return;
+    }
+
+    setFormErrors({});
+    setActionError(null);
+    setSaveError(null);
+    setConfirmAction("activate");
+  }
+
   async function handleSave() {
     if (
       !material ||
@@ -225,7 +339,8 @@ export default function AuthorDiagnosticsEditorClient({
       (material.status !== "draft" &&
         material.status !== "active" &&
         material.status !== "revoked") ||
-      saveSubmitRef.current
+      saveSubmitRef.current ||
+      actionSubmitRef.current
     ) {
       return;
     }
@@ -239,9 +354,8 @@ export default function AuthorDiagnosticsEditorClient({
       }
     }
 
-    setFormErrors(nextErrors);
-
     if (Object.keys(nextErrors).length > 0) {
+      showFormValidationErrors(nextErrors);
       return;
     }
 
@@ -250,22 +364,7 @@ export default function AuthorDiagnosticsEditorClient({
     setSaveError(null);
 
     try {
-      const updated = await updateAuthorPersonalMaterial(material.id, {
-        materialType: formValues.materialType as AuthorPersonalMaterial["materialType"],
-        clientFirstName: formValues.clientFirstName.trim() || null,
-        clientLastName: formValues.clientLastName.trim() || null,
-        materialDate: formValues.materialDate,
-        title: formValues.title.trim() || null,
-        description: formValues.description.trim() || null,
-        personalRecommendation: formValues.personalRecommendation.trim() || null,
-        returnUrl: formValues.returnUrl.trim() || null,
-        returnButtonLabel: formValues.returnButtonLabel.trim() || null,
-      });
-
-      const nextValues = materialToFormValues(updated);
-      setMaterial(updated);
-      setFormValues(nextValues);
-      setInitialValues(nextValues);
+      await persistDraft(formValues);
       setToastTone("success");
       setToast("Изменения сохранены");
     } catch (error) {
@@ -371,22 +470,84 @@ export default function AuthorDiagnosticsEditorClient({
   const hasAttachment = Boolean(material?.hasAudio || material?.hasPdf);
 
   async function handleConfirmAction() {
-    if (!material || !confirmAction) {
+    if (!material || !confirmAction || actionSubmitRef.current || saveSubmitRef.current) {
       return;
     }
 
+    if (confirmAction === "activate") {
+      if (!formValues) {
+        return;
+      }
+
+      const nextErrors = validatePersonalMaterialForm(formValues);
+      const nameError = requireClientFirstName(formValues);
+      if (nameError) {
+        nextErrors.clientFirstName = nameError;
+      }
+
+      if (Object.keys(nextErrors).length > 0) {
+        setConfirmAction(null);
+        setActionError(nameError ?? "Проверьте правильность заполнения формы.");
+        showFormValidationErrors(nextErrors);
+        return;
+      }
+
+      actionSubmitRef.current = true;
+      setActionLoading(true);
+      setActionError(null);
+      setSaveError(null);
+
+      let activatePhase: "save" | "activate" = "activate";
+
+      try {
+        const needsSave =
+          !initialValues || JSON.stringify(formValues) !== JSON.stringify(initialValues);
+
+        if (needsSave) {
+          activatePhase = "save";
+          await persistDraft(formValues);
+          activatePhase = "activate";
+        }
+
+        const result = await activateAuthorPersonalMaterial(material.id);
+        setOneTimeAccessUrl(result.accessUrl);
+        syncSavedMaterial(result.material);
+        setFormErrors({});
+        setConfirmAction(null);
+      } catch (error) {
+        setConfirmAction(null);
+
+        if (activatePhase === "save") {
+          setSaveError(getPersonalMaterialErrorMessage(error));
+          setActionError("Не удалось сохранить изменения перед активацией. Попробуйте ещё раз.");
+        } else if (
+          isPersonalMaterialClientError(error) &&
+          error.code === "client_name_required"
+        ) {
+          setFormErrors((current) => ({
+            ...current,
+            clientFirstName: "Укажите имя клиента.",
+          }));
+          setActionError("Укажите имя клиента.");
+          focusFirstFormError({ clientFirstName: "Укажите имя клиента." });
+        } else {
+          setActionError(
+            "Не удалось активировать материал. Изменения формы сохранены — попробуйте активировать ещё раз.",
+          );
+        }
+      } finally {
+        actionSubmitRef.current = false;
+        setActionLoading(false);
+      }
+
+      return;
+    }
+
+    actionSubmitRef.current = true;
     setActionLoading(true);
     setActionError(null);
 
     try {
-      if (confirmAction === "activate") {
-        const result = await activateAuthorPersonalMaterial(material.id);
-        setMaterial(result.material);
-        setOneTimeAccessUrl(result.accessUrl);
-        setFormValues(materialToFormValues(result.material));
-        setInitialValues(materialToFormValues(result.material));
-      }
-
       if (confirmAction === "rotate") {
         const result = await rotateAuthorPersonalMaterial(material.id);
         setMaterial(result.material);
@@ -420,20 +581,7 @@ export default function AuthorDiagnosticsEditorClient({
 
       setConfirmAction(null);
     } catch (error) {
-      if (confirmAction === "activate") {
-        if (
-          isPersonalMaterialClientError(error) &&
-          error.code === "client_name_required"
-        ) {
-          setFormErrors((current) => ({
-            ...current,
-            clientFirstName: "Укажите имя клиента.",
-          }));
-          setActionError("Укажите имя клиента.");
-        } else {
-          setActionError(getPersonalMaterialActivationErrorMessage(error));
-        }
-      } else if (confirmAction === "delete") {
+      if (confirmAction === "delete") {
         setConfirmAction(null);
         setToastTone("error");
         setToast(getPersonalMaterialErrorMessage(error));
@@ -441,6 +589,7 @@ export default function AuthorDiagnosticsEditorClient({
         setActionError(getPersonalMaterialErrorMessage(error));
       }
     } finally {
+      actionSubmitRef.current = false;
       setActionLoading(false);
     }
   }
@@ -540,7 +689,7 @@ export default function AuthorDiagnosticsEditorClient({
             errors={formErrors}
             disabled={saving || uploading || actionLoading}
             readOnly={isReadOnly}
-            idPrefix="edit-diagnostics"
+            idPrefix={EDIT_FORM_ID_PREFIX}
             onChange={updateField}
           />
         </div>
@@ -630,27 +779,8 @@ export default function AuthorDiagnosticsEditorClient({
           </p>
           <button
             type="button"
-            disabled={!hasAttachment || actionLoading || uploading || uploadingPdf}
-            onClick={() => {
-              if (!formValues) {
-                return;
-              }
-
-              const nameError = requireClientFirstName(formValues);
-              if (nameError) {
-                setFormErrors((current) => ({
-                  ...current,
-                  clientFirstName: nameError,
-                }));
-                setActionError(nameError);
-                document
-                  .getElementById("edit-diagnostics-client-first-name")
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                return;
-              }
-
-              setConfirmAction("activate");
-            }}
+            disabled={!hasAttachment || actionLoading || uploading || uploadingPdf || saving}
+            onClick={handleActivateClick}
             className="mt-4 min-h-11 w-full rounded-full bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
           >
             Активировать и получить ссылку
@@ -771,8 +901,13 @@ export default function AuthorDiagnosticsEditorClient({
         description="После активации вы получите персональную ссылку для клиента. Материал можно будет редактировать и после активации."
         confirmLabel="Активировать"
         loading={actionLoading}
+        loadingLabel="Сохраняем и активируем…"
         onConfirm={() => void handleConfirmAction()}
-        onCancel={() => setConfirmAction(null)}
+        onCancel={() => {
+          if (!actionLoading) {
+            setConfirmAction(null);
+          }
+        }}
       />
 
       <AuthorDiagnosticsConfirmModal

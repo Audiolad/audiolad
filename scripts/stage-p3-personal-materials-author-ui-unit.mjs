@@ -90,6 +90,7 @@ function testEditorComponent() {
   const editor = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsEditorClient.tsx");
   const upload = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload.tsx");
   const oneTime = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsOneTimeLinkPanel.tsx");
+  const modal = read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal.tsx");
 
   assert(editor.includes("updateAuthorPersonalMaterial"), "PATCH save");
   assert(editor.includes("activateAuthorPersonalMaterial"), "activate");
@@ -148,6 +149,45 @@ function testEditorComponent() {
   assert(clipboard.includes("noopener,noreferrer"), "open link privacy");
   assert(oneTime.includes("Ссылка скопирована"), "copy feedback");
   assert(oneTime.includes("break-all"), "long url wrap");
+
+  assert(editor.includes("function handleActivateClick"), "activate click validates before modal");
+  assert(editor.includes("validatePersonalMaterialForm(formValues)"), "reuse form validation");
+  assert(editor.includes("focusFirstFormError"), "focus first invalid field");
+  assert(editor.includes('scrollIntoView({ behavior: "smooth", block: "center" })'), "scroll to first invalid field");
+  assert(editor.includes('EDIT_FORM_ID_PREFIX = "edit-diagnostics"'), "edit form id prefix");
+  assert(editor.includes("client-first-name"), "client first name field id suffix");
+  assert(editor.includes("onClick={handleActivateClick}"), "activate button uses validated click handler");
+  assert(editor.includes("actionSubmitRef"), "activate double-submit guard");
+  assert(editor.includes("persistDraft"), "shared draft persist for save/activate");
+  assert(editor.includes("syncSavedMaterial"), "shared dirty-state sync after save");
+  assert(editor.includes("needsSave"), "skip save when form already clean");
+  assert(editor.includes("activatePhase"), "separate save vs activate error phases");
+  assert(editor.includes("buildPersonalMaterialUpdatePayload"), "shared update payload for save/activate");
+  assert(editor.includes('loadingLabel="Сохраняем и активируем…"'), "activate loading label");
+  {
+    const activateFlowStart = editor.indexOf('if (confirmAction === "activate")');
+    const needsSaveInFlow = editor.indexOf("needsSave", activateFlowStart);
+    const activateCallInFlow = editor.indexOf(
+      "activateAuthorPersonalMaterial(material.id)",
+      activateFlowStart,
+    );
+    assert(activateFlowStart >= 0, "activate confirm branch exists");
+    assert(
+      needsSaveInFlow > activateFlowStart && needsSaveInFlow < activateCallInFlow,
+      "save-before-activate order in confirm flow",
+    );
+  }
+  assert(
+    editor.includes("Не удалось сохранить изменения перед активацией"),
+    "save failure message before activate",
+  );
+  assert(
+    editor.includes("Не удалось активировать материал. Изменения формы сохранены"),
+    "activate failure keeps saved form",
+  );
+  assert(editor.includes("Сохранить изменения"), "manual draft save remains");
+  assert(modal.includes("loadingLabel"), "modal supports loadingLabel");
+  assert(modal.includes('loadingLabel = "Подождите…"'), "modal default loading label");
 }
 
 function testResponsiveClasses() {
@@ -178,6 +218,7 @@ function testAccessibility() {
   assert(!guestCta.includes("dangerouslySetInnerHTML"), "no dangerous html");
   assert(modal.includes("role=\"dialog\""), "modal dialog");
   assert(modal.includes("aria-modal=\"true\""), "modal aria");
+  assert(modal.includes("if (!loading)"), "modal blocks cancel while loading");
   assert(upload.includes("aria-live"), "upload live region");
 }
 

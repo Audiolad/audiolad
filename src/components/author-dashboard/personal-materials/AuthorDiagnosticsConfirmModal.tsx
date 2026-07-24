@@ -10,6 +10,7 @@ type AuthorDiagnosticsConfirmModalProps = {
   cancelLabel?: string;
   confirmTone?: "primary" | "danger";
   loading?: boolean;
+  loadingLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -22,6 +23,7 @@ export default function AuthorDiagnosticsConfirmModal({
   cancelLabel = "Отмена",
   confirmTone = "primary",
   loading = false,
+  loadingLabel = "Подождите…",
   onConfirm,
   onCancel,
 }: AuthorDiagnosticsConfirmModalProps) {
@@ -48,7 +50,11 @@ export default function AuthorDiagnosticsConfirmModal({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(36,24,58,0.45)] p-4 sm:items-center"
       role="presentation"
-      onClick={onCancel}
+      onClick={() => {
+        if (!loading) {
+          onCancel();
+        }
+      }}
     >
       <div
         role="dialog"
@@ -81,7 +87,7 @@ export default function AuthorDiagnosticsConfirmModal({
             disabled={loading}
             className={`min-h-11 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60 ${confirmClassName}`}
           >
-            {loading ? "Подождите…" : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>
