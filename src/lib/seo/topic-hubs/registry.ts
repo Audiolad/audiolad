@@ -3,6 +3,9 @@ import type { TopicHubDefinition } from "./types";
 /**
  * Editorial SEO hubs. Platform directory remains `topics` (key/slug like self-worth).
  * Hub slug may be Russian SEO-friendly and must not replace topics.key.
+ *
+ * Note: there is no dedicated platform topic for «женская энергия».
+ * Relevant published practices are tagged with self-worth (often + energy/relationships).
  */
 export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
   {
@@ -41,6 +44,11 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
     ],
     relatedLinks: [
       {
+        href: "/topics/zhenskaya-energiya",
+        title: "Женская энергия – подборка практик",
+        description: "Другой угол: женственность, наполнение и мягкая сила",
+      },
+      {
         href: "/catalog?topic=self-worth",
         title: "Все практики темы в каталоге",
         description: "Фильтр каталога по теме «Уверенность и самоценность»",
@@ -57,6 +65,72 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
       },
     ],
   },
+  {
+    slug: "zhenskaya-energiya",
+    topicKey: "self-worth",
+    resolveTopicChips: false,
+    practiceSlugAllowlist: [
+      "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+      "posvyaschenie-v-energiyu-bogini-bastet",
+      "sila-zhenstvennosti",
+      "zhenskie-dengi",
+      "muzhchina-ryadom",
+      "velikie-zhenschiny-mira",
+    ],
+    title: "Женская энергия",
+    metaDescription:
+      "Аудиопрактики и медитации на женскую энергию: женственность, наполнение, мягкая сила и женские практики на АудиоЛаде. Слушайте онлайн.",
+    intro:
+      "Подборка для тех, кто ищет женскую энергию и женские практики: мягкая сила, наполнение, привлекательность и опора на свою природу – без обещаний «прокачать» результат за один день.",
+    body: [
+      "В Яндексе рядом с запросом «женская энергия» часто стоят «женские практики», «женская медитация», «наполнение женской энергией» и «медитация на женскую энергию». Это listen-intent: человек хочет услышать практику, а не прочитать теорию.",
+      "На АудиоЛаде отдельной платформенной темы «женская энергия» пока нет – релевантные опубликованные практики помечены темой «Уверенность и самоценность» (часто вместе с «Энергия и ресурс» или «Отношения»). Здесь собрана редакционная подборка именно под женский энергетический угол; страница «Любовь к себе» отвечает на запросы про принятие и самоценность.",
+    ],
+    faq: [
+      {
+        question: "Чем «женская энергия» отличается от «любви к себе»?",
+        answer:
+          "«Любовь к себе» ближе к принятию, самоценности и внутренней опоре. «Женская энергия» – к состоянию женственности, наполнению, мягкой силе и практикам вроде Бастет или силы женственности. Часть практик может пересекаться, но заголовки, тексты и акцент подборок разные.",
+      },
+      {
+        question: "Что обычно ищут по запросу «женские практики»?",
+        answer:
+          "По данным Wordstat рядом идут женская медитация, наполнение энергией, привлекательность и мягкая сила. На этой странице – аудиопрактики под эти формулировки, без чужих брендов и без обещаний гарантированного результата.",
+      },
+      {
+        question: "С какой практики начать?",
+        answer:
+          "Если хотите мягкий вход – начните с бесплатной практики про Бастет или «Женские деньги». Если нужен более глубокий цикл – посмотрите «Силу женственности» или «Посвящение в энергию Бастет».",
+      },
+      {
+        question: "Это эзотерика или психотерапия?",
+        answer:
+          "Это авторские аудиопрактики для самонаблюдения и внутренней настройки. Они не заменяют консультацию врача или психотерапевта и не обещают лечение.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/topics/lyubov-k-sebe",
+        title: "Любовь к себе",
+        description: "Принятие себя, самоценность и бережное отношение к себе",
+      },
+      {
+        href: "/catalog?topic=self-worth",
+        title: "Тема «Уверенность и самоценность» в каталоге",
+        description: "Полный фильтр платформенной темы, включая смежные практики",
+      },
+      {
+        href: "/catalog?topic=energy",
+        title: "Энергия и ресурс в каталоге",
+        description: "Шире, чем женский угол – восстановление и ресурс",
+      },
+      {
+        href: "/authors",
+        title: "Авторы АудиоЛада",
+        description: "Каталоги Сергея, Зои и совместные практики",
+      },
+    ],
+  },
 ] as const;
 
 const HUBS_BY_SLUG = new Map(
@@ -64,7 +138,9 @@ const HUBS_BY_SLUG = new Map(
 );
 
 const HUBS_BY_TOPIC_KEY = new Map(
-  TOPIC_HUB_DEFINITIONS.map((hub) => [hub.topicKey, hub] as const),
+  TOPIC_HUB_DEFINITIONS.filter((hub) => hub.resolveTopicChips !== false).map(
+    (hub) => [hub.topicKey, hub] as const,
+  ),
 );
 
 export function listTopicHubDefinitions(): readonly TopicHubDefinition[] {

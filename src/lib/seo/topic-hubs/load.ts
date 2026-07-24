@@ -39,7 +39,13 @@ export async function loadTopicHubPageData(
     listActiveTopics(supabase).catch(() => []),
   ]);
 
-  const products = sortProductsForHub(productsRaw);
+  const allowlist = hub.practiceSlugAllowlist;
+  const filtered =
+    allowlist && allowlist.length > 0
+      ? productsRaw.filter((product) => allowlist.includes(product.slug))
+      : productsRaw;
+
+  const products = sortProductsForHub(filtered);
   const freeProducts = products.filter((product) => product.isFree);
   const paidProducts = products.filter((product) => !product.isFree);
   const platformTopic =
