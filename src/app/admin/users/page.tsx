@@ -1,6 +1,6 @@
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
 import TestUserResetPanel from "@/components/admin/TestUserResetPanel";
-import { requireAdminPanelAccess } from "@/lib/admin/guard";
+import { requireAdminPermission } from "@/lib/admin/guard";
 import { getPlatformOwnerSessionIfOwner } from "@/lib/admin/require-platform-owner";
 import { getTestUserResetPreflight } from "@/lib/admin/test-user-reset/reset";
 import { listAdminUsers } from "@/lib/admin/queries";
@@ -13,7 +13,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<{ q?: string; role?: string; page?: string }>;
 }) {
-  const session = await requireAdminPanelAccess();
+  const session = await requireAdminPermission("users.view");
   const ownerSession = await getPlatformOwnerSessionIfOwner();
   const params = await searchParams;
   const page = Number.parseInt(params.page ?? "1", 10);

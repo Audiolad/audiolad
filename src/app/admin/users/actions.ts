@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdminPanelAccess } from "@/lib/admin/guard";
+import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   deleteAdminUsersBatch,
   type AdminUserDeletionBatchResult,
@@ -14,7 +14,7 @@ export type DeleteAdminUsersActionResult = AdminUserDeletionBatchResult;
 export async function deleteAdminUsers(
   userIds: string[],
 ): Promise<DeleteAdminUsersActionResult> {
-  const session = await requireAdminPanelAccess();
+  const session = await requireAdminPermission("users.manage");
   const service = createServiceRoleClient();
 
   const result = await deleteAdminUsersBatch(service, {

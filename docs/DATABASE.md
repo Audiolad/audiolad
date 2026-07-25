@@ -242,6 +242,34 @@ RLS: существующие политики author members на `practices/{p
 - `POST/DELETE /api/author/products/[id]/audio/[audioId]/cover` — upload/delete обложки трека (только при `use_shared_cover = false`).
 - `PATCH /api/author/products/[id]` — поле `use_shared_cover`.
 
+## Platform RBAC (внутренняя команда)
+
+Миграция: `supabase/migrations/20260725120000_platform_rbac_foundation.sql`.
+
+Отдельная модель доступа для сотрудников платформы. **Не смешивать** с `author_members.role` (`owner` / `editor` авторского пространства).
+
+### Таблицы
+
+| Таблица | Назначение |
+|--------|------------|
+| `platform_permissions` | Коды разрешений (`admin_panel.access`, `dashboard.view`, …) |
+| `platform_roles` | Роли команды: `owner`, `admin`, `editor`, `support`, `analyst`, `finance` |
+| `platform_role_permissions` | Наборы permissions для ролей |
+| `platform_user_roles` | Many-to-many: пользователь → роли команды |
+
+### Решение о доступе
+
+- Приложение и SQL используют `has_platform_permission(user_id, permission_code)`.
+- Роль `owner` даёт все текущие и будущие permissions (bypass в функции).
+- Legacy `profiles.role` (`platform_owner` / `platform_admin`) временно учитывается внутри `has_platform_permission` и при миграции копируется в `platform_user_roles`.
+- Колонка `profiles.role` **сохраняется**; отказ от legacy — отдельный этап.
+
+### RLS
+
+- Чтение справочников ролей/permissions — `authenticated`.
+- Чтение `platform_user_roles` — свои строки или при наличии `team.view`.
+- Мутации назначений — через `service_role` / SQL (UI назначения ролей пока нет).
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

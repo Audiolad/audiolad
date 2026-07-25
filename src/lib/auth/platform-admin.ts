@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  assertPermission,
+  hasPermission,
+  loadPlatformAccess,
+} from "@/lib/auth/platform-access";
+import { fetchUserPlatformRole as fetchLegacyPlatformRole } from "@/lib/auth/platform-role-lookup";
+
 export const PLATFORM_OWNER_ROLE = "platform_owner" as const;
 export const PLATFORM_ADMIN_ROLE = "platform_admin" as const;
 export const LISTENER_ROLE = "listener" as const;
@@ -10,14 +17,27 @@ export type PlatformRole =
   | typeof LISTENER_ROLE
   | string;
 
+export { fetchUserPlatformRole } from "@/lib/auth/platform-role-lookup";
+
+/**
+ * @deprecated Prefer platform team roles (owner/admin/…) via platform-access.
+ * Kept for legacy profiles.role values and user-deletion policy labels.
+ */
 export function isPlatformOwnerRole(role: string | null | undefined): boolean {
   return role === PLATFORM_OWNER_ROLE;
 }
 
+/**
+ * @deprecated Prefer platform team roles via platform-access.
+ */
 export function isPlatformAdminRole(role: string | null | undefined): boolean {
   return role === PLATFORM_ADMIN_ROLE;
 }
 
+/**
+ * @deprecated Prefer hasPermission(..., "admin_panel.access").
+ * Temporary helper for legacy profiles.role strings only.
+ */
 export function isPlatformStaffRole(role: string | null | undefined): boolean {
   return isPlatformOwnerRole(role) || isPlatformAdminRole(role);
 }
@@ -34,52 +54,40 @@ export function getPlatformRoleLabel(role: string | null | undefined): string {
   return "Слушатель";
 }
 
-export async function fetchUserPlatformRole(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error("platform_role_lookup_failed");
-  }
-
-  return typeof data?.role === "string" ? data.role : null;
-}
-
+/**
+ * Elevated platform access for operational surfaces that previously
+ * checked legacy staff. Maps to admin_panel.access via the RBAC layer.
+ */
 export async function isPlatformAdmin(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
-  const role = await fetchUserPlatformRole(supabase, userId);
-  return isPlatformStaffRole(role);
+  return hasPermission(supabase, userId, "admin_panel.access");
 }
 
 export async function hasAdminPanelAccess(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
-  const role = await fetchUserPlatformRole(supabase, userId);
-  return isPlatformStaffRole(role);
+  return hasPermission(supabase, userId, "admin_panel.access");
 }
 
 export async function assertPlatformAdmin(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ ok: true } | { ok: false; status: 403 | 500 }> {
-  try {
-    const admin = await isPlatformAdmin(supabase, userId);
+  return assertPermission(supabase, userId, "admin_panel.access");
+}
 
-    if (!admin) {
-      return { ok: false, status: 403 };
-    }
-
-    return { ok: true };
-  } catch {
-    return { ok: false, status: 500 };
+export async function isPlatformOwner(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const access = await loadPlatformAccess(supabase, userId);
+  if (access.roles.includes("owner")) {
+    return true;
   }
+
+  const legacy = await fetchLegacyPlatformRole(supabase, userId);
+  return isPlatformOwnerRole(legacy);
 }

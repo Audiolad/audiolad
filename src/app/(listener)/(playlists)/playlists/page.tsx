@@ -1,5 +1,5 @@
 import PlaylistsClient from "@/components/playlists/PlaylistsClient";
-import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { hasPermission } from "@/lib/auth/platform-access";
 import { listEditorialPlaylists, listOwnedPlaylists } from "@/lib/playlists/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -31,7 +31,11 @@ export default async function PlaylistsPage() {
   let canCreateEditorial = false;
 
   try {
-    canCreateEditorial = await isPlatformAdmin(supabase, user.id);
+    canCreateEditorial = await hasPermission(
+      supabase,
+      user.id,
+      "products.moderate",
+    );
   } catch (adminError) {
     console.error("playlists_page_admin_check_error", adminError);
   }

@@ -25,6 +25,29 @@ function AuthorOutlineIcon() {
   );
 }
 
+function AdminPanelOutlineIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[18px] w-[18px] shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+const entryButtonClassName =
+  "inline-flex h-11 min-h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#e8ddf5] bg-[#faf7fd] px-3 text-sm font-semibold text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#f3ebfc] active:bg-[#efe6fa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
 export default function DesktopRightColumnTop({
   shellData,
 }: DesktopRightColumnTopProps) {
@@ -64,14 +87,27 @@ export default function DesktopRightColumnTop({
         </div>
       )}
 
-      <Link
-        href={shellData.authorCta.href}
-        className="inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[#e8ddf5] bg-[#faf7fd] px-3 text-sm font-semibold text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#f3ebfc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        title={shellData.authorCta.label}
-      >
-        <AuthorOutlineIcon />
-        <span className="truncate">{shellData.authorCta.label}</span>
-      </Link>
+      {shellData.showAuthorEntry ? (
+        <Link
+          href={shellData.authorCta.href}
+          className={entryButtonClassName}
+          title={shellData.authorCta.label}
+        >
+          <AuthorOutlineIcon />
+          <span className="truncate">{shellData.authorCta.label}</span>
+        </Link>
+      ) : null}
+
+      {shellData.showAdminPanel ? (
+        <Link
+          href={shellData.adminPanelHref}
+          className={entryButtonClassName}
+          title="Панель управления"
+        >
+          <AdminPanelOutlineIcon />
+          <span className="truncate">Панель управления</span>
+        </Link>
+      ) : null}
     </div>
   );
 }

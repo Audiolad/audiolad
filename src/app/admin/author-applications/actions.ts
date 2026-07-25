@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { AdminAuthorApplicationActionState } from "@/app/admin/author-applications/action-state";
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
-import { requireAdminPanelAccess } from "@/lib/admin/guard";
+import { requireAdminPermission } from "@/lib/admin/guard";
 import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,7 @@ async function runApplicationAction(
   args: Record<string, unknown>,
   successMessage: string,
 ): Promise<AdminAuthorApplicationActionState> {
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   if (!applicationId) {
     return { ok: false, error: "Не удалось определить заявку." };
@@ -131,7 +131,7 @@ export async function approveAuthorApplication(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();
@@ -198,7 +198,7 @@ export async function resendAuthorAccessGrantedEmail(
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
   // Legacy action name retained for the admin form; sends author_application_approved mail.
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const forceResend = String(formData.get("forceResend") ?? "") === "1";
@@ -266,7 +266,7 @@ export async function suspendLinkedAuthorAccess(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const authorId = String(formData.get("authorId") ?? "").trim();
@@ -302,7 +302,7 @@ export async function restoreLinkedAuthorAccess(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const authorId = String(formData.get("authorId") ?? "").trim();
@@ -334,7 +334,7 @@ export async function updateAuthorApplicationAdminNote(
   _prevState: AdminAuthorApplicationActionState,
   formData: FormData,
 ): Promise<AdminAuthorApplicationActionState> {
-  await requireAdminPanelAccess();
+  await requireAdminPermission("authors.manage");
 
   const applicationId = String(formData.get("applicationId") ?? "").trim();
   const adminNote = String(formData.get("adminNote") ?? "").trim();

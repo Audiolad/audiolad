@@ -7,6 +7,8 @@
  */
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 import {
@@ -43,8 +45,10 @@ function assert(condition, message) {
   }
 }
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 function readRepoFile(...segments) {
-  return readFileSync(`/var/www/audiolad/${segments.join("/")}`, "utf8");
+  return readFileSync(path.join(REPO_ROOT, ...segments), "utf8");
 }
 
 function testPolicyGuards() {
@@ -151,7 +155,10 @@ function testStaticWiring() {
   const table = readRepoFile("src", "components", "admin", "AdminUsersTable.tsx");
   const deletion = readRepoFile("src", "lib", "admin", "user-deletion.ts");
 
-  assert(actions.includes("requireAdminPanelAccess"), "action checks admin session");
+  assert(
+    actions.includes('requireAdminPermission("users.manage")'),
+    "action checks users.manage permission",
+  );
   assert(actions.includes("createServiceRoleClient"), "action uses service role");
   assert(!actions.includes("SUPABASE_SERVICE_ROLE_KEY"), "service key stays server-side");
   assert(

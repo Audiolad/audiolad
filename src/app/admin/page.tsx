@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 import AdminAnalyticsFunnel from "@/components/admin/AdminAnalyticsFunnel";
 import AdminAnalyticsMetrics from "@/components/admin/AdminAnalyticsMetrics";
@@ -9,7 +10,13 @@ import AdminPopularPracticesTable from "@/components/admin/AdminPopularPractices
 import AdminRecentActivityList from "@/components/admin/AdminRecentActivityList";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
 import { getAdminAnalyticsDashboard } from "@/lib/admin/analytics-queries";
+import {
+  getFirstAllowedAdminPath,
+  requireAdminPanelAccess,
+  requireAdminPermission,
+} from "@/lib/admin/guard";
 import { getAdminOverviewStats } from "@/lib/admin/queries";
+import { snapshotHasPermission } from "@/lib/auth/platform-access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,19 +25,37 @@ export default async function AdminOverviewPage({
 }: {
   searchParams: Promise<{ period?: string; includeTest?: string }>;
 }) {
+  const session = await requireAdminPanelAccess();
+
+  if (!snapshotHasPermission(session.access, "dashboard.view")) {
+    const fallback = getFirstAllowedAdminPath(session.access);
+    if (fallback && fallback !== "/admin") {
+      redirect(fallback);
+    }
+    await requireAdminPermission("dashboard.view");
+  }
+
+  const canViewAnalytics = snapshotHasPermission(
+    session.access,
+    "analytics.view",
+  );
   const params = await searchParams;
 
   let overviewStats;
-  let analyticsDashboard;
+  let analyticsDashboard = null;
 
   try {
-    [overviewStats, analyticsDashboard] = await Promise.all([
-      getAdminOverviewStats(),
-      getAdminAnalyticsDashboard({
-        period: params.period,
-        includeTest: params.includeTest,
-      }),
-    ]);
+    if (canViewAnalytics) {
+      [overviewStats, analyticsDashboard] = await Promise.all([
+        getAdminOverviewStats(),
+        getAdminAnalyticsDashboard({
+          period: params.period,
+          includeTest: params.includeTest,
+        }),
+      ]);
+    } else {
+      overviewStats = await getAdminOverviewStats();
+    }
   } catch (error) {
     console.error("admin_overview_load_error", error);
 
@@ -43,52 +68,54 @@ export default async function AdminOverviewPage({
 
   return (
     <div className="space-y-8">
-      <section aria-labelledby="admin-analytics-heading">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 id="admin-analytics-heading" className="text-[21px] font-semibold">
-              Аналитика платформы
-            </h2>
-            <p className="mt-1 text-sm text-[#796ba0]">
-              Период: {analyticsDashboard.periodLabel}. Обновлено{" "}
-              {new Intl.DateTimeFormat("ru-RU", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Moscow",
-              }).format(new Date(analyticsDashboard.generatedAt))}
-            </p>
+      {canViewAnalytics && analyticsDashboard ? (
+        <section aria-labelledby="admin-analytics-heading">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="admin-analytics-heading" className="text-[21px] font-semibold">
+                Аналитика платформы
+              </h2>
+              <p className="mt-1 text-sm text-[#796ba0]">
+                Период: {analyticsDashboard.periodLabel}. Обновлено{" "}
+                {new Intl.DateTimeFormat("ru-RU", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: "Europe/Moscow",
+                }).format(new Date(analyticsDashboard.generatedAt))}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-end gap-3">
+              <Suspense fallback={null}>
+                <AdminAnalyticsPeriodPicker currentPeriod={analyticsDashboard.period} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <AdminAnalyticsTestTrafficControls
+                  currentPeriod={analyticsDashboard.period}
+                  includeTest={analyticsDashboard.includeTest}
+                  excludedTestVisitors={analyticsDashboard.excludedTestVisitors}
+                  excludedTestSessions={analyticsDashboard.excludedTestSessions}
+                />
+              </Suspense>
+            </div>
           </div>
 
-          <div className="flex flex-col items-end gap-3">
-            <Suspense fallback={null}>
-              <AdminAnalyticsPeriodPicker currentPeriod={analyticsDashboard.period} />
-            </Suspense>
-            <Suspense fallback={null}>
-              <AdminAnalyticsTestTrafficControls
-                currentPeriod={analyticsDashboard.period}
-                includeTest={analyticsDashboard.includeTest}
-                excludedTestVisitors={analyticsDashboard.excludedTestVisitors}
-                excludedTestSessions={analyticsDashboard.excludedTestSessions}
-              />
-            </Suspense>
+          <AdminAnalyticsMetrics metrics={analyticsDashboard.metrics} />
+
+          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <AdminAnalyticsFunnel steps={analyticsDashboard.funnel} />
+            <AdminRecentActivityList items={analyticsDashboard.recentActivity} />
           </div>
-        </div>
 
-        <AdminAnalyticsMetrics metrics={analyticsDashboard.metrics} />
-
-        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <AdminAnalyticsFunnel steps={analyticsDashboard.funnel} />
-          <AdminRecentActivityList items={analyticsDashboard.recentActivity} />
-        </div>
-
-        <div className="mt-6 space-y-6">
-          <AdminAnalyticsSourcesTable rows={analyticsDashboard.sources} />
-          <AdminPopularPracticesTable rows={analyticsDashboard.popularPractices} />
-        </div>
-      </section>
+          <div className="mt-6 space-y-6">
+            <AdminAnalyticsSourcesTable rows={analyticsDashboard.sources} />
+            <AdminPopularPracticesTable rows={analyticsDashboard.popularPractices} />
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="admin-overview-heading">
         <div className="mb-5">

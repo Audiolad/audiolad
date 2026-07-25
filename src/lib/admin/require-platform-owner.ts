@@ -1,7 +1,4 @@
-import {
-  fetchUserPlatformRole,
-  isPlatformOwnerRole,
-} from "@/lib/auth/platform-admin";
+import { isPlatformOwner } from "@/lib/auth/platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 
@@ -21,9 +18,9 @@ export async function requirePlatformOwnerAccess(): Promise<PlatformOwnerSession
     redirect("/auth/sign-in?next=/admin/users");
   }
 
-  const role = await fetchUserPlatformRole(supabase, user.id);
+  const owner = await isPlatformOwner(supabase, user.id);
 
-  if (!isPlatformOwnerRole(role)) {
+  if (!owner) {
     notFound();
   }
 
@@ -44,9 +41,9 @@ export async function getPlatformOwnerSessionIfOwner(): Promise<PlatformOwnerSes
     return null;
   }
 
-  const role = await fetchUserPlatformRole(supabase, user.id);
+  const owner = await isPlatformOwner(supabase, user.id);
 
-  if (!isPlatformOwnerRole(role)) {
+  if (!owner) {
     return null;
   }
 

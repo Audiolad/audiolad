@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { hasPermission } from "@/lib/auth/platform-access";
 
 type PlaylistAccessRow = {
   id: string;
@@ -43,7 +43,7 @@ export async function canUserEditPlaylist(
   }
 
   if (playlist.is_editorial === true) {
-    return isPlatformAdmin(supabase, userId);
+    return hasPermission(supabase, userId, "products.moderate");
   }
 
   return false;
