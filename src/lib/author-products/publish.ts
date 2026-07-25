@@ -8,13 +8,83 @@ import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
 import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
 import { minutesFromSeconds } from "./utils";
+import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 
-type PublishValidationResult =
+export type PublishValidationResult =
   | { ok: true }
   | { ok: false; code: string; message: string };
 
+export type PublishReadinessRequirementKey =
+  | "author"
+  | "title"
+  | "slug"
+  | "description"
+  | "format"
+  | "cover"
+  | "audio"
+  | "price"
+  | "topics";
+
+export type PublishReadinessRequirement = {
+  key: PublishReadinessRequirementKey;
+  label: string;
+  ok: boolean;
+  code: string | null;
+  message: string | null;
+};
+
+export type PublishReadinessResult = {
+  ok: boolean;
+  requirements: PublishReadinessRequirement[];
+  completedCount: number;
+  totalCount: number;
+  firstFailure: { code: string; message: string } | null;
+};
+
+export type EvaluatePublishReadinessOptions = {
+  accessStatus?: AuthorAccessStatus;
+  /** Active practice topics; required for the shared publish + onboarding gate. */
+  activeTopicCount: number;
+};
+
 function sortAudioItemsByPosition(audioItems: AudioItemRow[]): AudioItemRow[] {
   return [...audioItems].sort((left, right) => left.position - right.position);
+}
+
+function requirement(
+  key: PublishReadinessRequirementKey,
+  label: string,
+  failure: { code: string; message: string } | null,
+): PublishReadinessRequirement {
+  if (!failure) {
+    return { key, label, ok: true, code: null, message: null };
+  }
+
+  return {
+    key,
+    label,
+    ok: false,
+    code: failure.code,
+    message: failure.message,
+  };
+}
+
+function summarizePublishReadiness(
+  requirements: PublishReadinessRequirement[],
+): PublishReadinessResult {
+  const completedCount = requirements.filter((item) => item.ok).length;
+  const firstFailed = requirements.find((item) => !item.ok);
+
+  return {
+    ok: !firstFailed,
+    requirements,
+    completedCount,
+    totalCount: requirements.length,
+    firstFailure:
+      firstFailed && firstFailed.code && firstFailed.message
+        ? { code: firstFailed.code, message: firstFailed.message }
+        : null,
+  };
 }
 
 export function validateAudioItemsStructure(
@@ -89,105 +159,169 @@ export function validateAudioItemsStructure(
   return { ok: true };
 }
 
-export function validatePublishRequirements(
+function buildCorePublishRequirements(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
   accessStatus?: AuthorAccessStatus,
-): PublishValidationResult {
-  if (!practice.author_id) {
-    return {
-      ok: false,
-      code: "missing_author",
-      message: "Выберите авторское пространство.",
-    };
-  }
+): PublishReadinessRequirement[] {
+  const authorFailure = !practice.author_id
+    ? {
+        code: "missing_author",
+        message: "Выберите авторское пространство.",
+      }
+    : null;
 
-  const title = practice.title?.trim();
+  const titleFailure = !practice.title?.trim()
+    ? {
+        code: "missing_title",
+        message: "Укажите название аудиопродукта.",
+      }
+    : null;
 
-  if (!title) {
-    return {
-      ok: false,
-      code: "missing_title",
-      message: "Укажите название аудиопродукта.",
-    };
-  }
+  const slugFailure = !practice.slug?.trim()
+    ? {
+        code: "missing_slug",
+        message: "Укажите адрес аудиопродукта.",
+      }
+    : null;
 
-  const slug = practice.slug?.trim();
-
-  if (!slug) {
-    return {
-      ok: false,
-      code: "missing_slug",
-      message: "Укажите адрес аудиопродукта.",
-    };
-  }
-
-  const description = practice.description?.trim();
-
-  if (!description) {
-    return {
-      ok: false,
-      code: "missing_description",
-      message: "Добавьте описание аудиопродукта.",
-    };
-  }
+  const descriptionFailure = !practice.description?.trim()
+    ? {
+        code: "missing_description",
+        message: "Добавьте описание аудиопродукта.",
+      }
+    : null;
 
   const format = practice.format?.trim();
+  const formatFailure =
+    !format || format === LEGACY_OTHER_FORMAT
+      ? {
+          code:
+            format === LEGACY_OTHER_FORMAT
+              ? "missing_custom_format"
+              : "missing_format",
+          message:
+            format === LEGACY_OTHER_FORMAT
+              ? "Укажите название своего формата"
+              : "Выберите публичный формат.",
+        }
+      : null;
 
-  if (!format || format === LEGACY_OTHER_FORMAT) {
-    return {
-      ok: false,
-      code: format === LEGACY_OTHER_FORMAT ? "missing_custom_format" : "missing_format",
-      message:
-        format === LEGACY_OTHER_FORMAT
-          ? "Укажите название своего формата"
-          : "Выберите публичный формат.",
-    };
-  }
-
-  const coverUrl = practice.cover_url?.trim();
-
-  if (!coverUrl) {
-    return {
-      ok: false,
-      code: "missing_cover",
-      message: "Загрузите обложку аудиопродукта.",
-    };
-  }
+  const coverFailure = !practice.cover_url?.trim()
+    ? {
+        code: "missing_cover",
+        message: "Загрузите обложку аудиопродукта.",
+      }
+    : null;
 
   const structureValidation = validateAudioItemsStructure(practice, audioItems);
+  const audioFailure = structureValidation.ok
+    ? null
+    : {
+        code: structureValidation.code,
+        message: structureValidation.message,
+      };
 
-  if (!structureValidation.ok) {
-    return structureValidation;
-  }
+  let priceFailure: { code: string; message: string } | null = null;
 
   if (accessStatus && !authorAccessAllowsPaidProducts(accessStatus)) {
     if (!practice.is_free || practice.price > 0) {
-      return {
-        ok: false,
+      priceFailure = {
         code: "paid_products_not_allowed",
         message: "Продажи станут доступны после коммерческого подключения.",
       };
     }
   }
 
-  if (practice.is_free) {
-    if (practice.price !== 0) {
-      return {
-        ok: false,
+  if (!priceFailure) {
+    if (practice.is_free) {
+      if (practice.price !== 0) {
+        priceFailure = {
+          code: "invalid_price",
+          message: "Для подарочного продукта цена должна быть 0 ₽.",
+        };
+      }
+    } else if (practice.price <= 0) {
+      priceFailure = {
         code: "invalid_price",
-        message: "Для подарочного продукта цена должна быть 0 ₽.",
+        message: "Укажите цену платного аудиопродукта.",
       };
     }
-  } else if (practice.price <= 0) {
+  }
+
+  return [
+    requirement("author", "Авторское пространство", authorFailure),
+    requirement("title", "Название", titleFailure),
+    requirement("slug", "Адрес", slugFailure),
+    requirement("description", "Описание", descriptionFailure),
+    requirement("format", "Формат", formatFailure),
+    requirement("cover", "Обложка", coverFailure),
+    requirement("audio", "Аудиозапись", audioFailure),
+    requirement("price", "Цена и доступ", priceFailure),
+  ];
+}
+
+/**
+ * Shared structured publish-readiness for publication API and author onboarding.
+ * Includes core field/audio/price rules plus the minimum-topics gate.
+ */
+export function evaluatePublishReadiness(
+  practice: PracticeRow,
+  audioItems: AudioItemRow[],
+  options: EvaluatePublishReadinessOptions,
+): PublishReadinessResult {
+  const topicCheck = assertPublishedTopicMinimum(options.activeTopicCount);
+  const topicFailure = topicCheck.ok
+    ? null
+    : { code: topicCheck.code, message: topicCheck.message };
+
+  return summarizePublishReadiness([
+    ...buildCorePublishRequirements(
+      practice,
+      audioItems,
+      options.accessStatus,
+    ),
+    requirement("topics", "Темы", topicFailure),
+  ]);
+}
+
+export function validatePublishRequirements(
+  practice: PracticeRow,
+  audioItems: AudioItemRow[],
+  accessStatus?: AuthorAccessStatus,
+  activeTopicCount?: number,
+): PublishValidationResult {
+  if (typeof activeTopicCount === "number") {
+    const readiness = evaluatePublishReadiness(practice, audioItems, {
+      accessStatus,
+      activeTopicCount,
+    });
+
+    if (readiness.ok || !readiness.firstFailure) {
+      return { ok: true };
+    }
+
     return {
       ok: false,
-      code: "invalid_price",
-      message: "Укажите цену платного аудиопродукта.",
+      code: readiness.firstFailure.code,
+      message: readiness.firstFailure.message,
     };
   }
 
-  return { ok: true };
+  // Legacy field/audio/price-only path (topics enforced separately / via RPC).
+  const readiness = summarizePublishReadiness(
+    buildCorePublishRequirements(practice, audioItems, accessStatus),
+  );
+
+  if (readiness.ok || !readiness.firstFailure) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    code: readiness.firstFailure.code,
+    message: readiness.firstFailure.message,
+  };
 }
 
 export async function publishPracticeProduct(

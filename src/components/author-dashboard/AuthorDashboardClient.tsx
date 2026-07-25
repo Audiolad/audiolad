@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
+import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
@@ -192,6 +193,13 @@ export default function AuthorDashboardClient({
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
 
+      <AuthorOnboardingChecklist
+        key={selectedAuthor.id}
+        authorId={selectedAuthor.id}
+        authorSlug={selectedAuthor.slug}
+        newProductHref={newProductHref}
+      />
+
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <label className="block flex-1">
           <span className="mb-2 block text-sm font-medium text-[#5f5484]">
@@ -265,11 +273,32 @@ export default function AuthorDashboardClient({
         ) : null}
 
         {!loading && !error && visibleProducts.length === 0 ? (
-          <p className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6 text-sm text-[#7d70a2]">
-            {listView === "archive"
-              ? "В архиве пока нет аудиопродуктов."
-              : "Пока нет аудиопродуктов. Создайте первый черновик."}
-          </p>
+          listView === "archive" ? (
+            <p className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6 text-sm text-[#7d70a2]">
+              В архиве пока нет аудиопродуктов.
+            </p>
+          ) : (
+            <div className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6">
+              <h3 className="text-[17px] font-semibold text-[#2f2548]">
+                Создайте свою первую практику
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                Начните с бесплатного аудиопродукта – так слушатели смогут
+                познакомиться с вами и вашим подходом.
+              </p>
+              <Link
+                href={newProductHref}
+                aria-disabled={!canMutateContent}
+                className={`mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold text-white sm:w-auto ${
+                  canMutateContent
+                    ? "bg-[#7042c5]"
+                    : "pointer-events-none bg-[#b7a5df] opacity-70"
+                }`}
+              >
+                Создать бесплатный продукт
+              </Link>
+            </div>
+          )
         ) : null}
 
         <div className="mt-4 space-y-4">

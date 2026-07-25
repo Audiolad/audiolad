@@ -6,10 +6,11 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
+  evaluatePublishReadiness,
   publishPracticeProduct,
-  validatePublishRequirements,
 } from "@/lib/author-products/publish";
 import { registerPracticeLegacySlug } from "@/lib/products/lookup";
+import { countActivePracticeTopics } from "@/lib/topics/queries";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -25,17 +26,23 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    const validation = validatePublishRequirements(
+    const activeTopicCount = await countActivePracticeTopics(supabase, id);
+    const readiness = evaluatePublishReadiness(
       detail.practice,
       detail.audio_items,
-      accessStatus,
+      {
+        accessStatus,
+        activeTopicCount,
+      },
     );
 
-    if (!validation.ok) {
+    if (!readiness.ok) {
       return NextResponse.json(
         {
-          error: validation.code,
-          message: validation.message,
+          error: readiness.firstFailure?.code ?? "publish_not_ready",
+          message:
+            readiness.firstFailure?.message ??
+            "Продукт ещё не готов к публикации.",
         },
         { status: 400 },
       );
