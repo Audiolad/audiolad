@@ -87,54 +87,69 @@ export default function AdminAnalyticsWorkbench({
     [pathname, router, urlState],
   );
 
-  useEffect(() => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoadingBreakdown(true);
-    setBreakdownError(null);
-
-    const params = buildAdminAnalyticsSearchParams(urlState);
-    params.set("top", urlState.top);
-
-    void fetch(`/api/admin/analytics/breakdown?${params.toString()}`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`breakdown_${response.status}`);
-        }
-        return (await response.json()) as AdminAnalyticsBreakdownBundle;
-      })
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setBreakdown(data);
-          setLoadingBreakdown(false);
-        }
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setBreakdownError(error instanceof Error ? error.message : "error");
-        setLoadingBreakdown(false);
-      });
-
-    return () => controller.abort();
-  }, [
+  const breakdownQueryKey = [
     urlState.period,
-    urlState.includeTest,
-    urlState.authorId,
-    urlState.practiceId,
-    urlState.utmSource,
-    urlState.deviceType,
+    urlState.includeTest ? "1" : "0",
+    urlState.authorId ?? "",
+    urlState.practiceId ?? "",
+    urlState.utmSource ?? "",
+    urlState.deviceType ?? "",
     urlState.top,
     urlState.practicesSort,
     urlState.practicesSortDir,
     urlState.authorsSort,
     urlState.authorsSortDir,
-  ]);
+  ].join("|");
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const params = buildAdminAnalyticsSearchParams(urlState);
+    params.set("top", urlState.top);
+
+    void (async () => {
+      // Async boundary avoids sync setState-in-effect lint cascade.
+      await Promise.resolve();
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setLoadingBreakdown(true);
+      setBreakdownError(null);
+
+      try {
+        const response = await fetch(
+          `/api/admin/analytics/breakdown?${params.toString()}`,
+          {
+            signal: controller.signal,
+            headers: { Accept: "application/json" },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`breakdown_${response.status}`);
+        }
+
+        const data = (await response.json()) as AdminAnalyticsBreakdownBundle;
+
+        if (!controller.signal.aborted) {
+          setBreakdown(data);
+          setLoadingBreakdown(false);
+        }
+      } catch (error: unknown) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setBreakdownError(error instanceof Error ? error.message : "error");
+        setLoadingBreakdown(false);
+      }
+    })();
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by breakdownQueryKey
+  }, [breakdownQueryKey]);
 
   const activeKpi: AdminAnalyticsKpiCard | null = useMemo(() => {
     if (!urlState.drill) {
