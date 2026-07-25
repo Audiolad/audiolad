@@ -1256,6 +1256,214 @@ assert(
   "money affirmations slug unique",
 );
 
+const changeMoneyAttitudeArticle = getArticleBySlug(
+  "kak-izmenit-otnoshenie-k-dengam",
+);
+assert(changeMoneyAttitudeArticle, "change money attitude article registered");
+assert(
+  changeMoneyAttitudeArticle.title ===
+    "Как изменить отношение к деньгам: почему это важно и с чего начать",
+  "change money attitude H1",
+);
+assert(
+  changeMoneyAttitudeArticle.metaTitle.startsWith(
+    "Как изменить отношение к деньгам",
+  ),
+  "change money attitude SEO title keeps primary query",
+);
+assert(
+  changeMoneyAttitudeArticle.metaTitle.includes("АудиоЛад") &&
+    !changeMoneyAttitudeArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "change money attitude SEO title has brand once",
+);
+assert(
+  changeMoneyAttitudeArticle.metaDescription !==
+    changeMoneyAttitudeArticle.leadBeforeAudio,
+  "change money attitude metaDescription is not visual lead",
+);
+assert(
+  changeMoneyAttitudeArticle.metaDescription !==
+    howToAttractMoneyArticle.metaDescription &&
+    changeMoneyAttitudeArticle.metaDescription !==
+      moneyAffirmationsArticle.metaDescription,
+  "change money attitude metaDescription is unique in money cluster",
+);
+assert(
+  changeMoneyAttitudeArticle.topicSlug === "meditatsii-na-dengi",
+  "change money attitude topic hub",
+);
+assert(
+  changeMoneyAttitudeArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "change money attitude topic href",
+);
+assert(
+  changeMoneyAttitudeArticle.primaryPractice.practiceKey ===
+    "klyuch-k-izobiliyu",
+  "change money attitude primary practice key",
+);
+assert(
+  changeMoneyAttitudeArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "change money attitude practice intro",
+);
+assert(
+  !JSON.stringify(changeMoneyAttitudeArticle).includes(
+    "Если для этой темы больше подойдёт",
+  ),
+  "change money attitude content has no editorial practice fork",
+);
+assert(
+  changeMoneyAttitudeArticle.leadBeforeAudio.startsWith(
+    "Наверное, почти каждый человек хотя бы раз замечал",
+  ),
+  "change money attitude opening body paragraph",
+);
+assert(
+  changeMoneyAttitudeArticle.shortAnswer.startsWith(
+    "Отношение к деньгам складывается из личного опыта",
+  ),
+  "change money attitude short answer keeps direct answer role",
+);
+assert(
+  !changeMoneyAttitudeArticle.leadBeforeAudio.includes(
+    "Отношение к деньгам складывается из личного опыта",
+  ),
+  "change money attitude lead is not a second definition",
+);
+assert(
+  changeMoneyAttitudeArticle.introAfterAudio[0] ===
+    "Изменить это за один день невозможно.",
+  "change money attitude intro starts after lead",
+);
+assert(
+  !changeMoneyAttitudeArticle.introAfterAudio.includes(
+    changeMoneyAttitudeArticle.leadBeforeAudio,
+  ),
+  "change money attitude lead not duplicated in intro",
+);
+assert(
+  !changeMoneyAttitudeArticle.introAfterAudio.some((paragraph) =>
+    paragraph.includes("Отношение к деньгам складывается из личного опыта"),
+  ),
+  "change money attitude intro does not repeat shortAnswer",
+);
+assert(
+  changeMoneyAttitudeArticle.sections.some((section) =>
+    section.paragraphs.includes("Понятный план работы с долгами."),
+  ),
+  "change money attitude keeps debt-plan wording",
+);
+assert(
+  changeMoneyAttitudeArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "Лучше выберите одно небольшое действие, которое можно выполнить уже сегодня.",
+    ),
+  ),
+  "change money attitude includes today-action exercise",
+);
+assert(
+  changeMoneyAttitudeArticle.captionAfterAudio === "",
+  "change money attitude no artificial caption",
+);
+assert(
+  changeMoneyAttitudeArticle.finalAudioLead === "",
+  "change money attitude no second primary player",
+);
+assert(changeMoneyAttitudeArticle.faq.length === 3, "change money attitude faq");
+assert(
+  changeMoneyAttitudeArticle.faq[0]?.question ===
+    "Можно ли изменить своё отношение к деньгам?",
+  "change money attitude FAQ first question",
+);
+assert(
+  !changeMoneyAttitudeArticle.faq[0]?.question.includes("полностью"),
+  "change money attitude FAQ avoids полностью wording",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "change money attitude links to playlist as playlist CTA",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").toLowerCase().includes("плейлист"),
+  ),
+  "change money attitude CTA names playlist explicitly",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-privlech-dengi-v-svoyu-zhizn",
+    ),
+  ),
+  "change money attitude links to how-to attract money article",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment && segment.href === "/articles/affirmatsii-na-dengi",
+    ),
+  ),
+  "change money attitude links to money affirmations article",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/chto-takoe-denezhnyy-potok",
+    ),
+  ),
+  "change money attitude links to money flow article",
+);
+assert(
+  !JSON.stringify(changeMoneyAttitudeArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "change money attitude does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(changeMoneyAttitudeArticle.brandNote?.includes("АудиоЛаде")),
+  "change money attitude brand note",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "change money attitude see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "money hub lists change money attitude article",
+);
+assert(
+  !changeMoneyAttitudeArticle.leadBeforeAudio.includes("—") &&
+    !changeMoneyAttitudeArticle.shortAnswer.includes("—") &&
+    !changeMoneyAttitudeArticle.metaTitle.includes("—"),
+  "change money attitude uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-izmenit-otnoshenie-k-dengam"),
+  "change money attitude in slug list",
+);
+assert(
+  listArticleSlugs().filter(
+    (slug) => slug === "kak-izmenit-otnoshenie-k-dengam",
+  ).length === 1,
+  "change money attitude slug unique",
+);
+assert(
+  changeMoneyAttitudeArticle.closingSection.paragraphs.some((paragraph) =>
+    paragraph.includes("начинают работать вместе"),
+  ),
+  "change money attitude closing keeps работать вместе wording",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -1301,6 +1509,12 @@ assert(
     (item) => item.href === "/articles/affirmatsii-na-dengi",
   ),
   "how-to attract money reverse-links to money affirmations article",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "money affirmations reverse-links to change money attitude article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -1518,6 +1732,14 @@ assert(
       entry.url === "https://audiolad.ru/articles/affirmatsii-na-dengi",
   ),
   "money affirmations article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "change money attitude article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
