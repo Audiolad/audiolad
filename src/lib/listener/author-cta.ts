@@ -63,3 +63,20 @@ export function resolveShowSidebarAuthorPromo(input: {
 }): boolean {
   return resolveListenerAuthorCta(input).label !== "Кабинет автора";
 }
+
+/**
+ * Right-column author entry vs control panel are independent.
+ * Staff without an author cabinet should not see become-author CTAs here.
+ */
+export function resolveShowAuthorEntry(input: {
+  authorCtaLabel: string;
+  showAdminPanel: boolean;
+}): boolean {
+  if (input.authorCtaLabel === "Кабинет автора") {
+    return true;
+  }
+  if (input.showAdminPanel) {
+    return false;
+  }
+  return true;
+}

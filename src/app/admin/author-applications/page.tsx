@@ -5,6 +5,7 @@ import {
   ADMIN_APPLICATION_STATUS_OPTIONS,
   resolveAdminApplicationFilterStatus,
 } from "@/lib/admin/application-status";
+import { requireAdminPermission } from "@/lib/admin/guard";
 import { listAdminAuthorApplications } from "@/lib/admin/queries";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export default async function AdminAuthorApplicationsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  await requireAdminPermission("authors.view");
   const params = await searchParams;
   const status = resolveAdminApplicationFilterStatus(params.status);
 

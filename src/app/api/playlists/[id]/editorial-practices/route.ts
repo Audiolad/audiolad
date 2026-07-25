@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { assertPlatformAdmin } from "@/lib/auth/platform-admin";
+import { assertPermission } from "@/lib/auth/platform-access";
 import {
   isEditorialAddRpcResult,
   listEditorialPracticeOptions,
@@ -47,7 +47,7 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  const adminCheck = await assertPlatformAdmin(supabase, user.id);
+  const adminCheck = await assertPermission(supabase, user.id, "products.moderate");
 
   if (!adminCheck.ok) {
     return NextResponse.json(
@@ -116,7 +116,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  const adminCheck = await assertPlatformAdmin(supabase, user.id);
+  const adminCheck = await assertPermission(supabase, user.id, "products.moderate");
 
   if (!adminCheck.ok) {
     return NextResponse.json(

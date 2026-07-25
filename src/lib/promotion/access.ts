@@ -7,13 +7,13 @@ import {
 } from "@/lib/author-products/auth";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorMemberRole, AuthorWorkspace } from "@/lib/author-products/types";
-import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { hasPermission } from "@/lib/auth/platform-access";
 
 export async function listPromotionWorkspaces(
   userId: string,
 ): Promise<AuthorWorkspace[]> {
   const { supabase } = await requireAuthenticatedUser();
-  const admin = await isPlatformAdmin(supabase, userId);
+  const admin = await hasPermission(supabase, userId, "authors.manage");
 
   if (!admin) {
     return listAuthorWorkspacesForUser(userId, supabase);
@@ -42,7 +42,7 @@ export async function listPromotionWorkspaces(
 
 export async function requireAuthorPromotionAccess(authorId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
-  const admin = await isPlatformAdmin(supabase, user.id);
+  const admin = await hasPermission(supabase, user.id, "authors.manage");
 
   if (admin) {
     return {
@@ -63,7 +63,7 @@ export async function requireAuthorPromotionAccess(authorId: string) {
 
 export async function requireAuthorPromotionMutationAccess(authorId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
-  const admin = await isPlatformAdmin(supabase, user.id);
+  const admin = await hasPermission(supabase, user.id, "authors.manage");
 
   if (admin) {
     return {

@@ -1,12 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { fetchUserPlatformRole } from "@/lib/auth/platform-admin";
+import { hasPermission } from "@/lib/auth/platform-access";
 import { removeUserAvatarObject } from "@/lib/profile/avatar";
 import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
   MAX_ADMIN_USER_DELETION_BATCH_SIZE,
-  canActorDeleteUsers,
   evaluateUserDeletionEligibility,
   isValidUserId,
   type UserDeletionDependencies,
@@ -304,9 +303,9 @@ export async function authorizeAdminUserDeletion(
   actorUserId: string,
 ): Promise<{ ok: true } | { ok: false; status: 403 | 500 }> {
   try {
-    const role = await fetchUserPlatformRole(service, actorUserId);
+    const allowed = await hasPermission(service, actorUserId, "users.manage");
 
-    if (!canActorDeleteUsers(role)) {
+    if (!allowed) {
       return { ok: false, status: 403 };
     }
 

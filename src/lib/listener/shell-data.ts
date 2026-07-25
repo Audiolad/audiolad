@@ -6,8 +6,10 @@ import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
+import { hasAdminPanelAccess } from "@/lib/auth/platform-admin";
 import {
   resolveListenerAuthorCta,
+  resolveShowAuthorEntry,
   resolveShowSidebarAuthorPromo,
   type ListenerAuthorCta,
 } from "@/lib/listener/author-cta";
@@ -18,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 export type { ListenerAuthorCta };
 export {
   resolveListenerAuthorCta,
+  resolveShowAuthorEntry,
   resolveShowBecomeAuthorPromo,
   resolveShowSidebarAuthorPromo,
 } from "@/lib/listener/author-cta";
@@ -29,6 +32,9 @@ export type ListenerShellData = {
   avatarUrl: string | null;
   profileHref: string;
   authorCta: ListenerAuthorCta;
+  showAuthorEntry: boolean;
+  showAdminPanel: boolean;
+  adminPanelHref: string;
   showSidebarAuthorPromo: boolean;
 };
 
@@ -52,6 +58,7 @@ async function loadListenerShellData(
       workspaces: [] as AuthorWorkspace[],
       applicationVariant: null,
     };
+    const authorCta = resolveListenerAuthorCta(guestAuthorInput);
 
     return {
       isAuthenticated: false,
@@ -59,26 +66,34 @@ async function loadListenerShellData(
       profileInitial: "",
       avatarUrl: null,
       profileHref: "/auth/sign-in",
-      authorCta: resolveListenerAuthorCta(guestAuthorInput),
+      authorCta,
+      showAuthorEntry: true,
+      showAdminPanel: false,
+      adminPanelHref: "/admin",
       showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(guestAuthorInput),
     };
   }
 
-  const [profileResult, workspaces, application] = await Promise.all([
-    client
-      .from("profiles")
-      .select("full_name, avatar_path, avatar_url")
-      .eq("id", user.id)
-      .maybeSingle(),
-    listAuthorWorkspacesForUser(user.id).catch((error) => {
-      console.error("listener_shell_author_workspaces_error", error);
-      return [] as AuthorWorkspace[];
-    }),
-    getCurrentAuthorApplication(client, user.id).catch((error) => {
-      console.error("listener_shell_author_application_error", error);
-      return null;
-    }),
-  ]);
+  const [profileResult, workspaces, application, showAdminPanel] =
+    await Promise.all([
+      client
+        .from("profiles")
+        .select("full_name, avatar_path, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle(),
+      listAuthorWorkspacesForUser(user.id).catch((error) => {
+        console.error("listener_shell_author_workspaces_error", error);
+        return [] as AuthorWorkspace[];
+      }),
+      getCurrentAuthorApplication(client, user.id).catch((error) => {
+        console.error("listener_shell_author_application_error", error);
+        return null;
+      }),
+      hasAdminPanelAccess(client, user.id).catch((error) => {
+        console.error("listener_shell_admin_panel_access_error", error);
+        return false;
+      }),
+    ]);
 
   if (profileResult.error) {
     console.error(
@@ -98,6 +113,7 @@ async function loadListenerShellData(
       applicationStatus: application?.status ?? null,
     }),
   };
+  const authorCta = resolveListenerAuthorCta(authorInput);
 
   return {
     isAuthenticated: true,
@@ -105,7 +121,13 @@ async function loadListenerShellData(
     profileInitial: getInitial(displayName),
     avatarUrl,
     profileHref: "/profile",
-    authorCta: resolveListenerAuthorCta(authorInput),
+    authorCta,
+    showAuthorEntry: resolveShowAuthorEntry({
+      authorCtaLabel: authorCta.label,
+      showAdminPanel,
+    }),
+    showAdminPanel,
+    adminPanelHref: "/admin",
     showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(authorInput),
   };
 }

@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import AuthorApplicationReviewForm from "@/components/admin/AuthorApplicationReviewForm";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
+import { requireAdminPermission } from "@/lib/admin/guard";
 import { getAdminAuthorApplication } from "@/lib/admin/queries";
+import { snapshotHasPermission } from "@/lib/auth/platform-access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,8 @@ export default async function AdminAuthorApplicationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await requireAdminPermission("authors.view");
+  const canManage = snapshotHasPermission(session.access, "authors.manage");
   const { id } = await params;
 
   let application;
@@ -54,7 +58,13 @@ export default async function AdminAuthorApplicationDetailPage({
         </div>
       </div>
 
-      <AuthorApplicationReviewForm application={application} />
+      {canManage ? (
+        <AuthorApplicationReviewForm application={application} />
+      ) : (
+        <div className="rounded-[22px] border border-[#eadff8] bg-white p-5 text-sm text-[#796ba0]">
+          Просмотр заявки доступен. Изменение статуса для вашей роли недоступно.
+        </div>
+      )}
     </section>
   );
 }
