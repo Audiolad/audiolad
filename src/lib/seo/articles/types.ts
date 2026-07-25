@@ -25,17 +25,24 @@ export type ArticleRelatedPracticeSlot = ArticlePracticeSlot & {
   blurb: string;
 };
 
+/** Inline text or link segment for multi-link editorial paragraphs. */
+export type ArticleInlineSegment =
+  | { text: string }
+  | { href: string; label: string };
+
 /**
  * Cross-link paragraph after the final audio CTA.
- * When `href` is set, `linkLabel` is rendered as an inline link between
- * `before` and `after`. When `href` is omitted, the full plain `before`
- * string is shown (for future articles mentioned without a live URL).
+ * When `segments` is set, it is rendered as mixed text/links.
+ * Otherwise: when `href` is set, `linkLabel` is rendered as an inline link
+ * between `before` and `after`. When `href` is omitted, the full plain
+ * `before` string is shown (for future articles mentioned without a live URL).
  */
 export type ArticleCrossLinkParagraph = {
   before: string;
   after?: string;
   linkLabel?: string;
   href?: string;
+  segments?: readonly ArticleInlineSegment[];
 };
 
 export type ArticleSeeAlsoLink = {

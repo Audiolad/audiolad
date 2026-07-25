@@ -178,29 +178,61 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
 
               {section.id === "audiopraktika" ? (
                 <div className="mt-6 space-y-4">
-                  <p className="text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-                    {article.finalAudioLead}
-                  </p>
-                  <ArticleAudioBlock
-                    placement="final_audio"
-                    product={primaryPractice}
-                    accessLabel={accessLabel}
-                    libraryAction={data.libraryAction}
-                    signInReturnPath={data.path}
-                  />
+                  {article.finalAudioLead.trim() ? (
+                    <>
+                      <p className="text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+                        {article.finalAudioLead}
+                      </p>
+                      <ArticleAudioBlock
+                        placement="final_audio"
+                        product={primaryPractice}
+                        accessLabel={accessLabel}
+                        libraryAction={data.libraryAction}
+                        signInReturnPath={data.path}
+                      />
+                    </>
+                  ) : null}
                   {article.afterFinalAudio && article.afterFinalAudio.length > 0 ? (
                     <div className="space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
                       {article.afterFinalAudio.map((item) => {
+                        const linkClassName =
+                          "font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+                        if (item.segments && item.segments.length > 0) {
+                          const key = item.segments
+                            .map((segment) =>
+                              "href" in segment
+                                ? `${segment.href}:${segment.label}`
+                                : segment.text,
+                            )
+                            .join("|");
+
+                          return (
+                            <p key={key}>
+                              {item.segments.map((segment) =>
+                                "href" in segment ? (
+                                  <Link
+                                    key={`${segment.href}:${segment.label}`}
+                                    href={segment.href}
+                                    className={linkClassName}
+                                  >
+                                    {segment.label}
+                                  </Link>
+                                ) : (
+                                  <span key={segment.text}>{segment.text}</span>
+                                ),
+                              )}
+                            </p>
+                          );
+                        }
+
                         const key = `${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`;
 
                         if (item.href && item.linkLabel) {
                           return (
                             <p key={key}>
                               {item.before}
-                              <Link
-                                href={item.href}
-                                className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                              >
+                              <Link href={item.href} className={linkClassName}>
                                 {item.linkLabel}
                               </Link>
                               {item.after ?? ""}

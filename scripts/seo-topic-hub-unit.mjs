@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { listArticlesByTopicSlug } from "../src/lib/seo/articles/index.ts";
 import {
   buildTopicHubJsonLdGraph,
   buildTopicHubMetadata,
@@ -231,6 +232,12 @@ assert(freeHub?.title === "Бесплатные медитации", "free hub H
 assert(
   listTopicHubSlugs().includes("besplatnye-meditatsii"),
   "free hub registered",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "besplatnye-meditatsii-onlayn",
+  ),
+  "free hub includes free meditations SEO article",
 );
 assert(
   sitemapEntries.some((entry) =>

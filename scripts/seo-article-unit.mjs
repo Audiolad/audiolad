@@ -19,6 +19,7 @@ import {
   getArticleBySlug,
   isValidArticleSlug,
   listArticleSlugs,
+  listArticlesByTopicSlug,
   resolveArticlePrimaryPractice,
 } from "../src/lib/seo/articles/index.ts";
 import { mapArticleDefinitionsToSitemapEntries } from "../src/lib/seo/sitemap-data.ts";
@@ -234,6 +235,124 @@ assert(
   "abundance in slug list",
 );
 assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "abundance reverse-links to free meditations article",
+);
+
+const freeMeditationsArticle = getArticleBySlug("besplatnye-meditatsii-onlayn");
+assert(freeMeditationsArticle, "free meditations article registered");
+assert(
+  freeMeditationsArticle.title ===
+    "Бесплатные медитации онлайн: как выбрать практику, которая действительно поможет",
+  "free meditations H1",
+);
+assert(
+  freeMeditationsArticle.metaTitle.includes("АудиоЛад") &&
+    !freeMeditationsArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "free meditations SEO title has brand once",
+);
+assert(
+  freeMeditationsArticle.metaDescription ===
+    "Как выбрать бесплатную медитацию онлайн, на что обратить внимание перед прослушиванием и с какой короткой аудиопрактики начать знакомство с медитациями.",
+  "free meditations metaDescription",
+);
+assert(
+  freeMeditationsArticle.metaDescription !==
+    freeMeditationsArticle.leadBeforeAudio,
+  "free meditations metaDescription is not visual lead",
+);
+assert(
+  freeMeditationsArticle.topicSlug === "besplatnye-meditatsii",
+  "free meditations topic hub",
+);
+assert(
+  freeMeditationsArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "free meditations topic href",
+);
+assert(
+  freeMeditationsArticle.primaryPractice.practiceKey === "elixir-molodosti",
+  "free meditations primary practice is Elixir",
+);
+assert(
+  freeMeditationsArticle.primaryPracticeIntro.includes("Эликсир Молодости"),
+  "free meditations practice intro",
+);
+assert(
+  freeMeditationsArticle.leadBeforeAudio.startsWith(
+    "Бесплатные медитации онлайн могут стать хорошим способом",
+  ),
+  "free meditations opening body paragraph",
+);
+assert(
+  freeMeditationsArticle.introAfterAudio[0].startsWith(
+    "Когда человек ищет бесплатную медитацию",
+  ),
+  "free meditations intro starts after lead",
+);
+assert(
+  !freeMeditationsArticle.introAfterAudio.includes(
+    freeMeditationsArticle.leadBeforeAudio,
+  ),
+  "free meditations lead not duplicated in intro",
+);
+assert(freeMeditationsArticle.captionAfterAudio === "", "no artificial caption");
+assert(freeMeditationsArticle.finalAudioLead === "", "no second primary player");
+assert(freeMeditationsArticle.faq.length === 3, "free meditations faq count");
+assert(
+  freeMeditationsArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+    ),
+  ),
+  "free meditations links to Klyuch practice",
+);
+assert(
+  freeMeditationsArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/practice/sergey-and-zoya/kod-prityazheniya",
+    ),
+  ),
+  "free meditations links to Kod practice",
+);
+assert(
+  freeMeditationsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+  ),
+  "free meditations links to abundance article",
+);
+assert(
+  Boolean(freeMeditationsArticle.brandNote?.includes("АудиоЛаде")),
+  "free meditations brand note",
+);
+assert(
+  freeMeditationsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "free meditations see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "besplatnye-meditatsii-onlayn",
+  ),
+  "free hub lists new article",
+);
+assert(
+  !freeMeditationsArticle.leadBeforeAudio.includes("—") &&
+    !freeMeditationsArticle.shortAnswer.includes("—") &&
+    !freeMeditationsArticle.metaTitle.includes("—"),
+  "free meditations uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("besplatnye-meditatsii-onlayn"),
+  "free meditations in slug list",
+);
+assert(
   article.afterFinalAudio?.some(
     (item) =>
       item.href ===
@@ -406,6 +525,14 @@ assert(
   "abundance article in sitemap mapper",
 );
 assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "free meditations article in sitemap mapper",
+);
+assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
   "sitemap has no localhost",
 );
@@ -551,6 +678,11 @@ assert(
 assert(
   viewSource.includes("article.afterFinalAudio"),
   "renders after-final-audio cross-links from data",
+);
+assert(
+  viewSource.includes("item.segments") &&
+    viewSource.includes("article.finalAudioLead.trim()"),
+  "supports multi-link CTA segments and optional final player",
 );
 assert(
   viewSource.includes("article.seeAlsoLinks"),
