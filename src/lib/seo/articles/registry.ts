@@ -6,6 +6,7 @@ import { KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE } from "./content/kak-privlech
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
 import { KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE } from "./content/kak-voyti-v-sostoyanie-izobiliya";
 import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
+import { MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE } from "./content/meditatsiya-na-ispolnenie-zhelaniy";
 import { MEDITATSIYA_NA_IZOBILIE_ARTICLE } from "./content/meditatsiya-na-izobilie";
 import { MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE } from "./content/meditatsiya-na-privlechenie-deneg";
 import type { ArticleDefinition } from "./types";
@@ -21,6 +22,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE,
   AFFIRMATSII_NA_DENGI_ARTICLE,
   KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE,
+  MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

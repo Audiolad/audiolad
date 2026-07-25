@@ -1464,6 +1464,182 @@ assert(
   "change money attitude closing keeps работать вместе wording",
 );
 
+const wishMeditationArticle = getArticleBySlug(
+  "meditatsiya-na-ispolnenie-zhelaniy",
+);
+assert(wishMeditationArticle, "wish meditation article registered");
+assert(
+  wishMeditationArticle.title ===
+    "Медитация на исполнение желаний: что это такое и чего от неё можно ожидать",
+  "wish meditation H1",
+);
+assert(
+  wishMeditationArticle.metaTitle.startsWith(
+    "Медитация на исполнение желаний",
+  ),
+  "wish meditation SEO title keeps primary query",
+);
+assert(
+  wishMeditationArticle.metaTitle.includes("АудиоЛад") &&
+    !wishMeditationArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "wish meditation SEO title has brand once",
+);
+assert(
+  wishMeditationArticle.metaDescription !==
+    wishMeditationArticle.leadBeforeAudio,
+  "wish meditation metaDescription is not visual lead",
+);
+assert(
+  wishMeditationArticle.topicSlug === "besplatnye-meditatsii",
+  "wish meditation uses free meditations hub",
+);
+assert(
+  wishMeditationArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "wish meditation topic href",
+);
+assert(
+  wishMeditationArticle.topicSlug !== "meditatsii-na-dengi",
+  "wish meditation is not forced into money hub",
+);
+assert(
+  wishMeditationArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "wish meditation primary practice key",
+);
+assert(
+  wishMeditationArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "wish meditation practice intro",
+);
+assert(
+  !JSON.stringify(wishMeditationArticle).includes(
+    "Если для этой темы больше подойдёт",
+  ),
+  "wish meditation content has no editorial practice fork",
+);
+assert(
+  wishMeditationArticle.leadBeforeAudio.includes(
+    "А вдруг существует практика, которая поможет приблизить желаемое?",
+  ),
+  "wish meditation opening body paragraph",
+);
+assert(
+  wishMeditationArticle.shortAnswer.startsWith(
+    "Медитация на исполнение желаний – это спокойная практика",
+  ),
+  "wish meditation short answer keeps definition role",
+);
+assert(
+  !wishMeditationArticle.leadBeforeAudio.includes(
+    "Медитация на исполнение желаний – это",
+  ),
+  "wish meditation lead is not a second definition",
+);
+assert(
+  wishMeditationArticle.introAfterAudio[0] ===
+    "Возникает закономерный вопрос – чего действительно можно ожидать от такой практики?",
+  "wish meditation intro starts after lead",
+);
+assert(
+  !wishMeditationArticle.introAfterAudio.includes(
+    wishMeditationArticle.leadBeforeAudio,
+  ),
+  "wish meditation lead not duplicated in intro",
+);
+assert(
+  wishMeditationArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "«Какой один небольшой шаг я могу сделать уже сегодня?»",
+    ),
+  ),
+  "wish meditation includes today-action exercise",
+);
+assert(
+  wishMeditationArticle.captionAfterAudio === "",
+  "wish meditation no artificial caption",
+);
+assert(
+  wishMeditationArticle.finalAudioLead === "",
+  "wish meditation no second primary player",
+);
+assert(wishMeditationArticle.faq.length === 3, "wish meditation faq");
+assert(
+  wishMeditationArticle.faq[0]?.answer.startsWith("Нет."),
+  "wish meditation FAQ rejects wish-fulfillment guarantee",
+);
+assert(
+  !JSON.stringify(wishMeditationArticle).toLowerCase().includes("вселенн"),
+  "wish meditation avoids universe-manifestation wording",
+);
+assert(
+  wishMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "wish meditation links to free meditations hub as collection CTA",
+);
+assert(
+  wishMeditationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-izobilie",
+    ),
+  ),
+  "wish meditation links to abundance meditation article",
+);
+assert(
+  wishMeditationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/besplatnye-meditatsii-onlayn",
+    ),
+  ),
+  "wish meditation links to free meditations article",
+);
+assert(
+  !JSON.stringify(wishMeditationArticle.afterFinalAudio).includes(
+    "/p/denezhnyy-potok-9288",
+  ),
+  "wish meditation does not pull money playlist into CTA",
+);
+assert(
+  !JSON.stringify(wishMeditationArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "wish meditation does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(wishMeditationArticle.brandNote?.includes("АудиоЛаде")),
+  "wish meditation brand note",
+);
+assert(
+  wishMeditationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "wish meditation see-also includes primary hub",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "meditatsiya-na-ispolnenie-zhelaniy",
+  ),
+  "free hub lists wish meditation article",
+);
+assert(
+  !wishMeditationArticle.leadBeforeAudio.includes("—") &&
+    !wishMeditationArticle.shortAnswer.includes("—") &&
+    !wishMeditationArticle.metaTitle.includes("—"),
+  "wish meditation uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("meditatsiya-na-ispolnenie-zhelaniy"),
+  "wish meditation in slug list",
+);
+assert(
+  listArticleSlugs().filter(
+    (slug) => slug === "meditatsiya-na-ispolnenie-zhelaniy",
+  ).length === 1,
+  "wish meditation slug unique",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -1515,6 +1691,12 @@ assert(
     (item) => item.href === "/articles/kak-izmenit-otnoshenie-k-dengam",
   ),
   "money affirmations reverse-links to change money attitude article",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-ispolnenie-zhelaniy",
+  ),
+  "abundance meditation reverse-links to wish meditation article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -1740,6 +1922,14 @@ assert(
       "https://audiolad.ru/articles/kak-izmenit-otnoshenie-k-dengam",
   ),
   "change money attitude article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/meditatsiya-na-ispolnenie-zhelaniy",
+  ),
+  "wish meditation article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),

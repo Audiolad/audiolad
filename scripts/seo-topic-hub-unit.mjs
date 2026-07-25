@@ -240,6 +240,18 @@ assert(
   "free hub includes free meditations SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
+  ),
+  "free hub includes wish-fulfillment meditation SEO article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
+  ),
+  "wish-fulfillment meditation is not forced into money hub",
+);
+assert(
   sitemapEntries.some((entry) =>
     entry.url.endsWith("/topics/besplatnye-meditatsii"),
   ),
