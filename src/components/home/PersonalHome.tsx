@@ -1,3 +1,4 @@
+import LegalFooter from "@/components/LegalFooter";
 import BecomeAuthorPromoBanner from "@/components/listener/BecomeAuthorPromoBanner";
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
 import type { PersonalHomeData } from "@/lib/home/types";
@@ -81,6 +82,8 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
           />
         </HomeSectionBoundary>
       ) : null}
+
+      <LegalFooter className="mt-10" />
     </>
   );
 }

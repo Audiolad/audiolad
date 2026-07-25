@@ -4,8 +4,10 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = "/var/www/audiolad";
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(path) {
   return readFileSync(`${root}/${path}`, "utf8");
@@ -13,6 +15,9 @@ function read(path) {
 
 const personalHome = read("src/components/home/PersonalHome.tsx");
 const guestHome = read("src/components/home/GuestHome.tsx");
+const homeLayout = read("src/app/(listener)/(home)/layout.tsx");
+const legalFooter = read("src/components/LegalFooter.tsx");
+const publicFooterLinks = read("src/lib/navigation/public-footer-links.ts");
 const dataTs = read("src/lib/home/data.ts");
 const typesTs = read("src/lib/home/types.ts");
 const banner = read("src/components/listener/BecomeAuthorPromoBanner.tsx");
@@ -155,6 +160,31 @@ assert(
     banner.includes("personal_home_desktop") &&
     banner.includes("BecomeAuthorPromoVisibility"),
   "BecomeAuthorPromoBanner supports personal home sources and visibility",
+);
+
+assert(
+  personalHome.includes('import LegalFooter from "@/components/LegalFooter"') &&
+    personalHome.includes('<LegalFooter className="mt-10" />'),
+  "PersonalHome renders shared LegalFooter at the bottom",
+);
+assert(
+  legalFooter.includes("PUBLIC_FOOTER_LINKS"),
+  "LegalFooter reuses PUBLIC_FOOTER_LINKS",
+);
+assert(
+  publicFooterLinks.includes('href: "/articles"') &&
+    publicFooterLinks.includes('title: "Статьи"'),
+  "PUBLIC_FOOTER_LINKS keeps articles discovery link",
+);
+assert(
+  homeLayout.includes("!shellData.isAuthenticated") &&
+    homeLayout.includes("<LegalFooter"),
+  "home layout keeps LegalFooter for guest home only",
+);
+assert(
+  personalHome.lastIndexOf("<LegalFooter") >
+    personalHome.lastIndexOf("BecomeAuthorPromoBanner"),
+  "LegalFooter is after personal home content sections",
 );
 
 console.log("personal-home-simplify-unit: ok");
