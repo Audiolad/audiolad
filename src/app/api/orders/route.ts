@@ -87,6 +87,7 @@ export async function POST(request: Request) {
     p_analytics_session_id: claims.analyticsSessionId,
     p_analytics_anonymous_id: claims.analyticsAnonymousId,
     p_checkout_origin_path: claims.checkoutOriginPath,
+    p_buy_click_client_event_id: claims.buyClickClientEventId,
   });
 
   if (error) {
@@ -128,6 +129,53 @@ export async function POST(request: Request) {
         order_id: truncateId(row.order_id),
         reason,
         session_id: truncateId(claims.analyticsSessionId),
+      }),
+    );
+  }
+
+  if (row.buy_click_linked) {
+    console.info(
+      JSON.stringify({
+        event: "buy_click_linked_to_order",
+        order_id: truncateId(row.order_id),
+        client_event_id: truncateId(claims.buyClickClientEventId),
+      }),
+    );
+  } else {
+    const reason = row.buy_click_link_reason ?? "unlinked";
+    const reasonEvent =
+      reason === "event_missing" || reason === "missing_client_event_id"
+        ? "buy_click_missing"
+        : reason === "invalid_event_type"
+          ? "buy_click_invalid_event"
+          : reason === "session_mismatch" || reason === "missing_order_session"
+            ? "buy_click_session_mismatch"
+            : reason === "practice_mismatch"
+              ? "buy_click_practice_mismatch"
+              : reason === "identity_mismatch"
+                ? "buy_click_identity_mismatch"
+                : reason === "stale_click"
+                  ? "buy_click_stale"
+                  : reason === "already_linked" ||
+                      reason === "already_linked_preserved"
+                    ? "buy_click_already_linked"
+                    : "buy_click_missing";
+    console.info(
+      JSON.stringify({
+        event: reasonEvent,
+        order_id: truncateId(row.order_id),
+        reason,
+        client_event_id: truncateId(claims.buyClickClientEventId),
+      }),
+    );
+  }
+
+  if (confidence === "exact") {
+    console.info(
+      JSON.stringify({
+        event: "buy_click_snapshot_preserved",
+        order_id: truncateId(row.order_id),
+        attribution_confidence: confidence,
       }),
     );
   }

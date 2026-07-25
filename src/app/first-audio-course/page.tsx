@@ -7,6 +7,7 @@ import LegalFooter from "@/components/LegalFooter";
 import PrimaryNav from "@/components/PrimaryNav";
 import PurchaseConsent from "@/components/PurchaseConsent";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import { createClient } from "@/lib/supabase/server";
 
 const FIRST_AUDIO_COURSE_SLUG = "first-audio-course";
 
@@ -54,7 +55,21 @@ function BulletList({ items }: { items: string[] }) {
 const cardClassName =
   "lg:mt-0 lg:rounded-[22px] lg:border lg:border-[#eadff8] lg:bg-white lg:p-7";
 
-export default function FirstAudioCoursePage() {
+export default async function FirstAudioCoursePage() {
+  const supabase = await createClient();
+  const { data: coursePractice } = await supabase
+    .from("practices")
+    .select("id, author_id, price")
+    .eq("slug", FIRST_AUDIO_COURSE_SLUG)
+    .maybeSingle();
+
+  const coursePriceMinor =
+    typeof coursePractice?.price === "number" &&
+    Number.isFinite(coursePractice.price) &&
+    coursePractice.price > 0
+      ? Math.floor(coursePractice.price) * 100
+      : 9900;
+
   return (
     <main className="min-h-screen bg-platform-surface text-[#25135c]">
       <div
@@ -145,6 +160,11 @@ export default function FirstAudioCoursePage() {
 
               <BuyPracticeButton
                 practiceSlug={FIRST_AUDIO_COURSE_SLUG}
+                practiceId={coursePractice?.id ?? null}
+                authorId={coursePractice?.author_id ?? null}
+                productPriceMinorSnapshot={coursePriceMinor}
+                currency="RUB"
+                purchaseSurface="practice_page"
                 label="Купить аудиоподкаст"
                 signInReturnPath="/first-audio-course"
                 className="mt-5 w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9872d8] px-5 py-4 text-[17px] font-semibold text-white shadow-[0_14px_34px_rgba(96,59,168,0.24)] transition hover:opacity-95 disabled:cursor-wait disabled:opacity-70"

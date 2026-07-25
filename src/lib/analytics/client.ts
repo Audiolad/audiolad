@@ -37,6 +37,13 @@ type TrackEventInput = {
   practice_id?: string | null;
   audio_item_id?: string | null;
   properties?: Record<string, string | number | boolean | null>;
+  /** Optional stable id for idempotent retries of the same physical action. */
+  client_event_id?: string | null;
+};
+
+export type TrackPlatformEventResult = {
+  client_event_id: string;
+  accepted: boolean;
 };
 
 let cachedSessionId: string | null = null;
@@ -189,9 +196,14 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
   return recorded;
 }
 
-export async function trackPlatformEvent(input: TrackEventInput): Promise<void> {
+export async function trackPlatformEvent(
+  input: TrackEventInput,
+): Promise<TrackPlatformEventResult> {
   const anonymousId = getOrCreateAnonymousId();
-  const clientEventId = createClientEventId();
+  const clientEventId =
+    typeof input.client_event_id === "string" && input.client_event_id.trim()
+      ? input.client_event_id.trim()
+      : createClientEventId();
 
   const body = {
     session_id: input.sessionId,
@@ -223,6 +235,8 @@ export async function trackPlatformEvent(input: TrackEventInput): Promise<void> 
   if (isYandexMetrikaGoalName(input.event_name)) {
     sendYandexGoal(input.event_name);
   }
+
+  return { client_event_id: clientEventId, accepted: result.ok };
 }
 
 export function setCachedAnalyticsSessionId(sessionId: string | null): void {

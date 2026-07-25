@@ -14,12 +14,15 @@ export type CreateOrderRpcRow = {
   currency: string;
   created_at: string;
   attribution_confidence?: string | null;
+  buy_click_linked?: boolean | null;
+  buy_click_link_reason?: string | null;
 };
 
 export type OrderAnalyticsClaims = {
   analyticsSessionId: string | null;
   analyticsAnonymousId: string | null;
   checkoutOriginPath: string | null;
+  buyClickClientEventId: string | null;
 };
 
 export type CreateOrderSuccessBody = {
@@ -84,6 +87,7 @@ export function extractOrderAnalyticsClaims(
   const sessionRaw = body.analytics_session_id;
   const anonymousRaw = body.analytics_anonymous_id;
   const originRaw = body.checkout_origin_path;
+  const buyClickRaw = body.buy_click_client_event_id;
 
   const analyticsSessionId =
     typeof sessionRaw === "string" && UUID_PATTERN.test(sessionRaw.trim())
@@ -98,10 +102,16 @@ export function extractOrderAnalyticsClaims(
   const checkoutOriginPath =
     typeof originRaw === "string" ? sanitizeOrigin(originRaw) : null;
 
+  const buyClickClientEventId =
+    typeof buyClickRaw === "string" && UUID_PATTERN.test(buyClickRaw.trim())
+      ? buyClickRaw.trim().toLowerCase()
+      : null;
+
   return {
     analyticsSessionId,
     analyticsAnonymousId,
     checkoutOriginPath,
+    buyClickClientEventId,
   };
 }
 

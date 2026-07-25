@@ -54,6 +54,12 @@ export type AdminAnalyticsUrlState = {
   moneyAuthorId: string | null;
   moneyPracticeId: string | null;
   moneyDrill: AdminMoneyDrillMetric;
+  /** Path-to-purchase (P3.2.1) — independent of money period when set. */
+  pathPeriod: AdminAnalyticsPeriod;
+  pathProduct: string | null;
+  pathSurface: string | null;
+  pathMode: "order_cohort";
+  pathDrill: string | null;
 };
 
 function parseTab(value: string | null): AdminAnalyticsTab {
@@ -119,6 +125,23 @@ function parseIncludeTestPayments(value: string | null): boolean {
   return value === "1" || value === "true";
 }
 
+function parsePathMode(value: string | null): "order_cohort" {
+  return "order_cohort";
+}
+
+function parsePathSurface(value: string | null): string | null {
+  if (!value) return null;
+  const allowed = new Set([
+    "practice_page",
+    "preview",
+    "catalog_card",
+    "playlist",
+    "author_page",
+    "unknown",
+  ]);
+  return allowed.has(value) ? value : null;
+}
+
 export function parseAdminAnalyticsUrlState(
   params: URLSearchParams | Record<string, string | undefined>,
 ): AdminAnalyticsUrlState {
@@ -158,6 +181,13 @@ export function parseAdminAnalyticsUrlState(
     moneyAuthorId: get("moneyAuthorId"),
     moneyPracticeId: get("moneyPracticeId"),
     moneyDrill: parseMoneyDrill(get("moneyDrill")),
+    pathPeriod: parseAdminAnalyticsPeriod(
+      get("pathPeriod") ?? get("moneyPeriod"),
+    ),
+    pathProduct: get("pathProduct"),
+    pathSurface: parsePathSurface(get("pathSurface")),
+    pathMode: parsePathMode(get("pathMode")),
+    pathDrill: get("pathDrill"),
   };
 }
 
@@ -208,6 +238,14 @@ export function buildAdminAnalyticsSearchParams(
     ["moneyAuthorId", state.moneyAuthorId],
     ["moneyPracticeId", state.moneyPracticeId],
     ["moneyDrill", state.moneyDrill],
+    [
+      "pathPeriod",
+      state.pathPeriod === state.moneyPeriod ? null : state.pathPeriod,
+    ],
+    ["pathProduct", state.pathProduct],
+    ["pathSurface", state.pathSurface],
+    ["pathMode", state.pathMode === "order_cohort" ? null : state.pathMode],
+    ["pathDrill", state.pathDrill],
   ];
 
   for (const [key, value] of optional) {

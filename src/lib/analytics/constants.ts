@@ -27,6 +27,7 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "article_related_practice_click",
   "article_toc_click",
   "article_final_audio_click",
+  "buy_clicked",
 ] as const;
 
 export type PlatformAnalyticsEventName =

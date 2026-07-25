@@ -3,14 +3,17 @@ import {
   sanitizeAnalyticsTrackId,
 } from "@/lib/promo/analytics-events";
 
+import { filterBuyClickedProperties } from "@/lib/analytics/buy-clicked";
+import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import { isPlatformAnalyticsEventName } from "@/lib/analytics/constants";
 
 const MAX_PROPERTIES = 12;
 
+/** Pathname-only: strip query/fragment/host (no tokens in stored path). */
 export function sanitizeAnalyticsPath(
   value: string | null | undefined,
 ): string | null {
-  return sanitizeAnalyticsString(value, 512);
+  return sanitizeCheckoutOriginPath(value);
 }
 
 export function sanitizeAnalyticsProperties(
@@ -93,6 +96,12 @@ export function parsePlatformTrackBody(body: unknown): {
     return null;
   }
 
+  const properties = sanitizeAnalyticsProperties(record.properties);
+  const filteredProperties =
+    eventName === "buy_clicked"
+      ? filterBuyClickedProperties(properties)
+      : properties;
+
   return {
     session_id: sessionId,
     anonymous_id: anonymousId,
@@ -106,7 +115,7 @@ export function parsePlatformTrackBody(body: unknown): {
     audio_item_id: sanitizeAnalyticsTrackId(
       typeof record.audio_item_id === "string" ? record.audio_item_id : null,
     ),
-    properties: sanitizeAnalyticsProperties(record.properties),
+    properties: filteredProperties,
     client_event_id: sanitizeAnalyticsTrackId(
       typeof record.client_event_id === "string" ? record.client_event_id : null,
     ),

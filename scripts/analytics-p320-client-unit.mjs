@@ -72,6 +72,7 @@ function testClaimsIgnoreClientUtm() {
   );
   assertEqual(claims.analyticsAnonymousId, "anon-1", "anon");
   assertEqual(claims.checkoutOriginPath, "/practice/x", "origin sanitized");
+  assertEqual(claims.buyClickClientEventId, null, "no buy click by default");
   assert(!("session_utm_source" in claims), "no client utm field");
   assertEqual(extractPracticeSlug({ practice_slug: "demo-product" }), "demo-product", "slug");
 }

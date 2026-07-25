@@ -342,6 +342,13 @@ export function PracticePrimaryActionSection({
           <>
             <BuyPracticeButton
               practiceSlug={presentation.primaryAction.practiceSlug}
+              practiceId={presentation.primaryAction.practiceId}
+              authorId={presentation.primaryAction.authorId}
+              productPriceMinorSnapshot={
+                presentation.primaryAction.productPriceMinorSnapshot
+              }
+              currency={presentation.primaryAction.currency}
+              purchaseSurface={presentation.primaryAction.purchaseSurface}
               label={presentation.primaryAction.label}
               className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white"
               signInReturnPath={practicePagePath}

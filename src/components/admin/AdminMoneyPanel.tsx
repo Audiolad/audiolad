@@ -24,6 +24,7 @@ import {
   type AdminAnalyticsUrlState,
   type AdminMoneyTab,
 } from "@/lib/admin/analytics-url-state";
+import AdminPathToPurchasePanel from "@/components/admin/AdminPathToPurchasePanel";
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length === 0) return <div className="h-8 w-16" aria-hidden />;
@@ -460,6 +461,8 @@ export default function AdminMoneyPanel({
           </section>
         </>
       ) : null}
+
+      <AdminPathToPurchasePanel urlState={urlState} onPatch={onPatch} />
 
       <section className="space-y-3" aria-labelledby="money-breakdown-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -77,6 +77,11 @@ export type PracticePrimaryAction =
       label: string;
       disabled: boolean;
       practiceSlug: string;
+      practiceId: string;
+      authorId: string | null;
+      productPriceMinorSnapshot: number | null;
+      currency: string;
+      purchaseSurface: "practice_page" | "preview";
     }
   | {
       kind: "audio_pending";
@@ -308,12 +313,15 @@ function resolveCommercialAccess(
 function buildCommercialPresentation(input: {
   access: ProductAccessResult;
   practice: PracticePricing & {
+    id: string;
     slug: string;
     audio_url: string | null;
+    author_id?: string | null;
   };
   authorSlug: string;
   paymentsConfigured: boolean;
   isAuthenticated: boolean;
+  purchaseSurface?: "practice_page" | "preview";
 }): Pick<
   PracticeAccessPresentation,
   | "statusBadge"
@@ -321,8 +329,14 @@ function buildCommercialPresentation(input: {
   | "primaryAction"
   | "showPaymentLegalNote"
 > {
-  const { access, practice, authorSlug, paymentsConfigured, isAuthenticated } =
-    input;
+  const {
+    access,
+    practice,
+    authorSlug,
+    paymentsConfigured,
+    isAuthenticated,
+    purchaseSurface = "practice_page",
+  } = input;
   const priceLabel = formatPracticePrice(practice.price);
   const isGuestListenEntry =
     !isAuthenticated &&
@@ -440,6 +454,16 @@ function buildCommercialPresentation(input: {
       label: paymentsConfigured ? buyLabel : "Продажи скоро откроются",
       disabled: !paymentsConfigured,
       practiceSlug: practice.slug,
+      practiceId: practice.id,
+      authorId: practice.author_id ?? null,
+      productPriceMinorSnapshot:
+        typeof practice.price === "number" &&
+        Number.isFinite(practice.price) &&
+        practice.price > 0
+          ? Math.floor(practice.price) * 100
+          : null,
+      currency: "RUB",
+      purchaseSurface,
     },
     showPaymentLegalNote: paymentsConfigured,
   };
@@ -480,6 +504,7 @@ export function buildPracticeAccessPresentation(input: {
     id: string;
     slug: string;
     audio_url: string | null;
+    author_id?: string | null;
   };
   authorSlug: string;
   paymentsConfigured: boolean;
@@ -570,6 +595,7 @@ export function buildPracticeAccessPresentation(input: {
       paymentsConfigured,
       // Guest CTA copy and funnel, without changing real server-side access.
       isAuthenticated: false,
+      purchaseSurface: "preview",
     });
     const libraryAction = resolveLibraryAction({
       access: commercialAccess,

@@ -3,11 +3,26 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { buildBuyClickedProperties } from "@/lib/analytics/buy-clicked";
 import { readCheckoutOriginPathFromWindow } from "@/lib/analytics/checkout-origin";
-import { getCurrentAnalyticsIdentity } from "@/lib/analytics/client";
+import {
+  getCachedAnalyticsSessionId,
+  getCurrentAnalyticsIdentity,
+  trackPlatformEvent,
+} from "@/lib/analytics/client";
+import { createClientEventId } from "@/lib/analytics/event-id";
+import {
+  normalizePurchaseSurface,
+  type PurchaseSurface,
+} from "@/lib/analytics/purchase-surface";
 
 type BuyPracticeButtonProps = {
   practiceSlug: string;
+  practiceId?: string | null;
+  authorId?: string | null;
+  productPriceMinorSnapshot?: number | null;
+  currency?: string | null;
+  purchaseSurface?: PurchaseSurface | string | null;
   label: string;
   className?: string;
   signInReturnPath?: string;
@@ -66,6 +81,11 @@ function isPaymentSuccessBody(body: unknown): body is PaymentSuccessBody {
 
 export default function BuyPracticeButton({
   practiceSlug,
+  practiceId = null,
+  authorId = null,
+  productPriceMinorSnapshot = null,
+  currency = "RUB",
+  purchaseSurface = "practice_page",
   label,
   className,
   signInReturnPath,
@@ -76,6 +96,7 @@ export default function BuyPracticeButton({
   const [isCheckingPending, setIsCheckingPending] = useState(true);
   const [hasPendingOrder, setHasPendingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const surface = normalizePurchaseSurface(purchaseSurface);
 
   useEffect(() => {
     let isMounted = true;
@@ -124,6 +145,38 @@ export default function BuyPracticeButton({
 
     try {
       const identity = getCurrentAnalyticsIdentity();
+      const sessionId = identity?.sessionId ?? getCachedAnalyticsSessionId();
+      const buyClickClientEventId = createClientEventId();
+      const path = readCheckoutOriginPathFromWindow();
+
+      if (sessionId && practiceId) {
+        const properties = buildBuyClickedProperties({
+          authorId,
+          productPriceMinorSnapshot,
+          currency,
+          path,
+          purchaseSurface: surface,
+          clientEventId: buyClickClientEventId,
+        });
+
+        await trackPlatformEvent({
+          sessionId,
+          event_name: "buy_clicked",
+          path,
+          practice_id: practiceId,
+          client_event_id: buyClickClientEventId,
+          properties,
+        });
+
+        console.info(
+          JSON.stringify({
+            event: "buy_click_recorded",
+            practice_id: practiceId.slice(0, 8),
+            surface,
+          }),
+        );
+      }
+
       const orderResponse = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -134,7 +187,9 @@ export default function BuyPracticeButton({
           practice_slug: practiceSlug,
           analytics_session_id: identity?.sessionId ?? null,
           analytics_anonymous_id: identity?.anonymousId ?? null,
-          checkout_origin_path: readCheckoutOriginPathFromWindow(),
+          checkout_origin_path: path,
+          buy_click_client_event_id:
+            sessionId && practiceId ? buyClickClientEventId : null,
         }),
       });
 
