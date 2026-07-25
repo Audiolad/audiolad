@@ -2,6 +2,8 @@ import { hasUserAuthorAvatar } from "@/lib/authors/has-user-avatar";
 import type { PublishReadinessResult } from "@/lib/author-products/publish";
 import { buildAuthorPublicPath, buildPracticePublicPath } from "@/lib/products/paths";
 
+import type { CommercialOnboardingSectionState } from "./commercial-onboarding";
+
 export const AUTHOR_ONBOARDING_STEP_COUNT = 5;
 
 export const AUTHOR_ONBOARDING_STORAGE_PREFIX =
@@ -13,6 +15,10 @@ export type AuthorOnboardingStepId =
   | "prepare_product"
   | "publish_product"
   | "promotion";
+
+/** First four free steps required before the commercial route unlocks. */
+export const AUTHOR_ONBOARDING_COMMERCIAL_GATE_STEP_IDS: readonly AuthorOnboardingStepId[] =
+  ["profile", "free_product", "prepare_product", "publish_product"];
 
 export type AuthorOnboardingProfileInput = {
   short_positioning?: string | null;
@@ -60,17 +66,30 @@ export type AuthorOnboardingStepState = {
   } | null;
 };
 
-export type AuthorOnboardingChecklistState = {
+export type AuthorOnboardingFreeChecklistState = {
   authorId: string;
   authorSlug: string;
+  /** Free-tier completed steps (of 5). */
   completedCount: number;
   totalCount: number;
+  /** True when all five free-tier steps are done. */
   complete: boolean;
+  /**
+   * True when the first four free steps are done.
+   * Step 5 (promotion) does not block the commercial route.
+   */
+  readyForCommercial: boolean;
   focusProductId: string | null;
   steps: AuthorOnboardingStepState[];
   hasNonArchivedPaidOnlyProducts: boolean;
   publishedProductId: string | null;
   publishedProductSlug: string | null;
+};
+
+export type AuthorOnboardingChecklistState = AuthorOnboardingFreeChecklistState & {
+  commercial: CommercialOnboardingSectionState;
+  /** Free + commercial sections fully complete. */
+  journeyComplete: boolean;
 };
 
 export type AuthorOnboardingUiPreference = {
@@ -226,6 +245,18 @@ export function focusProductSuitabilityScore(
   return 0;
 }
 
+export function isFreeOnboardingReadyForCommercial(
+  completionFlags: readonly boolean[],
+): boolean {
+  // Flags are ordered as AuthorOnboardingStepId list; gate uses the first four.
+  return (
+    completionFlags.length >= AUTHOR_ONBOARDING_COMMERCIAL_GATE_STEP_IDS.length &&
+    AUTHOR_ONBOARDING_COMMERCIAL_GATE_STEP_IDS.every(
+      (_stepId, index) => completionFlags[index] === true,
+    )
+  );
+}
+
 export function selectFocusProduct(
   products: AuthorOnboardingProductInput[],
 ): AuthorOnboardingProductInput | null {
@@ -296,7 +327,7 @@ export function evaluateAuthorOnboardingChecklist(input: {
   profile: AuthorOnboardingProfileInput;
   products: AuthorOnboardingProductInput[];
   campaigns: AuthorOnboardingCampaignInput[];
-}): AuthorOnboardingChecklistState {
+}): AuthorOnboardingFreeChecklistState {
   const { authorId, authorSlug, profile, products, campaigns } = input;
 
   const nonArchived = products.filter(isNonArchivedProduct);
@@ -324,6 +355,8 @@ export function evaluateAuthorOnboardingChecklist(input: {
   ];
   const completedCount = completionFlags.filter(Boolean).length;
   const firstIncompleteIndex = completionFlags.findIndex((flag) => !flag);
+  const readyForCommercial =
+    isFreeOnboardingReadyForCommercial(completionFlags);
 
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`;
   const profileHref = `/author-dashboard/profile?author=${encodeURIComponent(authorSlug)}`;
@@ -410,6 +443,7 @@ export function evaluateAuthorOnboardingChecklist(input: {
     completedCount,
     totalCount: AUTHOR_ONBOARDING_STEP_COUNT,
     complete: completedCount === AUTHOR_ONBOARDING_STEP_COUNT,
+    readyForCommercial,
     focusProductId: focusProduct?.id ?? null,
     steps,
     hasNonArchivedPaidOnlyProducts: paidOnlyNonArchived,

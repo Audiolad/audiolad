@@ -1,0 +1,636 @@
+import type { AuthorApplicationStatus } from "@/lib/author-applications/types";
+import {
+  isActivePromotionForPublishedProduct,
+  isNonArchivedProduct,
+  isPublishedProduct,
+  selectFocusProduct,
+  type AuthorOnboardingCampaignInput,
+  type AuthorOnboardingProductInput,
+} from "@/lib/author-dashboard/onboarding-checklist";
+import type { PublishReadinessResult } from "@/lib/author-products/publish";
+import {
+  authorAccessAllowsPaidProducts,
+  type AuthorAccessStatus,
+} from "@/lib/authors/access";
+import {
+  buildPracticePublicPath,
+  buildPracticePublishPreviewPath,
+} from "@/lib/products/paths";
+
+export const COMMERCIAL_ONBOARDING_STEP_COUNT = 7;
+
+export type CommercialOnboardingStepId =
+  | "commercial_application"
+  | "payout_details"
+  | "terms_acceptance"
+  | "paid_product"
+  | "prepare_paid_product"
+  | "publish_paid_product"
+  | "paid_promotion";
+
+export type OnboardingStepVisualState =
+  | "completed"
+  | "active"
+  | "locked"
+  | "coming_soon";
+
+/**
+ * Platform capability flags for commercial onboarding.
+ * Flip to `true` when the corresponding author-facing surface ships —
+ * without inventing fake forms or unlocks.
+ */
+export type CommercialOnboardingCapabilities = {
+  /** Author can open a real commercial-status application / status page. */
+  applicationSubmissionAvailable: boolean;
+  /** Author payout / legal details form exists and persists. */
+  payoutDetailsAvailable: boolean;
+  /** Author cooperation terms / offer acceptance exists and persists. */
+  termsAcceptanceAvailable: boolean;
+};
+
+export const DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES: CommercialOnboardingCapabilities =
+  {
+    applicationSubmissionAvailable: false,
+    payoutDetailsAvailable: false,
+    termsAcceptanceAvailable: false,
+  };
+
+export type CommercialApplicationStatus =
+  | "none"
+  | AuthorApplicationStatus;
+
+export type CommercialOnboardingStepState = {
+  id: CommercialOnboardingStepId;
+  title: string;
+  description: string;
+  state: OnboardingStepVisualState;
+  statusLabel?: string;
+  actionLabel?: string;
+  href?: string;
+  ctaExternal?: boolean;
+  hint?: string | null;
+  readiness?: {
+    completedCount: number;
+    totalCount: number;
+    requirements: Array<{
+      key: string;
+      label: string;
+      ok: boolean;
+    }>;
+  } | null;
+};
+
+export type CommercialOnboardingSectionState = {
+  unlocked: boolean;
+  completedCount: number;
+  totalCount: number;
+  complete: boolean;
+  /** Shown instead of N/7 while the commercial section is gated. */
+  progressMode: "gated" | "count";
+  steps: CommercialOnboardingStepState[];
+  focusPaidProductId: string | null;
+  publishedPaidProductId: string | null;
+  publishedPaidProductSlug: string | null;
+};
+
+const STEP_META: Record<
+  CommercialOnboardingStepId,
+  { title: string; description: string }
+> = {
+  commercial_application: {
+    title: "Подайте заявку на коммерческий статус",
+    description:
+      "Расскажите о себе и своих аудиопродуктах. Мы рассмотрим заявку и откроем возможность продавать материалы на АудиоЛаде.",
+  },
+  payout_details: {
+    title: "Заполните данные для выплат",
+    description:
+      "Укажите необходимые сведения, чтобы получать авторское вознаграждение от продаж.",
+  },
+  terms_acceptance: {
+    title: "Примите условия сотрудничества",
+    description:
+      "Ознакомьтесь с условиями размещения платных продуктов и выплаты авторского вознаграждения.",
+  },
+  paid_product: {
+    title: "Создайте первый платный продукт",
+    description:
+      "Добавьте аудиоматериалы, описание, обложку и установите стоимость продукта.",
+  },
+  prepare_paid_product: {
+    title: "Подготовьте платный продукт к публикации",
+    description:
+      "Проверьте страницу продукта, содержание, цену и то, как его увидят слушатели.",
+  },
+  publish_paid_product: {
+    title: "Опубликуйте первый платный продукт",
+    description:
+      "После публикации продукт появится на вашей странице и станет доступен для покупки.",
+  },
+  paid_promotion: {
+    title: "Создайте ссылку для продвижения",
+    description:
+      "Поделитесь платным продуктом со своей аудиторией и отслеживайте переходы, прослушивания и продажи.",
+  },
+};
+
+const LOCKED_STATUS_LABEL = "Пока недоступно";
+const COMING_SOON_STATUS_LABEL = "Скоро будет доступно";
+
+export function getCommercialApplicationStatusLabel(
+  status: CommercialApplicationStatus,
+): string | null {
+  switch (status) {
+    case "none":
+      return null;
+    case "draft":
+      return "Черновик";
+    case "submitted":
+      return "Отправлена";
+    case "in_review":
+      return "На рассмотрении";
+    case "needs_changes":
+      return "Требуется уточнение";
+    case "approved":
+      return "Одобрена";
+    case "rejected":
+      return "Отклонена";
+    case "withdrawn":
+      return "Отозвана";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Map workspace access + optional future commercial application row
+ * onto the shared author-application status vocabulary.
+ *
+ * `authors.access_status` is the current source of truth for commercial tier.
+ * A dedicated commercial application row can be passed later without changing
+ * step ids or UI contracts.
+ */
+export function resolveCommercialApplicationStatus(input: {
+  accessStatus: AuthorAccessStatus | string | null | undefined;
+  applicationStatus?: AuthorApplicationStatus | null;
+}): CommercialApplicationStatus {
+  if (input.accessStatus === "commercial") {
+    return "approved";
+  }
+
+  if (input.accessStatus === "commercial_pending") {
+    if (
+      input.applicationStatus === "submitted" ||
+      input.applicationStatus === "in_review" ||
+      input.applicationStatus === "needs_changes"
+    ) {
+      return input.applicationStatus;
+    }
+
+    return "in_review";
+  }
+
+  if (input.applicationStatus) {
+    return input.applicationStatus;
+  }
+
+  return "none";
+}
+
+export function isPaidNonArchivedProduct(
+  product: Pick<AuthorOnboardingProductInput, "status" | "is_free">,
+): boolean {
+  return isNonArchivedProduct(product) && product.is_free === false;
+}
+
+function buildVisiblePaidReadiness(
+  readiness: PublishReadinessResult | null | undefined,
+) {
+  if (!readiness) {
+    return null;
+  }
+
+  const keys = ["description", "cover", "audio", "topics", "price"] as const;
+  const requirements = readiness.requirements
+    .filter((item) => (keys as readonly string[]).includes(item.key))
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      ok: item.ok,
+    }));
+
+  return {
+    completedCount: requirements.filter((item) => item.ok).length,
+    totalCount: requirements.length,
+    requirements,
+  };
+}
+
+function lockedStep(
+  id: CommercialOnboardingStepId,
+  overrides?: Partial<CommercialOnboardingStepState>,
+): CommercialOnboardingStepState {
+  return {
+    id,
+    ...STEP_META[id],
+    state: "locked",
+    statusLabel: LOCKED_STATUS_LABEL,
+    hint: null,
+    readiness: null,
+    ...overrides,
+  };
+}
+
+function comingSoonStep(
+  id: CommercialOnboardingStepId,
+  overrides?: Partial<CommercialOnboardingStepState>,
+): CommercialOnboardingStepState {
+  return {
+    id,
+    ...STEP_META[id],
+    state: "coming_soon",
+    statusLabel: COMING_SOON_STATUS_LABEL,
+    hint: null,
+    readiness: null,
+    ...overrides,
+  };
+}
+
+export function evaluateCommercialOnboardingChecklist(input: {
+  authorSlug: string;
+  accessStatus: AuthorAccessStatus;
+  freeGateReady: boolean;
+  products: AuthorOnboardingProductInput[];
+  campaigns: AuthorOnboardingCampaignInput[];
+  capabilities?: CommercialOnboardingCapabilities;
+  /** Future: persisted payout/legal details completeness. */
+  payoutDetailsComplete?: boolean;
+  /** Future: persisted cooperation terms acceptance. */
+  termsAccepted?: boolean;
+  /** Future: dedicated commercial application status row. */
+  applicationStatus?: AuthorApplicationStatus | null;
+  /** Future: real application / status page href. */
+  applicationHref?: string | null;
+  /** Future: payout details form href. */
+  payoutDetailsHref?: string | null;
+  /** Future: terms acceptance page href. */
+  termsHref?: string | null;
+}): CommercialOnboardingSectionState {
+  const {
+    authorSlug,
+    accessStatus,
+    freeGateReady,
+    products,
+    campaigns,
+    applicationStatus = null,
+    applicationHref = null,
+    payoutDetailsHref = null,
+    termsHref = null,
+  } = input;
+
+  const capabilities =
+    input.capabilities ?? DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES;
+  const payoutDetailsComplete = input.payoutDetailsComplete === true;
+  const termsAccepted = input.termsAccepted === true;
+
+  const paidProducts = products.filter(isPaidNonArchivedProduct);
+  const publishedPaidProducts = paidProducts.filter(isPublishedProduct);
+  const focusPaidProduct = selectFocusProduct(paidProducts);
+  const publishedPaidProduct = publishedPaidProducts[0] ?? null;
+
+  const application = resolveCommercialApplicationStatus({
+    accessStatus,
+    applicationStatus,
+  });
+  const applicationApproved = application === "approved";
+  const applicationInFlight =
+    application === "submitted" ||
+    application === "in_review" ||
+    application === "draft" ||
+    application === "needs_changes" ||
+    application === "rejected";
+
+  const payoutStepComplete =
+    capabilities.payoutDetailsAvailable && payoutDetailsComplete;
+  const termsStepComplete =
+    capabilities.termsAcceptanceAvailable && termsAccepted;
+
+  const commercialRequirementsMet =
+    applicationApproved && payoutStepComplete && termsStepComplete;
+
+  const paidProductComplete = paidProducts.length > 0;
+  const preparePaidComplete = paidProducts.some(
+    (product) => product.status === "published" || product.readiness.ok,
+  );
+  const publishPaidComplete = publishedPaidProducts.length > 0;
+
+  const paidPublishedIds = new Set(
+    publishedPaidProducts.map((product) => product.id),
+  );
+  const paidPromotionComplete = campaigns.some(
+    (campaign) =>
+      isActivePromotionForPublishedProduct(campaign) &&
+      paidPublishedIds.has(campaign.practice_id),
+  );
+
+  const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`;
+  const promotionHref = `/author-dashboard/promotion?author=${encodeURIComponent(authorSlug)}`;
+  const focusEditHref = focusPaidProduct
+    ? `/author-dashboard/products/${focusPaidProduct.id}`
+    : newProductHref;
+  const focusPreviewHref =
+    focusPaidProduct &&
+    focusPaidProduct.slug &&
+    focusPaidProduct.status !== "published"
+      ? buildPracticePublishPreviewPath(authorSlug, focusPaidProduct.slug)
+      : focusEditHref;
+  const publishedPublicHref =
+    publishedPaidProduct && publishedPaidProduct.slug
+      ? buildPracticePublicPath(authorSlug, publishedPaidProduct.slug)
+      : focusEditHref;
+
+  const canCreatePaidProducts = authorAccessAllowsPaidProducts(accessStatus);
+
+  if (!freeGateReady) {
+    const steps: CommercialOnboardingStepState[] = [
+      lockedStep("commercial_application", {
+        hint: "Коммерческие возможности станут доступны после публикации первого бесплатного продукта.",
+      }),
+      lockedStep("payout_details"),
+      lockedStep("terms_acceptance"),
+      lockedStep("paid_product"),
+      lockedStep("prepare_paid_product"),
+      lockedStep("publish_paid_product"),
+      lockedStep("paid_promotion"),
+    ];
+
+    return {
+      unlocked: false,
+      completedCount: 0,
+      totalCount: COMMERCIAL_ONBOARDING_STEP_COUNT,
+      complete: false,
+      progressMode: "gated",
+      steps,
+      focusPaidProductId: focusPaidProduct?.id ?? null,
+      publishedPaidProductId: publishedPaidProduct?.id ?? null,
+      publishedPaidProductSlug: publishedPaidProduct?.slug ?? null,
+    };
+  }
+
+  // --- Step 1: commercial application ---
+  let applicationStep: CommercialOnboardingStepState;
+
+  if (applicationApproved) {
+    applicationStep = {
+      id: "commercial_application",
+      ...STEP_META.commercial_application,
+      state: "completed",
+      statusLabel: getCommercialApplicationStatusLabel("approved") ?? undefined,
+      hint: null,
+      readiness: null,
+    };
+  } else if (applicationInFlight) {
+    applicationStep = {
+      id: "commercial_application",
+      ...STEP_META.commercial_application,
+      state: "active",
+      statusLabel:
+        getCommercialApplicationStatusLabel(application) ?? undefined,
+      actionLabel:
+        application === "needs_changes" || application === "draft"
+          ? capabilities.applicationSubmissionAvailable
+            ? "Дополнить заявку"
+            : undefined
+          : undefined,
+      href:
+        (application === "needs_changes" || application === "draft") &&
+        capabilities.applicationSubmissionAvailable &&
+        applicationHref
+          ? applicationHref
+          : undefined,
+      hint:
+        application === "rejected"
+          ? "Заявка отклонена. После обновления условий вы сможете подать её снова."
+          : "Мы рассмотрим заявку и сообщим о решении.",
+      readiness: null,
+    };
+  } else if (!capabilities.applicationSubmissionAvailable) {
+    applicationStep = comingSoonStep("commercial_application");
+  } else {
+    applicationStep = {
+      id: "commercial_application",
+      ...STEP_META.commercial_application,
+      state: "active",
+      actionLabel: "Подать заявку",
+      href: applicationHref ?? undefined,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  // --- Step 2: payout details ---
+  let payoutStep: CommercialOnboardingStepState;
+
+  if (!applicationApproved) {
+    payoutStep = lockedStep("payout_details", {
+      hint: "Шаг откроется после одобрения коммерческой заявки.",
+    });
+  } else if (!capabilities.payoutDetailsAvailable) {
+    payoutStep = comingSoonStep("payout_details");
+  } else if (payoutDetailsComplete) {
+    payoutStep = {
+      id: "payout_details",
+      ...STEP_META.payout_details,
+      state: "completed",
+      hint: null,
+      readiness: null,
+    };
+  } else {
+    payoutStep = {
+      id: "payout_details",
+      ...STEP_META.payout_details,
+      state: "active",
+      actionLabel: "Заполнить данные",
+      href: payoutDetailsHref ?? undefined,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  // --- Step 3: terms ---
+  let termsStep: CommercialOnboardingStepState;
+
+  if (!applicationApproved) {
+    termsStep = lockedStep("terms_acceptance", {
+      hint: "Шаг откроется после одобрения коммерческой заявки.",
+    });
+  } else if (!capabilities.termsAcceptanceAvailable) {
+    termsStep = comingSoonStep("terms_acceptance");
+  } else if (termsAccepted) {
+    termsStep = {
+      id: "terms_acceptance",
+      ...STEP_META.terms_acceptance,
+      state: "completed",
+      hint: null,
+      readiness: null,
+    };
+  } else {
+    termsStep = {
+      id: "terms_acceptance",
+      ...STEP_META.terms_acceptance,
+      state: "active",
+      actionLabel: "Ознакомиться с условиями",
+      href: termsHref ?? undefined,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  // --- Steps 4–7: paid product path ---
+  let paidProductStep: CommercialOnboardingStepState;
+  let preparePaidStep: CommercialOnboardingStepState;
+  let publishPaidStep: CommercialOnboardingStepState;
+  let paidPromotionStep: CommercialOnboardingStepState;
+
+  if (paidProductComplete) {
+    paidProductStep = {
+      id: "paid_product",
+      ...STEP_META.paid_product,
+      state: "completed",
+      hint: null,
+      readiness: null,
+    };
+  } else if (!commercialRequirementsMet) {
+    paidProductStep = lockedStep("paid_product", {
+      hint: !applicationApproved
+        ? "Сначала нужна одобренная коммерческая заявка."
+        : "Сначала заполните данные для выплат и примите условия сотрудничества.",
+    });
+  } else if (!canCreatePaidProducts) {
+    paidProductStep = lockedStep("paid_product", {
+      hint: "Публикация платных продуктов станет доступна после коммерческого подключения.",
+    });
+  } else {
+    paidProductStep = {
+      id: "paid_product",
+      ...STEP_META.paid_product,
+      state: "active",
+      actionLabel: "Создать платный продукт",
+      href: newProductHref,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  if (preparePaidComplete) {
+    preparePaidStep = {
+      id: "prepare_paid_product",
+      ...STEP_META.prepare_paid_product,
+      state: "completed",
+      hint: null,
+      readiness: buildVisiblePaidReadiness(
+        focusPaidProduct?.readiness ?? publishedPaidProduct?.readiness,
+      ),
+    };
+  } else if (!paidProductComplete) {
+    preparePaidStep = lockedStep("prepare_paid_product", {
+      hint: "Шаг откроется после создания платного продукта.",
+    });
+  } else {
+    preparePaidStep = {
+      id: "prepare_paid_product",
+      ...STEP_META.prepare_paid_product,
+      state: "active",
+      actionLabel: "Проверить перед публикацией",
+      href: focusPreviewHref,
+      hint: null,
+      readiness: buildVisiblePaidReadiness(focusPaidProduct?.readiness),
+    };
+  }
+
+  if (publishPaidComplete) {
+    publishPaidStep = {
+      id: "publish_paid_product",
+      ...STEP_META.publish_paid_product,
+      state: "completed",
+      actionLabel: "Открыть страницу продукта",
+      href: publishedPublicHref,
+      ctaExternal: true,
+      hint: null,
+      readiness: null,
+    };
+  } else if (!preparePaidComplete) {
+    publishPaidStep = lockedStep("publish_paid_product", {
+      hint: "Шаг откроется, когда платный продукт будет готов к публикации.",
+    });
+  } else {
+    publishPaidStep = {
+      id: "publish_paid_product",
+      ...STEP_META.publish_paid_product,
+      state: "active",
+      actionLabel: "Перейти к публикации",
+      href: focusPreviewHref,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  if (paidPromotionComplete) {
+    paidPromotionStep = {
+      id: "paid_promotion",
+      ...STEP_META.paid_promotion,
+      state: "completed",
+      hint: null,
+      readiness: null,
+    };
+  } else if (!publishPaidComplete) {
+    paidPromotionStep = lockedStep("paid_promotion", {
+      hint: "Шаг откроется после публикации платного продукта.",
+    });
+  } else {
+    paidPromotionStep = {
+      id: "paid_promotion",
+      ...STEP_META.paid_promotion,
+      state: "active",
+      actionLabel: "Создать ссылку",
+      href: promotionHref,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  // Payout + terms may be active in parallel after approval; later paid
+  // steps stay sequential via prerequisite checks above.
+  const steps = [
+    applicationStep,
+    payoutStep,
+    termsStep,
+    paidProductStep,
+    preparePaidStep,
+    publishPaidStep,
+    paidPromotionStep,
+  ];
+
+  const completionFlags = [
+    applicationApproved,
+    payoutStepComplete,
+    termsStepComplete,
+    paidProductComplete,
+    preparePaidComplete,
+    publishPaidComplete,
+    paidPromotionComplete,
+  ];
+  const completedCount = completionFlags.filter(Boolean).length;
+
+  return {
+    unlocked: true,
+    completedCount,
+    totalCount: COMMERCIAL_ONBOARDING_STEP_COUNT,
+    complete: completedCount === COMMERCIAL_ONBOARDING_STEP_COUNT,
+    progressMode: "count",
+    steps,
+    focusPaidProductId: focusPaidProduct?.id ?? null,
+    publishedPaidProductId: publishedPaidProduct?.id ?? null,
+    publishedPaidProductSlug: publishedPaidProduct?.slug ?? null,
+  };
+}

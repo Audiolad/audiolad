@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+  evaluateCommercialOnboardingChecklist,
+} from "@/lib/author-dashboard/commercial-onboarding";
+import {
   evaluateAuthorOnboardingChecklist,
   type AuthorOnboardingCampaignInput,
   type AuthorOnboardingChecklistState,
@@ -285,7 +289,7 @@ export async function loadAuthorOnboardingChecklistState(
     },
   );
 
-  return evaluateAuthorOnboardingChecklist({
+  const free = evaluateAuthorOnboardingChecklist({
     authorId,
     authorSlug,
     profile: {
@@ -298,4 +302,19 @@ export async function loadAuthorOnboardingChecklistState(
     products,
     campaigns,
   });
+
+  const commercial = evaluateCommercialOnboardingChecklist({
+    authorSlug,
+    accessStatus,
+    freeGateReady: free.readyForCommercial,
+    products,
+    campaigns,
+    capabilities: DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+  });
+
+  return {
+    ...free,
+    commercial,
+    journeyComplete: free.complete && commercial.complete,
+  };
 }

@@ -12,10 +12,16 @@ import {
   validatePublishRequirements,
 } from "../src/lib/author-products/publish.ts";
 import {
+  DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+  evaluateCommercialOnboardingChecklist,
+  resolveCommercialApplicationStatus,
+} from "../src/lib/author-dashboard/commercial-onboarding.ts";
+import {
   buildAuthorOnboardingStorageKey,
   evaluateAuthorOnboardingChecklist,
   focusProductSuitabilityScore,
   isAuthorProfileMinimumComplete,
+  isFreeOnboardingReadyForCommercial,
   parseAuthorOnboardingUiPreference,
   selectFocusProduct,
   serializeAuthorOnboardingUiPreference,
@@ -74,10 +80,44 @@ function baseAudio(overrides = {}) {
   };
 }
 
-function readyReadiness(activeTopicCount = 1) {
+function readyReadiness(activeTopicCount = 1, accessStatus = "free") {
   return evaluatePublishReadiness(basePractice(), [baseAudio()], {
-    accessStatus: "free",
+    accessStatus,
     activeTopicCount,
+  });
+}
+
+function readyPaidReadiness(activeTopicCount = 1) {
+  return evaluatePublishReadiness(
+    basePractice({
+      is_free: false,
+      price: 990,
+    }),
+    [baseAudio()],
+    {
+      accessStatus: "commercial",
+      activeTopicCount,
+    },
+  );
+}
+
+function completeProfile() {
+  return {
+    short_positioning: "Позиционирование",
+    full_bio: "О себе",
+    avatar_url: "https://cdn.example/avatar.jpg",
+  };
+}
+
+function evaluateCommercial(overrides = {}) {
+  return evaluateCommercialOnboardingChecklist({
+    authorSlug: "demo-author",
+    accessStatus: "free",
+    freeGateReady: true,
+    products: [],
+    campaigns: [],
+    capabilities: DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+    ...overrides,
   });
 }
 
@@ -305,6 +345,7 @@ function testEmptyAuthor() {
   const state = evaluate();
   assert.equal(state.completedCount, 0);
   assert.equal(state.complete, false);
+  assert.equal(state.readyForCommercial, false);
   assert.equal(state.steps[0].completed, false);
   assert.equal(state.steps[0].active, true);
   assert.equal(state.steps[0].ctaLabel, "Оформить страницу");
@@ -538,10 +579,15 @@ function testSourceGuards() {
     "src/components/author-dashboard/AuthorOnboardingChecklist.tsx",
   );
   assert.match(checklistUi, /Начните работу на АудиоЛаде/);
+  assert.match(checklistUi, /Бесплатный старт/);
+  assert.match(checklistUi, /Начните зарабатывать на своих аудиопродуктах/);
+  assert.match(checklistUi, /Пока недоступно/);
+  assert.match(checklistUi, /Скоро будет доступно/);
   assert.match(checklistUi, /Поздравляем/);
   assert.match(checklistUi, /Ваша страница автора полностью готова/);
   assert.match(checklistUi, /Показать стартовый чек-лист/);
   assert.match(checklistUi, /useAuthorOnboardingUiPreference/);
+  assert.match(checklistUi, /journeyComplete/);
   assert.match(
     read("src/lib/author-dashboard/onboarding-preference-store.ts"),
     /buildAuthorOnboardingStorageKey/,
@@ -550,6 +596,276 @@ function testSourceGuards() {
     read("src/lib/author-dashboard/onboarding-checklist.ts"),
     /audiolad:author-onboarding:v1:/,
   );
+  assert.match(
+    read("src/lib/author-dashboard/commercial-onboarding.ts"),
+    /evaluateCommercialOnboardingChecklist/,
+  );
+  assert.match(
+    read("src/lib/author-dashboard/load-onboarding-state.ts"),
+    /evaluateCommercialOnboardingChecklist/,
+  );
+}
+
+function testCommercialScenarios() {
+  // 1. New author without profile
+  const emptyFree = evaluate();
+  assert.equal(emptyFree.readyForCommercial, false);
+  const gated = evaluateCommercial({ freeGateReady: false });
+  assert.equal(gated.unlocked, false);
+  assert.equal(gated.progressMode, "gated");
+  assert.equal(gated.steps[0].state, "locked");
+  assert.equal(gated.steps[0].statusLabel, "Пока недоступно");
+
+  // 2. Profile complete, no product
+  const profileOnly = evaluate({ profile: completeProfile() });
+  assert.equal(profileOnly.steps[0].completed, true);
+  assert.equal(profileOnly.readyForCommercial, false);
+
+  // 3. Free product created, not ready
+  const draftFree = evaluate({
+    profile: completeProfile(),
+    products: [product({}, emptyDraftReadiness())],
+  });
+  assert.equal(draftFree.steps[1].completed, true);
+  assert.equal(draftFree.steps[2].completed, false);
+  assert.equal(draftFree.readyForCommercial, false);
+
+  // 4. Free product ready, not published
+  const readyFree = evaluate({
+    profile: completeProfile(),
+    products: [product({}, readyReadiness())],
+  });
+  assert.equal(readyFree.steps[2].completed, true);
+  assert.equal(readyFree.steps[3].completed, false);
+  assert.equal(readyFree.readyForCommercial, false);
+
+  // 5. Free published, no promo — commercial gate opens; promo step still open
+  const publishedFree = evaluate({
+    profile: completeProfile(),
+    products: [
+      product(
+        {
+          status: "published",
+        },
+        readyReadiness(),
+      ),
+    ],
+  });
+  assert.equal(publishedFree.readyForCommercial, true);
+  assert.equal(publishedFree.steps[4].completed, false);
+  assert.equal(
+    isFreeOnboardingReadyForCommercial([
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]),
+    true,
+  );
+
+  // 6. Commercial application missing / platform form not ready
+  const noApplication = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "free",
+  });
+  assert.equal(noApplication.unlocked, true);
+  assert.equal(noApplication.progressMode, "count");
+  assert.equal(noApplication.steps[0].id, "commercial_application");
+  assert.equal(noApplication.steps[0].state, "coming_soon");
+  assert.equal(noApplication.steps[0].statusLabel, "Скоро будет доступно");
+  assert.equal(noApplication.steps[1].state, "locked");
+  assert.equal(noApplication.steps[3].state, "locked");
+
+  // 7. Commercial application submitted / in review
+  assert.equal(
+    resolveCommercialApplicationStatus({
+      accessStatus: "commercial_pending",
+    }),
+    "in_review",
+  );
+  const submitted = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial_pending",
+  });
+  assert.equal(submitted.steps[0].state, "active");
+  assert.equal(submitted.steps[0].statusLabel, "На рассмотрении");
+  assert.equal(submitted.steps[1].state, "locked");
+  assert.equal(submitted.steps[3].state, "locked");
+
+  const submittedExplicit = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial_pending",
+    applicationStatus: "submitted",
+  });
+  assert.equal(submittedExplicit.steps[0].statusLabel, "Отправлена");
+
+  // 8. Commercial application approved
+  const approved = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+  });
+  assert.equal(approved.steps[0].state, "completed");
+  assert.equal(approved.steps[0].statusLabel, "Одобрена");
+
+  // 9. Commercial data not implemented → coming_soon; paid stays locked
+  assert.equal(approved.steps[1].state, "coming_soon");
+  assert.equal(approved.steps[2].state, "coming_soon");
+  assert.equal(approved.steps[3].state, "locked");
+  assert.match(
+    approved.steps[3].hint ?? "",
+    /данные для выплат|условия сотрудничества/i,
+  );
+
+  // Application form available → active CTA
+  const applyReady = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "free",
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      applicationSubmissionAvailable: true,
+    },
+    applicationHref: "/author-dashboard/commercial-application",
+  });
+  assert.equal(applyReady.steps[0].state, "active");
+  assert.equal(applyReady.steps[0].actionLabel, "Подать заявку");
+  assert.equal(
+    applyReady.steps[0].href,
+    "/author-dashboard/commercial-application",
+  );
+
+  // Requirements met unlocks paid create
+  const requirementsMet = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
+  });
+  assert.equal(requirementsMet.steps[1].state, "completed");
+  assert.equal(requirementsMet.steps[2].state, "completed");
+  assert.equal(requirementsMet.steps[3].state, "active");
+  assert.equal(requirementsMet.steps[3].actionLabel, "Создать платный продукт");
+
+  // 10. Paid draft created
+  const paidDraft = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
+    products: [
+      product(
+        {
+          id: "paid-1",
+          is_free: false,
+          status: "draft",
+          slug: "paid-praktika",
+        },
+        emptyDraftReadiness(),
+      ),
+    ],
+  });
+  assert.equal(paidDraft.steps[3].state, "completed");
+  assert.equal(paidDraft.steps[4].state, "active");
+  assert.equal(paidDraft.focusPaidProductId, "paid-1");
+
+  // 11. Paid product previewed / ready to publish
+  const paidReady = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
+    products: [
+      product(
+        {
+          id: "paid-1",
+          is_free: false,
+          status: "draft",
+          slug: "paid-praktika",
+        },
+        readyPaidReadiness(),
+      ),
+    ],
+  });
+  assert.equal(paidReady.steps[4].state, "completed");
+  assert.equal(paidReady.steps[5].state, "active");
+  assert.match(paidReady.steps[5].href ?? "", /preview=publish/);
+
+  // 12. First paid product published
+  const paidPublished = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
+    products: [
+      product(
+        {
+          id: "paid-1",
+          is_free: false,
+          status: "published",
+          slug: "paid-praktika",
+        },
+        readyPaidReadiness(),
+      ),
+    ],
+  });
+  assert.equal(paidPublished.steps[5].state, "completed");
+  assert.equal(paidPublished.steps[6].state, "active");
+  assert.equal(paidPublished.steps[6].actionLabel, "Создать ссылку");
+
+  // 13. Promo link for paid product
+  const paidPromo = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
+    products: [
+      product(
+        {
+          id: "paid-1",
+          is_free: false,
+          status: "published",
+          slug: "paid-praktika",
+        },
+        readyPaidReadiness(),
+      ),
+    ],
+    campaigns: [
+      {
+        id: "campaign-paid",
+        status: "active",
+        practice_id: "paid-1",
+        practice_status: "published",
+      },
+    ],
+  });
+  assert.equal(paidPromo.complete, true);
+  assert.equal(paidPromo.completedCount, 7);
+  assert.equal(paidPromo.steps[6].state, "completed");
 }
 
 function main() {
@@ -563,6 +879,7 @@ function main() {
   testPreparePublishPromotionAndComplete();
   testUiPreferenceStorage();
   testSourceGuards();
+  testCommercialScenarios();
   console.log("author-onboarding-checklist-unit: ok");
 }
 
