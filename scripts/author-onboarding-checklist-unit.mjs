@@ -664,7 +664,7 @@ function testCommercialScenarios() {
     true,
   );
 
-  // 6. Commercial application missing / platform form not ready
+  // 6. Commercial application form available by default → Подать заявку
   const noApplication = evaluateCommercial({
     freeGateReady: true,
     accessStatus: "free",
@@ -672,10 +672,26 @@ function testCommercialScenarios() {
   assert.equal(noApplication.unlocked, true);
   assert.equal(noApplication.progressMode, "count");
   assert.equal(noApplication.steps[0].id, "commercial_application");
-  assert.equal(noApplication.steps[0].state, "coming_soon");
-  assert.equal(noApplication.steps[0].statusLabel, "Скоро будет доступно");
+  assert.equal(noApplication.steps[0].state, "active");
+  assert.equal(noApplication.steps[0].actionLabel, "Подать заявку");
+  assert.equal(
+    noApplication.steps[0].href,
+    "/author-dashboard/commercial-application?author=demo-author",
+  );
   assert.equal(noApplication.steps[1].state, "locked");
   assert.equal(noApplication.steps[3].state, "locked");
+
+  // Capability off still shows coming_soon
+  const formUnavailable = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "free",
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      applicationSubmissionAvailable: false,
+    },
+  });
+  assert.equal(formUnavailable.steps[0].state, "coming_soon");
+  assert.equal(formUnavailable.steps[0].statusLabel, "Скоро будет доступно");
 
   // 7. Commercial application submitted / in review
   assert.equal(
@@ -690,6 +706,7 @@ function testCommercialScenarios() {
   });
   assert.equal(submitted.steps[0].state, "active");
   assert.equal(submitted.steps[0].statusLabel, "На рассмотрении");
+  assert.equal(submitted.steps[0].actionLabel, "Смотреть заявку");
   assert.equal(submitted.steps[1].state, "locked");
   assert.equal(submitted.steps[3].state, "locked");
 
@@ -698,7 +715,49 @@ function testCommercialScenarios() {
     accessStatus: "commercial_pending",
     applicationStatus: "submitted",
   });
-  assert.equal(submittedExplicit.steps[0].statusLabel, "Отправлена");
+  assert.equal(submittedExplicit.steps[0].statusLabel, "Заявка отправлена");
+  assert.equal(submittedExplicit.steps[0].actionLabel, "Смотреть заявку");
+  assert.match(
+    submittedExplicit.steps[0].description,
+    /получили заявку/i,
+  );
+
+  const draftContinue = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "free",
+    applicationStatus: "draft",
+  });
+  assert.equal(draftContinue.steps[0].actionLabel, "Продолжить заполнение");
+  assert.match(
+    draftContinue.steps[0].href ?? "",
+    /commercial-application\?author=demo-author/,
+  );
+
+  const needsChanges = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial_pending",
+    applicationStatus: "needs_changes",
+    applicationReviewComment: "Уточните формат материалов.",
+  });
+  assert.equal(needsChanges.steps[0].statusLabel, "Нужно уточнить данные");
+  assert.equal(needsChanges.steps[0].actionLabel, "Исправить заявку");
+  assert.equal(needsChanges.steps[0].hint, "Уточните формат материалов.");
+
+  const legacyPending = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "commercial_pending",
+    legacyPendingWithoutApplication: true,
+  });
+  assert.equal(legacyPending.steps[0].statusLabel, "На рассмотрении");
+  assert.equal(legacyPending.steps[0].actionLabel, undefined);
+  assert.equal(legacyPending.steps[0].href, undefined);
+
+  const rejected = evaluateCommercial({
+    freeGateReady: true,
+    accessStatus: "free",
+    applicationStatus: "rejected",
+  });
+  assert.equal(rejected.steps[0].statusLabel, "Заявка не одобрена");
 
   // 8. Commercial application approved
   const approved = evaluateCommercial({
@@ -717,14 +776,10 @@ function testCommercialScenarios() {
     /данные для выплат|условия сотрудничества/i,
   );
 
-  // Application form available → active CTA
+  // Explicit application href is respected
   const applyReady = evaluateCommercial({
     freeGateReady: true,
     accessStatus: "free",
-    capabilities: {
-      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
-      applicationSubmissionAvailable: true,
-    },
     applicationHref: "/author-dashboard/commercial-application",
   });
   assert.equal(applyReady.steps[0].state, "active");

@@ -1,4 +1,4 @@
-import type { AuthorApplicationStatus } from "@/lib/author-applications/types";
+import type { AuthorCommercialApplicationStatus } from "@/lib/author-commercial-applications/types";
 import {
   isActivePromotionForPublishedProduct,
   isNonArchivedProduct,
@@ -50,14 +50,14 @@ export type CommercialOnboardingCapabilities = {
 
 export const DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES: CommercialOnboardingCapabilities =
   {
-    applicationSubmissionAvailable: false,
+    applicationSubmissionAvailable: true,
     payoutDetailsAvailable: false,
     termsAcceptanceAvailable: false,
   };
 
 export type CommercialApplicationStatus =
   | "none"
-  | AuthorApplicationStatus;
+  | AuthorCommercialApplicationStatus;
 
 export type CommercialOnboardingStepState = {
   id: CommercialOnboardingStepId;
@@ -146,15 +146,15 @@ export function getCommercialApplicationStatusLabel(
     case "draft":
       return "Черновик";
     case "submitted":
-      return "Отправлена";
+      return "Заявка отправлена";
     case "in_review":
       return "На рассмотрении";
     case "needs_changes":
-      return "Требуется уточнение";
+      return "Нужно уточнить данные";
     case "approved":
       return "Одобрена";
     case "rejected":
-      return "Отклонена";
+      return "Заявка не одобрена";
     case "withdrawn":
       return "Отозвана";
     default:
@@ -163,19 +163,23 @@ export function getCommercialApplicationStatusLabel(
 }
 
 /**
- * Map workspace access + optional future commercial application row
- * onto the shared author-application status vocabulary.
+ * Map workspace access + commercial application row onto checklist status.
  *
- * `authors.access_status` is the current source of truth for commercial tier.
- * A dedicated commercial application row can be passed later without changing
- * step ids or UI contracts.
+ * `authors.access_status` remains authoritative for commercial tier.
+ * When `legacyPendingWithoutApplication` is set (pending without a row),
+ * treat as in_review and do not prompt to create a new application.
  */
 export function resolveCommercialApplicationStatus(input: {
   accessStatus: AuthorAccessStatus | string | null | undefined;
-  applicationStatus?: AuthorApplicationStatus | null;
+  applicationStatus?: AuthorCommercialApplicationStatus | null;
+  legacyPendingWithoutApplication?: boolean;
 }): CommercialApplicationStatus {
   if (input.accessStatus === "commercial") {
     return "approved";
+  }
+
+  if (input.legacyPendingWithoutApplication && !input.applicationStatus) {
+    return "in_review";
   }
 
   if (input.accessStatus === "commercial_pending") {
@@ -267,9 +271,16 @@ export function evaluateCommercialOnboardingChecklist(input: {
   payoutDetailsComplete?: boolean;
   /** Future: persisted cooperation terms acceptance. */
   termsAccepted?: boolean;
-  /** Future: dedicated commercial application status row. */
-  applicationStatus?: AuthorApplicationStatus | null;
-  /** Future: real application / status page href. */
+  /** Dedicated commercial application status row. */
+  applicationStatus?: AuthorCommercialApplicationStatus | null;
+  /** Review comment shown to the author (needs_changes / rejected). */
+  applicationReviewComment?: string | null;
+  /**
+   * Legacy commercial_pending workspace without a commercial application row.
+   * Treat as in_review and do not offer a create-application CTA.
+   */
+  legacyPendingWithoutApplication?: boolean;
+  /** Real application / status page href. */
   applicationHref?: string | null;
   /** Future: payout details form href. */
   payoutDetailsHref?: string | null;
@@ -283,7 +294,8 @@ export function evaluateCommercialOnboardingChecklist(input: {
     products,
     campaigns,
     applicationStatus = null,
-    applicationHref = null,
+    applicationReviewComment = null,
+    legacyPendingWithoutApplication = false,
     payoutDetailsHref = null,
     termsHref = null,
   } = input;
@@ -292,6 +304,9 @@ export function evaluateCommercialOnboardingChecklist(input: {
     input.capabilities ?? DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES;
   const payoutDetailsComplete = input.payoutDetailsComplete === true;
   const termsAccepted = input.termsAccepted === true;
+  const resolvedApplicationHref =
+    input.applicationHref ??
+    `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`;
 
   const paidProducts = products.filter(isPaidNonArchivedProduct);
   const publishedPaidProducts = paidProducts.filter(isPublishedProduct);
@@ -301,6 +316,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
   const application = resolveCommercialApplicationStatus({
     accessStatus,
     applicationStatus,
+    legacyPendingWithoutApplication,
   });
   const applicationApproved = application === "approved";
   const applicationInFlight =
@@ -379,6 +395,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
 
   // --- Step 1: commercial application ---
   let applicationStep: CommercialOnboardingStepState;
+  const reviewComment = applicationReviewComment?.trim() || null;
 
   if (applicationApproved) {
     applicationStep = {
@@ -390,28 +407,59 @@ export function evaluateCommercialOnboardingChecklist(input: {
       readiness: null,
     };
   } else if (applicationInFlight) {
+    const canContinue =
+      capabilities.applicationSubmissionAvailable &&
+      !legacyPendingWithoutApplication &&
+      (application === "draft" || application === "needs_changes");
+    const canView =
+      capabilities.applicationSubmissionAvailable &&
+      !legacyPendingWithoutApplication &&
+      (application === "submitted" ||
+        application === "in_review" ||
+        application === "rejected");
+
+    let actionLabel: string | undefined;
+    if (canContinue) {
+      actionLabel =
+        application === "needs_changes"
+          ? "Исправить заявку"
+          : "Продолжить заполнение";
+    } else if (canView) {
+      actionLabel = "Смотреть заявку";
+    }
+
+    let hint: string | null = null;
+    if (reviewComment) {
+      hint = reviewComment;
+    } else if (application === "rejected") {
+      hint =
+        "Заявка не одобрена. Повторная подача откроется только после отдельного решения команды.";
+    } else if (application === "needs_changes") {
+      hint = "Нужно уточнить данные в заявке.";
+    } else if (application === "draft") {
+      hint = null;
+    } else if (application === "submitted") {
+      hint = "Мы получили заявку и сообщим о результате после рассмотрения.";
+    } else {
+      hint = "Мы рассмотрим заявку и сообщим о решении.";
+    }
+
+    const description =
+      application === "submitted"
+        ? "Мы получили заявку и сообщим о результате после рассмотрения."
+        : STEP_META.commercial_application.description;
+
     applicationStep = {
       id: "commercial_application",
-      ...STEP_META.commercial_application,
+      title: STEP_META.commercial_application.title,
+      description,
       state: "active",
       statusLabel:
         getCommercialApplicationStatusLabel(application) ?? undefined,
-      actionLabel:
-        application === "needs_changes" || application === "draft"
-          ? capabilities.applicationSubmissionAvailable
-            ? "Дополнить заявку"
-            : undefined
-          : undefined,
+      actionLabel,
       href:
-        (application === "needs_changes" || application === "draft") &&
-        capabilities.applicationSubmissionAvailable &&
-        applicationHref
-          ? applicationHref
-          : undefined,
-      hint:
-        application === "rejected"
-          ? "Заявка отклонена. После обновления условий вы сможете подать её снова."
-          : "Мы рассмотрим заявку и сообщим о решении.",
+        canContinue || canView ? resolvedApplicationHref : undefined,
+      hint,
       readiness: null,
     };
   } else if (!capabilities.applicationSubmissionAvailable) {
@@ -422,7 +470,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
       ...STEP_META.commercial_application,
       state: "active",
       actionLabel: "Подать заявку",
-      href: applicationHref ?? undefined,
+      href: resolvedApplicationHref,
       hint: null,
       readiness: null,
     };

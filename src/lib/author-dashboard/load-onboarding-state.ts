@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getAuthorCommercialApplication } from "@/lib/author-commercial-applications/queries";
 import {
   DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
   evaluateCommercialOnboardingChecklist,
@@ -159,11 +160,13 @@ export async function loadAuthorOnboardingChecklistState(
 ): Promise<AuthorOnboardingChecklistState> {
   const { authorId, authorSlug, accessStatus } = input;
 
-  const [profile, productList, campaigns] = await Promise.all([
-    getAuthorProfileDetail(supabase, authorId),
-    listAuthorProducts(supabase, authorId),
-    loadCampaignsForAuthor(supabase, authorId),
-  ]);
+  const [profile, productList, campaigns, commercialApplication] =
+    await Promise.all([
+      getAuthorProfileDetail(supabase, authorId),
+      listAuthorProducts(supabase, authorId),
+      loadCampaignsForAuthor(supabase, authorId),
+      getAuthorCommercialApplication(supabase, authorId).catch(() => null),
+    ]);
 
   if (!profile) {
     throw new Error("author_not_found");
@@ -309,7 +312,15 @@ export async function loadAuthorOnboardingChecklistState(
     freeGateReady: free.readyForCommercial,
     products,
     campaigns,
-    capabilities: DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      applicationSubmissionAvailable: true,
+    },
+    applicationStatus: commercialApplication?.status ?? null,
+    applicationReviewComment: commercialApplication?.review_comment ?? null,
+    applicationHref: `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`,
+    legacyPendingWithoutApplication:
+      accessStatus === "commercial_pending" && !commercialApplication,
   });
 
   return {
