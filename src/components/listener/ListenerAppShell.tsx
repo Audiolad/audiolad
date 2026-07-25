@@ -68,7 +68,10 @@ export function ListenerAppShell({
 
         {config.showRightColumn ? (
           <div className="listener-app-shell__now-playing-slot hidden xl:flex xl:min-h-0 xl:self-stretch">
-            <DesktopRightColumn shellData={shellData} />
+            <DesktopRightColumn
+              shellData={shellData}
+              showPlaybackControls={config.showRightColumnPlaybackControls}
+            />
           </div>
         ) : null}
       </div>

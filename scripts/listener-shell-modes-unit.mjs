@@ -24,8 +24,9 @@ const listenerLayout = read("src/app/(listener)/layout.tsx");
 assert(
   shellConfig.includes('default:') &&
     shellConfig.includes('profile:') &&
-    shellConfig.includes('author:'),
-  "shell-config must define default, profile and author modes",
+    shellConfig.includes('author:') &&
+    shellConfig.includes('listen:'),
+  "shell-config must define default, profile, author and listen modes",
 );
 
 assert(
@@ -53,6 +54,20 @@ const authorConfig = shellConfig.match(
 assert(
   authorConfig,
   "author mode must hide right column, desktop player bar and mobile bottom nav wrapper",
+);
+
+const listenConfig = shellConfig.match(
+  /listen:[\s\S]*?showDesktopPlayerBar: false[\s\S]*?showRightColumnPlaybackControls: false/,
+);
+assert(
+  listenConfig,
+  "listen mode must hide desktop player bar and right-column playback controls",
+);
+
+assert(
+  shellConfig.includes("showRightColumn: true") &&
+    /listen:[\s\S]*?showRightColumn: true/.test(shellConfig),
+  "listen mode must keep the right column",
 );
 
 assert(

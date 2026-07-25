@@ -4,10 +4,12 @@ import type { ListenerShellData } from "@/lib/listener/shell-data";
 
 type DesktopRightColumnProps = {
   shellData: ListenerShellData;
+  showPlaybackControls?: boolean;
 };
 
 export default function DesktopRightColumn({
   shellData,
+  showPlaybackControls = true,
 }: DesktopRightColumnProps) {
   return (
     <aside
@@ -17,7 +19,11 @@ export default function DesktopRightColumn({
       <div className="shrink-0 px-4 pt-4">
         <DesktopRightColumnTop shellData={shellData} />
       </div>
-      <NowPlayingPanel embedded />
+      <NowPlayingPanel
+        embedded
+        showPlaybackControls={showPlaybackControls}
+        showOpenPlayerLink={showPlaybackControls}
+      />
     </aside>
   );
 }

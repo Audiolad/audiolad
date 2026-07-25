@@ -3,9 +3,15 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 
-import AudioPlayer from "@/components/audio/AudioPlayer";
+import {
+  ListenPlayerDesktop,
+  ListenPlayerMobile,
+  ListenPlayerProvider,
+  type ListenPlayerProps,
+} from "@/components/audio/AudioPlayer";
 import ListenPageClient from "@/components/audio/ListenPageClient";
 import BottomNav from "@/components/BottomNav";
+import { ListenerAppShell } from "@/components/listener/ListenerAppShell";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
@@ -16,6 +22,7 @@ import {
   mapRowToListenTrack,
 } from "@/lib/listen/track-cover";
 import type { ListenTrack } from "@/lib/listen/types";
+import { getListenerShellData } from "@/lib/listener/shell-data";
 import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
 import {
   resolveProductAccess,
@@ -103,7 +110,37 @@ function getAuthorName(authors: PracticeRow["authors"]): string {
   return name || "Автор не указан";
 }
 
-function ListenShell({
+function ListenBackLink({
+  href,
+  label,
+  variant,
+}: {
+  href: string;
+  label: string;
+  variant: "mobile" | "desktop";
+}) {
+  if (variant === "desktop") {
+    return (
+      <Link
+        href={href}
+        className="inline-flex min-h-11 items-center text-sm font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 items-center text-sm font-medium text-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+    >
+      {label}
+    </Link>
+  );
+}
+
+function ListenMobileShell({
   children,
   backHref,
   backLabel,
@@ -113,7 +150,7 @@ function ListenShell({
   backLabel: string;
 }) {
   return (
-    <main className="min-h-dvh bg-[#24133f] text-white">
+    <main className="player-shell min-h-dvh bg-[#24133f] text-white">
       <div
         className={`relative mx-auto min-h-dvh w-full max-w-[480px] overflow-hidden bg-gradient-to-b from-[#6f4bbb] via-[#8e68c9] to-[#2b1749] px-5 pt-[max(1.25rem,env(safe-area-inset-top,0px))] motion-reduce:transition-none ${platformNavPaddingClass}`}
       >
@@ -121,12 +158,7 @@ function ListenShell({
         <div className="pointer-events-none absolute -right-24 bottom-20 h-72 w-72 rounded-full bg-[#e9c3b5]/15 blur-3xl motion-reduce:blur-none" />
 
         <header className="relative z-10">
-          <Link
-            href={backHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            {backLabel}
-          </Link>
+          <ListenBackLink href={backHref} label={backLabel} variant="mobile" />
         </header>
 
         <div className="relative z-10">{children}</div>
@@ -137,7 +169,26 @@ function ListenShell({
   );
 }
 
-function ListenMessageState({
+function ListenDesktopFrame({
+  children,
+  backHref,
+  backLabel,
+}: {
+  children: ReactNode;
+  backHref: string;
+  backLabel: string;
+}) {
+  return (
+    <div className="box-border min-w-0 max-w-full px-6 pb-8 pt-3">
+      <header>
+        <ListenBackLink href={backHref} label={backLabel} variant="desktop" />
+      </header>
+      <div className="mx-auto mt-4 w-full max-w-[1100px]">{children}</div>
+    </div>
+  );
+}
+
+async function ListenMessageState({
   title,
   description,
   backHref,
@@ -148,19 +199,46 @@ function ListenMessageState({
   backHref: string;
   backLabel: string;
 }) {
+  const shellData = await getListenerShellData();
+
   return (
-    <ListenShell backHref={backHref} backLabel={backLabel}>
-      <section className="mt-16 rounded-[28px] border border-white/12 bg-white/8 px-6 py-8 text-center">
-        <h1 className="text-[24px] font-semibold leading-tight">{title}</h1>
-        <p className="mt-4 text-sm leading-6 text-white/70">{description}</p>
-        <Link
-          href={backHref}
-          className="mt-6 inline-flex min-h-11 items-center rounded-full bg-white/15 px-5 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-        >
-          {backLabel}
-        </Link>
-      </section>
-    </ListenShell>
+    <>
+      <div className="xl:hidden">
+        <ListenMobileShell backHref={backHref} backLabel={backLabel}>
+          <section className="mt-16 rounded-[28px] border border-white/12 bg-white/8 px-6 py-8 text-center">
+            <h1 className="text-[24px] font-semibold leading-tight">{title}</h1>
+            <p className="mt-4 text-sm leading-6 text-white/70">{description}</p>
+            <Link
+              href={backHref}
+              className="mt-6 inline-flex min-h-11 items-center rounded-full bg-white/15 px-5 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              {backLabel}
+            </Link>
+          </section>
+        </ListenMobileShell>
+      </div>
+
+      <div className="hidden xl:block xl:h-dvh">
+        <ListenerAppShell shellData={shellData} mode="listen">
+          <ListenDesktopFrame backHref={backHref} backLabel={backLabel}>
+            <section className="rounded-[28px] border border-[#eadff8] bg-white px-8 py-10 text-center shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+              <h1 className="text-[28px] font-semibold leading-tight text-[#25135c]">
+                {title}
+              </h1>
+              <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-[#65577f]">
+                {description}
+              </p>
+              <Link
+                href={backHref}
+                className="mt-6 inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-5 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              >
+                {backLabel}
+              </Link>
+            </section>
+          </ListenDesktopFrame>
+        </ListenerAppShell>
+      </div>
+    </>
   );
 }
 
@@ -411,15 +489,50 @@ export async function renderListenPage(
     accessReason: productAccess.reason,
   });
   const listeningNotice = resolveListeningNotice(practiceRow);
+  const shellData = await getListenerShellData();
+  const isAuthorPreview = access.mode === "author_preview";
+  const sessionPayload = {
+    practiceId: practiceRow.id,
+    authorSlug: resolvedAuthorSlug,
+    productSlug: practiceRow.slug,
+    practiceTitle: practiceRow.title,
+    authorName,
+    format: trimmedFormat,
+    tracks,
+    initialProgress,
+    coverSymbol,
+    coverGradient,
+    coverImageUrl,
+    coverImage,
+    coverUpdatedAt,
+    isAuthorPreview,
+    guestProgressMode,
+    guestProgressMeta: guestProgressMode
+      ? { practiceSlug: practiceRow.slug }
+      : undefined,
+    promoConversionMode,
+  };
+  const playerProps: ListenPlayerProps = {
+    practiceId: practiceRow.id,
+    practiceTitle: practiceRow.title,
+    authorName,
+    format: trimmedFormat,
+    tracks,
+    coverSymbol,
+    coverGradient,
+    coverImageUrl,
+    coverImage,
+    coverUpdatedAt,
+    isAuthorPreview,
+    promoConversionMode,
+    authorSlug: resolvedAuthorSlug,
+    productSlug: practiceRow.slug,
+    listeningNotice,
+    sessionPayload,
+  };
 
   return (
-    <ListenShell backHref={practiceHref} backLabel="← К практике">
-      <div className="mt-4 text-center">
-        <p className="text-xs uppercase tracking-[0.18em] text-white/60">
-          Сейчас играет
-        </p>
-      </div>
-
+    <>
       <Suspense fallback={null}>
         <ListenPageClient
           practiceId={practiceRow.id}
@@ -435,7 +548,7 @@ export async function renderListenPage(
           coverImageUrl={coverImageUrl}
           coverImage={coverImage}
           coverUpdatedAt={coverUpdatedAt}
-          isAuthorPreview={access.mode === "author_preview"}
+          isAuthorPreview={isAuthorPreview}
           autoplay={options?.autoplay === true}
           promoConversionMode={promoConversionMode}
           isAuthenticated={isAuthenticated}
@@ -448,44 +561,32 @@ export async function renderListenPage(
         />
       </Suspense>
 
-      <AudioPlayer
-        practiceId={practiceRow.id}
-        practiceTitle={practiceRow.title}
-        authorName={authorName}
-        format={trimmedFormat}
-        tracks={tracks}
-        coverSymbol={coverSymbol}
-        coverGradient={coverGradient}
-        coverImageUrl={coverImageUrl}
-        coverImage={coverImage}
-        coverUpdatedAt={coverUpdatedAt}
-        isAuthorPreview={access.mode === "author_preview"}
-        promoConversionMode={promoConversionMode}
-        authorSlug={resolvedAuthorSlug}
-        productSlug={practiceRow.slug}
-        listeningNotice={listeningNotice}
-        sessionPayload={{
-          practiceId: practiceRow.id,
-          authorSlug: resolvedAuthorSlug,
-          productSlug: practiceRow.slug,
-          practiceTitle: practiceRow.title,
-          authorName,
-          format: trimmedFormat,
-          tracks,
-          initialProgress,
-          coverSymbol,
-          coverGradient,
-          coverImageUrl,
-          coverImage,
-          coverUpdatedAt,
-          isAuthorPreview: access.mode === "author_preview",
-          guestProgressMode,
-          guestProgressMeta: guestProgressMode
-            ? { practiceSlug: practiceRow.slug }
-            : undefined,
-          promoConversionMode,
-        }}
-      />
-    </ListenShell>
+      <ListenPlayerProvider {...playerProps}>
+        <div className="xl:hidden">
+          <ListenMobileShell
+            backHref={practiceHref}
+            backLabel="← К практике"
+          >
+            <div className="mt-4 text-center">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/60">
+                Сейчас играет
+              </p>
+            </div>
+            <ListenPlayerMobile />
+          </ListenMobileShell>
+        </div>
+
+        <div className="hidden xl:block xl:h-dvh">
+          <ListenerAppShell shellData={shellData} mode="listen">
+            <ListenDesktopFrame
+              backHref={practiceHref}
+              backLabel="← К практике"
+            >
+              <ListenPlayerDesktop />
+            </ListenDesktopFrame>
+          </ListenerAppShell>
+        </div>
+      </ListenPlayerProvider>
+    </>
   );
 }

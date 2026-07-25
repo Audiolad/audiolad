@@ -207,8 +207,12 @@ function PlaybackControls({
 
 export default function NowPlayingPanel({
   embedded = false,
+  showPlaybackControls = true,
+  showOpenPlayerLink = true,
 }: {
   embedded?: boolean;
+  showPlaybackControls?: boolean;
+  showOpenPlayerLink?: boolean;
 }) {
   const { session, activeQueue } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
@@ -351,7 +355,7 @@ export default function NowPlayingPanel({
           </div>
         ) : null}
 
-        {isEngineReady && engine ? (
+        {showPlaybackControls && isEngineReady && engine ? (
           <PlaybackControls
             queueMode={queueMode}
             isPlaying={engine.isPlaying}
@@ -402,7 +406,7 @@ export default function NowPlayingPanel({
         ) : null}
 
         <div className="mt-4 flex flex-col gap-2">
-          {listenHref ? (
+          {showOpenPlayerLink && listenHref ? (
             <Link
               href={listenHref}
               className="inline-flex min-h-10 items-center justify-center rounded-[14px] bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6234b5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"

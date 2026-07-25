@@ -18,5 +18,5 @@ export default function ListenLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <div className="player-shell min-h-dvh bg-[#24133f]">{children}</div>;
+  return children;
 }

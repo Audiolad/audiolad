@@ -1,6 +1,6 @@
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
-export type ListenerShellMode = "default" | "profile" | "author";
+export type ListenerShellMode = "default" | "profile" | "author" | "listen";
 
 export type ListenerShellConfig = {
   mode: ListenerShellMode;
@@ -9,6 +9,7 @@ export type ListenerShellConfig = {
   showDesktopPlayerBar: boolean;
   showDesktopSearch: boolean;
   showMobileBottomNav: boolean;
+  showRightColumnPlaybackControls: boolean;
   bodyClassName: string;
   centerColumnClassName: string;
 };
@@ -31,6 +32,7 @@ export const LISTENER_SHELL_CONFIGS: Record<
     showDesktopPlayerBar: true,
     showDesktopSearch: true,
     showMobileBottomNav: true,
+    showRightColumnPlaybackControls: true,
     bodyClassName: DEFAULT_BODY_CLASS,
     centerColumnClassName: "",
   },
@@ -41,6 +43,7 @@ export const LISTENER_SHELL_CONFIGS: Record<
     showDesktopPlayerBar: true,
     showDesktopSearch: true,
     showMobileBottomNav: true,
+    showRightColumnPlaybackControls: true,
     bodyClassName: DEFAULT_BODY_CLASS,
     centerColumnClassName: "listener-profile-content",
   },
@@ -51,8 +54,20 @@ export const LISTENER_SHELL_CONFIGS: Record<
     showDesktopPlayerBar: false,
     showDesktopSearch: true,
     showMobileBottomNav: false,
+    showRightColumnPlaybackControls: true,
     bodyClassName: AUTHOR_MOBILE_BODY_CLASS,
     centerColumnClassName: "listener-author-content",
+  },
+  listen: {
+    mode: "listen",
+    showDesktopSidebar: true,
+    showRightColumn: true,
+    showDesktopPlayerBar: false,
+    showDesktopSearch: true,
+    showMobileBottomNav: false,
+    showRightColumnPlaybackControls: false,
+    bodyClassName: DEFAULT_BODY_CLASS,
+    centerColumnClassName: "listener-listen-content",
   },
 };
 
