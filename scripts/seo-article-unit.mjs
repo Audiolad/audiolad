@@ -173,6 +173,27 @@ assert(
   "abundance practice intro",
 );
 assert(
+  abundanceArticle.leadBeforeAudio ===
+    "Иногда кажется, что жизнь превратилась в бесконечную гонку.",
+  "abundance opening body paragraph",
+);
+assert(
+  abundanceArticle.introAfterAudio[0] === "Нужно успеть больше.",
+  "abundance intro continues after opening paragraph",
+);
+assert(
+  !abundanceArticle.introAfterAudio.includes(abundanceArticle.leadBeforeAudio),
+  "abundance opening paragraph is not duplicated in introAfterAudio",
+);
+assert(
+  abundanceArticle.metaDescription !== abundanceArticle.leadBeforeAudio,
+  "abundance SEO description stays separate from body lead",
+);
+assert(
+  abundanceArticle.metaDescription.includes("состояние изобилия"),
+  "abundance metaDescription kept for SEO/cards",
+);
+assert(
   !abundanceArticle.primaryPracticeIntro.includes("—") &&
     !abundanceArticle.shortAnswer.includes("—"),
   "abundance uses medium dash",
@@ -321,6 +342,35 @@ assert(
   String(metadata.description).includes("аудиопрактика"),
   "meta description mentions audio",
 );
+assert(
+  String(metadata.description) === article.metaDescription,
+  "article metadata description uses metaDescription field",
+);
+assert(
+  String(metadata.description) !== article.leadBeforeAudio,
+  "article metadata description is not the visual body lead",
+);
+assert(
+  String(metadata.openGraph?.description ?? "") === article.metaDescription,
+  "Open Graph description uses metaDescription",
+);
+
+for (const slug of listArticleSlugs()) {
+  const item = getArticleBySlug(slug);
+  assert(item, `article ${slug} loads`);
+  assert(item.authorLabel === "Редакция АудиоЛада", `${slug} editorial byline`);
+  assert(item.leadBeforeAudio.trim().length > 0, `${slug} keeps opening paragraph`);
+  assert(
+    !item.introAfterAudio.includes(item.leadBeforeAudio),
+    `${slug} opening paragraph not duplicated in introAfterAudio`,
+  );
+  assert(
+    item.metaDescription.trim().length > 0 &&
+      item.metaDescription !== item.leadBeforeAudio,
+    `${slug} keeps separate SEO metaDescription`,
+  );
+  assert(item.primaryPractice?.practiceKey, `${slug} has primary practice key`);
+}
 
 const jsonLd = buildArticleJsonLdGraph(pageData);
 const serialized = JSON.stringify(jsonLd);
@@ -463,6 +513,28 @@ assert(
 assert(
   !/<h1[\s\S]*?\{article\.leadBeforeAudio\}[\s\S]*?authorLabel/.test(viewSource),
   "leadBeforeAudio is not rendered under H1 before byline",
+);
+const practiceBlockIdx = viewSource.indexOf(
+  'id="article-primary-practice-heading"',
+);
+const bodyLeadIdx = viewSource.indexOf(
+  "[article.leadBeforeAudio, ...article.introAfterAudio]",
+);
+const captionIdx = viewSource.indexOf("{article.captionAfterAudio}");
+const shortAnswerIdx = viewSource.indexOf("{article.shortAnswer}");
+assert(practiceBlockIdx > 0, "practice block present in template");
+assert(bodyLeadIdx > practiceBlockIdx, "body opens after practice block");
+assert(
+  captionIdx > bodyLeadIdx,
+  "captionAfterAudio comes after opening body paragraphs",
+);
+assert(
+  shortAnswerIdx > bodyLeadIdx,
+  "short answer comes after opening body paragraphs",
+);
+assert(
+  (viewSource.match(/article\.leadBeforeAudio/g) || []).length === 1,
+  "leadBeforeAudio referenced exactly once in page view",
 );
 assert(
   viewSource.includes("article.primaryPracticeEyebrow"),
