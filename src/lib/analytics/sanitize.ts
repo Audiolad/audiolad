@@ -16,6 +16,23 @@ export function sanitizeAnalyticsPath(
   return sanitizeCheckoutOriginPath(value);
 }
 
+/** Allowlisted UTM/referrer string: trim, drop control chars, length cap. */
+export function sanitizeAnalyticsUtmValue(
+  value: string | null | undefined,
+  maxLength = 128,
+): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const cleaned = value
+    .trim()
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .slice(0, maxLength);
+
+  return cleaned || null;
+}
+
 export function sanitizeAnalyticsProperties(
   value: unknown,
 ): Record<string, string | number | boolean> {
@@ -131,6 +148,7 @@ export function parseSessionBody(body: unknown): {
   utm_medium: string | null;
   utm_campaign: string | null;
   utm_content: string | null;
+  utm_term: string | null;
   referrer_domain: string | null;
   device_type: string | null;
   client_version: string | null;
@@ -162,25 +180,23 @@ export function parseSessionBody(body: unknown): {
     landing_path: sanitizeAnalyticsPath(
       typeof record.landing_path === "string" ? record.landing_path : null,
     ),
-    utm_source: sanitizeAnalyticsString(
+    utm_source: sanitizeAnalyticsUtmValue(
       typeof record.utm_source === "string" ? record.utm_source : null,
-      128,
     ),
-    utm_medium: sanitizeAnalyticsString(
+    utm_medium: sanitizeAnalyticsUtmValue(
       typeof record.utm_medium === "string" ? record.utm_medium : null,
-      128,
     ),
-    utm_campaign: sanitizeAnalyticsString(
+    utm_campaign: sanitizeAnalyticsUtmValue(
       typeof record.utm_campaign === "string" ? record.utm_campaign : null,
-      128,
     ),
-    utm_content: sanitizeAnalyticsString(
+    utm_content: sanitizeAnalyticsUtmValue(
       typeof record.utm_content === "string" ? record.utm_content : null,
-      128,
     ),
-    referrer_domain: sanitizeAnalyticsString(
+    utm_term: sanitizeAnalyticsUtmValue(
+      typeof record.utm_term === "string" ? record.utm_term : null,
+    ),
+    referrer_domain: sanitizeAnalyticsUtmValue(
       typeof record.referrer_domain === "string" ? record.referrer_domain : null,
-      128,
     ),
     device_type:
       deviceType === "mobile" || deviceType === "tablet" || deviceType === "desktop"

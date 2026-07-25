@@ -26,6 +26,7 @@ type SessionInitInput = {
   utm_medium?: string | null;
   utm_campaign?: string | null;
   utm_content?: string | null;
+  utm_term?: string | null;
   referrer_domain?: string | null;
   device_type?: string | null;
 };
@@ -133,6 +134,7 @@ export async function ensureAnalyticsSession(
         utm_medium: input.utm_medium ?? null,
         utm_campaign: input.utm_campaign ?? null,
         utm_content: input.utm_content ?? null,
+        utm_term: input.utm_term ?? null,
         referrer_domain: input.referrer_domain ?? null,
         device_type: input.device_type ?? null,
         user_agent: getUserAgent(),

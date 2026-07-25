@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     p_utm_medium: parsed.utm_medium,
     p_utm_campaign: parsed.utm_campaign,
     p_utm_content: parsed.utm_content,
+    p_utm_term: parsed.utm_term,
     p_referrer_domain: parsed.referrer_domain,
     p_device_type: parsed.device_type ?? "desktop",
     p_user_agent: request.headers.get("user-agent"),

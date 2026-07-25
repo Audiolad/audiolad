@@ -3,6 +3,7 @@ export type TrafficAttribution = {
   utmMedium: string | null;
   utmCampaign: string | null;
   utmContent: string | null;
+  utmTerm: string | null;
 };
 
 const ATTRIBUTION_STORAGE_KEY = "audiolad_traffic_attribution";
@@ -37,6 +38,7 @@ export function parseTrafficAttributionFromSearchParams(
       normalizeParam(params.get("utm_campaign")) ??
       normalizeParam(params.get("campaign")),
     utmContent: normalizeParam(params.get("utm_content")),
+    utmTerm: normalizeParam(params.get("utm_term")),
   };
 }
 
@@ -45,7 +47,8 @@ export function hasTrafficAttribution(attribution: TrafficAttribution): boolean 
     attribution.utmSource ||
       attribution.utmMedium ||
       attribution.utmCampaign ||
-      attribution.utmContent,
+      attribution.utmContent ||
+      attribution.utmTerm,
   );
 }
 
@@ -62,6 +65,7 @@ export function mergeTrafficAttribution(
     utmMedium: primary.utmMedium ?? fallback.utmMedium,
     utmCampaign: primary.utmCampaign ?? fallback.utmCampaign,
     utmContent: primary.utmContent ?? fallback.utmContent,
+    utmTerm: primary.utmTerm ?? fallback.utmTerm,
   };
 }
 
@@ -90,6 +94,7 @@ export function readStoredTrafficAttribution(): TrafficAttribution | null {
       utmMedium: normalizeParam(record.utmMedium as string | undefined),
       utmCampaign: normalizeParam(record.utmCampaign as string | undefined),
       utmContent: normalizeParam(record.utmContent as string | undefined),
+      utmTerm: normalizeParam(record.utmTerm as string | undefined),
     };
   } catch {
     return null;
@@ -131,11 +136,13 @@ export function attributionToApiFields(attribution: TrafficAttribution): {
   utm_medium: string | null;
   utm_campaign: string | null;
   utm_content: string | null;
+  utm_term: string | null;
 } {
   return {
     utm_source: attribution.utmSource,
     utm_medium: attribution.utmMedium,
     utm_campaign: attribution.utmCampaign,
     utm_content: attribution.utmContent,
+    utm_term: attribution.utmTerm,
   };
 }
