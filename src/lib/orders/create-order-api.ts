@@ -13,6 +13,13 @@ export type CreateOrderRpcRow = {
   amount_minor: number;
   currency: string;
   created_at: string;
+  attribution_confidence?: string | null;
+};
+
+export type OrderAnalyticsClaims = {
+  analyticsSessionId: string | null;
+  analyticsAnonymousId: string | null;
+  checkoutOriginPath: string | null;
 };
 
 export type CreateOrderSuccessBody = {
@@ -64,6 +71,38 @@ export function extractPracticeSlug(
   }
 
   return trimmed;
+}
+
+/**
+ * Client analytics claims for order attribution.
+ * UTM/referrer/confidence from body are intentionally ignored.
+ */
+export function extractOrderAnalyticsClaims(
+  body: Record<string, unknown>,
+  sanitizeOrigin: (value: string | null | undefined) => string | null,
+): OrderAnalyticsClaims {
+  const sessionRaw = body.analytics_session_id;
+  const anonymousRaw = body.analytics_anonymous_id;
+  const originRaw = body.checkout_origin_path;
+
+  const analyticsSessionId =
+    typeof sessionRaw === "string" && UUID_PATTERN.test(sessionRaw.trim())
+      ? sessionRaw.trim().toLowerCase()
+      : null;
+
+  const analyticsAnonymousId =
+    typeof anonymousRaw === "string" && anonymousRaw.trim().length > 0
+      ? anonymousRaw.trim().slice(0, 128)
+      : null;
+
+  const checkoutOriginPath =
+    typeof originRaw === "string" ? sanitizeOrigin(originRaw) : null;
+
+  return {
+    analyticsSessionId,
+    analyticsAnonymousId,
+    checkoutOriginPath,
+  };
 }
 
 export function resolveIdempotencyKey(

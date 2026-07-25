@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import {
+  extractOrderAnalyticsClaims,
   extractPracticeSlug,
   mapRpcErrorMessage,
   parseJsonObject,
-  pendingOrderToSuccessBody,
   resolveIdempotencyKey,
   toCreateOrderSuccessBody,
   type CreateOrderRpcRow,
-  type PendingOrderRow,
 } from "@/lib/orders/create-order-api";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
+
+function truncateId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return `${value.slice(0, 8)}…`;
+}
 
 export async function POST(request: Request) {
   const supabase = await createClientFromRequest(request);
@@ -57,47 +62,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const { data: practice, error: practiceError } = await supabase
-    .from("practices")
-    .select("id")
-    .eq("slug", practiceSlug)
-    .maybeSingle();
+  const claims = extractOrderAnalyticsClaims(
+    parsedBody,
+    sanitizeCheckoutOriginPath,
+  );
 
-  if (practiceError) {
-    console.error("create_order_practice_lookup_error", practiceError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  if (!practice?.id) {
-    return NextResponse.json({ error: "practice_not_found" }, { status: 404 });
-  }
-
-  const { data: existingPendingOrder, error: pendingOrderError } =
-    await supabase
-      .from("orders")
-      .select(
-        "id, practice_id, practice_slug_snapshot, status, amount_minor, currency, created_at",
-      )
-      .eq("user_id", user.id)
-      .eq("practice_id", practice.id)
-      .eq("status", "pending")
-      .maybeSingle();
-
-  if (pendingOrderError) {
-    console.error("create_order_pending_lookup_error", pendingOrderError.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  if (existingPendingOrder) {
-    return NextResponse.json(
-      pendingOrderToSuccessBody(existingPendingOrder as PendingOrderRow),
-      { status: 200 },
+  if (
+    typeof parsedBody.checkout_origin_path === "string" &&
+    parsedBody.checkout_origin_path.trim() &&
+    claims.checkoutOriginPath &&
+    parsedBody.checkout_origin_path.includes("?")
+  ) {
+    console.info(
+      JSON.stringify({
+        event: "attribution_origin_sanitized",
+        practice_slug: practiceSlug,
+      }),
     );
   }
 
   const { data, error } = await supabase.rpc("create_practice_order", {
     p_practice_slug: practiceSlug,
     p_idempotency_key: idempotencyKey,
+    p_analytics_session_id: claims.analyticsSessionId,
+    p_analytics_anonymous_id: claims.analyticsAnonymousId,
+    p_checkout_origin_path: claims.checkoutOriginPath,
   });
 
   if (error) {
@@ -117,6 +106,30 @@ export async function POST(request: Request) {
   if (!row?.order_id) {
     console.error("create_order_rpc_empty_result");
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  const confidence = row.attribution_confidence ?? "unknown";
+  if (confidence === "exact") {
+    console.info(
+      JSON.stringify({
+        event: "attribution_snapshot_exact",
+        order_id: truncateId(row.order_id),
+        session_id: truncateId(claims.analyticsSessionId),
+      }),
+    );
+  } else {
+    const reason =
+      !claims.analyticsSessionId || !claims.analyticsAnonymousId
+        ? "missing_claims"
+        : "validation_failed_or_unknown";
+    console.info(
+      JSON.stringify({
+        event: "attribution_snapshot_unknown",
+        order_id: truncateId(row.order_id),
+        reason,
+        session_id: truncateId(claims.analyticsSessionId),
+      }),
+    );
   }
 
   return NextResponse.json(toCreateOrderSuccessBody(row), { status: 201 });

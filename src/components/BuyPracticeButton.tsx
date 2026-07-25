@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { readCheckoutOriginPathFromWindow } from "@/lib/analytics/checkout-origin";
+import { getCurrentAnalyticsIdentity } from "@/lib/analytics/client";
+
 type BuyPracticeButtonProps = {
   practiceSlug: string;
   label: string;
@@ -120,6 +123,7 @@ export default function BuyPracticeButton({
     setErrorMessage(null);
 
     try {
+      const identity = getCurrentAnalyticsIdentity();
       const orderResponse = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -128,6 +132,9 @@ export default function BuyPracticeButton({
         },
         body: JSON.stringify({
           practice_slug: practiceSlug,
+          analytics_session_id: identity?.sessionId ?? null,
+          analytics_anonymous_id: identity?.anonymousId ?? null,
+          checkout_origin_path: readCheckoutOriginPathFromWindow(),
         }),
       });
 
