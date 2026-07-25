@@ -1,4 +1,5 @@
 import { BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE } from "./content/besplatnye-meditatsii-onlayn";
+import { CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE } from "./content/chto-takoe-denezhnyy-potok";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
 import { KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE } from "./content/kak-voyti-v-sostoyanie-izobiliya";
 import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
@@ -9,6 +10,7 @@ const ARTICLE_DEFINITIONS = [
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,
+  CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

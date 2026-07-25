@@ -155,6 +155,14 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
       href: "/articles/kak-voyti-v-sostoyanie-izobiliya",
       after: ".",
     },
+    {
+      before:
+        "Если хочется понять, что обычно имеют в виду под денежным потоком и как спокойнее относиться к финансам, рекомендуем прочитать статью ",
+      linkLabel:
+        "«Что такое денежный поток и как изменить своё отношение к деньгам»",
+      href: "/articles/chto-takoe-denezhnyy-potok",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
@@ -185,5 +193,5 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-25T13:30:00.000Z",
 } as const satisfies ArticleDefinition;

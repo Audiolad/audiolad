@@ -339,6 +339,16 @@ assert(
   "money hub registered",
 );
 assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "chto-takoe-denezhnyy-potok",
+  ),
+  "money hub includes money flow SEO article",
+);
+assert(
+  !listTopicHubSlugs().includes("denezhnyy-potok"),
+  "no duplicate denezhnyy-potok topic hub",
+);
+assert(
   sitemapEntries.some((entry) =>
     entry.url.endsWith("/topics/meditatsii-na-dengi"),
   ),
