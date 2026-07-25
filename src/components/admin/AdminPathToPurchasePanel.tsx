@@ -27,23 +27,33 @@ export default function AdminPathToPurchasePanel({ urlState, onPatch }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+  const pathKey = [
+    urlState.pathPeriod,
+    urlState.includeTestPayments ? "1" : "0",
+    urlState.pathProduct ?? "",
+    urlState.pathSurface ?? "",
+    urlState.pathMode,
+  ].join("|");
 
-    async function load() {
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void (async () => {
+      await Promise.resolve();
+      if (controller.signal.aborted) return;
+      setLoading(true);
+      setError(null);
       try {
         const params = buildAdminAnalyticsSearchParams(urlState);
         const response = await fetch(
           `/api/admin/analytics/path?${params.toString()}`,
-          { cache: "no-store" },
+          { cache: "no-store", signal: controller.signal },
         );
         const body = (await response.json().catch(() => null)) as
           | AdminPathBundle
           | { error?: string }
           | null;
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         if (!response.ok || !body || !("stages" in body)) {
           setError(
             body && "error" in body && typeof body.error === "string"
@@ -51,30 +61,22 @@ export default function AdminPathToPurchasePanel({ urlState, onPatch }: Props) {
               : "load_failed",
           );
           setBundle(null);
+          setLoading(false);
           return;
         }
         setBundle(body);
+        setLoading(false);
       } catch {
-        if (!cancelled) {
-          setError("load_failed");
-          setBundle(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (controller.signal.aborted) return;
+        setError("load_failed");
+        setBundle(null);
+        setLoading(false);
       }
-    }
+    })();
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    urlState.pathPeriod,
-    urlState.includeTestPayments,
-    urlState.pathProduct,
-    urlState.pathSurface,
-    urlState.pathMode,
-  ]);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathKey]);
 
   const noExactLinks =
     bundle != null && bundle.cohort.exactClickLinkedOrders === 0;

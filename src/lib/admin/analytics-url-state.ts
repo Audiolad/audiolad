@@ -125,7 +125,7 @@ function parseIncludeTestPayments(value: string | null): boolean {
   return value === "1" || value === "true";
 }
 
-function parsePathMode(value: string | null): "order_cohort" {
+function parsePathMode(_value: string | null): "order_cohort" {
   return "order_cohort";
 }
 
