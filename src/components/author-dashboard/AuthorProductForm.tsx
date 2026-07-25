@@ -49,6 +49,8 @@ import {
   authorAccessAllowsPaidProducts,
   getPaidPricingDisabledReason,
 } from "@/lib/authors/access";
+import { buildPracticePublishPreviewPath } from "@/lib/products/paths";
+import { requiresPublishPreviewBeforePublish } from "@/lib/products/publish-preview";
 import { formatRubles } from "@/lib/products/price-format";
 import {
   createDefaultListeningNoticeFormState,
@@ -550,7 +552,10 @@ export default function AuthorProductForm({
     form.slug && selectedAuthor?.slug
       ? buildPracticePublicPath(selectedAuthor.slug, form.slug)
       : "";
-
+  const publishPreviewPath =
+    form.slug && selectedAuthor?.slug
+      ? buildPracticePublishPreviewPath(selectedAuthor.slug, form.slug)
+      : "";
   async function getPracticeIdForCoverUpload(): Promise<string | null> {
     const existingPracticeId = practiceIdRef.current || practiceId;
 
@@ -953,7 +958,77 @@ export default function AuthorProductForm({
     }
   }
 
+  async function openPublishPreviewTab(): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    setFieldErrors({});
+    setTopicError(undefined);
+
+    const previewTab = window.open("about:blank", "_blank");
+
+    try {
+      const ensured = await ensurePracticeId();
+
+      if (!ensured) {
+        previewTab?.close();
+        return false;
+      }
+
+      const saved = await saveProduct();
+
+      if (!saved) {
+        previewTab?.close();
+        return false;
+      }
+
+      // saveProduct clears busy in its finally; keep the editor busy until the tab opens.
+      setBusy(true);
+
+      const productResponse = await fetch(
+        `/api/author/products/${ensured.practiceId}`,
+        { cache: "no-store" },
+      );
+      const productPayload = (await productResponse.json()) as {
+        product?: AuthorProductDetail;
+      };
+      const practice = productPayload.product?.practice;
+      const authorSlug =
+        authors.find((author) => author.id === practice?.author_id)?.slug ??
+        selectedAuthor?.slug;
+      const productSlug = practice?.slug?.trim();
+
+      if (!authorSlug || !productSlug) {
+        previewTab?.close();
+        setError("Не удалось открыть предпросмотр: нет публичного адреса.");
+        return false;
+      }
+
+      const href = buildPracticePublishPreviewPath(authorSlug, productSlug);
+
+      if (previewTab) {
+        previewTab.opener = null;
+        previewTab.location.href = href;
+      } else {
+        window.open(href, "_blank");
+      }
+
+      return true;
+    } catch {
+      previewTab?.close();
+      setError("Не удалось открыть предпросмотр.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function publishProduct() {
+    if (requiresPublishPreviewBeforePublish(form.publishedAt)) {
+      await openPublishPreviewTab();
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -2452,6 +2527,14 @@ export default function AuthorProductForm({
           <>
             <button
               type="button"
+              disabled={busy || !canMutateContent || !publishPreviewPath}
+              onClick={() => void openPublishPreviewTab()}
+              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Предпросмотр
+            </button>
+            <button
+              type="button"
               disabled={busy || !canMutateContent}
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
@@ -2470,14 +2553,24 @@ export default function AuthorProductForm({
         ) : null}
 
         {isDraft ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void publishProduct()}
-            className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
-          >
-            Опубликовать
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={busy || !canMutateContent}
+              onClick={() => void openPublishPreviewTab()}
+              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Предпросмотр
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canMutateContent}
+              onClick={() => void publishProduct()}
+              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
+            >
+              Опубликовать
+            </button>
+          </>
         ) : null}
 
         {isArchived ? (

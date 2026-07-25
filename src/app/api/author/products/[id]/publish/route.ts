@@ -40,6 +40,7 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json(
         {
           error: readiness.firstFailure?.code ?? "publish_not_ready",
+          publishReady: false,
           message:
             readiness.firstFailure?.message ??
             "Продукт ещё не готов к публикации.",

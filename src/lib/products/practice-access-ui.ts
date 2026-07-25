@@ -112,6 +112,8 @@ export type PracticeAccessPresentation = {
   statusDetail: string | null;
   showAuthorToolbar: boolean;
   showBuyerPreviewBanner: boolean;
+  showPublishPreviewBanner: boolean;
+  canPublishFromPreview: boolean;
   authorToolbarMessage: string | null;
   authorToolbarActions: PracticeAuthorToolbarAction[];
   showAdminPreview: boolean;
@@ -181,6 +183,34 @@ export function mapLibraryClaimButtonError(
 
 export function resolveLibraryActionAfterClaimSuccess(): "in_library" {
   return "in_library";
+}
+
+/** Post-publish guest view used by mandatory publish preview. */
+export function resolvePublishPreviewListenerAccess(
+  access: ProductAccessResult,
+  practice: PracticePricing,
+): ProductAccessResult {
+  if (practice.is_free === true) {
+    return {
+      canListen: true,
+      canAcquire: false,
+      isPubliclyListed: true,
+      reason: "free",
+      isAuthorMember: access.isAuthorMember,
+      accessSource: null,
+      hasEntitlement: false,
+    };
+  }
+
+  return {
+    canListen: false,
+    canAcquire: true,
+    isPubliclyListed: true,
+    reason: "not_authenticated",
+    isAuthorMember: access.isAuthorMember,
+    accessSource: null,
+    hasEntitlement: false,
+  };
 }
 
 function resolveCommercialAccess(
@@ -441,6 +471,7 @@ export function buildPracticeAccessPresentation(input: {
   paymentsConfigured: boolean;
   isAuthenticated: boolean;
   buyerPreviewMode?: boolean;
+  publishPreviewMode?: boolean;
 }): PracticeAccessPresentation {
   const {
     access,
@@ -449,11 +480,47 @@ export function buildPracticeAccessPresentation(input: {
     paymentsConfigured,
     isAuthenticated,
     buyerPreviewMode = false,
+    publishPreviewMode = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
   const listenHref = buildListenPath(authorSlug, practice.slug, {
     autoplay: true,
   });
+
+  if (publishPreviewMode && access.isAuthorMember) {
+    const listenerAccess = resolvePublishPreviewListenerAccess(access, practice);
+    const simulatedPractice = {
+      ...practice,
+      status: "published",
+      is_catalog_listed: true,
+    };
+    const commercial = buildCommercialPresentation({
+      access: listenerAccess,
+      practice: simulatedPractice,
+      authorSlug,
+      paymentsConfigured,
+      isAuthenticated: false,
+    });
+    const libraryAction = resolveLibraryAction({
+      access: listenerAccess,
+      practice: simulatedPractice,
+      isAuthenticated: false,
+      buyerPreviewMode: false,
+    });
+
+    return {
+      ...commercial,
+      libraryAction,
+      showAuthorToolbar: false,
+      showBuyerPreviewBanner: false,
+      showPublishPreviewBanner: true,
+      canPublishFromPreview: access.isAuthorMember,
+      authorToolbarMessage: null,
+      authorToolbarActions: [],
+      showAdminPreview: false,
+    };
+  }
+
   const libraryAction = resolveLibraryAction({
     access,
     practice,
@@ -484,6 +551,8 @@ export function buildPracticeAccessPresentation(input: {
       libraryAction,
       showAuthorToolbar: false,
       showBuyerPreviewBanner: true,
+      showPublishPreviewBanner: false,
+      canPublishFromPreview: false,
       authorToolbarMessage: null,
       authorToolbarActions: buildAuthorToolbarActions({
         authorSlug,
@@ -503,6 +572,8 @@ export function buildPracticeAccessPresentation(input: {
       libraryAction,
       showAuthorToolbar: true,
       showBuyerPreviewBanner: false,
+      showPublishPreviewBanner: false,
+      canPublishFromPreview: false,
       authorToolbarMessage: "Вы вошли как владелец этого продукта",
       authorToolbarActions: buildAuthorToolbarActions({
         authorSlug,
@@ -521,6 +592,8 @@ export function buildPracticeAccessPresentation(input: {
     libraryAction,
     showAuthorToolbar: false,
     showBuyerPreviewBanner: false,
+    showPublishPreviewBanner: false,
+    canPublishFromPreview: false,
     authorToolbarMessage: null,
     authorToolbarActions: [],
     showAdminPreview: access.reason === "admin",

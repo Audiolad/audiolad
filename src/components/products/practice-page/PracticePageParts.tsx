@@ -7,6 +7,7 @@ import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 
+import PublishPreviewBanner from "./PublishPreviewBanner";
 import type { PracticePageCoverData, PracticePageViewModel } from "./types";
 
 export function disabledButtonClasses(): string {
@@ -125,10 +126,25 @@ export function PracticeAccessBanners({
   presentation,
   practicePagePath,
   listenDeniedMessage,
+  publishPreview,
 }: Pick<
   PracticePageViewModel,
-  "presentation" | "practicePagePath" | "listenDeniedMessage"
+  | "presentation"
+  | "practicePagePath"
+  | "listenDeniedMessage"
+  | "publishPreview"
 >) {
+  if (publishPreview?.enabled) {
+    return (
+      <PublishPreviewBanner
+        practiceId={publishPreview.practiceId}
+        editHref={publishPreview.editHref}
+        publicPath={publishPreview.publicPath}
+        canPublish={publishPreview.canPublish}
+      />
+    );
+  }
+
   return (
     <>
       {presentation.showBuyerPreviewBanner ? (

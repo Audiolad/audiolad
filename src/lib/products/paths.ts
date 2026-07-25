@@ -17,6 +17,14 @@ export function buildPracticeBuyerPreviewPath(
   return `${base}?preview=buyer`;
 }
 
+export function buildPracticePublishPreviewPath(
+  authorSlug: string,
+  productSlug: string,
+): string {
+  const base = buildPracticePublicPath(authorSlug, productSlug);
+  return `${base}?preview=publish`;
+}
+
 export function buildListenPath(
   authorSlug: string,
   productSlug: string,

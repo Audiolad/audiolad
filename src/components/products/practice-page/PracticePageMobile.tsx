@@ -29,6 +29,7 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
           presentation={viewModel.presentation}
           practicePagePath={viewModel.practicePagePath}
           listenDeniedMessage={viewModel.listenDeniedMessage}
+          publishPreview={viewModel.publishPreview}
         />
 
         <section className="mt-6">

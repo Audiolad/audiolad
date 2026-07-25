@@ -29,6 +29,7 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
           presentation={viewModel.presentation}
           practicePagePath={viewModel.practicePagePath}
           listenDeniedMessage={viewModel.listenDeniedMessage}
+          publishPreview={viewModel.publishPreview}
         />
 
         <section className="mt-6 grid grid-cols-[minmax(240px,280px)_minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">

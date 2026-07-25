@@ -13,6 +13,14 @@ export type PracticePageCoverData = {
   displayWidth: number;
 };
 
+export type PracticePagePublishPreview = {
+  enabled: true;
+  practiceId: string;
+  editHref: string;
+  publicPath: string;
+  canPublish: boolean;
+};
+
 export type PracticePageViewModel = {
   practice: {
     id: string;
@@ -39,4 +47,5 @@ export type PracticePageViewModel = {
   listeningNotice: ResolvedListeningNotice | null;
   mobileCover: PracticePageCoverData;
   desktopCover: PracticePageCoverData;
+  publishPreview: PracticePagePublishPreview | null;
 };

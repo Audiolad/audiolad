@@ -19,10 +19,14 @@ import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
+  buildAuthorDashboardEditPath,
   buildPracticeAccessPresentation,
   canUseBuyerPreviewMode,
 } from "@/lib/products/practice-access-ui";
-import { resolveProductAccess } from "@/lib/products/access";
+import {
+  isPracticePublished,
+  resolveProductAccess,
+} from "@/lib/products/access";
 import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
 import { shouldShowPromoConversionFlow } from "@/lib/promo/access";
@@ -37,6 +41,12 @@ import {
   buildPracticeCanonicalUrl,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
+import {
+  canActivatePublishPreviewMode,
+  canPublishFromPublishPreview,
+  shouldIndexPracticePage,
+  shouldTrackPracticeListenerAnalytics,
+} from "@/lib/products/publish-preview";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
@@ -170,6 +180,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     typeof practice.description === "string"
       ? practice.description.trim()
       : "";
+  const canonical = buildPracticeCanonicalUrl(authorSlug, productSlug);
+  const indexable = shouldIndexPracticePage(practice.status);
 
   return {
     title: `${practice.title} – АудиоЛад`,
@@ -177,11 +189,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       ? truncateDescription(trimmedDescription)
       : METADATA_DESCRIPTION_FALLBACK,
     alternates: {
-      canonical: buildPracticeCanonicalUrl(authorSlug, productSlug),
+      canonical,
     },
     openGraph: {
-      url: buildPracticeCanonicalUrl(authorSlug, productSlug),
+      url: canonical,
     },
+    robots: indexable
+      ? undefined
+      : {
+          index: false,
+          follow: false,
+        },
   };
 }
 
@@ -224,8 +242,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     return <PracticePageErrorState />;
   }
 
+  const publishPreviewMode = canActivatePublishPreviewMode({
+    previewParam,
+    practiceStatus: practice.status,
+    access,
+  });
+
   const authorPreview =
-    access.reason === "author_owner" && practice.status !== "published";
+    access.reason === "author_owner" && !isPracticePublished(practice.status);
 
   let publicAudioItems: Awaited<ReturnType<typeof loadPublicAudioItems>> = [];
 
@@ -237,14 +261,16 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       entitledAccess:
         access.canListen &&
         !authorPreview &&
-        practice.status !== "published",
+        !isPracticePublished(practice.status),
     });
   } catch {
     return <PracticePageErrorState />;
   }
 
   const buyerPreviewMode =
-    previewParam === "buyer" && canUseBuyerPreviewMode(access);
+    !publishPreviewMode &&
+    previewParam === "buyer" &&
+    canUseBuyerPreviewMode(access);
   const practicePagePath = buildPracticePublicPath(
     resolvedAuthorSlug,
     practice.slug,
@@ -257,6 +283,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     paymentsConfigured: isPaymentsConfigured(),
     isAuthenticated: Boolean(user),
     buyerPreviewMode,
+    publishPreviewMode,
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
@@ -280,12 +307,19 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listenParam === "required"
       ? "Для прослушивания необходимо приобрести доступ."
       : null;
-  const promoConversionMode = shouldShowPromoConversionFlow({
-    isAuthenticated: Boolean(user),
-    hasEntitlement: access.hasEntitlement,
-    canListen: access.canListen,
-    accessReason: access.reason,
+  const trackListenerAnalytics = shouldTrackPracticeListenerAnalytics({
+    practiceStatus: practice.status,
+    publishPreviewMode,
   });
+
+  const promoConversionMode =
+    trackListenerAnalytics &&
+    shouldShowPromoConversionFlow({
+      isAuthenticated: Boolean(user),
+      hasEntitlement: access.hasEntitlement,
+      canListen: access.canListen,
+      accessReason: access.reason,
+    });
 
   const promoListenPath = buildListenPath(resolvedAuthorSlug, practice.slug);
 
@@ -344,7 +378,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practicePagePath,
     promoListenPath,
     promoConversionMode,
-    listenDeniedMessage,
+    listenDeniedMessage: publishPreviewMode ? null : listenDeniedMessage,
     practiceTopics,
     publicAudioItems,
     listeningNotice,
@@ -367,6 +401,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       symbol,
       displayWidth: DESKTOP_COVER_DISPLAY_WIDTH,
     },
+    publishPreview: publishPreviewMode
+      ? {
+          enabled: true,
+          practiceId: practice.id,
+          editHref: buildAuthorDashboardEditPath(practice.id),
+          publicPath: practicePagePath,
+          canPublish: canPublishFromPublishPreview(access),
+        }
+      : null,
   };
 
   const practiceCoverUrl = resolveProductCoverUrl(
@@ -402,22 +445,24 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   return (
     <>
       <JsonLd data={structuredData} />
-      {user ? (
+      {trackListenerAnalytics && user ? (
         <PromoPostSignupHandler
           practiceId={practice.id}
           practiceSlug={practice.slug}
         />
       ) : null}
-      {promoConversionMode ? (
+      {trackListenerAnalytics && promoConversionMode ? (
         <PromoPracticeTracker
           practiceId={practice.id}
           practiceSlug={practice.slug}
         />
       ) : null}
-      <PracticeViewTracker
-        practiceId={practice.id}
-        path={`/practice/${resolvedAuthorSlug}/${practice.slug}`}
-      />
+      {trackListenerAnalytics ? (
+        <PracticeViewTracker
+          practiceId={practice.id}
+          path={practicePagePath}
+        />
+      ) : null}
       <PracticePageMobile viewModel={viewModel} />
       <PracticePageDesktop viewModel={viewModel} />
     </>
