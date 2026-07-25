@@ -39,25 +39,25 @@ function sanitizeUtmValue(value: string | null | undefined): string | null {
 export function acquisitionSourceLabel(
   sourceClass: AcquisitionSourceClass | null | undefined,
 ): string {
-  if (!sourceClass || sourceClass === "direct_or_unknown" || sourceClass === "unknown") {
-    return "Без UTM / источник не определён";
-  }
-
   switch (sourceClass) {
     case "utm":
-      return "UTM";
+      return "UTM-кампания";
     case "organic_search":
       return "Органический поиск";
     case "social":
-      return "Соцсети";
+      return "Социальные сети";
     case "messenger":
-      return "Мессенджер";
+      return "Мессенджеры";
     case "referral":
-      return "Реферал";
-    case "internal":
-      return "Внутренний";
-    default:
+      return "Переход с другого сайта";
+    case "direct_or_unknown":
       return "Без UTM / источник не определён";
+    case "internal":
+      return "Внутренний переход";
+    case "unknown":
+      return "Нет данных";
+    default:
+      return "Нет данных";
   }
 }
 

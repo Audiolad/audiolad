@@ -12,6 +12,7 @@ import AdminAnalyticsKpiStrip from "@/components/admin/AdminAnalyticsKpiStrip";
 import AdminAnalyticsMetricCards from "@/components/admin/AdminAnalyticsMetricCards";
 import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalyticsTestTrafficControls";
 import AdminAnalyticsTimeseriesChart from "@/components/admin/AdminAnalyticsTimeseriesChart";
+import AdminAttributionPanel from "@/components/admin/AdminAttributionPanel";
 import AdminMoneyPanel from "@/components/admin/AdminMoneyPanel";
 import { ADMIN_ANALYTICS_PERIOD_OPTIONS } from "@/lib/admin/analytics-period";
 import type {
@@ -225,7 +226,8 @@ export default function AdminAnalyticsWorkbench({
           [
             { id: "product", label: "Продукт" },
             { id: "money", label: "Деньги" },
-          ] as const
+            { id: "sources", label: "Источники" },
+          ] as const satisfies ReadonlyArray<{ id: AdminAnalyticsView; label: string }>
         ).map((item) => (
           <button
             key={item.id}
@@ -246,6 +248,10 @@ export default function AdminAnalyticsWorkbench({
 
       {view === "money" ? (
         <AdminMoneyPanel urlState={urlState} onPatch={replaceState} />
+      ) : null}
+
+      {view === "sources" ? (
+        <AdminAttributionPanel urlState={urlState} onPatch={replaceState} />
       ) : null}
 
       {view === "product" ? (

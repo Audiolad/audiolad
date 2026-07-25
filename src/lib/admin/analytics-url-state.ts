@@ -4,11 +4,18 @@ import {
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 
-export type AdminAnalyticsView = "product" | "money";
+export type AdminAnalyticsView = "product" | "money" | "sources";
 export type AdminAnalyticsTab = "practices" | "authors" | "utm";
 export type AdminMoneyTab = "products" | "authors";
 export type AdminAnalyticsTopN = "10" | "25" | "all";
 export type AdminAnalyticsUtmGroup = "source" | "campaign" | "medium";
+export type AdminAttributionMode = "first_touch" | "session_touch";
+export type AdminAttributionConfidence =
+  | "all"
+  | "exact"
+  | "strong"
+  | "inferred"
+  | "unknown";
 export type AdminAnalyticsDrillMetric =
   | "visitors"
   | "registrations"
@@ -60,6 +67,22 @@ export type AdminAnalyticsUrlState = {
   pathSurface: string | null;
   pathMode: "order_cohort";
   pathDrill: string | null;
+  /** Attribution panel (P3.2.3) — payment-period cohort. */
+  attributionMode: AdminAttributionMode;
+  attributionPeriod: AdminAnalyticsPeriod;
+  attributionConfidence: AdminAttributionConfidence;
+  attributionSourceClass: string | null;
+  attributionUtmSource: string | null;
+  attributionUtmMedium: string | null;
+  attributionCampaign: string | null;
+  attributionLanding: string | null;
+  attributionAuthorId: string | null;
+  attributionPracticeId: string | null;
+  attributionQ: string;
+  attributionTop: AdminAnalyticsTopN;
+  attributionSort: string;
+  attributionSortDir: "asc" | "desc";
+  attributionSection: string | null;
 };
 
 function parseTab(value: string | null): AdminAnalyticsTab {
@@ -101,7 +124,10 @@ function parseDrill(value: string | null): AdminAnalyticsDrillMetric {
 }
 
 function parseView(value: string | null): AdminAnalyticsView {
-  return value === "money" ? "money" : "product";
+  if (value === "money" || value === "sources") {
+    return value;
+  }
+  return "product";
 }
 
 function parseMoneyTab(value: string | null): AdminMoneyTab {
@@ -140,6 +166,25 @@ function parsePathSurface(value: string | null): string | null {
     "unknown",
   ]);
   return allowed.has(value) ? value : null;
+}
+
+function parseAttributionMode(value: string | null): AdminAttributionMode {
+  return value === "first_touch" ? "first_touch" : "session_touch";
+}
+
+function parseAttributionConfidence(
+  value: string | null,
+): AdminAttributionConfidence {
+  if (
+    value === "exact" ||
+    value === "strong" ||
+    value === "inferred" ||
+    value === "unknown" ||
+    value === "all"
+  ) {
+    return value;
+  }
+  return "all";
 }
 
 export function parseAdminAnalyticsUrlState(
@@ -188,6 +233,25 @@ export function parseAdminAnalyticsUrlState(
     pathSurface: parsePathSurface(get("pathSurface")),
     pathMode: parsePathMode(get("pathMode")),
     pathDrill: get("pathDrill"),
+    attributionMode: parseAttributionMode(get("attributionMode")),
+    attributionPeriod: parseAdminAnalyticsPeriod(
+      get("attributionPeriod") ?? get("moneyPeriod"),
+    ),
+    attributionConfidence: parseAttributionConfidence(
+      get("confidence") ?? get("attributionConfidence"),
+    ),
+    attributionSourceClass: get("sourceClass") ?? get("attributionSourceClass"),
+    attributionUtmSource: get("attributionUtmSource"),
+    attributionUtmMedium: get("attributionUtmMedium"),
+    attributionCampaign: get("campaign") ?? get("attributionCampaign"),
+    attributionLanding: get("landing") ?? get("attributionLanding"),
+    attributionAuthorId: get("attributionAuthorId"),
+    attributionPracticeId: get("attributionPracticeId"),
+    attributionQ: (get("attributionQ") ?? "").trim(),
+    attributionTop: parseTop(get("attributionTop")),
+    attributionSort: get("attributionSort")?.trim() || "gross_minor",
+    attributionSortDir: parseDir(get("attributionSortDir")),
+    attributionSection: get("attributionSection"),
   };
 }
 
@@ -246,6 +310,40 @@ export function buildAdminAnalyticsSearchParams(
     ["pathSurface", state.pathSurface],
     ["pathMode", state.pathMode === "order_cohort" ? null : state.pathMode],
     ["pathDrill", state.pathDrill],
+    [
+      "attributionMode",
+      state.attributionMode === "session_touch" ? null : state.attributionMode,
+    ],
+    [
+      "attributionPeriod",
+      state.attributionPeriod === state.moneyPeriod
+        ? null
+        : state.attributionPeriod,
+    ],
+    [
+      "confidence",
+      state.attributionConfidence === "all"
+        ? null
+        : state.attributionConfidence,
+    ],
+    ["sourceClass", state.attributionSourceClass],
+    ["attributionUtmSource", state.attributionUtmSource],
+    ["attributionUtmMedium", state.attributionUtmMedium],
+    ["campaign", state.attributionCampaign],
+    ["landing", state.attributionLanding],
+    ["attributionAuthorId", state.attributionAuthorId],
+    ["attributionPracticeId", state.attributionPracticeId],
+    ["attributionQ", state.attributionQ || null],
+    ["attributionTop", state.attributionTop === "25" ? null : state.attributionTop],
+    [
+      "attributionSort",
+      state.attributionSort === "gross_minor" ? null : state.attributionSort,
+    ],
+    [
+      "attributionSortDir",
+      state.attributionSortDir === "desc" ? null : state.attributionSortDir,
+    ],
+    ["attributionSection", state.attributionSection],
   ];
 
   for (const [key, value] of optional) {
