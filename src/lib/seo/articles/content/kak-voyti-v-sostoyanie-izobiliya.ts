@@ -180,6 +180,14 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
       href: "/articles/besplatnye-meditatsii-onlayn",
       after: ".",
     },
+    {
+      before:
+        "А если тема денег и внутреннего напряжения вокруг финансов откликается сильнее, рекомендуем прочитать статью ",
+      linkLabel:
+        "«Что такое денежный поток и как изменить своё отношение к деньгам»",
+      href: "/articles/chto-takoe-denezhnyy-potok",
+      after: ".",
+    },
   ],
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
@@ -210,5 +218,5 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T12:00:00.000Z",
+  updatedAt: "2026-07-25T13:30:00.000Z",
 } as const satisfies ArticleDefinition;

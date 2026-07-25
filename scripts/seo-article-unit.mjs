@@ -142,6 +142,12 @@ assert(
   "money article links to abundance article",
 );
 assert(
+  moneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
+  ),
+  "money article reverse-links to money flow article",
+);
+assert(
   !JSON.stringify(moneyArticle).includes(
     "/articles/kak-vojti-v-sostoyanie-izobiliya",
   ),
@@ -352,6 +358,134 @@ assert(
   listArticleSlugs().includes("besplatnye-meditatsii-onlayn"),
   "free meditations in slug list",
 );
+
+const moneyFlowArticle = getArticleBySlug("chto-takoe-denezhnyy-potok");
+assert(moneyFlowArticle, "money flow article registered");
+assert(
+  moneyFlowArticle.title ===
+    "Что такое денежный поток и как изменить своё отношение к деньгам",
+  "money flow H1",
+);
+assert(
+  moneyFlowArticle.metaTitle.includes("АудиоЛад") &&
+    !moneyFlowArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "money flow SEO title has brand once",
+);
+assert(
+  moneyFlowArticle.metaDescription ===
+    "Что обычно понимают под денежным потоком, почему возникает ощущение, что деньги постоянно уходят, и как более спокойно относиться к финансовым вопросам.",
+  "money flow metaDescription",
+);
+assert(
+  moneyFlowArticle.metaDescription !== moneyFlowArticle.leadBeforeAudio,
+  "money flow metaDescription is not visual lead",
+);
+assert(
+  moneyFlowArticle.topicSlug === "meditatsii-na-dengi",
+  "money flow uses money topic hub",
+);
+assert(
+  moneyFlowArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "money flow topic href",
+);
+assert(
+  moneyFlowArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "money flow primary practice key",
+);
+assert(
+  moneyFlowArticle.primaryPracticeIntro.includes("Энергия Денежного Пути"),
+  "money flow practice intro",
+);
+assert(
+  !moneyFlowArticle.primaryPracticeIntro.includes("Денежный Поток»"),
+  "money flow does not present playlist as primary practice",
+);
+assert(
+  moneyFlowArticle.leadBeforeAudio.startsWith("Под денежным потоком часто понимают"),
+  "money flow opening body paragraph",
+);
+assert(
+  moneyFlowArticle.introAfterAudio[0] === "Вы много работаете.",
+  "money flow intro starts after lead",
+);
+assert(
+  !moneyFlowArticle.introAfterAudio.includes(moneyFlowArticle.leadBeforeAudio),
+  "money flow lead not duplicated in intro",
+);
+assert(moneyFlowArticle.captionAfterAudio === "", "money flow no artificial caption");
+assert(moneyFlowArticle.finalAudioLead === "", "money flow no second primary player");
+assert(moneyFlowArticle.faq.length === 3, "money flow faq count");
+assert(
+  moneyFlowArticle.afterFinalAudio?.some(
+    (item) => item.href === "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "money flow links to Klyuch practice",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href ===
+          "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    ),
+  ),
+  "money flow links to money meditation article",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+    ),
+  ),
+  "money flow links to abundance article",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "money flow links to free meditations article",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "money flow links to Денежный Поток playlist",
+);
+assert(
+  Boolean(moneyFlowArticle.brandNote?.includes("АудиоЛаде")),
+  "money flow brand note",
+);
+assert(
+  moneyFlowArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "money flow see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "chto-takoe-denezhnyy-potok",
+  ),
+  "money hub lists money flow article",
+);
+assert(
+  !moneyFlowArticle.leadBeforeAudio.includes("—") &&
+    !moneyFlowArticle.shortAnswer.includes("—") &&
+    !moneyFlowArticle.metaTitle.includes("—"),
+  "money flow uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("chto-takoe-denezhnyy-potok"),
+  "money flow in slug list",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
+  ),
+  "abundance reverse-links to money flow article",
+);
 assert(
   article.afterFinalAudio?.some(
     (item) =>
@@ -531,6 +665,13 @@ assert(
       "https://audiolad.ru/articles/besplatnye-meditatsii-onlayn",
   ),
   "free meditations article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/chto-takoe-denezhnyy-potok",
+  ),
+  "money flow article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
