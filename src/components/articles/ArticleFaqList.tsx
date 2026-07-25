@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 
+import { articleFaqAnswerClass } from "@/components/articles/typography";
 import type { ArticleFaqItem } from "@/lib/seo/articles";
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -52,9 +53,7 @@ function FaqDetailsItem({ item }: { item: ArticleFaqItem }) {
         </span>
       </summary>
       <div id={panelId} className="px-5 pb-4">
-        <p className="text-sm leading-6 text-[#4a3d73] sm:text-[15px] sm:leading-7">
-          {item.answer}
-        </p>
+        <p className={articleFaqAnswerClass}>{item.answer}</p>
       </div>
     </details>
   );

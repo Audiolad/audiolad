@@ -7,6 +7,10 @@ import ArticleRelatedPracticeClickTracker from "@/components/articles/ArticleRel
 import ArticleToc from "@/components/articles/ArticleToc";
 import ArticleTopicLink from "@/components/articles/ArticleTopicLink";
 import ArticleViewTracker from "@/components/articles/ArticleViewTracker";
+import {
+  articleBodyClass,
+  articleBodyStackClass,
+} from "@/components/articles/typography";
 import CatalogProductCard from "@/components/products/CatalogProductCard";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildArticleJsonLdGraph } from "@/lib/seo/articles";
@@ -131,7 +135,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             </div>
           </section>
 
-          <div className="mt-4 space-y-4 text-base leading-7 text-[#4a3d73] sm:mt-5 sm:text-[17px] sm:leading-8">
+          <div className={`mt-4 sm:mt-5 ${articleBodyStackClass}`}>
             {[article.leadBeforeAudio, ...article.introAfterAudio].map(
               (paragraph) => (
                 <p key={paragraph.slice(0, 64)}>{paragraph}</p>
@@ -140,7 +144,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
           </div>
 
           {article.captionAfterAudio ? (
-            <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            <p className={`mt-4 ${articleBodyClass}`}>
               {article.captionAfterAudio}
             </p>
           ) : null}
@@ -155,9 +159,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             >
               Короткий ответ
             </h2>
-            <p className="mt-3 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-              {article.shortAnswer}
-            </p>
+            <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
           </aside>
 
           <ArticleToc items={tocItems} />
@@ -170,7 +172,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
               >
                 {section.title}
               </h2>
-              <div className="mt-4 space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+              <div className={`mt-4 ${articleBodyStackClass}`}>
                 {section.paragraphs.map((paragraph) => (
                   <p key={paragraph.slice(0, 64)}>{paragraph}</p>
                 ))}
@@ -180,9 +182,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                 <div className="mt-6 space-y-4">
                   {article.finalAudioLead.trim() ? (
                     <>
-                      <p className="text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-                        {article.finalAudioLead}
-                      </p>
+                      <p className={articleBodyClass}>{article.finalAudioLead}</p>
                       <ArticleAudioBlock
                         placement="final_audio"
                         product={primaryPractice}
@@ -193,7 +193,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                     </>
                   ) : null}
                   {article.afterFinalAudio && article.afterFinalAudio.length > 0 ? (
-                    <div className="space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+                    <div className={articleBodyStackClass}>
                       {article.afterFinalAudio.map((item) => {
                         const linkClassName =
                           "font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
@@ -245,7 +245,9 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                     </div>
                   ) : null}
                   {article.brandNote ? (
-                    <aside className="rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+                    <aside
+                      className={`rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5 ${articleBodyClass}`}
+                    >
                       <p>{article.brandNote}</p>
                     </aside>
                   ) : null}
@@ -261,7 +263,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             >
               {article.closingSection.title}
             </h2>
-            <div className="mt-4 space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            <div className={`mt-4 ${articleBodyStackClass}`}>
               {article.closingSection.paragraphs.map((paragraph) => (
                 <p key={paragraph.slice(0, 64)}>{paragraph}</p>
               ))}
