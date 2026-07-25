@@ -51,3 +51,4 @@ public/audiolad_brand_icons.zip
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+/tmp/
