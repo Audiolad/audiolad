@@ -24,6 +24,12 @@ export function estimateArticleReadingTimeMinutes(
       ...section.paragraphs,
     ]),
     article.finalAudioLead,
+    ...(article.afterFinalAudio ?? []).flatMap((item) => [
+      item.before,
+      item.linkLabel ?? "",
+      item.after ?? "",
+    ]),
+    ...article.seeAlsoLinks.flatMap((item) => [item.title, item.description]),
     article.closingSection.title,
     ...article.closingSection.paragraphs,
     ...article.faq.flatMap((item) => [item.question, item.answer]),

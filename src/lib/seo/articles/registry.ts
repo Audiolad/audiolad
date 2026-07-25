@@ -1,8 +1,10 @@
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
+import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
   KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE,
+  MEDITATSIYA_NA_DENGI_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

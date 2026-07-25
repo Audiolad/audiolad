@@ -26,6 +26,25 @@ export type ArticleRelatedPracticeSlot = ArticlePracticeSlot & {
 };
 
 /**
+ * Cross-link paragraph after the final audio CTA.
+ * When `href` is set, `linkLabel` is rendered as an inline link between
+ * `before` and `after`. When `href` is omitted, the full plain `before`
+ * string is shown (for future articles mentioned without a live URL).
+ */
+export type ArticleCrossLinkParagraph = {
+  before: string;
+  after?: string;
+  linkLabel?: string;
+  href?: string;
+};
+
+export type ArticleSeeAlsoLink = {
+  href: string;
+  title: string;
+  description: string;
+};
+
+/**
  * Serializable article document. Safe to load from registry today and from DB later.
  * Keep this shape free of React nodes and runtime-only fields.
  */
@@ -60,6 +79,13 @@ export type ArticleDefinition = {
   /** Intro paragraphs after top audio (continuation; no duplicate of leadBeforeAudio) */
   introAfterAudio: readonly string[];
   finalAudioLead: string;
+  /**
+   * Optional editorial cross-links after the final audio block
+   * (other articles in the cluster; omit href for not-yet-published titles).
+   */
+  afterFinalAudio?: readonly ArticleCrossLinkParagraph[];
+  /** Footer “Смотрите также” cards (topic hub + related hubs) */
+  seeAlsoLinks: readonly ArticleSeeAlsoLink[];
   /** Closing h2 section after the final audio block */
   closingSection: ArticleSection;
   publishedAt: string;

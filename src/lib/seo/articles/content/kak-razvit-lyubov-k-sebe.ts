@@ -168,6 +168,28 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
   ],
   finalAudioLead:
     "Возможно, после прочтения некоторые мысли стали ближе и понятнее. Теперь можно ненадолго отложить слова и пройти этот путь через голос, дыхание и внимание к себе.",
+  afterFinalAudio: [
+    {
+      before:
+        "Если внутреннее напряжение связано ещё и с деньгами, можно также прочитать статью ",
+      linkLabel:
+        "«Медитация на деньги: как работать с вниманием и денежным настроем»",
+      href: "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      after: ".",
+    },
+  ],
+  seeAlsoLinks: [
+    {
+      href: "/topics/lyubov-k-sebe",
+      title: "Все практики о любви к себе",
+      description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/topics/besplatnye-meditatsii",
+      title: "Бесплатные медитации",
+      description: "Практики, которые можно слушать без оплаты",
+    },
+  ],
   closingSection: {
     id: "skladyvaetsya-postepenno",
     title: "Любовь к себе складывается постепенно",
@@ -178,5 +200,5 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-24T00:00:00.000Z",
-  updatedAt: "2026-07-24T00:00:00.000Z",
+  updatedAt: "2026-07-25T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

@@ -15,10 +15,12 @@ export {
   resolveCatalogPracticeByKey,
 } from "./resolve-practices";
 export type {
+  ArticleCrossLinkParagraph,
   ArticleDefinition,
   ArticleFaqItem,
   ArticlePageData,
   ArticlePracticeSlot,
   ArticleRelatedPracticeSlot,
   ArticleSection,
+  ArticleSeeAlsoLink,
 } from "./types";

@@ -94,6 +94,78 @@ assert(
   "caption uses medium dash",
 );
 assert(listArticleSlugs().includes("kak-razvit-lyubov-k-sebe"), "slug list");
+assert(
+  listArticleSlugs().includes(
+    "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  ),
+  "money article slug list",
+);
+
+const moneyArticle = getArticleBySlug(
+  "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+);
+assert(moneyArticle, "money article registered");
+assert(
+  moneyArticle.title ===
+    "Медитация на деньги: как работать с вниманием и денежным настроем",
+  "money article H1",
+);
+assert(moneyArticle.topicSlug === "meditatsii-na-dengi", "money topic slug");
+assert(
+  moneyArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "money topic href",
+);
+assert(
+  moneyArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "money primary practice key",
+);
+assert(
+  moneyArticle.primaryPracticeIntro.includes("Энергия Денежного Пути"),
+  "money practice intro names practice",
+);
+assert(
+  !moneyArticle.primaryPracticeIntro.includes("—"),
+  "money practice intro uses medium dash",
+);
+assert(moneyArticle.faq.length === 3, "money faq count");
+assert(
+  moneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-razvit-lyubov-k-sebe",
+  ),
+  "money article links to love article",
+);
+assert(
+  moneyArticle.afterFinalAudio?.some(
+    (item) =>
+      !item.href &&
+      item.before.includes("Как войти в состояние изобилия"),
+  ),
+  "abundance mention stays without live link",
+);
+assert(
+  !JSON.stringify(moneyArticle).includes(
+    "/articles/kak-vojti-v-sostoyanie-izobiliya",
+  ),
+  "no broken abundance article URL",
+);
+assert(
+  moneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "money see-also includes hub",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) =>
+      item.href ===
+      "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  ),
+  "love article reverse-links to money article",
+);
+assert(
+  article.seeAlsoLinks.some((item) => item.href === "/topics/lyubov-k-sebe"),
+  "love see-also includes hub",
+);
 
 const catalogIndex = buildCatalogPracticeKeyIndex([
   {
@@ -210,8 +282,67 @@ assert(
   "article in sitemap mapper",
 );
 assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  ),
+  "money article in sitemap mapper",
+);
+assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
   "sitemap has no localhost",
+);
+
+const moneyPageData = {
+  article: moneyArticle,
+  path: "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  canonicalUrl:
+    "https://audiolad.ru/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(moneyArticle),
+  primaryPractice: {
+    id: "p-money",
+    title: "Энергия Денежного Пути",
+    slug: moneyArticle.primaryPractice.practiceKey,
+    subtitle: null,
+    description: null,
+    format: "Энергопоток",
+    price: 0,
+    isFree: true,
+    authorName: "Сергей",
+    authorSlug: "sergey-petrov",
+    href: `/practice/sergey-petrov/${moneyArticle.primaryPractice.practiceKey}`,
+    meta: null,
+    statsLabel: "5 мин",
+    productTypeLabel: "Энергопоток",
+    priceLabel: "Бесплатно",
+    sortTimestamp: 0,
+    coverUrl: "https://audiolad.ru/covers/energiya-denezhnogo-puti.jpg",
+    coverImage: null,
+    updatedAt: null,
+  },
+  relatedPractices: [],
+  libraryAction: "sign_in",
+};
+const moneyMetadata = buildArticleMetadata(moneyPageData);
+assert(
+  moneyMetadata.alternates?.canonical === moneyPageData.canonicalUrl,
+  "money canonical",
+);
+assert(
+  String(moneyMetadata.title).includes("Медитация на деньги"),
+  "money meta title",
+);
+const moneyJsonLd = JSON.stringify(buildArticleJsonLdGraph(moneyPageData));
+assert(moneyJsonLd.includes('"@type":"Article"'), "money Article schema");
+assert(moneyJsonLd.includes('"@type":"FAQPage"'), "money FAQPage schema");
+assert(
+  moneyJsonLd.includes('"@type":"BreadcrumbList"'),
+  "money BreadcrumbList schema",
+);
+assert(
+  moneyJsonLd.includes("Можно ли слушать медитацию каждый день?"),
+  "money FAQ in json-ld",
 );
 
 const articleEvents = [
@@ -266,6 +397,18 @@ assert(
 assert(
   viewSource.includes('id="article-primary-practice-heading"'),
   "practice intro has accessible heading id",
+);
+assert(
+  viewSource.includes("article.afterFinalAudio"),
+  "renders after-final-audio cross-links from data",
+);
+assert(
+  viewSource.includes("article.seeAlsoLinks"),
+  "see-also links are data-driven",
+);
+assert(
+  !viewSource.includes("Все практики о любви к себе"),
+  "page view does not hardcode love hub see-also label",
 );
 assert(!viewSource.includes("[Включить аудиопрактику]"), "no text stub player");
 assert(!viewSource.includes("bastet-"), "page view has no hard practice slug");

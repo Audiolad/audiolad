@@ -187,6 +187,30 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                     libraryAction={data.libraryAction}
                     signInReturnPath={data.path}
                   />
+                  {article.afterFinalAudio && article.afterFinalAudio.length > 0 ? (
+                    <div className="space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+                      {article.afterFinalAudio.map((item) => {
+                        const key = `${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`;
+
+                        if (item.href && item.linkLabel) {
+                          return (
+                            <p key={key}>
+                              {item.before}
+                              <Link
+                                href={item.href}
+                                className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                              >
+                                {item.linkLabel}
+                              </Link>
+                              {item.after ?? ""}
+                            </p>
+                          );
+                        }
+
+                        return <p key={key}>{item.before}</p>;
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </section>
@@ -235,39 +259,47 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             </section>
           ) : null}
 
-          <section className="mt-12">
-            <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
-              Смотрите также
-            </h2>
-            <ul className="mt-4 grid list-none gap-3 p-0">
-              <li>
-                <ArticleTopicLink
-                  href={article.topicHref}
-                  className="block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                >
-                  <span className="text-base font-semibold text-[#7042c5]">
-                    Все практики о любви к себе
-                  </span>
-                  <span className="mt-1 block text-sm leading-6 text-[#7d70a2]">
-                    Тематическая подборка АудиоЛада
-                  </span>
-                </ArticleTopicLink>
-              </li>
-              <li>
-                <Link
-                  href="/topics/besplatnye-meditatsii"
-                  className="block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                >
-                  <span className="text-base font-semibold text-[#7042c5]">
-                    Бесплатные медитации
-                  </span>
-                  <span className="mt-1 block text-sm leading-6 text-[#7d70a2]">
-                    Практики, которые можно слушать без оплаты
-                  </span>
-                </Link>
-              </li>
-            </ul>
-          </section>
+          {article.seeAlsoLinks.length > 0 ? (
+            <section className="mt-12">
+              <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
+                Смотрите также
+              </h2>
+              <ul className="mt-4 grid list-none gap-3 p-0">
+                {article.seeAlsoLinks.map((item) => {
+                  const className =
+                    "block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+                  const content = (
+                    <>
+                      <span className="text-base font-semibold text-[#7042c5]">
+                        {item.title}
+                      </span>
+                      <span className="mt-1 block text-sm leading-6 text-[#7d70a2]">
+                        {item.description}
+                      </span>
+                    </>
+                  );
+
+                  if (item.href.startsWith("/topics/")) {
+                    return (
+                      <li key={item.href}>
+                        <ArticleTopicLink href={item.href} className={className}>
+                          {content}
+                        </ArticleTopicLink>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li key={item.href}>
+                      <Link href={item.href} className={className}>
+                        {content}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
         </article>
       </ArticlePlaybackProvider>
     </>
