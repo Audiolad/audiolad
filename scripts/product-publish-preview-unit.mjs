@@ -210,6 +210,7 @@ function testListenerIdenticalPresentation() {
   assert.equal(freePresentation.showPublishPreviewBanner, true);
   assert.equal(freePresentation.showAuthorToolbar, false);
   assert.equal(freePresentation.showBuyerPreviewBanner, false);
+  assert.equal(freePresentation.showBuyerPreviewExit, false);
   assert.equal(freePresentation.showAdminPreview, false);
   assert.equal(freePresentation.canPublishFromPreview, true);
   assert.equal(freePresentation.primaryAction.kind, "listen");

@@ -25,13 +25,13 @@ export default function ProductTopicLinks({
       aria-label="Темы практики"
       className={`${className}`.trim()}
     >
-      <p className="mb-2 text-sm font-medium text-[#7d70a2]">Темы</p>
-      <ul className="flex flex-wrap gap-2">
+      <p className="mb-1.5 text-sm font-medium text-[#7d70a2]">Темы</p>
+      <ul className="flex flex-row flex-wrap items-center gap-2">
         {topics.map((topic) => (
-          <li key={topic.key}>
+          <li key={topic.key} className="max-w-full shrink-0">
             <Link
               href={resolveTopicPublicHref(topic.key)}
-              className="inline-flex min-h-11 items-center rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-4 py-2 text-sm font-medium text-[#7042c5] transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              className="inline-flex min-h-11 max-w-full items-center rounded-full border border-[#e4d7f4] bg-[#faf7ff] px-4 py-2 text-sm font-medium text-[#7042c5] transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               {topic.title}
             </Link>

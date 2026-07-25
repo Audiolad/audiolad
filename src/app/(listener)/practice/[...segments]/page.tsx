@@ -5,6 +5,7 @@ import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
 import PracticePageDesktop from "@/components/products/practice-page/PracticePageDesktop";
 import PracticePageErrorState from "@/components/products/practice-page/PracticePageErrorState";
 import PracticePageMobile from "@/components/products/practice-page/PracticePageMobile";
+import { BuyerPreviewExitControl } from "@/components/products/practice-page/PracticePageParts";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import JsonLd from "@/components/seo/JsonLd";
 import PromoPracticeTracker from "@/components/promo/PromoPracticeTracker";
@@ -462,6 +463,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
           practiceId={practice.id}
           path={practicePagePath}
         />
+      ) : null}
+      {presentation.showBuyerPreviewExit ? (
+        <BuyerPreviewExitControl href={practicePagePath} />
       ) : null}
       <PracticePageMobile viewModel={viewModel} />
       <PracticePageDesktop viewModel={viewModel} />

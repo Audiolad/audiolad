@@ -2,6 +2,8 @@ import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
 
+import ProductTopicLinks from "@/components/products/ProductTopicLinks";
+
 import {
   PracticeAccessBanners,
   PracticeBackLink,
@@ -17,38 +19,57 @@ type PracticePageDesktopProps = {
 };
 
 export default function PracticePageDesktop({ viewModel }: PracticePageDesktopProps) {
-  const { practice, description, publicAudioItems, listeningNotice, presentation, resolvedAuthorSlug } =
-    viewModel;
+  const {
+    practice,
+    description,
+    publicAudioItems,
+    listeningNotice,
+    presentation,
+    resolvedAuthorSlug,
+    practiceTopics,
+  } = viewModel;
 
   return (
-    <div className="hidden xl:block">
-      <div className="px-6 pt-3">
+    <div className="hidden min-w-0 xl:block">
+      <div className="box-border min-w-0 max-w-full px-6 pt-3">
         <PracticeBackLink />
 
         <PracticeAccessBanners
           presentation={viewModel.presentation}
-          practicePagePath={viewModel.practicePagePath}
           listenDeniedMessage={viewModel.listenDeniedMessage}
           publishPreview={viewModel.publishPreview}
         />
 
-        <section className="mt-6 grid grid-cols-[minmax(240px,280px)_minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+        <section className="mt-6 grid min-w-0 grid-cols-[minmax(240px,280px)_minmax(0,1fr)] items-start gap-x-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-x-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           <div className="w-full max-w-[280px] xl:max-w-[300px] 2xl:max-w-[360px]">
             <PracticeProductCover cover={viewModel.desktopCover} priority />
           </div>
 
-          <div className="min-w-0">
-            <PracticeMetaSection
+          {/*
+            height:0 + min-height:100% keeps the text/CTA column tied to cover height,
+            so the primary action bottom edge aligns with the cover bottom.
+          */}
+          <div className="flex h-0 min-h-full min-w-0 max-w-full flex-col">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <PracticeMetaSection
+                viewModel={viewModel}
+                subtitleClamp
+                titleClassName="mt-2 text-[34px] font-semibold leading-[1.12] xl:text-[36px]"
+                showTopics={false}
+                authorMetaLayout="inline"
+              />
+            </div>
+
+            <PracticePrimaryActionSection
               viewModel={viewModel}
-              subtitleClamp={false}
-              titleClassName="mt-4 text-[34px] font-semibold leading-[1.12] xl:text-[36px]"
+              className="mt-3 shrink-0"
             />
-
-            <PracticePrimaryActionSection viewModel={viewModel} className="mt-6" />
-
-            <PracticeLibraryActionSection viewModel={viewModel} />
           </div>
         </section>
+
+        <ProductTopicLinks topics={practiceTopics} className="mt-4" />
+
+        <PracticeLibraryActionSection viewModel={viewModel} className="mt-3" />
 
         {description ? (
           <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">

@@ -27,7 +27,6 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
 
         <PracticeAccessBanners
           presentation={viewModel.presentation}
-          practicePagePath={viewModel.practicePagePath}
           listenDeniedMessage={viewModel.listenDeniedMessage}
           publishPreview={viewModel.publishPreview}
         />
@@ -37,7 +36,11 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         </section>
 
         <section className="mt-6">
-          <PracticeMetaSection viewModel={viewModel} />
+          <PracticeMetaSection
+            viewModel={viewModel}
+            authorMetaLayout="inline"
+            titleClassName="mt-3 text-[32px] font-semibold leading-[1.15]"
+          />
         </section>
 
         {description ? (
