@@ -150,8 +150,14 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     service
       .from("orders")
       .select("*", { count: "exact", head: true })
-      .eq("status", "paid"),
-    service.from("orders").select("amount_minor").eq("status", "paid"),
+      .eq("status", "paid")
+      .eq("is_test", false),
+    // P3.0: gross from succeeded non-test payments (not orders.paid).
+    service
+      .from("payments")
+      .select("amount_minor")
+      .eq("status", "succeeded")
+      .eq("is_test", false),
   ]);
 
   const revenueMinor = (revenueResult.data ?? []).reduce(
@@ -231,7 +237,7 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     {
       kind: "currency",
       key: "revenue",
-      label: "Подтверждённая выручка",
+      label: "Подтверждённая выручка (без test)",
       valueRub: revenueMinor / 100,
     },
   ];

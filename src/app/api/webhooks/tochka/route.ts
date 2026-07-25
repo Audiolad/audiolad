@@ -5,15 +5,28 @@ import {
   findPaymentByOrderId,
   findPaymentByProviderOperationId,
   fulfillSucceededTochkaPayment,
+  markWebhookEventTerminal,
+  recordTochkaWebhookEvent,
 } from "@/lib/payments/fulfill-payment";
 import { parseTochkaAmountToMinor } from "@/lib/payments/payment-api";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
 import { verifyTochkaWebhookJwt } from "@/lib/payments/tochka-webhook";
+import {
+  buildTochkaWebhookDedupKey,
+  sanitizeTochkaWebhookPayload,
+} from "@/lib/payments/webhook-ledger";
 
+/**
+ * Tochka acquiring webhook.
+ * - Invalid signature → 400 (no fulfill, no ledger trust)
+ * - Transient processing failure → 500 (provider retry; event stays failed/received)
+ * - Business handled (processed / duplicate / requires_review / ignored) → 200
+ */
 export async function POST(request: Request) {
   const jwtBody = await request.text();
 
   if (!jwtBody || jwtBody.trim() === "") {
+    logCheckoutEvent("tochka_webhook_empty_body");
     return new NextResponse(null, { status: 400 });
   }
 
@@ -25,18 +38,77 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 400 });
   }
 
+  const sanitized = sanitizeTochkaWebhookPayload(payload);
+  const dedupKey = buildTochkaWebhookDedupKey(sanitized);
+
   logCheckoutEvent("tochka_webhook_verified", {
-    webhookType:
-      typeof payload.webhookType === "string" ? payload.webhookType : null,
+    webhookType: sanitized.webhookType,
+    status: sanitized.status,
+    hasOperationId: Boolean(sanitized.operationId),
+    hasTransactionId: Boolean(sanitized.transactionId),
   });
 
-  if (payload.webhookType !== "acquiringInternetPayment") {
+  if (!dedupKey) {
+    logCheckoutEvent("tochka_webhook_dedup_key_missing");
     return new NextResponse(null, { status: 200 });
   }
 
-  const status = typeof payload.status === "string" ? payload.status : "";
+  const eventType = sanitized.webhookType ?? "unknown";
+  const recorded = await recordTochkaWebhookEvent({
+    dedupKey,
+    providerEventId: sanitized.transactionId,
+    providerPaymentId: sanitized.operationId,
+    eventType,
+    payload: sanitized,
+    signatureVerified: true,
+  });
 
-  if (status !== "APPROVED") {
+  if (!recorded) {
+    logCheckoutEvent("tochka_webhook_ledger_write_failed");
+    return new NextResponse(null, { status: 500 });
+  }
+
+  if (
+    recorded.processingStatus === "processed" ||
+    recorded.processingStatus === "duplicate"
+  ) {
+    logCheckoutEvent("tochka_webhook_duplicate", {
+      webhookEventId: recorded.id,
+      processingStatus: recorded.processingStatus,
+    });
+    return new NextResponse(null, { status: 200 });
+  }
+
+  if (recorded.processingStatus === "requires_review") {
+    logCheckoutEvent("tochka_webhook_requires_review", {
+      webhookEventId: recorded.id,
+      reviewReason: recorded.reviewReason,
+    });
+    return new NextResponse(null, { status: 200 });
+  }
+
+  if (sanitized.webhookType !== "acquiringInternetPayment") {
+    await markWebhookEventTerminal({
+      webhookEventId: recorded.id,
+      processingStatus: "ignored",
+      lastError: "unsupported_webhook_type",
+    });
+    logCheckoutEvent("tochka_webhook_ignored_type", {
+      webhookEventId: recorded.id,
+    });
+    return new NextResponse(null, { status: 200 });
+  }
+
+  if (sanitized.status !== "APPROVED") {
+    await markWebhookEventTerminal({
+      webhookEventId: recorded.id,
+      processingStatus: "ignored",
+      lastError: "unsupported_status",
+    });
+    logCheckoutEvent("tochka_webhook_ignored_status", {
+      webhookEventId: recorded.id,
+      status: sanitized.status,
+    });
     return new NextResponse(null, { status: 200 });
   }
 
@@ -44,90 +116,120 @@ export async function POST(request: Request) {
 
   if (!config) {
     console.error("tochka_webhook_config_missing");
+    logCheckoutEvent("tochka_webhook_config_missing");
     return new NextResponse(null, { status: 500 });
   }
 
-  const operationId =
-    typeof payload.operationId === "string" ? payload.operationId : null;
-  const paymentLinkId =
-    typeof payload.paymentLinkId === "string" ? payload.paymentLinkId : null;
-  const webhookCustomerCode =
-    typeof payload.customerCode === "string" ? payload.customerCode : null;
-  const webhookMerchantId =
-    typeof payload.merchantId === "string" ? payload.merchantId : null;
-
-  if (!operationId) {
+  if (!sanitized.operationId) {
     console.error("tochka_webhook_missing_operation_id");
+    logCheckoutEvent("tochka_webhook_missing_operation_id", {
+      webhookEventId: recorded.id,
+    });
+    // Keep event retryable / reviewable via fulfill with empty operation id.
+    const result = await fulfillSucceededTochkaPayment({
+      webhookEventId: recorded.id,
+      providerPaymentId: "",
+      paymentId: null,
+      providerAmountMinor: 0,
+      providerCurrency: "RUB",
+      providerStatus: "APPROVED",
+    });
+    return new NextResponse(null, {
+      status: result.httpRetryable ? 500 : 200,
+    });
+  }
+
+  if (
+    sanitized.customerCode &&
+    sanitized.customerCode !== config.customerCode
+  ) {
+    console.error("tochka_webhook_customer_code_mismatch");
+    logCheckoutEvent("tochka_webhook_customer_code_mismatch", {
+      webhookEventId: recorded.id,
+    });
     return new NextResponse(null, { status: 200 });
   }
 
   if (
-    webhookCustomerCode &&
-    webhookCustomerCode !== config.customerCode
+    config.merchantId &&
+    sanitized.merchantId &&
+    sanitized.merchantId !== config.merchantId
   ) {
-    console.error("tochka_webhook_customer_code_mismatch");
-    return new NextResponse(null, { status: 200 });
-  }
-
-  if (config.merchantId && webhookMerchantId && webhookMerchantId !== config.merchantId) {
     console.error("tochka_webhook_merchant_id_mismatch");
+    logCheckoutEvent("tochka_webhook_merchant_id_mismatch", {
+      webhookEventId: recorded.id,
+    });
     return new NextResponse(null, { status: 200 });
   }
 
   const payment =
-    (await findPaymentByProviderOperationId(operationId)) ??
-    (paymentLinkId ? await findPaymentByOrderId(paymentLinkId) : null);
+    (await findPaymentByProviderOperationId(sanitized.operationId)) ??
+    (sanitized.paymentLinkId
+      ? await findPaymentByOrderId(sanitized.paymentLinkId)
+      : null);
 
   if (!payment) {
-    console.error("tochka_webhook_payment_not_found", operationId);
-    return new NextResponse(null, { status: 200 });
-  }
-
-  if (paymentLinkId && paymentLinkId !== payment.order_id) {
-    console.error("tochka_webhook_payment_link_id_mismatch", {
-      paymentId: payment.id,
+    console.error("tochka_webhook_payment_not_found");
+    logCheckoutEvent("tochka_webhook_payment_not_found", {
+      webhookEventId: recorded.id,
     });
-    return new NextResponse(null, { status: 200 });
-  }
-
-  if (payment.currency !== "RUB") {
-    console.error("tochka_webhook_currency_mismatch", {
-      paymentId: payment.id,
-    });
-    return new NextResponse(null, { status: 200 });
-  }
-
-  const webhookAmountMinor = parseTochkaAmountToMinor(payload.amount);
-
-  if (
-    webhookAmountMinor === null ||
-    webhookAmountMinor !== payment.amount_minor
+  } else if (
+    sanitized.paymentLinkId &&
+    sanitized.paymentLinkId !== payment.order_id
   ) {
-    console.error("tochka_webhook_amount_mismatch", {
-      expected: payment.amount_minor,
-      actual: webhookAmountMinor,
+    console.error("tochka_webhook_payment_link_id_mismatch");
+    logCheckoutEvent("tochka_webhook_payment_link_id_mismatch", {
+      webhookEventId: recorded.id,
       paymentId: payment.id,
     });
-    return new NextResponse(null, { status: 200 });
   }
+
+  if (payment && payment.currency !== "RUB") {
+    console.error("tochka_webhook_currency_mismatch");
+    logCheckoutEvent("tochka_webhook_currency_mismatch", {
+      webhookEventId: recorded.id,
+      paymentId: payment.id,
+    });
+  }
+
+  const webhookAmountMinor = parseTochkaAmountToMinor(sanitized.amount);
 
   const result = await fulfillSucceededTochkaPayment({
-    paymentId: payment.id,
-    providerPaymentId: operationId,
-    providerStatus: status,
-    webhookPayload: payload,
+    webhookEventId: recorded.id,
+    providerPaymentId: sanitized.operationId,
+    paymentId: payment?.id ?? null,
+    providerAmountMinor: webhookAmountMinor ?? -1,
+    providerCurrency: "RUB",
+    providerStatus: "APPROVED",
   });
 
-  if (!result.ok) {
-    console.error("tochka_webhook_fulfill_failed", result.reason);
-    logCheckoutEvent("tochka_webhook_fulfill_failed", {
-      orderId: payment.order_id,
-      reason: result.reason,
+  if (result.httpRetryable) {
+    logCheckoutEvent("tochka_webhook_fulfill_retryable", {
+      webhookEventId: recorded.id,
+      outcome: result.outcome,
+    });
+    return new NextResponse(null, { status: 500 });
+  }
+
+  if (result.outcome === "requires_review") {
+    logCheckoutEvent("tochka_webhook_requires_review", {
+      webhookEventId: recorded.id,
+      reviewReason: result.reviewReason,
+      orderId: result.orderId,
+      paymentId: result.paymentId,
+    });
+  } else if (result.outcome === "repaired") {
+    logCheckoutEvent("tochka_webhook_fulfill_repaired", {
+      webhookEventId: recorded.id,
+      orderId: result.orderId,
+      paymentId: result.paymentId,
     });
   } else {
     logCheckoutEvent("tochka_webhook_fulfill_ok", {
+      webhookEventId: recorded.id,
       orderId: result.orderId,
-      alreadyProcessed: result.alreadyProcessed,
+      alreadyProcessed: result.wasAlreadyComplete,
+      outcome: result.outcome,
     });
   }
 

@@ -27,6 +27,8 @@ export type PaymentRow = {
   provider_metadata: Record<string, unknown>;
   created_at: string;
   confirmed_at: string | null;
+  is_test?: boolean;
+  test_reason?: string | null;
 };
 
 export type PublicOrderStatusBody = {

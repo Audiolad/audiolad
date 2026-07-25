@@ -1,152 +1,271 @@
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
-import type { OrderRow, PaymentRow } from "@/lib/payments/payment-api";
+import type { PaymentRow } from "@/lib/payments/payment-api";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-type FulfillPaymentInput = {
-  paymentId: string;
-  providerPaymentId: string;
-  providerStatus: string;
-  webhookPayload: Record<string, unknown>;
+export type FulfillTochkaOutcome =
+  | "completed"
+  | "already_complete"
+  | "repaired"
+  | "requires_review"
+  | "ignored"
+  | "failed";
+
+export type FulfillTochkaPaymentResult = {
+  ok: boolean;
+  outcome: FulfillTochkaOutcome;
+  reviewReason: string | null;
+  paymentId: string | null;
+  orderId: string | null;
+  paymentStatus: string | null;
+  orderStatus: string | null;
+  accessGranted: boolean;
+  accessInserted: boolean;
+  wasRepaired: boolean;
+  wasAlreadyComplete: boolean;
+  isTest: boolean;
+  processingStatus: string | null;
+  webhookEventId: string | null;
+  httpRetryable: boolean;
 };
 
-type FulfillPaymentResult =
-  | { ok: true; alreadyProcessed: boolean; orderId: string }
-  | { ok: false; reason: string };
+type RpcFulfillRow = {
+  ok?: boolean;
+  outcome?: string;
+  review_reason?: string | null;
+  payment_id?: string | null;
+  order_id?: string | null;
+  payment_status?: string | null;
+  order_status?: string | null;
+  access_granted?: boolean;
+  access_inserted?: boolean;
+  was_repaired?: boolean;
+  was_already_complete?: boolean;
+  is_test?: boolean;
+  processing_status?: string | null;
+  webhook_event_id?: string | null;
+  error_code?: string | null;
+};
 
-export async function fulfillSucceededTochkaPayment(
-  input: FulfillPaymentInput,
-): Promise<FulfillPaymentResult> {
+function asOutcome(value: string | undefined): FulfillTochkaOutcome {
+  switch (value) {
+    case "completed":
+    case "already_complete":
+    case "repaired":
+    case "requires_review":
+    case "ignored":
+    case "failed":
+      return value;
+    default:
+      return "failed";
+  }
+}
+
+function mapRpcResult(raw: unknown): FulfillTochkaPaymentResult {
+  const row = (raw ?? {}) as RpcFulfillRow;
+  const ok = row.ok === true;
+  const outcome = asOutcome(row.outcome);
+  const httpRetryable = !ok && outcome === "failed";
+
+  return {
+    ok,
+    outcome,
+    reviewReason:
+      typeof row.review_reason === "string" ? row.review_reason : null,
+    paymentId: typeof row.payment_id === "string" ? row.payment_id : null,
+    orderId: typeof row.order_id === "string" ? row.order_id : null,
+    paymentStatus:
+      typeof row.payment_status === "string" ? row.payment_status : null,
+    orderStatus: typeof row.order_status === "string" ? row.order_status : null,
+    accessGranted: row.access_granted === true,
+    accessInserted: row.access_inserted === true,
+    wasRepaired: row.was_repaired === true,
+    wasAlreadyComplete: row.was_already_complete === true,
+    isTest: row.is_test === true,
+    processingStatus:
+      typeof row.processing_status === "string" ? row.processing_status : null,
+    webhookEventId:
+      typeof row.webhook_event_id === "string" ? row.webhook_event_id : null,
+    httpRetryable,
+  };
+}
+
+export type RecordWebhookEventResult = {
+  id: string;
+  isNew: boolean;
+  processingStatus: string;
+  paymentId: string | null;
+  orderId: string | null;
+  reviewReason: string | null;
+};
+
+export async function recordTochkaWebhookEvent(input: {
+  dedupKey: string;
+  providerEventId: string | null;
+  providerPaymentId: string | null;
+  eventType: string;
+  payload: Record<string, unknown>;
+  signatureVerified: boolean;
+}): Promise<RecordWebhookEventResult | null> {
   const supabase = createServiceRoleClient();
 
-  const { data: payment, error: paymentError } = await supabase
-    .from("payments")
-    .select(
-      "id, order_id, provider, provider_payment_id, status, amount_minor, currency, provider_metadata",
-    )
-    .eq("id", input.paymentId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("record_payment_webhook_event", {
+    p_provider: "tochka",
+    p_dedup_key: input.dedupKey,
+    p_provider_event_id: input.providerEventId,
+    p_provider_payment_id: input.providerPaymentId,
+    p_event_type: input.eventType,
+    p_payload: input.payload,
+    p_signature_verified: input.signatureVerified,
+  });
 
-  if (paymentError) {
-    console.error("fulfill_payment_lookup_error", paymentError.message);
-    return { ok: false, reason: "payment_lookup_failed" };
+  if (error) {
+    console.error("record_payment_webhook_event_error", error.message);
+    return null;
   }
 
-  if (!payment) {
-    return { ok: false, reason: "payment_not_found" };
-  }
-
-  const paymentRow = payment as PaymentRow;
-
-  if (paymentRow.status === "succeeded") {
-    logCheckoutEvent("fulfill_payment_already_processed", {
-      orderId: paymentRow.order_id,
-      paymentId: paymentRow.id,
-    });
-    return {
-      ok: true,
-      alreadyProcessed: true,
-      orderId: paymentRow.order_id,
-    };
-  }
-
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .select(
-      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at",
-    )
-    .eq("id", paymentRow.order_id)
-    .maybeSingle();
-
-  if (orderError) {
-    console.error("fulfill_order_lookup_error", orderError.message);
-    return { ok: false, reason: "order_lookup_failed" };
-  }
-
-  if (!order) {
-    return { ok: false, reason: "order_not_found" };
-  }
-
-  const orderRow = order as OrderRow;
-
-  if (orderRow.status === "paid") {
-    logCheckoutEvent("fulfill_order_already_processed", {
-      orderId: orderRow.id,
-      paymentId: paymentRow.id,
-    });
-    return {
-      ok: true,
-      alreadyProcessed: true,
-      orderId: orderRow.id,
-    };
-  }
-
-  const now = new Date().toISOString();
-  const mergedMetadata = {
-    ...(paymentRow.provider_metadata ?? {}),
-    provider_status: input.providerStatus,
-    webhook_payload: input.webhookPayload,
-    fulfilled_at: now,
+  const row = data as {
+    id?: string;
+    is_new?: boolean;
+    processing_status?: string;
+    payment_id?: string | null;
+    order_id?: string | null;
+    review_reason?: string | null;
   };
 
-  const { error: paymentUpdateError } = await supabase
-    .from("payments")
-    .update({
-      status: "succeeded",
-      provider_payment_id: input.providerPaymentId,
-      confirmed_at: now,
-      updated_at: now,
-      provider_metadata: mergedMetadata,
-    })
-    .eq("id", paymentRow.id)
-    .eq("status", paymentRow.status);
-
-  if (paymentUpdateError) {
-    console.error("fulfill_payment_update_error", paymentUpdateError.message);
-    return { ok: false, reason: "payment_update_failed" };
+  if (typeof row?.id !== "string") {
+    return null;
   }
 
-  const { error: orderUpdateError } = await supabase
-    .from("orders")
-    .update({
-      status: "paid",
-      paid_at: now,
-      updated_at: now,
-    })
-    .eq("id", orderRow.id)
-    .eq("status", orderRow.status);
+  return {
+    id: row.id,
+    isNew: row.is_new === true,
+    processingStatus:
+      typeof row.processing_status === "string"
+        ? row.processing_status
+        : "received",
+    paymentId: typeof row.payment_id === "string" ? row.payment_id : null,
+    orderId: typeof row.order_id === "string" ? row.order_id : null,
+    reviewReason:
+      typeof row.review_reason === "string" ? row.review_reason : null,
+  };
+}
 
-  if (orderUpdateError) {
-    console.error("fulfill_order_update_error", orderUpdateError.message);
-    return { ok: false, reason: "order_update_failed" };
-  }
+/**
+ * Transactional Tochka APPROVED fulfillment (P3.0).
+ * Always goes through fulfill_tochka_payment_transactional — repairs gaps on replay.
+ */
+export async function fulfillSucceededTochkaPayment(input: {
+  webhookEventId: string;
+  providerPaymentId: string;
+  paymentId: string | null;
+  providerAmountMinor: number;
+  providerCurrency: string;
+  providerStatus: string;
+}): Promise<FulfillTochkaPaymentResult> {
+  const supabase = createServiceRoleClient();
 
-  const { error: grantError } = await supabase.rpc(
-    "grant_practice_purchase_access",
+  const { data, error } = await supabase.rpc(
+    "fulfill_tochka_payment_transactional",
     {
-      p_order_id: orderRow.id,
+      p_webhook_event_id: input.webhookEventId,
+      p_provider_payment_id: input.providerPaymentId,
+      p_payment_id: input.paymentId,
+      p_provider_amount_minor: input.providerAmountMinor,
+      p_provider_currency: input.providerCurrency,
+      p_provider_status: input.providerStatus,
     },
   );
 
-  if (grantError) {
-    console.error("fulfill_grant_access_error", grantError.message);
-    logCheckoutEvent("fulfill_grant_access_failed", {
-      orderId: orderRow.id,
-      paymentId: paymentRow.id,
+  if (error) {
+    console.error("fulfill_tochka_payment_rpc_error", error.message);
+    logCheckoutEvent("fulfill_payment_rpc_error", {
+      webhookEventId: input.webhookEventId,
+      paymentId: input.paymentId,
     });
-    return { ok: false, reason: "grant_access_failed" };
+    return {
+      ok: false,
+      outcome: "failed",
+      reviewReason: "rpc_error",
+      paymentId: input.paymentId,
+      orderId: null,
+      paymentStatus: null,
+      orderStatus: null,
+      accessGranted: false,
+      accessInserted: false,
+      wasRepaired: false,
+      wasAlreadyComplete: false,
+      isTest: false,
+      processingStatus: "failed",
+      webhookEventId: input.webhookEventId,
+      httpRetryable: true,
+    };
   }
 
-  logCheckoutEvent("fulfill_payment_succeeded", {
-    orderId: orderRow.id,
-    paymentId: paymentRow.id,
-    alreadyProcessed: false,
-  });
+  const result = mapRpcResult(data);
 
-  return {
-    ok: true,
-    alreadyProcessed: false,
-    orderId: orderRow.id,
-  };
+  if (result.outcome === "repaired") {
+    logCheckoutEvent("fulfill_payment_repaired", {
+      orderId: result.orderId,
+      paymentId: result.paymentId,
+      webhookEventId: result.webhookEventId,
+    });
+  } else if (result.outcome === "completed") {
+    logCheckoutEvent("fulfill_payment_succeeded", {
+      orderId: result.orderId,
+      paymentId: result.paymentId,
+      alreadyProcessed: false,
+      isTest: result.isTest,
+    });
+  } else if (result.outcome === "already_complete") {
+    logCheckoutEvent("fulfill_payment_already_processed", {
+      orderId: result.orderId,
+      paymentId: result.paymentId,
+      webhookEventId: result.webhookEventId,
+    });
+  } else if (result.outcome === "requires_review") {
+    logCheckoutEvent("fulfill_payment_requires_review", {
+      orderId: result.orderId,
+      paymentId: result.paymentId,
+      reviewReason: result.reviewReason,
+      webhookEventId: result.webhookEventId,
+    });
+  } else if (!result.ok) {
+    logCheckoutEvent("fulfill_payment_failed", {
+      webhookEventId: result.webhookEventId,
+      reviewReason: result.reviewReason,
+    });
+  }
+
+  return result;
+}
+
+export async function markWebhookEventTerminal(input: {
+  webhookEventId: string;
+  processingStatus: "ignored" | "requires_review" | "failed";
+  reviewReason?: string | null;
+  lastError?: string | null;
+}): Promise<boolean> {
+  const supabase = createServiceRoleClient();
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("payment_webhook_events")
+    .update({
+      processing_status: input.processingStatus,
+      processed_at: now,
+      updated_at: now,
+      review_reason: input.reviewReason ?? null,
+      last_error: input.lastError ?? null,
+    })
+    .eq("id", input.webhookEventId)
+    .in("processing_status", ["received", "failed"]);
+
+  if (error) {
+    console.error("mark_webhook_event_terminal_error", error.message);
+    return false;
+  }
+
+  return true;
 }
 
 export async function findPaymentByProviderOperationId(
@@ -157,7 +276,7 @@ export async function findPaymentByProviderOperationId(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, order_id, provider, provider_payment_id, idempotency_key, status, amount_minor, currency, provider_metadata, created_at, confirmed_at",
+      "id, order_id, provider, provider_payment_id, idempotency_key, status, amount_minor, currency, provider_metadata, created_at, confirmed_at, is_test, test_reason",
     )
     .eq("provider", "tochka")
     .eq("provider_payment_id", operationId)
@@ -179,7 +298,7 @@ export async function findPaymentByOrderId(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, order_id, provider, provider_payment_id, idempotency_key, status, amount_minor, currency, provider_metadata, created_at, confirmed_at",
+      "id, order_id, provider, provider_payment_id, idempotency_key, status, amount_minor, currency, provider_metadata, created_at, confirmed_at, is_test, test_reason",
     )
     .eq("order_id", orderId)
     .eq("provider", "tochka")

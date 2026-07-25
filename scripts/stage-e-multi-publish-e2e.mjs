@@ -169,6 +169,8 @@ async function fulfillTestOrder(admin, orderId) {
         status: "pending",
         amount_minor: order.amount_minor,
         currency: order.currency,
+        is_test: true,
+        test_reason: "e2e_metadata",
         provider_metadata: { e2e_test: true },
       })
       .select("id")
@@ -188,6 +190,8 @@ async function fulfillTestOrder(admin, orderId) {
       confirmed_at: now,
       updated_at: now,
       provider_payment_id: `e2e-${paymentId}`,
+      is_test: true,
+      test_reason: "e2e_metadata",
       provider_metadata: {
         e2e_test: true,
         fulfilled_at: now,
@@ -205,6 +209,8 @@ async function fulfillTestOrder(admin, orderId) {
       status: "paid",
       paid_at: now,
       updated_at: now,
+      is_test: true,
+      test_reason: "e2e_payment",
     })
     .eq("id", orderId)
     .eq("status", "pending");

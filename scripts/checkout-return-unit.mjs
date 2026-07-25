@@ -117,10 +117,18 @@ function testLoggingAndWebhookUnchanged() {
     "utf8",
   );
 
-  assert(fulfill.includes("grant_practice_purchase_access"), "grant RPC unchanged");
+  assert(
+    fulfill.includes("fulfill_tochka_payment_transactional"),
+    "fulfill uses transactional RPC",
+  );
   assert(fulfill.includes("logCheckoutEvent"), "fulfill logs checkout events");
   assert(webhook.includes("fulfillSucceededTochkaPayment"), "webhook still fulfills payments");
+  assert(webhook.includes("recordTochkaWebhookEvent"), "webhook writes ledger");
   assert(webhook.includes("tochka_webhook_verified"), "webhook verification logged");
+  assert(
+    webhook.includes("tochka_webhook_signature_invalid"),
+    "invalid signature is logged",
+  );
 }
 
 async function main() {
