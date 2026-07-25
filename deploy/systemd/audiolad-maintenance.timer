@@ -2,9 +2,10 @@
 Description=Daily Audiolad disk hygiene (off-peak UTC)
 
 [Timer]
-OnCalendar=*-*-* 04:30:00
+OnCalendar=*-*-* 03:30:00
 Persistent=true
 RandomizedDelaySec=900
+Unit=audiolad-maintenance.service
 
 [Install]
 WantedBy=timers.target
