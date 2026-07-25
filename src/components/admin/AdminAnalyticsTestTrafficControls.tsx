@@ -48,12 +48,18 @@ export default function AdminAnalyticsTestTrafficControls({
             }`}
           />
         </span>
-        Не учитывать тестовый трафик
+        Не учитывать размеченный тестовый трафик
       </Link>
+
+      <p className="max-w-xs text-right text-xs leading-5 text-[#796ba0]">
+        Исключает только сессии с тестовыми utm_campaign или тестовыми
+        anonymous_id. Staff и обычный трафик владельца не фильтруются.
+      </p>
 
       {showExcluded ? (
         <p className="text-right text-xs leading-5 text-[#796ba0]">
-          Исключено тестовых посетителей: {excludedTestVisitors.toLocaleString("ru-RU")}
+          Исключено размеченных тестовых посетителей:{" "}
+          {excludedTestVisitors.toLocaleString("ru-RU")}
           {excludedTestSessions > 0
             ? ` · сессий: ${excludedTestSessions.toLocaleString("ru-RU")}`
             : null}
