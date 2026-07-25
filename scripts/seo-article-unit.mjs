@@ -524,10 +524,21 @@ assert(
   "abundance meditation practice intro",
 );
 assert(
-  abundanceMeditationArticle.leadBeforeAudio.startsWith(
-    "Медитация на изобилие – это спокойная практика",
-  ),
+  abundanceMeditationArticle.leadBeforeAudio ===
+    "Иногда ощущение нехватки сохраняется даже тогда, когда в жизни уже многое есть. Несколько спокойных минут помогают замедлиться, заметить свои опоры и посмотреть на происходящее немного шире.",
   "abundance meditation opening body paragraph",
+);
+assert(
+  abundanceMeditationArticle.shortAnswer.startsWith(
+    "Медитация на изобилие – это спокойная аудиопрактика",
+  ),
+  "abundance meditation short answer keeps definition role",
+);
+assert(
+  !abundanceMeditationArticle.leadBeforeAudio.includes(
+    "Медитация на изобилие – это",
+  ),
+  "abundance meditation lead is not a second definition",
 );
 assert(
   abundanceMeditationArticle.introAfterAudio[0] ===
