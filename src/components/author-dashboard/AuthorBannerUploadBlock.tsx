@@ -224,7 +224,7 @@ export default function AuthorBannerUploadBlock({
   );
 }
 
-export function readBannerPositionFromProfileProp(profile: {
+export function readBannerPositionFromProfileRow(profile: {
   banner_position_x?: unknown;
   banner_position_y?: unknown;
 }): BannerPosition {
