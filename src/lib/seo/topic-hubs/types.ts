@@ -50,6 +50,13 @@ export type TopicHubDefinition = {
   indexWhenEmpty?: boolean;
 };
 
+export type TopicHubArticleCard = {
+  slug: string;
+  title: string;
+  href: string;
+  description: string;
+};
+
 export type TopicHubPageData = {
   hub: TopicHubDefinition;
   path: string;
@@ -57,5 +64,6 @@ export type TopicHubPageData = {
   products: CatalogProduct[];
   freeProducts: CatalogProduct[];
   paidProducts: CatalogProduct[];
+  articles: TopicHubArticleCard[];
   platformTopicTitle: string | null;
 };

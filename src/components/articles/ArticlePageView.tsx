@@ -211,6 +211,11 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                       })}
                     </div>
                   ) : null}
+                  {article.brandNote ? (
+                    <aside className="rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+                      <p>{article.brandNote}</p>
+                    </aside>
+                  ) : null}
                 </div>
               ) : null}
             </section>

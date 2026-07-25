@@ -29,6 +29,7 @@ export function estimateArticleReadingTimeMinutes(
       item.linkLabel ?? "",
       item.after ?? "",
     ]),
+    article.brandNote ?? "",
     ...article.seeAlsoLinks.flatMap((item) => [item.title, item.description]),
     article.closingSection.title,
     ...article.closingSection.paragraphs,

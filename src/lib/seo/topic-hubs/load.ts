@@ -4,6 +4,10 @@ import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import {
+  buildArticlePath,
+  listArticlesByTopicSlug,
+} from "@/lib/seo/articles";
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 import { listActiveTopics } from "@/lib/topics/queries";
 
@@ -89,6 +93,12 @@ export async function loadTopicHubPageData(
     ? (activeTopics.find((topic) => topic.key === topicKey) ?? null)
     : null;
   const path = buildTopicHubPath(hub.slug);
+  const articles = listArticlesByTopicSlug(hub.slug).map((article) => ({
+    slug: article.slug,
+    title: article.title,
+    href: buildArticlePath(article.slug),
+    description: article.metaDescription,
+  }));
 
   return {
     hub,
@@ -97,6 +107,7 @@ export async function loadTopicHubPageData(
     products,
     freeProducts,
     paidProducts,
+    articles,
     platformTopicTitle: platformTopic?.title ?? null,
   };
 }

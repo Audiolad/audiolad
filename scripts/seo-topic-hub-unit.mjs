@@ -113,6 +113,7 @@ const pageData = {
   ],
   freeProducts: [],
   paidProducts: [],
+  articles: [],
   platformTopicTitle: "Уверенность и самоценность",
 };
 
@@ -159,6 +160,7 @@ const femalePageData = {
   products: pageData.products,
   freeProducts: [],
   paidProducts: [],
+  articles: [],
   platformTopicTitle: "Уверенность и самоценность",
 };
 const femaleMeta = buildTopicHubMetadata(femalePageData);
@@ -186,6 +188,15 @@ assert(
 
 const pageSource = read("src/app/(listener)/topics/[slug]/page.tsx");
 assert(pageSource.includes("loadTopicHubPageData"), "page loads hub data");
+assert(
+  read("src/components/topics/TopicHubPageView.tsx").includes("Статьи по теме"),
+  "hub renders articles section",
+);
+assert(
+  read("src/lib/seo/topic-hubs/load.ts").includes("listArticlesByTopicSlug"),
+  "hub loads articles from article registry",
+);
+
 assert(pageSource.includes("buildTopicHubMetadata"), "page metadata builder");
 
 const viewSource = read("src/components/topics/TopicHubPageView.tsx");
@@ -275,6 +286,7 @@ const freePageData = {
   products: pageData.products,
   freeProducts: pageData.products,
   paidProducts: [],
+  articles: [],
   platformTopicTitle: null,
 };
 const freeMeta = buildTopicHubMetadata(freePageData);
@@ -398,6 +410,7 @@ const moneyPageData = {
   products: pageData.products,
   freeProducts: pageData.products,
   paidProducts: [],
+  articles: [],
   platformTopicTitle: "Деньги",
 };
 const moneyMeta = buildTopicHubMetadata(moneyPageData);
@@ -519,6 +532,7 @@ const abundancePageData = {
   products: pageData.products,
   freeProducts: pageData.products,
   paidProducts: [],
+  articles: [],
   platformTopicTitle: "Деньги",
 };
 const abundanceMeta = buildTopicHubMetadata(abundancePageData);

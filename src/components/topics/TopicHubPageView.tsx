@@ -160,6 +160,31 @@ export default function TopicHubPageView({ data }: TopicHubPageViewProps) {
           </>
         )}
 
+        {data.articles.length > 0 ? (
+          <section className="mt-12 max-w-3xl">
+            <h2 className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl">
+              Статьи по теме
+            </h2>
+            <ul className="mt-4 grid list-none gap-3 p-0">
+              {data.articles.map((article) => (
+                <li key={article.slug}>
+                  <Link
+                    href={article.href}
+                    className="block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                  >
+                    <span className="text-base font-semibold text-[#7042c5]">
+                      {article.title}
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-[#7d70a2]">
+                      {article.description}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section className="mt-12 max-w-3xl">
           <h2 className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl">
             Частые вопросы

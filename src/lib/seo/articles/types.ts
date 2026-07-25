@@ -84,6 +84,11 @@ export type ArticleDefinition = {
    * (other articles in the cluster; omit href for not-yet-published titles).
    */
   afterFinalAudio?: readonly ArticleCrossLinkParagraph[];
+  /**
+   * Optional branded editorial note after the practice CTA / cross-links
+   * (Audiolad positioning; not a second H2).
+   */
+  brandNote?: string;
   /** Footer “Смотрите также” cards (topic hub + related hubs) */
   seeAlsoLinks: readonly ArticleSeeAlsoLink[];
   /** Closing h2 section after the final audio block */

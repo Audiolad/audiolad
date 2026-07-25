@@ -7,6 +7,7 @@ export {
   getArticleBySlug,
   listArticleDefinitions,
   listArticleSlugs,
+  listArticlesByTopicSlug,
 } from "./registry";
 export {
   buildCatalogPracticeKeyIndex,

@@ -136,23 +136,81 @@ assert(
 );
 assert(
   moneyArticle.afterFinalAudio?.some(
-    (item) =>
-      !item.href &&
-      item.before.includes("Как войти в состояние изобилия"),
+    (item) => item.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
   ),
-  "abundance mention stays without live link",
+  "money article links to abundance article",
 );
 assert(
   !JSON.stringify(moneyArticle).includes(
     "/articles/kak-vojti-v-sostoyanie-izobiliya",
   ),
-  "no broken abundance article URL",
+  "no broken typo abundance URL",
 );
 assert(
   moneyArticle.seeAlsoLinks.some(
     (item) => item.href === "/topics/meditatsii-na-dengi",
   ),
   "money see-also includes hub",
+);
+
+const abundanceArticle = getArticleBySlug("kak-voyti-v-sostoyanie-izobiliya");
+assert(abundanceArticle, "abundance article registered");
+assert(
+  abundanceArticle.title.includes("состояние изобилия"),
+  "abundance H1",
+);
+assert(abundanceArticle.topicSlug === "izobilie", "abundance topic slug");
+assert(
+  abundanceArticle.topicHref === "/topics/izobilie",
+  "abundance topic href",
+);
+assert(
+  abundanceArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "abundance primary practice",
+);
+assert(
+  abundanceArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "abundance practice intro",
+);
+assert(
+  !abundanceArticle.primaryPracticeIntro.includes("—") &&
+    !abundanceArticle.shortAnswer.includes("—"),
+  "abundance uses medium dash",
+);
+assert(abundanceArticle.faq.length === 3, "abundance faq count");
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) =>
+      item.href === "/practice/sergey-and-zoya/kod-prityazheniya",
+  ),
+  "abundance links to Kod Prityazheniya practice",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) =>
+      item.href ===
+      "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  ),
+  "abundance links to money article",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) =>
+      !item.href && item.before.includes("Мышление дефицита"),
+  ),
+  "deficit-thinking mention stays without live link",
+);
+assert(
+  Boolean(abundanceArticle.brandNote?.includes("АудиоЛаде")),
+  "abundance has brand note",
+);
+assert(
+  abundanceArticle.seeAlsoLinks.some((item) => item.href === "/topics/izobilie"),
+  "abundance see-also includes hub",
+);
+assert(
+  listArticleSlugs().includes("kak-voyti-v-sostoyanie-izobiliya"),
+  "abundance in slug list",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -290,6 +348,14 @@ assert(
   "money article in sitemap mapper",
 );
 assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-voyti-v-sostoyanie-izobiliya",
+  ),
+  "abundance article in sitemap mapper",
+);
+assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
   "sitemap has no localhost",
 );
@@ -405,6 +471,10 @@ assert(
 assert(
   viewSource.includes("article.seeAlsoLinks"),
   "see-also links are data-driven",
+);
+assert(
+  viewSource.includes("article.brandNote"),
+  "renders optional brand note from data",
 );
 assert(
   !viewSource.includes("Все практики о любви к себе"),
