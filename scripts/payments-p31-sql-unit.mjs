@@ -306,6 +306,19 @@ INSERT INTO orders (
   assertEqual(tsPayments, windowSummary.payment_count, "timeseries payments = summary");
   assertEqual(tsGross, windowSummary.gross_minor, "timeseries gross = summary");
 
+  psqlFile(
+    TEST_DB,
+    join(ROOT, "supabase/migrations/20260725192200_admin_payments_p31_timeseries_range_fix.sql"),
+  );
+
+  const allTs = json(
+    `SELECT public.admin_payments_p31_timeseries(NULL,NULL,false,NULL,NULL,'day');`,
+  );
+  const allTsPayments = allTs.points.reduce((s, p) => s + p.payments, 0);
+  const allTsGross = allTs.points.reduce((s, p) => s + p.gross_minor, 0);
+  assertEqual(allTsPayments, summary.payment_count, "all-time timeseries payments = summary");
+  assertEqual(allTsGross, summary.gross_minor, "all-time timeseries gross = summary");
+
   console.log("payments-p31-sql-unit: ok");
 }
 

@@ -415,36 +415,57 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_bucket interval;
-  v_start timestamptz;
-  v_end timestamptz;
+  v_tz text := 'Europe/Moscow';
+  v_from timestamptz;
+  v_to timestamptz;
+  v_granularity text;
+  v_step interval;
+  v_start_local timestamp;
+  v_end_local timestamp;
   v_points jsonb;
 BEGIN
-  IF p_bucket = 'week' THEN
-    v_bucket := interval '7 days';
+  -- Canonical body also shipped in 20260725192200_admin_payments_p31_timeseries_range_fix.sql
+  v_to := coalesce(p_to, now());
+
+  IF p_from IS NOT NULL THEN
+    v_from := p_from;
   ELSE
-    v_bucket := interval '1 day';
+    SELECT min(p.confirmed_at)
+    INTO v_from
+    FROM public.payments AS p
+    WHERE p.status = 'succeeded'
+      AND p.confirmed_at IS NOT NULL
+      AND p.confirmed_at < v_to
+      AND (p_include_test OR p.is_test = false);
+    v_from := coalesce(v_from, v_to - interval '29 days');
   END IF;
 
-  v_start := date_trunc(
-    'day',
-    coalesce(p_from, now() - interval '29 days') AT TIME ZONE 'Europe/Moscow'
-  ) AT TIME ZONE 'Europe/Moscow';
-
-  v_end := date_trunc(
-    'day',
-    coalesce(p_to, now()) AT TIME ZONE 'Europe/Moscow'
-  ) AT TIME ZONE 'Europe/Moscow';
+  IF v_from >= v_to THEN
+    v_from := v_to - interval '1 day';
+  END IF;
 
   IF p_bucket = 'week' THEN
-    v_start := date_trunc('week', v_start AT TIME ZONE 'Europe/Moscow')
-      AT TIME ZONE 'Europe/Moscow';
+    v_granularity := 'week';
+    v_step := interval '7 days';
+  ELSE
+    v_granularity := 'day';
+    v_step := interval '1 day';
+  END IF;
+
+  v_start_local := date_trunc(v_granularity, (v_from AT TIME ZONE v_tz));
+  v_end_local := date_trunc(
+    v_granularity,
+    ((v_to - interval '1 microsecond') AT TIME ZONE v_tz)
+  );
+
+  IF v_end_local < v_start_local THEN
+    v_end_local := v_start_local;
   END IF;
 
   SELECT coalesce(
     jsonb_agg(
       jsonb_build_object(
-        'bucket', to_char(d.bucket AT TIME ZONE 'Europe/Moscow', 'YYYY-MM-DD'),
+        'bucket', to_char(d.bucket_local, 'YYYY-MM-DD'),
         'payments', coalesce(m.payments, 0),
         'unique_buyers', coalesce(m.unique_buyers, 0),
         'gross_minor', coalesce(m.gross_minor, 0),
@@ -454,20 +475,20 @@ BEGIN
           ELSE NULL
         END
       )
-      ORDER BY d.bucket
+      ORDER BY d.bucket_local
     ),
     '[]'::jsonb
   )
   INTO v_points
-  FROM generate_series(v_start, v_end - v_bucket, v_bucket) AS d(bucket)
+  FROM generate_series(v_start_local, v_end_local, v_step) AS d(bucket_local)
   LEFT JOIN LATERAL (
     SELECT
       count(*)::integer AS payments,
       count(DISTINCT b.user_id)::integer AS unique_buyers,
       coalesce(sum(b.amount_minor), 0)::bigint AS gross_minor
     FROM public.admin_payments_p31_payment_base(
-      d.bucket,
-      d.bucket + v_bucket,
+      d.bucket_local AT TIME ZONE v_tz,
+      (d.bucket_local + v_step) AT TIME ZONE v_tz,
       p_include_test,
       p_author_id,
       p_practice_id
@@ -475,10 +496,11 @@ BEGIN
   ) AS m ON true;
 
   RETURN jsonb_build_object(
-    'bucket', CASE WHEN p_bucket = 'week' THEN 'week' ELSE 'day' END,
+    'bucket', v_granularity,
     'points', v_points,
     'notes', jsonb_build_object(
-      'unique_buyers', 'per_bucket_not_summable_to_period'
+      'unique_buyers', 'per_bucket_not_summable_to_period',
+      'range', 'half_open_from_to_moscow_buckets'
     )
   );
 END;
