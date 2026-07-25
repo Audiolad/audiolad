@@ -37,6 +37,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/", changeFrequency: "weekly", priority: 1 },
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
   { path: "/become-author", changeFrequency: "monthly", priority: 0.5 },
   { path: "/first-audio-course", changeFrequency: "monthly", priority: 0.6 },
   { path: "/offer", changeFrequency: "yearly", priority: 0.3 },
