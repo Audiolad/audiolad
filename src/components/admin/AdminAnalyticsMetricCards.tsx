@@ -27,10 +27,15 @@ function DeltaBadge({ card }: { card: AdminAnalyticsMetricCard }) {
       className={`mt-2 text-xs font-medium ${tone}`}
       title={`Предыдущий период: ${delta.previous.toLocaleString("ru-RU")}`}
     >
-      {delta.percentLabel}
-      {delta.absolute !== 0
-        ? ` · ${delta.absolute > 0 ? "+" : ""}${delta.absolute.toLocaleString("ru-RU")}`
-        : null}
+      <span aria-hidden>{delta.compactLabel}</span>
+      <span className="sr-only">
+        {delta.direction === "up"
+          ? "рост"
+          : delta.direction === "down"
+            ? "падение"
+            : "без существенного изменения"}
+        , предыдущее значение {delta.previous.toLocaleString("ru-RU")}
+      </span>
     </p>
   );
 }

@@ -165,6 +165,8 @@ export type AdminAnalyticsDelta = {
   previous: number;
   absolute: number;
   percentLabel: string;
+  /** Compact glyph label for KPI strip: ▲ +18% / ▼ −6% / = / — */
+  compactLabel: string;
   direction: "up" | "down" | "flat" | "neutral";
 };
 
@@ -184,6 +186,7 @@ export function formatAdminDelta(
         previous,
         absolute: 0,
         percentLabel: "—",
+        compactLabel: "—",
         direction: "neutral",
       };
     }
@@ -192,16 +195,40 @@ export function formatAdminDelta(
       previous,
       absolute,
       percentLabel: "н/д",
+      compactLabel: "—",
       direction: "neutral",
     };
   }
 
-  const percent = Math.round((absolute / previous) * 100);
+  const rawPercent = (absolute / previous) * 100;
+
+  if (Math.abs(rawPercent) < 1) {
+    return {
+      previous,
+      absolute,
+      percentLabel: "=",
+      compactLabel: "=",
+      direction: "flat",
+    };
+  }
+
+  const percent = Math.round(rawPercent);
+
+  if (percent > 0) {
+    return {
+      previous,
+      absolute,
+      percentLabel: `+${percent}%`,
+      compactLabel: `▲ +${percent}%`,
+      direction: "up",
+    };
+  }
 
   return {
     previous,
     absolute,
-    percentLabel: `${percent > 0 ? "+" : ""}${percent}%`,
-    direction: percent > 0 ? "up" : percent < 0 ? "down" : "flat",
+    percentLabel: `${percent}%`,
+    compactLabel: `▼ ${percent}%`.replace("-", "−"),
+    direction: "down",
   };
 }

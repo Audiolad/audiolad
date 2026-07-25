@@ -82,11 +82,34 @@ function testAdminDashboard() {
   );
   const dictionary = read("src/lib/admin/analytics-metrics-dictionary.ts");
 
-  assert(page.includes("getAdminAnalyticsDashboard"), "admin analytics wired");
-  assert(page.includes("AdminAnalyticsPeriodPicker"), "period picker in admin page");
-  assert(page.includes("AdminAnalyticsFunnelPanel"), "funnel panel");
-  assert(page.includes("AdminAnalyticsTimeseriesChart"), "timeseries chart");
-  assert(page.includes("AdminAnalyticsBreakdownTabs"), "breakdown tabs");
+  assert(
+    page.includes("getAdminAnalyticsSummaryBundle") ||
+      page.includes("getAdminAnalyticsDashboard"),
+    "admin analytics wired",
+  );
+  assert(
+    page.includes("AdminAnalyticsWorkbench") ||
+      page.includes("AdminAnalyticsPeriodPicker"),
+    "period picker / workbench in admin page",
+  );
+  const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
+  assert(
+    workbench.includes("AdminAnalyticsFunnelPanel"),
+    "funnel panel",
+  );
+  assert(
+    read("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
+      "AdminAnalyticsTimeseriesChart",
+    ),
+    "timeseries chart",
+  );
+  assert(
+    read("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
+      "AdminAnalyticsBreakdownPanel",
+    ) ||
+      page.includes("AdminAnalyticsBreakdownTabs"),
+    "breakdown panel",
+  );
   assert(
     queries.includes('rpc("admin_analytics_p2_summary"'),
     "dashboard uses P2 summary rpc",
@@ -94,6 +117,14 @@ function testAdminDashboard() {
   assert(
     queries.includes('rpc("admin_analytics_p2_timeseries"'),
     "dashboard uses P2 timeseries rpc",
+  );
+  assert(
+    queries.includes("getAdminAnalyticsSummaryBundle"),
+    "summary-first loader for P2.5",
+  );
+  assert(
+    page.includes("AdminAnalyticsWorkbench") || page.includes("getAdminAnalyticsSummaryBundle"),
+    "admin page uses summary workbench",
   );
   assert(
     !queries.includes('.from("analytics_events")'),

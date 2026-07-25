@@ -137,6 +137,25 @@ export type AdminAnalyticsFilterOption = {
   label: string;
 };
 
+export type AdminAnalyticsKpiKey =
+  | "visitors"
+  | "registrations"
+  | "playStarts"
+  | "completions"
+  | "saves";
+
+export type AdminAnalyticsKpiCard = {
+  key: AdminAnalyticsKpiKey;
+  label: string;
+  value: number;
+  kind: AdminMetricKind;
+  kindLabel: string;
+  formula: string;
+  hint: string;
+  delta: AdminAnalyticsDelta | null;
+  sparkline: number[];
+};
+
 export type AdminAnalyticsDashboard = {
   period: AdminAnalyticsPeriod;
   periodLabel: string;
@@ -152,6 +171,7 @@ export type AdminAnalyticsDashboard = {
   excludedTestVisitors: number;
   excludedTestSessions: number;
   audience: AdminAnalyticsMetricCard[];
+  kpi: AdminAnalyticsKpiCard[];
   funnelEvents: AdminAnalyticsFunnelStep[];
   funnelPeople: AdminAnalyticsFunnelStep[];
   purchasesPlaceholder: string;
@@ -190,6 +210,17 @@ export type AdminAnalyticsDashboard = {
     authors: AdminAnalyticsFilterOption[];
     practices: AdminAnalyticsFilterOption[];
   };
+};
+
+export type AdminAnalyticsSummaryBundle = Omit<
+  AdminAnalyticsDashboard,
+  "practices" | "authors" | "acquisition"
+>;
+
+export type AdminAnalyticsBreakdownBundle = {
+  practices: AdminAnalyticsDashboard["practices"];
+  authors: AdminAnalyticsDashboard["authors"];
+  acquisition: AdminAnalyticsDashboard["acquisition"];
 };
 
 type SummarySnapshot = {
@@ -331,6 +362,76 @@ function funnelStep(
         ? null
         : `${label}: ${metricKindLabel(kind)}; конверсия от предыдущего этапа той же линии`,
   };
+}
+
+function buildKpi(
+  summary: SummarySnapshot,
+  points: AdminAnalyticsTimeseriesPoint[],
+): AdminAnalyticsKpiCard[] {
+  const prev = summary.previous ?? null;
+  const visitors = asNonNegativeInt(summary.audience?.visitors);
+  const registrations = asNonNegativeInt(summary.audience?.registrations);
+  const playStarts = asNonNegativeInt(summary.events?.play_starts);
+  const completions = asNonNegativeInt(summary.events?.completions);
+  const saves = asNonNegativeInt(summary.events?.saves);
+
+  return [
+    {
+      key: "visitors",
+      label: "Посетители",
+      value: visitors,
+      kind: "unique_person",
+      kindLabel: metricKindLabel("unique_person"),
+      formula: "COUNT(DISTINCT visitor_key)",
+      hint: `${METRIKA_DIFF_TOOLTIP} Уникальные люди по visitor_key.`,
+      delta: formatAdminDelta(visitors, prev?.visitors),
+      sparkline: points.map((point) => point.visitors),
+    },
+    {
+      key: "registrations",
+      label: "Регистрации",
+      value: registrations,
+      kind: "account",
+      kindLabel: metricKindLabel("account"),
+      formula: "COUNT(profiles) по created_at",
+      hint: "Новые профили за период (БД, не клиентская цель).",
+      delta: formatAdminDelta(registrations, prev?.registrations),
+      sparkline: points.map((point) => point.registrations),
+    },
+    {
+      key: "playStarts",
+      label: "Запуски",
+      value: playStarts,
+      kind: "event",
+      kindLabel: metricKindLabel("event"),
+      formula: "COUNT(audio_play_started)",
+      hint: "События запуска аудио.",
+      delta: formatAdminDelta(playStarts, prev?.play_starts),
+      sparkline: points.map((point) => point.playStarts),
+    },
+    {
+      key: "completions",
+      label: "Дослушивания",
+      value: completions,
+      kind: "event",
+      kindLabel: metricKindLabel("event"),
+      formula: "COUNT(audio_completed)",
+      hint: "События дослушивания.",
+      delta: formatAdminDelta(completions, prev?.completions),
+      sparkline: points.map((point) => point.completions),
+    },
+    {
+      key: "saves",
+      label: "Сохранили",
+      value: saves,
+      kind: "event",
+      kindLabel: metricKindLabel("event"),
+      formula: "COUNT(first_manual_library_save)",
+      hint: "Сохранили практику в Аудиотеку.",
+      delta: formatAdminDelta(saves, prev?.saves),
+      sparkline: points.map((point) => point.saves),
+    },
+  ];
 }
 
 function buildAudience(summary: SummarySnapshot): AdminAnalyticsMetricCard[] {
@@ -522,7 +623,132 @@ function buildFilterNotes(filters: AdminAnalyticsDashboard["filters"]): string[]
   return notes;
 }
 
-export async function getAdminAnalyticsDashboard(input?: {
+function mapPracticeRows(
+  rows: Array<Record<string, unknown>> | undefined,
+): AdminAnalyticsPracticeRow[] {
+  return (rows ?? [])
+    .map((row) => {
+      const views = asNonNegativeInt(row.views);
+      const playStarts = asNonNegativeInt(row.playStarts ?? row.play_starts);
+      const completions = asNonNegativeInt(row.completions);
+      return {
+        practiceId:
+          typeof row.practiceId === "string"
+            ? row.practiceId
+            : String(row.practice_id ?? ""),
+        title: typeof row.title === "string" ? row.title : "Практика",
+        authorId:
+          typeof row.authorId === "string"
+            ? row.authorId
+            : typeof row.author_id === "string"
+              ? row.author_id
+              : null,
+        authorName:
+          typeof row.authorName === "string"
+            ? row.authorName
+            : typeof row.author_name === "string"
+              ? row.author_name
+              : "Автор",
+        authorSlug:
+          typeof row.authorSlug === "string"
+            ? row.authorSlug
+            : typeof row.author_slug === "string"
+              ? row.author_slug
+              : null,
+        practiceSlug:
+          typeof row.practiceSlug === "string"
+            ? row.practiceSlug
+            : typeof row.practice_slug === "string"
+              ? row.practice_slug
+              : null,
+        href: typeof row.href === "string" ? row.href : null,
+        views,
+        uniqueVisitors: asNonNegativeInt(row.uniqueVisitors ?? row.unique_visitors),
+        playStarts,
+        uniqueListeners: asNonNegativeInt(
+          row.uniqueListeners ?? row.unique_listeners,
+        ),
+        completions,
+        uniqueCompleters: asNonNegativeInt(
+          row.uniqueCompleters ?? row.unique_completers,
+        ),
+        saves: asNonNegativeInt(row.saves),
+        uniqueSavers: asNonNegativeInt(row.uniqueSavers ?? row.unique_savers),
+        viewToPlayRate: formatAdminPercent(playStarts, views),
+        playToCompleteRate: formatAdminPercent(completions, playStarts),
+      };
+    })
+    .filter((row) => row.practiceId);
+}
+
+function mapAuthorRows(
+  rows: Array<Record<string, unknown>> | undefined,
+): AdminAnalyticsAuthorRow[] {
+  return (rows ?? [])
+    .map((row) => ({
+      authorId:
+        typeof row.authorId === "string"
+          ? row.authorId
+          : String(row.author_id ?? ""),
+      name: typeof row.name === "string" ? row.name : "Автор",
+      slug: typeof row.slug === "string" ? row.slug : null,
+      href: typeof row.href === "string" ? row.href : null,
+      publishedPractices: asNonNegativeInt(
+        row.publishedPractices ?? row.published_practices,
+      ),
+      views: asNonNegativeInt(row.views),
+      playStarts: asNonNegativeInt(row.playStarts ?? row.play_starts),
+      uniqueListeners: asNonNegativeInt(
+        row.uniqueListeners ?? row.unique_listeners,
+      ),
+      completions: asNonNegativeInt(row.completions),
+      saves: asNonNegativeInt(row.saves),
+    }))
+    .filter((row) => row.authorId);
+}
+
+function mapAcquisitionRows(
+  rows: Array<Record<string, unknown>> | undefined,
+): AdminAnalyticsAcquisitionRow[] {
+  return (rows ?? []).map((row) => ({
+    utmSource:
+      typeof row.utmSource === "string"
+        ? row.utmSource
+        : typeof row.utm_source === "string"
+          ? row.utm_source
+          : "",
+    utmMedium:
+      typeof row.utmMedium === "string"
+        ? row.utmMedium
+        : typeof row.utm_medium === "string"
+          ? row.utm_medium
+          : "",
+    utmCampaign:
+      typeof row.utmCampaign === "string"
+        ? row.utmCampaign
+        : typeof row.utm_campaign === "string"
+          ? row.utm_campaign
+          : "",
+    utmContent:
+      typeof row.utmContent === "string"
+        ? row.utmContent
+        : typeof row.utm_content === "string"
+          ? row.utm_content
+          : "",
+    label:
+      typeof row.label === "string"
+        ? row.label
+        : "Без UTM / прямые и неопределённые переходы",
+    sessions: asNonNegativeInt(row.sessions),
+    visitors: asNonNegativeInt(row.visitors),
+    registrations: asNonNegativeInt(row.registrations),
+    playStarts: asNonNegativeInt(row.playStarts ?? row.play_starts),
+    listeners: asNonNegativeInt(row.listeners),
+    saves: asNonNegativeInt(row.saves),
+  }));
+}
+
+type DashboardInput = {
   period?: string | null;
   includeTest?: string | null;
   authorId?: string | null;
@@ -536,30 +762,22 @@ export async function getAdminAnalyticsDashboard(input?: {
   authorsSortDir?: string | null;
   authorsPage?: string | null;
   acquisitionPage?: string | null;
-}): Promise<AdminAnalyticsDashboard> {
+  practicesLimit?: number | null;
+  authorsLimit?: number | null;
+  acquisitionLimit?: number | null;
+};
+
+function resolveSharedQuery(input?: DashboardInput) {
   const period = parseAdminAnalyticsPeriod(input?.period);
   const includeTest = parseAdminIncludeTestParam(input?.includeTest);
   const range = resolveAdminAnalyticsPeriodRange(period);
   const previous = resolvePreviousAdminAnalyticsPeriodRange(period);
-  const generatedAt = new Date().toISOString();
-
   const filters = {
     authorId: asOptionalUuid(input?.authorId),
     practiceId: asOptionalUuid(input?.practiceId),
     utmSource: asOptionalUtm(input?.utmSource),
     deviceType: asOptionalDevice(input?.deviceType),
   };
-
-  const practicesSort = input?.practicesSort?.trim() || "play_starts";
-  const practicesSortDir = parseSortDir(input?.practicesSortDir);
-  const practicesPage = parsePage(input?.practicesPage);
-  const authorsSort = input?.authorsSort?.trim() || "play_starts";
-  const authorsSortDir = parseSortDir(input?.authorsSortDir);
-  const authorsPage = parsePage(input?.authorsPage);
-  const acquisitionPage = parsePage(input?.acquisitionPage);
-  const pageSize = clampPageSize(20);
-
-  const service = createServiceRoleClient();
   const sharedFilters = {
     p_from: range.from,
     p_to: range.to,
@@ -570,39 +788,25 @@ export async function getAdminAnalyticsDashboard(input?: {
     p_device_type: filters.deviceType,
   };
 
-  const [
-    summaryRes,
-    timeseriesRes,
-    practicesRes,
-    authorsRes,
-    acquisitionRes,
-    filterOptions,
-  ] = await Promise.all([
+  return { period, includeTest, range, previous, filters, sharedFilters };
+}
+
+/** Fast path for first paint: summary + timeseries only. */
+export async function getAdminAnalyticsSummaryBundle(
+  input?: DashboardInput,
+): Promise<AdminAnalyticsSummaryBundle> {
+  const { period, includeTest, range, previous, filters, sharedFilters } =
+    resolveSharedQuery(input);
+  const generatedAt = new Date().toISOString();
+  const service = createServiceRoleClient();
+
+  const [summaryRes, timeseriesRes, filterOptions] = await Promise.all([
     service.rpc("admin_analytics_p2_summary", {
       ...sharedFilters,
       p_prev_from: previous?.from ?? null,
       p_prev_to: previous?.to ?? null,
     }),
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
-    service.rpc("admin_analytics_p2_practices", {
-      ...sharedFilters,
-      p_sort: practicesSort,
-      p_sort_dir: practicesSortDir,
-      p_limit: pageSize,
-      p_offset: (practicesPage - 1) * pageSize,
-    }),
-    service.rpc("admin_analytics_p2_authors", {
-      ...sharedFilters,
-      p_sort: authorsSort,
-      p_sort_dir: authorsSortDir,
-      p_limit: pageSize,
-      p_offset: (authorsPage - 1) * pageSize,
-    }),
-    service.rpc("admin_analytics_p2_acquisition", {
-      ...sharedFilters,
-      p_limit: pageSize,
-      p_offset: (acquisitionPage - 1) * pageSize,
-    }),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
@@ -613,24 +817,13 @@ export async function getAdminAnalyticsDashboard(input?: {
 
   const summary = (summaryRes.data ?? {}) as SummarySnapshot;
   const funnel = buildFunnelLines(summary);
-
   const timeseriesData = (timeseriesRes.data ?? {}) as {
     granularity?: string;
     points?: unknown;
   };
-  const practicesData = (practicesRes.data ?? {}) as {
-    total?: number;
-    rows?: Array<Record<string, unknown>>;
-  };
-  const authorsData = (authorsRes.data ?? {}) as {
-    total?: number;
-    rows?: Array<Record<string, unknown>>;
-  };
-  const acquisitionData = (acquisitionRes.data ?? {}) as {
-    attribution?: string;
-    total?: number;
-    rows?: Array<Record<string, unknown>>;
-  };
+  const points = timeseriesRes.error
+    ? []
+    : mapTimeseriesPoints(timeseriesData.points);
 
   return {
     period,
@@ -646,102 +839,89 @@ export async function getAdminAnalyticsDashboard(input?: {
       summary.audience?.excluded_service_sessions,
     ),
     audience: buildAudience(summary),
+    kpi: buildKpi(summary, points),
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,
     purchasesPlaceholder:
       "Покупки появятся здесь после запуска продаж. Сейчас показатель скрыт, чтобы не показывать фиктивные нули.",
     timeseries: {
       granularity: timeseriesData.granularity === "week" ? "week" : "day",
-      points: timeseriesRes.error ? [] : mapTimeseriesPoints(timeseriesData.points),
+      points,
       error: timeseriesRes.error?.message ?? null,
     },
+    filterOptions,
+  };
+}
+
+/** Lazy breakdown load for tabs / drill-down. */
+export async function getAdminAnalyticsBreakdownBundle(
+  input?: DashboardInput,
+): Promise<AdminAnalyticsBreakdownBundle> {
+  const { sharedFilters } = resolveSharedQuery(input);
+  const practicesSort = input?.practicesSort?.trim() || "play_starts";
+  const practicesSortDir = parseSortDir(input?.practicesSortDir);
+  const practicesPage = parsePage(input?.practicesPage);
+  const authorsSort = input?.authorsSort?.trim() || "play_starts";
+  const authorsSortDir = parseSortDir(input?.authorsSortDir);
+  const authorsPage = parsePage(input?.authorsPage);
+  const acquisitionPage = parsePage(input?.acquisitionPage);
+  const practicesLimit = clampPageSize(input?.practicesLimit ?? 25);
+  const authorsLimit = clampPageSize(input?.authorsLimit ?? 25);
+  const acquisitionLimit = clampPageSize(input?.acquisitionLimit ?? 100);
+
+  const service = createServiceRoleClient();
+  const [practicesRes, authorsRes, acquisitionRes] = await Promise.all([
+    service.rpc("admin_analytics_p2_practices", {
+      ...sharedFilters,
+      p_sort: practicesSort,
+      p_sort_dir: practicesSortDir,
+      p_limit: practicesLimit,
+      p_offset: (practicesPage - 1) * practicesLimit,
+    }),
+    service.rpc("admin_analytics_p2_authors", {
+      ...sharedFilters,
+      p_sort: authorsSort,
+      p_sort_dir: authorsSortDir,
+      p_limit: authorsLimit,
+      p_offset: (authorsPage - 1) * authorsLimit,
+    }),
+    service.rpc("admin_analytics_p2_acquisition", {
+      ...sharedFilters,
+      p_limit: acquisitionLimit,
+      p_offset: (acquisitionPage - 1) * acquisitionLimit,
+    }),
+  ]);
+
+  const practicesData = (practicesRes.data ?? {}) as {
+    total?: number;
+    rows?: Array<Record<string, unknown>>;
+  };
+  const authorsData = (authorsRes.data ?? {}) as {
+    total?: number;
+    rows?: Array<Record<string, unknown>>;
+  };
+  const acquisitionData = (acquisitionRes.data ?? {}) as {
+    total?: number;
+    rows?: Array<Record<string, unknown>>;
+  };
+
+  return {
     practices: {
       total: asNonNegativeInt(practicesData.total),
-      rows: practicesRes.error
-        ? []
-        : (practicesData.rows ?? []).map((row) => {
-            const views = asNonNegativeInt(row.views);
-            const playStarts = asNonNegativeInt(row.playStarts ?? row.play_starts);
-            const completions = asNonNegativeInt(row.completions);
-            return {
-              practiceId: typeof row.practiceId === "string" ? row.practiceId : String(row.practice_id ?? ""),
-              title: typeof row.title === "string" ? row.title : "Практика",
-              authorId:
-                typeof row.authorId === "string"
-                  ? row.authorId
-                  : typeof row.author_id === "string"
-                    ? row.author_id
-                    : null,
-              authorName:
-                typeof row.authorName === "string"
-                  ? row.authorName
-                  : typeof row.author_name === "string"
-                    ? row.author_name
-                    : "Автор",
-              authorSlug:
-                typeof row.authorSlug === "string"
-                  ? row.authorSlug
-                  : typeof row.author_slug === "string"
-                    ? row.author_slug
-                    : null,
-              practiceSlug:
-                typeof row.practiceSlug === "string"
-                  ? row.practiceSlug
-                  : typeof row.practice_slug === "string"
-                    ? row.practice_slug
-                    : null,
-              href: typeof row.href === "string" ? row.href : null,
-              views,
-              uniqueVisitors: asNonNegativeInt(
-                row.uniqueVisitors ?? row.unique_visitors,
-              ),
-              playStarts,
-              uniqueListeners: asNonNegativeInt(
-                row.uniqueListeners ?? row.unique_listeners,
-              ),
-              completions,
-              uniqueCompleters: asNonNegativeInt(
-                row.uniqueCompleters ?? row.unique_completers,
-              ),
-              saves: asNonNegativeInt(row.saves),
-              uniqueSavers: asNonNegativeInt(row.uniqueSavers ?? row.unique_savers),
-              viewToPlayRate: formatAdminPercent(playStarts, views),
-              playToCompleteRate: formatAdminPercent(completions, playStarts),
-            };
-          }).filter((row) => row.practiceId),
+      rows: practicesRes.error ? [] : mapPracticeRows(practicesData.rows),
       sort: practicesSort,
       sortDir: practicesSortDir,
       page: practicesPage,
-      pageSize,
+      pageSize: practicesLimit,
       error: practicesRes.error?.message ?? null,
     },
     authors: {
       total: asNonNegativeInt(authorsData.total),
-      rows: authorsRes.error
-        ? []
-        : (authorsData.rows ?? []).map((row) => ({
-            authorId:
-              typeof row.authorId === "string"
-                ? row.authorId
-                : String(row.author_id ?? ""),
-            name: typeof row.name === "string" ? row.name : "Автор",
-            slug: typeof row.slug === "string" ? row.slug : null,
-            href: typeof row.href === "string" ? row.href : null,
-            publishedPractices: asNonNegativeInt(
-              row.publishedPractices ?? row.published_practices,
-            ),
-            views: asNonNegativeInt(row.views),
-            playStarts: asNonNegativeInt(row.playStarts ?? row.play_starts),
-            uniqueListeners: asNonNegativeInt(
-              row.uniqueListeners ?? row.unique_listeners,
-            ),
-            completions: asNonNegativeInt(row.completions),
-            saves: asNonNegativeInt(row.saves),
-          })).filter((row) => row.authorId),
+      rows: authorsRes.error ? [] : mapAuthorRows(authorsData.rows),
       sort: authorsSort,
       sortDir: authorsSortDir,
       page: authorsPage,
-      pageSize,
+      pageSize: authorsLimit,
       error: authorsRes.error?.message ?? null,
     },
     acquisition: {
@@ -749,47 +929,25 @@ export async function getAdminAnalyticsDashboard(input?: {
       total: asNonNegativeInt(acquisitionData.total),
       rows: acquisitionRes.error
         ? []
-        : (acquisitionData.rows ?? []).map((row) => ({
-            utmSource:
-              typeof row.utmSource === "string"
-                ? row.utmSource
-                : typeof row.utm_source === "string"
-                  ? row.utm_source
-                  : "",
-            utmMedium:
-              typeof row.utmMedium === "string"
-                ? row.utmMedium
-                : typeof row.utm_medium === "string"
-                  ? row.utm_medium
-                  : "",
-            utmCampaign:
-              typeof row.utmCampaign === "string"
-                ? row.utmCampaign
-                : typeof row.utm_campaign === "string"
-                  ? row.utm_campaign
-                  : "",
-            utmContent:
-              typeof row.utmContent === "string"
-                ? row.utmContent
-                : typeof row.utm_content === "string"
-                  ? row.utm_content
-                  : "",
-            label:
-              typeof row.label === "string"
-                ? row.label
-                : "Без UTM / прямые и неопределённые переходы",
-            sessions: asNonNegativeInt(row.sessions),
-            visitors: asNonNegativeInt(row.visitors),
-            registrations: asNonNegativeInt(row.registrations),
-            playStarts: asNonNegativeInt(row.playStarts ?? row.play_starts),
-            listeners: asNonNegativeInt(row.listeners),
-            saves: asNonNegativeInt(row.saves),
-          })),
+        : mapAcquisitionRows(acquisitionData.rows),
       page: acquisitionPage,
-      pageSize,
+      pageSize: acquisitionLimit,
       error: acquisitionRes.error?.message ?? null,
     },
-    filterOptions,
+  };
+}
+
+export async function getAdminAnalyticsDashboard(
+  input?: DashboardInput,
+): Promise<AdminAnalyticsDashboard> {
+  const [summary, breakdown] = await Promise.all([
+    getAdminAnalyticsSummaryBundle(input),
+    getAdminAnalyticsBreakdownBundle(input),
+  ]);
+
+  return {
+    ...summary,
+    ...breakdown,
   };
 }
 
