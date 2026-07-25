@@ -357,6 +357,12 @@ assert(
   "money hub includes how-to attract money SEO article",
 );
 assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "affirmatsii-na-dengi",
+  ),
+  "money hub includes money affirmations SEO article",
+);
+assert(
   !listTopicHubSlugs().includes("denezhnyy-potok"),
   "no duplicate denezhnyy-potok topic hub",
 );

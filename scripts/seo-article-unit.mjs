@@ -1050,6 +1050,212 @@ assert(
   "how-to attract money slug unique",
 );
 
+const moneyAffirmationsArticle = getArticleBySlug("affirmatsii-na-dengi");
+assert(moneyAffirmationsArticle, "money affirmations article registered");
+assert(
+  moneyAffirmationsArticle.title ===
+    "Аффирмации на деньги: помогают ли они изменить отношение к финансам",
+  "money affirmations H1",
+);
+assert(
+  moneyAffirmationsArticle.metaTitle.startsWith("Аффирмации на деньги"),
+  "money affirmations SEO title keeps primary query",
+);
+assert(
+  moneyAffirmationsArticle.metaTitle.includes("АудиоЛад") &&
+    !moneyAffirmationsArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "money affirmations SEO title has brand once",
+);
+assert(
+  moneyAffirmationsArticle.metaDescription !==
+    moneyAffirmationsArticle.leadBeforeAudio,
+  "money affirmations metaDescription is not visual lead",
+);
+assert(
+  moneyAffirmationsArticle.metaDescription !==
+    howToAttractMoneyArticle.metaDescription &&
+    moneyAffirmationsArticle.metaDescription !==
+      moneyAttractionArticle.metaDescription,
+  "money affirmations metaDescription is unique in money cluster",
+);
+assert(
+  moneyAffirmationsArticle.topicSlug === "meditatsii-na-dengi",
+  "money affirmations topic hub",
+);
+assert(
+  moneyAffirmationsArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "money affirmations topic href",
+);
+assert(
+  moneyAffirmationsArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "money affirmations primary practice key",
+);
+assert(
+  moneyAffirmationsArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "money affirmations practice intro",
+);
+assert(
+  !JSON.stringify(moneyAffirmationsArticle).includes(
+    "Если для этой темы больше подойдёт",
+  ),
+  "money affirmations content has no editorial practice fork",
+);
+assert(
+  moneyAffirmationsArticle.leadBeforeAudio.startsWith(
+    "Наверняка вы встречали фразы вроде",
+  ),
+  "money affirmations opening body paragraph",
+);
+assert(
+  moneyAffirmationsArticle.shortAnswer.startsWith(
+    "Аффирмации на деньги – это короткие поддерживающие утверждения",
+  ),
+  "money affirmations short answer keeps definition role",
+);
+assert(
+  !moneyAffirmationsArticle.leadBeforeAudio.includes(
+    "Аффирмации на деньги – это",
+  ),
+  "money affirmations lead is not a second definition",
+);
+assert(
+  moneyAffirmationsArticle.introAfterAudio[0] ===
+    "Поэтому возникает закономерный вопрос – действительно ли аффирмации способны помочь или это просто красивые слова?",
+  "money affirmations intro starts after lead",
+);
+assert(
+  !moneyAffirmationsArticle.introAfterAudio.includes(
+    moneyAffirmationsArticle.leadBeforeAudio,
+  ),
+  "money affirmations lead not duplicated in intro",
+);
+assert(
+  !moneyAffirmationsArticle.introAfterAudio.some((paragraph) =>
+    paragraph.includes("Аффирмации на деньги – это"),
+  ),
+  "money affirmations intro does not repeat shortAnswer definition",
+);
+assert(
+  moneyAffirmationsArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "«Я постепенно учусь принимать более взвешенные финансовые решения.»",
+    ),
+  ),
+  "money affirmations includes reframing exercise",
+);
+assert(
+  moneyAffirmationsArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "После этого выберите одно небольшое действие, которое можно сделать в ближайшие сутки.",
+    ),
+  ),
+  "money affirmations includes next-day action exercise",
+);
+assert(
+  moneyAffirmationsArticle.captionAfterAudio === "",
+  "money affirmations no artificial caption",
+);
+assert(
+  moneyAffirmationsArticle.finalAudioLead === "",
+  "money affirmations no second primary player",
+);
+assert(moneyAffirmationsArticle.faq.length === 3, "money affirmations faq");
+assert(
+  moneyAffirmationsArticle.faq[0]?.question ===
+    "Аффирмации действительно помогают заработать больше?",
+  "money affirmations FAQ earning question",
+);
+assert(
+  !moneyAffirmationsArticle.faq[0]?.answer.toLowerCase().includes("гарант"),
+  "money affirmations FAQ avoids guarantee wording",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "money affirmations links to playlist as playlist CTA",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").toLowerCase().includes("плейлист"),
+  ),
+  "money affirmations CTA names playlist explicitly",
+);
+assert(
+  !moneyAffirmationsArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").includes("как отдельную практику"),
+  ),
+  "money affirmations does not call playlist a practice",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-privlech-dengi-v-svoyu-zhizn",
+    ),
+  ),
+  "money affirmations links to how-to attract money article",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href ===
+          "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    ),
+  ),
+  "money affirmations links to money meditation article",
+);
+assert(
+  moneyAffirmationsArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/chto-takoe-denezhnyy-potok",
+    ),
+  ),
+  "money affirmations links to money flow article",
+);
+assert(
+  !JSON.stringify(moneyAffirmationsArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "money affirmations does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(moneyAffirmationsArticle.brandNote?.includes("АудиоЛаде")),
+  "money affirmations brand note",
+);
+assert(
+  moneyAffirmationsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "money affirmations see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "affirmatsii-na-dengi",
+  ),
+  "money hub lists money affirmations article",
+);
+assert(
+  !moneyAffirmationsArticle.leadBeforeAudio.includes("—") &&
+    !moneyAffirmationsArticle.shortAnswer.includes("—") &&
+    !moneyAffirmationsArticle.metaTitle.includes("—"),
+  "money affirmations uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("affirmatsii-na-dengi"),
+  "money affirmations in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "affirmatsii-na-dengi")
+    .length === 1,
+  "money affirmations slug unique",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -1089,6 +1295,12 @@ assert(
     (item) => item.href === "/articles/kak-privlech-dengi-v-svoyu-zhizn",
   ),
   "attraction meditation reverse-links to how-to attract money article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/affirmatsii-na-dengi",
+  ),
+  "how-to attract money reverse-links to money affirmations article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -1299,6 +1511,13 @@ assert(
       "https://audiolad.ru/articles/kak-privlech-dengi-v-svoyu-zhizn",
   ),
   "how-to attract money article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/affirmatsii-na-dengi",
+  ),
+  "money affirmations article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
