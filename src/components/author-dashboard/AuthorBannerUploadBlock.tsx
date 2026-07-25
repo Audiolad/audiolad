@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import BannerPositionEditorModal from "@/components/author-dashboard/BannerPositionEditorModal";
+import { AUTHOR_DEFAULT_BANNER_PATH } from "@/lib/authors/brand-assets";
 import {
   formatBannerObjectPosition,
   getDefaultBannerPosition,
@@ -77,6 +78,8 @@ export default function AuthorBannerUploadBlock({
     },
   });
 
+  const hasCustomBanner = showPreview && Boolean(displaySrc);
+
   const handleEditPosition = useCallback(() => {
     if (!bannerUrl?.trim()) {
       openPicker();
@@ -107,14 +110,26 @@ export default function AuthorBannerUploadBlock({
   return (
     <div>
       <span className="mb-2 block text-sm font-medium">Фоновый баннер</span>
+      {!hasCustomBanner ? (
+        <p className="mb-3 text-sm leading-5 text-[#7d70a2]">
+          Необязательно – сейчас используется стандартный баннер АудиоЛада. Его
+          можно заменить позже.
+        </p>
+      ) : null}
+
       <div className="relative flex flex-col gap-4">
         <button
           type="button"
           onClick={openPicker}
           disabled={disabled || isBusy || savingPosition}
+          aria-label={
+            hasCustomBanner
+              ? "Заменить фоновый баннер"
+              : "Загрузить свой фоновый баннер"
+          }
           className="group relative block h-32 w-full overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#f8f4fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 sm:h-40"
         >
-          {showPreview && displaySrc ? (
+          {hasCustomBanner && displaySrc ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -129,20 +144,37 @@ export default function AuthorBannerUploadBlock({
               </span>
             </>
           ) : (
-            <span className="flex h-full items-center justify-center text-sm text-[#8c79b6]">
-              Загрузить баннер
-            </span>
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={AUTHOR_DEFAULT_BANNER_PATH}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute inset-0 flex flex-col items-center justify-center bg-[#25135c]/28 px-4 text-center">
+                <span className="text-sm font-semibold text-white">
+                  Стандартный баннер АудиоЛада
+                </span>
+                <span className="mt-1 text-xs font-medium text-white/90">
+                  Загрузить свой баннер
+                </span>
+              </span>
+            </>
           )}
         </button>
 
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={handleEditPosition}
+            onClick={hasCustomBanner ? handleEditPosition : openPicker}
             disabled={disabled || isBusy || savingPosition}
             className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
           >
-            {uploading ? "Загрузка…" : showPreview ? "Изменить" : "Загрузить"}
+            {uploading
+              ? "Загрузка…"
+              : hasCustomBanner
+                ? "Изменить"
+                : "Загрузить свой баннер"}
           </button>
           {bannerUrl ? (
             <button
@@ -192,7 +224,7 @@ export default function AuthorBannerUploadBlock({
   );
 }
 
-export function readBannerPositionFromProfileRow(profile: {
+export function readBannerPositionFromProfileProp(profile: {
   banner_position_x?: unknown;
   banner_position_y?: unknown;
 }): BannerPosition {

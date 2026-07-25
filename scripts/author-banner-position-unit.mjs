@@ -67,11 +67,19 @@ function testPublicHeader() {
 function testDashboardPreview() {
   const block = read("src/components/author-dashboard/AuthorBannerUploadBlock.tsx");
   assert(block.includes("style={{ objectPosition }}"), "dashboard objectPosition");
+  assert(block.includes("AUTHOR_DEFAULT_BANNER_PATH"), "shows brand default banner");
+  assert(
+    block.includes("Необязательно – сейчас используется стандартный баннер АудиоЛада"),
+    "optional banner explanation",
+  );
+  assert(block.includes("Стандартный баннер АудиоЛада"), "default banner label");
+  assert(block.includes("Загрузить свой баннер"), "custom upload CTA");
+  assert(!block.includes(">Загрузить баннер<"), "legacy upload label removed");
 }
 
 function testApiAuth() {
   const route = read("src/app/api/author/profile/banner-position/route.ts");
-  assert(route.includes("requireAuthorMembership"), "auth check");
+  assert(route.includes("requireAuthorMutationMembership"), "auth check");
 }
 
 function testObjectUrl() {

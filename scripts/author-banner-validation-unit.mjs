@@ -114,7 +114,12 @@ function testBannerConfigContract() {
 
 function testBannerHintAndMessages() {
   assert(
-    AUTHOR_BANNER_UPLOAD_HINT.includes("рекомендуемое соотношение около 3:1"),
+    AUTHOR_BANNER_UPLOAD_HINT.includes("Свой баннер можно загрузить позже"),
+    "banner upload hint mentions optional later upload",
+  );
+  assert(
+    /рекомендуемое соотношение/i.test(AUTHOR_BANNER_UPLOAD_HINT) &&
+      AUTHOR_BANNER_UPLOAD_HINT.includes("3:1"),
     "banner upload hint mentions recommended aspect ratio",
   );
   assert(

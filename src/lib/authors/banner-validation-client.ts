@@ -8,7 +8,7 @@ export const AUTHOR_BANNER_IMAGE_CONFIG = {
 };
 
 export const AUTHOR_BANNER_UPLOAD_HINT =
-  "Широкое изображение, рекомендуемое соотношение около 3:1. JPG, PNG или WebP до 3 МБ. Минимальный размер — 1200 × 400 пикселей.";
+  "Свой баннер можно загрузить позже. Рекомендуемое соотношение – около 3:1, минимальный размер – 1200 × 400 пикселей. JPG, PNG или WebP до 3 МБ.";
 
 export const AUTHOR_BANNER_ERROR_MESSAGES = {
   unsupportedFormat: "Загрузите баннер в формате JPG, PNG или WebP.",
