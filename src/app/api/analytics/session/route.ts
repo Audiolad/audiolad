@@ -41,6 +41,8 @@ export async function POST(request: Request) {
     p_utm_content: parsed.utm_content,
     p_referrer_domain: parsed.referrer_domain,
     p_device_type: parsed.device_type ?? "desktop",
+    p_user_agent: request.headers.get("user-agent"),
+    p_client_version: parsed.client_version,
   });
 
   if (error) {

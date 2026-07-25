@@ -59,6 +59,10 @@ export function sanitizeAnalyticsProperties(
   return next;
 }
 
+function sanitizeClientVersion(value: unknown): string | null {
+  return sanitizeAnalyticsString(typeof value === "string" ? value : null, 32);
+}
+
 export function parsePlatformTrackBody(body: unknown): {
   session_id: string;
   anonymous_id: string;
@@ -67,6 +71,8 @@ export function parsePlatformTrackBody(body: unknown): {
   practice_id: string | null;
   audio_item_id: string | null;
   properties: Record<string, string | number | boolean>;
+  client_event_id: string | null;
+  client_version: string | null;
 } | null {
   if (typeof body !== "object" || body === null) {
     return null;
@@ -101,6 +107,10 @@ export function parsePlatformTrackBody(body: unknown): {
       typeof record.audio_item_id === "string" ? record.audio_item_id : null,
     ),
     properties: sanitizeAnalyticsProperties(record.properties),
+    client_event_id: sanitizeAnalyticsTrackId(
+      typeof record.client_event_id === "string" ? record.client_event_id : null,
+    ),
+    client_version: sanitizeClientVersion(record.client_version),
   };
 }
 
@@ -114,6 +124,7 @@ export function parseSessionBody(body: unknown): {
   utm_content: string | null;
   referrer_domain: string | null;
   device_type: string | null;
+  client_version: string | null;
 } | null {
   if (typeof body !== "object" || body === null) {
     return null;
@@ -166,6 +177,7 @@ export function parseSessionBody(body: unknown): {
       deviceType === "mobile" || deviceType === "tablet" || deviceType === "desktop"
         ? deviceType
         : null,
+    client_version: sanitizeClientVersion(record.client_version),
   };
 }
 

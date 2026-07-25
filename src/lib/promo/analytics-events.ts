@@ -1,3 +1,5 @@
+export { getOrCreateAnonymousId as getOrCreateAnonymousSessionId } from "@/lib/analytics/identity-storage";
+
 export const PROMO_ANALYTICS_EVENTS = [
   "promo_practice_viewed",
   "promo_practice_play_started",
@@ -36,36 +38,6 @@ export type PromoAnalyticsEventPayload = {
   current_position?: number | null;
   duration?: number | null;
 };
-
-const ANONYMOUS_ID_KEY = "audiolad_anonymous_id";
-
-function generateAnonymousId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-export function getOrCreateAnonymousSessionId(): string {
-  if (typeof window === "undefined") {
-    return generateAnonymousId();
-  }
-
-  try {
-    const existing = window.localStorage.getItem(ANONYMOUS_ID_KEY);
-
-    if (existing?.trim()) {
-      return existing.trim();
-    }
-
-    const next = generateAnonymousId();
-    window.localStorage.setItem(ANONYMOUS_ID_KEY, next);
-    return next;
-  } catch {
-    return generateAnonymousId();
-  }
-}
 
 export function sanitizeAnalyticsString(
   value: string | null | undefined,

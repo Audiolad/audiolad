@@ -1,17 +1,21 @@
 import { SESSION_STORAGE_KEY } from "@/lib/analytics/constants";
+import { ANONYMOUS_ID_KEY } from "@/lib/analytics/identity-storage";
+import { RETRY_QUEUE_KEY } from "@/lib/analytics/retry-queue";
+import { SESSION_STATE_KEY } from "@/lib/analytics/session-state";
 import { PERSONAL_HOME_STORAGE_KEYS } from "@/lib/home/personal-greeting";
 import { PWA_LOCAL_STORAGE_KEYS } from "@/lib/pwa/constants";
 
 const DESKTOP_PLAYER_KEY = "audiolad:desktop-player-last-session";
 const PROMO_ATTRIBUTION_KEY = "audiolad_promo_attribution";
 const ANALYTICS_ATTRIBUTION_KEY = "audiolad_attribution";
-const ANONYMOUS_ID_KEY = "audiolad_anonymous_id";
 const ANALYTICS_COOKIES_KEY = "audiolad_analytics_cookies";
 const PERSONAL_MATERIAL_ACCESS_KEY = "audiolad_pm_access_url";
 const PLAYER_DEBUG_KEY = "audiolad-player-debug";
 
 export const TEST_USER_LOCAL_STORAGE_KEYS = [
   ANONYMOUS_ID_KEY,
+  SESSION_STATE_KEY,
+  RETRY_QUEUE_KEY,
   ANALYTICS_ATTRIBUTION_KEY,
   PROMO_ATTRIBUTION_KEY,
   DESKTOP_PLAYER_KEY,

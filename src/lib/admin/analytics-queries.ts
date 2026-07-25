@@ -154,9 +154,9 @@ function buildMetrics(snapshot: DashboardSnapshot): AdminAnalyticsMetricCard[] {
       key: "visitors",
       label: "Внутренние посетители",
       hint:
-        "Уникальные идентификаторы внутренней аналитики. " +
-        "Один человек может учитываться несколько раз на разных устройствах, " +
-        "в разных браузерах или вкладках.",
+        "Единый visitor_key: user_id, либо anonymous_id с учётом identity link, " +
+        "либо anonymous_id. Один человек на разных устройствах может учитываться " +
+        "несколько раз, пока нет связи с аккаунтом.",
       value: visitors,
     },
     {

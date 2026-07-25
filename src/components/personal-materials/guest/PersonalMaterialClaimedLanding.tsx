@@ -64,6 +64,7 @@ export default function PersonalMaterialClaimedLanding({
 
     try {
       const supabase = createClient();
+      await supabase.rpc("unlink_analytics_identity");
       await supabase.auth.signOut();
       router.refresh();
     } catch {

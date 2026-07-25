@@ -16,13 +16,13 @@ import {
 import { shouldTrackPageView } from "@/lib/analytics/dedup";
 import { detectClientDeviceType } from "@/lib/analytics/device";
 import {
+  isSessionStateActive,
+  readSessionState,
+} from "@/lib/analytics/session-state";
+import {
   extractReferrerDomain,
   resolveTrafficSource,
 } from "@/lib/analytics/sources";
-import {
-  readStoredSessionId,
-  storeSessionId,
-} from "@/lib/analytics/session-storage";
 
 export default function PlatformAnalyticsProvider({
   children,
@@ -56,7 +56,11 @@ export default function PlatformAnalyticsProvider({
       });
 
       void (async () => {
-        const storedSessionId = readStoredSessionId();
+        const localState = readSessionState();
+        const storedSessionId = isSessionStateActive(localState)
+          ? localState?.sessionId ?? null
+          : null;
+
         if (storedSessionId) {
           setCachedAnalyticsSessionId(storedSessionId);
         }
@@ -73,7 +77,6 @@ export default function PlatformAnalyticsProvider({
           return;
         }
 
-        storeSessionId(sessionId);
         setCachedAnalyticsSessionId(sessionId);
         initializedRef.current = true;
 

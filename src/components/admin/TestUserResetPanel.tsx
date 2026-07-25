@@ -187,6 +187,7 @@ export default function TestUserResetPanel({
           user?.email &&
           user.email.toLowerCase() === TEST_USER_RESET_EMAIL.toLowerCase()
         ) {
+          await supabase.rpc("unlink_analytics_identity");
           await supabase.auth.signOut();
         }
 

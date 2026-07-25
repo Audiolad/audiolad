@@ -100,7 +100,7 @@ function testAdminDashboard() {
     "registration rate formula documented",
   );
   assert(
-    controls.includes("Не учитывать размеченный тестовый трафик"),
+    controls.includes("Не учитывать служебный и тестовый трафик"),
     "honest test-traffic toggle label",
   );
 }

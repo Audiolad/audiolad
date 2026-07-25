@@ -1,38 +1,38 @@
-import { SESSION_STORAGE_KEY } from "@/lib/analytics/constants";
+import { getOrCreateAnonymousId } from "@/lib/analytics/identity-storage";
+import {
+  clearSessionState,
+  isSessionStateActive,
+  readSessionState,
+  writeSessionState,
+} from "@/lib/analytics/session-state";
 
+/**
+ * @deprecated Session id is now tracked via session-state (localStorage), not
+ * sessionStorage. Kept for backward compatibility with existing callers.
+ */
 export function readStoredSessionId(): string | null {
-  if (typeof window === "undefined") {
+  const state = readSessionState();
+
+  if (!state || !isSessionStateActive(state)) {
     return null;
   }
 
-  try {
-    const value = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-    return value?.trim() || null;
-  } catch {
-    return null;
-  }
+  return state.sessionId;
 }
 
+/**
+ * @deprecated Writes to session-state (localStorage) instead of sessionStorage.
+ */
 export function storeSessionId(sessionId: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-  } catch {
-    // sessionStorage unavailable
-  }
+  writeSessionState({
+    sessionId,
+    anonymousId: getOrCreateAnonymousId(),
+  });
 }
 
+/**
+ * @deprecated Clears session-state (localStorage) instead of sessionStorage.
+ */
 export function clearStoredSessionId(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
-  } catch {
-    // sessionStorage unavailable
-  }
+  clearSessionState();
 }

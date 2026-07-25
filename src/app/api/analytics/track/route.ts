@@ -42,6 +42,9 @@ export async function POST(request: Request) {
     p_practice_id: parsed.practice_id,
     p_audio_item_id: parsed.audio_item_id,
     p_properties: parsed.properties,
+    p_client_event_id: parsed.client_event_id,
+    p_user_agent: request.headers.get("user-agent"),
+    p_client_version: parsed.client_version,
   });
 
   if (error) {

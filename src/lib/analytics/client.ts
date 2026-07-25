@@ -1,9 +1,23 @@
 import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
+import { createClientEventId } from "@/lib/analytics/event-id";
+import { getOrCreateAnonymousId } from "@/lib/analytics/identity-storage";
+import {
+  enqueueAnalyticsRetry,
+  flushAnalyticsRetryQueue,
+  type AnalyticsRetryItem,
+  type AnalyticsRetrySendResult,
+} from "@/lib/analytics/retry-queue";
+import {
+  isSessionStateActive,
+  readSessionState,
+  writeSessionState,
+} from "@/lib/analytics/session-state";
 import {
   isYandexMetrikaGoalName,
   sendYandexGoal,
 } from "@/lib/analytics/yandex-metrika";
-import { getOrCreateAnonymousSessionId } from "@/lib/promo/analytics-events";
+
+export const CLIENT_VERSION = "p1";
 
 type SessionInitInput = {
   sessionId?: string | null;
@@ -28,10 +42,13 @@ type TrackEventInput = {
 let cachedSessionId: string | null = null;
 let sessionInitPromise: Promise<string | null> | null = null;
 
-async function postJson<T>(
-  url: string,
-  body: unknown,
-): Promise<T | null> {
+type PostJsonResult<T> = {
+  ok: boolean;
+  status: number;
+  data: T | null;
+};
+
+async function postJson<T>(url: string, body: unknown): Promise<PostJsonResult<T>> {
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -42,34 +59,67 @@ async function postJson<T>(
       keepalive: true,
     });
 
-    if (!response.ok) {
-      return null;
-    }
+    const data = (await response.json().catch(() => null)) as T | null;
 
-    return (await response.json()) as T;
+    return { ok: response.ok, status: response.status, data };
   } catch {
-    return null;
+    return { ok: false, status: 0, data: null };
   }
+}
+
+function getUserAgent(): string | null {
+  return typeof navigator !== "undefined" ? navigator.userAgent : null;
+}
+
+function touchSessionState(): void {
+  const state = readSessionState();
+
+  if (!state || !isSessionStateActive(state)) {
+    return;
+  }
+
+  writeSessionState({
+    sessionId: state.sessionId,
+    anonymousId: state.anonymousId,
+    lastSeenAt: Date.now(),
+  });
+}
+
+async function sendRetryItem(item: AnalyticsRetryItem): Promise<AnalyticsRetrySendResult> {
+  const result = await postJson(item.url, item.body);
+
+  if (result.ok) {
+    return { ok: true };
+  }
+
+  if (result.status === 0 || result.status === 429 || result.status >= 500) {
+    return { ok: false, retry: true };
+  }
+
+  return { ok: false, retry: false };
 }
 
 export async function ensureAnalyticsSession(
   input: SessionInitInput,
 ): Promise<string | null> {
-  if (cachedSessionId) {
-    return cachedSessionId;
-  }
-
   if (sessionInitPromise) {
     return sessionInitPromise;
   }
 
-  sessionInitPromise = (async () => {
-    const anonymousId = getOrCreateAnonymousSessionId();
+  const anonymousId = getOrCreateAnonymousId();
+  const localState = readSessionState();
+  const isLocalStateActive = isSessionStateActive(localState);
 
+  if (isLocalStateActive && localState) {
+    cachedSessionId = localState.sessionId;
+  }
+
+  sessionInitPromise = (async () => {
     const result = await postJson<{ session_id?: string }>(
       "/api/analytics/session",
       {
-        session_id: input.sessionId ?? null,
+        session_id:
+          input.sessionId ?? (isLocalStateActive ? localState?.sessionId : null) ?? null,
         anonymous_id: anonymousId,
         landing_path: input.landingPath,
         utm_source: input.utm_source ?? null,
@@ -78,13 +128,16 @@ export async function ensureAnalyticsSession(
         utm_content: input.utm_content ?? null,
         referrer_domain: input.referrer_domain ?? null,
         device_type: input.device_type ?? null,
+        user_agent: getUserAgent(),
+        client_version: CLIENT_VERSION,
       },
     );
 
-    const sessionId = result?.session_id ?? null;
+    const sessionId = result.data?.session_id ?? null;
 
     if (sessionId) {
       cachedSessionId = sessionId;
+      writeSessionState({ sessionId, anonymousId });
     }
 
     sessionInitPromise = null;
@@ -103,8 +156,13 @@ export async function linkAnalyticsSessionUser(): Promise<void> {
 
   await postJson("/api/analytics/session/link", {
     session_id: sessionId,
-    anonymous_id: getOrCreateAnonymousSessionId(),
+    anonymous_id: getOrCreateAnonymousId(),
   });
+}
+
+/** Close active identity links for the current authenticated user (call before sign-out). */
+export async function unlinkAnalyticsIdentity(): Promise<void> {
+  await postJson("/api/analytics/identity/unlink", {});
 }
 
 export async function recordPlatformSignupCompleted(): Promise<boolean> {
@@ -118,11 +176,11 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
     "/api/analytics/signup/complete",
     {
       session_id: sessionId,
-      anonymous_id: getOrCreateAnonymousSessionId(),
+      anonymous_id: getOrCreateAnonymousId(),
     },
   );
 
-  const recorded = Boolean(result?.recorded);
+  const recorded = Boolean(result.data?.recorded);
 
   if (recorded) {
     sendYandexGoal("signup_completed");
@@ -132,9 +190,10 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
 }
 
 export async function trackPlatformEvent(input: TrackEventInput): Promise<void> {
-  const anonymousId = getOrCreateAnonymousSessionId();
+  const anonymousId = getOrCreateAnonymousId();
+  const clientEventId = createClientEventId();
 
-  void postJson("/api/analytics/track", {
+  const body = {
     session_id: input.sessionId,
     anonymous_id: anonymousId,
     event_name: input.event_name,
@@ -142,7 +201,24 @@ export async function trackPlatformEvent(input: TrackEventInput): Promise<void> 
     practice_id: input.practice_id ?? null,
     audio_item_id: input.audio_item_id ?? null,
     properties: input.properties ?? {},
-  });
+    client_event_id: clientEventId,
+    client_version: CLIENT_VERSION,
+  };
+
+  const result = await postJson("/api/analytics/track", body);
+
+  if (
+    !result.ok &&
+    (result.status === 0 || result.status === 429 || result.status >= 500)
+  ) {
+    enqueueAnalyticsRetry({
+      id: clientEventId,
+      url: "/api/analytics/track",
+      body,
+    });
+  }
+
+  touchSessionState();
 
   if (isYandexMetrikaGoalName(input.event_name)) {
     sendYandexGoal(input.event_name);
@@ -155,4 +231,12 @@ export function setCachedAnalyticsSessionId(sessionId: string | null): void {
 
 export function getCachedAnalyticsSessionId(): string | null {
   return cachedSessionId;
+}
+
+if (typeof window !== "undefined") {
+  void flushAnalyticsRetryQueue(sendRetryItem);
+
+  window.addEventListener("online", () => {
+    void flushAnalyticsRetryQueue(sendRetryItem);
+  });
 }
