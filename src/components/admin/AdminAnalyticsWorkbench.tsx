@@ -12,6 +12,7 @@ import AdminAnalyticsKpiStrip from "@/components/admin/AdminAnalyticsKpiStrip";
 import AdminAnalyticsMetricCards from "@/components/admin/AdminAnalyticsMetricCards";
 import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalyticsTestTrafficControls";
 import AdminAnalyticsTimeseriesChart from "@/components/admin/AdminAnalyticsTimeseriesChart";
+import AdminMoneyPanel from "@/components/admin/AdminMoneyPanel";
 import { ADMIN_ANALYTICS_PERIOD_OPTIONS } from "@/lib/admin/analytics-period";
 import type {
   AdminAnalyticsBreakdownBundle,
@@ -25,6 +26,7 @@ import {
   type AdminAnalyticsTab,
   type AdminAnalyticsTopN,
   type AdminAnalyticsUtmGroup,
+  type AdminAnalyticsView,
 } from "@/lib/admin/analytics-url-state";
 
 const emptyBreakdown: AdminAnalyticsBreakdownBundle = {
@@ -102,6 +104,10 @@ export default function AdminAnalyticsWorkbench({
   ].join("|");
 
   useEffect(() => {
+    if (urlState.view !== "product") {
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -148,8 +154,8 @@ export default function AdminAnalyticsWorkbench({
     })();
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by breakdownQueryKey
-  }, [breakdownQueryKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by breakdownQueryKey + view
+  }, [breakdownQueryKey, urlState.view]);
 
   const activeKpi: AdminAnalyticsKpiCard | null = useMemo(() => {
     if (!urlState.drill) {
@@ -182,6 +188,8 @@ export default function AdminAnalyticsWorkbench({
     replaceState({ authorsSort: sort, authorsSortDir: "desc" });
   }
 
+  const view: AdminAnalyticsView = urlState.view;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -202,14 +210,46 @@ export default function AdminAnalyticsWorkbench({
           </p>
         </div>
 
-        <AdminAnalyticsTestTrafficControls
-          currentPeriod={summary.period}
-          includeTest={summary.includeTest}
-          excludedTestVisitors={summary.excludedTestVisitors}
-          excludedTestSessions={summary.excludedTestSessions}
-        />
+        {view === "product" ? (
+          <AdminAnalyticsTestTrafficControls
+            currentPeriod={summary.period}
+            includeTest={summary.includeTest}
+            excludedTestVisitors={summary.excludedTestVisitors}
+            excludedTestSessions={summary.excludedTestSessions}
+          />
+        ) : null}
       </div>
 
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Раздел аналитики">
+        {(
+          [
+            { id: "product", label: "Продукт" },
+            { id: "money", label: "Деньги" },
+          ] as const
+        ).map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={view === item.id}
+            onClick={() => replaceState({ view: item.id })}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              view === item.id
+                ? "bg-[#25135c] text-white"
+                : "border border-[#eadff8] bg-white text-[#7042c5]"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "money" ? (
+        <AdminMoneyPanel urlState={urlState} onPatch={replaceState} />
+      ) : null}
+
+      {view === "product" ? (
+        <>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Быстрый период">
         {ADMIN_ANALYTICS_PERIOD_OPTIONS.map((option) => {
           const active = option.id === urlState.period;
@@ -311,6 +351,8 @@ export default function AdminAnalyticsWorkbench({
         loading={loadingBreakdown}
         onClose={() => replaceState({ drill: null })}
       />
+        </>
+      ) : null}
     </div>
   );
 }

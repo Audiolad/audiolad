@@ -4,7 +4,9 @@ import {
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 
+export type AdminAnalyticsView = "product" | "money";
 export type AdminAnalyticsTab = "practices" | "authors" | "utm";
+export type AdminMoneyTab = "products" | "authors";
 export type AdminAnalyticsTopN = "10" | "25" | "all";
 export type AdminAnalyticsUtmGroup = "source" | "campaign" | "medium";
 export type AdminAnalyticsDrillMetric =
@@ -14,8 +16,16 @@ export type AdminAnalyticsDrillMetric =
   | "completions"
   | "saves"
   | null;
+export type AdminMoneyDrillMetric =
+  | "payments"
+  | "buyers"
+  | "gross"
+  | "aov"
+  | "repeatBuyers"
+  | null;
 
 export type AdminAnalyticsUrlState = {
+  view: AdminAnalyticsView;
   period: AdminAnalyticsPeriod;
   includeTest: boolean;
   authorId: string | null;
@@ -31,6 +41,19 @@ export type AdminAnalyticsUrlState = {
   authorsSort: string;
   authorsSortDir: "asc" | "desc";
   drill: AdminAnalyticsDrillMetric;
+  /** Money-layer period (independent from product analytics). */
+  moneyPeriod: AdminAnalyticsPeriod;
+  includeTestPayments: boolean;
+  moneyTab: AdminMoneyTab;
+  moneyQ: string;
+  moneyTop: AdminAnalyticsTopN;
+  moneyProductsSort: string;
+  moneyProductsSortDir: "asc" | "desc";
+  moneyAuthorsSort: string;
+  moneyAuthorsSortDir: "asc" | "desc";
+  moneyAuthorId: string | null;
+  moneyPracticeId: string | null;
+  moneyDrill: AdminMoneyDrillMetric;
 };
 
 function parseTab(value: string | null): AdminAnalyticsTab {
@@ -71,6 +94,31 @@ function parseDrill(value: string | null): AdminAnalyticsDrillMetric {
   return null;
 }
 
+function parseView(value: string | null): AdminAnalyticsView {
+  return value === "money" ? "money" : "product";
+}
+
+function parseMoneyTab(value: string | null): AdminMoneyTab {
+  return value === "authors" ? "authors" : "products";
+}
+
+function parseMoneyDrill(value: string | null): AdminMoneyDrillMetric {
+  if (
+    value === "payments" ||
+    value === "buyers" ||
+    value === "gross" ||
+    value === "aov" ||
+    value === "repeatBuyers"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function parseIncludeTestPayments(value: string | null): boolean {
+  return value === "1" || value === "true";
+}
+
 export function parseAdminAnalyticsUrlState(
   params: URLSearchParams | Record<string, string | undefined>,
 ): AdminAnalyticsUrlState {
@@ -82,6 +130,7 @@ export function parseAdminAnalyticsUrlState(
   };
 
   return {
+    view: parseView(get("view")),
     period: parseAdminAnalyticsPeriod(get("period")),
     includeTest: parseAdminIncludeTestParam(get("includeTest")),
     authorId: get("authorId"),
@@ -97,6 +146,18 @@ export function parseAdminAnalyticsUrlState(
     authorsSort: get("authorsSort")?.trim() || "play_starts",
     authorsSortDir: parseDir(get("authorsSortDir")),
     drill: parseDrill(get("drill")),
+    moneyPeriod: parseAdminAnalyticsPeriod(get("moneyPeriod")),
+    includeTestPayments: parseIncludeTestPayments(get("includeTestPayments")),
+    moneyTab: parseMoneyTab(get("moneyTab")),
+    moneyQ: (get("moneyQ") ?? "").trim(),
+    moneyTop: parseTop(get("moneyTop")),
+    moneyProductsSort: get("moneyProductsSort")?.trim() || "gross_minor",
+    moneyProductsSortDir: parseDir(get("moneyProductsSortDir")),
+    moneyAuthorsSort: get("moneyAuthorsSort")?.trim() || "gross_minor",
+    moneyAuthorsSortDir: parseDir(get("moneyAuthorsSortDir")),
+    moneyAuthorId: get("moneyAuthorId"),
+    moneyPracticeId: get("moneyPracticeId"),
+    moneyDrill: parseMoneyDrill(get("moneyDrill")),
   };
 }
 
@@ -107,8 +168,11 @@ export function buildAdminAnalyticsSearchParams(
   const params = new URLSearchParams(base?.toString() ?? "");
   params.set("period", state.period);
   params.set("includeTest", state.includeTest ? "1" : "0");
+  params.set("moneyPeriod", state.moneyPeriod);
+  params.set("includeTestPayments", state.includeTestPayments ? "1" : "0");
 
   const optional: Array<[string, string | null | undefined]> = [
+    ["view", state.view === "product" ? null : state.view],
     ["authorId", state.authorId],
     ["practiceId", state.practiceId],
     ["utmSource", state.utmSource],
@@ -122,6 +186,28 @@ export function buildAdminAnalyticsSearchParams(
     ["authorsSort", state.authorsSort === "play_starts" ? null : state.authorsSort],
     ["authorsSortDir", state.authorsSortDir === "desc" ? null : state.authorsSortDir],
     ["drill", state.drill],
+    ["moneyTab", state.moneyTab === "products" ? null : state.moneyTab],
+    ["moneyQ", state.moneyQ || null],
+    ["moneyTop", state.moneyTop === "25" ? null : state.moneyTop],
+    [
+      "moneyProductsSort",
+      state.moneyProductsSort === "gross_minor" ? null : state.moneyProductsSort,
+    ],
+    [
+      "moneyProductsSortDir",
+      state.moneyProductsSortDir === "desc" ? null : state.moneyProductsSortDir,
+    ],
+    [
+      "moneyAuthorsSort",
+      state.moneyAuthorsSort === "gross_minor" ? null : state.moneyAuthorsSort,
+    ],
+    [
+      "moneyAuthorsSortDir",
+      state.moneyAuthorsSortDir === "desc" ? null : state.moneyAuthorsSortDir,
+    ],
+    ["moneyAuthorId", state.moneyAuthorId],
+    ["moneyPracticeId", state.moneyPracticeId],
+    ["moneyDrill", state.moneyDrill],
   ];
 
   for (const [key, value] of optional) {
