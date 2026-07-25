@@ -131,9 +131,19 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             </div>
           </section>
 
-          <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-            {article.captionAfterAudio}
-          </p>
+          <div className="mt-4 space-y-4 text-base leading-7 text-[#4a3d73] sm:mt-5 sm:text-[17px] sm:leading-8">
+            {[article.leadBeforeAudio, ...article.introAfterAudio].map(
+              (paragraph) => (
+                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+              ),
+            )}
+          </div>
+
+          {article.captionAfterAudio ? (
+            <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+              {article.captionAfterAudio}
+            </p>
+          ) : null}
 
           <aside
             aria-labelledby="article-short-answer-title"
@@ -151,14 +161,6 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
           </aside>
 
           <ArticleToc items={tocItems} />
-
-          <div className="mt-8 space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-            {[article.leadBeforeAudio, ...article.introAfterAudio].map(
-              (paragraph) => (
-                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-              ),
-            )}
-          </div>
 
           {article.sections.map((section) => (
             <section key={section.id} className="mt-10">
