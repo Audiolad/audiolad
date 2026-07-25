@@ -1580,10 +1580,18 @@ assert(
     item.segments?.some(
       (segment) =>
         "href" in segment &&
-        segment.href === "/articles/meditatsiya-na-izobilie",
+        segment.href === "/articles/vizualizatsiya-zhelaniy",
     ),
   ),
-  "wish meditation links to abundance meditation article",
+  "wish meditation reverse-links to wish visualization article",
+);
+assert(
+  wishMeditationArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("визуализация желаемого результата"),
+    ),
+  ),
+  "wish meditation mentions visualization as clarity tool",
 );
 assert(
   wishMeditationArticle.afterFinalAudio?.some((item) =>
@@ -1638,6 +1646,191 @@ assert(
     (slug) => slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ).length === 1,
   "wish meditation slug unique",
+);
+
+const wishVisualizationArticle = getArticleBySlug("vizualizatsiya-zhelaniy");
+assert(wishVisualizationArticle, "wish visualization article registered");
+assert(
+  wishVisualizationArticle.title ===
+    "Визуализация желаний: что это такое и может ли она быть полезной",
+  "wish visualization H1",
+);
+assert(
+  wishVisualizationArticle.metaTitle.startsWith("Визуализация желаний"),
+  "wish visualization SEO title keeps primary query",
+);
+assert(
+  wishVisualizationArticle.metaTitle.includes("АудиоЛад") &&
+    !wishVisualizationArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "wish visualization SEO title has brand once",
+);
+assert(
+  wishVisualizationArticle.metaDescription !==
+    wishVisualizationArticle.leadBeforeAudio,
+  "wish visualization metaDescription is not visual lead",
+);
+assert(
+  wishVisualizationArticle.topicSlug === "besplatnye-meditatsii",
+  "wish visualization uses free meditations hub",
+);
+assert(
+  wishVisualizationArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "wish visualization topic href",
+);
+assert(
+  wishVisualizationArticle.topicSlug !== "meditatsii-na-dengi",
+  "wish visualization is not forced into money hub",
+);
+assert(
+  wishVisualizationArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "wish visualization primary practice key",
+);
+assert(
+  wishVisualizationArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "wish visualization practice intro",
+);
+assert(
+  !JSON.stringify(wishVisualizationArticle).includes(
+    "Перед публикацией стоит проверить",
+  ),
+  "wish visualization content has no editorial notes",
+);
+assert(
+  wishVisualizationArticle.leadBeforeAudio.includes(
+    "представить свою мечту во всех подробностях",
+  ),
+  "wish visualization opening body paragraph",
+);
+assert(
+  wishVisualizationArticle.shortAnswer.startsWith(
+    "Многие используют визуализацию как способ мысленно представить",
+  ),
+  "wish visualization short answer keeps definition role",
+);
+assert(
+  !wishVisualizationArticle.leadBeforeAudio.includes(
+    "Многие используют визуализацию как способ",
+  ),
+  "wish visualization lead is not a second definition",
+);
+assert(
+  wishVisualizationArticle.introAfterAudio[0] ===
+    "Поэтому возникает закономерный вопрос – действительно ли визуализация может быть полезной или это просто красивая идея?",
+  "wish visualization intro starts after lead",
+);
+assert(
+  !wishVisualizationArticle.introAfterAudio.includes(
+    wishVisualizationArticle.leadBeforeAudio,
+  ),
+  "wish visualization lead not duplicated in intro",
+);
+assert(
+  wishVisualizationArticle.sections.some((section) =>
+    section.paragraphs.includes("«Что я могу сделать уже сегодня?»"),
+  ),
+  "wish visualization includes today-action prompt",
+);
+assert(
+  wishVisualizationArticle.captionAfterAudio === "",
+  "wish visualization no artificial caption",
+);
+assert(
+  wishVisualizationArticle.finalAudioLead === "",
+  "wish visualization no second primary player",
+);
+assert(wishVisualizationArticle.faq.length === 3, "wish visualization faq");
+assert(
+  wishVisualizationArticle.faq[0]?.answer.startsWith("Нет."),
+  "wish visualization FAQ rejects fulfillment guarantee",
+);
+assert(
+  !JSON.stringify(wishVisualizationArticle).toLowerCase().includes("вселенн"),
+  "wish visualization avoids universe-manifestation wording",
+);
+assert(
+  !JSON.stringify(wishVisualizationArticle).toLowerCase().includes("закон притяжения"),
+  "wish visualization avoids attraction-law framing",
+);
+assert(
+  wishVisualizationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "wish visualization links to free meditations hub as collection CTA",
+);
+assert(
+  wishVisualizationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-ispolnenie-zhelaniy",
+    ),
+  ),
+  "wish visualization links to wish meditation article",
+);
+assert(
+  wishVisualizationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/besplatnye-meditatsii-onlayn",
+    ),
+  ),
+  "wish visualization links to free meditations article",
+);
+assert(
+  !JSON.stringify(wishVisualizationArticle.afterFinalAudio).includes(
+    "/p/denezhnyy-potok-9288",
+  ),
+  "wish visualization does not pull money playlist into CTA",
+);
+assert(
+  !JSON.stringify(wishVisualizationArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "wish visualization does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(wishVisualizationArticle.brandNote?.includes("АудиоЛаде")),
+  "wish visualization brand note",
+);
+assert(
+  wishVisualizationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "wish visualization see-also includes primary hub",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "vizualizatsiya-zhelaniy",
+  ),
+  "free hub lists wish visualization article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "vizualizatsiya-zhelaniy",
+  ),
+  "money hub does not list wish visualization article",
+);
+assert(
+  !wishVisualizationArticle.leadBeforeAudio.includes("—") &&
+    !wishVisualizationArticle.shortAnswer.includes("—") &&
+    !wishVisualizationArticle.metaTitle.includes("—"),
+  "wish visualization uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("vizualizatsiya-zhelaniy"),
+  "wish visualization in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "vizualizatsiya-zhelaniy")
+    .length === 1,
+  "wish visualization slug unique",
+);
+assert(
+  wishVisualizationArticle.closingSection.paragraphs.some((paragraph) =>
+    paragraph.includes("не способ управлять будущими событиями"),
+  ),
+  "wish visualization closing rejects future-control framing",
 );
 
 assert(
@@ -1930,6 +2123,13 @@ assert(
       "https://audiolad.ru/articles/meditatsiya-na-ispolnenie-zhelaniy",
   ),
   "wish meditation article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/vizualizatsiya-zhelaniy",
+  ),
+  "wish visualization article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),

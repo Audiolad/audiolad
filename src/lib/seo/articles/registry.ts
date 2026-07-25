@@ -9,6 +9,7 @@ import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak
 import { MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE } from "./content/meditatsiya-na-ispolnenie-zhelaniy";
 import { MEDITATSIYA_NA_IZOBILIE_ARTICLE } from "./content/meditatsiya-na-izobilie";
 import { MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE } from "./content/meditatsiya-na-privlechenie-deneg";
+import { VIZUALIZATSIYA_ZHELANIY_ARTICLE } from "./content/vizualizatsiya-zhelaniy";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -23,6 +24,7 @@ const ARTICLE_DEFINITIONS = [
   AFFIRMATSII_NA_DENGI_ARTICLE,
   KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE,
   MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE,
+  VIZUALIZATSIYA_ZHELANIY_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
