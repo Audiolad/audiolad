@@ -162,6 +162,12 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
           label:
             "«Медитация на деньги: как работать с вниманием и денежным настроем»",
         },
+        { text: ", " },
+        {
+          href: "/articles/meditatsiya-na-privlechenie-deneg",
+          label:
+            "«Медитация на привлечение денег: что это такое и как она помогает изменить отношение к финансам»",
+        },
         { text: " и " },
         {
           href: "/articles/kak-voyti-v-sostoyanie-izobiliya",

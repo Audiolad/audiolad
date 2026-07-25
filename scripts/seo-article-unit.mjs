@@ -647,6 +647,181 @@ assert(
   listArticleSlugs().includes("meditatsiya-na-izobilie"),
   "abundance meditation in slug list",
 );
+
+const moneyAttractionArticle = getArticleBySlug(
+  "meditatsiya-na-privlechenie-deneg",
+);
+assert(moneyAttractionArticle, "money attraction article registered");
+assert(
+  moneyAttractionArticle.title ===
+    "Медитация на привлечение денег: что это такое и как она помогает изменить отношение к финансам",
+  "money attraction H1",
+);
+assert(
+  moneyAttractionArticle.metaTitle.startsWith(
+    "Медитация на привлечение денег",
+  ),
+  "money attraction SEO title keeps primary query",
+);
+assert(
+  moneyAttractionArticle.metaTitle.includes("АудиоЛад") &&
+    !moneyAttractionArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "money attraction SEO title has brand once",
+);
+assert(
+  moneyAttractionArticle.metaDescription !==
+    moneyAttractionArticle.leadBeforeAudio,
+  "money attraction metaDescription is not visual lead",
+);
+assert(
+  moneyAttractionArticle.metaDescription !== moneyArticle.metaDescription,
+  "money attraction metaDescription differs from money meditation article",
+);
+assert(
+  moneyAttractionArticle.topicSlug === "meditatsii-na-dengi",
+  "money attraction topic hub",
+);
+assert(
+  moneyAttractionArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "money attraction topic href",
+);
+assert(
+  moneyAttractionArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "money attraction primary practice key",
+);
+assert(
+  moneyAttractionArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "money attraction practice intro",
+);
+assert(
+  moneyAttractionArticle.leadBeforeAudio ===
+    "Когда мысли о деньгах начинают занимать почти всё внимание, становится трудно замечать что-то ещё.",
+  "money attraction opening body paragraph",
+);
+assert(
+  moneyAttractionArticle.shortAnswer.startsWith(
+    "Медитация на привлечение денег – это спокойная практика",
+  ),
+  "money attraction short answer keeps definition role",
+);
+assert(
+  !moneyAttractionArticle.leadBeforeAudio.includes(
+    "Медитация на привлечение денег – это",
+  ),
+  "money attraction lead is not a second definition",
+);
+assert(
+  moneyAttractionArticle.introAfterAudio[0] ===
+    "Кажется, что любая неожиданная трата становится серьёзной проблемой.",
+  "money attraction intro starts after lead",
+);
+assert(
+  !moneyAttractionArticle.introAfterAudio.includes(
+    moneyAttractionArticle.leadBeforeAudio,
+  ),
+  "money attraction lead not duplicated in intro",
+);
+assert(
+  moneyAttractionArticle.captionAfterAudio === "",
+  "money attraction no artificial caption",
+);
+assert(
+  moneyAttractionArticle.finalAudioLead === "",
+  "money attraction no second primary player",
+);
+assert(moneyAttractionArticle.faq.length === 3, "money attraction faq");
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "money attraction links to playlist as playlist CTA",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").toLowerCase().includes("плейлист"),
+  ),
+  "money attraction CTA names playlist explicitly",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/chto-takoe-denezhnyy-potok",
+    ),
+  ),
+  "money attraction links to money flow article",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href ===
+          "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    ),
+  ),
+  "money attraction links to money meditation article",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-izobilie",
+    ),
+  ),
+  "money attraction links to abundance meditation article",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+    ),
+  ),
+  "money attraction links to state-of-abundance article",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "money attraction links to free meditations article",
+);
+assert(
+  !JSON.stringify(moneyAttractionArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "money attraction does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(moneyAttractionArticle.brandNote?.includes("АудиоЛаде")),
+  "money attraction brand note",
+);
+assert(
+  moneyAttractionArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "money attraction see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "meditatsiya-na-privlechenie-deneg",
+  ),
+  "money hub lists money attraction article",
+);
+assert(
+  !moneyAttractionArticle.leadBeforeAudio.includes("—") &&
+    !moneyAttractionArticle.shortAnswer.includes("—") &&
+    !moneyAttractionArticle.metaTitle.includes("—"),
+  "money attraction uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("meditatsiya-na-privlechenie-deneg"),
+  "money attraction in slug list",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -664,6 +839,22 @@ assert(
     (item) => item.href === "/articles/meditatsiya-na-izobilie",
   ),
   "money article reverse-links to abundance meditation article",
+);
+assert(
+  moneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-privlechenie-deneg",
+  ),
+  "money article reverse-links to money attraction article",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-privlechenie-deneg",
+    ),
+  ),
+  "money flow reverse-links to money attraction article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -858,6 +1049,14 @@ assert(
       entry.url === "https://audiolad.ru/articles/meditatsiya-na-izobilie",
   ),
   "abundance meditation article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/meditatsiya-na-privlechenie-deneg",
+  ),
+  "money attraction article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),

@@ -171,6 +171,14 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
       href: "/articles/meditatsiya-na-izobilie",
       after: ".",
     },
+    {
+      before:
+        "А если важно именно снизить напряжение вокруг финансов и привлечения денег, рекомендуем прочитать статью ",
+      linkLabel:
+        "«Медитация на привлечение денег: что это такое и как она помогает изменить отношение к финансам»",
+      href: "/articles/meditatsiya-na-privlechenie-deneg",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
