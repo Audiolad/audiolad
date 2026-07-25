@@ -31,7 +31,7 @@ import {
 
 import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 import AuthorBannerUploadBlock, {
-  readBannerPositionFromProfileProp,
+  readBannerPositionFromProfileRow,
 } from "./AuthorBannerUploadBlock";
 
 type PublishedProductOption = {
@@ -119,7 +119,7 @@ export default function AuthorProfileClient({
         setFullBio(profile.full_bio?.trim() || "");
         setAvatarUrl(profile.avatar_url);
         setBannerUrl(profile.banner_url);
-        setBannerPosition(readBannerPositionFromProfileProp(profile));
+        setBannerPosition(readBannerPositionFromProfileRow(profile));
         setTopicKeys(profile.topicKeys);
         setFeaturedProductIds(profile.featuredProducts.map((product) => product.id));
         setPublishedProducts(payload.publishedProducts ?? []);
