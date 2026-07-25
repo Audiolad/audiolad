@@ -77,12 +77,23 @@ function testAdminDashboard() {
   const controls = read(
     "src/components/admin/AdminAnalyticsTestTrafficControls.tsx",
   );
+  const p2sql = read(
+    "supabase/migrations/20260725180000_admin_analytics_p2_dashboard.sql",
+  );
+  const dictionary = read("src/lib/admin/analytics-metrics-dictionary.ts");
 
   assert(page.includes("getAdminAnalyticsDashboard"), "admin analytics wired");
   assert(page.includes("AdminAnalyticsPeriodPicker"), "period picker in admin page");
+  assert(page.includes("AdminAnalyticsFunnelPanel"), "funnel panel");
+  assert(page.includes("AdminAnalyticsTimeseriesChart"), "timeseries chart");
+  assert(page.includes("AdminAnalyticsBreakdownTabs"), "breakdown tabs");
   assert(
-    queries.includes('rpc("admin_analytics_dashboard_snapshot"'),
-    "dashboard uses SQL snapshot rpc",
+    queries.includes('rpc("admin_analytics_p2_summary"'),
+    "dashboard uses P2 summary rpc",
+  );
+  assert(
+    queries.includes('rpc("admin_analytics_p2_timeseries"'),
+    "dashboard uses P2 timeseries rpc",
   );
   assert(
     !queries.includes('.from("analytics_events")'),
@@ -96,13 +107,19 @@ function testAdminDashboard() {
   assert(queries.includes("Внутренние посетители"), "visitors terminology updated");
   assert(queries.includes("profiles.created_at"), "registration hint uses profiles.created_at");
   assert(
-    queries.includes("Регистрации / внутренние посетители"),
+    queries.includes("Регистрации (аккаунты) / внутренние посетители (люди)"),
     "registration rate formula documented",
   );
   assert(
     controls.includes("Не учитывать служебный и тестовый трафик"),
     "honest test-traffic toggle label",
   );
+  assert(p2sql.includes("admin_analytics_p2_practices"), "practices rpc");
+  assert(p2sql.includes("admin_analytics_p2_authors"), "authors rpc");
+  assert(p2sql.includes("admin_analytics_p2_acquisition"), "acquisition rpc");
+  assert(p2sql.includes("admin_analytics_dashboard_snapshot"), "P0/P1 snapshot untouched mention or coexistence");
+  assert(dictionary.includes("first_manual_library_save"), "save metric dictionary");
+  assert(dictionary.includes("comparableToMetrika"), "metrika comparability flags");
 }
 
 function testPercentRounding() {

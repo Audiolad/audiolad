@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import AdminAnalyticsFunnel from "@/components/admin/AdminAnalyticsFunnel";
-import AdminAnalyticsMetrics from "@/components/admin/AdminAnalyticsMetrics";
+import AdminAnalyticsBreakdownTabs from "@/components/admin/AdminAnalyticsBreakdownTabs";
+import AdminAnalyticsDefinitions from "@/components/admin/AdminAnalyticsDefinitions";
+import AdminAnalyticsFilters from "@/components/admin/AdminAnalyticsFilters";
+import AdminAnalyticsFunnelPanel from "@/components/admin/AdminAnalyticsFunnelPanel";
+import AdminAnalyticsMetricCards from "@/components/admin/AdminAnalyticsMetricCards";
 import AdminAnalyticsPeriodPicker from "@/components/admin/AdminAnalyticsPeriodPicker";
 import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalyticsTestTrafficControls";
-import AdminAnalyticsSourcesTable from "@/components/admin/AdminAnalyticsSourcesTable";
-import AdminPopularPracticesTable from "@/components/admin/AdminPopularPracticesTable";
-import AdminRecentActivityList from "@/components/admin/AdminRecentActivityList";
+import AdminAnalyticsTimeseriesChart from "@/components/admin/AdminAnalyticsTimeseriesChart";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
 import { getAdminAnalyticsDashboard } from "@/lib/admin/analytics-queries";
 import {
@@ -23,7 +24,21 @@ export const dynamic = "force-dynamic";
 export default async function AdminOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; includeTest?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    includeTest?: string;
+    authorId?: string;
+    practiceId?: string;
+    utmSource?: string;
+    deviceType?: string;
+    practicesSort?: string;
+    practicesSortDir?: string;
+    practicesPage?: string;
+    authorsSort?: string;
+    authorsSortDir?: string;
+    authorsPage?: string;
+    acquisitionPage?: string;
+  }>;
 }) {
   const session = await requireAdminPanelAccess();
 
@@ -51,6 +66,17 @@ export default async function AdminOverviewPage({
         getAdminAnalyticsDashboard({
           period: params.period,
           includeTest: params.includeTest,
+          authorId: params.authorId,
+          practiceId: params.practiceId,
+          utmSource: params.utmSource,
+          deviceType: params.deviceType,
+          practicesSort: params.practicesSort,
+          practicesSortDir: params.practicesSortDir,
+          practicesPage: params.practicesPage,
+          authorsSort: params.authorsSort,
+          authorsSortDir: params.authorsSortDir,
+          authorsPage: params.authorsPage,
+          acquisitionPage: params.acquisitionPage,
         }),
       ]);
     } else {
@@ -69,8 +95,8 @@ export default async function AdminOverviewPage({
   return (
     <div className="space-y-8">
       {canViewAnalytics && analyticsDashboard ? (
-        <section aria-labelledby="admin-analytics-heading">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <section aria-labelledby="admin-analytics-heading" className="space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="admin-analytics-heading" className="text-[21px] font-semibold">
                 Аналитика платформы
@@ -88,7 +114,7 @@ export default async function AdminOverviewPage({
               </p>
             </div>
 
-            <div className="flex flex-col items-end gap-3">
+            <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:items-end">
               <Suspense fallback={null}>
                 <AdminAnalyticsPeriodPicker currentPeriod={analyticsDashboard.period} />
               </Suspense>
@@ -103,17 +129,46 @@ export default async function AdminOverviewPage({
             </div>
           </div>
 
-          <AdminAnalyticsMetrics metrics={analyticsDashboard.metrics} />
+          <Suspense fallback={null}>
+            <AdminAnalyticsFilters
+              currentPeriod={analyticsDashboard.period}
+              includeTest={analyticsDashboard.includeTest}
+              authorId={analyticsDashboard.filters.authorId}
+              practiceId={analyticsDashboard.filters.practiceId}
+              utmSource={analyticsDashboard.filters.utmSource}
+              deviceType={analyticsDashboard.filters.deviceType}
+              authors={analyticsDashboard.filterOptions.authors}
+              practices={analyticsDashboard.filterOptions.practices}
+              filterNotes={analyticsDashboard.filterNotes}
+            />
+          </Suspense>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <AdminAnalyticsFunnel steps={analyticsDashboard.funnel} />
-            <AdminRecentActivityList items={analyticsDashboard.recentActivity} />
-          </div>
+          <AdminAnalyticsDefinitions />
 
-          <div className="mt-6 space-y-6">
-            <AdminAnalyticsSourcesTable rows={analyticsDashboard.sources} />
-            <AdminPopularPracticesTable rows={analyticsDashboard.popularPractices} />
-          </div>
+          <section aria-labelledby="admin-audience-heading" className="space-y-3">
+            <h3 id="admin-audience-heading" className="text-[19px] font-semibold">
+              Аудитория
+            </h3>
+            <AdminAnalyticsMetricCards metrics={analyticsDashboard.audience} />
+          </section>
+
+          <AdminAnalyticsFunnelPanel
+            events={analyticsDashboard.funnelEvents}
+            people={analyticsDashboard.funnelPeople}
+            purchasesPlaceholder={analyticsDashboard.purchasesPlaceholder}
+          />
+
+          <AdminAnalyticsTimeseriesChart
+            points={analyticsDashboard.timeseries.points}
+            granularity={analyticsDashboard.timeseries.granularity}
+            error={analyticsDashboard.timeseries.error}
+          />
+
+          <AdminAnalyticsBreakdownTabs
+            practices={analyticsDashboard.practices}
+            authors={analyticsDashboard.authors}
+            acquisition={analyticsDashboard.acquisition}
+          />
         </section>
       ) : null}
 
@@ -126,7 +181,6 @@ export default async function AdminOverviewPage({
             Показатели из базы данных (без привязки к выбранному периоду аналитики).
           </p>
         </div>
-
         <AdminStatGrid cards={overviewStats.cards} />
       </section>
     </div>

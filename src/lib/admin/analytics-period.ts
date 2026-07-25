@@ -122,3 +122,86 @@ export function formatAdminPercent(numerator: number, denominator: number): stri
 
   return `${Math.round((numerator / denominator) * 100)}%`;
 }
+
+export type AdminAnalyticsPreviousPeriodRange = {
+  from: string;
+  to: string;
+} | null;
+
+/**
+ * Previous comparable window of the same duration.
+ * Today / all → null (comparison would mislead).
+ */
+export function resolvePreviousAdminAnalyticsPeriodRange(
+  period: AdminAnalyticsPeriod,
+  now: Date = new Date(),
+): AdminAnalyticsPreviousPeriodRange {
+  if (period === "today" || period === "all") {
+    return null;
+  }
+
+  const current = resolveAdminAnalyticsPeriodRange(period, now);
+
+  if (!current.from || !current.to) {
+    return null;
+  }
+
+  const fromMs = Date.parse(current.from);
+  const toMs = Date.parse(current.to);
+
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) {
+    return null;
+  }
+
+  const durationMs = toMs - fromMs;
+
+  return {
+    from: new Date(fromMs - durationMs).toISOString(),
+    to: current.from,
+  };
+}
+
+export type AdminAnalyticsDelta = {
+  previous: number;
+  absolute: number;
+  percentLabel: string;
+  direction: "up" | "down" | "flat" | "neutral";
+};
+
+export function formatAdminDelta(
+  current: number,
+  previous: number | null | undefined,
+): AdminAnalyticsDelta | null {
+  if (previous === null || previous === undefined) {
+    return null;
+  }
+
+  const absolute = current - previous;
+
+  if (previous <= 0) {
+    if (current <= 0) {
+      return {
+        previous,
+        absolute: 0,
+        percentLabel: "—",
+        direction: "neutral",
+      };
+    }
+
+    return {
+      previous,
+      absolute,
+      percentLabel: "н/д",
+      direction: "neutral",
+    };
+  }
+
+  const percent = Math.round((absolute / previous) * 100);
+
+  return {
+    previous,
+    absolute,
+    percentLabel: `${percent > 0 ? "+" : ""}${percent}%`,
+    direction: percent > 0 ? "up" : percent < 0 ? "down" : "flat",
+  };
+}
