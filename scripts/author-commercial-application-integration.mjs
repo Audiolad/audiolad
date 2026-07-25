@@ -85,7 +85,7 @@ function applyMigration() {
   const sql = readFileSync(
     path.join(
       ROOT,
-      "supabase/migrations/20260725210000_author_commercial_applications.sql",
+      "supabase/migrations/20260725230000_author_commercial_applications.sql",
     ),
     "utf8",
   );

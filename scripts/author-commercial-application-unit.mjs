@@ -207,7 +207,7 @@ function testOnboardingCommercialApplicationFlow() {
 
 function testSourceGuards() {
   const migration = read(
-    "supabase/migrations/20260725210000_author_commercial_applications.sql",
+    "supabase/migrations/20260725230000_author_commercial_applications.sql",
   );
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.author_commercial_applications/);
   assert.match(migration, /submit_author_commercial_application/);
