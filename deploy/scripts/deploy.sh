@@ -68,7 +68,7 @@ main() {
 
   ensure_dirs
   acquire_deploy_lock
-  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-3}"
+  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
   check_disk_space 2048
 
   if [[ ! -f "$DEPLOY_ROOT/shared/.env.production" ]]; then
@@ -227,7 +227,7 @@ main() {
   stop_pm2_app_safe "$OLD_ACTIVE_PM2_APP" "$OLD_ACTIVE_PORT"
   pm2 save
 
-  prune_old_releases 3
+  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
   log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
   log_info "Deploy completed successfully: $RELEASE_NAME"
 }

@@ -1,12 +1,17 @@
 [Unit]
 Description=Audiolad production disk hygiene
-Documentation=file:/var/www/audiolad/deploy/scripts/audiolad-maintenance.sh
+Documentation=file:/var/www/audiolad/deploy/docs/MAINTENANCE.md
 After=network-online.target docker.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/audiolad-maintenance.sh
+ExecStart=/usr/local/lib/audiolad/audiolad-maintenance.sh --apply
+Environment=RELEASE_PRUNE_ENABLED=1
+Environment=KEEP_EXTRA_RELEASES=1
+Environment=RELEASE_RETENTION_MIN_AGE_SECONDS=1800
+Environment=RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS=7200
+Environment=WORKTREE_PRUNE_ENABLED=1
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
