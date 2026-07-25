@@ -822,6 +822,234 @@ assert(
   "money attraction in slug list",
 );
 
+const howToAttractMoneyArticle = getArticleBySlug(
+  "kak-privlech-dengi-v-svoyu-zhizn",
+);
+assert(howToAttractMoneyArticle, "how-to attract money article registered");
+assert(
+  howToAttractMoneyArticle.title ===
+    "Как привлечь деньги в свою жизнь: что действительно помогает изменить отношение к финансам",
+  "how-to attract money H1",
+);
+assert(
+  howToAttractMoneyArticle.metaTitle.startsWith(
+    "Как привлечь деньги в свою жизнь",
+  ),
+  "how-to attract money SEO title keeps primary query",
+);
+assert(
+  howToAttractMoneyArticle.metaTitle.includes("АудиоЛад") &&
+    !howToAttractMoneyArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "how-to attract money SEO title has brand once",
+);
+assert(
+  howToAttractMoneyArticle.metaDescription !==
+    howToAttractMoneyArticle.leadBeforeAudio,
+  "how-to attract money metaDescription is not visual lead",
+);
+assert(
+  howToAttractMoneyArticle.metaDescription !==
+    moneyAttractionArticle.metaDescription,
+  "how-to attract money metaDescription differs from attraction meditation",
+);
+assert(
+  howToAttractMoneyArticle.topicSlug === "meditatsii-na-dengi",
+  "how-to attract money topic hub",
+);
+assert(
+  howToAttractMoneyArticle.topicHref === "/topics/meditatsii-na-dengi",
+  "how-to attract money topic href",
+);
+assert(
+  howToAttractMoneyArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "how-to attract money primary practice key",
+);
+assert(
+  howToAttractMoneyArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "how-to attract money practice intro",
+);
+assert(
+  !howToAttractMoneyArticle.primaryPracticeIntro.includes(
+    "Если для этой темы больше подойдёт",
+  ),
+  "how-to attract money has no editorial practice fork",
+);
+assert(
+  !JSON.stringify(howToAttractMoneyArticle).includes(
+    "Если для этой темы больше подойдёт",
+  ),
+  "how-to attract money content has no editorial practice fork",
+);
+assert(
+  howToAttractMoneyArticle.leadBeforeAudio.startsWith(
+    "Когда финансовые переживания возвращаются каждый день",
+  ),
+  "how-to attract money opening body paragraph",
+);
+assert(
+  howToAttractMoneyArticle.shortAnswer.startsWith(
+    "Привлечение денег в реальной жизни обычно связано не с одним секретным способом",
+  ),
+  "how-to attract money short answer keeps direct answer role",
+);
+assert(
+  !howToAttractMoneyArticle.leadBeforeAudio.includes(
+    "Привлечение денег в реальной жизни обычно связано",
+  ),
+  "how-to attract money lead is not a second definition",
+);
+assert(
+  howToAttractMoneyArticle.introAfterAudio[0] ===
+    "Из-за постоянного напряжения становится сложнее спокойно оценивать ситуацию.",
+  "how-to attract money intro starts after lead",
+);
+assert(
+  !howToAttractMoneyArticle.introAfterAudio.includes(
+    howToAttractMoneyArticle.leadBeforeAudio,
+  ),
+  "how-to attract money lead not duplicated in intro",
+);
+assert(
+  howToAttractMoneyArticle.sections.some(
+    (section) => section.id === "menyat-finansovye-privychki",
+  ),
+  "how-to attract money includes habits section",
+);
+assert(
+  howToAttractMoneyArticle.sections.some((section) =>
+    section.paragraphs.includes("Понятный план работы с долгами."),
+  ),
+  "how-to attract money keeps debt-plan wording",
+);
+assert(
+  howToAttractMoneyArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "«Какой один небольшой и конкретный шаг я могу сделать в ближайшие сутки?»",
+    ),
+  ),
+  "how-to attract money includes next-day action exercise",
+);
+assert(
+  howToAttractMoneyArticle.captionAfterAudio === "",
+  "how-to attract money no artificial caption",
+);
+assert(
+  howToAttractMoneyArticle.finalAudioLead === "",
+  "how-to attract money no second primary player",
+);
+assert(howToAttractMoneyArticle.faq.length === 3, "how-to attract money faq");
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "how-to attract money links to playlist as playlist CTA",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").toLowerCase().includes("плейлист"),
+  ),
+  "how-to attract money CTA names playlist explicitly",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-privlechenie-deneg",
+    ),
+  ),
+  "how-to attract money links to attraction meditation article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href ===
+          "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    ),
+  ),
+  "how-to attract money links to money meditation article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/chto-takoe-denezhnyy-potok",
+    ),
+  ),
+  "how-to attract money links to money flow article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+    ),
+  ),
+  "how-to attract money links to state-of-abundance article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/meditatsiya-na-izobilie",
+    ),
+  ),
+  "how-to attract money links to abundance meditation article",
+);
+assert(
+  howToAttractMoneyArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/besplatnye-meditatsii-onlayn",
+    ),
+  ),
+  "how-to attract money links to free meditations article",
+);
+assert(
+  !JSON.stringify(howToAttractMoneyArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "how-to attract money does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(howToAttractMoneyArticle.brandNote?.includes("АудиоЛаде")),
+  "how-to attract money brand note",
+);
+assert(
+  howToAttractMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/meditatsii-na-dengi",
+  ),
+  "how-to attract money see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-privlech-dengi-v-svoyu-zhizn",
+  ),
+  "money hub lists how-to attract money article",
+);
+assert(
+  !howToAttractMoneyArticle.leadBeforeAudio.includes("—") &&
+    !howToAttractMoneyArticle.shortAnswer.includes("—") &&
+    !howToAttractMoneyArticle.metaTitle.includes("—"),
+  "how-to attract money uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-privlech-dengi-v-svoyu-zhizn"),
+  "how-to attract money in slug list",
+);
+assert(
+  listArticleSlugs().filter(
+    (slug) => slug === "kak-privlech-dengi-v-svoyu-zhizn",
+  ).length === 1,
+  "how-to attract money slug unique",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -855,6 +1083,12 @@ assert(
     ),
   ),
   "money flow reverse-links to money attraction article",
+);
+assert(
+  moneyAttractionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-privlech-dengi-v-svoyu-zhizn",
+  ),
+  "attraction meditation reverse-links to how-to attract money article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -1057,6 +1291,14 @@ assert(
       "https://audiolad.ru/articles/meditatsiya-na-privlechenie-deneg",
   ),
   "money attraction article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-privlech-dengi-v-svoyu-zhizn",
+  ),
+  "how-to attract money article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
