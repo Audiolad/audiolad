@@ -486,6 +486,8 @@ export function buildPracticeAccessPresentation(input: {
   isAuthenticated: boolean;
   buyerPreviewMode?: boolean;
   publishPreviewMode?: boolean;
+  /** Clean listener-view within publish-preview (draft only; no status change). */
+  publishListenerViewMode?: boolean;
 }): PracticeAccessPresentation {
   const {
     access,
@@ -495,6 +497,7 @@ export function buildPracticeAccessPresentation(input: {
     isAuthenticated,
     buyerPreviewMode = false,
     publishPreviewMode = false,
+    publishListenerViewMode = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
   const listenHref = buildListenPath(authorSlug, practice.slug, {
@@ -521,6 +524,23 @@ export function buildPracticeAccessPresentation(input: {
       isAuthenticated: false,
       buyerPreviewMode: false,
     });
+
+    // Listener-view reuses the same commercial simulation as author publish-preview,
+    // but hides service chrome and shows the floating return control.
+    if (publishListenerViewMode) {
+      return {
+        ...commercial,
+        libraryAction,
+        showAuthorToolbar: false,
+        showBuyerPreviewBanner: false,
+        showBuyerPreviewExit: true,
+        showPublishPreviewBanner: false,
+        canPublishFromPreview: false,
+        authorToolbarMessage: null,
+        authorToolbarActions: [],
+        showAdminPreview: false,
+      };
+    }
 
     return {
       ...commercial,

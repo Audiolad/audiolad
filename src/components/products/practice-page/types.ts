@@ -18,6 +18,7 @@ export type PracticePagePublishPreview = {
   practiceId: string;
   editHref: string;
   publicPath: string;
+  listenerViewHref: string;
   canPublish: boolean;
 };
 

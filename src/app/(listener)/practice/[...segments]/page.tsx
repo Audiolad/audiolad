@@ -41,8 +41,11 @@ import {
   buildListenPath,
   buildPracticeCanonicalUrl,
   buildPracticePublicPath,
+  buildPracticePublishListenerPreviewPath,
+  buildPracticePublishPreviewPath,
 } from "@/lib/products/paths";
 import {
+  canActivatePublishListenerViewMode,
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
   shouldIndexPracticePage,
@@ -58,7 +61,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ listen?: string; preview?: string }>;
+  searchParams: Promise<{ listen?: string; preview?: string; view?: string }>;
 };
 
 const METADATA_DESCRIPTION_FALLBACK =
@@ -206,7 +209,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PracticePage({ params, searchParams }: PageProps) {
   const { segments } = await params;
-  const { listen: listenParam, preview: previewParam } = await searchParams;
+  const {
+    listen: listenParam,
+    preview: previewParam,
+    view: viewParam,
+  } = await searchParams;
   const route = await resolvePracticeRoute(segments);
 
   if (!route) {
@@ -248,6 +255,12 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practiceStatus: practice.status,
     access,
   });
+  const publishListenerViewMode = canActivatePublishListenerViewMode({
+    previewParam,
+    viewParam,
+    practiceStatus: practice.status,
+    access,
+  });
 
   const authorPreview =
     access.reason === "author_owner" && !isPracticePublished(practice.status);
@@ -276,6 +289,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     resolvedAuthorSlug,
     practice.slug,
   );
+  const publishPreviewPath = buildPracticePublishPreviewPath(
+    resolvedAuthorSlug,
+    practice.slug,
+  );
+  const publishListenerViewPath = buildPracticePublishListenerPreviewPath(
+    resolvedAuthorSlug,
+    practice.slug,
+  );
 
   const presentation = buildPracticeAccessPresentation({
     access,
@@ -285,6 +306,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     isAuthenticated: Boolean(user),
     buyerPreviewMode,
     publishPreviewMode,
+    publishListenerViewMode,
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
@@ -402,15 +424,17 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       symbol,
       displayWidth: DESKTOP_COVER_DISPLAY_WIDTH,
     },
-    publishPreview: publishPreviewMode
-      ? {
-          enabled: true,
-          practiceId: practice.id,
-          editHref: buildAuthorDashboardEditPath(practice.id),
-          publicPath: practicePagePath,
-          canPublish: canPublishFromPublishPreview(access),
-        }
-      : null,
+    publishPreview:
+      publishPreviewMode && !publishListenerViewMode
+        ? {
+            enabled: true,
+            practiceId: practice.id,
+            editHref: buildAuthorDashboardEditPath(practice.id),
+            publicPath: practicePagePath,
+            listenerViewHref: publishListenerViewPath,
+            canPublish: canPublishFromPublishPreview(access),
+          }
+        : null,
   };
 
   const practiceCoverUrl = resolveProductCoverUrl(
@@ -465,7 +489,21 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         />
       ) : null}
       {presentation.showBuyerPreviewExit ? (
-        <BuyerPreviewExitControl href={practicePagePath} />
+        <BuyerPreviewExitControl
+          href={
+            publishListenerViewMode ? publishPreviewPath : practicePagePath
+          }
+          label={
+            publishListenerViewMode
+              ? "Вернуться в предпросмотр автора"
+              : "Вернуться в режим автора"
+          }
+          shortLabel={
+            publishListenerViewMode
+              ? "Вернуться в предпросмотр автора"
+              : "К режиму автора"
+          }
+        />
       ) : null}
       <PracticePageMobile viewModel={viewModel} />
       <PracticePageDesktop viewModel={viewModel} />

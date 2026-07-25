@@ -2,11 +2,18 @@ import type { ProductAccessResult } from "@/lib/products/access";
 import { isPracticePublished } from "@/lib/products/access";
 
 export const PRACTICE_PUBLISH_PREVIEW_QUERY_VALUE = "publish";
+export const PRACTICE_PUBLISH_LISTENER_VIEW_QUERY_VALUE = "listener";
 
 export function isPublishPreviewQuery(
   previewParam: string | null | undefined,
 ): boolean {
   return previewParam === PRACTICE_PUBLISH_PREVIEW_QUERY_VALUE;
+}
+
+export function isPublishListenerViewQuery(
+  viewParam: string | null | undefined,
+): boolean {
+  return viewParam === PRACTICE_PUBLISH_LISTENER_VIEW_QUERY_VALUE;
 }
 
 /**
@@ -24,6 +31,23 @@ export function canActivatePublishPreviewMode(input: {
     isPublishPreviewQuery(input.previewParam) &&
     !isPracticePublished(input.practiceStatus) &&
     input.access.isAuthorMember
+  );
+}
+
+/**
+ * Clean listener-view of an unpublished product. Reuses publish-preview access
+ * (owner/editor membership only) and never changes product status.
+ * Guests / other workspaces cannot activate this via URL params alone.
+ */
+export function canActivatePublishListenerViewMode(input: {
+  previewParam: string | null | undefined;
+  viewParam: string | null | undefined;
+  practiceStatus: string | null | undefined;
+  access: Pick<ProductAccessResult, "isAuthorMember">;
+}): boolean {
+  return (
+    canActivatePublishPreviewMode(input) &&
+    isPublishListenerViewQuery(input.viewParam)
   );
 }
 

@@ -9,10 +9,15 @@ import {
   buildPracticeAccessPresentation,
   resolvePublishPreviewListenerAccess,
 } from "../src/lib/products/practice-access-ui.ts";
-import { buildPracticePublishPreviewPath } from "../src/lib/products/paths.ts";
 import {
+  buildPracticePublishListenerPreviewPath,
+  buildPracticePublishPreviewPath,
+} from "../src/lib/products/paths.ts";
+import {
+  canActivatePublishListenerViewMode,
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
+  isPublishListenerViewQuery,
   isPublishNotReadyResponse,
   isPublishPreviewQuery,
   PUBLISH_PREVIEW_NOT_READY_MESSAGE,
@@ -84,8 +89,14 @@ function testPathsHelper() {
     buildPracticePublishPreviewPath("anna", "praktika"),
     "/practice/anna/praktika?preview=publish",
   );
+  assert.equal(
+    buildPracticePublishListenerPreviewPath("anna", "praktika"),
+    "/practice/anna/praktika?preview=publish&view=listener",
+  );
   assert.equal(isPublishPreviewQuery("publish"), true);
   assert.equal(isPublishPreviewQuery("buyer"), false);
+  assert.equal(isPublishListenerViewQuery("listener"), true);
+  assert.equal(isPublishListenerViewQuery("buyer"), false);
 }
 
 function testFirstPublishGate() {
@@ -158,6 +169,72 @@ function testActivationRbac() {
     ),
     true,
     "editor-equivalent membership keeps publish (no stricter owner-only rule)",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "publish",
+      viewParam: "listener",
+      practiceStatus: "draft",
+      access: memberAccess(),
+    }),
+    true,
+    "workspace member can open draft listener-view",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "publish",
+      viewParam: "listener",
+      practiceStatus: "draft",
+      access: guestAccess(),
+    }),
+    false,
+    "guest cannot activate draft listener-view via URL",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "publish",
+      viewParam: "listener",
+      practiceStatus: "draft",
+      access: otherWorkspaceAccess(),
+    }),
+    false,
+    "other author cannot activate draft listener-view",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "publish",
+      viewParam: undefined,
+      practiceStatus: "draft",
+      access: memberAccess(),
+    }),
+    false,
+    "publish preview without view=listener stays in author preview",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "buyer",
+      viewParam: "listener",
+      practiceStatus: "draft",
+      access: memberAccess(),
+    }),
+    false,
+    "listener view requires preview=publish gate",
+  );
+
+  assert.equal(
+    canActivatePublishListenerViewMode({
+      previewParam: "publish",
+      viewParam: "listener",
+      practiceStatus: "published",
+      access: memberAccess(),
+    }),
+    false,
+    "published product must not activate draft listener-view",
   );
 }
 
@@ -240,6 +317,58 @@ function testListenerIdenticalPresentation() {
   assert.equal(incompleteDraftAccess.reason, "free");
 }
 
+function testDraftListenerViewPresentation() {
+  const freeListenerView = buildPracticeAccessPresentation({
+    access: memberAccess(),
+    practice: basePractice(),
+    authorSlug: "anna",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: true,
+  });
+
+  assert.equal(freeListenerView.showPublishPreviewBanner, false);
+  assert.equal(freeListenerView.showBuyerPreviewExit, true);
+  assert.equal(freeListenerView.showAuthorToolbar, false);
+  assert.equal(freeListenerView.showAdminPreview, false);
+  assert.equal(freeListenerView.canPublishFromPreview, false);
+  assert.equal(freeListenerView.primaryAction.kind, "listen");
+  assert.match(freeListenerView.statusBadge, /без оплаты/i);
+
+  const paidListenerView = buildPracticeAccessPresentation({
+    access: memberAccess(),
+    practice: basePractice({
+      is_free: false,
+      price: 490,
+      audio_url: "https://cdn.example/audio.mp3",
+    }),
+    authorSlug: "anna",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: true,
+  });
+
+  assert.equal(paidListenerView.showPublishPreviewBanner, false);
+  assert.equal(paidListenerView.showBuyerPreviewExit, true);
+  assert.equal(paidListenerView.primaryAction.kind, "buy");
+  assert.equal(paidListenerView.statusBadge.includes("Недоступно"), false);
+
+  // Without publishListenerViewMode, author banner stays; exit stays hidden.
+  const authorPublishPreview = buildPracticeAccessPresentation({
+    access: memberAccess(),
+    practice: basePractice(),
+    authorSlug: "anna",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: false,
+  });
+  assert.equal(authorPublishPreview.showPublishPreviewBanner, true);
+  assert.equal(authorPublishPreview.showBuyerPreviewExit, false);
+}
+
 function testStructuredNotReady() {
   assert.equal(
     isPublishNotReadyResponse({ publishReady: false, error: "missing_cover" }),
@@ -310,7 +439,20 @@ function testSourceContracts() {
   assert.match(banner, /isPublishNotReadyResponse/);
   assert.match(banner, /location\.replace\(publicPath\)/);
   assert.match(banner, /Вернуться к редактированию/);
+  assert.match(banner, /Посмотреть глазами слушателя/);
   assert.match(banner, /Опубликовать/);
+  assert.match(banner, /listenerViewHref/);
+  assert.match(banner, /sm:grid-cols-\[repeat\(3,auto\)\]/);
+
+  assert.match(page, /canActivatePublishListenerViewMode/);
+  assert.match(page, /publishListenerViewMode/);
+  assert.match(page, /buildPracticePublishListenerPreviewPath/);
+  assert.match(page, /Вернуться в предпросмотр автора/);
+  assert.match(
+    paths,
+    /export function buildPracticePublishListenerPreviewPath/,
+    "listener-view path helper exists",
+  );
 
   assert.match(publishRoute, /publishReady:\s*false/);
 
@@ -347,6 +489,7 @@ testFirstPublishGate();
 testActivationRbac();
 testSeoAndAnalyticsGuards();
 testListenerIdenticalPresentation();
+testDraftListenerViewPresentation();
 testStructuredNotReady();
 testSourceContracts();
 testIncompleteDraftPreviewAllowedInUi();

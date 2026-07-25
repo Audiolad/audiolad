@@ -25,6 +25,14 @@ export function buildPracticePublishPreviewPath(
   return `${base}?preview=publish`;
 }
 
+/** Clean listener simulation of a draft; requires publish-preview access gate. */
+export function buildPracticePublishListenerPreviewPath(
+  authorSlug: string,
+  productSlug: string,
+): string {
+  return `${buildPracticePublishPreviewPath(authorSlug, productSlug)}&view=listener`;
+}
+
 export function buildListenPath(
   authorSlug: string,
   productSlug: string,
