@@ -76,7 +76,7 @@ assert(article.authorLabel === "Редакция АудиоЛада", "editorial
 assert(
   article.leadBeforeAudio ===
     "Любовь к себе редко начинается с громких обещаний. Иногда достаточно сделать один небольшой шаг навстречу себе.",
-  "short lead for first screen",
+  "opening body paragraph kept in leadBeforeAudio field",
 );
 assert(
   article.introAfterAudio.some((paragraph) =>
@@ -452,6 +452,18 @@ assert(viewSource.includes("ArticleAudioBlock"), "audio blocks");
 assert(viewSource.includes("placement=\"final_audio\""), "final audio placement");
 assert(viewSource.includes("Частые вопросы"), "visible FAQ");
 assert(viewSource.includes("ArticleFaqList"), "FAQ list component");
+assert(
+  /<h1[\s\S]*?<\/h1>\s*<p className="mt-2 text-sm/.test(viewSource),
+  "byline follows H1 without lead paragraph between them",
+);
+assert(
+  viewSource.includes("[article.leadBeforeAudio, ...article.introAfterAudio]"),
+  "leadBeforeAudio renders as first body paragraph after practice block",
+);
+assert(
+  !/<h1[\s\S]*?\{article\.leadBeforeAudio\}[\s\S]*?authorLabel/.test(viewSource),
+  "leadBeforeAudio is not rendered under H1 before byline",
+);
 assert(
   viewSource.includes("article.primaryPracticeEyebrow"),
   "renders article-specific practice eyebrow from data",

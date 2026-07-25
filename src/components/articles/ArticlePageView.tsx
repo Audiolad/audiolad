@@ -102,9 +102,6 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
             <h1 className="text-[1.5rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.625rem] sm:text-[1.75rem] sm:leading-tight md:text-[2rem]">
               {article.title}
             </h1>
-            <p className="mt-2.5 text-base leading-7 text-[#4a3d73] sm:mt-3 sm:text-[17px] sm:leading-8">
-              {article.leadBeforeAudio}
-            </p>
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
               {article.authorLabel} · {readingTimeLabel(data.readingTimeMinutes)}
             </p>
@@ -156,9 +153,11 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
           <ArticleToc items={tocItems} />
 
           <div className="mt-8 space-y-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
-            {article.introAfterAudio.map((paragraph) => (
-              <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-            ))}
+            {[article.leadBeforeAudio, ...article.introAfterAudio].map(
+              (paragraph) => (
+                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+              ),
+            )}
           </div>
 
           {article.sections.map((section) => (

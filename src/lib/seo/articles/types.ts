@@ -55,7 +55,10 @@ export type ArticleDefinition = {
   breadcrumbTitle: string;
   metaTitle: string;
   metaDescription: string;
-  /** Short lead before top audio block */
+  /**
+   * Opening paragraph of the article body (after the practice block).
+   * Not rendered under H1 — use metaDescription for SEO/cards/previews.
+   */
   leadBeforeAudio: string;
   /** Caption under top audio block */
   captionAfterAudio: string;
@@ -76,7 +79,10 @@ export type ArticleDefinition = {
   faq: readonly ArticleFaqItem[];
   /** Body sections after short answer / TOC (each becomes h2) */
   sections: readonly ArticleSection[];
-  /** Intro paragraphs after top audio (continuation; no duplicate of leadBeforeAudio) */
+  /**
+   * Body paragraphs after the practice block (continuation of leadBeforeAudio).
+   * Template prepends leadBeforeAudio before these paragraphs.
+   */
   introAfterAudio: readonly string[];
   finalAudioLead: string;
   /**
