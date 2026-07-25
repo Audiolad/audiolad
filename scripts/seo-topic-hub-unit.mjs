@@ -489,6 +489,22 @@ assert(
 );
 assert(listTopicHubSlugs().includes("izobilie"), "izobilie registered");
 assert(
+  listArticlesByTopicSlug("izobilie").some(
+    (article) => article.slug === "meditatsiya-na-izobilie",
+  ),
+  "izobilie hub includes abundance meditation SEO article",
+);
+assert(
+  listArticlesByTopicSlug("izobilie").some(
+    (article) => article.slug === "kak-voyti-v-sostoyanie-izobiliya",
+  ),
+  "izobilie hub still includes state-of-abundance article",
+);
+assert(
+  !listTopicHubSlugs().includes("meditatsiya-na-izobilie"),
+  "no duplicate meditatsiya-na-izobilie topic hub",
+);
+assert(
   sitemapEntries.some((entry) => entry.url.endsWith("/topics/izobilie")),
   "sitemap includes izobilie",
 );

@@ -480,11 +480,179 @@ assert(
   listArticleSlugs().includes("chto-takoe-denezhnyy-potok"),
   "money flow in slug list",
 );
+
+const abundanceMeditationArticle = getArticleBySlug("meditatsiya-na-izobilie");
+assert(abundanceMeditationArticle, "abundance meditation article registered");
+assert(
+  abundanceMeditationArticle.title ===
+    "Что такое медитация на изобилие и как она помогает изменить отношение к достатку",
+  "abundance meditation H1",
+);
+assert(
+  abundanceMeditationArticle.metaTitle.startsWith("Медитация на изобилие"),
+  "abundance meditation SEO title keeps primary query",
+);
+assert(
+  abundanceMeditationArticle.metaTitle.includes("АудиоЛад") &&
+    !abundanceMeditationArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "abundance meditation SEO title has brand once",
+);
+assert(
+  abundanceMeditationArticle.metaDescription !==
+    abundanceMeditationArticle.leadBeforeAudio,
+  "abundance meditation metaDescription is not visual lead",
+);
+assert(
+  abundanceMeditationArticle.metaDescription !==
+    abundanceArticle.metaDescription,
+  "abundance meditation metaDescription differs from state-of-abundance article",
+);
+assert(
+  abundanceMeditationArticle.topicSlug === "izobilie",
+  "abundance meditation topic hub",
+);
+assert(
+  abundanceMeditationArticle.topicHref === "/topics/izobilie",
+  "abundance meditation topic href",
+);
+assert(
+  abundanceMeditationArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "abundance meditation primary practice key",
+);
+assert(
+  abundanceMeditationArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "abundance meditation practice intro",
+);
+assert(
+  abundanceMeditationArticle.leadBeforeAudio.startsWith(
+    "Медитация на изобилие – это спокойная практика",
+  ),
+  "abundance meditation opening body paragraph",
+);
+assert(
+  abundanceMeditationArticle.introAfterAudio[0] ===
+    "Иногда кажется, что чего-то постоянно не хватает.",
+  "abundance meditation intro starts after lead",
+);
+assert(
+  !abundanceMeditationArticle.introAfterAudio.includes(
+    abundanceMeditationArticle.leadBeforeAudio,
+  ),
+  "abundance meditation lead not duplicated in intro",
+);
+assert(
+  abundanceMeditationArticle.captionAfterAudio === "",
+  "abundance meditation no artificial caption",
+);
+assert(
+  abundanceMeditationArticle.finalAudioLead === "",
+  "abundance meditation no second primary player",
+);
+assert(abundanceMeditationArticle.faq.length === 3, "abundance meditation faq");
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/p/denezhnyy-potok-9288",
+  ),
+  "abundance meditation links to playlist as playlist CTA",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some((item) =>
+    String(item.after ?? "").toLowerCase().includes("плейлист"),
+  ),
+  "abundance meditation CTA names playlist explicitly",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+    ),
+  ),
+  "abundance meditation links to state-of-abundance article",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href === "/articles/chto-takoe-denezhnyy-potok",
+    ),
+  ),
+  "abundance meditation links to money flow article",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some((item) =>
+    item.segments?.some(
+      (segment) =>
+        "href" in segment &&
+        segment.href ===
+          "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    ),
+  ),
+  "abundance meditation links to money meditation article",
+);
+assert(
+  abundanceMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "abundance meditation links to free meditations article",
+);
+assert(
+  !JSON.stringify(abundanceMeditationArticle.afterFinalAudio).includes(
+    "/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+  ),
+  "abundance meditation does not re-link primary practice in CTA",
+);
+assert(
+  Boolean(abundanceMeditationArticle.brandNote?.includes("АудиоЛаде")),
+  "abundance meditation brand note",
+);
+assert(
+  abundanceMeditationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/izobilie",
+  ),
+  "abundance meditation see-also includes hub",
+);
+assert(
+  listArticlesByTopicSlug("izobilie").some(
+    (item) => item.slug === "meditatsiya-na-izobilie",
+  ),
+  "izobilie hub lists abundance meditation article",
+);
+assert(
+  listArticlesByTopicSlug("izobilie").some(
+    (item) => item.slug === "kak-voyti-v-sostoyanie-izobiliya",
+  ),
+  "izobilie hub still lists state-of-abundance article",
+);
+assert(
+  !abundanceMeditationArticle.leadBeforeAudio.includes("—") &&
+    !abundanceMeditationArticle.shortAnswer.includes("—") &&
+    !abundanceMeditationArticle.metaTitle.includes("—"),
+  "abundance meditation uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("meditatsiya-na-izobilie"),
+  "abundance meditation in slug list",
+);
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
   ),
   "abundance reverse-links to money flow article",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-izobilie",
+  ),
+  "abundance reverse-links to abundance meditation article",
+);
+assert(
+  moneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-izobilie",
+  ),
+  "money article reverse-links to abundance meditation article",
 );
 assert(
   article.afterFinalAudio?.some(
@@ -672,6 +840,13 @@ assert(
       entry.url === "https://audiolad.ru/articles/chto-takoe-denezhnyy-potok",
   ),
   "money flow article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/meditatsiya-na-izobilie",
+  ),
+  "abundance meditation article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),

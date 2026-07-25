@@ -163,6 +163,14 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
       href: "/articles/chto-takoe-denezhnyy-potok",
       after: ".",
     },
+    {
+      before:
+        "А если ближе тема достатка и внутреннего ощущения наполненности, рекомендуем прочитать статью ",
+      linkLabel:
+        "«Что такое медитация на изобилие и как она помогает изменить отношение к достатку»",
+      href: "/articles/meditatsiya-na-izobilie",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
@@ -193,5 +201,5 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T13:30:00.000Z",
+  updatedAt: "2026-07-25T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
