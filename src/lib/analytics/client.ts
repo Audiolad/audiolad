@@ -233,6 +233,31 @@ export function getCachedAnalyticsSessionId(): string | null {
   return cachedSessionId;
 }
 
+export type CurrentAnalyticsIdentity = {
+  sessionId: string;
+  anonymousId: string;
+};
+
+/**
+ * Read current analytics identity for checkout claims.
+ * Does not create a session. Returns null when session is missing/expired.
+ */
+export function getCurrentAnalyticsIdentity(): CurrentAnalyticsIdentity | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const localState = readSessionState();
+  if (!isSessionStateActive(localState) || !localState) {
+    return null;
+  }
+
+  return {
+    sessionId: localState.sessionId,
+    anonymousId: localState.anonymousId,
+  };
+}
+
 if (typeof window !== "undefined") {
   void flushAnalyticsRetryQueue(sendRetryItem);
 

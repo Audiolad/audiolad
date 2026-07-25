@@ -5,8 +5,11 @@ import { useEffect, useRef } from "react";
 
 import {
   attributionToApiFields,
+  hasTrafficAttribution,
+  mergeTrafficAttribution,
   parseTrafficAttributionFromSearchParams,
-  resolveTrafficAttribution,
+  readStoredTrafficAttribution,
+  storeTrafficAttribution,
 } from "@/lib/analytics/attribution";
 import {
   ensureAnalyticsSession,
@@ -19,10 +22,7 @@ import {
   isSessionStateActive,
   readSessionState,
 } from "@/lib/analytics/session-state";
-import {
-  extractReferrerDomain,
-  resolveTrafficSource,
-} from "@/lib/analytics/sources";
+import { extractReferrerDomain } from "@/lib/analytics/sources";
 
 export default function PlatformAnalyticsProvider({
   children,
@@ -44,16 +44,18 @@ export default function PlatformAnalyticsProvider({
       const searchParams = new URLSearchParams(
         typeof window !== "undefined" ? window.location.search : "",
       );
-      const attribution = resolveTrafficAttribution(
-        parseTrafficAttributionFromSearchParams(searchParams),
-      );
+      // Session-touch: URL UTM only. Do not merge localStorage first-touch into
+      // new analytics_sessions (P3.2.0). Client first-touch cache may still update
+      // for a future first-touch model, but never as session payload.
+      const urlAttribution = parseTrafficAttributionFromSearchParams(searchParams);
+      if (hasTrafficAttribution(urlAttribution)) {
+        storeTrafficAttribution(
+          mergeTrafficAttribution(urlAttribution, readStoredTrafficAttribution()),
+        );
+      }
       const referrerDomain =
         extractReferrerDomain(typeof document !== "undefined" ? document.referrer : null) ??
         null;
-      const source = resolveTrafficSource({
-        utmSource: attribution.utmSource,
-        referrerDomain,
-      });
 
       void (async () => {
         const localState = readSessionState();
@@ -68,8 +70,8 @@ export default function PlatformAnalyticsProvider({
         const sessionId = await ensureAnalyticsSession({
           sessionId: storedSessionId,
           landingPath: pathname || "/",
-          ...attributionToApiFields(attribution),
-          referrer_domain: referrerDomain ?? (source === "direct" ? null : source),
+          ...attributionToApiFields(urlAttribution),
+          referrer_domain: referrerDomain,
           device_type: detectClientDeviceType(),
         });
 
