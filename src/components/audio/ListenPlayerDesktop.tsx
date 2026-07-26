@@ -79,19 +79,19 @@ export default function ListenPlayerDesktop() {
   } = useListenPlayer();
 
   const secondaryBtnClass =
-    "inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35";
+    "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#6f4bbb] via-[#8e68c9] to-[#2b1749] text-white shadow-[0_18px_48px_rgba(55,30,100,0.18)]">
       <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-[#e5b5df]/20 blur-3xl motion-reduce:blur-none" />
       <div className="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-[#e9c3b5]/15 blur-3xl motion-reduce:blur-none" />
 
-      <div className="relative z-10 flex flex-col gap-6 p-6 xl:gap-7 xl:p-7 2xl:p-8">
+      <div className="relative z-10 flex flex-col gap-4 p-5 xl:gap-5 xl:p-5 2xl:gap-5 2xl:p-6">
         {/* 1. Top: cover + practice info */}
-        <section className="grid min-w-0 grid-cols-[minmax(280px,min(48%,460px))_minmax(0,1fr)] items-start gap-6 xl:gap-8">
-          <div className="w-full max-w-[460px] justify-self-start">
+        <section className="grid min-w-0 grid-cols-[minmax(240px,min(42%,320px))_minmax(0,1fr)] items-start gap-5 xl:gap-6 2xl:grid-cols-[minmax(260px,min(34%,360px))_minmax(0,1fr)]">
+          <div className="w-full max-w-[320px] justify-self-start 2xl:max-w-[360px]">
             <div
-              className={`relative aspect-square w-full overflow-hidden rounded-[28px] shadow-[0_28px_70px_rgba(20,8,42,0.38)] ${
+              className={`relative aspect-square w-full overflow-hidden rounded-[24px] shadow-[0_22px_56px_rgba(20,8,42,0.34)] ${
                 showCoverImage
                   ? "bg-[#2b1749]"
                   : `bg-gradient-to-br ${coverGradient}`
@@ -102,7 +102,7 @@ export default function ListenPlayerDesktop() {
                   coverUrl={activeCoverUrl}
                   coverImage={activeCoverImage}
                   updatedAt={activeCoverUpdatedAt}
-                  displayWidth={480}
+                  displayWidth={360}
                   priority
                   className="absolute inset-0 h-full w-full object-cover"
                   onError={() => {
@@ -113,10 +113,10 @@ export default function ListenPlayerDesktop() {
                 />
               ) : (
                 <>
-                  <div className="absolute -left-10 -top-10 h-52 w-52 rounded-full bg-white/15 blur-2xl motion-reduce:blur-none" />
-                  <div className="absolute -bottom-12 -right-10 h-56 w-56 rounded-full bg-[#f7d2c8]/30 blur-2xl motion-reduce:blur-none" />
+                  <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl motion-reduce:blur-none" />
+                  <div className="absolute -bottom-12 -right-10 h-44 w-44 rounded-full bg-[#f7d2c8]/30 blur-2xl motion-reduce:blur-none" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex h-40 w-40 items-center justify-center rounded-full border border-white/40 bg-white/10 text-[88px] text-white shadow-[0_0_60px_rgba(255,255,255,0.28)]">
+                    <div className="flex h-28 w-28 items-center justify-center rounded-full border border-white/40 bg-white/10 text-[64px] text-white shadow-[0_0_48px_rgba(255,255,255,0.28)]">
                       {coverSymbol}
                     </div>
                   </div>
@@ -125,19 +125,19 @@ export default function ListenPlayerDesktop() {
             </div>
           </div>
 
-          <div className="min-w-0 pt-1">
+          <div className="min-w-0 pt-0.5">
             <p className="text-xs uppercase tracking-[0.18em] text-white/60">
               Сейчас играет
             </p>
 
             {queueLabel ? (
-              <p className="mt-2 text-xs uppercase tracking-[0.14em] text-white/55">
+              <p className="mt-1.5 text-xs uppercase tracking-[0.14em] text-white/55">
                 {queueLabel}
                 {activeQueue?.title ? ` · ${activeQueue.title}` : ""}
               </p>
             ) : null}
 
-            <h1 className="mt-3 text-[30px] font-semibold leading-[1.15] tracking-[-0.01em] xl:text-[34px] 2xl:text-[36px]">
+            <h1 className="mt-2 text-[26px] font-semibold leading-[1.18] tracking-[-0.01em] xl:text-[28px] 2xl:text-[32px]">
               {practiceTitle}
             </h1>
 
@@ -156,17 +156,17 @@ export default function ListenPlayerDesktop() {
             <AuthorLink
               authorSlug={authorSlug}
               authorName={authorName}
-              className="mt-3 inline-block text-[15px] font-medium text-white/80 hover:text-white"
+              className="mt-2.5 inline-block text-[15px] font-medium text-white/80 hover:text-white"
             />
 
             {trimmedFormat ? (
-              <p className="mt-2 text-xs uppercase tracking-[0.14em] text-white/50">
+              <p className="mt-1.5 text-xs uppercase tracking-[0.14em] text-white/50">
                 {trimmedFormat}
               </p>
             ) : null}
 
             {isAuthorPreview ? (
-              <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/80">
+              <p className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3.5 py-1 text-xs text-white/80">
                 Режим предпросмотра автора
               </p>
             ) : null}
@@ -241,9 +241,9 @@ export default function ListenPlayerDesktop() {
         </section>
 
         {/* 2. Bottom: full-width controls panel */}
-        <section className="rounded-[24px] border border-white/12 bg-[#2b1749]/35 px-5 py-5 backdrop-blur-sm xl:px-7 xl:py-6">
+        <section className="rounded-[22px] border border-white/12 bg-[#2b1749]/35 px-5 py-4 backdrop-blur-sm xl:px-6 xl:py-4">
           {isEngineReady && isMultiTrack ? (
-            <div className="mb-5" aria-label="Общий прогресс программы">
+            <div className="mb-4" aria-label="Общий прогресс программы">
               <div className="flex items-center justify-between text-xs text-white/65">
                 <span>Пройдено {programProgressPercent}%</span>
                 {programCompleted ? (
@@ -309,14 +309,14 @@ export default function ListenPlayerDesktop() {
                     </span>
                   </div>
 
-                  <div className="mt-6 flex flex-col items-center">
-                    <div className="flex items-center justify-center gap-3 xl:gap-4">
+                  <div className="mt-4 flex flex-col items-center">
+                    <div className="flex items-center justify-center gap-2.5 xl:gap-3">
                       <button
                         type="button"
                         onClick={() => handleSeekOffset(-15)}
                         disabled={!hasValidDuration}
                         aria-label="Назад на 15 секунд"
-                        className={`${secondaryBtnClass} p-2.5`}
+                        className={`${secondaryBtnClass} p-2`}
                       >
                         <RewindFifteenIcon />
                       </button>
@@ -345,12 +345,12 @@ export default function ListenPlayerDesktop() {
                         onClick={() => void handlePlayPause()}
                         disabled={!isEngineReady || !src || isLoading}
                         aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
-                        className="inline-flex h-[72px] w-[72px] items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_18px_40px_rgba(0,0,0,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_14px_32px_rgba(0,0,0,0.26)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isPlaying ? (
-                          <PauseIcon className="h-9 w-9" />
+                          <PauseIcon className="h-8 w-8" />
                         ) : (
-                          <PlayIcon className="h-9 w-9" />
+                          <PlayIcon className="h-8 w-8" />
                         )}
                       </button>
 
@@ -374,7 +374,7 @@ export default function ListenPlayerDesktop() {
                         onClick={() => handleSeekOffset(15)}
                         disabled={!hasValidDuration}
                         aria-label="Вперёд на 15 секунд"
-                        className={`${secondaryBtnClass} p-2.5`}
+                        className={`${secondaryBtnClass} p-2`}
                       >
                         <ForwardFifteenIcon />
                       </button>
@@ -384,7 +384,7 @@ export default function ListenPlayerDesktop() {
                       type="button"
                       onClick={handleSpeedChange}
                       aria-label={`Скорость воспроизведения ${playbackRate}×`}
-                      className="mt-3 min-h-10 rounded-full border border-white/20 px-4 py-1.5 text-sm font-semibold text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                      className="mt-2 min-h-9 rounded-full border border-white/20 px-3.5 py-1 text-sm font-semibold text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                     >
                       {playbackRate}×
                     </button>
@@ -407,21 +407,21 @@ export default function ListenPlayerDesktop() {
           <ListenPlayerPromoSlot forDesktop />
 
           {listeningNotice ? (
-            <div className="mt-6 rounded-[20px] border border-white/12 bg-white/[0.07] px-5 py-4 xl:px-6">
-              <div className="flex min-w-0 items-start gap-4">
+            <div className="mt-4 rounded-[18px] border border-white/12 bg-white/[0.07] px-4 py-3 xl:px-5">
+              <div className="flex min-w-0 items-start gap-3">
                 <div
-                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg text-white/80"
+                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-base text-white/80"
                   aria-hidden="true"
                 >
                   ✦
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[16px] font-semibold leading-snug">
+                  <h2 className="text-[15px] font-semibold leading-snug">
                     {listeningNotice.title}
                   </h2>
                   <FormattedPlainText
                     text={listeningNotice.text}
-                    className="mt-1.5 text-sm leading-6 text-white/72"
+                    className="mt-1 text-sm leading-5 text-white/72"
                   />
                 </div>
               </div>
