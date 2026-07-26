@@ -79,17 +79,17 @@ export default function ListenPlayerDesktop() {
   } = useListenPlayer();
 
   const secondaryBtnClass =
-    "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35";
+    "inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#6f4bbb] via-[#8e68c9] to-[#2b1749] text-white shadow-[0_18px_48px_rgba(55,30,100,0.18)]">
       <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-[#e5b5df]/20 blur-3xl motion-reduce:blur-none" />
       <div className="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-[#e9c3b5]/15 blur-3xl motion-reduce:blur-none" />
 
-      <div className="relative z-10 flex flex-col gap-4 p-5 xl:gap-5 xl:p-5 2xl:gap-5 2xl:p-6">
+      <div className="relative z-10 flex flex-col gap-3 p-4 xl:gap-3 xl:p-4 2xl:gap-3.5 2xl:p-4">
         {/* 1. Top: cover + practice info */}
-        <section className="grid min-w-0 grid-cols-[minmax(240px,min(42%,320px))_minmax(0,1fr)] items-start gap-5 xl:gap-6 2xl:grid-cols-[minmax(260px,min(34%,360px))_minmax(0,1fr)]">
-          <div className="w-full max-w-[320px] justify-self-start 2xl:max-w-[360px]">
+        <section className="grid min-w-0 grid-cols-[minmax(220px,min(40%,290px))_minmax(0,1fr)] items-start gap-4 xl:gap-5 2xl:grid-cols-[minmax(240px,min(32%,325px))_minmax(0,1fr)]">
+          <div className="w-full max-w-[290px] justify-self-start 2xl:max-w-[325px]">
             <div
               className={`relative aspect-square w-full overflow-hidden rounded-[24px] shadow-[0_22px_56px_rgba(20,8,42,0.34)] ${
                 showCoverImage
@@ -102,7 +102,7 @@ export default function ListenPlayerDesktop() {
                   coverUrl={activeCoverUrl}
                   coverImage={activeCoverImage}
                   updatedAt={activeCoverUpdatedAt}
-                  displayWidth={360}
+                  displayWidth={325}
                   priority
                   className="absolute inset-0 h-full w-full object-cover"
                   onError={() => {
@@ -241,9 +241,9 @@ export default function ListenPlayerDesktop() {
         </section>
 
         {/* 2. Bottom: full-width controls panel */}
-        <section className="rounded-[22px] border border-white/12 bg-[#2b1749]/35 px-5 py-4 backdrop-blur-sm xl:px-6 xl:py-4">
+        <section className="rounded-[22px] border border-white/12 bg-[#2b1749]/35 px-4 py-3.5 backdrop-blur-sm xl:px-5 xl:py-3.5">
           {isEngineReady && isMultiTrack ? (
-            <div className="mb-4" aria-label="Общий прогресс программы">
+            <div className="mb-3" aria-label="Общий прогресс программы">
               <div className="flex items-center justify-between text-xs text-white/65">
                 <span>Пройдено {programProgressPercent}%</span>
                 {programCompleted ? (
@@ -309,14 +309,14 @@ export default function ListenPlayerDesktop() {
                     </span>
                   </div>
 
-                  <div className="mt-4 flex flex-col items-center">
-                    <div className="flex items-center justify-center gap-2.5 xl:gap-3">
+                  <div className="mt-3 flex flex-col items-center">
+                    <div className="flex items-center justify-center gap-2 xl:gap-2.5">
                       <button
                         type="button"
                         onClick={() => handleSeekOffset(-15)}
                         disabled={!hasValidDuration}
                         aria-label="Назад на 15 секунд"
-                        className={`${secondaryBtnClass} p-2`}
+                        className={`${secondaryBtnClass} p-1.5`}
                       >
                         <RewindFifteenIcon />
                       </button>
@@ -345,12 +345,12 @@ export default function ListenPlayerDesktop() {
                         onClick={() => void handlePlayPause()}
                         disabled={!isEngineReady || !src || isLoading}
                         aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
-                        className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_14px_32px_rgba(0,0,0,0.26)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-[58px] w-[58px] items-center justify-center rounded-full bg-white text-[#4b2f86] shadow-[0_12px_28px_rgba(0,0,0,0.26)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isPlaying ? (
-                          <PauseIcon className="h-8 w-8" />
+                          <PauseIcon className="h-7 w-7" />
                         ) : (
-                          <PlayIcon className="h-8 w-8" />
+                          <PlayIcon className="h-7 w-7" />
                         )}
                       </button>
 
@@ -384,7 +384,7 @@ export default function ListenPlayerDesktop() {
                       type="button"
                       onClick={handleSpeedChange}
                       aria-label={`Скорость воспроизведения ${playbackRate}×`}
-                      className="mt-2 min-h-9 rounded-full border border-white/20 px-3.5 py-1 text-sm font-semibold text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                      className="mt-1.5 min-h-8 rounded-full border border-white/20 px-3 py-0.5 text-sm font-semibold text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                     >
                       {playbackRate}×
                     </button>
@@ -393,7 +393,7 @@ export default function ListenPlayerDesktop() {
               )}
 
               {progressError ? (
-                <p className="mt-3 text-center text-xs text-white/55">
+                <p className="mt-2.5 text-center text-xs text-white/55">
                   {progressError}
                 </p>
               ) : null}
@@ -407,10 +407,10 @@ export default function ListenPlayerDesktop() {
           <ListenPlayerPromoSlot forDesktop />
 
           {listeningNotice ? (
-            <div className="mt-4 rounded-[18px] border border-white/12 bg-white/[0.07] px-4 py-3 xl:px-5">
+            <div className="mt-3 rounded-[18px] border border-white/12 bg-white/[0.07] px-4 py-2.5 xl:px-5">
               <div className="flex min-w-0 items-start gap-3">
                 <div
-                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-base text-white/80"
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm text-white/80"
                   aria-hidden="true"
                 >
                   ✦
