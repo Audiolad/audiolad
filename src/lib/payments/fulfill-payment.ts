@@ -241,7 +241,7 @@ export async function fulfillSucceededTochkaPayment(input: {
 
 export async function markWebhookEventTerminal(input: {
   webhookEventId: string;
-  processingStatus: "ignored" | "requires_review" | "failed";
+  processingStatus: "processed" | "ignored" | "requires_review" | "failed";
   reviewReason?: string | null;
   lastError?: string | null;
 }): Promise<boolean> {

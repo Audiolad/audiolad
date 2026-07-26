@@ -9,6 +9,10 @@ import {
   recordTochkaWebhookEvent,
 } from "@/lib/payments/fulfill-payment";
 import { parseTochkaAmountToMinor } from "@/lib/payments/payment-api";
+import {
+  applyTochkaRefundWebhookStatus,
+  isTochkaRefundWebhookStatus,
+} from "@/lib/payments/refunds/webhook-refunds";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
 import { verifyTochkaWebhookJwt } from "@/lib/payments/tochka-webhook";
 import {
@@ -96,6 +100,55 @@ export async function POST(request: Request) {
     logCheckoutEvent("tochka_webhook_ignored_type", {
       webhookEventId: recorded.id,
     });
+    return new NextResponse(null, { status: 200 });
+  }
+
+  // Refund lifecycle (P3.3.1) — separate fact layer, APPROVED fulfill untouched.
+  if (isTochkaRefundWebhookStatus(sanitized.status)) {
+    if (!sanitized.operationId) {
+      await markWebhookEventTerminal({
+        webhookEventId: recorded.id,
+        processingStatus: "ignored",
+        lastError: "refund_missing_operation_id",
+      });
+      return new NextResponse(null, { status: 200 });
+    }
+
+    const refundResult = await applyTochkaRefundWebhookStatus({
+      providerPaymentId: sanitized.operationId,
+      providerStatus: sanitized.status,
+      amountMinor: parseTochkaAmountToMinor(sanitized.amount),
+      safeSnapshot: {
+        webhook_status: sanitized.status,
+        webhook_event_id: recorded.id,
+      },
+      correlationId: `webhook:${recorded.id}`,
+    });
+
+    if (!refundResult.ok) {
+      logCheckoutEvent("tochka_webhook_refund_failed", {
+        webhookEventId: recorded.id,
+        outcome: refundResult.outcome,
+      });
+      return new NextResponse(null, { status: 500 });
+    }
+
+    await markWebhookEventTerminal({
+      webhookEventId: recorded.id,
+      processingStatus:
+        refundResult.outcome === "requires_review" ? "requires_review" : "processed",
+      reviewReason:
+        refundResult.outcome === "requires_review"
+          ? "webhook_refund_ambiguous"
+          : null,
+    });
+
+    logCheckoutEvent("tochka_webhook_refund_applied", {
+      webhookEventId: recorded.id,
+      outcome: refundResult.outcome,
+      updatedCount: refundResult.updatedCount,
+    });
+
     return new NextResponse(null, { status: 200 });
   }
 

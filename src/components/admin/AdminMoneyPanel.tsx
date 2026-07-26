@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_MONEY_AUTHOR_GROSS_TOOLTIP,
   ADMIN_MONEY_FUNNEL_NOTE,
+  ADMIN_MONEY_PROVIDER_FEES_NOTE,
   ADMIN_MONEY_REFUNDS_NOTE,
+  ADMIN_REFUND_ACCESS_NOTE,
+  ADMIN_REFUND_METRIC_DICTIONARY,
 } from "@/lib/admin/analytics-money-dictionary";
 import { formatRubFromMinor } from "@/lib/admin/analytics-money-format";
 import type {
@@ -394,6 +397,71 @@ export default function AdminMoneyPanel({
             Новые покупатели: {summary.newBuyers}. Повторные: {summary.repeatBuyers}.{" "}
             {ADMIN_MONEY_FUNNEL_NOTE}
           </p>
+
+          <section className="space-y-3" aria-labelledby="money-refunds-heading">
+            <h4 id="money-refunds-heading" className="text-[17px] font-semibold">
+              Возвраты и чистые поступления
+            </h4>
+            {summary.refunds ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                  {(
+                    [
+                      {
+                        key: "refunded" as const,
+                        value: formatRubFromMinor(summary.refunds.refundedMinor),
+                        sub: `${summary.refunds.refundCount} шт.`,
+                      },
+                      {
+                        key: "netCollected" as const,
+                        value: formatRubFromMinor(summary.refunds.netMinor),
+                        sub: "до комиссий",
+                      },
+                      {
+                        key: "providerFees" as const,
+                        value: ADMIN_MONEY_PROVIDER_FEES_NOTE,
+                        sub: "—",
+                      },
+                      {
+                        key: "refundsPending" as const,
+                        value: String(summary.refunds.pendingCount),
+                        sub: formatRubFromMinor(summary.refunds.pendingMinor),
+                      },
+                      {
+                        key: "refundsRequiresReview" as const,
+                        value: String(summary.refunds.requiresReviewCount),
+                        sub: formatRubFromMinor(summary.refunds.requiresReviewMinor),
+                      },
+                    ]
+                  ).map((card) => {
+                    const def = ADMIN_REFUND_METRIC_DICTIONARY[card.key];
+                    return (
+                      <div
+                        key={card.key}
+                        className="rounded-[18px] border border-[#eadff8] bg-white p-3 shadow-sm"
+                        title={`${def.hint}\nТип: ${def.kindLabel}\nФормула: ${def.formula}`}
+                      >
+                        <p className="text-xs font-medium text-[#796ba0]">{def.label}</p>
+                        <p className="mt-1 text-xl font-semibold text-[#25135c] sm:text-2xl">
+                          {card.value}
+                        </p>
+                        <p className="mt-1 text-xs text-[#796ba0]">{card.sub}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[#796ba0]">
+                  Полностью возвращённых оплат: {summary.refunds.fullyRefundedPayments}.
+                  Частично: {summary.refunds.partiallyRefundedPayments}.{" "}
+                  {ADMIN_REFUND_ACCESS_NOTE}
+                </p>
+              </>
+            ) : (
+              <p className="rounded-[16px] border border-[#eadff8] bg-white px-4 py-4 text-sm text-[#796ba0]">
+                Слой возвратов недоступен. «Получено оплат» показано без изменений.
+              </p>
+            )}
+          </section>
 
           <section className="space-y-3" aria-labelledby="money-funnel-heading">
             <h4 id="money-funnel-heading" className="text-[17px] font-semibold">

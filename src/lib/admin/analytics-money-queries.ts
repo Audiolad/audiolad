@@ -73,6 +73,23 @@ export type AdminMoneyAuthorRow = {
   repeatBuyers: number;
 };
 
+/**
+ * Refund overlay for the money panel (P3.3.1).
+ * Null while the refund layer is unavailable — gross never depends on it.
+ */
+export type AdminMoneySummaryRefunds = {
+  refundCount: number;
+  refundedMinor: number;
+  netMinor: number;
+  partiallyRefundedPayments: number;
+  fullyRefundedPayments: number;
+  pendingCount: number;
+  pendingMinor: number;
+  requiresReviewCount: number;
+  requiresReviewMinor: number;
+  providerFees: string;
+};
+
 export type AdminMoneySummaryBundle = {
   period: AdminAnalyticsPeriod;
   includeTest: boolean;
@@ -93,6 +110,7 @@ export type AdminMoneySummaryBundle = {
   kpi: AdminMoneyKpiCard[];
   funnel: AdminMoneyFunnelStep[];
   timeseries: AdminMoneyTimeseriesPoint[];
+  refunds: AdminMoneySummaryRefunds | null;
   notes: {
     sot: string;
     refunds: string;
@@ -251,6 +269,7 @@ export async function getAdminMoneySummaryBundle(input: {
     }),
     funnel: [],
     timeseries: [],
+    refunds: null,
     notes: {
       sot: "payments.status=succeeded",
       refunds: "not_connected",
@@ -268,7 +287,7 @@ export async function getAdminMoneySummaryBundle(input: {
       ? "week"
       : "day";
 
-  const [summaryResult, timeseriesResult] = await Promise.all([
+  const [summaryResult, timeseriesResult, refundsResult] = await Promise.all([
     supabase.rpc("admin_payments_p31_summary", {
       p_from: range.from,
       p_to: range.to,
@@ -285,6 +304,11 @@ export async function getAdminMoneySummaryBundle(input: {
       p_author_id: input.authorId ?? null,
       p_practice_id: input.practiceId ?? null,
       p_bucket: bucket,
+    }),
+    supabase.rpc("admin_refund_p331_summary", {
+      p_from: range.from,
+      p_to: range.to,
+      p_include_test: input.includeTest,
     }),
   ]);
 
@@ -331,6 +355,31 @@ export async function getAdminMoneySummaryBundle(input: {
       })
     : [];
 
+  // Refund overlay is optional: a missing refund layer must not break money.
+  const refundsRaw =
+    !refundsResult.error && refundsResult.data
+      ? (refundsResult.data as Record<string, unknown>)
+      : null;
+
+  if (refundsResult.error) {
+    console.error("admin_refund_p331_summary_error", refundsResult.error.message);
+  }
+
+  const refunds: AdminMoneySummaryRefunds | null = refundsRaw
+    ? {
+        refundCount: asNumber(refundsRaw.refund_count),
+        refundedMinor: asNumber(refundsRaw.refunded_minor),
+        netMinor: asNumber(refundsRaw.net_minor, grossMinor),
+        partiallyRefundedPayments: asNumber(refundsRaw.partially_refunded_payments),
+        fullyRefundedPayments: asNumber(refundsRaw.fully_refunded_payments),
+        pendingCount: asNumber(refundsRaw.pending_count),
+        pendingMinor: asNumber(refundsRaw.pending_minor),
+        requiresReviewCount: asNumber(refundsRaw.requires_review_count),
+        requiresReviewMinor: asNumber(refundsRaw.requires_review_minor),
+        providerFees: "not_connected",
+      }
+    : null;
+
   return {
     period: input.period,
     includeTest: input.includeTest,
@@ -359,9 +408,10 @@ export async function getAdminMoneySummaryBundle(input: {
     }),
     funnel,
     timeseries,
+    refunds,
     notes: {
       sot: "payments.status=succeeded",
-      refunds: "not_connected",
+      refunds: refunds ? "p331_refund_facts" : "not_connected",
       authorPayout: "not_connected",
       dailyUniqueBuyers: "not_additive_to_period_unique",
     },

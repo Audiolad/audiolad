@@ -15,6 +15,7 @@ export const PLATFORM_PERMISSIONS = [
   "analytics.view",
   "finance.view",
   "payouts.manage",
+  "refunds.manage",
   "team.view",
   "team.manage",
   "settings.manage",
@@ -63,7 +64,12 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
   ],
   support: ["admin_panel.access", "authors.view", "users.view"],
   analyst: ["admin_panel.access", "dashboard.view", "analytics.view"],
-  finance: ["admin_panel.access", "finance.view", "payouts.manage"],
+  finance: [
+    "admin_panel.access",
+    "finance.view",
+    "payouts.manage",
+    "refunds.manage",
+  ],
 };
 
 export function isPlatformPermission(

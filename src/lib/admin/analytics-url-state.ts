@@ -4,7 +4,7 @@ import {
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 
-export type AdminAnalyticsView = "product" | "money" | "sources";
+export type AdminAnalyticsView = "product" | "money" | "sources" | "refunds";
 export type AdminAnalyticsTab = "practices" | "authors" | "utm";
 export type AdminMoneyTab = "products" | "authors";
 export type AdminAnalyticsTopN = "10" | "25" | "all";
@@ -61,6 +61,9 @@ export type AdminAnalyticsUrlState = {
   moneyAuthorId: string | null;
   moneyPracticeId: string | null;
   moneyDrill: AdminMoneyDrillMetric;
+  /** Refunds (P3.3.1) — reuses the money period and test toggle. */
+  refundsStatus: string | null;
+  refundsQ: string;
   /** Path-to-purchase (P3.2.1) — independent of money period when set. */
   pathPeriod: AdminAnalyticsPeriod;
   pathProduct: string | null;
@@ -124,10 +127,24 @@ function parseDrill(value: string | null): AdminAnalyticsDrillMetric {
 }
 
 function parseView(value: string | null): AdminAnalyticsView {
-  if (value === "money" || value === "sources") {
+  if (value === "money" || value === "sources" || value === "refunds") {
     return value;
   }
   return "product";
+}
+
+function parseRefundsStatus(value: string | null): string | null {
+  if (!value) return null;
+  const allowed = new Set([
+    "requested",
+    "submitted",
+    "pending",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "requires_review",
+  ]);
+  return allowed.has(value) ? value : null;
 }
 
 function parseMoneyTab(value: string | null): AdminMoneyTab {
@@ -226,6 +243,8 @@ export function parseAdminAnalyticsUrlState(
     moneyAuthorId: get("moneyAuthorId"),
     moneyPracticeId: get("moneyPracticeId"),
     moneyDrill: parseMoneyDrill(get("moneyDrill")),
+    refundsStatus: parseRefundsStatus(get("refundsStatus")),
+    refundsQ: (get("refundsQ") ?? "").trim(),
     pathPeriod: parseAdminAnalyticsPeriod(
       get("pathPeriod") ?? get("moneyPeriod"),
     ),
@@ -302,6 +321,8 @@ export function buildAdminAnalyticsSearchParams(
     ["moneyAuthorId", state.moneyAuthorId],
     ["moneyPracticeId", state.moneyPracticeId],
     ["moneyDrill", state.moneyDrill],
+    ["refundsStatus", state.refundsStatus],
+    ["refundsQ", state.refundsQ || null],
     [
       "pathPeriod",
       state.pathPeriod === state.moneyPeriod ? null : state.pathPeriod,

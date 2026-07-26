@@ -28,6 +28,24 @@ export type CreateTochkaPaymentResult = {
   rawResponse: Record<string, unknown>;
 };
 
+export type RefundTochkaPaymentInput = {
+  operationId: string;
+  amountMinor: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+};
+
+export type RefundTochkaPaymentResult = {
+  providerRefundId: string | null;
+  isRefund: boolean;
+  amountMinor: number | null;
+  providerStatus: string | null;
+  providerDate: string | null;
+  rawResponse: Record<string, unknown>;
+};
+
+const REFUND_REQUEST_TIMEOUT_MS = 20_000;
+
 type TochkaReceiptItem = {
   name: string;
   amount: number;
@@ -200,6 +218,117 @@ export async function createTochkaPaymentOperation(
     paymentLink,
     paymentLinkId,
     status,
+    rawResponse: payload,
+  };
+}
+
+/**
+ * POST /acquiring/v1.0/payments/{operationId}/refund
+ *
+ * Amount is serialized in decimal rubles exactly like create payment, and must
+ * not exceed the original payment (the provider supports partial refunds).
+ * The response `orderId` is the refund operation id, stored as provider_refund_id.
+ *
+ * Error codes are meaningful: `tochka_refund_rejected` is a definitive provider
+ * rejection, while timeout/transport codes leave the refund state unknown.
+ */
+export async function refundTochkaPaymentOperation(
+  input: RefundTochkaPaymentInput,
+): Promise<RefundTochkaPaymentResult> {
+  const config = getTochkaConfig();
+
+  if (!config) {
+    throw new Error("tochka_not_configured");
+  }
+
+  if (!input.operationId || input.operationId.trim() === "") {
+    throw new Error("tochka_refund_missing_operation_id");
+  }
+
+  if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
+    throw new Error("tochka_refund_invalid_amount");
+  }
+
+  const amount = minorToRubles(input.amountMinor);
+
+  if (!(amount > 0)) {
+    throw new Error("tochka_refund_invalid_amount");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REFUND_REQUEST_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  input.signal?.addEventListener("abort", onExternalAbort);
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${config.jwtToken}`,
+  };
+
+  if (input.idempotencyKey) {
+    headers["Idempotency-Key"] = input.idempotencyKey;
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${config.apiBaseUrl}/acquiring/v1.0/payments/${encodeURIComponent(input.operationId)}/refund`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ Data: { amount } }),
+        signal: controller.signal,
+        cache: "no-store",
+      },
+    );
+  } catch {
+    if (controller.signal.aborted) {
+      throw new Error("tochka_refund_timeout");
+    }
+    // Never surface the underlying message: it can carry request details.
+    throw new Error("tochka_refund_transport_error");
+  } finally {
+    clearTimeout(timeout);
+    input.signal?.removeEventListener("abort", onExternalAbort);
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | Record<string, unknown>
+    | null;
+
+  if (!response.ok) {
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error("tochka_refund_rejected");
+    }
+    throw new Error("tochka_refund_failed");
+  }
+
+  if (!payload) {
+    throw new Error("tochka_refund_invalid_response");
+  }
+
+  const data = extractDataObject(payload);
+
+  if (!data) {
+    throw new Error("tochka_refund_invalid_response");
+  }
+
+  const providerRefundId =
+    typeof data.orderId === "string" && data.orderId.trim() !== ""
+      ? data.orderId
+      : null;
+
+  return {
+    providerRefundId,
+    isRefund: data.isRefund === true,
+    amountMinor:
+      typeof data.amount === "number" && Number.isFinite(data.amount)
+        ? Math.round(data.amount * 100)
+        : null,
+    providerStatus: typeof data.status === "string" ? data.status : null,
+    providerDate: typeof data.date === "string" ? data.date : null,
     rawResponse: payload,
   };
 }
