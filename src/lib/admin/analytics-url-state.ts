@@ -4,7 +4,13 @@ import {
 } from "@/lib/admin/analytics-period";
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 
-export type AdminAnalyticsView = "product" | "money" | "sources" | "refunds";
+export type AdminAnalyticsView =
+  | "product"
+  | "money"
+  | "sources"
+  | "refunds"
+  | "authors-economy";
+export type AdminAuthorEconomyTab = "authors" | "ledger" | "terms" | "dry-run";
 export type AdminAnalyticsTab = "practices" | "authors" | "utm";
 export type AdminMoneyTab = "products" | "authors";
 export type AdminAnalyticsTopN = "10" | "25" | "all";
@@ -64,6 +70,11 @@ export type AdminAnalyticsUrlState = {
   /** Refunds (P3.3.1) — reuses the money period and test toggle. */
   refundsStatus: string | null;
   refundsQ: string;
+  /** Author economy (P3.3.2) — reuses the money period and test toggle. */
+  authorEconomyTab: AdminAuthorEconomyTab;
+  authorEconomyAuthorId: string | null;
+  authorEconomyEntryType: string | null;
+  authorEconomyQ: string;
   /** Path-to-purchase (P3.2.1) — independent of money period when set. */
   pathPeriod: AdminAnalyticsPeriod;
   pathProduct: string | null;
@@ -127,10 +138,34 @@ function parseDrill(value: string | null): AdminAnalyticsDrillMetric {
 }
 
 function parseView(value: string | null): AdminAnalyticsView {
-  if (value === "money" || value === "sources" || value === "refunds") {
+  if (
+    value === "money" ||
+    value === "sources" ||
+    value === "refunds" ||
+    value === "authors-economy"
+  ) {
     return value;
   }
   return "product";
+}
+
+function parseAuthorEconomyTab(value: string | null): AdminAuthorEconomyTab {
+  if (value === "ledger" || value === "terms" || value === "dry-run") {
+    return value;
+  }
+  return "authors";
+}
+
+function parseAuthorEconomyEntryType(value: string | null): string | null {
+  if (!value) return null;
+  const allowed = new Set([
+    "sale_accrual",
+    "refund_reversal",
+    "manual_credit",
+    "manual_debit",
+    "correction",
+  ]);
+  return allowed.has(value) ? value : null;
 }
 
 function parseRefundsStatus(value: string | null): string | null {
@@ -245,6 +280,12 @@ export function parseAdminAnalyticsUrlState(
     moneyDrill: parseMoneyDrill(get("moneyDrill")),
     refundsStatus: parseRefundsStatus(get("refundsStatus")),
     refundsQ: (get("refundsQ") ?? "").trim(),
+    authorEconomyTab: parseAuthorEconomyTab(get("authorEconomyTab")),
+    authorEconomyAuthorId: get("authorEconomyAuthorId"),
+    authorEconomyEntryType: parseAuthorEconomyEntryType(
+      get("authorEconomyEntryType"),
+    ),
+    authorEconomyQ: (get("authorEconomyQ") ?? "").trim(),
     pathPeriod: parseAdminAnalyticsPeriod(
       get("pathPeriod") ?? get("moneyPeriod"),
     ),
@@ -323,6 +364,13 @@ export function buildAdminAnalyticsSearchParams(
     ["moneyDrill", state.moneyDrill],
     ["refundsStatus", state.refundsStatus],
     ["refundsQ", state.refundsQ || null],
+    [
+      "authorEconomyTab",
+      state.authorEconomyTab === "authors" ? null : state.authorEconomyTab,
+    ],
+    ["authorEconomyAuthorId", state.authorEconomyAuthorId],
+    ["authorEconomyEntryType", state.authorEconomyEntryType],
+    ["authorEconomyQ", state.authorEconomyQ || null],
     [
       "pathPeriod",
       state.pathPeriod === state.moneyPeriod ? null : state.pathPeriod,

@@ -14,6 +14,7 @@ import AdminAnalyticsTestTrafficControls from "@/components/admin/AdminAnalytics
 import AdminAnalyticsTimeseriesChart from "@/components/admin/AdminAnalyticsTimeseriesChart";
 import AdminAttributionPanel from "@/components/admin/AdminAttributionPanel";
 import AdminMoneyPanel from "@/components/admin/AdminMoneyPanel";
+import AdminAuthorEconomyPanel from "@/components/admin/AdminAuthorEconomyPanel";
 import AdminRefundsPanel from "@/components/admin/AdminRefundsPanel";
 import { ADMIN_ANALYTICS_PERIOD_OPTIONS } from "@/lib/admin/analytics-period";
 import type {
@@ -228,6 +229,7 @@ export default function AdminAnalyticsWorkbench({
             { id: "product", label: "Продукт" },
             { id: "money", label: "Деньги" },
             { id: "refunds", label: "Возвраты" },
+            { id: "authors-economy", label: "Экономика авторов" },
             { id: "sources", label: "Источники" },
           ] as const satisfies ReadonlyArray<{ id: AdminAnalyticsView; label: string }>
         ).map((item) => (
@@ -254,6 +256,10 @@ export default function AdminAnalyticsWorkbench({
 
       {view === "refunds" ? (
         <AdminRefundsPanel urlState={urlState} onPatch={replaceState} />
+      ) : null}
+
+      {view === "authors-economy" ? (
+        <AdminAuthorEconomyPanel urlState={urlState} onPatch={replaceState} />
       ) : null}
 
       {view === "sources" ? (

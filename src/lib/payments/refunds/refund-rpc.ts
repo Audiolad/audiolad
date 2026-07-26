@@ -3,6 +3,7 @@
  * Every money decision lives in SQL; this file only marshals arguments.
  */
 
+import { ensureFinanceObligationProcessed } from "@/lib/payments/author-finance/finance-rpc";
 import {
   mapRefundSettlement,
   type RefundSettlement,
@@ -278,7 +279,36 @@ export async function applyPaymentRefundProviderStatus(input: {
     return rpcFailure("rejected", toValidationCode(error.message));
   }
 
-  return mapRpcResult(data, "");
+  const result = mapRpcResult(data, "");
+
+  if (result.ok && result.refund?.status === "succeeded") {
+    await settleAuthorReversal(result.refund.id, input.correlationId);
+  }
+
+  return result;
+}
+
+/**
+ * P3.3.2: drain the reversal obligation the refund transition enqueued.
+ * The refund itself is already a committed fact, so a bookkeeping problem is
+ * logged and left in the outbox rather than surfaced to the refund caller.
+ */
+async function settleAuthorReversal(
+  refundId: string,
+  correlationId: string | null,
+): Promise<void> {
+  try {
+    await ensureFinanceObligationProcessed({
+      obligationType: "refund_succeeded_reversal",
+      subjectId: refundId,
+      fallbackCorrelationId: correlationId,
+    });
+  } catch (error) {
+    console.error(
+      "author_reversal_post_refund_error",
+      error instanceof Error ? error.message : "unknown",
+    );
+  }
 }
 
 export async function cancelPaymentRefundRequest(input: {

@@ -1,3 +1,4 @@
+import { ensureFinanceObligationProcessed } from "@/lib/payments/author-finance/finance-rpc";
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
 import type { PaymentRow } from "@/lib/payments/payment-api";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -236,7 +237,42 @@ export async function fulfillSucceededTochkaPayment(input: {
     });
   }
 
+  if (result.paymentId && result.paymentStatus === "succeeded") {
+    await settleAuthorAccrual(result.paymentId, result.webhookEventId);
+  }
+
   return result;
+}
+
+/**
+ * P3.3.2: drain the accrual obligation the fulfill transaction enqueued.
+ * The buyer already has their payment and their access at this point, so a
+ * bookkeeping problem must never surface here — anything unresolved stays in
+ * the outbox for process_due_finance_obligations.
+ */
+async function settleAuthorAccrual(
+  paymentId: string,
+  webhookEventId: string | null,
+): Promise<void> {
+  try {
+    const settled = await ensureFinanceObligationProcessed({
+      obligationType: "payment_succeeded_accrual",
+      subjectId: paymentId,
+      fallbackCorrelationId: webhookEventId,
+    });
+
+    if (settled && settled.status === "requires_review") {
+      logCheckoutEvent("author_accrual_requires_review", {
+        paymentId,
+        resultCode: settled.resultCode,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "author_accrual_post_fulfill_error",
+      error instanceof Error ? error.message : "unknown",
+    );
+  }
 }
 
 export async function markWebhookEventTerminal(input: {

@@ -455,6 +455,11 @@ export default function AdminMoneyPanel({
                   Частично: {summary.refunds.partiallyRefundedPayments}.{" "}
                   {ADMIN_REFUND_ACCESS_NOTE}
                 </p>
+                <p className="text-xs text-[#796ba0]">
+                  Доля авторов в этих суммах не учтена: обязательства перед
+                  авторами считаются отдельным реестром в разделе «Экономика
+                  авторов».
+                </p>
               </>
             ) : (
               <p className="rounded-[16px] border border-[#eadff8] bg-white px-4 py-4 text-sm text-[#796ba0]">
