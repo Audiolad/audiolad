@@ -2747,6 +2747,204 @@ assert(
   "past-release closing section",
 );
 
+const clarifyDesiresArticle = getArticleBySlug("kak-ponyat-chego-ya-hochu");
+assert(clarifyDesiresArticle, "clarify-desires article registered");
+assert(
+  clarifyDesiresArticle.title ===
+    "Как понять, чего вы действительно хотите: вопросы для спокойного размышления",
+  "clarify-desires H1",
+);
+assert(
+  clarifyDesiresArticle.metaTitle ===
+    "Как понять, чего я хочу: вопросы для спокойного размышления – АудиоЛад",
+  "clarify-desires SEO title",
+);
+assert(
+  clarifyDesiresArticle.metaDescription !==
+    clarifyDesiresArticle.leadBeforeAudio,
+  "clarify-desires metaDescription is not visual lead",
+);
+assert(
+  clarifyDesiresArticle.topicSlug === "besplatnye-meditatsii",
+  "clarify-desires uses free meditations hub",
+);
+assert(
+  clarifyDesiresArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "clarify-desires topic href",
+);
+assert(
+  clarifyDesiresArticle.primaryPractice.practiceKey === "kod-prityazheniya",
+  "clarify-desires primary practice key",
+);
+assert(
+  clarifyDesiresArticle.primaryPracticeIntro.includes("Код Притяжения"),
+  "clarify-desires practice intro",
+);
+assert(
+  clarifyDesiresArticle.primaryPracticeIntro.includes(
+    "сосредоточиться на одном выбранном направлении",
+  ),
+  "clarify-desires practice intro stays CTA-aligned",
+);
+assert(
+  !clarifyDesiresArticle.primaryPracticeIntro.includes("определяет желания") &&
+    !clarifyDesiresArticle.primaryPracticeIntro.includes("найдёт за вас"),
+  "clarify-desires practice intro does not invent desire-finding claims",
+);
+assert(
+  clarifyDesiresArticle.leadBeforeAudio.includes(
+    "всё меньше понимает, чего на самом деле хочет",
+  ),
+  "clarify-desires opening body paragraph",
+);
+assert(
+  clarifyDesiresArticle.shortAnswer.includes(
+    "не хватает спокойного пространства",
+  ),
+  "clarify-desires short answer",
+);
+assert(
+  clarifyDesiresArticle.sections.some(
+    (section) => section.id === "zhelaniya-mogut-menyatsya",
+  ),
+  "clarify-desires has desires-can-change section",
+);
+assert(
+  clarifyDesiresArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("как отпустить прошлое и перестать жить воспоминаниями"),
+    ),
+  ),
+  "clarify-desires body mentions past-release sibling",
+);
+assert(
+  clarifyDesiresArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("визуализации желаний"),
+    ),
+  ),
+  "clarify-desires body mentions wish visualization sibling",
+);
+assert(
+  clarifyDesiresArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "clarify-desires links to past-release article",
+);
+assert(
+  clarifyDesiresArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/vizualizatsiya-zhelaniy",
+  ),
+  "clarify-desires links to wish visualization article",
+);
+assert(
+  clarifyDesiresArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "clarify-desires links to free meditations hub",
+);
+assert(
+  Boolean(clarifyDesiresArticle.brandNote?.includes("АудиоЛаде")),
+  "clarify-desires brand note",
+);
+assert(
+  clarifyDesiresArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "clarify-desires see-also includes hub",
+);
+assert(
+  clarifyDesiresArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "clarify-desires see-also includes past-release",
+);
+assert(
+  clarifyDesiresArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/vizualizatsiya-zhelaniy",
+  ),
+  "clarify-desires see-also includes wish visualization",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "kak-ponyat-chego-ya-hochu",
+  ),
+  "free hub lists clarify-desires article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-ponyat-chego-ya-hochu",
+  ),
+  "money hub does not list clarify-desires article",
+);
+assert(
+  !clarifyDesiresArticle.leadBeforeAudio.includes("—") &&
+    !clarifyDesiresArticle.shortAnswer.includes("—") &&
+    !clarifyDesiresArticle.metaTitle.includes("—"),
+  "clarify-desires uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-ponyat-chego-ya-hochu"),
+  "clarify-desires in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-ponyat-chego-ya-hochu")
+    .length === 1,
+  "clarify-desires slug unique",
+);
+assert(
+  clarifyDesiresArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "clarify-desires publishedAt set",
+);
+assert(
+  clarifyDesiresArticle.closingSection.title === "Главное",
+  "clarify-desires closing section",
+);
+assert(
+  clarifyDesiresArticle.faq.length === 4,
+  "clarify-desires faq count",
+);
+assert(
+  wishVisualizationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-ponyat-chego-ya-hochu",
+  ),
+  "wish visualization reverse-links to clarify-desires article",
+);
+assert(
+  wishVisualizationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-ponyat-chego-ya-hochu",
+  ),
+  "wish visualization see-also includes clarify-desires",
+);
+assert(
+  wishVisualizationArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "wish visualization updatedAt bumped for clarify-desires reverse",
+);
+assert(
+  wishVisualizationArticle.publishedAt === "2026-07-25T00:00:00.000Z",
+  "wish visualization publishedAt unchanged",
+);
+assert(
+  wishMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-ponyat-chego-ya-hochu",
+  ),
+  "wish meditation reverse-links to clarify-desires article",
+);
+assert(
+  wishMeditationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-ponyat-chego-ya-hochu",
+  ),
+  "wish meditation see-also includes clarify-desires",
+);
+assert(
+  wishMeditationArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "wish meditation updatedAt bumped for clarify-desires reverse",
+);
+assert(
+  wishMeditationArticle.publishedAt === "2026-07-25T00:00:00.000Z",
+  "wish meditation publishedAt unchanged",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
