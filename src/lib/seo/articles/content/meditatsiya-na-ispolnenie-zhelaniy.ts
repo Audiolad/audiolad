@@ -138,6 +138,14 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если конкретное желание пока не определено, сначала можно обратиться к статье ",
+      linkLabel:
+        "«Как понять, чего вы действительно хотите: вопросы для спокойного размышления»",
+      href: "/articles/kak-ponyat-chego-ya-hochu",
+      after: ", где собраны вопросы, помогающие услышать собственное направление.",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -173,6 +181,11 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-ponyat-chego-ya-hochu",
+      title: "Как понять, чего я хочу",
+      description: "Если желание пока не сформулировано",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -192,5 +205,5 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-27T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

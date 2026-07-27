@@ -276,6 +276,12 @@ assert(
   "free hub includes past-release SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-ponyat-chego-ya-hochu",
+  ),
+  "free hub includes clarify-desires SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
