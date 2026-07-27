@@ -2295,8 +2295,20 @@ assert(
   "forgive-a-person avoids CTA overload for past-release reverse",
 );
 assert(
-  forgivePersonArticle.updatedAt === "2026-07-27T12:00:00.000Z",
-  "forgive-a-person updatedAt bumped for past-release reverse-link edit",
+  forgivePersonArticle.updatedAt === "2026-07-27T13:00:00.000Z",
+  "forgive-a-person updatedAt bumped for self-forgiveness reverse-link edit",
+);
+assert(
+  forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-sebya",
+  ),
+  "forgive-a-person reverse-links to self-forgiveness article",
+);
+assert(
+  forgivePersonArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prostit-sebya",
+  ),
+  "forgive-a-person see-also includes self-forgiveness",
 );
 assert(
   forgivePersonArticle.publishedAt === "2026-07-27T00:00:00.000Z",
@@ -2943,6 +2955,136 @@ assert(
 assert(
   wishMeditationArticle.publishedAt === "2026-07-25T00:00:00.000Z",
   "wish meditation publishedAt unchanged",
+);
+
+const selfForgivenessArticle = getArticleBySlug("kak-prostit-sebya");
+assert(selfForgivenessArticle, "self-forgiveness article registered");
+assert(
+  selfForgivenessArticle.title ===
+    "Как простить себя за прошлые ошибки и начать относиться к себе бережнее",
+  "self-forgiveness H1",
+);
+assert(
+  selfForgivenessArticle.metaTitle ===
+    "Как простить себя за прошлые ошибки – АудиоЛад",
+  "self-forgiveness SEO title",
+);
+assert(
+  selfForgivenessArticle.metaDescription !==
+    selfForgivenessArticle.leadBeforeAudio,
+  "self-forgiveness metaDescription is not visual lead",
+);
+assert(
+  selfForgivenessArticle.topicSlug === "besplatnye-meditatsii",
+  "self-forgiveness uses free meditations hub",
+);
+assert(
+  selfForgivenessArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "self-forgiveness primary practice key",
+);
+assert(
+  selfForgivenessArticle.primaryPracticeIntro.includes(
+    "13 шагов Радикального прощения",
+  ),
+  "self-forgiveness practice intro",
+);
+assert(
+  selfForgivenessArticle.primaryPracticeIntro.includes(
+    "перестать обвинять себя",
+  ),
+  "self-forgiveness practice intro stays CTA-aligned",
+);
+assert(
+  selfForgivenessArticle.shortAnswer.includes(
+    "не значит объявить любой свой поступок правильным",
+  ),
+  "self-forgiveness short answer",
+);
+assert(
+  selfForgivenessArticle.sections.some(
+    (section) => section.id === "dopolnitelnaya-podderzhka",
+  ),
+  "self-forgiveness keeps professional-support section",
+);
+assert(
+  selfForgivenessArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "self-forgiveness links to past-release article",
+);
+assert(
+  selfForgivenessArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ),
+  "self-forgiveness links to forgive-a-person article",
+);
+assert(
+  selfForgivenessArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "self-forgiveness links to free meditations hub",
+);
+assert(
+  Boolean(selfForgivenessArticle.brandNote?.includes("АудиоЛаде")),
+  "self-forgiveness brand note",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "kak-prostit-sebya",
+  ),
+  "free hub lists self-forgiveness article",
+);
+assert(
+  !selfForgivenessArticle.leadBeforeAudio.includes("—") &&
+    !selfForgivenessArticle.shortAnswer.includes("—") &&
+    !selfForgivenessArticle.metaTitle.includes("—"),
+  "self-forgiveness uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-prostit-sebya"),
+  "self-forgiveness in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-prostit-sebya").length ===
+    1,
+  "self-forgiveness slug unique",
+);
+assert(
+  selfForgivenessArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "self-forgiveness publishedAt set",
+);
+assert(
+  selfForgivenessArticle.faq.length === 4,
+  "self-forgiveness faq count",
+);
+assert(
+  pastReleaseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-sebya",
+  ),
+  "past-release reverse-links to self-forgiveness article",
+);
+assert(
+  pastReleaseArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prostit-sebya",
+  ),
+  "past-release see-also includes self-forgiveness",
+);
+assert(
+  pastReleaseArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("Как простить себя"),
+    ),
+  ),
+  "past-release body mentions self-forgiveness sibling",
+);
+assert(
+  pastReleaseArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "past-release updatedAt bumped for self-forgiveness reverse",
+);
+assert(
+  pastReleaseArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "past-release publishedAt unchanged",
 );
 
 assert(
