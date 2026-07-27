@@ -373,6 +373,14 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если страх расходов проявляется прежде всего через постоянную экономию на собственных потребностях и привычку выбирать себя последней, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать экономить на себе и начать учитывать собственные потребности»",
+      href: "/articles/kak-perestat-ekonomit-na-sebe",
+      after: ".",
+    },
+    {
+      before:
         "Если трудность с личными расходами связана с привычкой считать собственные потребности менее важными, обесценивать свой труд или не участвовать в финансовых решениях, отдельно можно прочитать статью ",
       linkLabel:
         "«Женская самоценность и деньги: как уважение к себе влияет на финансовые решения»",
@@ -411,6 +419,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-perestat-ekonomit-na-sebe",
+      title: "Как перестать экономить на себе",
+      description: "Привычка выбирать себя последней и плановые личные расходы",
+    },
+    {
       href: "/articles/zhenskaya-samotsennost-i-dengi",
       title: "Женская самоценность и деньги",
       description: "Потребности, ценность труда и финансовые границы",
@@ -435,5 +448,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T18:00:00.000Z",
 } as const satisfies ArticleDefinition;

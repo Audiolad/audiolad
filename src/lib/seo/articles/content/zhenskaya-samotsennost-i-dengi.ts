@@ -390,6 +390,11 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
       description: "Вина после покупки и личные расходы в бюджете",
     },
     {
+      href: "/articles/kak-perestat-ekonomit-na-sebe",
+      title: "Как перестать экономить на себе",
+      description: "Привычка выбирать себя последней в финансовых вопросах",
+    },
+    {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
       title: "Как женщине разрешить себе деньги",
       description: "Принятие оплаты, потребности и финансовое участие",
@@ -414,5 +419,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T17:00:00.000Z",
+  updatedAt: "2026-07-27T18:00:00.000Z",
 } as const satisfies ArticleDefinition;
