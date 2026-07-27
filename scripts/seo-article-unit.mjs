@@ -3380,6 +3380,85 @@ assert(
   "change money attitude see-also includes fear-spend-on-self",
 );
 
+const stopSavingOnSelfArticle = getArticleBySlug(
+  "kak-perestat-ekonomit-na-sebe",
+);
+assert(stopSavingOnSelfArticle, "stop-saving-on-self article registered");
+assert(
+  stopSavingOnSelfArticle.title ===
+    "Как перестать экономить на себе и начать учитывать собственные потребности",
+  "stop-saving-on-self H1",
+);
+assert(
+  stopSavingOnSelfArticle.metaTitle ===
+    "Как перестать экономить на себе – спокойный и практичный подход | АудиоЛад",
+  "stop-saving-on-self SEO title",
+);
+assert(
+  stopSavingOnSelfArticle.topicSlug === "besplatnye-meditatsii",
+  "stop-saving-on-self hub",
+);
+assert(
+  stopSavingOnSelfArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "stop-saving-on-self practice",
+);
+assert(
+  stopSavingOnSelfArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "stop-saving-on-self practice intro",
+);
+assert(
+  stopSavingOnSelfArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не заменяет бюджет, накопления"),
+    ),
+  "stop-saving-on-self practice disclaimer",
+);
+assert(
+  stopSavingOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/strah-tratit-dengi-na-sebya",
+  ),
+  "stop-saving-on-self links to fear-spend-on-self",
+);
+assert(
+  stopSavingOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "stop-saving-on-self links to female-self-worth-money",
+);
+assert(
+  listArticleSlugs().includes("kak-perestat-ekonomit-na-sebe"),
+  "stop-saving-on-self in slug list",
+);
+assert(
+  !stopSavingOnSelfArticle.metaTitle.includes("—"),
+  "stop-saving-on-self uses medium dash",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-ekonomit-na-sebe",
+  ),
+  "fear-spend-on-self reverse-links to stop-saving-on-self",
+);
+assert(
+  femaleSelfWorthMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-ekonomit-na-sebe",
+  ),
+  "female-self-worth-money see-also includes stop-saving-on-self",
+);
+assert(
+  allowYourselfMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-ekonomit-na-sebe",
+  ),
+  "allow-yourself-money see-also includes stop-saving-on-self",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-ekonomit-na-sebe",
+  ),
+  "change money attitude see-also includes stop-saving-on-self",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

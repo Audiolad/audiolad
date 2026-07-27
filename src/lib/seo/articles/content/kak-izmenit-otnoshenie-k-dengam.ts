@@ -240,6 +240,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Тревога перед личными расходами и семейные правила",
     },
     {
+      href: "/articles/kak-perestat-ekonomit-na-sebe",
+      title: "Как перестать экономить на себе",
+      description: "Устойчивые привычки и учёт личных потребностей",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -259,5 +264,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T17:00:00.000Z",
+  updatedAt: "2026-07-27T18:00:00.000Z",
 } as const satisfies ArticleDefinition;
