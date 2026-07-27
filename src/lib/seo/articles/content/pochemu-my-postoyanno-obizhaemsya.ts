@@ -222,6 +222,14 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если обида перешла в устойчивую злость на конкретного человека и мешает вернуть внутреннее спокойствие, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать постоянно злиться на человека и вернуть себе внутреннее спокойствие»",
+      href: "/articles/kak-perestat-zlitsya-na-cheloveka",
+      after: ".",
+    },
+    {
+      before:
         "Если речь идёт не о привычке часто обижаться, а о конкретном человеке, после поступка которого трудно двигаться дальше, можно также прочитать статью ",
       linkLabel:
         "«Как простить человека, если обида всё ещё не отпускает»",
@@ -260,6 +268,11 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-perestat-zlitsya-na-cheloveka",
+      title: "Как перестать злиться на человека",
+      description: "Если обида перешла в устойчивую злость",
+    },
+    {
       href: "/articles/kak-otpustit-proshloe",
       title: "Как отпустить прошлое",
       description: "Если внимание чаще уходит в воспоминания и несбывшиеся ожидания",
@@ -274,5 +287,5 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T12:00:00.000Z",
+  updatedAt: "2026-07-27T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

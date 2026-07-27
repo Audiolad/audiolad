@@ -2295,8 +2295,14 @@ assert(
   "forgive-a-person avoids CTA overload for past-release reverse",
 );
 assert(
-  forgivePersonArticle.updatedAt === "2026-07-27T13:00:00.000Z",
-  "forgive-a-person updatedAt bumped for self-forgiveness reverse-link edit",
+  forgivePersonArticle.updatedAt === "2026-07-27T14:00:00.000Z",
+  "forgive-a-person updatedAt bumped for anger reverse-link edit",
+);
+assert(
+  forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-zlitsya-na-cheloveka",
+  ),
+  "forgive-a-person reverse-links to anger article",
 );
 assert(
   forgivePersonArticle.afterFinalAudio?.some(
@@ -2517,8 +2523,14 @@ assert(
   "habitual-offense see-also includes past-release article",
 );
 assert(
-  habitualOffenseArticle.updatedAt === "2026-07-27T12:00:00.000Z",
-  "habitual-offense updatedAt bumped for past-release reverse",
+  habitualOffenseArticle.updatedAt === "2026-07-27T14:00:00.000Z",
+  "habitual-offense updatedAt bumped for anger reverse",
+);
+assert(
+  habitualOffenseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-zlitsya-na-cheloveka",
+  ),
+  "habitual-offense reverse-links to anger article",
 );
 assert(
   habitualOffenseArticle.publishedAt === "2026-07-27T00:00:00.000Z",
@@ -3079,8 +3091,79 @@ assert(
   "past-release body mentions self-forgiveness sibling",
 );
 assert(
-  pastReleaseArticle.updatedAt === "2026-07-27T12:00:00.000Z",
-  "past-release updatedAt bumped for self-forgiveness reverse",
+  pastReleaseArticle.updatedAt === "2026-07-27T14:00:00.000Z",
+  "past-release updatedAt bumped for anger reverse",
+);
+assert(
+  pastReleaseArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-zlitsya-na-cheloveka",
+  ),
+  "past-release see-also includes anger article",
+);
+
+const angerAtPersonArticle = getArticleBySlug(
+  "kak-perestat-zlitsya-na-cheloveka",
+);
+assert(angerAtPersonArticle, "anger-at-person article registered");
+assert(
+  angerAtPersonArticle.title ===
+    "Как перестать постоянно злиться на человека и вернуть себе внутреннее спокойствие",
+  "anger-at-person H1",
+);
+assert(
+  angerAtPersonArticle.metaTitle ===
+    "Как перестать злиться на человека и вернуть спокойствие – АудиоЛад",
+  "anger-at-person SEO title",
+);
+assert(
+  angerAtPersonArticle.topicSlug === "besplatnye-meditatsii",
+  "anger-at-person hub",
+);
+assert(
+  angerAtPersonArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "anger-at-person practice",
+);
+assert(
+  angerAtPersonArticle.primaryPracticeIntro.includes(
+    "не требует оправдывать",
+  ) === false &&
+    angerAtPersonArticle.sections
+      .find((section) => section.id === "audiopraktika")
+      ?.paragraphs.some((paragraph) =>
+        paragraph.includes("не требует оправдывать чужое поведение"),
+      ),
+  "anger-at-person practice disclaimer present",
+);
+assert(
+  angerAtPersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "anger-at-person links to habitual-offense",
+);
+assert(
+  angerAtPersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ),
+  "anger-at-person links to forgive-a-person",
+);
+assert(
+  angerAtPersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "anger-at-person links to past-release",
+);
+assert(
+  listArticleSlugs().includes("kak-perestat-zlitsya-na-cheloveka"),
+  "anger-at-person in slug list",
+);
+assert(
+  !angerAtPersonArticle.metaTitle.includes("—"),
+  "anger-at-person uses medium dash",
+);
+assert(
+  angerAtPersonArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "anger-at-person publishedAt",
 );
 assert(
   pastReleaseArticle.publishedAt === "2026-07-27T00:00:00.000Z",
