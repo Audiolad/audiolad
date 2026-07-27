@@ -370,6 +370,14 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     },
     {
       before:
+        "Если до разговора о прощении важно сначала разобраться со злостью, границами и ожиданиями, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать постоянно злиться на человека и вернуть себе внутреннее спокойствие»",
+      href: "/articles/kak-perestat-zlitsya-na-cheloveka",
+      after: ".",
+    },
+    {
+      before:
         "Если после работы с обидой на другого человека остаётся тяжёлое чувство к себе – за свои реакции, молчание, решения или роль в этой истории, – отдельно можно прочитать статью ",
       linkLabel: "«Как простить себя»",
       href: "/articles/kak-prostit-sebya",
@@ -404,6 +412,11 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
       description: "Если мысли снова возвращаются к болезненной ситуации",
     },
     {
+      href: "/articles/kak-perestat-zlitsya-na-cheloveka",
+      title: "Как перестать злиться на человека",
+      description: "Если сначала важно разобраться со злостью и границами",
+    },
+    {
       href: "/articles/kak-prostit-sebya",
       title: "Как простить себя",
       description: "Если после прощения другого остаётся вина перед собой",
@@ -426,5 +439,5 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T13:00:00.000Z",
+  updatedAt: "2026-07-27T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

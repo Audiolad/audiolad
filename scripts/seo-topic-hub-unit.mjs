@@ -288,6 +288,12 @@ assert(
   "free hub includes self-forgiveness SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-perestat-zlitsya-na-cheloveka",
+  ),
+  "free hub includes anger-at-person SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
