@@ -12,6 +12,12 @@ export type AuthorFinanceCapabilities = {
   canManageTerms: boolean;
   canManageLedger: boolean;
   canManageAdjustments: boolean;
+  canViewPayouts: boolean;
+  canCreatePayouts: boolean;
+  canApprovePayouts: boolean;
+  canMarkPayoutsPaid: boolean;
+  canReversePayouts: boolean;
+  canManagePayouts: boolean;
 };
 
 async function resolveActor(): Promise<
@@ -49,6 +55,21 @@ async function resolveActor(): Promise<
         access,
         "finance.adjustments.manage",
       ),
+      canViewPayouts: snapshotHasPermission(access, "finance.payouts.view"),
+      canCreatePayouts: snapshotHasPermission(access, "finance.payouts.create"),
+      canApprovePayouts: snapshotHasPermission(
+        access,
+        "finance.payouts.approve",
+      ),
+      canMarkPayoutsPaid: snapshotHasPermission(
+        access,
+        "finance.payouts.mark_paid",
+      ),
+      canReversePayouts: snapshotHasPermission(
+        access,
+        "finance.payouts.reverse",
+      ),
+      canManagePayouts: snapshotHasPermission(access, "finance.payouts.manage"),
     },
   };
 }
@@ -75,7 +96,8 @@ export async function requireAuthorFinanceViewActor(): Promise<
     snapshotHasPermission(access, "finance.view") ||
     snapshotHasPermission(access, "analytics.view") ||
     resolved.capabilities.canManageTerms ||
-    resolved.capabilities.canManageLedger;
+    resolved.capabilities.canManageLedger ||
+    resolved.capabilities.canViewPayouts;
 
   if (!canView) {
     return {

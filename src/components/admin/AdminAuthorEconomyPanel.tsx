@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import AdminAuthorPayoutsPanel from "@/components/admin/AdminAuthorPayoutsPanel";
 import {
   ADMIN_AUTHOR_FINANCE_BLOCKER_LABELS,
   ADMIN_AUTHOR_FINANCE_DICTIONARY,
@@ -35,6 +36,7 @@ type Capabilities = {
   canManageTerms: boolean;
   canManageLedger: boolean;
   canManageAdjustments: boolean;
+  canViewPayouts: boolean;
 };
 
 type AuthorEconomyBundle = {
@@ -49,6 +51,7 @@ const TABS = [
   { id: "authors", label: "Авторы" },
   { id: "ledger", label: "Реестр" },
   { id: "terms", label: "Условия" },
+  { id: "payouts", label: "Выплаты" },
   { id: "dry-run", label: "Предпросмотр истории" },
 ] as const satisfies ReadonlyArray<{ id: AdminAuthorEconomyTab; label: string }>;
 
@@ -273,6 +276,7 @@ export default function AdminAuthorEconomyPanel({
     canManageTerms: false,
     canManageLedger: false,
     canManageAdjustments: false,
+    canViewPayouts: false,
   };
 
   const authorOptions = useMemo(
@@ -590,6 +594,16 @@ export default function AdminAuthorEconomyPanel({
               busyId={busyId}
               onAction={runTermsAction}
             />
+          ) : null}
+
+          {tab === "payouts" ? (
+            capabilities.canViewPayouts ? (
+              <AdminAuthorPayoutsPanel urlState={urlState} onPatch={onPatch} />
+            ) : (
+              <p className="rounded-[16px] border border-[#eadff8] bg-white p-4 text-sm text-[#796ba0]">
+                Нужно разрешение finance.payouts.view, чтобы видеть выплаты.
+              </p>
+            )
           ) : null}
 
           {tab === "dry-run" ? (

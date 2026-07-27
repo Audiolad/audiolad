@@ -10,7 +10,19 @@ export type AdminAnalyticsView =
   | "sources"
   | "refunds"
   | "authors-economy";
-export type AdminAuthorEconomyTab = "authors" | "ledger" | "terms" | "dry-run";
+export type AdminAuthorEconomyTab =
+  | "authors"
+  | "ledger"
+  | "terms"
+  | "payouts"
+  | "dry-run";
+export type AdminAuthorPayoutTab =
+  | "candidates"
+  | "drafts"
+  | "processing"
+  | "paid"
+  | "review"
+  | "all";
 export type AdminAnalyticsTab = "practices" | "authors" | "utm";
 export type AdminMoneyTab = "products" | "authors";
 export type AdminAnalyticsTopN = "10" | "25" | "all";
@@ -75,6 +87,9 @@ export type AdminAnalyticsUrlState = {
   authorEconomyAuthorId: string | null;
   authorEconomyEntryType: string | null;
   authorEconomyQ: string;
+  /** Payouts (P3.3.3) — lives inside the author economy view. */
+  payoutTab: AdminAuthorPayoutTab;
+  payoutStatus: string | null;
   /** Path-to-purchase (P3.2.1) — independent of money period when set. */
   pathPeriod: AdminAnalyticsPeriod;
   pathProduct: string | null;
@@ -150,10 +165,43 @@ function parseView(value: string | null): AdminAnalyticsView {
 }
 
 function parseAuthorEconomyTab(value: string | null): AdminAuthorEconomyTab {
-  if (value === "ledger" || value === "terms" || value === "dry-run") {
+  if (
+    value === "ledger" ||
+    value === "terms" ||
+    value === "payouts" ||
+    value === "dry-run"
+  ) {
     return value;
   }
   return "authors";
+}
+
+function parsePayoutTab(value: string | null): AdminAuthorPayoutTab {
+  if (
+    value === "drafts" ||
+    value === "processing" ||
+    value === "paid" ||
+    value === "review" ||
+    value === "all"
+  ) {
+    return value;
+  }
+  return "candidates";
+}
+
+function parsePayoutStatus(value: string | null): string | null {
+  if (!value) return null;
+  const allowed = new Set([
+    "draft",
+    "approved",
+    "processing",
+    "paid",
+    "failed",
+    "cancelled",
+    "requires_review",
+    "reversed",
+  ]);
+  return allowed.has(value) ? value : null;
 }
 
 function parseAuthorEconomyEntryType(value: string | null): string | null {
@@ -285,6 +333,8 @@ export function parseAdminAnalyticsUrlState(
     authorEconomyEntryType: parseAuthorEconomyEntryType(
       get("authorEconomyEntryType"),
     ),
+    payoutTab: parsePayoutTab(get("payoutTab")),
+    payoutStatus: parsePayoutStatus(get("payoutStatus")),
     authorEconomyQ: (get("authorEconomyQ") ?? "").trim(),
     pathPeriod: parseAdminAnalyticsPeriod(
       get("pathPeriod") ?? get("moneyPeriod"),
@@ -371,6 +421,8 @@ export function buildAdminAnalyticsSearchParams(
     ["authorEconomyAuthorId", state.authorEconomyAuthorId],
     ["authorEconomyEntryType", state.authorEconomyEntryType],
     ["authorEconomyQ", state.authorEconomyQ || null],
+    ["payoutTab", state.payoutTab === "candidates" ? null : state.payoutTab],
+    ["payoutStatus", state.payoutStatus],
     [
       "pathPeriod",
       state.pathPeriod === state.moneyPeriod ? null : state.pathPeriod,
