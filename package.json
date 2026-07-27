@@ -26,6 +26,7 @@
     "test:payments-p331": "npx tsx scripts/payments-p331-refund-unit.mjs && node scripts/payments-p331-refund-sql-unit.mjs",
     "test:payments-p332": "npx tsx scripts/payments-p332-author-finance-unit.mjs && node scripts/payments-p332-author-finance-sql-unit.mjs",
     "test:payments-p333": "npx tsx scripts/payments-p333-author-payout-unit.mjs && node scripts/payments-p333-author-payout-sql-unit.mjs",
+    "test:payments-p334": "npx tsx scripts/payments-p334-author-finance-unit.mjs && node scripts/payments-p334-author-finance-sql-unit.mjs",
     "test:analytics-p320": "npx tsx scripts/analytics-p320-client-unit.mjs && node scripts/analytics-p320-sql-unit.mjs",
     "test:analytics-p321": "npx tsx scripts/analytics-p321-client-unit.mjs && node scripts/analytics-p321-sql-unit.mjs",
     "test:analytics-p322": "npx tsx scripts/analytics-p322-client-unit.mjs && node scripts/analytics-p322-sql-unit.mjs",

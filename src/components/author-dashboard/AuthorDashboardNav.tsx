@@ -66,6 +66,20 @@ function DiagnosticsIcon() {
   );
 }
 
+function FinanceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M8 8h6a3 3 0 0 1 0 6H8m0-6v10m0-4h7M6 6h12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 type AuthorDashboardNavProps = {
   authorSlug?: string;
 };
@@ -102,6 +116,12 @@ export default function AuthorDashboardNav({
       label: "Продвижение",
       icon: PromotionIcon,
       active: pathname.startsWith("/author-dashboard/promotion"),
+    },
+    {
+      href: `/author-dashboard/finance${authorQuery}`,
+      label: "Финансы",
+      icon: FinanceIcon,
+      active: pathname.startsWith("/author-dashboard/finance"),
     },
   ];
 
