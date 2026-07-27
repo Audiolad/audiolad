@@ -300,6 +300,12 @@ assert(
   "free hub includes allow-yourself-money SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "zhenskaya-samotsennost-i-dengi",
+  ),
+  "free hub includes female-self-worth-money SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

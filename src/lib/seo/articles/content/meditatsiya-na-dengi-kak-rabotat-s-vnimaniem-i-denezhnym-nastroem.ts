@@ -192,6 +192,11 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
       description: "Если сначала важно разобраться с виной и правом на оплату",
     },
     {
+      href: "/articles/zhenskaya-samotsennost-i-dengi",
+      title: "Женская самоценность и деньги",
+      description: "Практический разбор оплаты, границ и обесценивания труда",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -214,5 +219,5 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T15:00:00.000Z",
+  updatedAt: "2026-07-27T16:00:00.000Z",
 } as const satisfies ArticleDefinition;

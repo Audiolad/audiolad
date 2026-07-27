@@ -230,6 +230,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Если конфликт связан с оплатой труда, виной и самоценностью",
     },
     {
+      href: "/articles/zhenskaya-samotsennost-i-dengi",
+      title: "Женская самоценность и деньги",
+      description: "Ценность труда, финансовые границы и переговоры",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -249,5 +254,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T15:00:00.000Z",
+  updatedAt: "2026-07-27T16:00:00.000Z",
 } as const satisfies ArticleDefinition;
