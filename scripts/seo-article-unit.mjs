@@ -3459,6 +3459,89 @@ assert(
   "change money attitude see-also includes stop-saving-on-self",
 );
 
+const acceptMoneyArticle = getArticleBySlug("kak-prinimat-dengi");
+assert(acceptMoneyArticle, "accept-money article registered");
+assert(
+  acceptMoneyArticle.title ===
+    "Как принимать деньги без чувства вины и неловкости",
+  "accept-money H1",
+);
+assert(
+  acceptMoneyArticle.metaTitle ===
+    "Как принимать деньги без чувства вины – АудиоЛад",
+  "accept-money SEO title",
+);
+assert(
+  acceptMoneyArticle.topicSlug === "besplatnye-meditatsii",
+  "accept-money hub",
+);
+assert(
+  acceptMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "accept-money practice",
+);
+assert(
+  acceptMoneyArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "accept-money practice intro",
+);
+assert(
+  acceptMoneyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует увеличения дохода"),
+    ),
+  "accept-money practice disclaimer",
+);
+assert(
+  acceptMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "accept-money links to allow-yourself-money",
+);
+assert(
+  acceptMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "accept-money links to female-self-worth-money",
+);
+assert(
+  listArticleSlugs().includes("kak-prinimat-dengi"),
+  "accept-money in slug list",
+);
+assert(
+  !acceptMoneyArticle.metaTitle.includes("—"),
+  "accept-money uses medium dash",
+);
+assert(
+  allowYourselfMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "allow-yourself-money reverse-links to accept-money",
+);
+assert(
+  femaleSelfWorthMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "female-self-worth-money see-also includes accept-money",
+);
+assert(
+  stopSavingOnSelfArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "stop-saving-on-self see-also includes accept-money",
+);
+assert(
+  fearSpendOnSelfArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "fear-spend-on-self see-also includes accept-money",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "change money attitude see-also includes accept-money",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

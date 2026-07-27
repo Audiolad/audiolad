@@ -511,6 +511,11 @@ export const KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE = {
       description: "Принятие оплаты и право учитывать желания",
     },
     {
+      href: "/articles/kak-prinimat-dengi",
+      title: "Как принимать деньги",
+      description: "Оплата, подарки и помощь без чувства вины",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Семейные установки и финансовые убеждения",
@@ -525,5 +530,5 @@ export const KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T19:00:00.000Z",
 } as const satisfies ArticleDefinition;

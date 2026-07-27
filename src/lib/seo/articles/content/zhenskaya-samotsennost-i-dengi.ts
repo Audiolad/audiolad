@@ -395,6 +395,11 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
       description: "Привычка выбирать себя последней в финансовых вопросах",
     },
     {
+      href: "/articles/kak-prinimat-dengi",
+      title: "Как принимать деньги",
+      description: "Получение оплаты и благодарности без оправданий",
+    },
+    {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
       title: "Как женщине разрешить себе деньги",
       description: "Принятие оплаты, потребности и финансовое участие",
@@ -419,5 +424,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T18:00:00.000Z",
+  updatedAt: "2026-07-27T19:00:00.000Z",
 } as const satisfies ArticleDefinition;

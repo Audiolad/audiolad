@@ -245,6 +245,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Устойчивые привычки и учёт личных потребностей",
     },
     {
+      href: "/articles/kak-prinimat-dengi",
+      title: "Как принимать деньги",
+      description: "Получение оплаты, подарков и помощи без вины",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -264,5 +269,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T18:00:00.000Z",
+  updatedAt: "2026-07-27T19:00:00.000Z",
 } as const satisfies ArticleDefinition;
