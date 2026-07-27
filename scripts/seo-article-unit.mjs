@@ -3236,6 +3236,79 @@ assert(
   "money meditation see-also includes allow-yourself-money",
 );
 
+const femaleSelfWorthMoneyArticle = getArticleBySlug(
+  "zhenskaya-samotsennost-i-dengi",
+);
+assert(femaleSelfWorthMoneyArticle, "female-self-worth-money article registered");
+assert(
+  femaleSelfWorthMoneyArticle.title ===
+    "Женская самоценность и деньги: как уважение к себе влияет на финансовые решения",
+  "female-self-worth-money H1",
+);
+assert(
+  femaleSelfWorthMoneyArticle.metaTitle ===
+    "Женская самоценность и деньги: как они связаны – АудиоЛад",
+  "female-self-worth-money SEO title",
+);
+assert(
+  femaleSelfWorthMoneyArticle.topicSlug === "besplatnye-meditatsii",
+  "female-self-worth-money hub",
+);
+assert(
+  femaleSelfWorthMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "female-self-worth-money practice",
+);
+assert(
+  femaleSelfWorthMoneyArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "female-self-worth-money practice intro",
+);
+assert(
+  femaleSelfWorthMoneyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует повышения дохода"),
+    ),
+  "female-self-worth-money practice disclaimer",
+);
+assert(
+  femaleSelfWorthMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "female-self-worth-money links to allow-yourself-money",
+);
+assert(
+  femaleSelfWorthMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
+  ),
+  "female-self-worth-money see-also includes money flow",
+);
+assert(
+  listArticleSlugs().includes("zhenskaya-samotsennost-i-dengi"),
+  "female-self-worth-money in slug list",
+);
+assert(
+  !femaleSelfWorthMoneyArticle.metaTitle.includes("—"),
+  "female-self-worth-money uses medium dash",
+);
+assert(
+  allowYourselfMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "allow-yourself-money reverse-links to female-self-worth-money",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "change money attitude see-also includes female-self-worth-money",
+);
+assert(
+  moneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "money meditation see-also includes female-self-worth-money",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
