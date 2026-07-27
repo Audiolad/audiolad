@@ -1,10 +1,8 @@
 import Link from "next/link";
 
-import {
-  getAdminApplicationStatusLabel,
-  isNewAuthorApplicationStatus,
-} from "@/lib/admin/application-status";
+import { isNewAuthorApplicationStatus } from "@/lib/admin/application-status";
 import type { AdminCommercialApplicationListItem } from "@/lib/admin/commercial-application-queries";
+import { getCommercialApplicationStatusLabel } from "@/lib/author-dashboard/commercial-onboarding";
 
 type CommercialApplicationsListProps = {
   applications: AdminCommercialApplicationListItem[];
@@ -56,8 +54,7 @@ export default function CommercialApplicationsList({
             <thead className="border-b border-[#eee6f7] bg-[#faf6ff] text-[#796ba0]">
               <tr>
                 <th className="px-4 py-3 font-medium">Автор</th>
-                <th className="px-4 py-3 font-medium">Темы</th>
-                <th className="px-4 py-3 font-medium">Формат</th>
+                <th className="px-4 py-3 font-medium">Планируемые продукты</th>
                 <th className="px-4 py-3 font-medium">Подана</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
                 <th className="px-4 py-3 font-medium" />
@@ -80,28 +77,36 @@ export default function CommercialApplicationsList({
                     </div>
                     {application.authorSlug ? (
                       <p className="mt-1 text-xs font-normal text-[#796ba0]">
-                        /{application.authorSlug}
+                        <Link
+                          href={`/authors/${application.authorSlug}`}
+                          className="hover:underline"
+                        >
+                          /{application.authorSlug}
+                        </Link>
                       </p>
                     ) : null}
                   </td>
-                  <td className="px-4 py-4 text-[#796ba0]">
-                    {truncate(application.topics, 48)}
+                  <td className="max-w-[280px] px-4 py-4 break-words text-[#796ba0]">
+                    {truncate(
+                      application.plannedProducts || application.topics,
+                      96,
+                    ) || "—"}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-[#796ba0]">
+                    {formatDateTime(
+                      application.submittedAt ?? application.createdAt,
+                    )}
                   </td>
                   <td className="px-4 py-4 text-[#796ba0]">
-                    {truncate(application.formatPlan, 40)}
-                  </td>
-                  <td className="px-4 py-4 text-[#796ba0]">
-                    {formatDateTime(application.submittedAt ?? application.createdAt)}
-                  </td>
-                  <td className="px-4 py-4 text-[#796ba0]">
-                    {getAdminApplicationStatusLabel(application.status)}
+                    {getCommercialApplicationStatusLabel(application.status) ??
+                      application.status}
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
                       href={`/admin/commercial-applications/${application.id}`}
                       className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] px-4 text-sm font-medium text-[#7042c5]"
                     >
-                      Открыть
+                      Открыть заявку
                     </Link>
                   </td>
                 </tr>
@@ -118,11 +123,11 @@ export default function CommercialApplicationsList({
             className="rounded-[22px] border border-[#eadff8] bg-white p-5"
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-[#25135c]">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold break-words text-[#25135c]">
                   {application.authorName}
                 </h2>
-                <p className="mt-1 text-sm text-[#796ba0]">
+                <p className="mt-1 text-sm break-words text-[#796ba0]">
                   {application.authorSlug
                     ? `/${application.authorSlug}`
                     : "Slug не указан"}
@@ -139,21 +144,22 @@ export default function CommercialApplicationsList({
               <div>
                 <dt className="text-[#9485b4]">Подана</dt>
                 <dd className="text-[#25135c]">
-                  {formatDateTime(application.submittedAt ?? application.createdAt)}
+                  {formatDateTime(
+                    application.submittedAt ?? application.createdAt,
+                  )}
                 </dd>
               </div>
               <div>
-                <dt className="text-[#9485b4]">Темы</dt>
-                <dd className="text-[#25135c]">{application.topics || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-[#9485b4]">Формат</dt>
-                <dd className="text-[#25135c]">{application.formatPlan || "—"}</dd>
+                <dt className="text-[#9485b4]">Планируемые продукты</dt>
+                <dd className="break-words text-[#25135c]">
+                  {application.plannedProducts || application.topics || "—"}
+                </dd>
               </div>
               <div>
                 <dt className="text-[#9485b4]">Статус</dt>
                 <dd className="text-[#25135c]">
-                  {getAdminApplicationStatusLabel(application.status)}
+                  {getCommercialApplicationStatusLabel(application.status) ??
+                    application.status}
                 </dd>
               </div>
             </dl>

@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 
 import AdminAnalyticsWorkbench from "@/components/admin/AdminAnalyticsWorkbench";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
+import CommercialApplicationsAttentionCard from "@/components/admin/CommercialApplicationsAttentionCard";
 import { getAdminAnalyticsSummaryBundle } from "@/lib/admin/analytics-queries";
+import type { CommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention";
+import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
 import {
   getFirstAllowedAdminPath,
   requireAdminPanelAccess,
@@ -42,12 +45,19 @@ export default async function AdminOverviewPage({
   );
   const params = await searchParams;
 
+  const canViewAuthors = snapshotHasPermission(session.access, "authors.view");
+
   let overviewStats;
   let analyticsSummary = null;
+  let commercialAttention: CommercialApplicationAttentionSummary | null = null;
 
   try {
+    const commercialPromise = canViewAuthors
+      ? getCachedAdminCommercialApplicationAttentionSummary()
+      : Promise.resolve(null);
+
     if (canViewAnalytics) {
-      [overviewStats, analyticsSummary] = await Promise.all([
+      [overviewStats, analyticsSummary, commercialAttention] = await Promise.all([
         getAdminOverviewStats(),
         getAdminAnalyticsSummaryBundle({
           period: params.period,
@@ -57,9 +67,13 @@ export default async function AdminOverviewPage({
           utmSource: params.utmSource,
           deviceType: params.deviceType,
         }),
+        commercialPromise,
       ]);
     } else {
-      overviewStats = await getAdminOverviewStats();
+      [overviewStats, commercialAttention] = await Promise.all([
+        getAdminOverviewStats(),
+        commercialPromise,
+      ]);
     }
   } catch (error) {
     console.error("admin_overview_load_error", error);
@@ -73,6 +87,10 @@ export default async function AdminOverviewPage({
 
   return (
     <div className="space-y-8">
+      {commercialAttention ? (
+        <CommercialApplicationsAttentionCard summary={commercialAttention} />
+      ) : null}
+
       {canViewAnalytics && analyticsSummary ? (
         <section aria-labelledby="admin-analytics-heading">
           <Suspense

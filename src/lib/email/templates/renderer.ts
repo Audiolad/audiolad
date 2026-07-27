@@ -13,6 +13,14 @@ import {
   renderAuthorApplicationSubmittedEmailText,
 } from "./author-application-submitted";
 import {
+  COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
+  COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
+  buildCommercialApplicationAdminAlertSubject,
+  renderCommercialApplicationAdminAlertEmailHtml,
+  renderCommercialApplicationAdminAlertEmailText,
+  type CommercialApplicationAdminAlertKind,
+} from "./commercial-application-admin-alert";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -103,6 +111,39 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (
+      input.templateKey === COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY
+    ) {
+      const authorName = readString(input.payload, "authorName");
+      const applicationId = readString(input.payload, "applicationId");
+
+      if (!authorName || !applicationId) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const kindValue = readString(input.payload, "kind");
+      const kind: CommercialApplicationAdminAlertKind =
+        kindValue === "updated" ? "updated" : "submitted";
+
+      return {
+        ok: true,
+        subject: buildCommercialApplicationAdminAlertSubject(authorName, kind),
+        html: renderCommercialApplicationAdminAlertEmailHtml({
+          authorName,
+          applicationId,
+          kind,
+          siteOrigin,
+        }),
+        text: renderCommercialApplicationAdminAlertEmailText({
+          authorName,
+          applicationId,
+          kind,
+          siteOrigin,
+        }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -122,6 +163,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY) {
     return AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+    return COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

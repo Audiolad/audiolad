@@ -1,4 +1,9 @@
 import {
+  sortAdminCommercialApplicationsByAttention,
+  summarizeCommercialApplicationAttention,
+  type CommercialApplicationAttentionSummary,
+} from "@/lib/admin/commercial-application-attention";
+import {
   AUTHOR_COMMERCIAL_APPLICATION_COLUMNS,
 } from "@/lib/author-commercial-applications/queries";
 import type {
@@ -14,6 +19,7 @@ export type AdminCommercialApplicationListItem = {
   authorId: string;
   authorName: string;
   authorSlug: string;
+  plannedProducts: string;
   topics: string;
   formatPlan: string;
   status: AuthorCommercialApplicationStatus;
@@ -21,6 +27,38 @@ export type AdminCommercialApplicationListItem = {
   createdAt: string;
   isNew: boolean;
 };
+
+function mapListRow(row: {
+  id: unknown;
+  author_id: unknown;
+  status: unknown;
+  planned_products?: unknown;
+  topics: unknown;
+  format_plan: unknown;
+  submitted_at: unknown;
+  created_at: unknown;
+  authors?:
+    | { name?: string; slug?: string }
+    | { name?: string; slug?: string }[]
+    | null;
+}): AdminCommercialApplicationListItem {
+  const authorsValue = row.authors ?? null;
+  const author = Array.isArray(authorsValue) ? authorsValue[0] : authorsValue;
+
+  return {
+    id: row.id as string,
+    authorId: row.author_id as string,
+    authorName: author?.name?.trim() || "Автор",
+    authorSlug: author?.slug?.trim() || "",
+    plannedProducts: String(row.planned_products ?? ""),
+    topics: String(row.topics ?? ""),
+    formatPlan: String(row.format_plan ?? ""),
+    status: row.status as AuthorCommercialApplicationStatus,
+    submittedAt: (row.submitted_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+    isNew: row.status === "submitted",
+  };
+}
 
 export async function listAdminCommercialApplications(input?: {
   status?: AuthorCommercialApplicationStatus | null;
@@ -34,6 +72,7 @@ export async function listAdminCommercialApplications(input?: {
       id,
       author_id,
       status,
+      planned_products,
       topics,
       format_plan,
       submitted_at,
@@ -58,26 +97,30 @@ export async function listAdminCommercialApplications(input?: {
     throw new Error("admin_commercial_applications_list_failed");
   }
 
-  return (data ?? []).map((row) => {
-    const authorsValue = row.authors as
-      | { name?: string; slug?: string }
-      | { name?: string; slug?: string }[]
-      | null;
-    const author = Array.isArray(authorsValue) ? authorsValue[0] : authorsValue;
+  const items = (data ?? []).map((row) => mapListRow(row));
 
-    return {
-      id: row.id as string,
-      authorId: row.author_id as string,
-      authorName: author?.name?.trim() || "Автор",
-      authorSlug: author?.slug?.trim() || "",
-      topics: String(row.topics ?? ""),
-      formatPlan: String(row.format_plan ?? ""),
-      status: row.status as AuthorCommercialApplicationStatus,
-      submittedAt: (row.submitted_at as string | null) ?? null,
-      createdAt: row.created_at as string,
-      isNew: row.status === "submitted",
-    };
-  });
+  return sortAdminCommercialApplicationsByAttention(items);
+}
+
+export async function getAdminCommercialApplicationAttentionSummary(): Promise<CommercialApplicationAttentionSummary> {
+  const service = createServiceRoleClient();
+
+  const { data, error } = await service
+    .from("author_commercial_applications")
+    .select("status")
+    .in("status", ["submitted", "needs_changes", "in_review"]);
+
+  if (error) {
+    console.error(
+      "admin_commercial_applications_attention_error",
+      error.message,
+    );
+    throw new Error("admin_commercial_applications_attention_failed");
+  }
+
+  return summarizeCommercialApplicationAttention(
+    (data ?? []).map((row) => String(row.status ?? "")),
+  );
 }
 
 export async function getAdminCommercialApplication(

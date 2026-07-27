@@ -290,7 +290,7 @@ export default function AuthorCommercialApplicationForm({
         ) : null}
 
         {status === "submitted" || status === "in_review" ? (
-          <p className="mt-4 text-sm leading-6 text-[#796ba0]">
+          <p className="mt-4 max-w-full text-sm leading-6 break-words text-[#796ba0]">
             Мы рассмотрим заявку и сообщим о решении. Пока заявка на рассмотрении,
             редактирование недоступно.
           </p>

@@ -721,6 +721,11 @@ function testCommercialScenarios() {
     submittedExplicit.steps[0].description,
     /получили заявку/i,
   );
+  assert.equal(
+    submittedExplicit.steps[0].hint,
+    null,
+    "submitted must not duplicate description in yellow hint",
+  );
 
   const draftContinue = evaluateCommercial({
     freeGateReady: true,

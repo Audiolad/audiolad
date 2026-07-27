@@ -428,6 +428,8 @@ export function evaluateCommercialOnboardingChecklist(input: {
       actionLabel = "Смотреть заявку";
     }
 
+    // Yellow hint is only for extra staff context / warnings — not for the
+    // same copy already shown as the step description.
     let hint: string | null = null;
     if (reviewComment) {
       hint = reviewComment;
@@ -436,12 +438,10 @@ export function evaluateCommercialOnboardingChecklist(input: {
         "Заявка не одобрена. Повторная подача откроется только после отдельного решения команды.";
     } else if (application === "needs_changes") {
       hint = "Нужно уточнить данные в заявке.";
-    } else if (application === "draft") {
-      hint = null;
-    } else if (application === "submitted") {
-      hint = "Мы получили заявку и сообщим о результате после рассмотрения.";
-    } else {
+    } else if (application === "in_review") {
       hint = "Мы рассмотрим заявку и сообщим о решении.";
+    } else {
+      hint = null;
     }
 
     const description =

@@ -225,6 +225,8 @@ function testSourceGuards() {
   assert.match(api, /requireAuthorMembership/);
   assert.match(api, /submitAuthorCommercialApplication/);
   assert.match(api, /saveAuthorCommercialApplicationDraft/);
+  assert.match(api, /sendCommercialApplicationAdminAlertEmail/);
+  assert.match(api, /idempotent/);
   assert.doesNotMatch(api, /status:\s*["']approved["']/);
 
   const form = read(
