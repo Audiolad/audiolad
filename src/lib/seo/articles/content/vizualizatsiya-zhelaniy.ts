@@ -60,6 +60,7 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
   ],
   introAfterAudio: [
     "Поэтому возникает закономерный вопрос – действительно ли визуализация может быть полезной или это просто красивая идея?",
+    "Прежде чем подробно представлять желаемое будущее, иногда полезно сначала разобраться, чего вы действительно хотите – об этом отдельно говорится в статье о том, как понять свои желания.",
   ],
   sections: [
     {
@@ -132,6 +133,14 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если конкретное желание или направление пока не определены, сначала может быть полезна статья ",
+      linkLabel:
+        "«Как понять, чего вы действительно хотите: вопросы для спокойного размышления»",
+      href: "/articles/kak-ponyat-chego-ya-hochu",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -167,6 +176,11 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-ponyat-chego-ya-hochu",
+      title: "Как понять, чего я хочу",
+      description: "Вопросы, которые помогают услышать собственные желания",
+    },
+    {
       href: "/articles/meditatsiya-na-ispolnenie-zhelaniy",
       title: "Медитация на исполнение желаний",
       description: "Чего реально ждать от такой практики",
@@ -186,5 +200,5 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-27T12:00:00.000Z",
 } as const satisfies ArticleDefinition;
