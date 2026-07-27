@@ -18,6 +18,7 @@ import { MEDITATSIYA_NA_IZOBILIE_ARTICLE } from "./content/meditatsiya-na-izobil
 import { MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE } from "./content/meditatsiya-na-privlechenie-deneg";
 import { POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE } from "./content/pochemu-my-postoyanno-obizhaemsya";
 import { VIZUALIZATSIYA_ZHELANIY_ARTICLE } from "./content/vizualizatsiya-zhelaniy";
+import { STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE } from "./content/strah-tratit-dengi-na-sebya";
 import { ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE } from "./content/zhenskaya-samotsennost-i-dengi";
 import type { ArticleDefinition } from "./types";
 
@@ -43,6 +44,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE,
   KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE,
   ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE,
+  STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
