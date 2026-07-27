@@ -370,6 +370,13 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     },
     {
       before:
+        "Если после работы с обидой на другого человека остаётся тяжёлое чувство к себе – за свои реакции, молчание, решения или роль в этой истории, – отдельно можно прочитать статью ",
+      linkLabel: "«Как простить себя»",
+      href: "/articles/kak-prostit-sebya",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -397,6 +404,11 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
       description: "Если мысли снова возвращаются к болезненной ситуации",
     },
     {
+      href: "/articles/kak-prostit-sebya",
+      title: "Как простить себя",
+      description: "Если после прощения другого остаётся вина перед собой",
+    },
+    {
       href: "/articles/kak-otpustit-proshloe",
       title: "Как отпустить прошлое",
       description: "Если удерживает не один человек, а целый жизненный этап",
@@ -414,5 +426,5 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T12:00:00.000Z",
+  updatedAt: "2026-07-27T13:00:00.000Z",
 } as const satisfies ArticleDefinition;
