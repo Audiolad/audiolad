@@ -278,6 +278,11 @@ export function evaluateCommercialOnboardingChecklist(input: {
   payoutProfileStatus?: AuthorPayoutProfileStatus | null;
   /** Review comment from payout profile (needs_changes / rejected). */
   payoutProfileReviewComment?: string | null;
+  /**
+   * Legacy commercial_active / commercial authors: keep payout step completed
+   * for onboarding presentation even without a verified payout_profile row.
+   */
+  legacyCommercialActive?: boolean;
   /** Dedicated commercial application status row. */
   applicationStatus?: AuthorCommercialApplicationStatus | null;
   /** Review comment shown to the author (needs_changes / rejected). */
@@ -307,6 +312,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
     termsHref = null,
     payoutProfileStatus = null,
     payoutProfileReviewComment = null,
+    legacyCommercialActive = false,
   } = input;
 
   const capabilities =
@@ -489,6 +495,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
     status: payoutProfileStatus,
     available: capabilities.payoutDetailsAvailable,
     applicationApproved,
+    legacyCommercialActive,
   });
   const payoutReviewComment = payoutProfileReviewComment?.trim() || null;
 

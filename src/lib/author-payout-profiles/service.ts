@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -110,9 +112,11 @@ function decryptRowFields(
     return parseSensitivePayload(plaintext);
   } catch (error) {
     if (error instanceof PayoutProfileEncryptionError) {
-      throw new AuthorPayoutProfileError(error.code, 500);
+      console.error("author_payout_profile_decrypt_unavailable", error.code);
+      throw new AuthorPayoutProfileError("encryption_unavailable", 503);
     }
-    throw new AuthorPayoutProfileError("encryption_decrypt_failed", 500);
+    console.error("author_payout_profile_decrypt_unavailable");
+    throw new AuthorPayoutProfileError("encryption_unavailable", 503);
   }
 }
 
@@ -124,9 +128,11 @@ function encryptFields(fields: AuthorPayoutProfileSensitivePayload): string {
     return serializePayoutProfileEncryptedEnvelope(envelope);
   } catch (error) {
     if (error instanceof PayoutProfileEncryptionError) {
-      throw new AuthorPayoutProfileError(error.code, 503);
+      console.error("author_payout_profile_encrypt_unavailable", error.code);
+      throw new AuthorPayoutProfileError("encryption_unavailable", 503);
     }
-    throw new AuthorPayoutProfileError("encryption_key_missing", 503);
+    console.error("author_payout_profile_encrypt_unavailable");
+    throw new AuthorPayoutProfileError("encryption_unavailable", 503);
   }
 }
 
@@ -341,38 +347,38 @@ export async function saveAuthorPayoutProfileDraft(input: {
     return toAuthorPublicView(data as ProfileRow, { includeFields: true })!;
   }
 
-  const versionBump =
-    fromStatus === "needs_changes" && nextStatus === "draft"
-      ? existing.version
-      : existing.version;
+  const nextVersion = existing.version + 1;
 
   const { data, error } = await input.supabase
     .from("author_payout_profiles")
     .update({
       recipient_type: recipientType,
       status: nextStatus,
-      version: versionBump,
+      version: nextVersion,
       encrypted_payload: encrypted,
       inn_last4: masks.inn_last4,
       account_last4: masks.account_last4,
       is_npd_declared: values.is_npd_declared,
       npd_status_check_result: npdResult,
       author_revision_comment: values.author_revision_comment || null,
-      review_comment:
-        nextStatus === "draft" && fromStatus === "needs_changes"
-          ? existing.review_comment
-          : existing.review_comment,
+      review_comment: existing.review_comment,
     })
     .eq("id", existing.id)
+    .eq("status", fromStatus)
+    .eq("version", existing.version)
     .select("*")
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
     console.error("author_payout_profile_update_failed");
     throw new AuthorPayoutProfileError("save_failed", 500);
   }
 
-  if (fromStatus !== nextStatus) {
+  if (!data) {
+    throw new AuthorPayoutProfileError("conflict", 409);
+  }
+
+  if (fromStatus !== nextStatus || changedFields.length > 0) {
     await logStatusEvent(input.supabase, {
       profileId: existing.id,
       authorId: input.authorId,
@@ -380,26 +386,11 @@ export async function saveAuthorPayoutProfileDraft(input: {
       toStatus: nextStatus,
       actorUserId: input.actorUserId,
       actorRole: "author",
-      reason: "author_edit",
+      reason: fromStatus !== nextStatus ? "author_edit" : "draft_saved",
       metadata: {
         recipient_type: recipientType,
         changed_fields: changedFields,
-        version: versionBump,
-      },
-    });
-  } else if (changedFields.length > 0) {
-    await logStatusEvent(input.supabase, {
-      profileId: existing.id,
-      authorId: input.authorId,
-      fromStatus,
-      toStatus: nextStatus,
-      actorUserId: input.actorUserId,
-      actorRole: "author",
-      reason: "draft_saved",
-      metadata: {
-        recipient_type: recipientType,
-        changed_fields: changedFields,
-        version: versionBump,
+        version: nextVersion,
       },
     });
   }
@@ -479,12 +470,17 @@ export async function submitAuthorPayoutProfile(input: {
     })
     .eq("id", row.id)
     .eq("status", "draft")
+    .eq("version", row.version)
     .select("*")
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
     console.error("author_payout_profile_submit_failed");
     throw new AuthorPayoutProfileError("submit_failed", 500);
+  }
+
+  if (!data) {
+    throw new AuthorPayoutProfileError("conflict", 409);
   }
 
   await logStatusEvent(input.supabase, {
@@ -531,19 +527,22 @@ export async function beginAuthorVerifiedPayoutProfileEdit(input: {
     throw new AuthorPayoutProfileError("transition_not_allowed", 409);
   }
 
+  const nextVersion = row.version + 1;
   const { data, error } = await input.supabase
     .from("author_payout_profiles")
     .update({
       status: "draft",
       verified_at: null,
+      version: nextVersion,
     })
     .eq("id", row.id)
     .eq("status", "verified")
+    .eq("version", row.version)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
-    throw new AuthorPayoutProfileError("transition_not_allowed", 409);
+    throw new AuthorPayoutProfileError("conflict", 409);
   }
 
   await logStatusEvent(input.supabase, {
@@ -554,7 +553,7 @@ export async function beginAuthorVerifiedPayoutProfileEdit(input: {
     actorUserId: input.actorUserId,
     actorRole: "author",
     reason: "author_reopen_for_edit",
-    metadata: { version: row.version },
+    metadata: { version: nextVersion },
   });
 
   return toAuthorPublicView(data as ProfileRow, { includeFields: true })!;
@@ -745,16 +744,20 @@ export async function staffTransitionPayoutProfile(input: {
     patch.rejected_at = null;
   }
 
+  const nextVersion = row.version + 1;
+  patch.version = nextVersion;
+
   const { data, error } = await input.supabase
     .from("author_payout_profiles")
     .update(patch)
     .eq("id", row.id)
     .eq("status", fromStatus)
+    .eq("version", row.version)
     .select("id")
     .maybeSingle();
 
   if (error || !data) {
-    throw new AuthorPayoutProfileError("transition_not_allowed", 409);
+    throw new AuthorPayoutProfileError("conflict", 409);
   }
 
   await logStatusEvent(input.supabase, {
@@ -766,7 +769,7 @@ export async function staffTransitionPayoutProfile(input: {
     actorRole: "staff",
     reason: `staff_${input.toStatus}`,
     metadata: {
-      version: row.version,
+      version: nextVersion,
       recipient_type: row.recipient_type,
       has_review_comment: Boolean(reviewComment),
       has_staff_note: Boolean(staffNote),

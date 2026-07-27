@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
 import {
   AuthorPayoutProfileError,
   beginAuthorVerifiedPayoutProfileEdit,
@@ -16,6 +17,32 @@ import {
 import { sendPayoutProfileAdminSubmittedEmail } from "@/lib/email/send-payout-profile-admin-submitted-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+const FORBIDDEN_CLIENT_FIELDS = [
+  "status",
+  "reviewed_by",
+  "verified_at",
+  "rejected_at",
+  "review_started_at",
+  "submitted_at",
+  "staff_note",
+  "encrypted_payload",
+  "version",
+  "inn_last4",
+  "account_last4",
+] as const;
+
+function sanitizeAuthorBody(body: Record<string, unknown>) {
+  const next = { ...body };
+  for (const key of FORBIDDEN_CLIENT_FIELDS) {
+    delete next[key];
+  }
+  return next;
+}
+
+function featureDisabledResponse() {
+  return jsonWithNoStore({ error: "feature_not_available" }, { status: 403 });
+}
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "private, no-store",
@@ -115,6 +142,14 @@ export async function GET(request: Request) {
     }
 
     await requireAuthorMembership(authorId);
+
+    if (!isPayoutProfilesEnabled()) {
+      return jsonWithNoStore({
+        profile: null,
+        featureEnabled: false,
+      });
+    }
+
     const service = createServiceRoleClient();
     const row = await getAuthorPayoutProfileRow(service, authorId);
     const status = row?.status ?? null;
@@ -127,7 +162,7 @@ export async function GET(request: Request) {
 
     const profile = toAuthorPublicView(row, { includeFields });
 
-    return jsonWithNoStore({ profile });
+    return jsonWithNoStore({ profile, featureEnabled: true });
   } catch (error) {
     return handlePayoutProfileError(error);
   }
@@ -135,7 +170,13 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    if (!isPayoutProfilesEnabled()) {
+      return featureDisabledResponse();
+    }
+
+    const body = sanitizeAuthorBody(
+      (await request.json()) as Record<string, unknown>,
+    );
     const authorId = resolveAuthorId(request, body);
 
     if (!authorId) {
@@ -165,7 +206,13 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    if (!isPayoutProfilesEnabled()) {
+      return featureDisabledResponse();
+    }
+
+    const body = sanitizeAuthorBody(
+      (await request.json()) as Record<string, unknown>,
+    );
     const authorId = resolveAuthorId(request, body);
     const action =
       typeof body.action === "string" ? body.action.trim() : "submit";

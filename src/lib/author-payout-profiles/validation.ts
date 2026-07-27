@@ -325,11 +325,14 @@ export function validateAuthorPayoutProfileFormValues(
   return errors;
 }
 
-/** Strip sequences that look like bank accounts / INN from admin comments. */
+/**
+ * Soft scrub of obvious account/INN-length digit runs from staff/author comments.
+ * Does not redact short digit mentions (e.g. «должно быть 9 цифр»).
+ */
 export function sanitizeStaffFacingComment(raw: string): string {
   return cleanText(raw, 4000)
+    .replace(CONTROL_CHARS, "")
     .replace(/\b\d{20}\b/g, "[скрыто]")
     .replace(/\b\d{15}\b/g, "[скрыто]")
-    .replace(/\b\d{12}\b/g, "[скрыто]")
-    .replace(/\b\d{9}\b/g, "[скрыто]");
+    .replace(/\b\d{12}\b/g, "[скрыто]");
 }

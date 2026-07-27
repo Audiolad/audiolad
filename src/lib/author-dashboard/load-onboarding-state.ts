@@ -23,8 +23,16 @@ import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
+import {
+  resolvePayoutStepCompleteForLegacyOnboarding,
+} from "@/lib/author-payout-profiles/onboarding-complete";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+export {
+  isPayoutProfileVerified,
+  resolvePayoutStepCompleteForLegacyOnboarding,
+} from "@/lib/author-payout-profiles/onboarding-complete";
 
 type PracticeReadinessRow = Pick<
   PracticeRow,
@@ -176,17 +184,6 @@ async function loadPayoutProfileSummary(authorId: string): Promise<{
   } catch {
     return { status: null, reviewComment: null };
   }
-}
-
-function resolvePayoutDetailsComplete(input: {
-  accessStatus: AuthorAccessStatus;
-  payoutProfileStatus: AuthorPayoutProfileStatus | null;
-}): boolean {
-  if (input.payoutProfileStatus) {
-    return input.payoutProfileStatus === "verified";
-  }
-
-  return isAuthorCommercialActiveAccess(input.accessStatus);
 }
 
 export async function loadAuthorOnboardingChecklistState(
@@ -369,10 +366,11 @@ export async function loadAuthorOnboardingChecklistState(
     applicationReviewComment: commercialApplication?.review_comment ?? null,
     payoutProfileStatus: payoutProfile.status,
     payoutProfileReviewComment: payoutProfile.reviewComment,
+    legacyCommercialActive: isAuthorCommercialActiveAccess(accessStatus),
     applicationHref: `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`,
     payoutDetailsHref: `/author-dashboard/commercial/payout-details?author=${encodeURIComponent(authorSlug)}`,
     termsHref: `/author-dashboard/commercial/terms?author=${encodeURIComponent(authorSlug)}`,
-    payoutDetailsComplete: resolvePayoutDetailsComplete({
+    payoutDetailsComplete: resolvePayoutStepCompleteForLegacyOnboarding({
       accessStatus,
       payoutProfileStatus: payoutProfile.status,
     }),

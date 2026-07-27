@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { AdminPayoutProfileActionState } from "@/app/admin/payout-profiles/action-state";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
 import { staffTransitionPayoutProfile } from "@/lib/author-payout-profiles/service";
 import { sendPayoutProfileAuthorStatusEmail } from "@/lib/email/send-payout-profile-author-status-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
@@ -66,6 +67,13 @@ async function runStaffTransition(
   },
 ): Promise<AdminPayoutProfileActionState> {
   const session = await requireAdminPermission("authors.payout_profiles.review");
+
+  if (!isPayoutProfilesEnabled()) {
+    return {
+      ok: false,
+      error: "Сбор и проверка данных для выплат пока отключены.",
+    };
+  }
 
   if (!profileId) {
     return { ok: false, error: "Не удалось определить анкету." };

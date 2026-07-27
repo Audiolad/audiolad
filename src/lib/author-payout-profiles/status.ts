@@ -54,6 +54,8 @@ export function mapPayoutProfileStatusToOnboardingVisual(input: {
   status: AuthorPayoutProfileStatus | null | undefined;
   available: boolean;
   applicationApproved: boolean;
+  /** Legacy commercial_active authors: do not force the new payout form. */
+  legacyCommercialActive?: boolean;
 }): {
   state: "locked" | "active" | "completed" | "coming_soon";
   statusLabel?: string;
@@ -69,6 +71,10 @@ export function mapPayoutProfileStatusToOnboardingVisual(input: {
 
   if (!input.available) {
     return { state: "coming_soon" };
+  }
+
+  if (input.legacyCommercialActive) {
+    return { state: "completed" };
   }
 
   const status = input.status ?? null;

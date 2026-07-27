@@ -1,9 +1,10 @@
 /**
  * Application-level AES-256-GCM for author payout profile PII.
  *
- * Server-only: do not import from client components.
  * Never log plaintext, key material, or full ciphertext.
  */
+
+import "server-only";
 
 import {
   createCipheriv,

@@ -337,8 +337,8 @@ export default function AuthorPayoutProfileForm({
 
   return (
     <div
-      className="space-y-5"
-      data-ym-disable-webvisor="true"
+      data-payout-profile-form="true"
+      className="ym-hide-content space-y-5"
     >
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">

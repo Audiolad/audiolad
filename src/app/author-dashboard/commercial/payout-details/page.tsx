@@ -1,6 +1,8 @@
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorPayoutProfileForm from "@/components/author-dashboard/AuthorPayoutProfileForm";
+import CommercialOnboardingStubPanel from "@/components/author-dashboard/CommercialOnboardingStubPanel";
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
+import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function AuthorCommercialPayoutDetailsPage({
   });
 
   const backHref = `/author-dashboard?author=${encodeURIComponent(author.slug)}`;
+  const collectionEnabled = isPayoutProfilesEnabled();
 
   return (
     <AuthorShell
@@ -27,10 +30,21 @@ export default async function AuthorCommercialPayoutDetailsPage({
       subtitle="Сведения для начисления и перечисления авторского вознаграждения"
       internalBackHref={backHref}
     >
-      <AuthorPayoutProfileForm
-        authorId={author.id}
-        backHref={backHref}
-      />
+      {collectionEnabled ? (
+        <AuthorPayoutProfileForm authorId={author.id} backHref={backHref} />
+      ) : (
+        <CommercialOnboardingStubPanel
+          title="Заполните данные для выплат"
+          lead="Форма сбора банковских и налоговых данных пока не открыта для заполнения."
+          bullets={[
+            "Мы готовим защищённый сбор реквизитов и юридические основания обработки.",
+            "Пока реальные банковские данные на этом экране не принимаются.",
+            "После включения формы вы сможете сохранить черновик и отправить данные на проверку.",
+          ]}
+          note="Этот шаг коммерческого подключения ещё не принимает реквизиты. Вернитесь в чеклист и продолжайте, когда форма будет открыта."
+          backHref={backHref}
+        />
+      )}
     </AuthorShell>
   );
 }

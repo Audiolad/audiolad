@@ -19,12 +19,17 @@ import {
   maskInn,
   maskPhone,
 } from "../src/lib/author-payout-profiles/masking.ts";
+import { isPayoutProfilesEnabled } from "../src/lib/author-payout-profiles/feature.ts";
 import {
   canAuthorTransitionPayoutProfileStatus,
   canStaffTransitionPayoutProfileStatus,
   isAuthorEditablePayoutProfileStatus,
   mapPayoutProfileStatusToOnboardingVisual,
 } from "../src/lib/author-payout-profiles/status.ts";
+import {
+  isPayoutProfileVerified,
+  resolvePayoutStepCompleteForLegacyOnboarding,
+} from "../src/lib/author-payout-profiles/onboarding-complete.ts";
 import {
   isValidBankAccount,
   isValidBik,
@@ -326,6 +331,34 @@ function testMasksAndGates() {
   );
   assert.equal(AUTHOR_COMMERCIAL_SHARE_BPS, 7000);
   assert.equal(PLATFORM_COMMERCIAL_SHARE_BPS, 3000);
+
+  assert.equal(isPayoutProfilesEnabled({}), false);
+  assert.equal(isPayoutProfilesEnabled({ PAYOUT_PROFILES_ENABLED: "true" }), true);
+
+  assert.equal(
+    resolvePayoutStepCompleteForLegacyOnboarding({
+      accessStatus: "commercial_active",
+      payoutProfileStatus: "draft",
+    }),
+    true,
+  );
+  assert.equal(
+    resolvePayoutStepCompleteForLegacyOnboarding({
+      accessStatus: "commercial_onboarding",
+      payoutProfileStatus: "draft",
+    }),
+    false,
+  );
+  assert.equal(isPayoutProfileVerified("verified"), true);
+  assert.equal(isPayoutProfileVerified("draft"), false);
+
+  const legacyVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: "draft",
+    available: true,
+    applicationApproved: true,
+    legacyCommercialActive: true,
+  });
+  assert.equal(legacyVisual.state, "completed");
 }
 
 function testEmailsAndSources() {
@@ -368,16 +401,23 @@ function testEmailsAndSources() {
   const api = read("src/app/api/author/payout-profile/route.ts");
   assert.match(api, /private, no-store/);
   assert.match(api, /legal_entity/);
+  assert.match(api, /feature_not_available/);
+  assert.match(api, /isPayoutProfilesEnabled/);
+  assert.match(api, /FORBIDDEN_CLIENT_FIELDS/);
 
   const form = read(
     "src/components/author-dashboard/AuthorPayoutProfileForm.tsx",
   );
-  assert.match(form, /data-ym-disable-webvisor/);
+  assert.match(form, /data-payout-profile-form/);
+  assert.match(form, /ym-hide-content/);
   assert.match(form, /AUTHOR_COMMERCIAL_SHARE_BPS/);
   assert.match(form, /Скоро/);
 
+  const privacy = read("src/lib/analytics/yandex-metrika-privacy.ts");
+  assert.match(privacy, /data-payout-profile-form/);
+
   const encryption = read("src/lib/author-payout-profiles/encryption.ts");
-  assert.match(encryption, /Server-only/);
+  assert.match(encryption, /import \"server-only\"/);
   assert.match(encryption, /aes-256-gcm/);
 }
 

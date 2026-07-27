@@ -1,7 +1,8 @@
 const INPUT_SELECTOR =
   "input, textarea, select, [contenteditable='true'], [contenteditable='']";
 
-const ADMIN_CONTENT_SELECTOR = "[data-admin-panel], [data-admin-form]";
+const ADMIN_CONTENT_SELECTOR =
+  "[data-admin-panel], [data-admin-form], [data-payout-profile-form]";
 
 let privacyObserver: MutationObserver | null = null;
 
