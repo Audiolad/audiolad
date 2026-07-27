@@ -298,6 +298,11 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
       description: "Оплата труда, границы и ценность собственного труда",
     },
     {
+      href: "/articles/strah-tratit-dengi-na-sebya",
+      title: "Страх тратить деньги на себя",
+      description: "Личные расходы, вина после покупки и бюджет",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Общий взгляд на финансовые убеждения и привычки",
@@ -322,5 +327,5 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T16:00:00.000Z",
+  updatedAt: "2026-07-27T17:00:00.000Z",
 } as const satisfies ArticleDefinition;

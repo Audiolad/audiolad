@@ -235,6 +235,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Ценность труда, финансовые границы и переговоры",
     },
     {
+      href: "/articles/strah-tratit-dengi-na-sebya",
+      title: "Страх тратить деньги на себя",
+      description: "Тревога перед личными расходами и семейные правила",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -254,5 +259,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T16:00:00.000Z",
+  updatedAt: "2026-07-27T17:00:00.000Z",
 } as const satisfies ArticleDefinition;

@@ -347,6 +347,14 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если уважение к собственным потребностям проявляется прежде всего в невозможности спокойно тратить деньги на себя и в чувстве вины после личной покупки, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Страх тратить деньги на себя: почему он возникает и как относиться к своим расходам спокойнее»",
+      href: "/articles/strah-tratit-dengi-na-sebya",
+      after: ".",
+    },
+    {
+      before:
         "Если хочется шире рассмотреть принятие денег, собственные финансовые потребности и право стремиться к комфортному уровню достатка, отдельно можно прочитать статью ",
       linkLabel: "«Как женщине разрешить себе деньги»",
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
@@ -377,6 +385,11 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/strah-tratit-dengi-na-sebya",
+      title: "Страх тратить деньги на себя",
+      description: "Вина после покупки и личные расходы в бюджете",
+    },
+    {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
       title: "Как женщине разрешить себе деньги",
       description: "Принятие оплаты, потребности и финансовое участие",
@@ -401,5 +414,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T17:00:00.000Z",
 } as const satisfies ArticleDefinition;
