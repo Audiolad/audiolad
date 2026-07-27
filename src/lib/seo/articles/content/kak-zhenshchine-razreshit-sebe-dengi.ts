@@ -246,6 +246,13 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если важно отдельно разобрать чувство вины и неловкости в момент получения оплаты, подарка или помощи, можно прочитать статью ",
+      linkLabel: "«Как принимать деньги без чувства вины и неловкости»",
+      href: "/articles/kak-prinimat-dengi",
+      after: ".",
+    },
+    {
+      before:
         "Если важно подробнее разобрать, как самоценность проявляется в оплате труда, рабочих условиях и финансовых границах, отдельно можно прочитать статью ",
       linkLabel:
         "«Женская самоценность и деньги: как уважение к себе влияет на финансовые решения»",
@@ -308,6 +315,11 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
       description: "Учёт собственных потребностей без импульсивных трат",
     },
     {
+      href: "/articles/kak-prinimat-dengi",
+      title: "Как принимать деньги",
+      description: "Оплата, подарки и помощь без чувства вины",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Общий взгляд на финансовые убеждения и привычки",
@@ -332,5 +344,5 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T18:00:00.000Z",
+  updatedAt: "2026-07-27T19:00:00.000Z",
 } as const satisfies ArticleDefinition;
