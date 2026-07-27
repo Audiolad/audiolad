@@ -155,12 +155,20 @@ export async function acquireOperationalEmailDelivery(
   }
 
   if (intent.mode === "insert") {
+    // commercial_application ids live in author_commercial_applications;
+    // operational_email_deliveries.application_id FK points only at
+    // author_applications, so keep it null and rely on dedup_key.
+    const linkedApplicationId =
+      messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE
+        ? null
+        : applicationId;
+
     const { data: inserted, error: insertError } = await client
       .from("operational_email_deliveries")
       .insert({
         dedup_key: dedupKey,
         message_type: messageType,
-        application_id: applicationId,
+        application_id: linkedApplicationId,
         recipient_email: recipientEmail,
         status: "pending",
       })

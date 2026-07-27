@@ -224,6 +224,17 @@ function testSourceGuards() {
   assert.match(actions, /!rpc\.result\.idempotent/);
   assert.match(actions, /commercial_application_approved_email_failed/);
 
+  const operational = read("src/lib/email/operational-deliveries.ts");
+  assert.match(
+    operational,
+    /messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE/,
+  );
+  assert.match(operational, /\? null\s*:\s*applicationId/);
+  assert.match(
+    operational,
+    /operational_email_deliveries\.application_id FK points only at/,
+  );
+
   const payoutPage = read(
     "src/app/author-dashboard/commercial/payout-details/page.tsx",
   );
