@@ -254,9 +254,9 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
       description: "Прощение без оправдания, примирения и обязательного доверия",
     },
     {
-      href: "/articles/besplatnye-meditatsii-onlayn",
-      title: "Бесплатные медитации онлайн",
-      description: "Как выбрать практику, которая действительно поможет",
+      href: "/articles/pochemu-my-postoyanno-obizhaemsya",
+      title: "Почему мы постоянно обижаемся",
+      description: "Если обида регулярно возникает в разных ситуациях",
     },
   ],
   closingSection: {
@@ -268,5 +268,5 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T08:00:00.000Z",
+  updatedAt: "2026-07-27T09:00:00.000Z",
 } as const satisfies ArticleDefinition;

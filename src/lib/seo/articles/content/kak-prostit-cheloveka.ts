@@ -375,6 +375,13 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       after: ", где собраны практики для разных жизненных ситуаций.",
     },
+    {
+      before:
+        "Если обида возникает не только по отношению к одному человеку, а регулярно в разных отношениях и повседневных ситуациях, можно также прочитать статью ",
+      linkLabel: "«Почему мы постоянно обижаемся и что с этим делать»",
+      href: "/articles/pochemu-my-postoyanno-obizhaemsya",
+      after: ".",
+    },
   ],
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
@@ -390,9 +397,9 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
       description: "Если мысли снова возвращаются к болезненной ситуации",
     },
     {
-      href: "/articles/kak-razvit-lyubov-k-sebe",
-      title: "Как развить любовь к себе",
-      description: "Соседняя тема: бережное отношение к себе",
+      href: "/articles/pochemu-my-postoyanno-obizhaemsya",
+      title: "Почему мы постоянно обижаемся",
+      description: "Если обида регулярно возникает в разных ситуациях",
     },
   ],
   closingSection: {
@@ -407,5 +414,5 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T09:00:00.000Z",
 } as const satisfies ArticleDefinition;

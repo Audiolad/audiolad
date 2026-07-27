@@ -1991,8 +1991,20 @@ assert(
   "release resentment see-also includes forgive-a-person article",
 );
 assert(
-  releaseResentmentArticle.updatedAt === "2026-07-27T08:00:00.000Z",
-  "release resentment updatedAt bumped for reverse-link edit",
+  releaseResentmentArticle.updatedAt === "2026-07-27T09:00:00.000Z",
+  "release resentment updatedAt bumped for habitual-offense seeAlso",
+);
+assert(
+  releaseResentmentArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "release resentment see-also includes habitual-offense article",
+);
+assert(
+  !releaseResentmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "release resentment avoids CTA overload for habitual-offense reverse",
 );
 assert(
   releaseResentmentArticle.publishedAt === "2026-07-27T00:00:00.000Z",
@@ -2248,6 +2260,216 @@ assert(
     .toLowerCase()
     .includes("отпустить обиду"),
   "forgive-a-person SEO title does not target resentment query",
+);
+assert(
+  forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "forgive-a-person reverse-links to habitual-offense article",
+);
+assert(
+  forgivePersonArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "forgive-a-person see-also includes habitual-offense article",
+);
+assert(
+  forgivePersonArticle.updatedAt === "2026-07-27T09:00:00.000Z",
+  "forgive-a-person updatedAt bumped for reverse-link edit",
+);
+assert(
+  forgivePersonArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "forgive-a-person publishedAt unchanged",
+);
+
+const habitualOffenseArticle = getArticleBySlug(
+  "pochemu-my-postoyanno-obizhaemsya",
+);
+assert(habitualOffenseArticle, "habitual-offense article registered");
+assert(
+  habitualOffenseArticle.title ===
+    "Почему мы постоянно обижаемся и что с этим делать",
+  "habitual-offense H1",
+);
+assert(
+  habitualOffenseArticle.metaTitle ===
+    "Почему мы постоянно обижаемся и как реагировать спокойнее – АудиоЛад",
+  "habitual-offense SEO title",
+);
+assert(
+  habitualOffenseArticle.metaTitle !== releaseResentmentArticle.metaTitle &&
+    habitualOffenseArticle.metaTitle !== forgivePersonArticle.metaTitle,
+  "habitual-offense SEO title differs from both siblings",
+);
+assert(
+  habitualOffenseArticle.metaDescription !==
+    habitualOffenseArticle.leadBeforeAudio,
+  "habitual-offense metaDescription is not visual lead",
+);
+assert(
+  habitualOffenseArticle.metaDescription !==
+    releaseResentmentArticle.metaDescription &&
+    habitualOffenseArticle.metaDescription !==
+      forgivePersonArticle.metaDescription,
+  "habitual-offense meta description differs from siblings",
+);
+assert(
+  habitualOffenseArticle.shortAnswer !== releaseResentmentArticle.shortAnswer &&
+    habitualOffenseArticle.shortAnswer !== forgivePersonArticle.shortAnswer,
+  "habitual-offense short answer differs from siblings",
+);
+assert(
+  habitualOffenseArticle.leadBeforeAudio !==
+    releaseResentmentArticle.leadBeforeAudio &&
+    habitualOffenseArticle.leadBeforeAudio !==
+      forgivePersonArticle.leadBeforeAudio,
+  "habitual-offense lead differs from siblings",
+);
+assert(
+  habitualOffenseArticle.topicSlug === "besplatnye-meditatsii",
+  "habitual-offense uses free meditations hub",
+);
+assert(
+  habitualOffenseArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "habitual-offense primary practice key",
+);
+assert(
+  habitualOffenseArticle.primaryPracticeIntro.includes(
+    "последовательный внутренний процесс",
+  ),
+  "habitual-offense practice intro stays catalog-aligned",
+);
+assert(
+  !habitualOffenseArticle.primaryPracticeIntro.includes("ожидан"),
+  "habitual-offense practice intro does not invent expectations work",
+);
+assert(
+  habitualOffenseArticle.leadBeforeAudio.includes(
+    "устал постоянно обижаться",
+  ),
+  "habitual-offense opening body paragraph",
+);
+assert(
+  habitualOffenseArticle.shortAnswer.startsWith(
+    "Избавиться от привычки постоянно обижаться не значит перестать чувствовать",
+  ),
+  "habitual-offense short answer keeps definition role",
+);
+assert(
+  !habitualOffenseArticle.leadBeforeAudio.includes(
+    "Избавиться от привычки постоянно обижаться",
+  ),
+  "habitual-offense lead is not a second definition",
+);
+assert(
+  habitualOffenseArticle.introAfterAudio[0]?.includes(
+    "привычки постоянно обижаться",
+  ),
+  "habitual-offense intro starts after lead",
+);
+assert(
+  habitualOffenseArticle.sections.some(
+    (section) => section.title === "Почему мелкие обиды могут накапливаться",
+  ),
+  "habitual-offense keeps accumulation H2",
+);
+assert(
+  habitualOffenseArticle.sections.some(
+    (section) =>
+      section.title ===
+      "Как понять, действительно ли нарушены ваши границы",
+  ),
+  "habitual-offense keeps boundaries H2",
+);
+assert(
+  habitualOffenseArticle.finalAudioLead === "",
+  "habitual-offense no second primary player",
+);
+assert(habitualOffenseArticle.faq.length === 4, "habitual-offense faq count");
+assert(
+  habitualOffenseArticle.faq.some((item) =>
+    item.question.includes("по мелочам"),
+  ),
+  "habitual-offense FAQ covers petty offense pattern",
+);
+assert(
+  !habitualOffenseArticle.faq.some((item) =>
+    item.question.toLowerCase().includes("простить"),
+  ),
+  "habitual-offense FAQ does not steal forgive-person intent",
+);
+assert(
+  !habitualOffenseArticle.metaTitle.toLowerCase().includes("отпустить обиду") &&
+    !habitualOffenseArticle.metaTitle.toLowerCase().includes("простить человека"),
+  "habitual-offense SEO title avoids sibling primary queries",
+);
+assert(
+  habitualOffenseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ),
+  "habitual-offense links to forgive-a-person article",
+);
+assert(
+  habitualOffenseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ),
+  "habitual-offense links to release resentment article",
+);
+assert(
+  habitualOffenseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "habitual-offense links to free meditations hub",
+);
+assert(
+  !habitualOffenseArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ) &&
+    !habitualOffenseArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-otpustit-obidu",
+    ),
+  "habitual-offense seeAlso avoids triple-linking siblings",
+);
+assert(
+  Boolean(habitualOffenseArticle.brandNote?.includes("АудиоЛаде")),
+  "habitual-offense brand note",
+);
+assert(
+  habitualOffenseArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("профессиональной поддержкой"),
+    ),
+  ),
+  "habitual-offense keeps professional-support safety note",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "free hub lists habitual-offense article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "money hub does not list habitual-offense article",
+);
+assert(
+  !habitualOffenseArticle.leadBeforeAudio.includes("—") &&
+    !habitualOffenseArticle.shortAnswer.includes("—") &&
+    !habitualOffenseArticle.metaTitle.includes("—"),
+  "habitual-offense uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("pochemu-my-postoyanno-obizhaemsya"),
+  "habitual-offense in slug list",
+);
+assert(
+  listArticleSlugs().filter(
+    (slug) => slug === "pochemu-my-postoyanno-obizhaemsya",
+  ).length === 1,
+  "habitual-offense slug unique",
 );
 
 assert(
@@ -2575,6 +2797,14 @@ assert(
       entry.url === "https://audiolad.ru/articles/kak-prostit-cheloveka",
   ),
   "forgive-a-person article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "habitual-offense article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
