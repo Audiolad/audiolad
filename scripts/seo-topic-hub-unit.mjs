@@ -318,6 +318,12 @@ assert(
   "free hub includes stop-saving-on-self SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-prinimat-dengi",
+  ),
+  "free hub includes accept-money SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

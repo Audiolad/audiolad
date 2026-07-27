@@ -434,6 +434,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       description: "Принятие оплаты, желания и право на финансовое участие",
     },
     {
+      href: "/articles/kak-prinimat-dengi",
+      title: "Как принимать деньги",
+      description: "Получение оплаты и помощи без оправданий",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Семейные установки и привычные реакции на деньги",
@@ -448,5 +453,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T18:00:00.000Z",
+  updatedAt: "2026-07-27T19:00:00.000Z",
 } as const satisfies ArticleDefinition;
