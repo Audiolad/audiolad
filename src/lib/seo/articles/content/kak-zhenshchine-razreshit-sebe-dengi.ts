@@ -246,6 +246,14 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если важно подробнее разобрать, как самоценность проявляется в оплате труда, рабочих условиях и финансовых границах, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Женская самоценность и деньги: как уважение к себе влияет на финансовые решения»",
+      href: "/articles/zhenskaya-samotsennost-i-dengi",
+      after: ".",
+    },
+    {
+      before:
         "Если хочется шире рассмотреть финансовые убеждения и привычные реакции на деньги, отдельно можно прочитать статью ",
       linkLabel:
         "«Как изменить отношение к деньгам: почему это важно и с чего начать»",
@@ -285,6 +293,11 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/zhenskaya-samotsennost-i-dengi",
+      title: "Женская самоценность и деньги",
+      description: "Оплата труда, границы и ценность собственного труда",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Общий взгляд на финансовые убеждения и привычки",
@@ -309,5 +322,5 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T16:00:00.000Z",
 } as const satisfies ArticleDefinition;
