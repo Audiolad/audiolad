@@ -187,6 +187,11 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+      title: "Как женщине разрешить себе деньги",
+      description: "Если сначала важно разобраться с виной и правом на оплату",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -209,5 +214,5 @@ export const MEDITATSIYA_NA_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T14:00:00.000Z",
+  updatedAt: "2026-07-27T15:00:00.000Z",
 } as const satisfies ArticleDefinition;

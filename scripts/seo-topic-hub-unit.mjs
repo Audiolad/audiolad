@@ -294,6 +294,12 @@ assert(
   "free hub includes anger-at-person SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "free hub includes allow-yourself-money SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
