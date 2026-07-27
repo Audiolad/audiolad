@@ -28,6 +28,34 @@ import {
   renderCommercialApplicationApprovedEmailText,
 } from "./commercial-application-approved";
 import {
+  PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_KEY,
+  PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_VERSION,
+  buildPayoutProfileAdminSubmittedSubject,
+  renderPayoutProfileAdminSubmittedEmailHtml,
+  renderPayoutProfileAdminSubmittedEmailText,
+} from "./payout-profile-admin-submitted";
+import {
+  PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_SUBJECT,
+  PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY,
+  PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_TEMPLATE_VERSION,
+  renderPayoutProfileNeedsChangesEmailHtml,
+  renderPayoutProfileNeedsChangesEmailText,
+} from "./payout-profile-needs-changes";
+import {
+  PAYOUT_PROFILE_REJECTED_EMAIL_SUBJECT,
+  PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_KEY,
+  PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_VERSION,
+  renderPayoutProfileRejectedEmailHtml,
+  renderPayoutProfileRejectedEmailText,
+} from "./payout-profile-rejected";
+import {
+  PAYOUT_PROFILE_VERIFIED_EMAIL_SUBJECT,
+  PAYOUT_PROFILE_VERIFIED_EMAIL_TEMPLATE_KEY,
+  PAYOUT_PROFILE_VERIFIED_EMAIL_TEMPLATE_VERSION,
+  renderPayoutProfileVerifiedEmailHtml,
+  renderPayoutProfileVerifiedEmailText,
+} from "./payout-profile-verified";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -171,6 +199,86 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (input.templateKey === PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_KEY) {
+      const authorName = readString(input.payload, "authorName");
+      const profileId = readString(input.payload, "profileId");
+
+      if (!authorName || !profileId) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: buildPayoutProfileAdminSubmittedSubject(authorName),
+        html: renderPayoutProfileAdminSubmittedEmailHtml({
+          authorName,
+          profileId,
+          siteOrigin,
+        }),
+        text: renderPayoutProfileAdminSubmittedEmailText({
+          authorName,
+          profileId,
+          siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY) {
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const authorName = readString(input.payload, "authorName");
+
+      return {
+        ok: true,
+        subject: PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_SUBJECT,
+        html: renderPayoutProfileNeedsChangesEmailHtml({
+          authorName,
+          siteOrigin,
+        }),
+        text: renderPayoutProfileNeedsChangesEmailText({
+          authorName,
+          siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === PAYOUT_PROFILE_VERIFIED_EMAIL_TEMPLATE_KEY) {
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const authorName = readString(input.payload, "authorName");
+
+      return {
+        ok: true,
+        subject: PAYOUT_PROFILE_VERIFIED_EMAIL_SUBJECT,
+        html: renderPayoutProfileVerifiedEmailHtml({
+          authorName,
+          siteOrigin,
+        }),
+        text: renderPayoutProfileVerifiedEmailText({
+          authorName,
+          siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_KEY) {
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const authorName = readString(input.payload, "authorName");
+
+      return {
+        ok: true,
+        subject: PAYOUT_PROFILE_REJECTED_EMAIL_SUBJECT,
+        html: renderPayoutProfileRejectedEmailHtml({
+          authorName,
+          siteOrigin,
+        }),
+        text: renderPayoutProfileRejectedEmailText({
+          authorName,
+          siteOrigin,
+        }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -198,6 +306,22 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY) {
     return COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_KEY) {
+    return PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_TEMPLATE_KEY) {
+    return PAYOUT_PROFILE_NEEDS_CHANGES_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === PAYOUT_PROFILE_VERIFIED_EMAIL_TEMPLATE_KEY) {
+    return PAYOUT_PROFILE_VERIFIED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_KEY) {
+    return PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

@@ -1,4 +1,6 @@
 import type { AuthorCommercialApplicationStatus } from "@/lib/author-commercial-applications/types";
+import { mapPayoutProfileStatusToOnboardingVisual } from "@/lib/author-payout-profiles/status";
+import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import {
   isActivePromotionForPublishedProduct,
   isNonArchivedProduct,
@@ -52,7 +54,7 @@ export type CommercialOnboardingCapabilities = {
 export const DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES: CommercialOnboardingCapabilities =
   {
     applicationSubmissionAvailable: true,
-    payoutDetailsAvailable: false,
+    payoutDetailsAvailable: true,
     termsAcceptanceAvailable: false,
   };
 
@@ -272,6 +274,10 @@ export function evaluateCommercialOnboardingChecklist(input: {
   payoutDetailsComplete?: boolean;
   /** Future: persisted cooperation terms acceptance. */
   termsAccepted?: boolean;
+  /** Loaded payout profile status row. */
+  payoutProfileStatus?: AuthorPayoutProfileStatus | null;
+  /** Review comment from payout profile (needs_changes / rejected). */
+  payoutProfileReviewComment?: string | null;
   /** Dedicated commercial application status row. */
   applicationStatus?: AuthorCommercialApplicationStatus | null;
   /** Review comment shown to the author (needs_changes / rejected). */
@@ -299,6 +305,8 @@ export function evaluateCommercialOnboardingChecklist(input: {
     legacyPendingWithoutApplication = false,
     payoutDetailsHref = null,
     termsHref = null,
+    payoutProfileStatus = null,
+    payoutProfileReviewComment = null,
   } = input;
 
   const capabilities =
@@ -477,13 +485,20 @@ export function evaluateCommercialOnboardingChecklist(input: {
   // --- Step 2: payout details ---
   let payoutStep: CommercialOnboardingStepState;
 
-  if (!applicationApproved) {
+  const payoutVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: payoutProfileStatus,
+    available: capabilities.payoutDetailsAvailable,
+    applicationApproved,
+  });
+  const payoutReviewComment = payoutProfileReviewComment?.trim() || null;
+
+  if (payoutVisual.state === "locked") {
     payoutStep = lockedStep("payout_details", {
-      hint: "Шаг откроется после одобрения коммерческой заявки.",
+      hint: payoutVisual.hint,
     });
-  } else if (!capabilities.payoutDetailsAvailable) {
+  } else if (payoutVisual.state === "coming_soon") {
     payoutStep = comingSoonStep("payout_details");
-  } else if (payoutDetailsComplete) {
+  } else if (payoutVisual.state === "completed") {
     payoutStep = {
       id: "payout_details",
       ...STEP_META.payout_details,
@@ -492,13 +507,23 @@ export function evaluateCommercialOnboardingChecklist(input: {
       readiness: null,
     };
   } else {
+    let payoutHint: string | null = payoutReviewComment ?? payoutVisual.hint ?? null;
+    if (
+      payoutProfileStatus === "needs_changes" &&
+      !payoutReviewComment &&
+      !payoutVisual.hint
+    ) {
+      payoutHint = "Нужно исправить данные для выплат.";
+    }
+
     payoutStep = {
       id: "payout_details",
       ...STEP_META.payout_details,
       state: "active",
-      actionLabel: "Заполнить данные",
+      statusLabel: payoutVisual.statusLabel,
+      actionLabel: payoutVisual.actionLabel,
       href: payoutDetailsHref ?? undefined,
-      hint: null,
+      hint: payoutHint,
       readiness: null,
     };
   }

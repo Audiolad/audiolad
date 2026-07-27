@@ -8,6 +8,7 @@ export const PLATFORM_PERMISSIONS = [
   "dashboard.view",
   "authors.view",
   "authors.manage",
+  "authors.payout_profiles.review",
   "products.view",
   "products.moderate",
   "users.view",

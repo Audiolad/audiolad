@@ -1,0 +1,114 @@
+import type { AuthorPayoutProfileStatus } from "./types";
+
+const AUTHOR_TRANSITIONS: Record<
+  AuthorPayoutProfileStatus,
+  readonly AuthorPayoutProfileStatus[]
+> = {
+  draft: ["submitted"],
+  submitted: [],
+  in_review: [],
+  needs_changes: ["draft"],
+  verified: ["draft"],
+  rejected: [],
+};
+
+const STAFF_TRANSITIONS: Record<
+  AuthorPayoutProfileStatus,
+  readonly AuthorPayoutProfileStatus[]
+> = {
+  draft: [],
+  submitted: ["in_review", "needs_changes", "verified", "rejected"],
+  in_review: ["needs_changes", "verified", "rejected"],
+  needs_changes: [],
+  verified: [],
+  rejected: [],
+};
+
+export function canAuthorTransitionPayoutProfileStatus(
+  from: AuthorPayoutProfileStatus,
+  to: AuthorPayoutProfileStatus,
+): boolean {
+  return AUTHOR_TRANSITIONS[from].includes(to);
+}
+
+export function canStaffTransitionPayoutProfileStatus(
+  from: AuthorPayoutProfileStatus,
+  to: AuthorPayoutProfileStatus,
+): boolean {
+  return STAFF_TRANSITIONS[from].includes(to);
+}
+
+export function isAuthorEditablePayoutProfileStatus(
+  status: AuthorPayoutProfileStatus,
+): boolean {
+  return status === "draft" || status === "needs_changes";
+}
+
+export function authorCanSubmitPayoutProfileStatus(
+  status: AuthorPayoutProfileStatus,
+): boolean {
+  return status === "draft" || status === "needs_changes";
+}
+
+export function mapPayoutProfileStatusToOnboardingVisual(input: {
+  status: AuthorPayoutProfileStatus | null | undefined;
+  available: boolean;
+  applicationApproved: boolean;
+}): {
+  state: "locked" | "active" | "completed" | "coming_soon";
+  statusLabel?: string;
+  actionLabel?: string;
+  hint?: string | null;
+} {
+  if (!input.applicationApproved) {
+    return {
+      state: "locked",
+      hint: "Шаг откроется после одобрения коммерческой заявки.",
+    };
+  }
+
+  if (!input.available) {
+    return { state: "coming_soon" };
+  }
+
+  const status = input.status ?? null;
+
+  if (!status) {
+    return {
+      state: "active",
+      actionLabel: "Заполнить данные",
+    };
+  }
+
+  switch (status) {
+    case "draft":
+      return {
+        state: "active",
+        statusLabel: "Черновик",
+        actionLabel: "Продолжить",
+      };
+    case "submitted":
+    case "in_review":
+      return {
+        state: "active",
+        statusLabel: "На проверке",
+        hint: "Данные проверяются. Обычно это занимает до нескольких рабочих дней.",
+      };
+    case "needs_changes":
+      return {
+        state: "active",
+        statusLabel: "Нужны исправления",
+        actionLabel: "Исправить данные",
+      };
+    case "verified":
+      return { state: "completed" };
+    case "rejected":
+      return {
+        state: "active",
+        statusLabel: "Отклонено",
+        actionLabel: "Открыть решение",
+      };
+    default:
+      return { state: "active", actionLabel: "Заполнить данные" };
+  }
+}

@@ -242,7 +242,7 @@ function testSourceGuards() {
     "src/app/author-dashboard/commercial/terms/page.tsx",
   );
   assert.match(payoutPage, /requireCommercialOnboardingAuthor/);
-  assert.match(payoutPage, /не собираем реальные реквизиты/i);
+  assert.match(payoutPage, /AuthorPayoutProfileForm/);
   assert.match(termsPage, /requireCommercialOnboardingAuthor/);
   assert.match(termsPage, /Принять условия сейчас нельзя/i);
   assert.match(termsPage, /AUTHOR_COMMERCIAL_SHARE_BPS/);

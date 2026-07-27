@@ -33,6 +33,20 @@ export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
 export const COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE =
   "commercial_application_approved";
 
+export const PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE =
+  "payout_profile_submitted_admin";
+export const PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE =
+  "payout_profile_needs_changes";
+export const PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE = "payout_profile_verified";
+export const PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE = "payout_profile_rejected";
+
+const PAYOUT_PROFILE_MESSAGE_TYPES = new Set([
+  PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE,
+  PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE,
+  PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE,
+  PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE,
+]);
+
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
   return `author_access_granted:${applicationId.trim()}`;
 }
@@ -49,9 +63,38 @@ export function buildCommercialApplicationApprovedDedupKey(
   return `commercial_application_approved:${applicationId.trim()}`;
 }
 
+export function buildPayoutProfileSubmittedAdminDedupKey(
+  profileId: string,
+  version: number,
+): string {
+  return `payout_profile_submitted_admin:${profileId.trim()}:${version}`;
+}
+
+export function buildPayoutProfileNeedsChangesDedupKey(
+  profileId: string,
+  version: number,
+): string {
+  return `payout_profile_needs_changes:${profileId.trim()}:${version}`;
+}
+
+export function buildPayoutProfileVerifiedDedupKey(
+  profileId: string,
+  version: number,
+): string {
+  return `payout_profile_verified:${profileId.trim()}:${version}`;
+}
+
+export function buildPayoutProfileRejectedDedupKey(
+  profileId: string,
+  version: number,
+): string {
+  return `payout_profile_rejected:${profileId.trim()}:${version}`;
+}
+
 function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
+  profileVersion?: number,
 ): string {
   if (messageType === AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE) {
     return buildAuthorApplicationApprovedDedupKey(applicationId);
@@ -59,6 +102,24 @@ function resolveOperationalEmailDedupKey(
 
   if (messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE) {
     return buildCommercialApplicationApprovedDedupKey(applicationId);
+  }
+
+  const version = profileVersion ?? 1;
+
+  if (messageType === PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE) {
+    return buildPayoutProfileSubmittedAdminDedupKey(applicationId, version);
+  }
+
+  if (messageType === PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE) {
+    return buildPayoutProfileNeedsChangesDedupKey(applicationId, version);
+  }
+
+  if (messageType === PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE) {
+    return buildPayoutProfileVerifiedDedupKey(applicationId, version);
+  }
+
+  if (messageType === PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE) {
+    return buildPayoutProfileRejectedDedupKey(applicationId, version);
   }
 
   return buildAuthorAccessGrantedDedupKey(applicationId);
@@ -69,6 +130,8 @@ export type AcquireOperationalEmailDeliveryInput = {
   recipientEmail: string;
   messageType?: string;
   forceResend?: boolean;
+  /** Required for payout profile dedup keys that include version. */
+  profileVersion?: number;
 };
 
 export type AcquireOperationalEmailDeliveryResult =
@@ -121,7 +184,11 @@ export async function acquireOperationalEmailDelivery(
   const recipientEmail = input.recipientEmail.trim().toLowerCase();
   const messageType =
     input.messageType?.trim() || AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE;
-  const dedupKey = resolveOperationalEmailDedupKey(applicationId, messageType);
+  const dedupKey = resolveOperationalEmailDedupKey(
+    applicationId,
+    messageType,
+    input.profileVersion,
+  );
 
   if (!applicationId || !recipientEmail) {
     return { ok: false, code: "invalid_input" };
@@ -155,11 +222,12 @@ export async function acquireOperationalEmailDelivery(
   }
 
   if (intent.mode === "insert") {
-    // commercial_application ids live in author_commercial_applications;
+    // commercial / payout profile ids are not in author_applications;
     // operational_email_deliveries.application_id FK points only at
     // author_applications, so keep it null and rely on dedup_key.
     const linkedApplicationId =
-      messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE
+      messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE ||
+      PAYOUT_PROFILE_MESSAGE_TYPES.has(messageType)
         ? null
         : applicationId;
 

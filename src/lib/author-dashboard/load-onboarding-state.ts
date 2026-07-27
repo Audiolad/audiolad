@@ -21,7 +21,10 @@ import {
 } from "@/lib/author-products/publish";
 import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
+import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
+import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type PracticeReadinessRow = Pick<
   PracticeRow,
@@ -150,6 +153,42 @@ async function loadCampaignsForAuthor(
   );
 }
 
+async function loadPayoutProfileSummary(authorId: string): Promise<{
+  status: AuthorPayoutProfileStatus | null;
+  reviewComment: string | null;
+}> {
+  try {
+    const service = createServiceRoleClient();
+    const { data, error } = await service
+      .from("author_payout_profiles")
+      .select("status, review_comment")
+      .eq("author_id", authorId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { status: null, reviewComment: null };
+    }
+
+    return {
+      status: (data.status as AuthorPayoutProfileStatus) ?? null,
+      reviewComment: (data.review_comment as string | null) ?? null,
+    };
+  } catch {
+    return { status: null, reviewComment: null };
+  }
+}
+
+function resolvePayoutDetailsComplete(input: {
+  accessStatus: AuthorAccessStatus;
+  payoutProfileStatus: AuthorPayoutProfileStatus | null;
+}): boolean {
+  if (input.payoutProfileStatus) {
+    return input.payoutProfileStatus === "verified";
+  }
+
+  return isAuthorCommercialActiveAccess(input.accessStatus);
+}
+
 export async function loadAuthorOnboardingChecklistState(
   supabase: SupabaseClient,
   input: {
@@ -160,12 +199,13 @@ export async function loadAuthorOnboardingChecklistState(
 ): Promise<AuthorOnboardingChecklistState> {
   const { authorId, authorSlug, accessStatus } = input;
 
-  const [profile, productList, campaigns, commercialApplication] =
+  const [profile, productList, campaigns, commercialApplication, payoutProfile] =
     await Promise.all([
       getAuthorProfileDetail(supabase, authorId),
       listAuthorProducts(supabase, authorId),
       loadCampaignsForAuthor(supabase, authorId),
       getAuthorCommercialApplication(supabase, authorId).catch(() => null),
+      loadPayoutProfileSummary(authorId),
     ]);
 
   if (!profile) {
@@ -322,17 +362,20 @@ export async function loadAuthorOnboardingChecklistState(
     capabilities: {
       ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
       applicationSubmissionAvailable: true,
-      // Stub routes ship with this change: cards become active after approve.
       payoutDetailsAvailable: commercialOnboardingOpen,
       termsAcceptanceAvailable: commercialOnboardingOpen,
     },
     applicationStatus: commercialApplication?.status ?? null,
     applicationReviewComment: commercialApplication?.review_comment ?? null,
+    payoutProfileStatus: payoutProfile.status,
+    payoutProfileReviewComment: payoutProfile.reviewComment,
     applicationHref: `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`,
     payoutDetailsHref: `/author-dashboard/commercial/payout-details?author=${encodeURIComponent(authorSlug)}`,
     termsHref: `/author-dashboard/commercial/terms?author=${encodeURIComponent(authorSlug)}`,
-    // Existing commercial_active authors keep paid access without fake completion.
-    payoutDetailsComplete: accessStatus === "commercial_active" || accessStatus === "commercial",
+    payoutDetailsComplete: resolvePayoutDetailsComplete({
+      accessStatus,
+      payoutProfileStatus: payoutProfile.status,
+    }),
     termsAccepted: accessStatus === "commercial_active" || accessStatus === "commercial",
     legacyPendingWithoutApplication:
       accessStatus === "commercial_pending" && !commercialApplication,
