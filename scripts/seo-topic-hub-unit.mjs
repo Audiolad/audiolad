@@ -258,6 +258,12 @@ assert(
   "free hub includes release resentment SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-prostit-cheloveka",
+  ),
+  "free hub includes forgive-a-person SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
@@ -274,6 +280,12 @@ assert(
     (article) => article.slug === "kak-otpustit-obidu",
   ),
   "release resentment is not forced into money hub",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "kak-prostit-cheloveka",
+  ),
+  "forgive-a-person is not forced into money hub",
 );
 assert(
   sitemapEntries.some((entry) =>

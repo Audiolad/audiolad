@@ -1950,10 +1950,29 @@ assert(
   "release resentment links to free meditations article",
 );
 assert(
-  !JSON.stringify(releaseResentmentArticle.afterFinalAudio).includes(
-    "/articles/kak-prostit",
+  releaseResentmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
   ),
-  "release resentment does not link unpublished forgiveness cluster articles",
+  "release resentment reverse-links to forgive-a-person article",
+);
+assert(
+  releaseResentmentArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes(
+        "как простить человека без оправдания его поступка и обязательного примирения",
+      ),
+    ),
+  ),
+  "release resentment mentions forgive-without-reconcile intent",
+);
+assert(
+  !JSON.stringify(releaseResentmentArticle).includes(
+    "/articles/kak-prostit\"",
+  ) &&
+    !JSON.stringify(releaseResentmentArticle).includes(
+      "/articles/kak-prostit'",
+    ),
+  "release resentment does not link unpublished stub slug kak-prostit",
 );
 assert(
   Boolean(releaseResentmentArticle.brandNote?.includes("АудиоЛаде")),
@@ -1964,6 +1983,20 @@ assert(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
   "release resentment see-also includes primary hub",
+);
+assert(
+  releaseResentmentArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ),
+  "release resentment see-also includes forgive-a-person article",
+);
+assert(
+  releaseResentmentArticle.updatedAt === "2026-07-27T08:00:00.000Z",
+  "release resentment updatedAt bumped for reverse-link edit",
+);
+assert(
+  releaseResentmentArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "release resentment publishedAt unchanged",
 );
 assert(
   listArticlesByTopicSlug("besplatnye-meditatsii").some(
@@ -1999,6 +2032,222 @@ assert(
     ),
   ),
   "release resentment keeps professional-support safety note",
+);
+
+const forgivePersonArticle = getArticleBySlug("kak-prostit-cheloveka");
+assert(forgivePersonArticle, "forgive-a-person article registered");
+assert(
+  forgivePersonArticle.title ===
+    "Как простить человека, если обида всё ещё не отпускает",
+  "forgive-a-person H1",
+);
+assert(
+  forgivePersonArticle.metaTitle ===
+    "Как простить человека без примирения и восстановления доверия – АудиоЛад",
+  "forgive-a-person SEO title differs from resentment article and keeps brand once",
+);
+assert(
+  forgivePersonArticle.metaTitle !== releaseResentmentArticle.metaTitle,
+  "forgive-a-person and resentment SEO titles differ",
+);
+assert(
+  forgivePersonArticle.metaDescription !==
+    forgivePersonArticle.leadBeforeAudio,
+  "forgive-a-person metaDescription is not visual lead",
+);
+assert(
+  forgivePersonArticle.metaDescription !==
+    releaseResentmentArticle.metaDescription,
+  "forgive-a-person and resentment meta descriptions differ",
+);
+assert(
+  forgivePersonArticle.shortAnswer !== releaseResentmentArticle.shortAnswer,
+  "forgive-a-person and resentment short answers differ",
+);
+assert(
+  forgivePersonArticle.leadBeforeAudio !==
+    releaseResentmentArticle.leadBeforeAudio,
+  "forgive-a-person and resentment leads differ",
+);
+assert(
+  forgivePersonArticle.topicSlug === "besplatnye-meditatsii",
+  "forgive-a-person uses free meditations hub",
+);
+assert(
+  forgivePersonArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "forgive-a-person topic href",
+);
+assert(
+  forgivePersonArticle.topicSlug !== "meditatsii-na-dengi",
+  "forgive-a-person is not forced into money hub",
+);
+assert(
+  forgivePersonArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "forgive-a-person primary practice key",
+);
+assert(
+  forgivePersonArticle.primaryPracticeIntro.includes(
+    "13 шагов Радикального прощения",
+  ),
+  "forgive-a-person practice intro",
+);
+assert(
+  forgivePersonArticle.primaryPracticeIntro.includes(
+    "последовательный внутренний процесс",
+  ),
+  "forgive-a-person practice intro stays catalog-aligned",
+);
+assert(
+  !forgivePersonArticle.primaryPracticeIntro.includes("гарант"),
+  "forgive-a-person practice intro avoids guarantees",
+);
+assert(
+  forgivePersonArticle.leadBeforeAudio.includes(
+    "устал носить в себе обиду, но простить всё равно не получается",
+  ),
+  "forgive-a-person opening body paragraph",
+);
+assert(
+  forgivePersonArticle.shortAnswer.startsWith(
+    "Простить человека не значит оправдать его поступок",
+  ),
+  "forgive-a-person short answer keeps definition role",
+);
+assert(
+  !forgivePersonArticle.leadBeforeAudio.includes(
+    "Простить человека не значит оправдать",
+  ),
+  "forgive-a-person lead is not a second definition",
+);
+assert(
+  forgivePersonArticle.introAfterAudio[0] ===
+    "В такой ситуации слово «простить» может вызывать сопротивление.",
+  "forgive-a-person intro starts after lead",
+);
+assert(
+  forgivePersonArticle.sections.some(
+    (section) =>
+      section.title ===
+      "Прощение, оправдание, примирение и доверие – не одно и то же",
+  ),
+  "forgive-a-person keeps intent-separating H2",
+);
+assert(
+  forgivePersonArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "Можно простить и больше не поддерживать общение.",
+    ),
+  ),
+  "forgive-a-person keeps forgive-without-contact wording",
+);
+assert(
+  forgivePersonArticle.captionAfterAudio === "",
+  "forgive-a-person no artificial caption",
+);
+assert(
+  forgivePersonArticle.finalAudioLead === "",
+  "forgive-a-person no second primary player",
+);
+assert(forgivePersonArticle.faq.length === 7, "forgive-a-person faq count");
+assert(
+  forgivePersonArticle.faq.some((item) =>
+    item.question.includes("не доверять"),
+  ),
+  "forgive-a-person FAQ covers trust separately",
+);
+assert(
+  forgivePersonArticle.faq.some((item) =>
+    item.question.includes("продолжает причинять боль"),
+  ),
+  "forgive-a-person FAQ covers ongoing harm",
+);
+assert(
+  !forgivePersonArticle.faq.some((item) =>
+    item.question.includes("отпустить обиду"),
+  ),
+  "forgive-a-person FAQ does not steal resentment primary intent",
+);
+assert(
+  forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ),
+  "forgive-a-person links to release resentment article",
+);
+assert(
+  forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "forgive-a-person links to free meditations hub as collection CTA",
+);
+assert(
+  !JSON.stringify(forgivePersonArticle.afterFinalAudio).includes(
+    "/p/denezhnyy-potok-9288",
+  ),
+  "forgive-a-person does not pull money playlist into CTA",
+);
+assert(
+  !JSON.stringify(forgivePersonArticle).includes("/topics/izobilie"),
+  "forgive-a-person avoids unrelated abundance hub links",
+);
+assert(
+  Boolean(forgivePersonArticle.brandNote?.includes("АудиоЛаде")),
+  "forgive-a-person brand note",
+);
+assert(
+  forgivePersonArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("профессиональной поддержкой"),
+    ),
+  ),
+  "forgive-a-person keeps professional-support safety note",
+);
+assert(
+  forgivePersonArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("насилием") || paragraph.includes("угрозой безопасности"),
+    ),
+  ),
+  "forgive-a-person keeps violence/safety boundary",
+);
+assert(
+  forgivePersonArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ),
+  "forgive-a-person see-also includes resentment article",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "kak-prostit-cheloveka",
+  ),
+  "free hub lists forgive-a-person article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-prostit-cheloveka",
+  ),
+  "money hub does not list forgive-a-person article",
+);
+assert(
+  !forgivePersonArticle.leadBeforeAudio.includes("—") &&
+    !forgivePersonArticle.shortAnswer.includes("—") &&
+    !forgivePersonArticle.metaTitle.includes("—"),
+  "forgive-a-person uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-prostit-cheloveka"),
+  "forgive-a-person in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-prostit-cheloveka")
+    .length === 1,
+  "forgive-a-person slug unique",
+);
+assert(
+  !forgivePersonArticle.metaTitle
+    .toLowerCase()
+    .includes("отпустить обиду"),
+  "forgive-a-person SEO title does not target resentment query",
 );
 
 assert(
@@ -2319,6 +2568,13 @@ assert(
       entry.url === "https://audiolad.ru/articles/kak-otpustit-obidu",
   ),
   "release resentment article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-prostit-cheloveka",
+  ),
+  "forgive-a-person article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),

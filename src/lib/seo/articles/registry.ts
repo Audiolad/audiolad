@@ -4,6 +4,7 @@ import { CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE } from "./content/chto-takoe-denezhn
 import { KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE } from "./content/kak-izmenit-otnoshenie-k-dengam";
 import { KAK_OTPUSTIT_OBIDU_ARTICLE } from "./content/kak-otpustit-obidu";
 import { KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE } from "./content/kak-privlech-dengi-v-svoyu-zhizn";
+import { KAK_PROSTIT_CHELOVEKA_ARTICLE } from "./content/kak-prostit-cheloveka";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
 import { KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE } from "./content/kak-voyti-v-sostoyanie-izobiliya";
 import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
@@ -27,6 +28,7 @@ const ARTICLE_DEFINITIONS = [
   MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE,
   VIZUALIZATSIYA_ZHELANIY_ARTICLE,
   KAK_OTPUSTIT_OBIDU_ARTICLE,
+  KAK_PROSTIT_CHELOVEKA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
