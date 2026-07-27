@@ -176,6 +176,13 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если внутренний конфликт связан именно с женской ролью, оплатой труда, принятием помощи и привычкой ставить потребности других выше своих, отдельно можно прочитать статью ",
+      linkLabel: "«Как женщине разрешить себе деньги»",
+      href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+      after: ".",
+    },
+    {
+      before:
         "Если тема финансов особенно важна для вас, обратите внимание и на подборку бесплатных практик ",
       linkLabel: "«Денежный Поток»",
       href: "/p/denezhnyy-potok-9288",
@@ -218,6 +225,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+      title: "Как женщине разрешить себе деньги",
+      description: "Если конфликт связан с оплатой труда, виной и самоценностью",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -237,5 +249,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-27T15:00:00.000Z",
 } as const satisfies ArticleDefinition;

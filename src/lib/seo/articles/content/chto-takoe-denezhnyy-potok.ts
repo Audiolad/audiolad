@@ -203,6 +203,11 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+      title: "Как женщине разрешить себе деньги",
+      description: "Узкий материал о вине, оплате труда и финансовых решениях",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -223,5 +228,5 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-27T15:00:00.000Z",
 } as const satisfies ArticleDefinition;

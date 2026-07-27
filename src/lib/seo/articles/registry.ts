@@ -11,6 +11,7 @@ import { KAK_PROSTIT_CHELOVEKA_ARTICLE } from "./content/kak-prostit-cheloveka";
 import { KAK_PROSTIT_SEBYA_ARTICLE } from "./content/kak-prostit-sebya";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
 import { KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE } from "./content/kak-voyti-v-sostoyanie-izobiliya";
+import { KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE } from "./content/kak-zhenshchine-razreshit-sebe-dengi";
 import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
 import { MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE } from "./content/meditatsiya-na-ispolnenie-zhelaniy";
 import { MEDITATSIYA_NA_IZOBILIE_ARTICLE } from "./content/meditatsiya-na-izobilie";
@@ -39,6 +40,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE,
   KAK_PROSTIT_SEBYA_ARTICLE,
   KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE,
+  KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

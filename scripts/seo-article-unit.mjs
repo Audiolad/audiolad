@@ -3170,6 +3170,72 @@ assert(
   "past-release publishedAt unchanged",
 );
 
+const allowYourselfMoneyArticle = getArticleBySlug(
+  "kak-zhenshchine-razreshit-sebe-dengi",
+);
+assert(allowYourselfMoneyArticle, "allow-yourself-money article registered");
+assert(
+  allowYourselfMoneyArticle.title === "Как женщине разрешить себе деньги",
+  "allow-yourself-money H1",
+);
+assert(
+  allowYourselfMoneyArticle.metaTitle ===
+    "Как женщине разрешить себе деньги – АудиоЛад",
+  "allow-yourself-money SEO title",
+);
+assert(
+  allowYourselfMoneyArticle.topicSlug === "besplatnye-meditatsii",
+  "allow-yourself-money hub",
+);
+assert(
+  allowYourselfMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "allow-yourself-money practice",
+);
+assert(
+  allowYourselfMoneyArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "allow-yourself-money practice intro",
+);
+assert(
+  allowYourselfMoneyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует роста дохода"),
+    ),
+  "allow-yourself-money practice disclaimer",
+);
+assert(
+  allowYourselfMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "allow-yourself-money links to change money attitude",
+);
+assert(
+  listArticleSlugs().includes("kak-zhenshchine-razreshit-sebe-dengi"),
+  "allow-yourself-money in slug list",
+);
+assert(
+  !allowYourselfMoneyArticle.metaTitle.includes("—"),
+  "allow-yourself-money uses medium dash",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "change money attitude reverse-links to allow-yourself-money",
+);
+assert(
+  moneyFlowArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "money flow see-also includes allow-yourself-money",
+);
+assert(
+  moneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "money meditation see-also includes allow-yourself-money",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
