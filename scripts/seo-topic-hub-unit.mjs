@@ -270,6 +270,12 @@ assert(
   "free hub includes habitual-offense SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-otpustit-proshloe",
+  ),
+  "free hub includes past-release SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
@@ -298,6 +304,12 @@ assert(
     (article) => article.slug === "pochemu-my-postoyanno-obizhaemsya",
   ),
   "habitual-offense is not forced into money hub",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "kak-otpustit-proshloe",
+  ),
+  "past-release is not forced into money hub",
 );
 assert(
   sitemapEntries.some((entry) =>

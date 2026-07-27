@@ -249,14 +249,14 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
-      href: "/articles/kak-prostit-cheloveka",
-      title: "Как простить человека",
-      description: "Прощение без оправдания, примирения и обязательного доверия",
-    },
-    {
       href: "/articles/pochemu-my-postoyanno-obizhaemsya",
       title: "Почему мы постоянно обижаемся",
       description: "Если обида регулярно возникает в разных ситуациях",
+    },
+    {
+      href: "/articles/kak-otpustit-proshloe",
+      title: "Как отпустить прошлое",
+      description: "Если удерживает не одна обида, а целый жизненный этап",
     },
   ],
   closingSection: {
@@ -268,5 +268,5 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T09:00:00.000Z",
+  updatedAt: "2026-07-27T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

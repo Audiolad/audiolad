@@ -397,9 +397,9 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
       description: "Если мысли снова возвращаются к болезненной ситуации",
     },
     {
-      href: "/articles/pochemu-my-postoyanno-obizhaemsya",
-      title: "Почему мы постоянно обижаемся",
-      description: "Если обида регулярно возникает в разных ситуациях",
+      href: "/articles/kak-otpustit-proshloe",
+      title: "Как отпустить прошлое",
+      description: "Если удерживает не один человек, а целый жизненный этап",
     },
   ],
   closingSection: {
@@ -414,5 +414,5 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T09:00:00.000Z",
+  updatedAt: "2026-07-27T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

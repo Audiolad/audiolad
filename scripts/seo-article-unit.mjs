@@ -1985,14 +1985,8 @@ assert(
   "release resentment see-also includes primary hub",
 );
 assert(
-  releaseResentmentArticle.seeAlsoLinks.some(
-    (item) => item.href === "/articles/kak-prostit-cheloveka",
-  ),
-  "release resentment see-also includes forgive-a-person article",
-);
-assert(
-  releaseResentmentArticle.updatedAt === "2026-07-27T09:00:00.000Z",
-  "release resentment updatedAt bumped for habitual-offense seeAlso",
+  releaseResentmentArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "release resentment updatedAt bumped for past-release seeAlso",
 );
 assert(
   releaseResentmentArticle.seeAlsoLinks.some(
@@ -2001,10 +1995,25 @@ assert(
   "release resentment see-also includes habitual-offense article",
 );
 assert(
+  releaseResentmentArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "release resentment see-also includes past-release article",
+);
+assert(
   !releaseResentmentArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ) &&
+    !releaseResentmentArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-proshloe",
+    ),
+  "release resentment avoids CTA overload for habitual/past reverse",
+);
+assert(
+  !releaseResentmentArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
   ),
-  "release resentment avoids CTA overload for habitual-offense reverse",
+  "release resentment seeAlso avoids triple-link for forgive-a-person",
 );
 assert(
   releaseResentmentArticle.publishedAt === "2026-07-27T00:00:00.000Z",
@@ -2268,14 +2277,26 @@ assert(
   "forgive-a-person reverse-links to habitual-offense article",
 );
 assert(
-  forgivePersonArticle.seeAlsoLinks.some(
+  !forgivePersonArticle.seeAlsoLinks.some(
     (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
   ),
-  "forgive-a-person see-also includes habitual-offense article",
+  "forgive-a-person seeAlso avoids triple-link for habitual-offense",
 );
 assert(
-  forgivePersonArticle.updatedAt === "2026-07-27T09:00:00.000Z",
-  "forgive-a-person updatedAt bumped for reverse-link edit",
+  forgivePersonArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "forgive-a-person see-also includes past-release article",
+);
+assert(
+  !forgivePersonArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "forgive-a-person avoids CTA overload for past-release reverse",
+);
+assert(
+  forgivePersonArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "forgive-a-person updatedAt bumped for past-release reverse-link edit",
 );
 assert(
   forgivePersonArticle.publishedAt === "2026-07-27T00:00:00.000Z",
@@ -2470,6 +2491,260 @@ assert(
     (slug) => slug === "pochemu-my-postoyanno-obizhaemsya",
   ).length === 1,
   "habitual-offense slug unique",
+);
+assert(
+  habitualOffenseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "habitual-offense reverse-links to past-release article",
+);
+assert(
+  habitualOffenseArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-proshloe",
+  ),
+  "habitual-offense see-also includes past-release article",
+);
+assert(
+  habitualOffenseArticle.updatedAt === "2026-07-27T12:00:00.000Z",
+  "habitual-offense updatedAt bumped for past-release reverse",
+);
+assert(
+  habitualOffenseArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "habitual-offense publishedAt unchanged",
+);
+
+const pastReleaseArticle = getArticleBySlug("kak-otpustit-proshloe");
+assert(pastReleaseArticle, "past-release article registered");
+assert(
+  pastReleaseArticle.title ===
+    "Как отпустить прошлое и перестать жить воспоминаниями",
+  "past-release H1",
+);
+assert(
+  pastReleaseArticle.metaTitle ===
+    "Как отпустить прошлое и начать жить настоящим – АудиоЛад",
+  "past-release SEO title",
+);
+assert(
+  pastReleaseArticle.metaTitle !== releaseResentmentArticle.metaTitle &&
+    pastReleaseArticle.metaTitle !== forgivePersonArticle.metaTitle &&
+    pastReleaseArticle.metaTitle !== habitualOffenseArticle.metaTitle,
+  "past-release SEO title differs from three siblings",
+);
+assert(
+  !pastReleaseArticle.metaTitle.toLowerCase().includes("отпустить обиду") &&
+    !pastReleaseArticle.metaTitle.toLowerCase().includes("простить человека") &&
+    !pastReleaseArticle.metaTitle.toLowerCase().includes("постоянно обижаемся"),
+  "past-release SEO title avoids sibling primary queries",
+);
+assert(
+  pastReleaseArticle.metaDescription !== pastReleaseArticle.leadBeforeAudio,
+  "past-release metaDescription is not visual lead",
+);
+assert(
+  pastReleaseArticle.metaDescription !==
+    releaseResentmentArticle.metaDescription &&
+    pastReleaseArticle.metaDescription !==
+      forgivePersonArticle.metaDescription &&
+    pastReleaseArticle.metaDescription !==
+      habitualOffenseArticle.metaDescription,
+  "past-release meta description differs from siblings",
+);
+assert(
+  pastReleaseArticle.shortAnswer !== releaseResentmentArticle.shortAnswer &&
+    pastReleaseArticle.shortAnswer !== forgivePersonArticle.shortAnswer &&
+    pastReleaseArticle.shortAnswer !== habitualOffenseArticle.shortAnswer,
+  "past-release short answer differs from siblings",
+);
+assert(
+  pastReleaseArticle.leadBeforeAudio !==
+    releaseResentmentArticle.leadBeforeAudio &&
+    pastReleaseArticle.leadBeforeAudio !==
+      forgivePersonArticle.leadBeforeAudio &&
+    pastReleaseArticle.leadBeforeAudio !==
+      habitualOffenseArticle.leadBeforeAudio,
+  "past-release lead differs from siblings",
+);
+assert(
+  pastReleaseArticle.topicSlug === "besplatnye-meditatsii",
+  "past-release uses free meditations hub",
+);
+assert(
+  pastReleaseArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "past-release topic href",
+);
+assert(
+  pastReleaseArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "past-release primary practice key",
+);
+assert(
+  pastReleaseArticle.primaryPracticeIntro.includes(
+    "13 шагов Радикального прощения",
+  ),
+  "past-release practice intro",
+);
+assert(
+  pastReleaseArticle.primaryPracticeIntro.includes(
+    "последовательный внутренний процесс",
+  ),
+  "past-release practice intro stays catalog-aligned",
+);
+assert(
+  !pastReleaseArticle.primaryPracticeIntro.includes("утрат") &&
+    !pastReleaseArticle.primaryPracticeIntro.includes("несбывш"),
+  "past-release practice intro does not invent grief/unlived-life work",
+);
+assert(
+  pastReleaseArticle.leadBeforeAudio.includes(
+    "жизнь словно разделилась на две части",
+  ),
+  "past-release opening body paragraph",
+);
+assert(
+  pastReleaseArticle.shortAnswer.startsWith(
+    "Отпустить прошлое не значит стереть воспоминания",
+  ),
+  "past-release short answer keeps definition role",
+);
+assert(
+  !pastReleaseArticle.leadBeforeAudio.includes(
+    "Отпустить прошлое не значит стереть",
+  ),
+  "past-release lead is not a second definition",
+);
+assert(
+  pastReleaseArticle.introAfterAudio[0] ===
+    "Возникает вопрос: можно ли отпустить прошлое, не забывая прожитый опыт и не обесценивая то, что когда-то было по-настоящему важно?",
+  "past-release intro starts after lead",
+);
+assert(
+  pastReleaseArticle.sections.some(
+    (section) =>
+      section.title === "Как отпустить жизнь, которая не сложилась",
+  ),
+  "past-release keeps unlived-life H2",
+);
+assert(
+  pastReleaseArticle.sections.some(
+    (section) =>
+      section.title === "Память и жизнь прошлым – не одно и то же",
+  ),
+  "past-release keeps memory-vs-living-in-past H2",
+);
+assert(
+  pastReleaseArticle.captionAfterAudio === "",
+  "past-release no artificial caption",
+);
+assert(
+  pastReleaseArticle.finalAudioLead === "",
+  "past-release no second primary player",
+);
+assert(pastReleaseArticle.faq.length === 4, "past-release faq count");
+assert(
+  pastReleaseArticle.faq.some((item) =>
+    item.question.includes("не забыть"),
+  ),
+  "past-release FAQ covers remembering while releasing",
+);
+assert(
+  !pastReleaseArticle.faq.some((item) =>
+    item.question.toLowerCase().includes("простить"),
+  ),
+  "past-release FAQ does not steal forgive-person intent",
+);
+assert(
+  pastReleaseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ),
+  "past-release links to release resentment article",
+);
+assert(
+  pastReleaseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prostit-cheloveka",
+  ),
+  "past-release links to forgive-a-person article",
+);
+assert(
+  pastReleaseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+  ),
+  "past-release links to habitual-offense article",
+);
+assert(
+  pastReleaseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "past-release links to free meditations hub",
+);
+assert(
+  !pastReleaseArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ) &&
+    !pastReleaseArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-prostit-cheloveka",
+    ) &&
+    !pastReleaseArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/pochemu-my-postoyanno-obizhaemsya",
+    ),
+  "past-release seeAlso avoids triple-linking siblings",
+);
+assert(
+  Boolean(pastReleaseArticle.brandNote?.includes("АудиоЛаде")),
+  "past-release brand note",
+);
+assert(
+  pastReleaseArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("профессиональная поддержка"),
+    ),
+  ),
+  "past-release keeps professional-support safety note",
+);
+assert(
+  pastReleaseArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes(
+        "Как отпустить обиду и перестать снова возвращаться к болезненной ситуации",
+      ),
+    ),
+  ),
+  "past-release body mentions one-offense sibling",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "kak-otpustit-proshloe",
+  ),
+  "free hub lists past-release article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-otpustit-proshloe",
+  ),
+  "money hub does not list past-release article",
+);
+assert(
+  !pastReleaseArticle.leadBeforeAudio.includes("—") &&
+    !pastReleaseArticle.shortAnswer.includes("—") &&
+    !pastReleaseArticle.metaTitle.includes("—"),
+  "past-release uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-otpustit-proshloe"),
+  "past-release in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-otpustit-proshloe")
+    .length === 1,
+  "past-release slug unique",
+);
+assert(
+  pastReleaseArticle.publishedAt === "2026-07-27T00:00:00.000Z",
+  "past-release publishedAt set",
+);
+assert(
+  pastReleaseArticle.closingSection.title === "Главное",
+  "past-release closing section",
 );
 
 assert(

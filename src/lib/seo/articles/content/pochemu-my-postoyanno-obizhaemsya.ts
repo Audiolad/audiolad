@@ -238,6 +238,13 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
     },
     {
       before:
+        "Если удерживает не привычка обижаться, а целый жизненный этап, сожаления и несбывшиеся ожидания, может быть полезна статья ",
+      linkLabel: "«Как отпустить прошлое и перестать жить воспоминаниями»",
+      href: "/articles/kak-otpustit-proshloe",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -253,9 +260,9 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
-      href: "/articles/kak-razvit-lyubov-k-sebe",
-      title: "Как развить любовь к себе",
-      description: "Соседняя тема: бережное отношение к себе",
+      href: "/articles/kak-otpustit-proshloe",
+      title: "Как отпустить прошлое",
+      description: "Если внимание чаще уходит в воспоминания и несбывшиеся ожидания",
     },
   ],
   closingSection: {
@@ -267,5 +274,5 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-07-27T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

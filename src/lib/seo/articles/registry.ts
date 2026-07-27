@@ -3,6 +3,7 @@ import { BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE } from "./content/besplatnye-medit
 import { CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE } from "./content/chto-takoe-denezhnyy-potok";
 import { KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE } from "./content/kak-izmenit-otnoshenie-k-dengam";
 import { KAK_OTPUSTIT_OBIDU_ARTICLE } from "./content/kak-otpustit-obidu";
+import { KAK_OTPUSTIT_PROSHLOE_ARTICLE } from "./content/kak-otpustit-proshloe";
 import { KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE } from "./content/kak-privlech-dengi-v-svoyu-zhizn";
 import { KAK_PROSTIT_CHELOVEKA_ARTICLE } from "./content/kak-prostit-cheloveka";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
@@ -31,6 +32,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_OTPUSTIT_OBIDU_ARTICLE,
   KAK_PROSTIT_CHELOVEKA_ARTICLE,
   POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE,
+  KAK_OTPUSTIT_PROSHLOE_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
