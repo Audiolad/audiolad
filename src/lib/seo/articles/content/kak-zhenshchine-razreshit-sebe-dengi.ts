@@ -303,6 +303,11 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
       description: "Личные расходы, вина после покупки и бюджет",
     },
     {
+      href: "/articles/kak-perestat-ekonomit-na-sebe",
+      title: "Как перестать экономить на себе",
+      description: "Учёт собственных потребностей без импульсивных трат",
+    },
+    {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Общий взгляд на финансовые убеждения и привычки",
@@ -327,5 +332,5 @@ export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T17:00:00.000Z",
+  updatedAt: "2026-07-27T18:00:00.000Z",
 } as const satisfies ArticleDefinition;
