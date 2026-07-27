@@ -21,6 +21,13 @@ import {
   type CommercialApplicationAdminAlertKind,
 } from "./commercial-application-admin-alert";
 import {
+  COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
+  COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
+  COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
+  renderCommercialApplicationApprovedEmailHtml,
+  renderCommercialApplicationApprovedEmailText,
+} from "./commercial-application-approved";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -144,6 +151,26 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (
+      input.templateKey === COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY
+    ) {
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const authorName = readString(input.payload, "authorName");
+
+      return {
+        ok: true,
+        subject: COMMERCIAL_APPLICATION_APPROVED_EMAIL_SUBJECT,
+        html: renderCommercialApplicationApprovedEmailHtml({
+          authorName,
+          siteOrigin,
+        }),
+        text: renderCommercialApplicationApprovedEmailText({
+          authorName,
+          siteOrigin,
+        }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -167,6 +194,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
     return COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY) {
+    return COMMERCIAL_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

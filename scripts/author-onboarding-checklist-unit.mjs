@@ -764,17 +764,23 @@ function testCommercialScenarios() {
   });
   assert.equal(rejected.steps[0].statusLabel, "Заявка не одобрена");
 
-  // 8. Commercial application approved
+  // 8–9. After approve (commercial_onboarding) payout/terms open; paid locked
   const approved = evaluateCommercial({
     freeGateReady: true,
-    accessStatus: "commercial",
+    accessStatus: "commercial_onboarding",
+    applicationStatus: "approved",
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsHref: "/author-dashboard/commercial/payout-details",
+    termsHref: "/author-dashboard/commercial/terms",
   });
   assert.equal(approved.steps[0].state, "completed");
   assert.equal(approved.steps[0].statusLabel, "Одобрена");
-
-  // 9. Commercial data not implemented → coming_soon; paid stays locked
-  assert.equal(approved.steps[1].state, "coming_soon");
-  assert.equal(approved.steps[2].state, "coming_soon");
+  assert.equal(approved.steps[1].state, "active");
+  assert.equal(approved.steps[2].state, "active");
   assert.equal(approved.steps[3].state, "locked");
   assert.match(
     approved.steps[3].hint ?? "",

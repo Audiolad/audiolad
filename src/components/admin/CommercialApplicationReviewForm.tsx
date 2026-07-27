@@ -58,6 +58,9 @@ function ActionFeedback({
     return (
       <div className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm text-[#3d8d65]">
         {state.message}
+        {state.warning ? (
+          <p className="mt-2 text-[#8a6a1f]">{state.warning}</p>
+        ) : null}
       </div>
     );
   }
@@ -66,6 +69,14 @@ function ActionFeedback({
     return (
       <div className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
         {state.error}
+      </div>
+    );
+  }
+
+  if (state.warning) {
+    return (
+      <div className="rounded-[18px] border border-[#f0e2b8] bg-[#fff9e8] px-4 py-3 text-sm text-[#8a6a1f]">
+        {state.warning}
       </div>
     );
   }
@@ -104,15 +115,15 @@ export default function CommercialApplicationReviewForm({
   );
 
   const feedbackState =
-    approveState.ok || approveState.error
+    approveState.ok || approveState.error || approveState.warning
       ? approveState
-      : rejectState.ok || rejectState.error
+      : rejectState.ok || rejectState.error || rejectState.warning
         ? rejectState
-        : changesState.ok || changesState.error
+        : changesState.ok || changesState.error || changesState.warning
           ? changesState
-          : takeState.ok || takeState.error
+          : takeState.ok || takeState.error || takeState.warning
             ? takeState
-            : noteState.ok || noteState.error
+            : noteState.ok || noteState.error || noteState.warning
               ? noteState
               : ADMIN_COMMERCIAL_APPLICATION_ACTION_INITIAL_STATE;
 

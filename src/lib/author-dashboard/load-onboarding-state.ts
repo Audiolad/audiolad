@@ -306,6 +306,13 @@ export async function loadAuthorOnboardingChecklistState(
     campaigns,
   });
 
+  const commercialOnboardingOpen =
+    accessStatus === "commercial_onboarding" ||
+    accessStatus === "commercial_active" ||
+    accessStatus === "commercial" ||
+    accessStatus === "commercial_suspended" ||
+    commercialApplication?.status === "approved";
+
   const commercial = evaluateCommercialOnboardingChecklist({
     authorSlug,
     accessStatus,
@@ -315,10 +322,18 @@ export async function loadAuthorOnboardingChecklistState(
     capabilities: {
       ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
       applicationSubmissionAvailable: true,
+      // Stub routes ship with this change: cards become active after approve.
+      payoutDetailsAvailable: commercialOnboardingOpen,
+      termsAcceptanceAvailable: commercialOnboardingOpen,
     },
     applicationStatus: commercialApplication?.status ?? null,
     applicationReviewComment: commercialApplication?.review_comment ?? null,
     applicationHref: `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`,
+    payoutDetailsHref: `/author-dashboard/commercial/payout-details?author=${encodeURIComponent(authorSlug)}`,
+    termsHref: `/author-dashboard/commercial/terms?author=${encodeURIComponent(authorSlug)}`,
+    // Existing commercial_active authors keep paid access without fake completion.
+    payoutDetailsComplete: accessStatus === "commercial_active" || accessStatus === "commercial",
+    termsAccepted: accessStatus === "commercial_active" || accessStatus === "commercial",
     legacyPendingWithoutApplication:
       accessStatus === "commercial_pending" && !commercialApplication,
   });

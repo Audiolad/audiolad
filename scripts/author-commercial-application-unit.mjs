@@ -154,16 +154,32 @@ function testOnboardingCommercialApplicationFlow() {
   // 9. Resubmit path after needs_changes stays editable CTA
   assert.match(needsChanges.steps[0].href ?? "", /commercial-application/);
 
-  // 10–11. Approved → access commercial, payout/terms coming_soon
+  // 10–11. Approved onboarding → payout/terms active, paid locked
   const approved = evaluateCommercial({
-    accessStatus: "commercial",
+    accessStatus: "commercial_onboarding",
     applicationStatus: "approved",
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsHref: "/author-dashboard/commercial/payout-details",
+    termsHref: "/author-dashboard/commercial/terms",
   });
   assert.equal(approved.steps[0].state, "completed");
-  assert.equal(approved.steps[1].state, "coming_soon");
-  assert.equal(approved.steps[2].state, "coming_soon");
-  assert.equal(approved.steps[1].statusLabel, "Скоро будет доступно");
-  assert.equal(approved.steps[2].statusLabel, "Скоро будет доступно");
+  assert.equal(approved.steps[1].state, "active");
+  assert.equal(approved.steps[2].state, "active");
+  assert.equal(approved.steps[1].actionLabel, "Заполнить данные");
+  assert.equal(approved.steps[2].actionLabel, "Открыть условия");
+  assert.equal(approved.steps[3].state, "locked");
+  assert.match(
+    approved.steps[3].hint ?? "",
+    /данные для выплат|условия сотрудничества/i,
+  );
+  assert.doesNotMatch(
+    approved.steps[3].hint ?? "",
+    /Сначала нужна одобренная коммерческая заявка/,
+  );
 
   // 12. Rejected — no reapply CTA
   const rejected = evaluateCommercial({
@@ -176,14 +192,25 @@ function testOnboardingCommercialApplicationFlow() {
   assert.notEqual(rejected.steps[0].actionLabel, "Подать заявку");
   assert.equal(rejected.steps[0].hint, "Пока недостаточно материалов.");
 
-  // 13. Legacy commercial without application row
+  // 13. Legacy commercial / commercial_active without application row
   assert.equal(
     resolveCommercialApplicationStatus({ accessStatus: "commercial" }),
     "approved",
   );
+  assert.equal(
+    resolveCommercialApplicationStatus({ accessStatus: "commercial_active" }),
+    "approved",
+  );
   const legacyCommercial = evaluateCommercial({
-    accessStatus: "commercial",
+    accessStatus: "commercial_active",
     applicationStatus: null,
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsComplete: true,
+    termsAccepted: true,
   });
   assert.equal(legacyCommercial.steps[0].state, "completed");
 

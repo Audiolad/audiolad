@@ -30,6 +30,8 @@ export type OperationalEmailDeliveryRow = {
 export const AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE = "author_access_granted";
 export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
   "author_application_approved";
+export const COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE =
+  "commercial_application_approved";
 
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
   return `author_access_granted:${applicationId.trim()}`;
@@ -41,12 +43,22 @@ export function buildAuthorApplicationApprovedDedupKey(
   return `author_application_approved:${applicationId.trim()}`;
 }
 
+export function buildCommercialApplicationApprovedDedupKey(
+  applicationId: string,
+): string {
+  return `commercial_application_approved:${applicationId.trim()}`;
+}
+
 function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
 ): string {
   if (messageType === AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE) {
     return buildAuthorApplicationApprovedDedupKey(applicationId);
+  }
+
+  if (messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE) {
+    return buildCommercialApplicationApprovedDedupKey(applicationId);
   }
 
   return buildAuthorAccessGrantedDedupKey(applicationId);

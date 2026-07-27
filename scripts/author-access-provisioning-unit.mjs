@@ -29,17 +29,25 @@ function testWithdrawnDisplayedAsCancelled() {
 }
 
 function testAccessHelpers() {
+  assert.equal(authorAccessAllowsPaidProducts("commercial_active"), true);
   assert.equal(authorAccessAllowsPaidProducts("commercial"), true);
+  assert.equal(authorAccessAllowsPaidProducts("commercial_onboarding"), false);
+  assert.equal(authorAccessAllowsPaidProducts("commercial_suspended"), false);
   assert.equal(authorAccessAllowsPaidProducts("free"), false);
   assert.equal(authorAccessAllowsPaidProducts("commercial_pending"), false);
 
   assert.equal(authorAccessAllowsContentMutations("free"), true);
+  assert.equal(authorAccessAllowsContentMutations("commercial_onboarding"), true);
   assert.equal(authorAccessAllowsContentMutations("suspended"), false);
   assert.equal(authorAccessAllowsContentMutations("terminated"), false);
 
   assert.match(
     getAuthorAccessBannerMessage("free") ?? "",
     /Бесплатный авторский аккаунт/,
+  );
+  assert.match(
+    getAuthorAccessBannerMessage("commercial_onboarding") ?? "",
+    /одобрена/i,
   );
   assert.match(
     getAuthorAccessBannerMessage("suspended") ?? "",
@@ -49,10 +57,19 @@ function testAccessHelpers() {
     getPaidPricingDisabledReason("free") ?? "",
     /коммерческого подключения/,
   );
+  assert.match(
+    getPaidPricingDisabledReason("commercial_onboarding") ?? "",
+    /данные для выплат|условия сотрудничества/,
+  );
+  assert.equal(getPaidPricingDisabledReason("commercial_active"), null);
   assert.equal(getPaidPricingDisabledReason("commercial"), null);
   assert.equal(
     getAuthorAccessStatusLabel("commercial_pending"),
     "Коммерческое подключение",
+  );
+  assert.equal(
+    getAuthorAccessStatusLabel("commercial_onboarding"),
+    "Коммерческий онбординг",
   );
 }
 

@@ -82,14 +82,13 @@ WHERE author_id IN (${authors});
 }
 
 function applyMigration() {
-  const sql = readFileSync(
-    path.join(
-      ROOT,
-      "supabase/migrations/20260725230000_author_commercial_applications.sql",
-    ),
-    "utf8",
-  );
-  sqlFile(sql);
+  for (const relativePath of [
+    "supabase/migrations/20260725230000_author_commercial_applications.sql",
+    "supabase/migrations/20260727180000_commercial_onboarding_access_statuses.sql",
+  ]) {
+    const sql = readFileSync(path.join(ROOT, relativePath), "utf8");
+    sqlFile(sql);
+  }
 }
 
 function expectFailure(fn, label) {
@@ -310,18 +309,42 @@ COMMIT;
         "take in review again",
       );
 
-      // 10–11. Approve → commercial
+      // 10–11. Approve → commercial_onboarding (paid still closed)
       const approve = sqlScalarAsUser(
         staffId,
         `SELECT public.approve_author_commercial_application('${applicationId}'::uuid, 'ok')::text`,
       );
       assert.ok(approve.includes('"status": "approved"'), "approved");
-      assert.ok(approve.includes('"access_status": "commercial"'), "commercial");
+      assert.ok(
+        approve.includes('"access_status": "commercial_onboarding"'),
+        "commercial_onboarding",
+      );
       assert.equal(
         sqlScalar(
           `SELECT access_status FROM public.authors WHERE id = '${authorId}'::uuid`,
         ),
-        "commercial",
+        "commercial_onboarding",
+      );
+      assert.equal(
+        sqlScalar(
+          `SELECT public.author_access_allows_paid_products('commercial_onboarding')`,
+        ),
+        "f",
+      );
+      assert.equal(
+        sqlScalar(
+          `SELECT public.author_access_allows_paid_products('commercial_active')`,
+        ),
+        "t",
+      );
+
+      const approveAgain = sqlScalarAsUser(
+        staffId,
+        `SELECT public.approve_author_commercial_application('${applicationId}'::uuid, 'ok')::text`,
+      );
+      assert.ok(
+        approveAgain.includes('"idempotent": true'),
+        "idempotent approve",
       );
 
       // Reject path on a second author

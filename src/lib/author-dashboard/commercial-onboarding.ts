@@ -10,6 +10,7 @@ import {
 import type { PublishReadinessResult } from "@/lib/author-products/publish";
 import {
   authorAccessAllowsPaidProducts,
+  isAuthorCommercialApprovedAccess,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 import {
@@ -105,12 +106,12 @@ const STEP_META: Record<
   payout_details: {
     title: "Заполните данные для выплат",
     description:
-      "Укажите необходимые сведения, чтобы получать авторское вознаграждение от продаж.",
+      "Укажите сведения, необходимые для начисления и перечисления авторского вознаграждения.",
   },
   terms_acceptance: {
     title: "Примите условия сотрудничества",
     description:
-      "Ознакомьтесь с условиями размещения платных продуктов и выплаты авторского вознаграждения.",
+      "Ознакомьтесь с условиями размещения платных продуктов, расчёта вознаграждения и работы с АудиоЛадом.",
   },
   paid_product: {
     title: "Создайте первый платный продукт",
@@ -174,7 +175,7 @@ export function resolveCommercialApplicationStatus(input: {
   applicationStatus?: AuthorCommercialApplicationStatus | null;
   legacyPendingWithoutApplication?: boolean;
 }): CommercialApplicationStatus {
-  if (input.accessStatus === "commercial") {
+  if (isAuthorCommercialApprovedAccess(input.accessStatus)) {
     return "approved";
   }
 
@@ -330,9 +331,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
     capabilities.payoutDetailsAvailable && payoutDetailsComplete;
   const termsStepComplete =
     capabilities.termsAcceptanceAvailable && termsAccepted;
-
-  const commercialRequirementsMet =
-    applicationApproved && payoutStepComplete && termsStepComplete;
 
   const paidProductComplete = paidProducts.length > 0;
   const preparePaidComplete = paidProducts.some(
@@ -527,7 +525,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
       id: "terms_acceptance",
       ...STEP_META.terms_acceptance,
       state: "active",
-      actionLabel: "Ознакомиться с условиями",
+      actionLabel: "Открыть условия",
       href: termsHref ?? undefined,
       hint: null,
       readiness: null,
@@ -548,17 +546,17 @@ export function evaluateCommercialOnboardingChecklist(input: {
       hint: null,
       readiness: null,
     };
-  } else if (!commercialRequirementsMet) {
-    paidProductStep = lockedStep("paid_product", {
-      hint: !applicationApproved
-        ? "Сначала нужна одобренная коммерческая заявка."
-        : "Сначала заполните данные для выплат и примите условия сотрудничества.",
-    });
   } else if (!canCreatePaidProducts) {
+    // Paid API/SQL gates are authoritative: onboarding authors stay locked even
+    // if UI cards for payout/terms are already open.
     paidProductStep = lockedStep("paid_product", {
-      hint: "Публикация платных продуктов станет доступна после коммерческого подключения.",
+      hint: applicationApproved
+        ? "Сначала заполните данные для выплат и примите условия сотрудничества."
+        : "Сначала нужна одобренная коммерческая заявка.",
     });
   } else {
+    // commercial_active / legacy commercial: paid is allowed even if historical
+    // payout/terms checklist rows were never marked complete.
     paidProductStep = {
       id: "paid_product",
       ...STEP_META.paid_product,

@@ -259,7 +259,12 @@ export function selectAuthorFinanceEmptyState(input: {
   const threshold = input.thresholdMinor ?? AUTHOR_FINANCE_MINIMUM_PAYOUT_MINOR;
 
   if (!input.payoutEligible) {
-    if (input.accessStatus === "commercial") {
+    if (
+      input.accessStatus === "commercial" ||
+      input.accessStatus === "commercial_active" ||
+      input.accessStatus === "commercial_onboarding" ||
+      input.accessStatus === "commercial_suspended"
+    ) {
       return "not_payout_eligible_commercial";
     }
     if (input.accessStatus === "commercial_pending") {
