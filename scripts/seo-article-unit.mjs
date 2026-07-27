@@ -3309,6 +3309,77 @@ assert(
   "money meditation see-also includes female-self-worth-money",
 );
 
+const fearSpendOnSelfArticle = getArticleBySlug("strah-tratit-dengi-na-sebya");
+assert(fearSpendOnSelfArticle, "fear-spend-on-self article registered");
+assert(
+  fearSpendOnSelfArticle.title ===
+    "Страх тратить деньги на себя: почему он возникает и как относиться к своим расходам спокойнее",
+  "fear-spend-on-self H1",
+);
+assert(
+  fearSpendOnSelfArticle.metaTitle ===
+    "Страх тратить деньги на себя: причины и что делать – АудиоЛад",
+  "fear-spend-on-self SEO title",
+);
+assert(
+  fearSpendOnSelfArticle.topicSlug === "besplatnye-meditatsii",
+  "fear-spend-on-self hub",
+);
+assert(
+  fearSpendOnSelfArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "fear-spend-on-self practice",
+);
+assert(
+  fearSpendOnSelfArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "fear-spend-on-self practice intro",
+);
+assert(
+  fearSpendOnSelfArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не заменяет бюджет, финансовый резерв"),
+    ),
+  "fear-spend-on-self practice disclaimer",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-samotsennost-i-dengi",
+  ),
+  "fear-spend-on-self links to female-self-worth-money",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+  ),
+  "fear-spend-on-self links to allow-yourself-money",
+);
+assert(
+  listArticleSlugs().includes("strah-tratit-dengi-na-sebya"),
+  "fear-spend-on-self in slug list",
+);
+assert(
+  !fearSpendOnSelfArticle.metaTitle.includes("—"),
+  "fear-spend-on-self uses medium dash",
+);
+assert(
+  femaleSelfWorthMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/strah-tratit-dengi-na-sebya",
+  ),
+  "female-self-worth-money reverse-links to fear-spend-on-self",
+);
+assert(
+  allowYourselfMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/strah-tratit-dengi-na-sebya",
+  ),
+  "allow-yourself-money see-also includes fear-spend-on-self",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/strah-tratit-dengi-na-sebya",
+  ),
+  "change money attitude see-also includes fear-spend-on-self",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
