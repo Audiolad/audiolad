@@ -252,6 +252,12 @@ assert(
   "free hub includes wish visualization SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-otpustit-obidu",
+  ),
+  "free hub includes release resentment SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
@@ -262,6 +268,12 @@ assert(
     (article) => article.slug === "vizualizatsiya-zhelaniy",
   ),
   "wish visualization is not forced into money hub",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (article) => article.slug === "kak-otpustit-obidu",
+  ),
+  "release resentment is not forced into money hub",
 );
 assert(
   sitemapEntries.some((entry) =>

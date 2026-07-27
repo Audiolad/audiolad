@@ -1833,6 +1833,174 @@ assert(
   "wish visualization closing rejects future-control framing",
 );
 
+const releaseResentmentArticle = getArticleBySlug("kak-otpustit-obidu");
+assert(releaseResentmentArticle, "release resentment article registered");
+assert(
+  releaseResentmentArticle.title ===
+    "Как отпустить обиду и перестать снова возвращаться к болезненной ситуации",
+  "release resentment H1",
+);
+assert(
+  releaseResentmentArticle.metaTitle.startsWith("Как отпустить обиду"),
+  "release resentment SEO title keeps primary query",
+);
+assert(
+  releaseResentmentArticle.metaTitle.includes("АудиоЛад") &&
+    !releaseResentmentArticle.metaTitle.includes("АудиоЛад – АудиоЛад"),
+  "release resentment SEO title has brand once",
+);
+assert(
+  releaseResentmentArticle.metaDescription !==
+    releaseResentmentArticle.leadBeforeAudio,
+  "release resentment metaDescription is not visual lead",
+);
+assert(
+  releaseResentmentArticle.topicSlug === "besplatnye-meditatsii",
+  "release resentment uses free meditations hub",
+);
+assert(
+  releaseResentmentArticle.topicHref === "/topics/besplatnye-meditatsii",
+  "release resentment topic href",
+);
+assert(
+  releaseResentmentArticle.topicSlug !== "meditatsii-na-dengi",
+  "release resentment is not forced into money hub",
+);
+assert(
+  releaseResentmentArticle.primaryPractice.practiceKey ===
+    "13-shagov-radikalnogo-proscheniya",
+  "release resentment primary practice key",
+);
+assert(
+  releaseResentmentArticle.primaryPracticeIntro.includes(
+    "13 шагов Радикального прощения",
+  ),
+  "release resentment practice intro",
+);
+assert(
+  !releaseResentmentArticle.primaryPracticeIntro.includes("мгновенно"),
+  "release resentment practice intro avoids instant-result claims",
+);
+assert(
+  releaseResentmentArticle.leadBeforeAudio.includes(
+    "внутри продолжает звучать снова и снова",
+  ),
+  "release resentment opening body paragraph",
+);
+assert(
+  releaseResentmentArticle.shortAnswer.startsWith(
+    "Отпустить обиду – не значит признать чужой поступок правильным",
+  ),
+  "release resentment short answer keeps definition role",
+);
+assert(
+  !releaseResentmentArticle.leadBeforeAudio.includes(
+    "Отпустить обиду – не значит признать",
+  ),
+  "release resentment lead is not a second definition",
+);
+assert(
+  releaseResentmentArticle.introAfterAudio[0] ===
+    "Возникает естественный вопрос – как отпустить обиду, если произошедшее по-прежнему кажется несправедливым и продолжает влиять на внутреннее состояние?",
+  "release resentment intro starts after lead",
+);
+assert(
+  releaseResentmentArticle.sections.some((section) =>
+    section.paragraphs.includes(
+      "Можно перестать жить внутри произошедшего и при этом не продолжать отношения.",
+    ),
+  ),
+  "release resentment keeps softened boundary wording",
+);
+assert(
+  !JSON.stringify(releaseResentmentArticle).includes(
+    "Можно простить и не продолжать отношения.",
+  ),
+  "release resentment has no categorical forgive-and-leave wording",
+);
+assert(
+  !JSON.stringify(releaseResentmentArticle).includes(
+    "эмоционально незавершённая ситуация",
+  ),
+  "release resentment FAQ/body avoids unfinished-situation jargon",
+);
+assert(
+  releaseResentmentArticle.captionAfterAudio === "",
+  "release resentment no artificial caption",
+);
+assert(
+  releaseResentmentArticle.finalAudioLead === "",
+  "release resentment no second primary player",
+);
+assert(releaseResentmentArticle.faq.length === 4, "release resentment faq");
+assert(
+  releaseResentmentArticle.faq[3]?.answer.startsWith("Нет."),
+  "release resentment FAQ does not require restoring contact",
+);
+assert(
+  releaseResentmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "release resentment links to free meditations hub as collection CTA",
+);
+assert(
+  releaseResentmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/besplatnye-meditatsii-onlayn",
+  ),
+  "release resentment links to free meditations article",
+);
+assert(
+  !JSON.stringify(releaseResentmentArticle.afterFinalAudio).includes(
+    "/articles/kak-prostit",
+  ),
+  "release resentment does not link unpublished forgiveness cluster articles",
+);
+assert(
+  Boolean(releaseResentmentArticle.brandNote?.includes("АудиоЛаде")),
+  "release resentment brand note",
+);
+assert(
+  releaseResentmentArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "release resentment see-also includes primary hub",
+);
+assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (item) => item.slug === "kak-otpustit-obidu",
+  ),
+  "free hub lists release resentment article",
+);
+assert(
+  !listArticlesByTopicSlug("meditatsii-na-dengi").some(
+    (item) => item.slug === "kak-otpustit-obidu",
+  ),
+  "money hub does not list release resentment article",
+);
+assert(
+  !releaseResentmentArticle.leadBeforeAudio.includes("—") &&
+    !releaseResentmentArticle.shortAnswer.includes("—") &&
+    !releaseResentmentArticle.metaTitle.includes("—"),
+  "release resentment uses medium dash",
+);
+assert(
+  listArticleSlugs().includes("kak-otpustit-obidu"),
+  "release resentment in slug list",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-otpustit-obidu").length ===
+    1,
+  "release resentment slug unique",
+);
+assert(
+  releaseResentmentArticle.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("профессиональной поддержкой"),
+    ),
+  ),
+  "release resentment keeps professional-support safety note",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
@@ -1898,6 +2066,20 @@ assert(
       "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
   ),
   "love article reverse-links to money article",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-otpustit-obidu",
+  ),
+  "love article reverse-links to release resentment article",
+);
+assert(
+  article.sections.some((section) =>
+    section.paragraphs.some((paragraph) =>
+      paragraph.includes("более ясный разговор об обиде"),
+    ),
+  ),
+  "love article mentions resentment as adjacent theme",
 );
 assert(
   article.seeAlsoLinks.some((item) => item.href === "/topics/lyubov-k-sebe"),
@@ -2130,6 +2312,13 @@ assert(
       entry.url === "https://audiolad.ru/articles/vizualizatsiya-zhelaniy",
   ),
   "wish visualization article in sitemap mapper",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-otpustit-obidu",
+  ),
+  "release resentment article in sitemap mapper",
 );
 assert(
   sitemapEntries.every((entry) => !String(entry.url).includes("localhost")),
