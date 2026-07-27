@@ -273,6 +273,11 @@ export const KAK_OTPUSTIT_PROSHLOE_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-perestat-zlitsya-na-cheloveka",
+      title: "Как перестать злиться на человека",
+      description: "Если прошлое удерживается через злость на конкретного человека",
+    },
+    {
       href: "/articles/kak-prostit-sebya",
       title: "Как простить себя",
       description: "Если удерживает вина за собственные поступки",
@@ -292,5 +297,5 @@ export const KAK_OTPUSTIT_PROSHLOE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T12:00:00.000Z",
+  updatedAt: "2026-07-27T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
