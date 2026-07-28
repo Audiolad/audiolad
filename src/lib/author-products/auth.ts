@@ -11,6 +11,8 @@ import {
   authorAccessAllowsPaidProducts,
 } from "@/lib/authors/access";
 
+import { isPracticeSaleLockError } from "@/lib/author-products/sale-lock";
+
 import type { AuthorMemberRole, AuthorWorkspace } from "./types";
 
 export class AuthorAccessError extends Error {
@@ -263,6 +265,16 @@ export function handleAuthorRouteError(error: unknown) {
     }
 
     return jsonError(error.code, error.status);
+  }
+
+  if (isPracticeSaleLockError(error)) {
+    return NextResponse.json(
+      {
+        error: error.code,
+        message: error.userMessage,
+      },
+      { status: error.status },
+    );
   }
 
   console.error("author_route_unhandled_error", error);

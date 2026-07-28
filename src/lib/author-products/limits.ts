@@ -21,6 +21,7 @@ export function validateMp3FileClient(file: File): string | null {
 export function getAudioUploadErrorMessage(
   code: string | undefined,
   status: number,
+  message?: string,
 ): string {
   switch (code) {
     case "invalid_file_type":
@@ -29,9 +30,18 @@ export function getAudioUploadErrorMessage(
       return "Размер аудиофайла не должен превышать 50 МБ.";
     case "invalid_audio_duration":
       return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
+    case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":
+      return (
+        message?.trim() ||
+        "Аудиоматериалы этого продукта нельзя удалить или заменить, потому что продукт уже приобретён слушателями."
+      );
     default:
       if (status === 413) {
         return "Размер аудиофайла не должен превышать 50 МБ.";
+      }
+
+      if (message?.trim()) {
+        return message.trim();
       }
 
       return "Не удалось загрузить MP3.";

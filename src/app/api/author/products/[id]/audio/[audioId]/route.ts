@@ -10,8 +10,16 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
+import {
+  PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
+  assertPracticeContentMutable,
+  isPracticeSaleLockError,
+  isProductContentLockedDbError,
+  saleLockConflictResponse,
+} from "@/lib/author-products/sale-lock";
 import { normalizeClearableTextField } from "@/lib/author-products/text-fields";
 import { removeTrackCoverFiles } from "@/lib/author-products/utils";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -103,6 +111,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, audioId } = await context.params;
     const { supabase } = await requirePracticeMutationAccess(id);
+    const serviceSupabase = createServiceRoleClient();
+
+    try {
+      await assertPracticeContentMutable(serviceSupabase, id);
+    } catch (error) {
+      if (isPracticeSaleLockError(error)) {
+        return NextResponse.json(
+          saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+          { status: 409 },
+        );
+      }
+
+      throw error;
+    }
 
     const { count, error: countError } = await supabase
       .from("audio_items")
@@ -152,6 +174,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .eq("practice_id", id);
 
     if (deleteError) {
+      if (isProductContentLockedDbError(deleteError)) {
+        return NextResponse.json(
+          saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+          { status: 409 },
+        );
+      }
+
       console.error("author_audio_delete_error", deleteError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
