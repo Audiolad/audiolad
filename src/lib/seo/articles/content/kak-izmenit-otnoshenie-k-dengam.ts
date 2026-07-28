@@ -241,6 +241,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-umenshit-impulsivnye-pokupki",
+      title: "Как уменьшить импульсивные покупки",
+      description: "Незапланированные расходы и более осознанный выбор",
+    },
+    {
       href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
       title: "Как перестать переживать из-за денег",
       description: "Финансовая тревога и переход к конкретным действиям",
@@ -300,5 +305,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T16:00:00.000Z",
+  updatedAt: "2026-07-28T18:00:00.000Z",
 } as const satisfies ArticleDefinition;

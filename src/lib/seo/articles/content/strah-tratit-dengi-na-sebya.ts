@@ -412,6 +412,14 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     },
     {
       before:
+        "Если тема расходов связана не только со страхом тратить, но и с повторяющимися незапланированными покупками, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как уменьшить импульсивные покупки и выбирать более осознанно»",
+      href: "/articles/kak-umenshit-impulsivnye-pokupki",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -425,6 +433,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-umenshit-impulsivnye-pokupki",
+      title: "Как уменьшить импульсивные покупки",
+      description: "Незапланированные расходы и более осознанный выбор",
     },
     {
       href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
@@ -476,5 +489,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T16:00:00.000Z",
+  updatedAt: "2026-07-28T18:00:00.000Z",
 } as const satisfies ArticleDefinition;
