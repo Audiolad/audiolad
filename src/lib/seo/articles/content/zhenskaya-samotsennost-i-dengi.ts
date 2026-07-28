@@ -410,6 +410,11 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
       description: "Общий взгляд на финансовые убеждения",
     },
     {
+      href: "/articles/denezhnye-ustanovki",
+      title: "Денежные установки",
+      description: "Привычные правила о деньгах и их происхождение",
+    },
+    {
       href: "/articles/chto-takoe-denezhnyy-potok",
       title: "Что такое денежный поток",
       description: "Осознанное отношение к доходам, расходам и решениям",
@@ -424,5 +429,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T19:00:00.000Z",
+  updatedAt: "2026-07-28T08:00:00.000Z",
 } as const satisfies ArticleDefinition;
