@@ -48,23 +48,34 @@ ALTER TABLE public.author_commercial_terms
 -- Approved rows are normally frozen; migration briefly disables the immutability
 -- trigger so the policy label/version can track the new pure helper. Ledger
 -- amounts are never rewritten here.
-ALTER TABLE public.author_commercial_terms
-  DISABLE TRIGGER author_commercial_terms_immutability_trg;
+-- Wrapped in one DO block so DISABLE cannot stick if UPDATE fails: the
+-- EXCEPTION path re-enables the trigger before re-raising.
+DO $relabel_terms$
+BEGIN
+  ALTER TABLE public.author_commercial_terms
+    DISABLE TRIGGER author_commercial_terms_immutability_trg;
 
-UPDATE public.author_commercial_terms
-SET
-  rounding_policy = 'ceil_author_remainder_platform',
-  calculation_version = 'p332.author_rounding_up_v1',
-  updated_at = now()
-WHERE rounding_policy = 'floor_author_remainder_platform'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.author_ledger_entries AS e
-    WHERE e.terms_id = author_commercial_terms.id
-  );
+  UPDATE public.author_commercial_terms
+  SET
+    rounding_policy = 'ceil_author_remainder_platform',
+    calculation_version = 'p332.author_rounding_up_v1',
+    updated_at = now()
+  WHERE rounding_policy = 'floor_author_remainder_platform'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.author_ledger_entries AS e
+      WHERE e.terms_id = author_commercial_terms.id
+    );
 
-ALTER TABLE public.author_commercial_terms
-  ENABLE TRIGGER author_commercial_terms_immutability_trg;
+  ALTER TABLE public.author_commercial_terms
+    ENABLE TRIGGER author_commercial_terms_immutability_trg;
+EXCEPTION
+  WHEN OTHERS THEN
+    ALTER TABLE public.author_commercial_terms
+      ENABLE TRIGGER author_commercial_terms_immutability_trg;
+    RAISE;
+END
+$relabel_terms$;
 
 -- 3) New drafts use the ceil policy.
 CREATE OR REPLACE FUNCTION public.create_author_commercial_terms_draft(
