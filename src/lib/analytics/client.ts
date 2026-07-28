@@ -37,6 +37,7 @@ type TrackEventInput = {
   path?: string | null;
   practice_id?: string | null;
   audio_item_id?: string | null;
+  author_id?: string | null;
   properties?: Record<string, string | number | boolean | null>;
   /** Optional stable id for idempotent retries of the same physical action. */
   client_event_id?: string | null;
@@ -214,6 +215,7 @@ export async function trackPlatformEvent(
     path: input.path ?? null,
     practice_id: input.practice_id ?? null,
     audio_item_id: input.audio_item_id ?? null,
+    author_id: input.author_id ?? null,
     properties: input.properties ?? {},
     client_event_id: clientEventId,
     client_version: CLIENT_VERSION,

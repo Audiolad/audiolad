@@ -66,6 +66,19 @@ function DiagnosticsIcon() {
   );
 }
 
+function StatsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M5 19V10M12 19V5M19 19v-7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function FinanceIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -153,6 +166,12 @@ export default function AuthorDashboardNav({
       label: "Продвижение",
       icon: PromotionIcon,
       active: pathname.startsWith("/author-dashboard/promotion"),
+    },
+    {
+      href: `/author-dashboard/stats${authorQuery}`,
+      label: "Статистика",
+      icon: StatsIcon,
+      active: pathname.startsWith("/author-dashboard/stats"),
     },
     {
       href: `/author-dashboard/finance${authorQuery}`,

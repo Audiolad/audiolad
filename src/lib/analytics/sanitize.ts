@@ -90,6 +90,7 @@ export function parsePlatformTrackBody(body: unknown): {
   path: string | null;
   practice_id: string | null;
   audio_item_id: string | null;
+  author_id: string | null;
   properties: Record<string, string | number | boolean>;
   client_event_id: string | null;
   client_version: string | null;
@@ -119,6 +120,18 @@ export function parsePlatformTrackBody(body: unknown): {
       ? filterBuyClickedProperties(properties)
       : properties;
 
+  const authorId = sanitizeAnalyticsTrackId(
+    typeof record.author_id === "string"
+      ? record.author_id
+      : typeof filteredProperties.author_id === "string"
+        ? filteredProperties.author_id
+        : null,
+  );
+
+  if (eventName === "author_page_view" && !authorId) {
+    return null;
+  }
+
   return {
     session_id: sessionId,
     anonymous_id: anonymousId,
@@ -132,6 +145,7 @@ export function parsePlatformTrackBody(body: unknown): {
     audio_item_id: sanitizeAnalyticsTrackId(
       typeof record.audio_item_id === "string" ? record.audio_item_id : null,
     ),
+    author_id: authorId,
     properties: filteredProperties,
     client_event_id: sanitizeAnalyticsTrackId(
       typeof record.client_event_id === "string" ? record.client_event_id : null,

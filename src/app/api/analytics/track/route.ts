@@ -45,13 +45,16 @@ export async function POST(request: Request) {
     p_client_event_id: parsed.client_event_id,
     p_user_agent: request.headers.get("user-agent"),
     p_client_version: parsed.client_version,
+    p_author_id: parsed.author_id,
   });
 
   if (error) {
     if (
       error.message.toLowerCase().includes("event_name_not_allowed") ||
       error.message.toLowerCase().includes("session_mismatch") ||
-      error.message.toLowerCase().includes("session_required")
+      error.message.toLowerCase().includes("session_required") ||
+      error.message.toLowerCase().includes("author_required") ||
+      error.message.toLowerCase().includes("author_not_found")
     ) {
       return NextResponse.json({ error: "invalid_event" }, { status: 400 });
     }
