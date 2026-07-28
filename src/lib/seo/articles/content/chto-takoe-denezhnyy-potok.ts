@@ -213,6 +213,11 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       description: "Привычные убеждения о деньгах и финансовые решения",
     },
     {
+      href: "/articles/kak-perestat-boyatsya-bolshih-deneg",
+      title: "Как перестать бояться больших денег",
+      description: "Тревога перед крупными суммами и ростом дохода",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -233,5 +238,5 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T08:00:00.000Z",
+  updatedAt: "2026-07-28T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

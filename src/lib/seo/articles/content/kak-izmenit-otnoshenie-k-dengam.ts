@@ -184,6 +184,14 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     },
     {
       before:
+        "Если тревога связана именно с крупными суммами, ростом дохода и страхом больших денег, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать бояться больших денег и спокойнее относиться к росту дохода»",
+      href: "/articles/kak-perestat-boyatsya-bolshih-deneg",
+      after: ".",
+    },
+    {
+      before:
         "Если внутренний конфликт связан именно с женской ролью, оплатой труда, принятием помощи и привычкой ставить потребности других выше своих, отдельно можно прочитать статью ",
       linkLabel: "«Как женщине разрешить себе деньги»",
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
@@ -282,5 +290,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T08:00:00.000Z",
+  updatedAt: "2026-07-28T12:00:00.000Z",
 } as const satisfies ArticleDefinition;
