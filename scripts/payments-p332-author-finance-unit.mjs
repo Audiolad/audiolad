@@ -21,6 +21,7 @@ import {
   isValidHoldDays,
   isValidShareBps,
   P332_CALCULATION_VERSION,
+  platformShareMinor,
 } from "../src/lib/payments/author-finance/types.ts";
 import { PLATFORM_ROLE_PERMISSIONS } from "../src/lib/auth/platform-permissions.ts";
 
@@ -28,6 +29,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATION = join(
   ROOT,
   "supabase/migrations/20260726140000_payments_p332_author_ledger.sql",
+);
+const ROUNDING_UP_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20260728180000_author_share_rounding_up.sql",
 );
 
 function assert(condition, message) {
@@ -40,16 +45,54 @@ function assertEqual(actual, expected, label) {
 // ---------------------------------------------------------------------------
 
 function testShareMath() {
-  // The real production number: 6 sales at 29900, gross 139400.
+  // Exact splits (70/30 unchanged).
   assertEqual(authorShareMinor(139400, 7000), 97580, "70% of the real gross");
   assertEqual(authorShareMinor(29900, 7000), 20930, "70% of one sale");
   assertEqual(authorShareMinor(29900, 3000), 8970, "30% of one sale");
+  assertEqual(authorShareMinor(99900, 7000), 69930, "70% of 999 RUB");
+  assertEqual(platformShareMinor(99900, 7000), 29970, "platform remainder of 999 RUB");
 
-  // Rounding always favours the platform: never hand out a kopek we don't have.
-  assertEqual(authorShareMinor(29900, 3333), 9965, "33.33% floors down");
-  assertEqual(authorShareMinor(1, 5000), 0, "half a kopek floors to zero");
-  assertEqual(authorShareMinor(3, 3333), 0, "sub-kopek floors to zero");
-  assertEqual(authorShareMinor(99, 9999), 98, "99 at 99.99% floors to 98");
+  // Exact integer kopek result.
+  assertEqual(authorShareMinor(10000, 7000), 7000, "exact kopek result");
+
+  // Fractional kopek — rounds up to the author.
+  // 3*7000/10000 = 2.1 → floor would keep 2; ceil gives 3 (< half kopek).
+  assertEqual(authorShareMinor(3, 7000), 3, "fraction < half kopek ceils up");
+  // 8*7000/10000 = 5.6 → floor would keep 5; ceil gives 6 (> half kopek).
+  assertEqual(authorShareMinor(8, 7000), 6, "fraction > half kopek ceils up");
+  assertEqual(authorShareMinor(29900, 3333), 9966, "33.33% ceils up");
+  assertEqual(authorShareMinor(1, 5000), 1, "half a kopek ceils to one");
+  assertEqual(authorShareMinor(3, 3333), 1, "sub-kopek ceils to one");
+  assertEqual(authorShareMinor(99, 9999), 99, "99 at 99.99% ceils to 99");
+  assertEqual(authorShareMinor(1, 1), 1, "minimum sale 1 kopek at tiny share");
+
+  // Live formula is ceil; a stored floor accrual on the same inputs would
+  // differ — history must keep the stored amount, not be recomputed.
+  const legacyFloorShare = Math.floor((29900 * 3333) / 10000); // 9965
+  assertEqual(legacyFloorShare, 9965, "legacy floor reference");
+  assertEqual(authorShareMinor(29900, 3333), 9966, "live ceil differs from legacy floor");
+  assert(
+    legacyFloorShare !== authorShareMinor(29900, 3333),
+    "ceil vs floor diverge on fractional kopeks — ledger rows must stay stored facts",
+  );
+
+  // author + platform = paid; no negative / surplus kopeks.
+  for (const [basis, bps] of [
+    [99900, 7000],
+    [29900, 7000],
+    [29900, 3333],
+    [1, 5000],
+    [1, 1],
+    [3, 3333],
+    [99, 9999],
+    [10000, 7000],
+  ]) {
+    const author = authorShareMinor(basis, bps);
+    const platform = platformShareMinor(basis, bps);
+    assertEqual(author + platform, basis, `identity at ${basis}/${bps}`);
+    assert(author >= 0, `author non-negative at ${basis}/${bps}`);
+    assert(platform >= 0, `platform non-negative at ${basis}/${bps}`);
+  }
 
   // Boundaries.
   assertEqual(authorShareMinor(29900, 10000), 29900, "100% is the whole sale");
@@ -60,15 +103,21 @@ function testShareMath() {
   assertEqual(authorShareMinor(Number.NaN, 7000), 0, "NaN basis is refused");
 
   // Integer math end to end: no float artefacts at scale.
+  // 999999999 * 0.7 = 699999999.3 → ceils to 700000000.
   assertEqual(
     authorShareMinor(999999999, 7000),
-    699999999,
-    "large basis stays exact",
+    700000000,
+    "large basis ceils fractional kopek",
   );
   for (let basis = 0; basis <= 2000; basis += 1) {
     const share = authorShareMinor(basis, 7000);
     assert(Number.isInteger(share), `share is an integer at basis ${basis}`);
     assert(share <= basis, `share never exceeds basis at ${basis}`);
+    assertEqual(
+      share + platformShareMinor(basis, 7000),
+      basis,
+      `identity across basis ${basis}`,
+    );
   }
 }
 
@@ -376,10 +425,20 @@ function testValidators() {
 
 /** Guards against the TS mirror drifting away from the SQL it duplicates. */
 function testSourceContracts() {
-  const sql = readFileSync(MIGRATION, "utf8");
+  const baseSql = readFileSync(MIGRATION, "utf8");
+  const roundingSql = readFileSync(ROUNDING_UP_MIGRATION, "utf8");
+  const sql = `${baseSql}\n${roundingSql}`;
 
-  assertEqual(P332_CALCULATION_VERSION, "p332.v1", "TS pins the version");
-  assert(sql.includes("'p332.v1'"), "SQL pins the same calculation version");
+  assertEqual(P332_CALCULATION_VERSION, "p332.v1", "TS pins the legacy version");
+  assert(baseSql.includes("'p332.v1'"), "SQL pins the legacy calculation version");
+  assert(
+    roundingSql.includes("p332.author_rounding_up_v1"),
+    "SQL pins the author-rounding-up calculation version",
+  );
+  assert(
+    !/UPDATE\s+public\.author_ledger_entries/i.test(roundingSql),
+    "rounding migration never rewrites historical ledger rows",
+  );
 
   assertEqual(
     AUTHOR_LEDGER_ENTRY_TYPES.join(","),
@@ -403,18 +462,33 @@ function testSourceContracts() {
     assert(sql.includes(`'${status}'`), `SQL knows the ${status} obligation status`);
   }
 
-  // The floor formula must be integer division in SQL, not a numeric cast.
+  // Ceil uses integer division only: (n + 9999) / 10000.
   assert(
     sql.includes("author_share_minor"),
     "SQL exposes the shared share function",
   );
   assert(
-    /\(p_basis_minor \* p_share_bps::bigint\) \/ 10000::bigint/.test(sql),
-    "SQL computes the share with bigint division, not a float",
+    /\(p_basis_minor \* p_share_bps::bigint \+ 9999\) \/ 10000::bigint/.test(
+      roundingSql,
+    ),
+    "SQL computes the share with bigint ceil division, not a float",
   );
   assert(
     !/p_basis_minor[^;]{0,80}::(numeric|float|double precision|real)/.test(sql),
     "SQL never casts the basis to a floating point type",
+  );
+
+  const labels = readFileSync(
+    join(ROOT, "src/lib/author-finance/labels.ts"),
+    "utf8",
+  );
+  assert(
+    labels.includes("округление выполняется в пользу автора"),
+    "author finance methodology states author-favour rounding",
+  );
+  assert(
+    !labels.includes("в пользу платформы"),
+    "author finance methodology no longer states platform-favour rounding",
   );
 
   // The ledger must be append-only and applying the migration must move no

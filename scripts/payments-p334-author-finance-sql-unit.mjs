@@ -268,6 +268,7 @@ INSERT INTO public.practices VALUES
     "supabase/migrations/20260725192100_admin_payments_p31_authors_products_fix.sql",
     "supabase/migrations/20260726120000_payments_p331_refund_facts.sql",
     "supabase/migrations/20260726140000_payments_p332_author_ledger.sql",
+    "supabase/migrations/20260728180000_author_share_rounding_up.sql",
     "supabase/migrations/20260727120000_payments_p333_author_payouts.sql",
     MIGRATION,
     EMPTY_STATE_MIGRATION,

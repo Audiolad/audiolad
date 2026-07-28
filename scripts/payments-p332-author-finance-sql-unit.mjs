@@ -185,6 +185,10 @@ INSERT INTO public.practices VALUES
   psqlFile(TEST_DB, join(ROOT, "supabase/migrations/20260725192100_admin_payments_p31_authors_products_fix.sql"));
   psqlFile(TEST_DB, join(ROOT, "supabase/migrations/20260726120000_payments_p331_refund_facts.sql"));
   psqlFile(TEST_DB, join(ROOT, "supabase/migrations/20260726140000_payments_p332_author_ledger.sql"));
+  psqlFile(
+    TEST_DB,
+    join(ROOT, "supabase/migrations/20260728180000_author_share_rounding_up.sql"),
+  );
 }
 
 function insertPayment({
@@ -292,12 +296,19 @@ function testShareMath() {
   // floor() in kopeks, remainder stays with the platform.
   assertEqual(number(`SELECT public.author_share_minor(139400::bigint, 7000);`), 97580, "70% of 139400");
   assertEqual(number(`SELECT public.author_share_minor(29900::bigint, 7000);`), 20930, "70% of 29900");
-  assertEqual(number(`SELECT public.author_share_minor(29900::bigint, 3333);`), 9965, "33.33% floors down");
-  assertEqual(number(`SELECT public.author_share_minor(1::bigint, 5000);`), 0, "half a kopek floors to zero");
+  assertEqual(number(`SELECT public.author_share_minor(99900::bigint, 7000);`), 69930, "70% of 99900");
+  assertEqual(number(`SELECT public.author_share_minor(29900::bigint, 3333);`), 9966, "33.33% ceils up");
+  assertEqual(number(`SELECT public.author_share_minor(1::bigint, 5000);`), 1, "half a kopek ceils to one");
+  assertEqual(number(`SELECT public.author_share_minor(1::bigint, 1);`), 1, "1 kopek minimum sale");
   assertEqual(number(`SELECT public.author_share_minor(29900::bigint, 10000);`), 29900, "100% share");
   assertEqual(number(`SELECT public.author_share_minor(29900::bigint, 0);`), 0, "zero share");
   assertEqual(number(`SELECT public.author_share_minor(0::bigint, 7000);`), 0, "zero basis");
   assertEqual(number(`SELECT public.author_share_minor(NULL, 7000);`), 0, "null basis is zero");
+  assertEqual(
+    number(`SELECT public.author_share_minor(99900::bigint, 7000) + (99900 - public.author_share_minor(99900::bigint, 7000));`),
+    99900,
+    "author + platform remainder equals paid",
+  );
 }
 
 function testTermsLifecycle() {
@@ -546,7 +557,7 @@ function testAccrualHappyPath() {
   assertEqual(created.entry.entry_type, "sale_accrual", "entry type");
   assertEqual(created.entry.author_share_bps, 7000, "rate snapshotted on the entry");
   assertEqual(created.entry.gross_basis_minor, 29900, "gross basis snapshotted");
-  assertEqual(created.entry.calculation_version, "p332.v1", "calculation version");
+  assertEqual(created.entry.calculation_version, "p332.author_rounding_up_v1", "calculation version");
   assertEqual(
     created.entry.idempotency_key,
     `p332:sale:${sale.paymentId}`,
@@ -698,19 +709,24 @@ function testZeroDeltaReversalWritesNothing() {
     "70% of 10000",
   );
 
-  // 1 kopek back: floor((10000-1)*0.7) = 6999 → a 1 kopek reversal.
+  // 1 kopek back: ceil((10000-1)*0.7) = 7000 → no delta (author still at 7000).
   const tiny = confirmRefund({ paymentId: sale.paymentId, amount: 1, key: "k-zero-1" });
   const tinyResult = json(
     `SELECT public.ensure_author_refund_reversal('${tiny}'::uuid, 'corr-zero-1', NULL);`,
   );
-  assertEqual(tinyResult.entry.amount_minor, -1, "sub-kopek rounding still reverses one kopek");
+  assertEqual(tinyResult.outcome, "skipped", "1-kopek refund can be a zero-delta under ceil");
+  assertEqual(
+    tinyResult.result_code,
+    "already_reconciled",
+    "author target stays 7000 after a 1-kopek refund",
+  );
 
-  // Another kopek: floor((10000-2)*0.7) = 6998 → another 1 kopek.
+  // 2 kopeks cumulative: ceil((10000-2)*0.7) = 6999 → a 1 kopek reversal.
   const tiny2 = confirmRefund({ paymentId: sale.paymentId, amount: 1, key: "k-zero-2" });
   const tiny2Result = json(
     `SELECT public.ensure_author_refund_reversal('${tiny2}'::uuid, 'corr-zero-2', NULL);`,
   );
-  assertEqual(tiny2Result.entry.amount_minor, -1, "second kopek reversal");
+  assertEqual(tiny2Result.entry.amount_minor, -1, "second kopek produces a 1-kopek reversal");
 
   // Force a zero-delta reversal by reconciling a refund whose target is already met.
   const entriesBefore = number(
@@ -994,7 +1010,7 @@ function testAmbiguousTermsNeverGuess() {
        status, valid_from, approved_at
      ) VALUES (
        '${AUTHOR_PAYEE}', 'RUB', 4000, 6000, 14,
-       'platform_absorbs', 'proportional_reversal', 'floor_author_remainder_platform',
+       'platform_absorbs', 'proportional_reversal', 'ceil_author_remainder_platform',
        'approved', '${TERMS_FROM}', now()
      );
      ALTER TABLE author_commercial_terms ENABLE TRIGGER author_commercial_terms_no_overlap_trg;`,
@@ -1084,7 +1100,7 @@ function testAnalytics() {
     summary.gross_minor - (summary.accrued_minor + summary.reversed_minor),
     "platform share is the remainder",
   );
-  assertEqual(summary.calculation_version, "p332.v1", "calculation version reported");
+  assertEqual(summary.calculation_version, "p332.author_rounding_up_v1", "calculation version reported");
   assertEqual(summary.notes.payouts, "not_connected", "payouts not connected");
   assertEqual(summary.notes.product_overrides, "not_implemented", "product overrides not implemented");
   assert(summary.obligations_skipped_platform_owned > 0, "platform skips are counted");

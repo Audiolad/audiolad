@@ -315,7 +315,7 @@ export async function getAuthorFinanceLedgerDetail(input: {
       authorShareBps: asNullableNumber(formula.author_share_bps),
       platformShareBps: asNullableNumber(formula.platform_share_bps),
       holdDays: asNullableNumber(formula.hold_days),
-      rounding: String(formula.rounding ?? "floor_author_remainder_platform"),
+      rounding: String(formula.rounding ?? "ceil_author_remainder_platform"),
       refundPolicy: String(formula.refund_policy ?? "proportional_reversal"),
     },
   };

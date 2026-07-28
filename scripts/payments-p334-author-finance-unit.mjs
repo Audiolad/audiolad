@@ -155,6 +155,14 @@ function testLabelsAreComplete() {
     "the methodology block explains at least accrual, hold, refunds and payout",
   );
   assert(
+    AUTHOR_FINANCE_METHODOLOGY[0].body.includes("в пользу автора"),
+    "accrual methodology rounds in favour of the author",
+  );
+  assert(
+    !AUTHOR_FINANCE_METHODOLOGY[0].body.includes("в пользу платформы"),
+    "accrual methodology no longer rounds in favour of the platform",
+  );
+  assert(
     AUTHOR_FINANCE_MINIMUM_PAYOUT_TEXT.includes("1000 ₽"),
     "the minimum payout is stated in rubles",
   );

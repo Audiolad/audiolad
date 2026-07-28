@@ -7,7 +7,10 @@
  * database. Money is always integer kopeks — no float ever touches it.
  */
 
+/** Legacy calculation version before author-favour rounding. */
 export const P332_CALCULATION_VERSION = "p332.v1";
+/** Current accrual math: ceil author share, platform gets remainder. */
+export const P332_AUTHOR_ROUNDING_UP_VERSION = "p332.author_rounding_up_v1";
 
 export const AUTHOR_LEDGER_ENTRY_TYPES = [
   "sale_accrual",
@@ -112,14 +115,31 @@ export function isAuthorPayoutClass(value: unknown): value is AuthorPayoutClass 
   );
 }
 
-/** Mirrors public.author_share_minor: floor(basis * bps / 10000) in kopeks. */
+/**
+ * Mirrors public.author_share_minor (author_rounding_up_v1):
+ * ceil(basis * bps / 10000) in integer kopeks. Platform remainder =
+ * basis - author share. Never rounds both sides independently.
+ */
 export function authorShareMinor(
   basisMinor: number,
   shareBps: number,
 ): number {
   if (!Number.isFinite(basisMinor) || !Number.isFinite(shareBps)) return 0;
   if (basisMinor <= 0 || shareBps <= 0) return 0;
-  return Math.floor((Math.trunc(basisMinor) * Math.trunc(shareBps)) / 10000);
+  const basis = Math.trunc(basisMinor);
+  const bps = Math.trunc(shareBps);
+  return Math.floor((basis * bps + 9999) / 10000);
+}
+
+/** Platform share as the remainder so author + platform always equals paid. */
+export function platformShareMinor(
+  basisMinor: number,
+  authorShareBps: number,
+): number {
+  if (!Number.isFinite(basisMinor) || basisMinor <= 0) return 0;
+  const basis = Math.trunc(basisMinor);
+  const author = authorShareMinor(basis, authorShareBps);
+  return basis - author;
 }
 
 export function isValidShareBps(value: number): boolean {
