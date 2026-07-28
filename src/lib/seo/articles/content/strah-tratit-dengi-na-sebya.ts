@@ -404,6 +404,14 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     },
     {
       before:
+        "Если напряжение связано не только с личными расходами, но и с постоянным прокручиванием финансовых страхов, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать постоянно переживать из-за денег и вернуть ощущение опоры»",
+      href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -417,6 +425,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
+      title: "Как перестать переживать из-за денег",
+      description: "Финансовая тревога и переход к конкретным действиям",
     },
     {
       href: "/articles/denezhnoe-myshlenie",
@@ -463,5 +476,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T14:00:00.000Z",
+  updatedAt: "2026-07-28T16:00:00.000Z",
 } as const satisfies ArticleDefinition;

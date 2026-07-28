@@ -3812,6 +3812,86 @@ assert(
   "fear-spend-on-self see-also includes money-thinking",
 );
 
+
+const moneyWorryArticle = getArticleBySlug(
+  "kak-perestat-perezhivat-iz-za-deneg",
+);
+assert(moneyWorryArticle, "money-worry article registered");
+assert(
+  moneyWorryArticle.title ===
+    "Как перестать постоянно переживать из-за денег и вернуть ощущение опоры",
+  "money-worry H1",
+);
+assert(
+  moneyWorryArticle.metaTitle ===
+    "Как перестать переживать из-за денег – спокойный и практичный подход | АудиоЛад",
+  "money-worry SEO title",
+);
+assert(
+  moneyWorryArticle.topicSlug === "besplatnye-meditatsii",
+  "money-worry hub",
+);
+assert(
+  moneyWorryArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "money-worry practice",
+);
+assert(
+  moneyWorryArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "money-worry practice intro",
+);
+assert(
+  moneyWorryArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует финансового благополучия"),
+    ),
+  "money-worry practice disclaimer",
+);
+assert(
+  moneyWorryArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "money-worry links to money-thinking",
+);
+assert(
+  moneyWorryArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "money-worry links to money-beliefs",
+);
+assert(
+  listArticleSlugs().includes("kak-perestat-perezhivat-iz-za-deneg"),
+  "money-worry in slug list",
+);
+assert(
+  !moneyWorryArticle.metaTitle.includes("—"),
+  "money-worry uses medium dash",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "money-thinking see-also includes money-worry",
+);
+assert(
+  moneyBeliefsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "money-beliefs see-also includes money-worry",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ) ||
+    fearSpendOnSelfArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+    ),
+  "fear-spend reverse-links to money-worry",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
