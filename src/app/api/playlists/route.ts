@@ -8,6 +8,11 @@ import {
 } from "@/lib/playlists/queries";
 import { PLAYLIST_MAX_PER_USER, type PlaylistRow } from "@/lib/playlists/types";
 import { parseCreatePlaylistBody } from "@/lib/playlists/validation";
+import {
+  playlistCanonicalFromSlug,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 function toPlaylistResponse(row: PlaylistRow) {
@@ -139,8 +144,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
+  const created = data as PlaylistRow;
+
+  if (created.visibility === "public" && created.slug) {
+    const url = playlistCanonicalFromSlug(created.slug);
+
+    if (url) {
+      scheduleIndexNowNotification([url], INDEXNOW_REASONS.playlist_published);
+    }
+  }
+
   return NextResponse.json(
-    { playlist: toPlaylistResponse(data as PlaylistRow) },
+    { playlist: toPlaylistResponse(created) },
     { status: 201 },
   );
 }

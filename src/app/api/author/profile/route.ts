@@ -21,6 +21,13 @@ import {
   normalizeTopicKeys,
 } from "@/lib/authors/validation";
 import { MAX_AUTHOR_PROFILE_TOPICS } from "@/lib/authors/constants";
+import {
+  buildAuthorCanonicalUrl,
+  countAuthorPublishedPractices,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { hasAuthorPublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 
 export async function GET(request: Request) {
   try {
@@ -185,6 +192,23 @@ export async function PATCH(request: Request) {
       supabase,
       authorId,
     );
+
+    const publicChanged = hasAuthorPublicIndexNowChanges({
+      scalarUpdates: updates,
+      topicKeysProvided: "topic_keys" in body,
+      featuredProductIdsProvided: "featured_product_ids" in body,
+    });
+
+    if (
+      publicChanged &&
+      profile?.slug &&
+      (await countAuthorPublishedPractices(supabase, authorId)) > 0
+    ) {
+      scheduleIndexNowNotification(
+        [buildAuthorCanonicalUrl(profile.slug)],
+        INDEXNOW_REASONS.author_profile_updated,
+      );
+    }
 
     return NextResponse.json({ profile, publishedProducts });
   } catch (error) {

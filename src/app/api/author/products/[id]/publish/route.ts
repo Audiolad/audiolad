@@ -11,6 +11,12 @@ import {
   publishPracticeProduct,
 } from "@/lib/author-products/publish";
 import { registerPracticeLegacySlug } from "@/lib/products/lookup";
+import {
+  countAuthorPublishedPractices,
+  loadAuthorSlug,
+  planPracticePublishIndexNow,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
 
 type RouteContext = {
@@ -59,6 +65,10 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const now = new Date().toISOString();
     const publishedAt = practice.published_at ?? now;
+    const isFirstPublishOfPractice = !practice.published_at;
+    const publishedCountBefore = isFirstPublishOfPractice
+      ? await countAuthorPublishedPractices(supabase, practice.author_id)
+      : 0;
 
     try {
       await publishPracticeProduct(supabase, id, publishedAt);
@@ -109,6 +119,21 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     const product = await getAuthorProductDetail(supabase, id);
+
+    if (product?.practice.slug) {
+      const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
+
+      if (authorSlug) {
+        for (const event of planPracticePublishIndexNow({
+          authorSlug,
+          practiceSlug: product.practice.slug,
+          isFirstPublishOfPractice,
+          publishedCountBefore,
+        })) {
+          scheduleIndexNowNotification(event.urls, event.reason);
+        }
+      }
+    }
 
     return NextResponse.json({ product, message: "Аудиопродукт опубликован." });
   } catch (error) {

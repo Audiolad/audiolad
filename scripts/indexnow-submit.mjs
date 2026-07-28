@@ -20,8 +20,11 @@ import { normalizeIndexNowUrls } from "../src/lib/seo/indexnow/urls.ts";
 function printHelp() {
   console.log(`IndexNow CLI (dry-run by default)
 
+Articles and topic hubs are code-first (appear after deploy). They are NOT
+wired to runtime hooks — submit them explicitly via --url (repeatable).
+
 Options:
-  --url <url>          Add one URL or path (repeatable)
+  --url <url>          Add one URL or path (repeatable; articles/hubs/manual)
   --from-sitemap       Load URLs from https://audiolad.ru/sitemap.xml
   --articles           With --from-sitemap: only /articles/*
   --topics             With --from-sitemap: only /topics/*
@@ -30,6 +33,7 @@ Options:
 
 Examples:
   npm run indexnow:dry-run -- --url https://audiolad.ru/articles/kak-razvit-lyubov-k-sebe
+  npm run indexnow:dry-run -- --url /articles/a --url /topics/b
   npm run indexnow:dry-run -- --from-sitemap --articles
 `);
 }

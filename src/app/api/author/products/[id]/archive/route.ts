@@ -10,6 +10,12 @@ import {
 } from "@/lib/author-products/lifecycle";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { archivePracticeProduct } from "@/lib/author-products/publish";
+import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
+import {
+  loadAuthorSlug,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -19,7 +25,7 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
     const serviceSupabase = createServiceRoleClient();
 
     const archiveBlockerMessage = getArchiveBlockerMessage(
@@ -36,6 +42,14 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
+    const wasPubliclyIndexed =
+      practice.status === "published" || practice.status === "unpublished";
+    const previousSlug = practice.slug;
+    const authorSlug =
+      wasPubliclyIndexed && previousSlug
+        ? await loadAuthorSlug(supabase, practice.author_id)
+        : null;
+
     try {
       await archivePracticeProduct(supabase, id);
     } catch {
@@ -44,6 +58,13 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     const product = await getAuthorProductDetail(supabase, id);
+
+    if (authorSlug && previousSlug && wasPubliclyIndexed) {
+      scheduleIndexNowNotification(
+        [buildPracticeCanonicalUrl(authorSlug, previousSlug)],
+        INDEXNOW_REASONS.practice_archived,
+      );
+    }
 
     return NextResponse.json({
       product,

@@ -21,6 +21,12 @@ import {
   isUuid,
   parsePatchPlaylistBody,
 } from "@/lib/playlists/validation";
+import {
+  playlistCanonicalFromSlug,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { resolvePlaylistIndexNowEvent } from "@/lib/seo/indexnow/public-fields";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -234,8 +240,33 @@ export async function PATCH(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
+  const updated = data as PlaylistRow;
+  const event = resolvePlaylistIndexNowEvent({
+    previousVisibility: playlist.visibility,
+    nextVisibility: updated.visibility,
+    previousSlug: playlist.slug,
+    nextSlug: updated.slug,
+    titleChanged: parsed.title !== undefined && parsed.title !== playlist.title,
+    editorialChanged:
+      parsed.isEditorial !== undefined &&
+      parsed.isEditorial !== playlist.is_editorial,
+  });
+
+  if (event.reason && event.slugs.length > 0) {
+    const absoluteUrls = event.slugs
+      .map((slug) => playlistCanonicalFromSlug(slug))
+      .filter((url): url is string => Boolean(url));
+
+    if (absoluteUrls.length > 0) {
+      scheduleIndexNowNotification(
+        absoluteUrls,
+        INDEXNOW_REASONS[event.reason],
+      );
+    }
+  }
+
   return NextResponse.json({
-    playlist: toPlaylistResponse(data as PlaylistRow),
+    playlist: toPlaylistResponse(updated),
   });
 }
 
@@ -318,6 +349,17 @@ export async function DELETE(request: Request, context: RouteContext) {
         cleanupError instanceof Error
           ? cleanupError.message
           : cleanupError,
+      );
+    }
+  }
+
+  if (playlist.visibility === "public" && playlist.slug) {
+    const url = playlistCanonicalFromSlug(playlist.slug);
+
+    if (url) {
+      scheduleIndexNowNotification(
+        [url],
+        INDEXNOW_REASONS.playlist_unpublished,
       );
     }
   }

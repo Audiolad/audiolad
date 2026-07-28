@@ -14,6 +14,13 @@ import {
 } from "@/lib/images/image-upload-service";
 import { imageProcessErrorMessage } from "@/lib/images/process-image";
 import { parseImageManifest } from "@/lib/images/image-manifest";
+import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
+import {
+  loadAuthorSlug,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -21,10 +28,30 @@ type RouteContext = {
 
 const PRACTICE_COVERS_BUCKET = "practice-covers";
 
+async function schedulePublishedCoverIndexNow(
+  supabase: SupabaseClient,
+  practice: { author_id: string; status: string; slug: string },
+) {
+  if (practice.status !== "published" || !practice.slug) {
+    return;
+  }
+
+  const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
+
+  if (!authorSlug) {
+    return;
+  }
+
+  scheduleIndexNowNotification(
+    [buildPracticeCanonicalUrl(authorSlug, practice.slug)],
+    INDEXNOW_REASONS.practice_updated,
+  );
+}
+
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
 
     const { data: existing } = await supabase
       .from("practices")
@@ -57,6 +84,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     const product = await getAuthorProductDetail(supabase, id);
+    await schedulePublishedCoverIndexNow(supabase, practice);
 
     return NextResponse.json({ product, cover_url: null });
   } catch (error) {
@@ -67,7 +95,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase } = await requirePracticeMutationAccess(id);
+    const { supabase, practice } = await requirePracticeMutationAccess(id);
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -149,6 +177,7 @@ export async function POST(request: Request, context: RouteContext) {
     await removePracticeCoverFiles(supabase, id);
 
     const product = await getAuthorProductDetail(supabase, id);
+    await schedulePublishedCoverIndexNow(supabase, practice);
 
     return NextResponse.json({
       product,

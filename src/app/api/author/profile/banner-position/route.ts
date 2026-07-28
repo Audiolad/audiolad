@@ -6,6 +6,12 @@ import {
 } from "@/lib/author-products/auth";
 import { normalizeBannerPositionPair } from "@/lib/authors/banner-position";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
+import {
+  buildAuthorCanonicalUrl,
+  countAuthorPublishedPractices,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 
 export async function PATCH(request: Request) {
   try {
@@ -65,6 +71,16 @@ export async function PATCH(request: Request) {
     }
 
     const profile = await getAuthorProfileDetail(supabase, authorId);
+
+    if (
+      profile?.slug &&
+      (await countAuthorPublishedPractices(supabase, authorId)) > 0
+    ) {
+      scheduleIndexNowNotification(
+        [buildAuthorCanonicalUrl(profile.slug)],
+        INDEXNOW_REASONS.author_profile_updated,
+      );
+    }
 
     return NextResponse.json({
       banner_position_x: position.x,

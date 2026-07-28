@@ -6,6 +6,12 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
+import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
+import {
+  loadAuthorSlug,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { setPracticeTopics } from "@/lib/topics/sync";
 
 type RouteContext = {
@@ -75,6 +81,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       practice.author_id,
       id,
     );
+
+    if (practice.status === "published" && practice.slug) {
+      const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
+
+      if (authorSlug) {
+        scheduleIndexNowNotification(
+          [buildPracticeCanonicalUrl(authorSlug, practice.slug)],
+          INDEXNOW_REASONS.practice_updated,
+        );
+      }
+    }
 
     return NextResponse.json({
       topics,

@@ -35,6 +35,14 @@ import {
   DEFAULT_LISTENING_NOTICE_TEXT,
   DEFAULT_LISTENING_NOTICE_TITLE,
 } from "@/lib/products/listening-notice";
+import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
+import {
+  loadAuthorSlug,
+  planPracticeSlugChangeIndexNow,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { hasPracticePublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PAID_PRICE_OPTIONS } from "@/lib/author-products/types";
 import { slugifyTitle } from "@/lib/author-products/utils";
@@ -346,6 +354,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
+    const previousSlug = practice.slug;
     const { data: updatedPractice, error: updateError } = await supabase
       .from("practices")
       .update(updates)
@@ -368,6 +377,31 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (!product) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    if (
+      practice.status === "published" &&
+      hasPracticePublicIndexNowChanges(updates)
+    ) {
+      const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
+      const nextSlug = product.practice.slug;
+
+      if (authorSlug && nextSlug) {
+        const slugChange = planPracticeSlugChangeIndexNow({
+          authorSlug,
+          previousSlug,
+          nextSlug,
+        });
+
+        if (slugChange) {
+          scheduleIndexNowNotification(slugChange.urls, slugChange.reason);
+        } else {
+          scheduleIndexNowNotification(
+            [buildPracticeCanonicalUrl(authorSlug, nextSlug)],
+            INDEXNOW_REASONS.practice_updated,
+          );
+        }
+      }
     }
 
     return NextResponse.json({ product });

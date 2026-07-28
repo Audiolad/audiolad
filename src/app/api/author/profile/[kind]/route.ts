@@ -25,6 +25,32 @@ import {
 import { parseImageManifest } from "@/lib/images/image-manifest";
 import { imageProcessErrorMessage } from "@/lib/images/process-image";
 import { avatarProcessErrorMessage } from "@/lib/images/process-avatar-image";
+import {
+  buildAuthorCanonicalUrl,
+  countAuthorPublishedPractices,
+  scheduleIndexNowNotification,
+} from "@/lib/seo/indexnow/hooks";
+import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function scheduleAuthorAssetIndexNow(
+  supabase: SupabaseClient,
+  authorId: string,
+  slug: string | null | undefined,
+) {
+  if (!slug) {
+    return;
+  }
+
+  if ((await countAuthorPublishedPractices(supabase, authorId)) <= 0) {
+    return;
+  }
+
+  scheduleIndexNowNotification(
+    [buildAuthorCanonicalUrl(slug)],
+    INDEXNOW_REASONS.author_profile_updated,
+  );
+}
 
 type RouteContext = {
   params: Promise<{ kind: string }>;
@@ -109,6 +135,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     }
 
     const profile = await getAuthorProfileDetail(supabase, authorId);
+    await scheduleAuthorAssetIndexNow(supabase, authorId, profile?.slug);
 
     return NextResponse.json({ profile });
   } catch (error) {
@@ -244,6 +271,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const profile = await getAuthorProfileDetail(supabase, authorId);
+    await scheduleAuthorAssetIndexNow(supabase, authorId, profile?.slug);
 
     return NextResponse.json({ profile, url: assetUrl });
   } catch (error) {
