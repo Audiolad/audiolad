@@ -13,8 +13,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
   isAuthorFinanceAmountState,
-  isAuthorFinanceEmptyStateCode,
   isAuthorFinanceIntegrityStatus,
+  selectAuthorFinanceEmptyState,
   type AuthorFinanceIntegrityStatus,
   type AuthorFinanceLedgerDetail,
   type AuthorFinanceLedgerRow,
@@ -124,6 +124,33 @@ export async function getAuthorFinanceSummary(input: {
 
   const row = asRecord(data);
   const termsStatus = String(row.terms_status ?? "missing");
+  const payoutEligible = row.payout_eligible === true;
+  const accessStatus = String(row.access_status ?? "free");
+  const approvedTermsCount = asNumber(row.approved_terms_count);
+  const entryCount = asNumber(row.entry_count);
+  const payableMinor = asNumber(row.payable_minor);
+  const reservedMinor = asNumber(row.reserved_minor);
+  const heldMinor = asNumber(row.held_minor);
+  const paidPayoutCount = asNumber(row.paid_payout_count);
+  const thresholdMinor = asNumber(row.threshold_minor, 100000);
+
+  // Recompute from access/balance fields so a stale SQL CASE (e.g. mapping
+  // commercial_active → free) cannot mislabel a commercial author in the UI.
+  const emptyStateCode = selectAuthorFinanceEmptyState({
+    payoutEligible,
+    accessStatus,
+    approvedTermsCount,
+    entryCount,
+    payableMinor,
+    reservedMinor,
+    heldMinor,
+    paidPayoutCount,
+    thresholdMinor,
+  });
+  const eligibilityMessage =
+    row.negative === true || row.eligibility_message === "negative_balance"
+      ? "negative_balance"
+      : emptyStateCode;
 
   return {
     currency: String(row.currency ?? "RUB"),
@@ -133,36 +160,34 @@ export async function getAuthorFinanceSummary(input: {
     accruedMinor: asNumber(row.accrued_minor),
     refundsReversedMinor: asNumber(row.refunds_reversed_minor),
     adjustmentsMinor: asNumber(row.adjustments_minor),
-    heldMinor: asNumber(row.held_minor),
+    heldMinor,
     availableMinor: asNumber(row.available_minor),
-    reservedMinor: asNumber(row.reserved_minor),
-    payableMinor: asNumber(row.payable_minor),
+    reservedMinor,
+    payableMinor,
     paidMinor: asNumber(row.paid_minor),
-    paidPayoutCount: asNumber(row.paid_payout_count),
-    entryCount: asNumber(row.entry_count),
+    paidPayoutCount,
+    entryCount,
 
     negative: row.negative === true,
     negativeMinor: asNumber(row.negative_minor),
 
-    thresholdMinor: asNumber(row.threshold_minor, 100000),
+    thresholdMinor,
     thresholdReached: row.threshold_reached === true,
 
-    payoutEligible: row.payout_eligible === true,
-    accessStatus: String(row.access_status ?? "free"),
+    payoutEligible,
+    accessStatus,
     termsStatus: (["missing", "active", "ended"].includes(termsStatus)
       ? termsStatus
       : "missing") as AuthorFinanceTermsStatus,
-    approvedTermsCount: asNumber(row.approved_terms_count),
+    approvedTermsCount,
     activeTermsSummary: mapTermsSummary(row.active_terms_summary),
 
     oldestPayableAt: asText(row.oldest_payable_at),
     nextHoldReleaseAt: asText(row.next_hold_release_at),
     unresolvedReviewCount: asNumber(row.unresolved_review_count),
 
-    emptyStateCode: isAuthorFinanceEmptyStateCode(row.empty_state_code)
-      ? row.empty_state_code
-      : "no_sales",
-    eligibilityMessage: String(row.eligibility_message ?? "no_sales"),
+    emptyStateCode,
+    eligibilityMessage,
   };
 }
 

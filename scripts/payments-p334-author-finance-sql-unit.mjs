@@ -35,6 +35,10 @@ const AUTHOR_NO_TERMS = "a5555555-5555-5555-5555-555555555555";
 const AUTHOR_HELD = "a6666666-6666-6666-6666-666666666666";
 /** Payout-eligible, balance below the 1000 RUB minimum. */
 const AUTHOR_SMALL = "a7777777-7777-7777-7777-777777777777";
+/** commercial_active, payout_eligible still false, no sales (German-like). */
+const AUTHOR_ACTIVE_NOT_PAYEE = "a8888888-8888-8888-8888-888888888888";
+/** commercial_onboarding, not yet a payee. */
+const AUTHOR_ONBOARDING = "a9999999-9999-4999-8999-999999999999";
 
 const PRACTICE_PAYEE = "c1111111-1111-1111-1111-111111111111";
 const PRACTICE_HELD = "c6666666-6666-6666-6666-666666666666";
@@ -47,6 +51,8 @@ const OLD_SALE_AT = "2026-02-10T10:00:00Z";
 
 const MIGRATION =
   "supabase/migrations/20260727140000_payments_p334_author_finance.sql";
+const EMPTY_STATE_MIGRATION =
+  "supabase/migrations/20260728160000_author_finance_empty_state_access_status.sql";
 
 /**
  * Every JSON key the author API must never return. Checked against the actual
@@ -243,7 +249,9 @@ INSERT INTO public.authors (id, name, slug, access_status) VALUES
   ('${AUTHOR_PLATFORM}', 'Platform Catalog', 'platform-catalog', 'commercial'),
   ('${AUTHOR_NO_TERMS}', 'No Terms', 'no-terms', 'commercial'),
   ('${AUTHOR_HELD}', 'Held Balance', 'held-balance', 'commercial'),
-  ('${AUTHOR_SMALL}', 'Small Balance', 'small-balance', 'commercial');
+  ('${AUTHOR_SMALL}', 'Small Balance', 'small-balance', 'commercial'),
+  ('${AUTHOR_ACTIVE_NOT_PAYEE}', 'Active Not Payee', 'active-not-payee', 'commercial_active'),
+  ('${AUTHOR_ONBOARDING}', 'Onboarding Author', 'onboarding-author', 'commercial_onboarding');
 
 INSERT INTO public.practices VALUES
   ('${PRACTICE_PAYEE}', '${AUTHOR_PAYEE}', 'Payee Practice', 'payee-practice', 'published', 299, false),
@@ -260,6 +268,7 @@ INSERT INTO public.practices VALUES
     "supabase/migrations/20260726140000_payments_p332_author_ledger.sql",
     "supabase/migrations/20260727120000_payments_p333_author_payouts.sql",
     MIGRATION,
+    EMPTY_STATE_MIGRATION,
   ]) {
     psqlFile(TEST_DB, join(ROOT, file));
   }
@@ -517,6 +526,21 @@ function testEmptyStatesBeforeMoney() {
     summary(AUTHOR_PLATFORM).empty_state_code,
     "not_payout_eligible_commercial",
     "commercial access is not payout eligibility",
+  );
+  assertEqual(
+    summary(AUTHOR_ACTIVE_NOT_PAYEE).empty_state_code,
+    "terms_missing",
+    "commercial_active without payout_eligible is not free",
+  );
+  assert(
+    summary(AUTHOR_ACTIVE_NOT_PAYEE).empty_state_code !==
+      "not_payout_eligible_free",
+    "commercial_active never maps to free empty state",
+  );
+  assertEqual(
+    summary(AUTHOR_ONBOARDING).empty_state_code,
+    "commercial_onboarding_incomplete",
+    "onboarding has a dedicated empty state",
   );
 
   enablePayouts(AUTHOR_NO_TERMS);

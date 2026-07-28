@@ -57,6 +57,9 @@ export const AUTHOR_FINANCE_EMPTY_STATE_CODES = [
   "not_payout_eligible_free",
   "not_payout_eligible_pending",
   "not_payout_eligible_commercial",
+  "commercial_onboarding_incomplete",
+  "access_suspended",
+  "access_terminated",
   "terms_missing",
   "no_sales",
   "held_only",
@@ -239,11 +242,12 @@ export function maskPayoutReference(
 }
 
 /**
- * Mirrors the CASE in public.author_finance_p334_summary.
+ * Mirrors public.author_finance_p334_select_empty_state / the CASE in
+ * author_finance_p334_summary.
  *
- * The order is the order an author asks the questions in: am I a payee at all,
- * are there agreed terms, did anything sell, can I be paid — and if not, what
- * exactly is standing in the way. Exactly one code is returned.
+ * Commercial access, payout profile and payout eligibility are independent:
+ * `commercial_active` never collapses to the free-account empty state just
+ * because payout_eligible is still false or a payout profile is missing.
  */
 export function selectAuthorFinanceEmptyState(input: {
   payoutEligible: boolean;
@@ -257,17 +261,26 @@ export function selectAuthorFinanceEmptyState(input: {
   thresholdMinor?: number;
 }): AuthorFinanceEmptyStateCode {
   const threshold = input.thresholdMinor ?? AUTHOR_FINANCE_MINIMUM_PAYOUT_MINOR;
+  const access = input.accessStatus;
 
-  if (!input.payoutEligible) {
-    if (
-      input.accessStatus === "commercial" ||
-      input.accessStatus === "commercial_active" ||
-      input.accessStatus === "commercial_onboarding" ||
-      input.accessStatus === "commercial_suspended"
-    ) {
+  if (access === "suspended" || access === "commercial_suspended") {
+    return "access_suspended";
+  }
+  if (access === "terminated") {
+    return "access_terminated";
+  }
+  if (access === "commercial_onboarding") {
+    return "commercial_onboarding_incomplete";
+  }
+
+  // commercial_active falls through to operational states even when the
+  // platform has not yet flipped payout_eligible — that flag must not frame
+  // an already commercial author as a free account.
+  if (!input.payoutEligible && access !== "commercial_active") {
+    if (access === "commercial") {
       return "not_payout_eligible_commercial";
     }
-    if (input.accessStatus === "commercial_pending") {
+    if (access === "commercial_pending") {
       return "not_payout_eligible_pending";
     }
     return "not_payout_eligible_free";

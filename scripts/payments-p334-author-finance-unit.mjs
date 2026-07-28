@@ -62,6 +62,10 @@ const MIGRATION = join(
   ROOT,
   "supabase/migrations/20260727140000_payments_p334_author_finance.sql",
 );
+const EMPTY_STATE_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20260728160000_author_finance_empty_state_access_status.sql",
+);
 
 function assert(condition, message) {
   if (!condition) throw new Error(`assertion failed: ${message}`);
@@ -299,11 +303,126 @@ function testEmptyStateMatrix() {
       accessStatus: "commercial",
     }),
     "not_payout_eligible_commercial",
-    "commercial but not a payee",
+    "legacy commercial but not a payee",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...base,
+      payoutEligible: false,
+      accessStatus: "commercial_onboarding",
+      entryCount: 0,
+    }),
+    "commercial_onboarding_incomplete",
+    "onboarding is its own state",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...base,
+      payoutEligible: false,
+      accessStatus: "commercial_suspended",
+    }),
+    "access_suspended",
+    "commercial_suspended is not free",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...base,
+      payoutEligible: true,
+      accessStatus: "suspended",
+    }),
+    "access_suspended",
+    "suspended outranks payout eligibility",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...base,
+      payoutEligible: false,
+      accessStatus: "terminated",
+    }),
+    "access_terminated",
+    "terminated is not free",
   );
 
-  // Ineligibility outranks everything, including a balance that would
-  // otherwise look payable.
+  // commercial_active must never look like a free account — even with no
+  // payout eligibility, no sales and a zero balance (German Semenyuk case).
+  const germanLike = {
+    ...base,
+    payoutEligible: false,
+    accessStatus: "commercial_active",
+    approvedTermsCount: 1,
+    entryCount: 0,
+    payableMinor: 0,
+  };
+  assertEqual(
+    selectAuthorFinanceEmptyState(germanLike),
+    "no_sales",
+    "commercial_active with no sales stays operational",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...germanLike,
+      approvedTermsCount: 0,
+    }),
+    "terms_missing",
+    "commercial_active without terms is not free",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...germanLike,
+      entryCount: 2,
+      payableMinor: 0,
+    }),
+    "no_sales",
+    "commercial_active with zero payable and no history is not free",
+  );
+
+  const freeCopy = getAuthorFinanceEmptyStateCopy("not_payout_eligible_free");
+  assert(
+    freeCopy.body.includes("бесплатный"),
+    "the free empty state still mentions a free account",
+  );
+  for (const scenario of [
+    germanLike,
+    { ...germanLike, approvedTermsCount: 0 },
+    { ...germanLike, payoutEligible: false, payableMinor: 0, entryCount: 0 },
+    {
+      ...base,
+      payoutEligible: false,
+      accessStatus: "commercial_active",
+      entryCount: 5,
+      payableMinor: 50000,
+    },
+  ]) {
+    const code = selectAuthorFinanceEmptyState(scenario);
+    const copy = getAuthorFinanceEmptyStateCopy(code);
+    assert(
+      code !== "not_payout_eligible_free",
+      `commercial_active must not resolve to free (got ${code})`,
+    );
+    assert(
+      !copy.body.includes("бесплатный"),
+      `commercial_active copy must not say free account (got ${code})`,
+    );
+  }
+
+  assertEqual(
+    getAuthorFinanceEmptyStateCopy("commercial_onboarding_incomplete").title,
+    "Коммерческое подключение ещё не завершено",
+    "onboarding has dedicated copy",
+  );
+  assertEqual(
+    getAuthorFinanceEmptyStateCopy("access_suspended").title,
+    "Коммерческий доступ приостановлен",
+    "suspended has dedicated copy",
+  );
+  assertEqual(
+    getAuthorFinanceEmptyStateCopy("access_terminated").title,
+    "Коммерческий доступ прекращён",
+    "terminated has dedicated copy",
+  );
+
+  // Ineligibility outranks everything for free authors, including a balance
+  // that would otherwise look payable.
   assertEqual(
     selectAuthorFinanceEmptyState({
       ...base,
@@ -312,7 +431,7 @@ function testEmptyStateMatrix() {
       payableMinor: 500000,
     }),
     "not_payout_eligible_free",
-    "eligibility is asked first",
+    "eligibility is asked first for free authors",
   );
 
   assertEqual(
@@ -610,7 +729,10 @@ function testPeriodResolution() {
  * build if the two copies drift.
  */
 function testSourceContracts() {
-  const sql = readFileSync(MIGRATION, "utf8");
+  const sql = [MIGRATION, EMPTY_STATE_MIGRATION]
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
+  const baseSql = readFileSync(MIGRATION, "utf8");
 
   for (const key of AUTHOR_FINANCE_TYPE_KEYS) {
     assert(sql.includes(`'${key}'`), `the SQL knows the type key ${key}`);
@@ -628,7 +750,7 @@ function testSourceContracts() {
     assert(sql.includes(`'${status}'`), `the SQL knows the integrity status ${status}`);
   }
 
-  // P3.3.4 is a read-only phase. Nothing in the migration may write.
+  // P3.3.4 is a read-only phase. Nothing in the base migration may write.
   for (const statement of [
     "CREATE TABLE",
     "INSERT INTO",
@@ -639,7 +761,7 @@ function testSourceContracts() {
     "DROP TABLE",
   ]) {
     assert(
-      !sql.toUpperCase().includes(statement),
+      !baseSql.toUpperCase().includes(statement),
       `the migration contains no ${statement}`,
     );
   }
@@ -676,6 +798,14 @@ function testSourceContracts() {
     sql.includes("public.author_payout_payable_snapshot("),
     "the summary reads the P3.3.3 payable snapshot",
   );
+  assert(
+    sql.includes("public.author_finance_p334_select_empty_state("),
+    "summary empty state goes through the shared selector",
+  );
+  assert(
+    sql.includes("IS DISTINCT FROM 'commercial_active'"),
+    "SQL keeps commercial_active out of the free-account branch",
+  );
 
   // No period argument on the summary: a balance is never period-bound.
   const summarySignature = sql.slice(
@@ -685,6 +815,68 @@ function testSourceContracts() {
   assert(
     !summarySignature.includes("timestamptz"),
     "the summary takes no period argument",
+  );
+
+  const queries = readFileSync(
+    join(ROOT, "src/lib/author-finance/queries.ts"),
+    "utf8",
+  );
+  assert(
+    queries.includes("selectAuthorFinanceEmptyState("),
+    "the app remaps empty_state_code from access/balance fields",
+  );
+  assert(
+    queries.includes("p_author_id: input.authorId"),
+    "finance RPCs always receive the verified author id",
+  );
+
+  const guard = readFileSync(
+    join(ROOT, "src/lib/author-finance/route-guard.ts"),
+    "utf8",
+  );
+  assert(
+    guard.includes("requireAuthorMembership(claimed)"),
+    "finance routes prove membership for the claimed author_id",
+  );
+  assert(
+    guard.includes("authorId: claimed"),
+    "only the verified claim reaches finance resolvers",
+  );
+
+  for (const route of [
+    "src/app/api/author/finance/summary/route.ts",
+    "src/app/api/author/finance/terms/route.ts",
+    "src/app/api/author/finance/ledger/route.ts",
+    "src/app/api/author/finance/payouts/route.ts",
+    "src/app/api/author/finance/export/route.ts",
+  ]) {
+    const src = readFileSync(join(ROOT, route), "utf8");
+    assert(
+      src.includes("requireAuthorFinanceAccess"),
+      `${route} gates on the selected author_id`,
+    );
+  }
+
+  const client = readFileSync(
+    join(ROOT, "src/components/author-dashboard/AuthorFinanceClient.tsx"),
+    "utf8",
+  );
+  assert(
+    client.includes("author_id=${encodeURIComponent(selectedAuthor.id)}"),
+    "the finance client always sends the selected author id",
+  );
+
+  const banner = readFileSync(
+    join(ROOT, "src/lib/author-finance/payout-profile-banner.ts"),
+    "utf8",
+  );
+  assert(
+    banner.includes("shouldShowFinancePayoutProfileBanner"),
+    "payout profile absence has its own banner helper",
+  );
+  assert(
+    !banner.includes("selectAuthorFinanceEmptyState"),
+    "payout profile banner does not drive commercial-access empty state",
   );
 }
 
