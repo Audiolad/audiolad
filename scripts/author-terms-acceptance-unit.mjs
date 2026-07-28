@@ -66,10 +66,9 @@ for (const phrase of [
 }
 assert.ok(!AUTHOR_TERMS_APPROVED_META.version.startsWith("sha256:"));
 
-// document renders without dropping body
+// document renders body once: intro + sections, without DOCX title/TOC duplicate
 const blocks = buildAuthorTermsDocumentBlocks();
 assert.ok(blocks.length > 20);
-assert.ok(blocks.some((b) => b.type === "heading" && b.id === "section-1"));
 assert.ok(
   blocks.some(
     (b) =>
@@ -77,6 +76,58 @@ assert.ok(
       b.text.includes("Настоящие Авторские условия сотрудничества"),
   ),
 );
+assert.equal(
+  blocks.findIndex(
+    (b) =>
+      b.type === "paragraph" &&
+      b.text.includes("Настоящие Авторские условия сотрудничества"),
+  ),
+  0,
+  "body must start with intro paragraph after page TOC",
+);
+assert.ok(!blocks.some((b) => b.type === "heading" && b.text === "АУДИОЛАД"));
+assert.ok(
+  !blocks.some(
+    (b) =>
+      (b.type === "heading" || b.type === "paragraph") &&
+      b.text === "Содержание",
+  ),
+);
+assert.ok(
+  !blocks.some(
+    (b) =>
+      b.type === "heading" &&
+      b.text.startsWith("Авторские условия сотрудничества (оферта"),
+  ),
+);
+
+const sectionHeadings = blocks.filter(
+  (b) => b.type === "heading" && typeof b.id === "string" && b.id.startsWith("section-"),
+);
+assert.equal(sectionHeadings.length, 25);
+for (let n = 1; n <= 25; n += 1) {
+  const matches = sectionHeadings.filter((b) => b.id === `section-${n}`);
+  assert.equal(matches.length, 1, `section-${n} must appear exactly once`);
+}
+
+const bodyText = blocks
+  .map((b) => {
+    if (b.type === "list") return b.items.join("\n");
+    return b.text;
+  })
+  .join("\n");
+assert.ok(bodyText.includes("1.1."));
+// representative clauses across the document remain present
+for (const clause of ["1.1.", "1.2.", "6.1.", "17.3.", "23.3."]) {
+  assert.ok(bodyText.includes(clause), `missing clause marker ${clause}`);
+}
+// section 25 is operator requisites without 25.x numbering
+assert.ok(bodyText.includes("25. Реквизиты оператора"));
+assert.ok(bodyText.includes("ОГРНИП: 316505300063237"));
+assert.ok(bodyText.includes("Конец документа"));
+// full approved text (for hash) still contains front matter; render path strips it
+assert.ok(AUTHOR_TERMS_APPROVED_TEXT.includes("Содержание"));
+assert.ok(AUTHOR_TERMS_APPROVED_TEXT.startsWith("АУДИОЛАД"));
 
 // migration seed matches code hash/id
 const migration = readFileSync(

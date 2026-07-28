@@ -18,11 +18,27 @@ function sectionIdForHeading(text: string): string | undefined {
   return `section-${match[1]}`;
 }
 
+/**
+ * Drop DOCX front matter that the public page already renders separately:
+ * brand line, document title, and the plain-text «Содержание» list.
+ * Legal wording of the body is left unchanged.
+ */
+export function stripAuthorTermsFrontMatter(text: string): string {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const marker = "Настоящие Авторские условия сотрудничества";
+  const index = normalized.indexOf(marker);
+  if (index < 0) {
+    return normalized;
+  }
+
+  return normalized.slice(index);
+}
+
 /** Split approved plain text into render blocks without altering wording. */
 export function buildAuthorTermsDocumentBlocks(
   text: string = AUTHOR_TERMS_APPROVED_TEXT,
 ): AuthorTermsDocumentBlock[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = stripAuthorTermsFrontMatter(text).split("\n");
   const blocks: AuthorTermsDocumentBlock[] = [];
   let listItems: string[] = [];
 
@@ -44,21 +60,7 @@ export function buildAuthorTermsDocumentBlocks(
       continue;
     }
 
-    if (trimmed === "АУДИОЛАД") {
-      flushList();
-      blocks.push({ type: "heading", level: 1, text: trimmed });
-      continue;
-    }
-
-    if (
-      trimmed.startsWith("Авторские условия сотрудничества") &&
-      !trimmed.match(/^\d+\./)
-    ) {
-      flushList();
-      blocks.push({ type: "heading", level: 1, text: trimmed });
-      continue;
-    }
-
+    // Numbered section titles (1. … 25.), but not clause numbers (1.1.).
     if (/^\d+\.\s+\S/.test(trimmed) && !/^\d+\.\d+/.test(trimmed)) {
       flushList();
       blocks.push({
