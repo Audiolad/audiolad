@@ -41,6 +41,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/become-author", changeFrequency: "monthly", priority: 0.5 },
   { path: "/first-audio-course", changeFrequency: "monthly", priority: 0.6 },
   { path: "/offer", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/author-terms", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/consent", changeFrequency: "yearly", priority: 0.3 },
   { path: "/payment-and-refund", changeFrequency: "yearly", priority: 0.3 },

@@ -27,6 +27,7 @@ import {
   resolvePayoutStepCompleteForLegacyOnboarding,
 } from "@/lib/author-payout-profiles/onboarding-complete";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export {
@@ -350,6 +351,8 @@ export async function loadAuthorOnboardingChecklistState(
     accessStatus === "commercial_suspended" ||
     commercialApplication?.status === "approved";
 
+  const termsAcceptance = await hasAcceptedCurrentAuthorTerms(authorId);
+
   const commercial = evaluateCommercialOnboardingChecklist({
     authorSlug,
     accessStatus,
@@ -360,7 +363,8 @@ export async function loadAuthorOnboardingChecklistState(
       ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
       applicationSubmissionAvailable: true,
       payoutDetailsAvailable: commercialOnboardingOpen,
-      termsAcceptanceAvailable: commercialOnboardingOpen,
+      termsAcceptanceAvailable:
+        commercialOnboardingOpen && Boolean(termsAcceptance.currentVersion),
     },
     applicationStatus: commercialApplication?.status ?? null,
     applicationReviewComment: commercialApplication?.review_comment ?? null,
@@ -374,7 +378,7 @@ export async function loadAuthorOnboardingChecklistState(
       accessStatus,
       payoutProfileStatus: payoutProfile.status,
     }),
-    termsAccepted: accessStatus === "commercial_active" || accessStatus === "commercial",
+    termsAccepted: termsAcceptance.accepted,
     legacyPendingWithoutApplication:
       accessStatus === "commercial_pending" && !commercialApplication,
   });

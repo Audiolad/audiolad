@@ -1,7 +1,6 @@
 import {
   authorAccessAllowsPaidProducts,
   isAuthorCommercialApprovedAccess,
-  isAuthorCommercialOnboardingAccess,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
 
@@ -38,10 +37,11 @@ export function resolveAuthorCommercialCapabilities(
     can_edit_payout_profile:
       canAccessOnboarding && accessStatus !== "commercial_suspended",
     can_view_commercial_terms: canAccessOnboarding,
-    // Acceptance stays closed until a published terms edition exists.
+    // Acceptance for current/new editions: onboarding + live commercial authors.
     can_accept_commercial_terms:
-      isAuthorCommercialOnboardingAccess(accessStatus) &&
-      publishedTermsAvailable,
+      publishedTermsAvailable &&
+      canAccessOnboarding &&
+      accessStatus !== "commercial_suspended",
     can_create_paid_product: paid,
     can_publish_paid_product: paid,
   };

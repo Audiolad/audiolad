@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
+import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
@@ -192,6 +193,10 @@ export default function AuthorDashboardClient({
     <div>
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
+      <AuthorTermsRequiredBanner
+        authorId={selectedAuthor.id}
+        authorSlug={selectedAuthor.slug}
+      />
 
       <AuthorOnboardingChecklist
         key={selectedAuthor.id}

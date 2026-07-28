@@ -106,16 +106,37 @@ function testOnboardingStates() {
     termsHref: "/author-dashboard/commercial/terms?author=demo",
   });
   assert.equal(approved.steps[0].state, "completed");
+  assert.equal(approved.steps[1].id, "terms_acceptance");
   assert.equal(approved.steps[1].state, "active");
-  assert.equal(approved.steps[2].state, "active");
+  assert.equal(approved.steps[2].id, "payout_details");
+  assert.equal(approved.steps[2].state, "locked");
   assert.equal(approved.steps[3].state, "locked");
-  assert.match(approved.steps[1].href ?? "", /payout-details/);
-  assert.match(approved.steps[2].href ?? "", /\/terms/);
-  assert.equal(approved.steps[2].actionLabel, "Открыть условия");
+  assert.match(approved.steps[1].href ?? "", /\/terms/);
+  assert.equal(approved.steps[1].actionLabel, "Открыть условия");
+  assert.match(
+    approved.steps[2].hint ?? "",
+    /Сначала примите Авторские условия сотрудничества/,
+  );
   assert.match(
     approved.steps[3].hint ?? "",
     /Сначала заполните данные для выплат и примите условия сотрудничества/,
   );
+
+  const afterTerms = evaluate({
+    accessStatus: "commercial_onboarding",
+    applicationStatus: "approved",
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    termsAccepted: true,
+    payoutDetailsHref: "/author-dashboard/commercial/payout-details?author=demo",
+    termsHref: "/author-dashboard/commercial/terms?author=demo",
+  });
+  assert.equal(afterTerms.steps[1].state, "completed");
+  assert.equal(afterTerms.steps[2].state, "active");
+  assert.match(afterTerms.steps[2].href ?? "", /payout-details/);
 
   const rejected = evaluate({
     accessStatus: "free",
@@ -244,11 +265,13 @@ function testSourceGuards() {
   assert.match(payoutPage, /requireCommercialOnboardingAuthor/);
   assert.match(payoutPage, /AuthorPayoutProfileForm/);
   assert.match(termsPage, /requireCommercialOnboardingAuthor/);
-  assert.match(termsPage, /Принять условия сейчас нельзя/i);
-  assert.match(termsPage, /AUTHOR_COMMERCIAL_SHARE_BPS/);
+  assert.match(termsPage, /AuthorTermsAcceptPanel/);
+  assert.match(termsPage, /Условия приняты/);
 
   const loader = read("src/lib/author-dashboard/load-onboarding-state.ts");
   assert.match(loader, /payoutDetailsAvailable: commercialOnboardingOpen/);
+  assert.match(loader, /hasAcceptedCurrentAuthorTerms/);
+  assert.match(loader, /termsAccepted: termsAcceptance\.accepted/);
   assert.match(loader, /payout-details/);
   assert.match(loader, /\/terms/);
 

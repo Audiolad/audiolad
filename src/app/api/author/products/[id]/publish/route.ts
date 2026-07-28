@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  assertAuthorCommercialWriteAllowed,
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
@@ -24,6 +25,13 @@ export async function POST(_request: Request, context: RouteContext) {
 
     if (!detail) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    if (!detail.practice.is_free) {
+      await assertAuthorCommercialWriteAllowed(
+        practice.author_id,
+        accessStatus,
+      );
     }
 
     const activeTopicCount = await countActivePracticeTopics(supabase, id);

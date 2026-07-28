@@ -10,6 +10,11 @@ import {
   authorAccessAllowsContentMutations,
   authorAccessAllowsPaidProducts,
 } from "@/lib/authors/access";
+import {
+  AuthorTermsAcceptanceRequiredError,
+  authorTermsAcceptanceRequiredResponse,
+} from "@/lib/author-terms/errors";
+import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
 
 import { isPracticeSaleLockError } from "@/lib/author-products/sale-lock";
 
@@ -188,6 +193,15 @@ export function assertAuthorPaidProductsAllowed(accessStatus: AuthorAccessStatus
   }
 }
 
+/** Paid commercial write-path: access tier + current author terms acceptance. */
+export async function assertAuthorCommercialWriteAllowed(
+  authorId: string,
+  accessStatus: AuthorAccessStatus,
+) {
+  assertAuthorPaidProductsAllowed(accessStatus);
+  await requireCurrentAuthorTermsAcceptance(authorId);
+}
+
 export async function requireAuthorMutationMembership(authorId: string) {
   const context = await requireAuthorMembership(authorId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
@@ -259,6 +273,10 @@ export async function requirePracticeAccess(practiceId: string) {
 }
 
 export function handleAuthorRouteError(error: unknown) {
+  if (error instanceof AuthorTermsAcceptanceRequiredError) {
+    return authorTermsAcceptanceRequiredResponse(error);
+  }
+
   if (error instanceof AuthorAccessError) {
     if (error.status >= 500) {
       console.error("author_route_error", error.code);

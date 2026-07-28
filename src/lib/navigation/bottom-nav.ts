@@ -1,6 +1,7 @@
 /** Маршруты без подсветки активной вкладки (юридические и информационные). */
 const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/offer",
+  "/author-terms",
   "/privacy",
   "/consent",
   "/payment-and-refund",

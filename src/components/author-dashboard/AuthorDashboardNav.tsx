@@ -123,6 +123,12 @@ export default function AuthorDashboardNav({
       icon: FinanceIcon,
       active: pathname.startsWith("/author-dashboard/finance"),
     },
+    {
+      href: `/author-dashboard/legal${authorQuery}`,
+      label: "Документы",
+      icon: ProfileIcon,
+      active: pathname.startsWith("/author-dashboard/legal"),
+    },
   ];
 
   return (

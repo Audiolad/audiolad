@@ -1,6 +1,10 @@
 export const LEGAL_LINKS = [
   { href: "/requisites", title: "Реквизиты" },
   { href: "/offer", title: "Публичная оферта" },
+  {
+    href: "/author-terms",
+    title: "Авторские условия сотрудничества",
+  },
   { href: "/privacy", title: "Политика обработки персональных данных" },
   { href: "/consent", title: "Согласие на обработку персональных данных" },
   { href: "/payment-and-refund", title: "Оплата, получение и возврат" },

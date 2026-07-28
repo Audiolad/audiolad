@@ -384,8 +384,8 @@ export function evaluateCommercialOnboardingChecklist(input: {
       lockedStep("commercial_application", {
         hint: "Коммерческие возможности станут доступны после публикации первого бесплатного продукта.",
       }),
-      lockedStep("payout_details"),
       lockedStep("terms_acceptance"),
+      lockedStep("payout_details"),
       lockedStep("paid_product"),
       lockedStep("prepare_paid_product"),
       lockedStep("publish_paid_product"),
@@ -488,18 +488,54 @@ export function evaluateCommercialOnboardingChecklist(input: {
     };
   }
 
-  // --- Step 2: payout details ---
+  // --- Step 2: terms (before payout writes; server enforces the same order) ---
+  let termsStep: CommercialOnboardingStepState;
+
+  if (!applicationApproved) {
+    termsStep = lockedStep("terms_acceptance", {
+      hint: "Шаг откроется после одобрения коммерческой заявки.",
+    });
+  } else if (!capabilities.termsAcceptanceAvailable) {
+    termsStep = comingSoonStep("terms_acceptance");
+  } else if (termsAccepted) {
+    termsStep = {
+      id: "terms_acceptance",
+      ...STEP_META.terms_acceptance,
+      state: "completed",
+      hint: null,
+      readiness: null,
+    };
+  } else {
+    termsStep = {
+      id: "terms_acceptance",
+      ...STEP_META.terms_acceptance,
+      state: "active",
+      actionLabel: "Открыть условия",
+      href: termsHref ?? undefined,
+      hint: null,
+      readiness: null,
+    };
+  }
+
+  // --- Step 3: payout details ---
   let payoutStep: CommercialOnboardingStepState;
+
+  const payoutDetailsUnlocked =
+    !capabilities.termsAcceptanceAvailable || termsAccepted;
 
   const payoutVisual = mapPayoutProfileStatusToOnboardingVisual({
     status: payoutProfileStatus,
-    available: capabilities.payoutDetailsAvailable,
+    available: capabilities.payoutDetailsAvailable && payoutDetailsUnlocked,
     applicationApproved,
     legacyCommercialActive,
   });
   const payoutReviewComment = payoutProfileReviewComment?.trim() || null;
 
-  if (payoutVisual.state === "locked") {
+  if (!payoutDetailsUnlocked && applicationApproved) {
+    payoutStep = lockedStep("payout_details", {
+      hint: "Сначала примите Авторские условия сотрудничества.",
+    });
+  } else if (payoutVisual.state === "locked") {
     payoutStep = lockedStep("payout_details", {
       hint: payoutVisual.hint,
     });
@@ -531,35 +567,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
       actionLabel: payoutVisual.actionLabel,
       href: payoutDetailsHref ?? undefined,
       hint: payoutHint,
-      readiness: null,
-    };
-  }
-
-  // --- Step 3: terms ---
-  let termsStep: CommercialOnboardingStepState;
-
-  if (!applicationApproved) {
-    termsStep = lockedStep("terms_acceptance", {
-      hint: "Шаг откроется после одобрения коммерческой заявки.",
-    });
-  } else if (!capabilities.termsAcceptanceAvailable) {
-    termsStep = comingSoonStep("terms_acceptance");
-  } else if (termsAccepted) {
-    termsStep = {
-      id: "terms_acceptance",
-      ...STEP_META.terms_acceptance,
-      state: "completed",
-      hint: null,
-      readiness: null,
-    };
-  } else {
-    termsStep = {
-      id: "terms_acceptance",
-      ...STEP_META.terms_acceptance,
-      state: "active",
-      actionLabel: "Открыть условия",
-      href: termsHref ?? undefined,
-      hint: null,
       readiness: null,
     };
   }
@@ -677,12 +684,11 @@ export function evaluateCommercialOnboardingChecklist(input: {
     };
   }
 
-  // Payout + terms may be active in parallel after approval; later paid
-  // steps stay sequential via prerequisite checks above.
+  // Terms before payout writes; later paid steps stay sequential.
   const steps = [
     applicationStep,
-    payoutStep,
     termsStep,
+    payoutStep,
     paidProductStep,
     preparePaidStep,
     publishPaidStep,
@@ -691,8 +697,8 @@ export function evaluateCommercialOnboardingChecklist(input: {
 
   const completionFlags = [
     applicationApproved,
-    payoutStepComplete,
     termsStepComplete,
+    payoutStepComplete,
     paidProductComplete,
     preparePaidComplete,
     publishPaidComplete,

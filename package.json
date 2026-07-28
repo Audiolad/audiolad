@@ -35,7 +35,8 @@
     "test:commercial-application:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/author-commercial-application-integration.mjs",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",
-    "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs"
+    "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs",
+    "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

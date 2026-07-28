@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  assertAuthorPaidProductsAllowed,
+  assertAuthorCommercialWriteAllowed,
   handleAuthorRouteError,
   requirePracticeAccess,
   requirePracticeMutationAccess,
@@ -214,7 +214,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if ("is_free" in body && typeof body.is_free === "boolean") {
       if (!body.is_free) {
-        assertAuthorPaidProductsAllowed(accessStatus);
+        await assertAuthorCommercialWriteAllowed(
+          practice.author_id,
+          accessStatus,
+        );
       }
 
       updates.is_free = body.is_free;
@@ -230,7 +233,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.price === "number" &&
       Number.isInteger(body.price)
     ) {
-      assertAuthorPaidProductsAllowed(accessStatus);
+      await assertAuthorCommercialWriteAllowed(
+        practice.author_id,
+        accessStatus,
+      );
 
       if (!PAID_PRICE_OPTIONS.includes(body.price as (typeof PAID_PRICE_OPTIONS)[number])) {
         return NextResponse.json({ error: "invalid_price" }, { status: 400 });

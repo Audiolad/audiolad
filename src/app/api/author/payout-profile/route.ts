@@ -14,6 +14,7 @@ import {
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
 import { sendPayoutProfileAdminSubmittedEmail } from "@/lib/email/send-payout-profile-admin-submitted-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -189,6 +190,7 @@ export async function PUT(request: Request) {
     }
 
     const { user } = await requireAuthorMembership(authorId);
+    await requireCurrentAuthorTermsAcceptance(authorId);
     const service = createServiceRoleClient();
 
     const profile = await saveAuthorPayoutProfileDraft({
@@ -222,6 +224,7 @@ export async function POST(request: Request) {
     }
 
     const { user } = await requireAuthorMembership(authorId);
+    await requireCurrentAuthorTermsAcceptance(authorId);
     const service = createServiceRoleClient();
 
     if (action === "begin_edit") {
