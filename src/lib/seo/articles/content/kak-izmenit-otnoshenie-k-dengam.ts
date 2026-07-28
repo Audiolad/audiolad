@@ -176,6 +176,14 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
   afterFinalAudio: [
     {
       before:
+        "Если важно подробнее разобрать, что обычно понимают под денежными установками и как они могут влиять на повседневные финансовые решения, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Денежные установки: что это такое и как они влияют на отношение к деньгам»",
+      href: "/articles/denezhnye-ustanovki",
+      after: ".",
+    },
+    {
+      before:
         "Если внутренний конфликт связан именно с женской ролью, оплатой труда, принятием помощи и привычкой ставить потребности других выше своих, отдельно можно прочитать статью ",
       linkLabel: "«Как женщине разрешить себе деньги»",
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
@@ -250,6 +258,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Получение оплаты, подарков и помощи без вины",
     },
     {
+      href: "/articles/denezhnye-ustanovki",
+      title: "Денежные установки",
+      description: "Убеждения о деньгах и их влияние на решения",
+    },
+    {
       href: "/topics/izobilie",
       title: "Изобилие",
       description: "Соседний угол: состояние изобилия и открытости",
@@ -269,5 +282,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-27T19:00:00.000Z",
+  updatedAt: "2026-07-28T08:00:00.000Z",
 } as const satisfies ArticleDefinition;

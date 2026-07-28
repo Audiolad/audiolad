@@ -3542,6 +3542,86 @@ assert(
   "change money attitude see-also includes accept-money",
 );
 
+const moneyBeliefsArticle = getArticleBySlug("denezhnye-ustanovki");
+assert(moneyBeliefsArticle, "money-beliefs article registered");
+assert(
+  moneyBeliefsArticle.title ===
+    "Денежные установки: что это такое и как они влияют на отношение к деньгам",
+  "money-beliefs H1",
+);
+assert(
+  moneyBeliefsArticle.metaTitle ===
+    "Денежные установки: что это такое и как они влияют на деньги | АудиоЛад",
+  "money-beliefs SEO title",
+);
+assert(
+  moneyBeliefsArticle.topicSlug === "besplatnye-meditatsii",
+  "money-beliefs hub",
+);
+assert(
+  moneyBeliefsArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "money-beliefs practice",
+);
+assert(
+  moneyBeliefsArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "money-beliefs practice intro",
+);
+assert(
+  moneyBeliefsArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует увеличения дохода"),
+    ),
+  "money-beliefs practice disclaimer",
+);
+assert(
+  moneyBeliefsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
+  ),
+  "money-beliefs links to money flow",
+);
+assert(
+  moneyBeliefsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "money-beliefs links to change money attitude",
+);
+assert(
+  listArticleSlugs().includes("denezhnye-ustanovki"),
+  "money-beliefs in slug list",
+);
+assert(
+  !moneyBeliefsArticle.metaTitle.includes("—"),
+  "money-beliefs uses medium dash",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "change money attitude reverse-links to money-beliefs",
+);
+assert(
+  moneyFlowArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "money flow see-also includes money-beliefs",
+);
+assert(
+  acceptMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "accept-money see-also includes money-beliefs",
+);
+assert(
+  femaleSelfWorthMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "female-self-worth-money see-also includes money-beliefs",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

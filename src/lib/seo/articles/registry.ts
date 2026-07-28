@@ -19,6 +19,7 @@ import { MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE } from "./content/meditatsiya
 import { POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE } from "./content/pochemu-my-postoyanno-obizhaemsya";
 import { VIZUALIZATSIYA_ZHELANIY_ARTICLE } from "./content/vizualizatsiya-zhelaniy";
 import { KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE } from "./content/kak-perestat-ekonomit-na-sebe";
+import { DENEZHNYE_USTANOVKI_ARTICLE } from "./content/denezhnye-ustanovki";
 import { KAK_PRINIMAT_DENGI_ARTICLE } from "./content/kak-prinimat-dengi";
 import { STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE } from "./content/strah-tratit-dengi-na-sebya";
 import { ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE } from "./content/zhenskaya-samotsennost-i-dengi";
@@ -49,6 +50,7 @@ const ARTICLE_DEFINITIONS = [
   STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE,
   KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE,
   KAK_PRINIMAT_DENGI_ARTICLE,
+  DENEZHNYE_USTANOVKI_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
