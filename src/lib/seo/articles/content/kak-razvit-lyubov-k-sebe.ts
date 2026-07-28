@@ -194,6 +194,14 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       href: "/articles/kak-napolnitsya-zhenskoy-energiey",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, как принять свой возраст и спокойнее относиться к возрастным изменениям, можно прочитать статью ",
+      linkLabel:
+        "«Как принять свой возраст и спокойнее относиться к возрастным изменениям»",
+      href: "/articles/kak-prinyat-svoy-vozrast",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
@@ -210,6 +218,11 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       href: "/articles/kak-napolnitsya-zhenskoy-energiey",
       title: "Как наполниться женской энергией и вернуть ощущение внутренней живости",
       description: "Внутренняя живость, контакт с собой и практические привычки",
+    },
+    {
+      href: "/articles/kak-prinyat-svoy-vozrast",
+      title: "Как принять свой возраст",
+      description: "Спокойнее относиться к возрастным изменениям и жизненному опыту",
     },
   ],
   closingSection: {

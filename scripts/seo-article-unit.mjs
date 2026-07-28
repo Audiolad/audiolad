@@ -4913,6 +4913,86 @@ assert(
   "scarcity-state reverse-links to female-energy",
 );
 
+const ageAcceptanceArticle = getArticleBySlug("kak-prinyat-svoy-vozrast");
+assert(ageAcceptanceArticle, "age-acceptance article registered");
+assert(
+  ageAcceptanceArticle.title ===
+    "Как принять свой возраст и спокойнее относиться к возрастным изменениям",
+  "age-acceptance H1",
+);
+assert(
+  ageAcceptanceArticle.topicSlug === "besplatnye-meditatsii",
+  "age-acceptance free hub",
+);
+assert(
+  ageAcceptanceArticle.primaryPractice.practiceKey === "elixir-molodosti",
+  "age-acceptance practice elixir",
+);
+assert(
+  ageAcceptanceArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some(
+      (paragraph) =>
+        paragraph.includes("не предназначена") &&
+        paragraph.includes("омоложения"),
+    ),
+  "age-acceptance audiopraktika non-rejuvenation disclaimer",
+);
+assert(ageAcceptanceArticle.faq.length === 4, "age-acceptance faq count");
+assert(
+  ageAcceptanceArticle.faq[0]?.question.startsWith("### "),
+  "age-acceptance faq first question uses ### prefix",
+);
+assert(
+  ageAcceptanceArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-razvit-lyubov-k-sebe",
+  "age-acceptance priority link to love-to-self",
+);
+assert(
+  !ageAcceptanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ) &&
+    !ageAcceptanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-sila",
+    ),
+  "age-acceptance has no links to unpublished zhenskaya-sila article",
+);
+assert(
+  listArticleSlugs().includes("kak-prinyat-svoy-vozrast"),
+  "age-acceptance in slug list",
+);
+assert(
+  !JSON.stringify(ageAcceptanceArticle).includes("—"),
+  "age-acceptance uses medium dash not em dash",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+  ) ||
+    article.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+    ),
+  "love-to-self reverse-links to age-acceptance",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+  ) ||
+    gratitudeAbundanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+    ),
+  "gratitude-abundance reverse-links to age-acceptance",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+  ) ||
+    scarcityStateArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-prinyat-svoy-vozrast",
+    ),
+  "scarcity-state reverse-links to age-acceptance",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
