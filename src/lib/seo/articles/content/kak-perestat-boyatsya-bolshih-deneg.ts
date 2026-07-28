@@ -703,6 +703,11 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
+      title: "Как перестать переживать из-за денег",
+      description: "Финансовая тревога и переход к конкретным действиям",
+    },
+    {
       href: "/articles/denezhnoe-myshlenie",
       title: "Денежное мышление",
       description: "Привычный способ воспринимать деньги и финансовые решения",
@@ -748,5 +753,5 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T14:00:00.000Z",
+  updatedAt: "2026-07-28T16:00:00.000Z",
 } as const satisfies ArticleDefinition;

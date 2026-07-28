@@ -688,6 +688,11 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
+      title: "Как перестать переживать из-за денег",
+      description: "Финансовая тревога и переход к конкретным действиям",
+    },
+    {
       href: "/articles/denezhnye-ustanovki",
       title: "Денежные установки",
       description: "Убеждения о деньгах и их влияние на решения",
@@ -728,5 +733,5 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T16:00:00.000Z",
 } as const satisfies ArticleDefinition;
