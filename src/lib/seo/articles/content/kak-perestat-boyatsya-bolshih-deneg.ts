@@ -687,6 +687,14 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
     },
     {
       before:
+        "Если тема роста дохода связана не только со страхом крупных сумм, но и с практическими шагами повышения заработка, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как повысить доход: реалистичные способы и практические шаги»",
+      href: "/articles/kak-povysit-dohod",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -701,6 +709,11 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-povysit-dohod",
+      title: "Как повысить доход",
+      description: "Реалистичные способы и практические шаги роста заработка",
     },
     {
       href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
@@ -753,5 +766,5 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T16:00:00.000Z",
+  updatedAt: "2026-07-28T20:00:00.000Z",
 } as const satisfies ArticleDefinition;

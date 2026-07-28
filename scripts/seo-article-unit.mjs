@@ -3989,6 +3989,83 @@ assert(
   "money flow see-also includes impulse-buying",
 );
 
+const raiseIncomeArticle = getArticleBySlug("kak-povysit-dohod");
+assert(raiseIncomeArticle, "raise-income article registered");
+assert(
+  raiseIncomeArticle.title ===
+    "Как повысить доход: реалистичные способы и практические шаги",
+  "raise-income H1",
+);
+assert(
+  raiseIncomeArticle.metaTitle ===
+    "Как повысить доход: реалистичные способы увеличить заработок | АудиоЛад",
+  "raise-income SEO title",
+);
+assert(
+  raiseIncomeArticle.topicSlug === "besplatnye-meditatsii",
+  "raise-income hub",
+);
+assert(
+  raiseIncomeArticle.primaryPractice.practiceKey === "prityanut-dengi-legko",
+  "raise-income practice",
+);
+assert(
+  raiseIncomeArticle.primaryPracticeIntro.includes("Притянуть деньги легко"),
+  "raise-income practice intro",
+);
+assert(
+  raiseIncomeArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует увеличение дохода"),
+    ),
+  "raise-income practice disclaimer",
+);
+assert(
+  raiseIncomeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "raise-income links to money-thinking",
+);
+assert(
+  raiseIncomeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "raise-income links to fear-big-money",
+);
+assert(
+  listArticleSlugs().includes("kak-povysit-dohod"),
+  "raise-income in slug list",
+);
+assert(
+  !raiseIncomeArticle.metaTitle.includes("—"),
+  "raise-income uses medium dash",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-povysit-dohod",
+  ) ||
+    moneyThinkingArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-povysit-dohod",
+    ),
+  "money-thinking reverse-links to raise-income",
+);
+assert(
+  fearBigMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-povysit-dohod",
+  ) ||
+    fearBigMoneyArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-povysit-dohod",
+    ),
+  "fear-big-money reverse-links to raise-income",
+);
+assert(
+  moneyBeliefsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-povysit-dohod",
+  ),
+  "money-beliefs see-also includes raise-income",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
