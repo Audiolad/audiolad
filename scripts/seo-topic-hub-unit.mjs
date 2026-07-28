@@ -378,6 +378,12 @@ assert(
   "free hub includes gratitude-abundance SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "kak-napolnitsya-zhenskoy-energiey",
+  ),
+  "free hub includes female-energy SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

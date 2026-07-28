@@ -27,6 +27,7 @@ import { KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE } from "./content/kak-umenshit
 import { KAK_POVYSIT_DOHOD_ARTICLE } from "./content/kak-povysit-dohod";
 import { KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE } from "./content/kak-nayti-novye-istochniki-dohoda";
 import { KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE } from "./content/kak-vyyti-iz-sostoyaniya-nehvatki";
+import { KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE } from "./content/kak-napolnitsya-zhenskoy-energiey";
 import { BLAGODARNOST_I_IZOBILIE_ARTICLE } from "./content/blagodarnost-i-izobilie";
 import { KAK_PRINIMAT_DENGI_ARTICLE } from "./content/kak-prinimat-dengi";
 import { STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE } from "./content/strah-tratit-dengi-na-sebya";
@@ -67,6 +68,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE,
   KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE,
   BLAGODARNOST_I_IZOBILIE_ARTICLE,
+  KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

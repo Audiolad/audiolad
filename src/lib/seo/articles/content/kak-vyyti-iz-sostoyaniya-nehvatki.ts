@@ -1222,6 +1222,14 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       after: ", где собраны практики для разных жизненных ситуаций.",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, как наполниться женской энергией и вернуть ощущение внутренней живости, можно прочитать статью ",
+      linkLabel:
+        "«Как наполниться женской энергией и вернуть ощущение внутренней живости»",
+      href: "/articles/kak-napolnitsya-zhenskoy-energiey",
+      after: ".",
+    },
   ],
   brandNote:
     "Аудиопрактики используются как дополнительная поддержка внутреннего состояния и внимания, но не заменяют финансовое планирование, профессиональное развитие, переговоры, юридическую помощь или другие реальные меры.",
@@ -1275,6 +1283,11 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
       href: "/articles/blagodarnost-i-izobilie",
       title: "Благодарность и изобилие",
       description: "Замечать опоры без отрицания трудностей",
+    },
+    {
+      href: "/articles/kak-napolnitsya-zhenskoy-energiey",
+      title: "Как наполниться женской энергией и вернуть ощущение внутренней живости",
+      description: "Внутренняя живость, контакт с собой и практические привычки",
     },
   ],
   closingSection: {

@@ -186,6 +186,14 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       href: "/articles/kak-otpustit-obidu",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, как наполниться женской энергией и вернуть ощущение внутренней живости, можно прочитать статью ",
+      linkLabel:
+        "«Как наполниться женской энергией и вернуть ощущение внутренней живости»",
+      href: "/articles/kak-napolnitsya-zhenskoy-energiey",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
@@ -198,6 +206,11 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       title: "Бесплатные медитации",
       description: "Практики, которые можно слушать без оплаты",
     },
+    {
+      href: "/articles/kak-napolnitsya-zhenskoy-energiey",
+      title: "Как наполниться женской энергией и вернуть ощущение внутренней живости",
+      description: "Внутренняя живость, контакт с собой и практические привычки",
+    },
   ],
   closingSection: {
     id: "skladyvaetsya-postepenno",
@@ -209,5 +222,5 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-24T00:00:00.000Z",
-  updatedAt: "2026-07-25T00:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

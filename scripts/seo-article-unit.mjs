@@ -4833,6 +4833,86 @@ assert(
   "page view does not hardcode practice title",
 );
 
+const femaleEnergyArticle = getArticleBySlug("kak-napolnitsya-zhenskoy-energiey");
+assert(femaleEnergyArticle, "female-energy article registered");
+assert(
+  femaleEnergyArticle.title ===
+    "Как наполниться женской энергией и вернуть ощущение внутренней живости",
+  "female-energy H1",
+);
+assert(
+  femaleEnergyArticle.topicSlug === "besplatnye-meditatsii",
+  "female-energy free hub",
+);
+assert(
+  femaleEnergyArticle.primaryPractice.practiceKey ===
+    "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+  "female-energy practice bastet",
+);
+assert(
+  femaleEnergyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) => paragraph.includes("не гарантирует")),
+  "female-energy audiopraktika disclaimer",
+);
+assert(
+  femaleEnergyArticle.faq.length === 4,
+  "female-energy faq count",
+);
+assert(
+  femaleEnergyArticle.faq[0]?.question.startsWith("### "),
+  "female-energy faq first question uses ### prefix",
+);
+assert(
+  femaleEnergyArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-razvit-lyubov-k-sebe",
+  "female-energy priority link to love-to-self",
+);
+assert(
+  !femaleEnergyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ) &&
+    !femaleEnergyArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-sila",
+    ),
+  "female-energy has no links to unpublished zhenskaya-sila article",
+);
+assert(
+  listArticleSlugs().includes("kak-napolnitsya-zhenskoy-energiey"),
+  "female-energy in slug list",
+);
+assert(
+  !JSON.stringify(femaleEnergyArticle).includes("—"),
+  "female-energy uses medium dash not em dash",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ) ||
+    article.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+    ),
+  "love-to-self reverse-links to female-energy",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ) ||
+    gratitudeAbundanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+    ),
+  "gratitude-abundance reverse-links to female-energy",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ) ||
+    scarcityStateArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+    ),
+  "scarcity-state reverse-links to female-energy",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
