@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
 import type {
   AuthorProductDetail,
   AuthorProductListItem,
@@ -7,6 +10,19 @@ import type {
   PracticeRow,
 } from "./types";
 import { slugifyTitle } from "./utils";
+
+async function resolveContentLockedAfterSale(
+  practiceId: string,
+): Promise<boolean> {
+  try {
+    const serviceSupabase = createServiceRoleClient();
+    const lock = await getPracticeSaleLock(serviceSupabase, practiceId);
+    return lock.locked;
+  } catch (error) {
+    console.error("practice_sale_lock_lookup_failed", practiceId, error);
+    throw new Error("sale_lock_lookup_failed");
+  }
+}
 
 export const AUDIO_ITEM_DETAIL_SELECT = `
   id,
@@ -127,9 +143,12 @@ export async function getAuthorProductDetail(
     throw new Error("audio_items_lookup_failed");
   }
 
+  const contentLockedAfterSale = await resolveContentLockedAfterSale(practiceId);
+
   return {
     practice: practice as PracticeRow,
     audio_items: (audioItems ?? []) as AudioItemRow[],
+    contentLockedAfterSale,
   };
 }
 
@@ -257,5 +276,6 @@ export async function createDraftProduct(
   return {
     practice: practice as PracticeRow,
     audio_items: [audioItem as AudioItemRow],
+    contentLockedAfterSale: false,
   };
 }

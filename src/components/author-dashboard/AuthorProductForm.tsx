@@ -324,6 +324,9 @@ export default function AuthorProductForm({
   const [topicError, setTopicError] = useState<string | undefined>(undefined);
   const [practiceId, setPracticeId] = useState(initialProduct?.practice.id ?? "");
   const practiceIdRef = useRef(initialProduct?.practice.id ?? "");
+  const [contentLockedAfterSale, setContentLockedAfterSale] = useState(
+    initialProduct?.contentLockedAfterSale === true,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -640,6 +643,7 @@ export default function AuthorProductForm({
     setAudioItems((current) =>
       mergeServerAudioItems(current, product.audio_items),
     );
+    setContentLockedAfterSale(product.contentLockedAfterSale === true);
   }
 
   function handleProductCoverUpdated({
@@ -1520,9 +1524,7 @@ export default function AuthorProductForm({
     }
 
     if (payload.product) {
-      setAudioItems((current) =>
-        mergeServerAudioItems(current, payload.product!.audio_items),
-      );
+      applyServerProductPreservingDraft(payload.product);
     }
   }
 
@@ -1591,6 +1593,7 @@ export default function AuthorProductForm({
       let payload: {
         product?: AuthorProductDetail;
         error?: string;
+        message?: string;
       } | null = null;
 
       if (text) {
@@ -1598,6 +1601,7 @@ export default function AuthorProductForm({
           payload = JSON.parse(text) as {
             product?: AuthorProductDetail;
             error?: string;
+            message?: string;
           };
         } catch {
           setAudioUploadErrors((current) => ({
@@ -1611,7 +1615,11 @@ export default function AuthorProductForm({
       if (!response.ok || !payload?.product) {
         setAudioUploadErrors((current) => ({
           ...current,
-          [audioId]: getAudioUploadErrorMessage(payload?.error, response.status),
+          [audioId]: getAudioUploadErrorMessage(
+            payload?.error,
+            response.status,
+            payload?.message,
+          ),
         }));
         return;
       }
@@ -1679,14 +1687,18 @@ export default function AuthorProductForm({
       );
 
       const text = await response.text();
-      let payload: { product?: AuthorProductDetail; error?: string } | null =
-        null;
+      let payload: {
+        product?: AuthorProductDetail;
+        error?: string;
+        message?: string;
+      } | null = null;
 
       if (text) {
         try {
           payload = JSON.parse(text) as {
             product?: AuthorProductDetail;
             error?: string;
+            message?: string;
           };
         } catch {
           setAudioUploadErrors((current) => ({
@@ -1700,7 +1712,14 @@ export default function AuthorProductForm({
       if (!response.ok || !payload?.product) {
         setAudioUploadErrors((current) => ({
           ...current,
-          [audioId]: "Не удалось удалить MP3.",
+          [audioId]:
+            payload?.message?.trim() ||
+            getAudioUploadErrorMessage(
+              payload?.error,
+              response.status,
+              payload?.message,
+            ) ||
+            "Не удалось удалить MP3.",
         }));
         return;
       }
@@ -1737,6 +1756,13 @@ export default function AuthorProductForm({
     <div className="min-w-0 space-y-8">
       {selectedAuthor ? (
         <AuthorAccessStatusBanner accessStatus={selectedAuthorAccessStatus} />
+      ) : null}
+
+      {contentLockedAfterSale ? (
+        <p className="rounded-[18px] border border-[#e4d7f4] bg-[#f8f4ff] px-4 py-3 text-sm text-[#5f5484]">
+          Этот продукт уже приобретён слушателями. Его можно снять с продажи или
+          переместить в архив, но удалить продукт или аудиоматериалы нельзя.
+        </p>
       ) : null}
 
       {message ? (
@@ -2403,38 +2429,40 @@ export default function AuthorProductForm({
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">
-                  <label
-                    className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
-                      uploadingAudioId === audioItem.id ||
-                      deletingAudioFileId === audioItem.id
-                        ? "cursor-not-allowed opacity-60"
-                        : "cursor-pointer"
-                    }`}
-                  >
-                    {uploadingAudioId === audioItem.id
-                      ? "Загрузка…"
-                      : audioItem.audio_path
-                        ? "Заменить MP3"
-                        : "Загрузить MP3"}
-                    <input
-                      type="file"
-                      accept="audio/mpeg,.mp3"
-                      className="hidden"
-                      disabled={
+                  {contentLockedAfterSale && audioItem.audio_path ? null : (
+                    <label
+                      className={`inline-flex rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white ${
                         uploadingAudioId === audioItem.id ||
                         deletingAudioFileId === audioItem.id
-                      }
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (file) {
-                          void uploadAudio(audioItem.id, file);
+                          ? "cursor-not-allowed opacity-60"
+                          : "cursor-pointer"
+                      }`}
+                    >
+                      {uploadingAudioId === audioItem.id
+                        ? "Загрузка…"
+                        : audioItem.audio_path
+                          ? "Заменить MP3"
+                          : "Загрузить MP3"}
+                      <input
+                        type="file"
+                        accept="audio/mpeg,.mp3"
+                        className="hidden"
+                        disabled={
+                          uploadingAudioId === audioItem.id ||
+                          deletingAudioFileId === audioItem.id
                         }
-                      }}
-                    />
-                  </label>
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) {
+                            void uploadAudio(audioItem.id, file);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
 
-                  {audioItem.audio_path ? (
+                  {audioItem.audio_path && !contentLockedAfterSale ? (
                     <button
                       type="button"
                       disabled={
@@ -2450,7 +2478,7 @@ export default function AuthorProductForm({
                     </button>
                   ) : null}
 
-                  {audioItems.length > 1 ? (
+                  {audioItems.length > 1 && !contentLockedAfterSale ? (
                     <button
                       type="button"
                       disabled={
@@ -2593,7 +2621,7 @@ export default function AuthorProductForm({
           </Link>
         ) : null}
 
-        {mode === "edit" && practiceId && isDraft ? (
+        {mode === "edit" && practiceId && isDraft && !contentLockedAfterSale ? (
           <button
             type="button"
             disabled={busy}

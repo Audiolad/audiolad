@@ -11,7 +11,14 @@ import {
 } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { syncPracticeAudioCompatibility } from "@/lib/author-products/publish";
+import {
+  PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
+  getPracticeSaleLock,
+  isProductContentLockedDbError,
+  saleLockConflictResponse,
+} from "@/lib/author-products/sale-lock";
 import { buildAudioItemStoragePath } from "@/lib/author-products/utils";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
@@ -36,6 +43,18 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (!audioItem?.id) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    const serviceSupabase = createServiceRoleClient();
+    const saleLock = await getPracticeSaleLock(serviceSupabase, id);
+
+    // Replacement (including same-path upsert) is forbidden after sale.
+    // First fill of a missing path remains allowed for recovery.
+    if (saleLock.locked && audioItem.audio_path) {
+      return NextResponse.json(
+        saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+        { status: 409 },
+      );
     }
 
     const formData = await request.formData();
@@ -96,6 +115,14 @@ export async function POST(request: Request, context: RouteContext) {
       .maybeSingle();
 
     if (updateError) {
+      if (isProductContentLockedDbError(updateError)) {
+        await supabase.storage.from("practice-audio").remove([storagePath]);
+        return NextResponse.json(
+          saleLockConflictResponse(PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE),
+          { status: 409 },
+        );
+      }
+
       console.error("author_audio_path_update_error", updateError.message);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }

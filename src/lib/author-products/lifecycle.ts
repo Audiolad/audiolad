@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  PRODUCT_CONTENT_LOCKED_AFTER_SALE,
+  PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE,
+  getPracticeSaleLock,
+} from "@/lib/author-products/sale-lock";
+import {
   removePracticeCoverFiles,
   removeTrackCoverFiles,
 } from "@/lib/author-products/utils";
@@ -11,7 +16,7 @@ export const STARTER_BUNDLE_BLOCKER_MESSAGE =
 export type ProductDeleteBlocker =
   | "published"
   | "starter_bundle"
-  | "has_entitlements"
+  | typeof PRODUCT_CONTENT_LOCKED_AFTER_SALE
   | "has_orders";
 
 export type ProductLifecycleBlocker =
@@ -69,19 +74,14 @@ export async function getProductLifecycleBlockers(
     blockers.push("starter_bundle", "active_starter_bundle");
   }
 
-  const { count: entitlementCount, error: entitlementError } = await supabase
-    .from("user_practices")
-    .select("id", { count: "exact", head: true })
-    .eq("practice_id", practiceId);
+  const saleLock = await getPracticeSaleLock(supabase, practiceId);
 
-  if (entitlementError) {
-    throw new Error("entitlement_lookup_failed");
+  if (saleLock.locked) {
+    blockers.push(PRODUCT_CONTENT_LOCKED_AFTER_SALE);
   }
 
-  if ((entitlementCount ?? 0) > 0) {
-    blockers.push("has_entitlements");
-  }
-
+  // Any order (including unpaid) blocks hard delete so storage cleanup cannot
+  // run before the orders FK RESTRICT rejects the practice delete.
   const { count: orderCount, error: orderError } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
@@ -91,7 +91,7 @@ export async function getProductLifecycleBlockers(
     throw new Error("orders_lookup_failed");
   }
 
-  if ((orderCount ?? 0) > 0) {
+  if ((orderCount ?? 0) > 0 && !saleLock.locked) {
     blockers.push("has_orders");
   }
 
@@ -138,8 +138,8 @@ export function getDeleteBlockerMessage(
     return STARTER_BUNDLE_BLOCKER_MESSAGE;
   }
 
-  if (blockers.includes("has_entitlements")) {
-    return "Нельзя удалить продукт: у пользователей уже есть доступ.";
+  if (blockers.includes(PRODUCT_CONTENT_LOCKED_AFTER_SALE)) {
+    return PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE;
   }
 
   if (blockers.includes("has_orders")) {
@@ -225,6 +225,13 @@ export async function deletePracticeProduct(
     .maybeSingle();
 
   if (deleteError) {
+    if (
+      typeof deleteError.message === "string" &&
+      deleteError.message.includes(PRODUCT_CONTENT_LOCKED_AFTER_SALE)
+    ) {
+      throw new Error(PRODUCT_CONTENT_LOCKED_AFTER_SALE);
+    }
+
     throw new Error("practice_delete_failed");
   }
 

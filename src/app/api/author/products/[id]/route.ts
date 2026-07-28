@@ -20,6 +20,7 @@ import {
   getDeleteBlockers,
   getProductLifecycleBlockers,
 } from "@/lib/author-products/lifecycle";
+import { PRODUCT_CONTENT_LOCKED_AFTER_SALE } from "@/lib/author-products/sale-lock";
 import {
   generateUniqueSlug,
   getAuthorProductDetail,
@@ -398,7 +399,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       if (
         code === "published" ||
         code === "starter_bundle" ||
-        code === "has_entitlements" ||
+        code === PRODUCT_CONTENT_LOCKED_AFTER_SALE ||
         code === "has_orders"
       ) {
         return NextResponse.json(

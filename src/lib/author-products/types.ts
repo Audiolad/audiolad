@@ -87,6 +87,8 @@ export type AuthorProductListItem = {
 export type AuthorProductDetail = {
   practice: PracticeRow;
   audio_items: AudioItemRow[];
+  /** True when entitlements or paid orders lock destructive content edits. */
+  contentLockedAfterSale: boolean;
 };
 
 export function getStatusLabel(status: string): string {
