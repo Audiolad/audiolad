@@ -3716,6 +3716,102 @@ assert(
   "money flow see-also includes fear-big-money",
 );
 
+
+const moneyThinkingArticle = getArticleBySlug("denezhnoe-myshlenie");
+assert(moneyThinkingArticle, "money-thinking article registered");
+assert(
+  moneyThinkingArticle.title ===
+    "Денежное мышление: что это такое и как оно проявляется в жизни",
+  "money-thinking H1",
+);
+assert(
+  moneyThinkingArticle.metaTitle ===
+    "Денежное мышление: что это такое и как оно влияет на отношение к деньгам | АудиоЛад",
+  "money-thinking SEO title",
+);
+assert(
+  moneyThinkingArticle.topicSlug === "besplatnye-meditatsii",
+  "money-thinking hub",
+);
+assert(
+  moneyThinkingArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "money-thinking practice",
+);
+assert(
+  moneyThinkingArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "money-thinking practice intro",
+);
+assert(
+  moneyThinkingArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует роста дохода"),
+    ),
+  "money-thinking practice disclaimer",
+);
+assert(
+  moneyThinkingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "money-thinking links to money-beliefs",
+);
+assert(
+  moneyThinkingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "money-thinking links to fear-big-money",
+);
+assert(
+  listArticleSlugs().includes("denezhnoe-myshlenie"),
+  "money-thinking in slug list",
+);
+assert(
+  !moneyThinkingArticle.metaTitle.includes("—"),
+  "money-thinking uses medium dash",
+);
+assert(
+  moneyBeliefsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "money-beliefs see-also includes money-thinking",
+);
+assert(
+  changeMoneyAttitudeArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "change money attitude see-also includes money-thinking",
+);
+assert(
+  moneyFlowArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ) ||
+    moneyFlowArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/denezhnoe-myshlenie",
+    ),
+  "money flow reverse-links to money-thinking",
+);
+assert(
+  fearBigMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "fear-big-money see-also includes money-thinking",
+);
+assert(
+  acceptMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "accept-money see-also includes money-thinking",
+);
+assert(
+  fearSpendOnSelfArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "fear-spend-on-self see-also includes money-thinking",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

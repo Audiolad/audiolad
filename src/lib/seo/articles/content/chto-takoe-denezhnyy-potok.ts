@@ -179,6 +179,14 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     },
     {
       before:
+        "Если важно спокойно разобрать, что обычно понимают под денежным мышлением и как оно проявляется в повседневных финансовых решениях, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Денежное мышление: что это такое и как оно проявляется в жизни»",
+      href: "/articles/denezhnoe-myshlenie",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, может быть полезна и статья ",
       linkLabel:
         "«Бесплатные медитации онлайн: как выбрать практику, которая действительно поможет»",
@@ -201,6 +209,11 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       href: "/topics/meditatsii-na-dengi",
       title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/denezhnoe-myshlenie",
+      title: "Денежное мышление",
+      description: "Привычный способ воспринимать деньги и финансовые решения",
     },
     {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
@@ -238,5 +251,5 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T12:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

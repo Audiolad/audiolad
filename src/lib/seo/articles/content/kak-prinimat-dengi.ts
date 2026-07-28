@@ -593,6 +593,11 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/denezhnoe-myshlenie",
+      title: "Денежное мышление",
+      description: "Привычный способ воспринимать деньги и финансовые решения",
+    },
+    {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
       title: "Как женщине разрешить себе деньги",
       description: "Внутреннее разрешение принимать оплату и желания",
@@ -632,5 +637,5 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T12:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

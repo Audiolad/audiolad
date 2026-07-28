@@ -703,6 +703,11 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/denezhnoe-myshlenie",
+      title: "Денежное мышление",
+      description: "Привычный способ воспринимать деньги и финансовые решения",
+    },
+    {
       href: "/articles/denezhnye-ustanovki",
       title: "Денежные установки",
       description: "Убеждения и правила, влияющие на отношение к деньгам",
@@ -743,5 +748,5 @@ export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

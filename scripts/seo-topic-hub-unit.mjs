@@ -336,6 +336,12 @@ assert(
   "free hub includes fear-big-money SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "denezhnoe-myshlenie",
+  ),
+  "free hub includes money-thinking SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

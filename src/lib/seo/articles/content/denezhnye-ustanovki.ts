@@ -580,6 +580,11 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/denezhnoe-myshlenie",
+      title: "Денежное мышление",
+      description: "Привычный способ воспринимать деньги и финансовые решения",
+    },
+    {
       href: "/articles/chto-takoe-denezhnyy-potok",
       title: "Что такое денежный поток",
       description: "Осознанное отношение к доходам, расходам и решениям",
@@ -615,5 +620,5 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T12:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
