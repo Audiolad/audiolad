@@ -198,6 +198,26 @@ export default function AuthorDashboardClient({
         authorSlug={selectedAuthor.slug}
       />
 
+      <section className="mt-4 rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-semibold text-[#25135c]">
+              Возможности для авторов
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-[#5f5484]">
+              Узнайте, как связать продукты, промостраницы, рекламные кампании и
+              статистику в понятный путь продвижения.
+            </p>
+          </div>
+          <Link
+            href={`/author-dashboard/opportunities?author=${encodeURIComponent(selectedAuthor.slug)}`}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white"
+          >
+            Посмотреть возможности
+          </Link>
+        </div>
+      </section>
+
       <AuthorOnboardingChecklist
         key={selectedAuthor.id}
         authorId={selectedAuthor.id}

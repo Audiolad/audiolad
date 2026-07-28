@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -572,6 +573,15 @@ export default function AuthorPromotionClient({
             >
               Создать кампанию
             </button>
+            <p className="mt-4 text-sm text-[#7d70a2]">
+              Не знаете, с чего начать?{" "}
+              <Link
+                href={`/author-dashboard/opportunities?author=${encodeURIComponent(selectedAuthor.slug)}`}
+                className="font-semibold text-[#7042c5] underline-offset-2 hover:underline"
+              >
+                Посмотрите готовые сценарии продвижения.
+              </Link>
+            </p>
           </div>
         ) : null}
 
