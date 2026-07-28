@@ -231,6 +231,14 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
         { text: "." },
       ],
     },
+    {
+      before:
+        "Если изменение отношения к деньгам связано с привычкой ожидать недостатка и желанием вернуть ощущение опоры, может быть полезна статья ",
+      linkLabel:
+        "«Как выйти из состояния нехватки и вернуть ощущение опоры»",
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      after: ".",
+    },
   ],
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
@@ -305,6 +313,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       title: "Плейлист «Денежный Поток»",
       description: "Бесплатные практики о деньгах для последовательного слушания",
     },
+    {
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      title: "Как выйти из состояния нехватки",
+      description: "Объективная нехватка и привычка ожидать потерь",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -315,5 +328,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T22:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

@@ -714,6 +714,14 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     },
     {
       before:
+        "Если финансовая тревога переплетается с постоянным ощущением, что ресурсов недостаточно, даже когда часть потребностей покрыта, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как выйти из состояния нехватки и вернуть ощущение опоры»",
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -774,6 +782,11 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
       title: "Страх тратить деньги на себя",
       description: "Тревога перед личными расходами",
     },
+    {
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      title: "Как выйти из состояния нехватки",
+      description: "Объективная нехватка и привычка ожидать потерь",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -785,5 +798,5 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T22:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

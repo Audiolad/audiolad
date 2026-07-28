@@ -4141,6 +4141,108 @@ assert(
   "money-thinking reverse-links to new-income-sources",
 );
 
+const scarcityStateArticle = getArticleBySlug(
+  "kak-vyyti-iz-sostoyaniya-nehvatki",
+);
+assert(scarcityStateArticle, "scarcity-state article registered");
+assert(
+  scarcityStateArticle.title ===
+    "Как выйти из состояния нехватки и вернуть ощущение опоры",
+  "scarcity-state H1",
+);
+assert(
+  scarcityStateArticle.metaTitle ===
+    "Как выйти из состояния нехватки и вернуть ощущение опоры | АудиоЛад",
+  "scarcity-state SEO title",
+);
+assert(
+  scarcityStateArticle.topicSlug === "besplatnye-meditatsii",
+  "scarcity-state hub",
+);
+assert(
+  scarcityStateArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "scarcity-state practice",
+);
+assert(
+  scarcityStateArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "scarcity-state practice intro",
+);
+assert(
+  scarcityStateArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует увеличение дохода"),
+    ),
+  "scarcity-state practice disclaimer",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-voyti-v-sostoyanie-izobiliya",
+  "scarcity-state priority link to abundance-state",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "scarcity-state links to money-worry",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "scarcity-state links to money-thinking",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/strah-tratit-dengi-na-sebya",
+  ),
+  "scarcity-state links to fear-spend",
+);
+assert(
+  listArticleSlugs().includes("kak-vyyti-iz-sostoyaniya-nehvatki"),
+  "scarcity-state in slug list",
+);
+assert(
+  !scarcityStateArticle.metaTitle.includes("—"),
+  "scarcity-state uses medium dash",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ) ||
+    abundanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+    ),
+  "abundance reverse-links to scarcity-state",
+);
+assert(
+  moneyWorryArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ) ||
+    moneyWorryArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+    ),
+  "money-worry reverse-links to scarcity-state",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ) ||
+    moneyThinkingArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+    ),
+  "money-thinking reverse-links to scarcity-state",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ) ||
+    fearSpendOnSelfArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+    ),
+  "fear-spend reverse-links to scarcity-state",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

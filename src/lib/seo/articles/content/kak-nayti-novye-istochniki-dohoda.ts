@@ -1217,6 +1217,14 @@ export const KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE = {
     },
     {
       before:
+        "Если поиск нового дохода связан с ощущением постоянной нехватки возможностей и ресурсов, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как выйти из состояния нехватки и вернуть ощущение опоры»",
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -1261,6 +1269,11 @@ export const KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE = {
       href: "/articles/kak-izmenit-otnoshenie-k-dengam",
       title: "Как изменить отношение к деньгам",
       description: "Финансовые убеждения и привычные реакции",
+    },
+    {
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      title: "Как выйти из состояния нехватки",
+      description: "Объективная нехватка и привычка ожидать потерь",
     },
   ],
   closingSection: {

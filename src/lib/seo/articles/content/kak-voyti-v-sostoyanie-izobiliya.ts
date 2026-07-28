@@ -196,6 +196,14 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
       href: "/articles/meditatsiya-na-izobilie",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, чем объективная нехватка ресурсов отличается от привычки ожидать потерь и как вернуть ощущение опоры через факты и управляемые шаги, можно прочитать статью ",
+      linkLabel:
+        "«Как выйти из состояния нехватки и вернуть ощущение опоры»",
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      after: ".",
+    },
   ],
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
@@ -215,6 +223,11 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
       title: "Бесплатные медитации",
       description: "Практики, которые можно слушать без оплаты",
     },
+    {
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      title: "Как выйти из состояния нехватки",
+      description: "Объективная нехватка и привычка ожидать потерь",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -226,5 +239,5 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-25T14:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

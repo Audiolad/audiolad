@@ -420,6 +420,14 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     },
     {
       before:
+        "Если страх расходов связан не только с тратами на себя, но и с более широким ощущением нехватки, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как выйти из состояния нехватки и вернуть ощущение опоры»",
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -479,6 +487,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       title: "Как перестать бояться больших денег",
       description: "Тревога перед крупными суммами и ростом дохода",
     },
+    {
+      href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      title: "Как выйти из состояния нехватки",
+      description: "Объективная нехватка и привычка ожидать потерь",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -489,5 +502,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T18:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;
