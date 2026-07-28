@@ -565,6 +565,14 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
     },
     {
       before:
+        "Если семейные установки хочется рассмотреть в более широком контексте темы «женщина и деньги», отдельно можно прочитать статью ",
+      linkLabel:
+        "«Женщина и деньги: психология отношения к финансам и финансовым решениям»",
+      href: "/articles/zhenshchina-i-dengi-psihologiya",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -640,5 +648,5 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T22:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

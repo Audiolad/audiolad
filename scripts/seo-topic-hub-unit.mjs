@@ -390,6 +390,12 @@ assert(
   "free hub includes age-acceptance SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "zhenshchina-i-dengi-psihologiya",
+  ),
+  "free hub includes woman-money-psychology SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

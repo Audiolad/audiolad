@@ -730,6 +730,14 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     },
     {
       before:
+        "Если финансовая тревога связана с более широким взглядом на психологию отношения женщины к деньгам, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Женщина и деньги: психология отношения к финансам и финансовым решениям»",
+      href: "/articles/zhenshchina-i-dengi-psihologiya",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -811,5 +819,5 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;

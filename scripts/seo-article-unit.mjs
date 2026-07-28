@@ -4993,6 +4993,127 @@ assert(
   "scarcity-state reverse-links to age-acceptance",
 );
 
+const womanMoneyPsychologyArticle = getArticleBySlug(
+  "zhenshchina-i-dengi-psihologiya",
+);
+assert(womanMoneyPsychologyArticle, "woman-money-psychology article registered");
+assert(
+  womanMoneyPsychologyArticle.title ===
+    "Женщина и деньги: психология отношения к финансам и финансовым решениям",
+  "woman-money-psychology H1",
+);
+assert(
+  womanMoneyPsychologyArticle.breadcrumbTitle === "Женщина и деньги",
+  "woman-money-psychology breadcrumb",
+);
+assert(
+  womanMoneyPsychologyArticle.metaTitle ===
+    "Женщина и деньги – психология отношения к финансам | АудиоЛад",
+  "woman-money-psychology SEO title",
+);
+assert(
+  womanMoneyPsychologyArticle.topicSlug === "besplatnye-meditatsii",
+  "woman-money-psychology free hub",
+);
+assert(
+  womanMoneyPsychologyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
+  "woman-money-psychology practice zhenskie-dengi",
+);
+assert(
+  womanMoneyPsychologyArticle.primaryPracticeIntro.includes("Женские деньги"),
+  "woman-money-psychology practice intro",
+);
+assert(
+  womanMoneyPsychologyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не увеличивает доход автоматически"),
+    ),
+  "woman-money-psychology practice disclaimer",
+);
+assert(
+  womanMoneyPsychologyArticle.brandNote?.includes("финансовую грамотность"),
+  "woman-money-psychology brand note",
+);
+assert(womanMoneyPsychologyArticle.faq.length === 4, "woman-money-psychology faq count");
+assert(
+  womanMoneyPsychologyArticle.faq[0]?.question.startsWith("### "),
+  "woman-money-psychology faq first question uses ### prefix",
+);
+assert(
+  womanMoneyPsychologyArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/denezhnoe-myshlenie",
+  "woman-money-psychology priority link to money-thinking",
+);
+assert(
+  womanMoneyPsychologyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "woman-money-psychology links to money-beliefs",
+);
+assert(
+  womanMoneyPsychologyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "woman-money-psychology links to accept-money",
+);
+assert(
+  womanMoneyPsychologyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "woman-money-psychology see-also includes hub",
+);
+assert(
+  listArticleSlugs().includes("zhenshchina-i-dengi-psihologiya"),
+  "woman-money-psychology in slug list",
+);
+assert(
+  !JSON.stringify(womanMoneyPsychologyArticle).includes("—"),
+  "woman-money-psychology uses medium dash not em dash",
+);
+assert(
+  moneyThinkingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "money-thinking reverse-links to woman-money-psychology",
+);
+assert(
+  getArticleBySlug("denezhnye-ustanovki")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "money-beliefs reverse-links to woman-money-psychology",
+);
+assert(
+  getArticleBySlug("kak-izmenit-otnoshenie-k-dengam")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "change-money-attitude reverse-links to woman-money-psychology",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "fear-spend reverse-links to woman-money-psychology",
+);
+assert(
+  acceptMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "accept-money reverse-links to woman-money-psychology",
+);
+assert(
+  moneyWorryArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "money-worry reverse-links to woman-money-psychology",
+);
+assert(
+  getArticleBySlug("kak-perestat-ekonomit-na-sebe")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
+  ),
+  "stop-saving-on-self reverse-links to woman-money-psychology",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

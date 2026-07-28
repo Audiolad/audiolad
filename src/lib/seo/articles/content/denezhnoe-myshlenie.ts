@@ -704,6 +704,14 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     },
     {
       before:
+        "Если тема «женщина и деньги» интересует в более широком психологическом контексте без стереотипов, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Женщина и деньги: психология отношения к финансам и финансовым решениям»",
+      href: "/articles/zhenshchina-i-dengi-psihologiya",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -790,5 +798,5 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
