@@ -15,6 +15,8 @@ type Props = {
   authorSlug: string;
   status: AuthorTermsStatusView;
   mode: "first" | "updated";
+  /** `card` — standalone block; `embedded` — controls only inside a parent card. */
+  variant?: "card" | "embedded";
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -40,6 +42,7 @@ export default function AuthorTermsAcceptPanel({
   authorSlug,
   status,
   mode,
+  variant = "card",
 }: Props) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
@@ -48,6 +51,7 @@ export default function AuthorTermsAcceptPanel({
   const [success, setSuccess] = useState(false);
 
   const version = status.currentVersion;
+  const embedded = variant === "embedded";
   const checkboxLabel =
     mode === "updated"
       ? AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED
@@ -60,10 +64,16 @@ export default function AuthorTermsAcceptPanel({
     mode === "updated"
       ? "Для продолжения коммерческой деятельности необходимо ознакомиться с новой редакцией и принять её."
       : "Для публикации продуктов и получения авторского вознаграждения необходимо ознакомиться с Авторскими условиями сотрудничества платформы «АудиоЛад» и принять их.";
-  const openLabel =
-    mode === "updated" ? "Посмотреть новую редакцию" : "Открыть Авторские условия";
-  const submitLabel =
-    mode === "updated" ? "Принять новую редакцию" : "Принять и продолжить";
+  const openLabel = embedded
+    ? "Открыть документ"
+    : mode === "updated"
+      ? "Посмотреть новую редакцию"
+      : "Открыть Авторские условия";
+  const submitLabel = embedded
+    ? "Принять и продолжить"
+    : mode === "updated"
+      ? "Принять новую редакцию"
+      : "Принять и продолжить";
 
   async function onSubmit() {
     if (!checked || pending || !status.canAccept) {
@@ -105,21 +115,8 @@ export default function AuthorTermsAcceptPanel({
     }
   }
 
-  return (
-    <section className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-6 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
-      <h2 className="text-[22px] font-semibold text-[#25135c]">{title}</h2>
-      <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">{lead}</p>
-
-      {version ? (
-        <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-          Версия: {version.version}
-          <br />
-          Дата публикации: {formatDate(version.publishedAt)}
-          <br />
-          Дата вступления в силу: {formatDate(version.effectiveAt)}
-        </p>
-      ) : null}
-
+  const controls = (
+    <>
       <div className="mt-5">
         <Link
           href="/author-terms"
@@ -164,6 +161,29 @@ export default function AuthorTermsAcceptPanel({
         <p className="mt-4 text-sm font-semibold text-[#2f7a4b]">Условия приняты</p>
       ) : null}
       {error ? <p className="mt-4 text-sm text-[#b42318]">{error}</p> : null}
+    </>
+  );
+
+  if (embedded) {
+    return <div>{controls}</div>;
+  }
+
+  return (
+    <section className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-6 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
+      <h2 className="text-[22px] font-semibold text-[#25135c]">{title}</h2>
+      <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">{lead}</p>
+
+      {version ? (
+        <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
+          Версия: {version.version}
+          <br />
+          Дата публикации: {formatDate(version.publishedAt)}
+          <br />
+          Дата вступления в силу: {formatDate(version.effectiveAt)}
+        </p>
+      ) : null}
+
+      {controls}
 
       <p className="mt-6 text-sm text-[#8c7dab]">
         <Link

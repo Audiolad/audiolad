@@ -229,6 +229,39 @@ const panel = readFileSync(
 assert.ok(panel.includes("disabled={!checked || pending || success || !status.canAccept}"));
 assert.ok(panel.includes("acknowledged: true"));
 assert.ok(panel.includes("Условия приняты"));
+assert.ok(panel.includes('variant?: "card" | "embedded"'));
+assert.ok(panel.includes('variant = "card"'));
+assert.ok(panel.includes("embedded"));
+
+const legalPage = readFileSync(
+  path.join(root, "src/app/author-dashboard/legal/page.tsx"),
+  "utf8",
+);
+assert.ok(legalPage.includes("AuthorLegalTermsCard"));
+assert.ok(!legalPage.includes("AuthorTermsAcceptPanel"));
+
+const legalCard = readFileSync(
+  path.join(
+    root,
+    "src/components/author-dashboard/AuthorLegalTermsCard.tsx",
+  ),
+  "utf8",
+);
+assert.ok(legalCard.includes('variant="embedded"'));
+assert.equal(
+  (
+    legalCard.match(
+      /Авторские условия сотрудничества платформы «АудиоЛад»/g,
+    ) || []
+  ).length,
+  1,
+);
+assert.ok(legalCard.includes("Требуется принятие"));
+assert.ok(legalCard.includes("Принято"));
+assert.ok(legalCard.includes("Дата вступления в силу"));
+assert.ok(legalCard.includes("Открыть документ"));
+assert.ok(!legalCard.includes("Юридические документы"));
+assert.equal((legalCard.match(/<section /g) || []).length, 1);
 
 const unpublish = readFileSync(
   path.join(root, "src/app/api/author/products/[id]/unpublish/route.ts"),
