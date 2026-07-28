@@ -187,6 +187,14 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, как связаны благодарность и изобилие и как замечать опоры без отрицания трудностей, может быть полезна статья ",
+      linkLabel:
+        "«Благодарность и изобилие: как замечать опоры, не отрицая трудности»",
+      href: "/articles/blagodarnost-i-izobilie",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, может быть полезна и статья ",
       linkLabel:
         "«Бесплатные медитации онлайн: как выбрать практику, которая действительно поможет»",
@@ -255,6 +263,11 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       title: "Плейлист «Денежный Поток»",
       description: "Бесплатные практики о деньгах для последовательного слушания",
     },
+    {
+      href: "/articles/blagodarnost-i-izobilie",
+      title: "Благодарность и изобилие",
+      description: "Замечать опоры без отрицания трудностей",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -266,5 +279,5 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T20:00:00.000Z",
+  updatedAt: "2026-07-28T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

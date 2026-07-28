@@ -4243,6 +4243,91 @@ assert(
   "fear-spend reverse-links to scarcity-state",
 );
 
+const gratitudeAbundanceArticle = getArticleBySlug("blagodarnost-i-izobilie");
+assert(gratitudeAbundanceArticle, "gratitude-abundance article registered");
+assert(
+  gratitudeAbundanceArticle.title ===
+    "Благодарность и изобилие: как замечать опоры, не отрицая трудности",
+  "gratitude-abundance H1",
+);
+assert(
+  gratitudeAbundanceArticle.metaTitle ===
+    "Благодарность и изобилие – как замечать опоры без самообмана | АудиоЛад",
+  "gratitude-abundance SEO title",
+);
+assert(
+  gratitudeAbundanceArticle.topicSlug === "besplatnye-meditatsii",
+  "gratitude-abundance hub",
+);
+assert(
+  gratitudeAbundanceArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "gratitude-abundance practice",
+);
+assert(
+  gratitudeAbundanceArticle.primaryPracticeIntro.includes("Ключ к Изобилию"),
+  "gratitude-abundance practice intro",
+);
+assert(
+  gratitudeAbundanceArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует деньги"),
+    ),
+  "gratitude-abundance practice disclaimer",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-voyti-v-sostoyanie-izobiliya",
+  "gratitude-abundance priority link to abundance-state",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ),
+  "gratitude-abundance links to scarcity-state",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "gratitude-abundance links to money-worry",
+);
+assert(
+  listArticleSlugs().includes("blagodarnost-i-izobilie"),
+  "gratitude-abundance in slug list",
+);
+assert(
+  !gratitudeAbundanceArticle.metaTitle.includes("—"),
+  "gratitude-abundance uses medium dash",
+);
+assert(
+  abundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/blagodarnost-i-izobilie",
+  ) ||
+    abundanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/blagodarnost-i-izobilie",
+    ),
+  "abundance reverse-links to gratitude-abundance",
+);
+assert(
+  scarcityStateArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/blagodarnost-i-izobilie",
+  ) ||
+    scarcityStateArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/blagodarnost-i-izobilie",
+    ),
+  "scarcity-state reverse-links to gratitude-abundance",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/blagodarnost-i-izobilie",
+  ) ||
+    moneyThinkingArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/blagodarnost-i-izobilie",
+    ),
+  "money-thinking reverse-links to gratitude-abundance",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

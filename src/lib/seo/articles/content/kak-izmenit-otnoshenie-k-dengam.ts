@@ -239,6 +239,14 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, как связаны благодарность и изобилие и как замечать опоры без отрицания трудностей, может быть полезна статья ",
+      linkLabel:
+        "«Благодарность и изобилие: как замечать опоры, не отрицая трудности»",
+      href: "/articles/blagodarnost-i-izobilie",
+      after: ".",
+    },
   ],
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
@@ -317,6 +325,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
       title: "Как выйти из состояния нехватки",
       description: "Объективная нехватка и привычка ожидать потерь",
+    },
+    {
+      href: "/articles/blagodarnost-i-izobilie",
+      title: "Благодарность и изобилие",
+      description: "Замечать опоры без отрицания трудностей",
     },
   ],
   closingSection: {

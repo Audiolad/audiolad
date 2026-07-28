@@ -1208,6 +1208,14 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, как связаны благодарность и изобилие и как замечать опоры без отрицания трудностей, можно прочитать статью ",
+      linkLabel:
+        "«Благодарность и изобилие: как замечать опоры, не отрицая трудности»",
+      href: "/articles/blagodarnost-i-izobilie",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -1262,6 +1270,11 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
       href: "/articles/strah-tratit-dengi-na-sebya",
       title: "Страх тратить деньги на себя",
       description: "Тревога перед личными расходами",
+    },
+    {
+      href: "/articles/blagodarnost-i-izobilie",
+      title: "Благодарность и изобилие",
+      description: "Замечать опоры без отрицания трудностей",
     },
   ],
   closingSection: {

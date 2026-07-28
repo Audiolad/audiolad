@@ -722,6 +722,14 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     },
     {
       before:
+        "Если финансовая тревога переплетается с желанием замечать доступные опоры и ресурсы без отрицания трудностей, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Благодарность и изобилие: как замечать опоры, не отрицая трудности»",
+      href: "/articles/blagodarnost-i-izobilie",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -786,6 +794,11 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
       title: "Как выйти из состояния нехватки",
       description: "Объективная нехватка и привычка ожидать потерь",
+    },
+    {
+      href: "/articles/blagodarnost-i-izobilie",
+      title: "Благодарность и изобилие",
+      description: "Замечать опоры без отрицания трудностей",
     },
   ],
   closingSection: {

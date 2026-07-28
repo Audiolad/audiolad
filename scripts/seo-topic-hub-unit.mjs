@@ -372,6 +372,12 @@ assert(
   "free hub includes scarcity-state SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "blagodarnost-i-izobilie",
+  ),
+  "free hub includes gratitude-abundance SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

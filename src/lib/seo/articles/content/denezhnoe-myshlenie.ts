@@ -696,6 +696,14 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     },
     {
       before:
+        "Если привычный способ думать о деньгах связан с желанием замечать доступные опоры и ресурсы без отрицания трудностей, может быть полезна статья ",
+      linkLabel:
+        "«Благодарность и изобилие: как замечать опоры, не отрицая трудности»",
+      href: "/articles/blagodarnost-i-izobilie",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -765,6 +773,11 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
       title: "Как выйти из состояния нехватки",
       description: "Объективная нехватка и привычка ожидать потерь",
+    },
+    {
+      href: "/articles/blagodarnost-i-izobilie",
+      title: "Благодарность и изобилие",
+      description: "Замечать опоры без отрицания трудностей",
     },
   ],
   closingSection: {
