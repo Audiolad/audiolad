@@ -68,7 +68,7 @@ main() {
 
   ensure_dirs
   acquire_deploy_lock
-  prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
+  # Retention/cleanup runs only after successful health-watch (never mid-deploy).
   check_disk_space 2048
 
   if [[ ! -f "$DEPLOY_ROOT/shared/.env.production" ]]; then
@@ -93,6 +93,7 @@ main() {
   local FULL_COMMIT="$DEPLOY_FULL_COMMIT"
   RELEASE_NAME="$(get_release_name "$FULL_COMMIT")"
   RELEASE_DIR="$DEPLOY_ROOT/releases/$RELEASE_NAME"
+  export CANDIDATE_RELEASE_DIR="$RELEASE_DIR"
   local candidate_port="$STANDBY_PORT"
   local candidate_app
   candidate_app="$(pm2_app_for_port "$candidate_port")"
@@ -105,6 +106,9 @@ main() {
   log_info "candidate_build_started release=${RELEASE_NAME} commit=${FULL_COMMIT}"
   log_info "Creating release $RELEASE_NAME from commit $FULL_COMMIT"
   mkdir -p "$RELEASE_DIR"
+  # Protect in-flight candidate from any retention/cleanup until deploy finishes.
+  printf 'started_at=%s\ncommit=%s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$FULL_COMMIT" \
+    >"$RELEASE_DIR/.deploy-inflight"
 
   git -C "$GIT_WORKDIR" archive "$FULL_COMMIT" | tar -x -C "$RELEASE_DIR"
   ln -sfn "$DEPLOY_ROOT/shared/.env.production" "$RELEASE_DIR/.env.local"
@@ -115,14 +119,16 @@ main() {
   npm run lint
   npm run build
 
-  if [[ ! -f ".next/BUILD_ID" ]]; then
-    log_error "Build failed: .next/BUILD_ID missing"
+  if [[ ! -f "$RELEASE_DIR/.next/BUILD_ID" ]]; then
+    log_error "Build failed: .next/BUILD_ID missing stage=after_build path=$RELEASE_DIR/.next/BUILD_ID"
     exit 1
   fi
 
   EXPECTED_BUILD_ID="$(read_build_id "$RELEASE_DIR")"
   log_info "candidate_build_passed release=${RELEASE_NAME} buildId=${EXPECTED_BUILD_ID}"
   log_info "Active production remains on port ${OLD_ACTIVE_PORT} app=${OLD_ACTIVE_PM2_APP}"
+  # Leave release tree before any destructive cleanup/rollback paths.
+  cd "$DEPLOY_ROOT"
 
   if ! start_release_on_port "$RELEASE_DIR" "$candidate_port" "$candidate_app"; then
     log_error "Failed to start candidate process"
@@ -150,6 +156,15 @@ main() {
     exit 1
   fi
 
+  if [[ ! -f "$RELEASE_DIR/.next/BUILD_ID" ]]; then
+    log_error "BUILD_ID missing before cutover stage=pre_cutover path=$RELEASE_DIR/.next/BUILD_ID"
+    exit 1
+  fi
+  if [[ "$(read_build_id "$RELEASE_DIR")" != "$EXPECTED_BUILD_ID" ]]; then
+    log_error "BUILD_ID changed before cutover stage=pre_cutover"
+    exit 1
+  fi
+
   local old_current=""
   if [[ -L "$DEPLOY_ROOT/current" ]]; then
     old_current="$(readlink -f "$DEPLOY_ROOT/current")"
@@ -160,6 +175,15 @@ main() {
   atomic_symlink "$RELEASE_DIR" "$DEPLOY_ROOT/current"
   log_info "Current release symlink switched to $RELEASE_DIR (Nginx still on port ${OLD_ACTIVE_PORT})"
 
+  if [[ ! -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then
+    log_error "BUILD_ID missing immediately after symlink cutover stage=post_cutover_symlink"
+    if [[ -n "$old_current" && -d "$old_current" ]]; then
+      atomic_symlink "$old_current" "$DEPLOY_ROOT/current"
+      log_warn "Restored current symlink after BUILD_ID loss at post_cutover_symlink"
+    fi
+    exit 1
+  fi
+
   printf '%s\n' "$FULL_COMMIT" > "$RELEASE_DIR/.deploy-commit"
   write_deploy_metadata \
     "$RELEASE_DIR" \
@@ -167,7 +191,6 @@ main() {
     "$DEPLOY_CANONICAL_HEAD" \
     "$DEPLOY_OVERRIDE_FLAG" \
     "$DEPLOY_OVERRIDE_REASON"
-
   log_info "Capturing PM2 baseline of active production before cutover"
   if ! pm2 jlist 2>/dev/null | node "$SCRIPT_DIR/lib/pm2-health.mjs" snapshot --app "$OLD_ACTIVE_PM2_APP" >"$RELEASE_DIR/.pm2-health-baseline.json"; then
     # First migration may still use legacy name while port apps exist.
@@ -198,6 +221,12 @@ main() {
     log_warn "Could not refresh PM2 baseline for candidate app; keeping previous snapshot"
   fi
 
+  if [[ ! -f "$RELEASE_DIR/.next/BUILD_ID" ]]; then
+    log_error "BUILD_ID missing after nginx cutover stage=post_cutover path=$RELEASE_DIR/.next/BUILD_ID"
+    AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "BUILD_ID missing after cutover"
+    exit 1
+  fi
+
   log_info "Waiting for public readiness with buildId=${EXPECTED_BUILD_ID}"
   if ! wait_for_production_readiness "$PUBLIC_BASE_URL" "$EXPECTED_BUILD_ID" 40 2 "public"; then
     log_error "public_smoke_failed (readiness) release=${RELEASE_NAME}"
@@ -217,6 +246,7 @@ main() {
   export PM2_HEALTH_BASELINE_FILE="$RELEASE_DIR/.pm2-health-baseline.json"
   export PM2_APP_NAME="$candidate_app"
   export PRODUCTION_PORT="$candidate_port"
+  export EXPECTED_BUILD_ID
   if ! "$SCRIPT_DIR/health-watch.sh" --post-deploy; then
     log_error "Post-deploy health watch failed"
     AUDIOLAD_DEPLOY_LOCK_HELD=1 "$SCRIPT_DIR/rollback.sh" "health watch failed after deploy"
@@ -227,6 +257,8 @@ main() {
   stop_pm2_app_safe "$OLD_ACTIVE_PM2_APP" "$OLD_ACTIVE_PORT"
   pm2 save
 
+  rm -f "$RELEASE_DIR/.deploy-inflight"
+  unset CANDIDATE_RELEASE_DIR
   prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"
   log_info "deploy_succeeded release=${RELEASE_NAME} commit=${FULL_COMMIT} buildId=${EXPECTED_BUILD_ID} port=${candidate_port} app=${candidate_app}"
   log_info "Deploy completed successfully: $RELEASE_NAME"

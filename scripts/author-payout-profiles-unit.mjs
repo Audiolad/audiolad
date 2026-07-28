@@ -16,16 +16,21 @@ import {
 } from "../src/lib/author-payout-profiles/encryption.ts";
 import {
   buildAuthorPayoutProfileMasks,
+  buildStoredRequisitesPresence,
   formatPayoutRequisitesSummary,
   maskBankAccount,
   maskCardNumber,
   maskInn,
   maskPhone,
+  redactPaymentSecretsForBrowser,
+  responseLooksLikeItContainsPaymentSecret,
 } from "../src/lib/author-payout-profiles/masking.ts";
 import { isPayoutProfilesEnabled } from "../src/lib/author-payout-profiles/feature.ts";
 import {
   formValuesToSensitivePayload,
+  mergeSensitivePayloadPreservingSecrets,
   parseSensitivePayload,
+  sensitivePayloadToFormValues,
   serializeSensitivePayload,
 } from "../src/lib/author-payout-profiles/payload.ts";
 import {
@@ -399,6 +404,146 @@ function testMasksAndGates() {
   assert.equal(isPayoutProfilesEnabled({ PAYOUT_PROFILES_ENABLED: "true" }), true);
 }
 
+function testBrowserHardening() {
+  const syntheticCard = "4111111111111111";
+  const syntheticAccount = "40817810099910004312";
+  const syntheticCorr = "30101810400000000225";
+
+  const payload = {
+    payout_method: "card",
+    legal_name: null,
+    first_name: "Иван",
+    last_name: "Иванов",
+    middle_name: null,
+    inn: makeValidInn(),
+    ogrnip: null,
+    email: "a@example.com",
+    phone: "+79991234567",
+    card_number: syntheticCard,
+    bank_account: syntheticAccount,
+    bank_bik: "044525225",
+    bank_name: "Тест Банк",
+    bank_correspondent_account: syntheticCorr,
+    registration_address: null,
+    tax_residency_note: null,
+  };
+
+  const draftRedacted = redactPaymentSecretsForBrowser(payload);
+  assert.equal(draftRedacted.card_number, null);
+  assert.equal(draftRedacted.bank_account, null);
+  assert.equal(draftRedacted.bank_correspondent_account, null);
+  assert.equal(draftRedacted.first_name, "Иван");
+  assert.equal(draftRedacted.bank_bik, "044525225");
+
+  const draftJson = JSON.stringify({
+    status: "draft",
+    fields: draftRedacted,
+    requisites: buildStoredRequisitesPresence({
+      payout_method: "card",
+      account_last4: "1111",
+    }),
+  });
+  assert.equal(
+    responseLooksLikeItContainsPaymentSecret(draftJson, [
+      syntheticCard,
+      syntheticAccount,
+      syntheticCorr,
+    ]),
+    false,
+  );
+  assert.match(draftJson, /•••• 1111|Карта •••• 1111/);
+
+  const submittedJson = JSON.stringify({
+    status: "submitted",
+    fields: null,
+    account_last4: "1111",
+    requisites: buildStoredRequisitesPresence({
+      payout_method: "card",
+      account_last4: "1111",
+    }),
+  });
+  assert.equal(
+    responseLooksLikeItContainsPaymentSecret(submittedJson, [
+      syntheticCard,
+      syntheticAccount,
+    ]),
+    false,
+  );
+
+  const presence = buildStoredRequisitesPresence({
+    payout_method: "bank_account",
+    account_last4: "4312",
+  });
+  assert.equal(presence.account.present, true);
+  assert.match(presence.account.masked, /4312/);
+  assert.equal(presence.card.present, false);
+
+  const formValues = sensitivePayloadToFormValues("self_employed", payload);
+  assert.equal(formValues.card_number, "");
+  assert.equal(formValues.bank_account, "");
+  assert.equal(formValues.bank_correspondent_account, "");
+
+  const emptyPatch = mergeSensitivePayloadPreservingSecrets(
+    {
+      ...payload,
+      card_number: null,
+      first_name: "Пётр",
+    },
+    payload,
+  );
+  assert.equal(emptyPatch.card_number, syntheticCard);
+  assert.equal(emptyPatch.first_name, "Пётр");
+
+  const replacePatch = mergeSensitivePayloadPreservingSecrets(
+    {
+      ...payload,
+      card_number: "5555555555554444",
+    },
+    payload,
+  );
+  assert.equal(replacePatch.card_number, "5555555555554444");
+
+  const key = makeKeyEnv("payout-v1");
+  const resolved = resolvePayoutProfileEncryptionKeyFromEnv(key);
+  const encrypted = encryptPayoutProfilePayload(
+    serializeSensitivePayload(replacePatch),
+    resolved,
+  );
+  const envelope = serializePayoutProfileEncryptedEnvelope(encrypted);
+  assert.doesNotMatch(envelope, /5555555555554444/);
+  assert.doesNotMatch(envelope, new RegExp(syntheticCard));
+  const decrypted = parseSensitivePayload(
+    decryptPayoutProfilePayload(
+      parsePayoutProfileEncryptedEnvelope(envelope),
+      resolved,
+    ),
+  );
+  assert.equal(decrypted.card_number, "5555555555554444");
+
+  const serviceSrc = read("src/lib/author-payout-profiles/service.ts");
+  assert.match(serviceSrc, /redactPaymentSecretsForBrowser/);
+  assert.match(serviceSrc, /buildStoredRequisitesPresence/);
+  assert.doesNotMatch(
+    serviceSrc,
+    /fields,\s*\n\s*can_edit/,
+  );
+
+  const adminDetailHasRedact = /getAdminPayoutProfileDetail[\s\S]*redactPaymentSecretsForBrowser/.test(
+    serviceSrc,
+  );
+  assert.equal(adminDetailHasRedact, true);
+
+  const formSrc = read(
+    "src/components/author-dashboard/AuthorPayoutProfileForm.tsx",
+  );
+  assert.match(formSrc, /autoComplete="new-password"/);
+  assert.match(formSrc, /Изменить реквизиты/);
+
+  const privacy = read("src/lib/analytics/yandex-metrika-privacy.ts");
+  assert.match(privacy, /data-payout-profile-form/);
+  assert.doesNotMatch(privacy, new RegExp(syntheticCard));
+}
+
 function testEmailsAndSources() {
   assert.equal(
     PAYOUT_PROFILE_VERIFIED_EMAIL_SUBJECT,
@@ -476,6 +621,7 @@ function main() {
   testPayloadAndMasks();
   testStatusMachine();
   testMasksAndGates();
+  testBrowserHardening();
   testEmailsAndSources();
   console.log("author-payout-profiles-unit: ok");
 }

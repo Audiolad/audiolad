@@ -35,8 +35,29 @@ log_info "Health watch started for ${WATCH_SECONDS}s (interval ${INTERVAL_SECOND
 log_info "Health watch target: app=${PM2_APP_NAME} port=${PRODUCTION_PORT}"
 log_info "Health watch restart policy: max_restart_delta=${MAX_RESTART_DELTA}"
 
-if [[ -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then
+if [[ -n "${EXPECTED_BUILD_ID:-}" ]]; then
+  expected_build_id="$EXPECTED_BUILD_ID"
+elif [[ -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then
   expected_build_id="$(tr -d '\n' < "$DEPLOY_ROOT/current/.next/BUILD_ID")"
+fi
+
+if [[ "$POST_DEPLOY" == "true" ]]; then
+  if [[ ! -f "$DEPLOY_ROOT/current/.next/BUILD_ID" ]]; then
+    log_error "BUILD_ID missing during health-watch stage=health_watch path=$DEPLOY_ROOT/current/.next/BUILD_ID"
+    exit 1
+  fi
+  if [[ -z "$expected_build_id" ]]; then
+    log_error "Expected BUILD_ID unset during post-deploy health-watch"
+    exit 1
+  fi
+  local_fs_build_id="$(tr -d '\n' < "$DEPLOY_ROOT/current/.next/BUILD_ID")"
+  if [[ "$local_fs_build_id" != "$expected_build_id" ]]; then
+    log_error "BUILD_ID mismatch on disk during health-watch expected=${expected_build_id} actual=${local_fs_build_id}"
+    exit 1
+  fi
+fi
+
+if [[ -n "$expected_build_id" ]]; then
   log_info "Expected BUILD_ID: $expected_build_id"
 fi
 

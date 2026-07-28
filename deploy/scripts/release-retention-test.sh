@@ -129,8 +129,56 @@ assert_dir_exists "$TEST_ROOT/deploy/releases/20260722-100000-cccccccc" "extra r
 assert_dir_missing "$TEST_ROOT/deploy/releases/20260722-090000-dddddddd" "non-extra successful removed"
 assert_dir_missing "$TEST_ROOT/deploy/releases/20260722-070000-ffffffffff" "oldest eligible release removed"
 assert_dir_missing "$TEST_ROOT/deploy/releases/20260722-060000-0000000000000000000000000000000000000000" "incomplete without commit removed when aged"
-assert_contains "$output" "KEEP release (current): $TEST_ROOT/deploy/releases/20260722-120000-aaaaaaaa" "log current keep"
+assert_contains "$output" "KEEP release (current): name=20260722-120000-aaaaaaaa path=$TEST_ROOT/deploy/releases/20260722-120000-aaaaaaaa" "log current keep"
 assert_contains "$output" "Removing successful release" "log successful removal"
+
+# Candidate / in-flight marker must never be pruned.
+inflight_root="$TEST_ROOT/inflight"
+mkdir -p "$inflight_root/releases"
+mkrelease "$inflight_root" "20260725-130000-aaaaaaaa" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" "2026-07-22 12:00:00"
+mkrelease "$inflight_root" "20260725-120000-bbbbbbbb" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "2026-07-22 11:00:00"
+mkrelease "$inflight_root" "20260725-110000-cccccccc" "" "2026-07-22 10:00:00"
+mkdir -p "$inflight_root/releases/20260725-110000-cccccccc/.next"
+echo "build-candidate" >"$inflight_root/releases/20260725-110000-cccccccc/.next/BUILD_ID"
+printf 'started_at=test\n' >"$inflight_root/releases/20260725-110000-cccccccc/.deploy-inflight"
+ln -sfn "$inflight_root/releases/20260725-130000-aaaaaaaa" "$inflight_root/current"
+ln -sfn "$inflight_root/releases/20260725-120000-bbbbbbbb" "$inflight_root/previous"
+inflight_output="$(
+  DEPLOY_ROOT="$inflight_root" \
+    CANDIDATE_RELEASE_DIR="$inflight_root/releases/20260725-110000-cccccccc" \
+    RELEASE_RETENTION_KEEP_EXTRA=0 \
+    RELEASE_RETENTION_DRY_RUN=0 \
+    RELEASE_RETENTION_MIN_AGE_SECONDS=0 \
+    RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS=0 \
+    RELEASE_RETENTION_SKIP_LSOF=1 \
+    PM2_APP_NAME="__missing_app__" \
+    bash -c 'source "$1/lib/common.sh"; prune_old_releases 0' _ "$SCRIPT_DIR" 2>&1
+)"
+assert_dir_exists "$inflight_root/releases/20260725-110000-cccccccc" "candidate/inflight release kept"
+assert_contains "$inflight_output" "KEEP release (candidate/inflight)" "candidate protect logged"
+
+# Path outside releases must never be deleted by safe_to_delete.
+outside_check="$(
+  DEPLOY_ROOT="$TEST_ROOT/deploy" \
+    RELEASE_RETENTION_SKIP_LSOF=1 \
+    PM2_APP_NAME="__missing_app__" \
+    bash -c '
+      source "$1/lib/common.sh"
+      release_retention_resolve_paths
+      if release_retention_safe_to_delete "/tmp"; then
+        echo SAFE_OK
+      else
+        echo SAFE_BLOCKED
+      fi
+      if release_retention_safe_to_delete "$DEPLOY_ROOT/shared"; then
+        echo SHARED_OK
+      else
+        echo SHARED_BLOCKED
+      fi
+    ' _ "$SCRIPT_DIR" 2>&1
+)"
+assert_contains "$outside_check" "SAFE_BLOCKED" "outside path blocked"
+assert_contains "$outside_check" "SHARED_BLOCKED" "shared path blocked"
 
 setup_fixture
 run_prune "$TEST_ROOT/deploy" 1 0 >/dev/null

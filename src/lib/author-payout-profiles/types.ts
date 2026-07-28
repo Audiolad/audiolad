@@ -89,6 +89,11 @@ export type AuthorPayoutProfileFormValues = {
   author_revision_comment: string;
 };
 
+export type AuthorPayoutStoredRequisitePresence = {
+  present: boolean;
+  masked: string | null;
+};
+
 export type AuthorPayoutProfilePublicView = {
   id: string;
   author_id: string;
@@ -109,8 +114,15 @@ export type AuthorPayoutProfilePublicView = {
   rejected_at: string | null;
   created_at: string;
   updated_at: string;
-  /** Present only for author edit modes and admin full view. */
+  /**
+   * Browser-safe edit fields only. Payment PAN/account are always null;
+   * presence is in `requisites` + last4 masks.
+   */
   fields?: AuthorPayoutProfileSensitivePayload | null;
+  requisites: {
+    card: AuthorPayoutStoredRequisitePresence;
+    account: AuthorPayoutStoredRequisitePresence;
+  };
   can_edit: boolean;
   can_submit: boolean;
   can_start_edit_from_verified: boolean;
@@ -145,7 +157,12 @@ export type AuthorPayoutProfileAdminDetail = AuthorPayoutProfileAdminListItem & 
   verified_at: string | null;
   rejected_at: string | null;
   created_at: string;
+  /** Browser-safe: payment PAN/account always redacted. */
   fields: AuthorPayoutProfileSensitivePayload;
+  requisites: {
+    card: AuthorPayoutStoredRequisitePresence;
+    account: AuthorPayoutStoredRequisitePresence;
+  };
 };
 
 export function isAuthorPayoutRecipientType(

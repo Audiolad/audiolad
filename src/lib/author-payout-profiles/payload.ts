@@ -69,12 +69,12 @@ export function sensitivePayloadToFormValues(
     ogrnip: fields.ogrnip ?? "",
     email: fields.email ?? "",
     phone: fields.phone ?? "",
-    // Never re-populate card/account into inputs after save — blank until re-entry.
+    // Write-only payment secrets: never rehydrate into browser inputs.
     card_number: "",
     bank_account: "",
     bank_bik: fields.bank_bik ?? "",
     bank_name: fields.bank_name ?? "",
-    bank_correspondent_account: fields.bank_correspondent_account ?? "",
+    bank_correspondent_account: "",
     registration_address: "",
     tax_residency_note: "",
     is_npd_declared: extras?.is_npd_declared === true,
@@ -122,6 +122,82 @@ export function parseSensitivePayload(
     bank_correspondent_account: parsed.bank_correspondent_account ?? null,
     registration_address: parsed.registration_address ?? null,
     tax_residency_note: parsed.tax_residency_note ?? null,
+  };
+}
+
+/**
+ * Patch semantics for write-only payment secrets: empty/missing input keeps
+ * the previously encrypted value; a new non-empty value replaces it.
+ */
+export function mergeSensitivePayloadPreservingSecrets(
+  next: AuthorPayoutProfileSensitivePayload,
+  previous: AuthorPayoutProfileSensitivePayload | null,
+): AuthorPayoutProfileSensitivePayload {
+  if (!previous) {
+    return next;
+  }
+
+  const methodChanged = next.payout_method !== previous.payout_method;
+
+  return {
+    ...next,
+    card_number:
+      next.card_number ||
+      (!methodChanged && next.payout_method === "card"
+        ? previous.card_number
+        : null),
+    bank_account:
+      next.bank_account ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_account
+        : null),
+    bank_bik:
+      next.bank_bik ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_bik
+        : null),
+    bank_correspondent_account:
+      next.bank_correspondent_account ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_correspondent_account
+        : null),
+  };
+}
+
+export function hydrateSecretsForValidation(
+  values: AuthorPayoutProfileFormValues,
+  previous: AuthorPayoutProfileSensitivePayload | null,
+): AuthorPayoutProfileFormValues {
+  if (!previous) {
+    return values;
+  }
+
+  const methodUnchanged =
+    values.payout_method === "" ||
+    values.payout_method === previous.payout_method;
+
+  return {
+    ...values,
+    card_number:
+      values.card_number ||
+      (methodUnchanged && previous.payout_method === "card"
+        ? previous.card_number ?? ""
+        : ""),
+    bank_account:
+      values.bank_account ||
+      (methodUnchanged && previous.payout_method === "bank_account"
+        ? previous.bank_account ?? ""
+        : ""),
+    bank_bik:
+      values.bank_bik ||
+      (methodUnchanged && previous.payout_method === "bank_account"
+        ? previous.bank_bik ?? ""
+        : ""),
+    bank_correspondent_account:
+      values.bank_correspondent_account ||
+      (methodUnchanged && previous.payout_method === "bank_account"
+        ? previous.bank_correspondent_account ?? ""
+        : ""),
   };
 }
 

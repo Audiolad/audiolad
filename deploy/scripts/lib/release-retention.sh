@@ -37,11 +37,13 @@ release_retention_age_seconds() {
 
 release_retention_resolve_pm2_cwd() {
   PM2_CWD=""
+  PM2_PROTECTED_CWDS=()
   if ! command -v pm2 >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
     return 0
   fi
 
-  PM2_CWD="$(
+  local cwds_raw=""
+  cwds_raw="$(
     pm2 jlist 2>/dev/null | node -e '
       let input = "";
       process.stdin.on("data", (chunk) => { input += chunk; });
@@ -49,17 +51,21 @@ release_retention_resolve_pm2_cwd() {
         try {
           const apps = JSON.parse(input || "[]");
           const wanted = process.env.PM2_APP_NAME || "";
-          const online = apps.filter((entry) => {
+          const paths = new Set();
+          for (const entry of apps) {
             const name = String(entry?.name || "");
             const status = String(entry?.pm2_env?.status || "");
-            if (status && status !== "online") return false;
-            if (wanted && name === wanted) return true;
-            return name === "audiolad" || name.startsWith("audiolad-p");
-          });
-          const preferred = wanted
-            ? online.find((entry) => entry.name === wanted) || online[0]
-            : online[0];
-          process.stdout.write(preferred?.pm2_env?.pm_cwd || "");
+            if (status && status !== "online") continue;
+            if (!(name === "audiolad" || name.startsWith("audiolad-p"))) continue;
+            const cwd = entry?.pm2_env?.pm_cwd;
+            if (cwd) paths.add(String(cwd));
+          }
+          if (wanted) {
+            const preferred = apps.find((entry) => entry.name === wanted);
+            const cwd = preferred?.pm2_env?.pm_cwd;
+            if (cwd) paths.add(String(cwd));
+          }
+          process.stdout.write([...paths].join("\n"));
         } catch {
           process.stdout.write("");
         }
@@ -67,9 +73,45 @@ release_retention_resolve_pm2_cwd() {
     ' 2>/dev/null || true
   )"
 
-  if [[ -n "$PM2_CWD" ]]; then
-    PM2_CWD="$(readlink -f "$PM2_CWD" 2>/dev/null || true)"
+  local cwd=""
+  while IFS= read -r cwd; do
+    [[ -n "$cwd" ]] || continue
+    cwd="$(readlink -f "$cwd" 2>/dev/null || true)"
+    [[ -n "$cwd" ]] || continue
+    PM2_PROTECTED_CWDS+=("$cwd")
+    if [[ -z "$PM2_CWD" ]]; then
+      PM2_CWD="$cwd"
+    fi
+  done <<<"$cwds_raw"
+}
+
+release_retention_is_pm2_protected() {
+  local real_release="$1"
+  local cwd
+  for cwd in "${PM2_PROTECTED_CWDS[@]:-}"; do
+    if [[ -n "$cwd" && "$real_release" == "$cwd" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+release_retention_is_candidate_protected() {
+  local real_release="$1"
+  local candidate="${CANDIDATE_RELEASE_DIR:-}"
+
+  if [[ -n "$candidate" ]]; then
+    candidate="$(readlink -f "$candidate" 2>/dev/null || true)"
+    if [[ -n "$candidate" && "$real_release" == "$candidate" ]]; then
+      return 0
+    fi
   fi
+
+  if [[ -f "$real_release/.deploy-inflight" ]]; then
+    return 0
+  fi
+
+  return 1
 }
 
 release_retention_resolve_paths() {
@@ -155,7 +197,11 @@ release_retention_is_protected() {
     return 0
   fi
 
-  if [[ -n "$PM2_CWD" && "$real_release" == "$PM2_CWD" ]]; then
+  if release_retention_is_pm2_protected "$real_release"; then
+    return 0
+  fi
+
+  if release_retention_is_candidate_protected "$real_release"; then
     return 0
   fi
 
@@ -204,7 +250,12 @@ release_retention_safe_to_delete() {
   [[ "$real_release" == "$RELEASES_DIR"/* ]] || return 1
   [[ "$real_release" != "$CURRENT_TARGET" ]] || return 1
   [[ "$real_release" != "$PREVIOUS_TARGET" ]] || return 1
-  [[ -z "$PM2_CWD" || "$real_release" != "$PM2_CWD" ]] || return 1
+  if release_retention_is_pm2_protected "$real_release"; then
+    return 1
+  fi
+  if release_retention_is_candidate_protected "$real_release"; then
+    return 1
+  fi
 
   # Re-resolve symlinks immediately before delete.
   local live_current live_previous
@@ -212,6 +263,11 @@ release_retention_safe_to_delete() {
   live_previous="$(readlink -f "$DEPLOY_ROOT/previous" 2>/dev/null || true)"
   [[ "$real_release" != "$live_current" ]] || return 1
   [[ "$real_release" != "$live_previous" ]] || return 1
+
+  # Shared / root / empty must never be deleted via retention.
+  [[ "$real_release" != "$DEPLOY_ROOT" ]] || return 1
+  [[ "$real_release" != "$DEPLOY_ROOT/shared" ]] || return 1
+  [[ "$real_release" != "$RELEASES_DIR" ]] || return 1
 
   return 0
 }
@@ -230,7 +286,7 @@ prune_old_releases() {
 
   mapfile -t releases < <(ls -1dt "$RELEASES_DIR"/* 2>/dev/null || true)
 
-  log_info "Release retention start keep_extra=$keep_extra dry_run=$RELEASE_RETENTION_DRY_RUN emergency=$RELEASE_RETENTION_EMERGENCY min_age=${RELEASE_RETENTION_MIN_AGE_SECONDS}s incomplete_age=${RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS}s releases=${#releases[@]} current=${CURRENT_TARGET:-none} previous=${PREVIOUS_TARGET:-none} pm2=${PM2_CWD:-none}"
+  log_info "Release retention start keep_extra=$keep_extra dry_run=$RELEASE_RETENTION_DRY_RUN emergency=$RELEASE_RETENTION_EMERGENCY min_age=${RELEASE_RETENTION_MIN_AGE_SECONDS}s incomplete_age=${RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS}s releases=${#releases[@]} current=${CURRENT_TARGET:-none} previous=${PREVIOUS_TARGET:-none} pm2=${PM2_CWD:-none} candidate=${CANDIDATE_RELEASE_DIR:-none} pm2_protected=${#PM2_PROTECTED_CWDS[@]}"
 
   for release in "${releases[@]}"; do
     [[ -d "$release" || -L "$release" ]] || continue
@@ -247,17 +303,22 @@ prune_old_releases() {
     release_retention_refresh_guards
 
     if [[ "$real_release" == "$CURRENT_TARGET" ]]; then
-      log_info "KEEP release (current): $real_release"
+      log_info "KEEP release (current): name=${release_name} path=$real_release"
       continue
     fi
 
     if [[ "$real_release" == "$PREVIOUS_TARGET" ]]; then
-      log_info "KEEP release (previous): $real_release"
+      log_info "KEEP release (previous/rollback): name=${release_name} path=$real_release"
       continue
     fi
 
-    if [[ -n "$PM2_CWD" && "$real_release" == "$PM2_CWD" ]]; then
-      log_info "KEEP release (pm2 cwd): $real_release"
+    if release_retention_is_pm2_protected "$real_release"; then
+      log_info "KEEP release (pm2 cwd): name=${release_name} path=$real_release"
+      continue
+    fi
+
+    if release_retention_is_candidate_protected "$real_release"; then
+      log_info "KEEP release (candidate/inflight): name=${release_name} path=$real_release"
       continue
     fi
 
@@ -265,13 +326,13 @@ prune_old_releases() {
 
     if release_retention_is_protected "$real_release" "$release_name"; then
       if ! release_retention_is_successful "$real_release"; then
-        log_info "KEEP incomplete release (age=${age_seconds}s < ${RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS}s): $real_release"
+        log_info "KEEP incomplete release (age=${age_seconds}s < ${RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS}s): name=${release_name} path=$real_release"
       elif ! release_retention_is_valid_name "$release_name"; then
-        log_warn "KEEP release with unexpected name: $real_release"
+        log_warn "KEEP release with unexpected name: name=${release_name} path=$real_release"
       elif (( age_seconds < RELEASE_RETENTION_MIN_AGE_SECONDS )); then
-        log_info "KEEP successful release (age=${age_seconds}s < ${RELEASE_RETENTION_MIN_AGE_SECONDS}s): $real_release"
+        log_info "KEEP successful release (age=${age_seconds}s < ${RELEASE_RETENTION_MIN_AGE_SECONDS}s): name=${release_name} path=$real_release"
       else
-        log_info "KEEP protected release: $real_release"
+        log_info "KEEP protected release: name=${release_name} path=$real_release"
       fi
       continue
     fi
@@ -279,22 +340,22 @@ prune_old_releases() {
     if release_retention_is_successful "$real_release"; then
       if (( kept_extra < keep_extra )); then
         kept_extra=$((kept_extra + 1))
-        log_info "KEEP extra successful release ($kept_extra/$keep_extra): $real_release"
+        log_info "KEEP extra successful release ($kept_extra/$keep_extra): name=${release_name} path=$real_release"
         continue
       fi
       commit="$(tr -d '\n' < "$real_release/.deploy-commit" | cut -c1-12)"
       size="$(release_retention_human_size "$real_release")"
       if [[ "$RELEASE_RETENTION_DRY_RUN" == "1" ]]; then
-        log_info "DRY-RUN would remove successful release size=$size commit=$commit age=${age_seconds}s path=$real_release"
+        log_info "DRY-RUN would remove successful release size=$size commit=$commit age=${age_seconds}s name=${release_name} path=$real_release"
         continue
       fi
       if ! release_retention_safe_to_delete "$real_release"; then
-        log_warn "SKIP delete after re-check: $real_release"
+        log_warn "SKIP delete after re-check: name=${release_name} path=$real_release"
         continue
       fi
       removed_bytes=$((removed_bytes + $(release_retention_bytes "$real_release")))
-      log_info "Removing successful release size=$size commit=$commit age=${age_seconds}s path=$real_release"
-      rm -rf "$real_release"
+      log_info "Removing successful release size=$size commit=$commit age=${age_seconds}s name=${release_name} path=$real_release"
+      rm -rf --one-file-system -- "$real_release"
       removed_count=$((removed_count + 1))
       continue
     fi
@@ -302,16 +363,16 @@ prune_old_releases() {
     # Incomplete and past protective age.
     size="$(release_retention_human_size "$real_release")"
     if [[ "$RELEASE_RETENTION_DRY_RUN" == "1" ]]; then
-      log_info "DRY-RUN would remove incomplete release size=$size age=${age_seconds}s path=$real_release"
+      log_info "DRY-RUN would remove incomplete release size=$size age=${age_seconds}s name=${release_name} path=$real_release"
       continue
     fi
     if ! release_retention_safe_to_delete "$real_release"; then
-      log_warn "SKIP incomplete delete after re-check: $real_release"
+      log_warn "SKIP incomplete delete after re-check: name=${release_name} path=$real_release"
       continue
     fi
     removed_bytes=$((removed_bytes + $(release_retention_bytes "$real_release")))
-    log_info "Removing incomplete release size=$size age=${age_seconds}s path=$real_release"
-    rm -rf "$real_release"
+    log_info "Removing incomplete release size=$size age=${age_seconds}s name=${release_name} path=$real_release"
+    rm -rf --one-file-system -- "$real_release"
     removed_count=$((removed_count + 1))
   done
 

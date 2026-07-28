@@ -106,3 +106,73 @@ export function formatPayoutRequisitesSummary(input: {
 export function maskSensitivePayloadForLog(): string {
   return "[redacted]";
 }
+
+/** Payment secrets that must never leave the server after encryption. */
+export const BROWSER_FORBIDDEN_PAYMENT_FIELDS = [
+  "card_number",
+  "bank_account",
+  "bank_correspondent_account",
+] as const;
+
+/**
+ * Strip full payment identifiers from a decrypted payload before any browser/
+ * admin JSON response. Names/contacts/INN/BIK remain for edit UX; PAN/account
+ * stay write-only (empty/null) with presence conveyed via last4/masks.
+ */
+export function redactPaymentSecretsForBrowser(
+  fields: AuthorPayoutProfileSensitivePayload,
+): AuthorPayoutProfileSensitivePayload {
+  return {
+    ...fields,
+    card_number: null,
+    bank_account: null,
+    bank_correspondent_account: null,
+  };
+}
+
+export function buildStoredRequisitesPresence(input: {
+  payout_method: AuthorPayoutMethod | null;
+  account_last4: string | null;
+  bank_display_name?: string | null;
+}): {
+  card: { present: boolean; masked: string | null };
+  account: { present: boolean; masked: string | null };
+} {
+  const last4 = input.account_last4;
+  const has = Boolean(last4);
+  const method = input.payout_method;
+
+  if (method === "card") {
+    return {
+      card: {
+        present: has,
+        masked: has ? maskCardNumber(`0000${last4}`) : null,
+      },
+      account: { present: false, masked: null },
+    };
+  }
+
+  if (method === "bank_account") {
+    return {
+      card: { present: false, masked: null },
+      account: {
+        present: has,
+        masked: has ? maskBankAccount(`0000${last4}`) : null,
+      },
+    };
+  }
+
+  // SBP / unknown: presence via last4 without inventing card/account PAN.
+  return {
+    card: { present: false, masked: null },
+    account: { present: false, masked: null },
+  };
+}
+
+/** True when a serialized response body contains forbidden full payment digits. */
+export function responseLooksLikeItContainsPaymentSecret(
+  serialized: string,
+  markers: string[],
+): boolean {
+  return markers.some((marker) => marker.length >= 8 && serialized.includes(marker));
+}

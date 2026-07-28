@@ -358,7 +358,15 @@ export default function AuthorPayoutProfileForm({
     [profile],
   );
 
-  const hasStoredRequisites = Boolean(profile?.account_last4);
+  const hasStoredRequisites = Boolean(
+    profile?.account_last4 ||
+      profile?.requisites?.card.present ||
+      profile?.requisites?.account.present,
+  );
+  const storedRequisitesMask =
+    profile?.requisites?.card.masked ||
+    profile?.requisites?.account.masked ||
+    summary;
   const showRequisiteInputs =
     !hasStoredRequisites || replaceRequisites || !profile;
 
@@ -694,7 +702,7 @@ export default function AuthorPayoutProfileForm({
                         <p className="font-medium text-[#25135c]">
                           Сохранённые реквизиты
                         </p>
-                        <p className="font-mono">{summary}</p>
+                        <p className="font-mono">{storedRequisitesMask}</p>
                         <button
                           type="button"
                           onClick={() => {
@@ -736,13 +744,24 @@ export default function AuthorPayoutProfileForm({
                             <input
                               type="text"
                               inputMode="numeric"
+                              name="audiolad-payout-card"
                               value={values.card_number}
                               onChange={(e) =>
                                 updateField("card_number", e.target.value)
                               }
                               disabled={!editable || busy}
-                              autoComplete="off"
+                              autoComplete="new-password"
+                              autoCorrect="off"
+                              spellCheck={false}
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-form-type="other"
                               data-mask="true"
+                              placeholder={
+                                hasStoredRequisites
+                                  ? "Введите новый номер карты"
+                                  : undefined
+                              }
                               className={inputClassName}
                             />
                             <FieldError message={fieldErrors.card_number} />
@@ -783,13 +802,24 @@ export default function AuthorPayoutProfileForm({
                               <input
                                 type="text"
                                 inputMode="numeric"
+                                name="audiolad-payout-account"
                                 value={values.bank_account}
                                 onChange={(e) =>
                                   updateField("bank_account", e.target.value)
                                 }
                                 disabled={!editable || busy}
-                                autoComplete="off"
+                                autoComplete="new-password"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                data-form-type="other"
                                 data-mask="true"
+                                placeholder={
+                                  hasStoredRequisites
+                                    ? "Введите новый номер счёта"
+                                    : undefined
+                                }
                                 className={inputClassName}
                               />
                               <FieldError message={fieldErrors.bank_account} />

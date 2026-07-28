@@ -9,10 +9,16 @@ import {
   PayoutProfileEncryptionError,
   serializePayoutProfileEncryptedEnvelope,
 } from "./encryption";
-import { buildAuthorPayoutProfileMasks } from "./masking";
+import {
+  buildAuthorPayoutProfileMasks,
+  buildStoredRequisitesPresence,
+  redactPaymentSecretsForBrowser,
+} from "./masking";
 import {
   formValuesToSensitivePayload,
+  hydrateSecretsForValidation,
   listChangedSensitiveFields,
+  mergeSensitivePayloadPreservingSecrets,
   parseSensitivePayload,
   sensitivePayloadToFormValues,
   serializeSensitivePayload,
@@ -94,45 +100,6 @@ function assertRecipientType(value: string): AuthorPayoutRecipientType {
     throw new AuthorPayoutProfileError("invalid_recipient_type", 400);
   }
   return value;
-}
-
-/**
- * Form never re-fills card/account after load. Keep previous secrets unless
- * the author entered new values or changed payout method.
- */
-function mergeSensitivePayloadPreservingSecrets(
-  next: AuthorPayoutProfileSensitivePayload,
-  previous: AuthorPayoutProfileSensitivePayload | null,
-): AuthorPayoutProfileSensitivePayload {
-  if (!previous) {
-    return next;
-  }
-
-  const methodChanged = next.payout_method !== previous.payout_method;
-
-  return {
-    ...next,
-    card_number:
-      next.card_number ||
-      (!methodChanged && next.payout_method === "card"
-        ? previous.card_number
-        : null),
-    bank_account:
-      next.bank_account ||
-      (!methodChanged && next.payout_method === "bank_account"
-        ? previous.bank_account
-        : null),
-    bank_bik:
-      next.bank_bik ||
-      (!methodChanged && next.payout_method === "bank_account"
-        ? previous.bank_bik
-        : null),
-    bank_correspondent_account:
-      next.bank_correspondent_account ||
-      (!methodChanged && next.payout_method === "bank_account"
-        ? previous.bank_correspondent_account
-        : null),
-  };
 }
 
 function assertStatus(value: string): AuthorPayoutProfileStatus {
@@ -256,17 +223,26 @@ export function toAuthorPublicView(
   }
 
   const status = assertStatus(row.status);
-  const fields =
-    options.includeFields && isAuthorEditablePayoutProfileStatus(status)
+  const decrypted =
+    options.includeFields &&
+    (isAuthorEditablePayoutProfileStatus(status) || status === "verified")
       ? decryptRowFields(row)
-      : options.includeFields && status === "verified"
-        ? decryptRowFields(row)
-        : null;
+      : null;
+  // Payment PAN/account never leave the server — even for draft edit.
+  const fields = decrypted
+    ? redactPaymentSecretsForBrowser(decrypted)
+    : null;
 
   const payoutMethod =
     row.payout_method && isAuthorPayoutMethod(row.payout_method)
       ? (row.payout_method as AuthorPayoutMethod)
       : fields?.payout_method ?? null;
+
+  const requisites = buildStoredRequisitesPresence({
+    payout_method: payoutMethod,
+    account_last4: row.account_last4,
+    bank_display_name: row.bank_display_name,
+  });
 
   return {
     id: row.id,
@@ -290,41 +266,10 @@ export function toAuthorPublicView(
     created_at: row.created_at,
     updated_at: row.updated_at,
     fields,
+    requisites,
     can_edit: isAuthorEditablePayoutProfileStatus(status),
     can_submit: authorCanSubmitPayoutProfileStatus(status),
     can_start_edit_from_verified: status === "verified",
-  };
-}
-
-function hydrateSecretsForValidation(
-  values: AuthorPayoutProfileFormValues,
-  previous: AuthorPayoutProfileSensitivePayload | null,
-): AuthorPayoutProfileFormValues {
-  if (!previous) {
-    return values;
-  }
-
-  const methodUnchanged =
-    values.payout_method === "" ||
-    values.payout_method === previous.payout_method;
-
-  return {
-    ...values,
-    card_number:
-      values.card_number ||
-      (methodUnchanged && previous.payout_method === "card"
-        ? previous.card_number ?? ""
-        : ""),
-    bank_account:
-      values.bank_account ||
-      (methodUnchanged && previous.payout_method === "bank_account"
-        ? previous.bank_account ?? ""
-        : ""),
-    bank_bik:
-      values.bank_bik ||
-      (methodUnchanged && previous.payout_method === "bank_account"
-        ? previous.bank_bik ?? ""
-        : ""),
   };
 }
 
@@ -743,11 +688,17 @@ export async function getAdminPayoutProfileDetail(
       | { name: string; slug: string | null }[];
   };
   const author = Array.isArray(row.authors) ? row.authors[0] : row.authors;
-  const fields = decryptRowFields(row);
+  const decrypted = decryptRowFields(row);
 
-  if (!fields) {
+  if (!decrypted) {
     throw new AuthorPayoutProfileError("encryption_envelope_invalid", 500);
   }
+
+  const fields = redactPaymentSecretsForBrowser(decrypted);
+  const payoutMethod =
+    row.payout_method && isAuthorPayoutMethod(row.payout_method)
+      ? row.payout_method
+      : fields.payout_method;
 
   return {
     id: row.id,
@@ -755,10 +706,7 @@ export async function getAdminPayoutProfileDetail(
     author_name: author?.name ?? "Автор",
     author_slug: author?.slug ?? null,
     recipient_type: assertRecipientType(row.recipient_type),
-    payout_method:
-      row.payout_method && isAuthorPayoutMethod(row.payout_method)
-        ? row.payout_method
-        : fields.payout_method,
+    payout_method: payoutMethod,
     bank_display_name: row.bank_display_name,
     status: assertStatus(row.status),
     version: row.version,
@@ -779,6 +727,11 @@ export async function getAdminPayoutProfileDetail(
     rejected_at: row.rejected_at,
     created_at: row.created_at,
     fields,
+    requisites: buildStoredRequisitesPresence({
+      payout_method: payoutMethod,
+      account_last4: row.account_last4,
+      bank_display_name: row.bank_display_name,
+    }),
   };
 }
 
