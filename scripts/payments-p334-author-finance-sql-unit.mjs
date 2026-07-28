@@ -53,6 +53,8 @@ const MIGRATION =
   "supabase/migrations/20260727140000_payments_p334_author_finance.sql";
 const EMPTY_STATE_MIGRATION =
   "supabase/migrations/20260728160000_author_finance_empty_state_access_status.sql";
+const AUTHOR_TERMS_EMPTY_STATE_MIGRATION =
+  "supabase/migrations/20260728170000_author_finance_author_terms_empty_state.sql";
 
 /**
  * Every JSON key the author API must never return. Checked against the actual
@@ -269,6 +271,7 @@ INSERT INTO public.practices VALUES
     "supabase/migrations/20260727120000_payments_p333_author_payouts.sql",
     MIGRATION,
     EMPTY_STATE_MIGRATION,
+    AUTHOR_TERMS_EMPTY_STATE_MIGRATION,
   ]) {
     psqlFile(TEST_DB, join(ROOT, file));
   }
@@ -529,8 +532,8 @@ function testEmptyStatesBeforeMoney() {
   );
   assertEqual(
     summary(AUTHOR_ACTIVE_NOT_PAYEE).empty_state_code,
-    "terms_missing",
-    "commercial_active without payout_eligible is not free",
+    "no_sales",
+    "commercial_active without finance terms stays operational",
   );
   assert(
     summary(AUTHOR_ACTIVE_NOT_PAYEE).empty_state_code !==

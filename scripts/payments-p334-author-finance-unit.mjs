@@ -45,6 +45,7 @@ import {
   maskPayoutReference,
   meetsAuthorPayoutThreshold,
   resolveAuthorFinancePeriodRange,
+  resolveAuthorFinanceAuthorTermsUi,
   selectAuthorFinanceEmptyState,
 } from "../src/lib/author-finance/types.ts";
 import {
@@ -65,6 +66,10 @@ const MIGRATION = join(
 const EMPTY_STATE_MIGRATION = join(
   ROOT,
   "supabase/migrations/20260728160000_author_finance_empty_state_access_status.sql",
+);
+const AUTHOR_TERMS_EMPTY_STATE_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20260728170000_author_finance_author_terms_empty_state.sql",
 );
 
 function assert(condition, message) {
@@ -311,9 +316,21 @@ function testEmptyStateMatrix() {
       payoutEligible: false,
       accessStatus: "commercial_onboarding",
       entryCount: 0,
+      authorTermsAccepted: false,
+    }),
+    "author_terms_required",
+    "onboarding without Author Terms asks to accept them",
+  );
+  assertEqual(
+    selectAuthorFinanceEmptyState({
+      ...base,
+      payoutEligible: false,
+      accessStatus: "commercial_onboarding",
+      entryCount: 0,
+      authorTermsAccepted: true,
     }),
     "commercial_onboarding_incomplete",
-    "onboarding is its own state",
+    "onboarding with Author Terms stays onboarding",
   );
   assertEqual(
     selectAuthorFinanceEmptyState({
@@ -343,37 +360,39 @@ function testEmptyStateMatrix() {
     "terminated is not free",
   );
 
-  // commercial_active must never look like a free account — even with no
-  // payout eligibility, no sales and a zero balance (German Semenyuk case).
+  // commercial_active + Author Terms accepted must never look like a free
+  // account or like finance terms are still awaiting agreement.
   const germanLike = {
     ...base,
     payoutEligible: false,
     accessStatus: "commercial_active",
-    approvedTermsCount: 1,
+    approvedTermsCount: 0,
     entryCount: 0,
     payableMinor: 0,
+    authorTermsAccepted: true,
   };
   assertEqual(
     selectAuthorFinanceEmptyState(germanLike),
     "no_sales",
-    "commercial_active with no sales stays operational",
+    "commercial_active with Author Terms and no sales stays operational",
   );
   assertEqual(
     selectAuthorFinanceEmptyState({
       ...germanLike,
       approvedTermsCount: 0,
+      payableMinor: 0,
+      entryCount: 0,
     }),
-    "terms_missing",
-    "commercial_active without terms is not free",
+    "no_sales",
+    "missing finance terms rows do not block commercial_active UI",
   );
   assertEqual(
     selectAuthorFinanceEmptyState({
       ...germanLike,
-      entryCount: 2,
-      payableMinor: 0,
+      authorTermsAccepted: false,
     }),
-    "no_sales",
-    "commercial_active with zero payable and no history is not free",
+    "author_terms_required",
+    "commercial_active without Author Terms asks to accept them",
   );
 
   const freeCopy = getAuthorFinanceEmptyStateCopy("not_payout_eligible_free");
@@ -389,8 +408,10 @@ function testEmptyStateMatrix() {
       ...base,
       payoutEligible: false,
       accessStatus: "commercial_active",
+      authorTermsAccepted: true,
       entryCount: 5,
       payableMinor: 50000,
+      approvedTermsCount: 0,
     },
   ]) {
     const code = selectAuthorFinanceEmptyState(scenario);
@@ -400,11 +421,49 @@ function testEmptyStateMatrix() {
       `commercial_active must not resolve to free (got ${code})`,
     );
     assert(
+      code !== "terms_missing",
+      `commercial_active + Author Terms must not resolve to terms_missing (got ${code})`,
+    );
+    assert(
       !copy.body.includes("бесплатный"),
       `commercial_active copy must not say free account (got ${code})`,
     );
+    assert(
+      !copy.body.includes("Действующих коммерческих условий пока нет"),
+      `commercial_active copy must not use legacy finance-terms gap copy (got ${code})`,
+    );
   }
 
+  const acceptedUi = resolveAuthorFinanceAuthorTermsUi({
+    accessStatus: "commercial_active",
+    authorTermsAccepted: true,
+  });
+  assertEqual(
+    acceptedUi.badge,
+    "Авторские условия приняты",
+    "accepted Author Terms badge",
+  );
+  assert(!acceptedUi.showAcceptCta, "accepted Author Terms need no CTA");
+  assert(
+    !acceptedUi.body.includes("не согласованы"),
+    "accepted Author Terms copy is not the legacy gap message",
+  );
+
+  const onboardingUi = resolveAuthorFinanceAuthorTermsUi({
+    accessStatus: "commercial_onboarding",
+    authorTermsAccepted: false,
+  });
+  assert(onboardingUi.showAcceptCta, "onboarding without terms shows CTA");
+  assert(
+    /Авторские условия/.test(onboardingUi.body),
+    "onboarding CTA mentions Author Terms",
+  );
+
+  assertEqual(
+    getAuthorFinanceEmptyStateCopy("author_terms_required").title,
+    "Примите Авторские условия",
+    "author terms required has dedicated copy",
+  );
   assertEqual(
     getAuthorFinanceEmptyStateCopy("commercial_onboarding_incomplete").title,
     "Коммерческое подключение ещё не завершено",
@@ -729,7 +788,7 @@ function testPeriodResolution() {
  * build if the two copies drift.
  */
 function testSourceContracts() {
-  const sql = [MIGRATION, EMPTY_STATE_MIGRATION]
+  const sql = [MIGRATION, EMPTY_STATE_MIGRATION, AUTHOR_TERMS_EMPTY_STATE_MIGRATION]
     .map((file) => readFileSync(file, "utf8"))
     .join("\n");
   const baseSql = readFileSync(MIGRATION, "utf8");

@@ -73,7 +73,13 @@ function checklist(overrides = {}) {
   const activateSrc = read("src/lib/authors/activate-commercial-after-terms.ts");
   assert.match(activateSrc, /commercial_active/);
   assert.match(activateSrc, /author_terms_accepted/);
+  assert.match(activateSrc, /ensureCommercialPayeeSetupAfterTerms/);
   assert.doesNotMatch(activateSrc, /payout_profile|author_payout_profiles/);
+
+  const setupSrc = read("src/lib/authors/ensure-commercial-payee-setup.ts");
+  assert.match(setupSrc, /approveImmediately:\s*true/);
+  assert.match(setupSrc, /payout_eligible:\s*true/);
+  assert.doesNotMatch(setupSrc, /payout_profile|author_payout_profiles/);
 
   const termsService = read("src/lib/author-terms/service.ts");
   assert.match(

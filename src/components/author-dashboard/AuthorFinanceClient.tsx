@@ -20,7 +20,6 @@ import {
   getAuthorFinancePayoutStatusLabel,
   getAuthorFinancePayoutStatusMessage,
   getAuthorFinancePeriodLabel,
-  getAuthorFinanceTermsStatusLabel,
   getAuthorFinanceTypeLabel,
 } from "@/lib/author-finance/labels";
 import {
@@ -32,6 +31,7 @@ import {
   AUTHOR_FINANCE_PERIODS,
   AUTHOR_FINANCE_TYPE_KEYS,
   isAuthorFinancePeriod,
+  resolveAuthorFinanceAuthorTermsUi,
   type AuthorFinanceIntegrityStatus,
   type AuthorFinanceLedgerDetail,
   type AuthorFinanceLedgerRow,
@@ -41,6 +41,10 @@ import {
   type AuthorFinanceSummary,
   type AuthorFinanceTermsRow,
 } from "@/lib/author-finance/types";
+import {
+  DEFAULT_COMMERCIAL_SHARE,
+  formatShareBpsAsPercent,
+} from "@/lib/author-commercial/economics";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
@@ -350,10 +354,22 @@ export default function AuthorFinanceClient({
     : null;
   const integrityMessage = getAuthorFinanceIntegrityMessage(integrityStatus);
   const activeTerms = terms.find((row) => row.isActiveNow) ?? null;
+  const authorTermsUi = summary
+    ? resolveAuthorFinanceAuthorTermsUi({
+        accessStatus: summary.accessStatus,
+        authorTermsAccepted: summary.authorTermsAccepted,
+      })
+    : null;
+  const displayShareBps =
+    activeTerms?.authorShareBps ??
+    summary?.activeTermsSummary?.authorShareBps ??
+    DEFAULT_COMMERCIAL_SHARE.authorShareBps;
+  const displayHoldDays = activeTerms?.holdDays ?? null;
   const showPayoutProfileBanner = shouldShowFinancePayoutProfileBanner({
     featureEnabled: payoutProfilesFeatureEnabled,
     payoutProfileStatus,
   });
+  const termsHref = `/author-dashboard/commercial/terms?author=${encodeURIComponent(selectedAuthor.slug)}`;
 
   return (
     <div className="min-w-0">
@@ -475,31 +491,53 @@ export default function AuthorFinanceClient({
           <Section
             title="Условия"
             actions={
-              <StateBadge
-                label={getAuthorFinanceTermsStatusLabel(summary.termsStatus)}
-              />
+              authorTermsUi ? (
+                <StateBadge label={authorTermsUi.badge} />
+              ) : null
             }
           >
-            {activeTerms ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {authorTermsUi ? (
+              <p className="text-sm leading-relaxed text-[#7d70a2]">
+                {authorTermsUi.body}
+                {summary.authorTermsAccepted && summary.authorTermsVersion
+                  ? ` Версия ${summary.authorTermsVersion}.`
+                  : null}
+              </p>
+            ) : null}
+
+            {authorTermsUi?.showAcceptCta ? (
+              <Link
+                href={termsHref}
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white"
+              >
+                Принять Авторские условия
+              </Link>
+            ) : null}
+
+            {summary.authorTermsAccepted ? (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Card
                   label="Ваша доля"
-                  value={formatShare(activeTerms.authorShareBps)}
+                  value={formatShareBpsAsPercent(displayShareBps)}
                 />
                 <Card
                   label="Срок удержания"
-                  value={formatHoldDays(activeTerms.holdDays)}
+                  value={
+                    displayHoldDays === null
+                      ? "По условиям платформы"
+                      : formatHoldDays(displayHoldDays)
+                  }
                 />
                 <Card
                   label="Действуют с"
-                  value={formatDate(activeTerms.validFrom)}
+                  value={
+                    activeTerms
+                      ? formatDate(activeTerms.validFrom)
+                      : "С принятия Авторских условий"
+                  }
                 />
               </div>
-            ) : (
-              <p className="text-sm text-[#7d70a2]">
-                Действующих коммерческих условий пока нет.
-              </p>
-            )}
+            ) : null}
 
             {terms.length > 1 ? (
               <ul className="mt-4 space-y-2">

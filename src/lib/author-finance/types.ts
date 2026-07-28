@@ -58,6 +58,7 @@ export const AUTHOR_FINANCE_EMPTY_STATE_CODES = [
   "not_payout_eligible_pending",
   "not_payout_eligible_commercial",
   "commercial_onboarding_incomplete",
+  "author_terms_required",
   "access_suspended",
   "access_terminated",
   "terms_missing",
@@ -242,12 +243,11 @@ export function maskPayoutReference(
 }
 
 /**
- * Mirrors public.author_finance_p334_select_empty_state / the CASE in
- * author_finance_p334_summary.
+ * Chooses the author-facing finance empty state.
  *
- * Commercial access, payout profile and payout eligibility are independent:
- * `commercial_active` never collapses to the free-account empty state just
- * because payout_eligible is still false or a payout profile is missing.
+ * Author Terms acceptance is the product gate for commercial authors.
+ * Missing `author_commercial_terms` rows must not frame a commercial_active
+ * author who already accepted Author Terms as "условия не согласованы".
  */
 export function selectAuthorFinanceEmptyState(input: {
   payoutEligible: boolean;
@@ -259,9 +259,12 @@ export function selectAuthorFinanceEmptyState(input: {
   heldMinor: number;
   paidPayoutCount: number;
   thresholdMinor?: number;
+  /** Current Author Terms edition accepted for this author space. */
+  authorTermsAccepted?: boolean | null;
 }): AuthorFinanceEmptyStateCode {
   const threshold = input.thresholdMinor ?? AUTHOR_FINANCE_MINIMUM_PAYOUT_MINOR;
   const access = input.accessStatus;
+  const authorTermsAccepted = input.authorTermsAccepted === true;
 
   if (access === "suspended" || access === "commercial_suspended") {
     return "access_suspended";
@@ -270,7 +273,15 @@ export function selectAuthorFinanceEmptyState(input: {
     return "access_terminated";
   }
   if (access === "commercial_onboarding") {
-    return "commercial_onboarding_incomplete";
+    return authorTermsAccepted
+      ? "commercial_onboarding_incomplete"
+      : "author_terms_required";
+  }
+  if (
+    (access === "commercial_active" || access === "commercial") &&
+    input.authorTermsAccepted === false
+  ) {
+    return "author_terms_required";
   }
 
   // commercial_active falls through to operational states even when the
@@ -286,7 +297,15 @@ export function selectAuthorFinanceEmptyState(input: {
     return "not_payout_eligible_free";
   }
 
-  if (input.approvedTermsCount === 0) return "terms_missing";
+  // Finance share/hold rows are an accrual ledger detail. For authors who
+  // already accepted Author Terms, missing rows must not block the cabinet UI.
+  const ignoreFinanceTermsGap =
+    authorTermsAccepted &&
+    (access === "commercial_active" || access === "commercial");
+
+  if (input.approvedTermsCount === 0 && !ignoreFinanceTermsGap) {
+    return "terms_missing";
+  }
   if (input.entryCount === 0) return "no_sales";
   if (input.payableMinor >= threshold) return "active_ok";
   if (input.payableMinor > 0) return "below_threshold";
@@ -294,6 +313,38 @@ export function selectAuthorFinanceEmptyState(input: {
   if (input.heldMinor > 0) return "held_only";
   if (input.paidPayoutCount > 0) return "has_paid_history";
   return "no_sales";
+}
+
+/** Author-facing terms badge for the finance page (Author Terms, not ledger rows). */
+export function resolveAuthorFinanceAuthorTermsUi(input: {
+  accessStatus: string;
+  authorTermsAccepted: boolean;
+}): {
+  badge: string;
+  body: string;
+  showAcceptCta: boolean;
+} {
+  if (input.authorTermsAccepted) {
+    return {
+      badge: "Авторские условия приняты",
+      body: "Начисления учитываются по действующей редакции Авторских условий.",
+      showAcceptCta: false,
+    };
+  }
+
+  if (input.accessStatus === "commercial_onboarding") {
+    return {
+      badge: "Нужно принять Авторские условия",
+      body: "Примите Авторские условия, чтобы завершить коммерческое подключение.",
+      showAcceptCta: true,
+    };
+  }
+
+  return {
+    badge: "Нужно принять Авторские условия",
+    body: "Примите Авторские условия, чтобы продажи учитывались в начислениях.",
+    showAcceptCta: true,
+  };
 }
 
 export function meetsAuthorPayoutThreshold(
@@ -449,6 +500,9 @@ export type AuthorFinanceSummary = {
   termsStatus: AuthorFinanceTermsStatus;
   approvedTermsCount: number;
   activeTermsSummary: AuthorFinanceTermsSummary | null;
+  /** Current Author Terms edition accepted for this author space. */
+  authorTermsAccepted: boolean;
+  authorTermsVersion: string | null;
 
   oldestPayableAt: string | null;
   nextHoldReleaseAt: string | null;

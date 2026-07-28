@@ -9,6 +9,7 @@
  * Test money is never included: the cabinet shows real money only.
  */
 
+import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
@@ -134,8 +135,12 @@ export async function getAuthorFinanceSummary(input: {
   const paidPayoutCount = asNumber(row.paid_payout_count);
   const thresholdMinor = asNumber(row.threshold_minor, 100000);
 
-  // Recompute from access/balance fields so a stale SQL CASE (e.g. mapping
-  // commercial_active → free) cannot mislabel a commercial author in the UI.
+  const authorTerms = await hasAcceptedCurrentAuthorTerms(input.authorId);
+  const authorTermsAccepted = authorTerms.accepted;
+  const authorTermsVersion = authorTerms.currentVersion?.version ?? null;
+
+  // Recompute from access/Author Terms/balance fields so a stale SQL CASE
+  // cannot mislabel a commercial author in the UI.
   const emptyStateCode = selectAuthorFinanceEmptyState({
     payoutEligible,
     accessStatus,
@@ -146,6 +151,7 @@ export async function getAuthorFinanceSummary(input: {
     heldMinor,
     paidPayoutCount,
     thresholdMinor,
+    authorTermsAccepted,
   });
   const eligibilityMessage =
     row.negative === true || row.eligibility_message === "negative_balance"
@@ -181,6 +187,8 @@ export async function getAuthorFinanceSummary(input: {
       : "missing") as AuthorFinanceTermsStatus,
     approvedTermsCount,
     activeTermsSummary: mapTermsSummary(row.active_terms_summary),
+    authorTermsAccepted,
+    authorTermsVersion,
 
     oldestPayableAt: asText(row.oldest_payable_at),
     nextHoldReleaseAt: asText(row.next_hold_release_at),
