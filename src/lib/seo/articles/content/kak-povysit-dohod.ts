@@ -1041,6 +1041,14 @@ export const KAK_POVYSIT_DOHOD_ARTICLE = {
     },
     {
       before:
+        "Если нужен не общий рост заработка, а поиск и проверка отдельного дополнительного источника дохода, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как найти новые источники дохода: реалистичные направления и первые шаги»",
+      href: "/articles/kak-nayti-novye-istochniki-dohoda",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -1055,6 +1063,11 @@ export const KAK_POVYSIT_DOHOD_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-nayti-novye-istochniki-dohoda",
+      title: "Как найти новые источники дохода",
+      description: "Дополнительный канал поступлений и первые шаги проверки",
     },
     {
       href: "/articles/denezhnoe-myshlenie",
@@ -1098,5 +1111,5 @@ export const KAK_POVYSIT_DOHOD_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T22:00:00.000Z",
 } as const satisfies ArticleDefinition;

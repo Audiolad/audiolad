@@ -680,6 +680,14 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     },
     {
       before:
+        "Если денежное мышление хочется связать с поиском нового канала поступлений и проверкой идеи небольшим шагом, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как найти новые источники дохода: реалистичные направления и первые шаги»",
+      href: "/articles/kak-nayti-novye-istochniki-dohoda",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -694,6 +702,11 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-nayti-novye-istochniki-dohoda",
+      title: "Как найти новые источники дохода",
+      description: "Дополнительный канал поступлений и первые шаги проверки",
     },
     {
       href: "/articles/kak-povysit-dohod",
@@ -751,5 +764,5 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T20:00:00.000Z",
+  updatedAt: "2026-07-28T22:00:00.000Z",
 } as const satisfies ArticleDefinition;
