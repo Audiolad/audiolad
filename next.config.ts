@@ -26,13 +26,17 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        // IndexNow ownership file at site root: /{KEY}.txt → API (key never in git/public/).
-        source: "/:key([A-Za-z0-9-]{8,128}).txt",
-        destination: "/api/seo/indexnow-key?key=:key",
-      },
-    ];
+    // beforeFiles: afterFiles rewrite to ?key=:key did not apply for /{key}.txt
+    // on Next 16 production (API query worked; public ownership URL 404'd).
+    return {
+      beforeFiles: [
+        {
+          // IndexNow ownership file at site root: /{KEY}.txt → API (key never in git/public/).
+          source: "/:key([A-Za-z0-9-]{8,128}).txt",
+          destination: "/api/seo/indexnow-key/:key",
+        },
+      ],
+    };
   },
 };
 

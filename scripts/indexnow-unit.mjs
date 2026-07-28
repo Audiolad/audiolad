@@ -412,6 +412,8 @@ function testSourceSafety() {
     "src/lib/seo/indexnow/notify.ts",
     "src/lib/seo/indexnow/urls.ts",
     "src/app/api/seo/indexnow-key/route.ts",
+    "src/app/api/seo/indexnow-key/[key]/route.ts",
+    "src/lib/seo/indexnow/key-response.ts",
     "scripts/indexnow-submit.mjs",
     "next.config.ts",
   ];
@@ -435,8 +437,12 @@ function testSourceSafety() {
     "next.config has narrow IndexNow rewrite",
   );
   assert(
-    nextConfig.includes("/api/seo/indexnow-key?key=:key"),
-    "rewrite targets key route",
+    nextConfig.includes("beforeFiles"),
+    "IndexNow rewrite uses beforeFiles",
+  );
+  assert(
+    nextConfig.includes("/api/seo/indexnow-key/:key"),
+    "rewrite targets path-param key route",
   );
 
   assert(
