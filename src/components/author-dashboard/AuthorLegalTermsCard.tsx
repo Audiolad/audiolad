@@ -1,6 +1,8 @@
 import Link from "next/link";
 
-import AuthorTermsAcceptPanel from "@/components/author-dashboard/AuthorTermsAcceptPanel";
+import AuthorTermsAcceptPanel, {
+  type AuthorTermsCommercialShareSummary,
+} from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
 
 type Props = {
@@ -8,6 +10,7 @@ type Props = {
   authorSlug: string;
   status: AuthorTermsStatusView;
   mode: "first" | "updated";
+  commercialShare?: AuthorTermsCommercialShareSummary | null;
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -54,6 +57,7 @@ export default function AuthorLegalTermsCard({
   authorSlug,
   status,
   mode,
+  commercialShare = null,
 }: Props) {
   const needsAcceptance = Boolean(
     status.currentVersion && !status.acceptedCurrent,
@@ -111,6 +115,7 @@ export default function AuthorLegalTermsCard({
           status={status}
           mode={mode}
           variant="embedded"
+          commercialShare={commercialShare}
         />
       ) : status.currentVersion ? (
         <div className="mt-5">

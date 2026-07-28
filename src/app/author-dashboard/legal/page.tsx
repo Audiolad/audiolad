@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
+import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorLegalTermsCard from "@/components/author-dashboard/AuthorLegalTermsCard";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
+import { loadAuthorCommercialShareSummary } from "@/lib/author-commercial/share-summary";
 import {
   listAuthorWorkspacesForUser,
   requireAuthenticatedUser,
@@ -35,11 +37,14 @@ export default async function AuthorLegalDocumentsPage({
     workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
 
   const { role } = await requireAuthorMembership(workspace.id);
-  const status = await loadAuthorTermsStatus({
-    authorId: workspace.id,
-    role,
-  });
-  const hadPrior = await authorHasAnyTermsAcceptance(workspace.id);
+  const [status, hadPrior, commercialShare] = await Promise.all([
+    loadAuthorTermsStatus({
+      authorId: workspace.id,
+      role,
+    }),
+    authorHasAnyTermsAcceptance(workspace.id),
+    loadAuthorCommercialShareSummary(workspace.id),
+  ]);
   const backHref = `/author-dashboard?author=${encodeURIComponent(workspace.slug)}`;
 
   return (
@@ -48,11 +53,17 @@ export default async function AuthorLegalDocumentsPage({
       subtitle="Документы коммерческого сотрудничества"
       internalBackHref={backHref}
     >
+      <div className="mb-6">
+        <AuthorDashboardNav authorSlug={workspace.slug} />
+      </div>
       <AuthorLegalTermsCard
         authorId={workspace.id}
         authorSlug={workspace.slug}
         status={status}
         mode={hadPrior ? "updated" : "first"}
+        commercialShare={
+          status.acceptedCurrent ? null : commercialShare
+        }
       />
     </AuthorShell>
   );
