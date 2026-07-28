@@ -3892,6 +3892,103 @@ assert(
   "fear-spend reverse-links to money-worry",
 );
 
+const impulseBuyingArticle = getArticleBySlug(
+  "kak-umenshit-impulsivnye-pokupki",
+);
+assert(impulseBuyingArticle, "impulse-buying article registered");
+assert(
+  impulseBuyingArticle.title ===
+    "Как уменьшить импульсивные покупки и выбирать более осознанно",
+  "impulse-buying H1",
+);
+assert(
+  impulseBuyingArticle.metaTitle ===
+    "Как уменьшить импульсивные покупки и покупать осознаннее | АудиоЛад",
+  "impulse-buying SEO title",
+);
+assert(
+  impulseBuyingArticle.topicSlug === "besplatnye-meditatsii",
+  "impulse-buying hub",
+);
+assert(
+  impulseBuyingArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "impulse-buying practice",
+);
+assert(
+  impulseBuyingArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "impulse-buying practice intro",
+);
+assert(
+  impulseBuyingArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует улучшения материального положения"),
+    ),
+  "impulse-buying practice disclaimer",
+);
+assert(
+  impulseBuyingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "impulse-buying links to money-thinking",
+);
+assert(
+  impulseBuyingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "impulse-buying links to money-beliefs",
+);
+assert(
+  impulseBuyingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "impulse-buying links to money-worry",
+);
+assert(
+  listArticleSlugs().includes("kak-umenshit-impulsivnye-pokupki"),
+  "impulse-buying in slug list",
+);
+assert(
+  !impulseBuyingArticle.metaTitle.includes("—"),
+  "impulse-buying uses medium dash",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ),
+  "money-thinking see-also includes impulse-buying",
+);
+assert(
+  moneyBeliefsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ),
+  "money-beliefs see-also includes impulse-buying",
+);
+assert(
+  moneyWorryArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ),
+  "money-worry reverse-links to impulse-buying",
+);
+assert(
+  fearSpendOnSelfArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ) ||
+    fearSpendOnSelfArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+    ),
+  "fear-spend reverse-links to impulse-buying",
+);
+assert(
+  moneyFlowArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ),
+  "money flow see-also includes impulse-buying",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

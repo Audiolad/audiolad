@@ -706,6 +706,14 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     },
     {
       before:
+        "Если финансовая тревога проявляется через незапланированные покупки и сожаление о расходах, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как уменьшить импульсивные покупки и выбирать более осознанно»",
+      href: "/articles/kak-umenshit-impulsivnye-pokupki",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -720,6 +728,11 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-umenshit-impulsivnye-pokupki",
+      title: "Как уменьшить импульсивные покупки",
+      description: "Незапланированные расходы и более осознанный выбор",
     },
     {
       href: "/articles/denezhnoe-myshlenie",
@@ -762,5 +775,5 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T18:00:00.000Z",
 } as const satisfies ArticleDefinition;
