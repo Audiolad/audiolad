@@ -241,6 +241,11 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/denezhnoe-myshlenie",
+      title: "Денежное мышление",
+      description: "Привычный способ воспринимать деньги и финансовые решения",
+    },
+    {
       href: "/articles/kak-zhenshchine-razreshit-sebe-dengi",
       title: "Как женщине разрешить себе деньги",
       description: "Если конфликт связан с оплатой труда, виной и самоценностью",
@@ -290,5 +295,5 @@ export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T12:00:00.000Z",
+  updatedAt: "2026-07-28T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
