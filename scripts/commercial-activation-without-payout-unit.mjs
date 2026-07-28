@@ -191,10 +191,10 @@ function checklist(overrides = {}) {
   assert.equal(section.totalCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
   assert.equal(section.complete, true);
   assert.equal(section.steps.at(-1)?.id, "payout_details");
-  assert.equal(section.steps.at(-1)?.statusLabel, "Необязательно");
+  assert.equal(section.steps.at(-1)?.statusLabel, "Не заполнено");
   assert.match(
     section.steps.at(-1)?.hint ?? "",
-    /Реквизиты можно заполнить позднее/,
+    /Можно заполнить позже/,
   );
 }
 

@@ -21,7 +21,6 @@ import {
 } from "@/lib/author-products/publish";
 import type { AudioItemRow, PracticeRow } from "@/lib/author-products/types";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
-import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import { getAuthorProfileDetail } from "@/lib/authors/profile";
 import {
   resolvePayoutStepCompleteForLegacyOnboarding,
@@ -165,25 +164,29 @@ async function loadCampaignsForAuthor(
 async function loadPayoutProfileSummary(authorId: string): Promise<{
   status: AuthorPayoutProfileStatus | null;
   reviewComment: string | null;
+  hasStoredRequisites: boolean;
 }> {
   try {
     const service = createServiceRoleClient();
     const { data, error } = await service
       .from("author_payout_profiles")
-      .select("status, review_comment")
+      .select("status, review_comment, account_last4, payout_method")
       .eq("author_id", authorId)
       .maybeSingle();
 
     if (error || !data) {
-      return { status: null, reviewComment: null };
+      return { status: null, reviewComment: null, hasStoredRequisites: false };
     }
 
     return {
       status: (data.status as AuthorPayoutProfileStatus) ?? null,
       reviewComment: (data.review_comment as string | null) ?? null,
+      hasStoredRequisites: Boolean(
+        data.account_last4 || data.payout_method,
+      ),
     };
   } catch {
-    return { status: null, reviewComment: null };
+    return { status: null, reviewComment: null, hasStoredRequisites: false };
   }
 }
 
@@ -370,7 +373,7 @@ export async function loadAuthorOnboardingChecklistState(
     applicationReviewComment: commercialApplication?.review_comment ?? null,
     payoutProfileStatus: payoutProfile.status,
     payoutProfileReviewComment: payoutProfile.reviewComment,
-    legacyCommercialActive: isAuthorCommercialActiveAccess(accessStatus),
+    payoutProfileHasStoredRequisites: payoutProfile.hasStoredRequisites,
     applicationHref: `/author-dashboard/commercial-application?author=${encodeURIComponent(authorSlug)}`,
     payoutDetailsHref: `/author-dashboard/commercial/payout-details?author=${encodeURIComponent(authorSlug)}`,
     termsHref: `/author-dashboard/commercial/terms?author=${encodeURIComponent(authorSlug)}`,

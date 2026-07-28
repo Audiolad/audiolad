@@ -283,10 +283,11 @@ export function evaluateCommercialOnboardingChecklist(input: {
   /** Review comment from payout profile (needs_changes / rejected). */
   payoutProfileReviewComment?: string | null;
   /**
-   * Legacy commercial_active / commercial authors: keep payout step completed
-   * for onboarding presentation even without a verified payout_profile row.
+   * @deprecated Ignored. commercial_active must not mark payout as filled.
    */
   legacyCommercialActive?: boolean;
+  /** True when payout profile open columns show stored requisites (last4). */
+  payoutProfileHasStoredRequisites?: boolean;
   /** Dedicated commercial application status row. */
   applicationStatus?: AuthorCommercialApplicationStatus | null;
   /** Review comment shown to the author (needs_changes / rejected). */
@@ -317,12 +318,14 @@ export function evaluateCommercialOnboardingChecklist(input: {
     payoutProfileStatus = null,
     payoutProfileReviewComment = null,
     legacyCommercialActive = false,
+    payoutProfileHasStoredRequisites = false,
   } = input;
 
   const capabilities =
     input.capabilities ?? DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES;
-  // Kept for callers; optional-step visuals use payoutProfileStatus / legacy flags.
+  // Kept for callers; optional-step visuals use payoutProfileStatus only.
   void input.payoutDetailsComplete;
+  void legacyCommercialActive;
   const termsAccepted = input.termsAccepted === true;
   const resolvedApplicationHref =
     input.applicationHref ??
@@ -531,10 +534,11 @@ export function evaluateCommercialOnboardingChecklist(input: {
     status: payoutProfileStatus,
     available: capabilities.payoutDetailsAvailable && payoutDetailsUnlocked,
     applicationApproved,
-    legacyCommercialActive,
+    hasStoredRequisites: payoutProfileHasStoredRequisites,
   });
   const payoutReviewComment = payoutProfileReviewComment?.trim() || null;
   const optionalPayoutHint =
+    payoutVisual.hint ??
     "Реквизиты можно заполнить позднее, перед первой выплатой.";
 
   if (!payoutDetailsUnlocked) {
@@ -550,7 +554,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
       id: "payout_details",
       ...STEP_META.payout_details,
       state: "completed",
-      statusLabel: "Заполнено",
+      statusLabel: payoutVisual.statusLabel ?? "Заполнено",
       hint: null,
       readiness: null,
     };
@@ -559,7 +563,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
       id: "payout_details",
       ...STEP_META.payout_details,
       state: "active",
-      statusLabel: "Необязательно",
+      statusLabel: payoutVisual.statusLabel ?? "Не заполнено",
       actionLabel: payoutVisual.actionLabel ?? "Заполнить реквизиты",
       href: payoutDetailsHref ?? undefined,
       hint: payoutReviewComment ?? optionalPayoutHint,

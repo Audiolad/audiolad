@@ -1,26 +1,24 @@
-import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 
 /**
- * Onboarding presentation only for legacy commercial_active authors.
+ * Optional checklist "filled enough" signal for callers that still pass
+ * payoutDetailsComplete. Must NOT treat commercial_active alone as filled,
+ * and must NOT treat empty/missing draft as complete.
  * Must NOT be used as payout_profile_verified for activation/payouts.
  */
 export function resolvePayoutStepCompleteForLegacyOnboarding(input: {
   accessStatus: AuthorAccessStatus;
   payoutProfileStatus: AuthorPayoutProfileStatus | null;
 }): boolean {
-  if (isAuthorCommercialActiveAccess(input.accessStatus)) {
-    return true;
-  }
+  // accessStatus is intentionally ignored for completeness — commercial
+  // activation is independent of payout requisites.
+  void input.accessStatus;
 
-  // Optional step: any saved/submitted profile counts as "filled" for display.
-  // Commercial activation does NOT depend on payout profile.
   return (
     input.payoutProfileStatus === "verified" ||
     input.payoutProfileStatus === "submitted" ||
-    input.payoutProfileStatus === "in_review" ||
-    input.payoutProfileStatus === "draft"
+    input.payoutProfileStatus === "in_review"
   );
 }
 

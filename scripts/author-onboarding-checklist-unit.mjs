@@ -600,9 +600,24 @@ function testSourceGuards() {
     read("src/lib/author-dashboard/commercial-onboarding.ts"),
     /evaluateCommercialOnboardingChecklist/,
   );
+  const loadOnboarding = read(
+    "src/lib/author-dashboard/load-onboarding-state.ts",
+  );
+  assert.match(loadOnboarding, /evaluateCommercialOnboardingChecklist/);
   assert.match(
-    read("src/lib/author-dashboard/load-onboarding-state.ts"),
-    /evaluateCommercialOnboardingChecklist/,
+    loadOnboarding,
+    /\.eq\(\s*["']author_id["']\s*,\s*authorId\s*\)/,
+  );
+  assert.match(loadOnboarding, /payoutProfileHasStoredRequisites/);
+  assert.doesNotMatch(
+    loadOnboarding,
+    /legacyCommercialActive:\s*isAuthorCommercialActiveAccess/,
+  );
+
+  const payoutVisual = read("src/lib/author-payout-profiles/status.ts");
+  assert.doesNotMatch(
+    payoutVisual,
+    /if \(input\.legacyCommercialActive\) \{\s*return \{\s*state:\s*"completed"/,
   );
 }
 
@@ -821,7 +836,7 @@ function testCommercialScenarios() {
   assert.equal(requirementsMet.steps[2].state, "active");
   assert.equal(requirementsMet.steps[2].actionLabel, "Создать платный продукт");
   assert.equal(requirementsMet.steps.at(-1)?.id, "payout_details");
-  assert.equal(requirementsMet.steps.at(-1)?.statusLabel, "Необязательно");
+  assert.equal(requirementsMet.steps.at(-1)?.statusLabel, "Не заполнено");
 
   // 10. Paid draft created
   const paidDraft = evaluateCommercial({
@@ -941,7 +956,119 @@ function testCommercialScenarios() {
   assert.equal(paidPromo.totalCount, 6);
   assert.equal(paidPromo.steps[5].state, "completed");
   assert.equal(paidPromo.steps[6].id, "payout_details");
-  assert.equal(paidPromo.steps[6].statusLabel, "Необязательно");
+  assert.equal(paidPromo.steps[6].statusLabel, "Не заполнено");
+}
+
+function testOptionalPayoutChecklistDisplay() {
+  const base = {
+    freeGateReady: true,
+    accessStatus: "commercial_active",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    capabilities: {
+      applicationSubmissionAvailable: true,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    products: [
+      product(
+        {
+          id: "paid-1",
+          is_free: false,
+          status: "published",
+          slug: "paid-praktika",
+        },
+        readyPaidReadiness(),
+      ),
+    ],
+    campaigns: [
+      {
+        id: "campaign-paid",
+        status: "active",
+        practice_id: "paid-1",
+        practice_status: "published",
+      },
+    ],
+  };
+
+  // 1–2. commercial_active + flag available + no profile → not «Заполнено»
+  const missing = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: null,
+    legacyCommercialActive: true,
+  });
+  const missingPayout = missing.steps.find((s) => s.id === "payout_details");
+  assert.equal(missingPayout?.state, "active");
+  assert.equal(missingPayout?.statusLabel, "Не заполнено");
+  assert.notEqual(missingPayout?.statusLabel, "Заполнено");
+  assert.equal(missing.complete, true);
+
+  // 3. empty draft → not «Заполнено»
+  const emptyDraft = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: "draft",
+    payoutProfileHasStoredRequisites: false,
+  });
+  assert.equal(
+    emptyDraft.steps.find((s) => s.id === "payout_details")?.statusLabel,
+    "Не заполнено",
+  );
+
+  // 4. partial draft → Черновик
+  const partialDraft = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: "draft",
+    payoutProfileHasStoredRequisites: true,
+  });
+  assert.equal(
+    partialDraft.steps.find((s) => s.id === "payout_details")?.statusLabel,
+    "Черновик",
+  );
+
+  // 5. submitted → Отправлено
+  const submitted = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: "submitted",
+  });
+  const submittedStep = submitted.steps.find((s) => s.id === "payout_details");
+  assert.equal(submittedStep?.state, "completed");
+  assert.equal(submittedStep?.statusLabel, "Отправлено");
+
+  // 6. needs_changes → Нужно исправить
+  const needs = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: "needs_changes",
+  });
+  assert.equal(
+    needs.steps.find((s) => s.id === "payout_details")?.statusLabel,
+    "Нужно исправить",
+  );
+
+  // 7. verified → Заполнено
+  const verified = evaluateCommercial({
+    ...base,
+    payoutProfileStatus: "verified",
+  });
+  const verifiedStep = verified.steps.find((s) => s.id === "payout_details");
+  assert.equal(verifiedStep?.state, "completed");
+  assert.equal(verifiedStep?.statusLabel, "Заполнено");
+
+  // 8–9. another author's profile status must not be passed in — caller filters
+  // by author_id. Regression: complete stays independent of payout.
+  const otherAuthorIgnored = evaluateCommercial({
+    ...base,
+    authorSlug: "german-semenuk",
+    payoutProfileStatus: null,
+  });
+  assert.equal(otherAuthorIgnored.complete, true);
+  assert.equal(
+    otherAuthorIgnored.steps.find((s) => s.id === "payout_details")?.statusLabel,
+    "Не заполнено",
+  );
+
+  // 10. optional payout never changes required complete flag
+  assert.equal(missing.complete, verified.complete);
+  assert.equal(missing.completedCount, verified.completedCount);
 }
 
 function main() {
@@ -956,6 +1083,7 @@ function main() {
   testUiPreferenceStorage();
   testSourceGuards();
   testCommercialScenarios();
+  testOptionalPayoutChecklistDisplay();
   console.log("author-onboarding-checklist-unit: ok");
 }
 

@@ -336,15 +336,50 @@ function testStatusMachine() {
     applicationApproved: true,
   });
   assert.equal(submittedVisual.state, "completed");
-  assert.equal(submittedVisual.statusLabel, "Данные отправлены");
+  assert.equal(submittedVisual.statusLabel, "Отправлено");
 
-  const draftVisual = mapPayoutProfileStatusToOnboardingVisual({
+  const emptyDraftVisual = mapPayoutProfileStatusToOnboardingVisual({
     status: "draft",
     available: true,
     applicationApproved: true,
+    hasStoredRequisites: false,
   });
-  assert.equal(draftVisual.state, "active");
-  assert.equal(draftVisual.statusLabel, "Не заполнено");
+  assert.equal(emptyDraftVisual.state, "active");
+  assert.equal(emptyDraftVisual.statusLabel, "Не заполнено");
+
+  const partialDraftVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: "draft",
+    available: true,
+    applicationApproved: true,
+    hasStoredRequisites: true,
+  });
+  assert.equal(partialDraftVisual.state, "active");
+  assert.equal(partialDraftVisual.statusLabel, "Черновик");
+
+  const missingVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: null,
+    available: true,
+    applicationApproved: true,
+    legacyCommercialActive: true,
+  });
+  assert.equal(missingVisual.state, "active");
+  assert.equal(missingVisual.statusLabel, "Не заполнено");
+  assert.notEqual(missingVisual.state, "completed");
+
+  const verifiedVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: "verified",
+    available: true,
+    applicationApproved: true,
+  });
+  assert.equal(verifiedVisual.state, "completed");
+  assert.equal(verifiedVisual.statusLabel, "Заполнено");
+
+  const needsChangesVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: "needs_changes",
+    available: true,
+    applicationApproved: true,
+  });
+  assert.equal(needsChangesVisual.statusLabel, "Нужно исправить");
 
   assert.equal(
     resolvePayoutStepCompleteForLegacyOnboarding({
@@ -352,6 +387,20 @@ function testStatusMachine() {
       payoutProfileStatus: "submitted",
     }),
     true,
+  );
+  assert.equal(
+    resolvePayoutStepCompleteForLegacyOnboarding({
+      accessStatus: "commercial_active",
+      payoutProfileStatus: null,
+    }),
+    false,
+  );
+  assert.equal(
+    resolvePayoutStepCompleteForLegacyOnboarding({
+      accessStatus: "commercial_active",
+      payoutProfileStatus: "draft",
+    }),
+    false,
   );
   assert.equal(isPayoutProfileVerified("submitted"), false);
   assert.equal(isPayoutProfileVerified("verified"), true);

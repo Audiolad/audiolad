@@ -144,10 +144,10 @@ function testOnboardingStates() {
   assert.equal(afterTerms.steps[2].state, "active");
   assert.equal(afterTerms.steps.at(-1)?.id, "payout_details");
   assert.equal(afterTerms.steps.at(-1)?.state, "active");
-  assert.equal(afterTerms.steps.at(-1)?.statusLabel, "Необязательно");
+  assert.equal(afterTerms.steps.at(-1)?.statusLabel, "Не заполнено");
   assert.match(
     afterTerms.steps.at(-1)?.hint ?? "",
-    /Реквизиты можно заполнить позднее/,
+    /Можно заполнить позже/,
   );
   assert.equal(afterTerms.complete, false);
   assert.equal(afterTerms.totalCount, 6);

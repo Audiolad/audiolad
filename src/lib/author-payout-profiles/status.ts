@@ -54,14 +54,26 @@ export function mapPayoutProfileStatusToOnboardingVisual(input: {
   status: AuthorPayoutProfileStatus | null | undefined;
   available: boolean;
   applicationApproved: boolean;
-  /** Legacy commercial_active authors: do not force the new payout form. */
+  /**
+   * @deprecated Ignored for display. commercial_active must not mark payout
+   * as filled — only a real payout profile status does.
+   */
   legacyCommercialActive?: boolean;
+  /**
+   * True when open columns show stored requisites (e.g. account_last4).
+   * Distinguishes empty draft rows from drafts with saved payment data.
+   */
+  hasStoredRequisites?: boolean;
 }): {
   state: "locked" | "active" | "completed" | "coming_soon";
   statusLabel?: string;
   actionLabel?: string;
   hint?: string | null;
 } {
+  // legacyCommercialActive intentionally unused: optional payout status must
+  // reflect the author's own payout profile, not commercial activation.
+  void input.legacyCommercialActive;
+
   if (!input.applicationApproved) {
     return {
       state: "locked",
@@ -73,50 +85,60 @@ export function mapPayoutProfileStatusToOnboardingVisual(input: {
     return { state: "coming_soon" };
   }
 
-  if (input.legacyCommercialActive) {
-    return { state: "completed" };
-  }
-
   const status = input.status ?? null;
 
   if (!status) {
     return {
       state: "active",
+      statusLabel: "Не заполнено",
       actionLabel: "Заполнить данные",
+      hint: "Можно заполнить позже",
     };
   }
 
   switch (status) {
     case "draft":
+      if (input.hasStoredRequisites) {
+        return {
+          state: "active",
+          statusLabel: "Черновик",
+          actionLabel: "Продолжить",
+        };
+      }
       return {
         state: "active",
         statusLabel: "Не заполнено",
-        actionLabel: "Продолжить",
+        actionLabel: "Заполнить данные",
+        hint: "Можно заполнить позже",
       };
     case "submitted":
     case "in_review":
       return {
         state: "completed",
-        statusLabel: "Данные отправлены",
+        statusLabel: "Отправлено",
       };
     case "needs_changes":
       return {
         state: "active",
-        statusLabel: "Требуется уточнение",
+        statusLabel: "Нужно исправить",
         actionLabel: "Уточнить данные",
       };
     case "verified":
       return {
         state: "completed",
-        statusLabel: "Данные заполнены",
+        statusLabel: "Заполнено",
       };
     case "rejected":
       return {
         state: "active",
-        statusLabel: "Требуется уточнение",
+        statusLabel: "Нужно исправить",
         actionLabel: "Открыть решение",
       };
     default:
-      return { state: "active", actionLabel: "Заполнить данные" };
+      return {
+        state: "active",
+        statusLabel: "Не заполнено",
+        actionLabel: "Заполнить данные",
+      };
   }
 }
