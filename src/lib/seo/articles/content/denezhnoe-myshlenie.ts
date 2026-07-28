@@ -672,6 +672,14 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     },
     {
       before:
+        "Если денежное мышление хочется связать с конкретными способами увеличения заработка, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как повысить доход: реалистичные способы и практические шаги»",
+      href: "/articles/kak-povysit-dohod",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -686,6 +694,11 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
+    },
+    {
+      href: "/articles/kak-povysit-dohod",
+      title: "Как повысить доход",
+      description: "Реалистичные способы и практические шаги роста заработка",
     },
     {
       href: "/articles/kak-umenshit-impulsivnye-pokupki",
@@ -738,5 +751,5 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T18:00:00.000Z",
+  updatedAt: "2026-07-28T20:00:00.000Z",
 } as const satisfies ArticleDefinition;

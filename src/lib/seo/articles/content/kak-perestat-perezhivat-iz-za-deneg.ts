@@ -730,6 +730,11 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-povysit-dohod",
+      title: "Как повысить доход",
+      description: "Реалистичные способы и практические шаги роста заработка",
+    },
+    {
       href: "/articles/kak-umenshit-impulsivnye-pokupki",
       title: "Как уменьшить импульсивные покупки",
       description: "Незапланированные расходы и более осознанный выбор",
@@ -775,5 +780,5 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T18:00:00.000Z",
+  updatedAt: "2026-07-28T20:00:00.000Z",
 } as const satisfies ArticleDefinition;

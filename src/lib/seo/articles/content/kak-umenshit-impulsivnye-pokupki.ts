@@ -861,6 +861,11 @@ export const KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-povysit-dohod",
+      title: "Как повысить доход",
+      description: "Реалистичные способы и практические шаги роста заработка",
+    },
+    {
       href: "/articles/denezhnoe-myshlenie",
       title: "Денежное мышление",
       description: "Привычный способ воспринимать деньги и решения",
@@ -901,5 +906,5 @@ export const KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-28T20:00:00.000Z",
 } as const satisfies ArticleDefinition;
