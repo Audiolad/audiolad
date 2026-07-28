@@ -370,6 +370,14 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     },
     {
       before:
+        "Если рост оплаты или более серьёзное предложение вызывает не только сомнения в своей ценности, но и тревогу перед крупными суммами, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как перестать бояться больших денег и спокойнее относиться к росту дохода»",
+      href: "/articles/kak-perestat-boyatsya-bolshih-deneg",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -429,5 +437,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T08:00:00.000Z",
+  updatedAt: "2026-07-28T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

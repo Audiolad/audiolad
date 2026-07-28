@@ -3622,6 +3622,100 @@ assert(
   "female-self-worth-money see-also includes money-beliefs",
 );
 
+const fearBigMoneyArticle = getArticleBySlug(
+  "kak-perestat-boyatsya-bolshih-deneg",
+);
+assert(fearBigMoneyArticle, "fear-big-money article registered");
+assert(
+  fearBigMoneyArticle.title ===
+    "Как перестать бояться больших денег и спокойнее относиться к росту дохода",
+  "fear-big-money H1",
+);
+assert(
+  fearBigMoneyArticle.metaTitle ===
+    "Как перестать бояться больших денег – причины и спокойный подход | АудиоЛад",
+  "fear-big-money SEO title",
+);
+assert(
+  fearBigMoneyArticle.topicSlug === "besplatnye-meditatsii",
+  "fear-big-money hub",
+);
+assert(
+  fearBigMoneyArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "fear-big-money practice",
+);
+assert(
+  fearBigMoneyArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "fear-big-money practice intro",
+);
+assert(
+  fearBigMoneyArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует высокого дохода"),
+    ),
+  "fear-big-money practice disclaimer",
+);
+assert(
+  fearBigMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnye-ustanovki",
+  ),
+  "fear-big-money links to money-beliefs",
+);
+assert(
+  fearBigMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-izmenit-otnoshenie-k-dengam",
+  ),
+  "fear-big-money links to change money attitude",
+);
+assert(
+  listArticleSlugs().includes("kak-perestat-boyatsya-bolshih-deneg"),
+  "fear-big-money in slug list",
+);
+assert(
+  !fearBigMoneyArticle.metaTitle.includes("—"),
+  "fear-big-money uses medium dash",
+);
+assert(
+  changeMoneyAttitudeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "change money attitude reverse-links to fear-big-money",
+);
+assert(
+  moneyBeliefsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "money-beliefs see-also includes fear-big-money",
+);
+assert(
+  acceptMoneyArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "accept-money see-also includes fear-big-money",
+);
+assert(
+  femaleSelfWorthMoneyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "female-self-worth-money reverse-links to fear-big-money",
+);
+assert(
+  fearSpendOnSelfArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "fear-spend-on-self see-also includes fear-big-money",
+);
+assert(
+  moneyFlowArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-perestat-boyatsya-bolshih-deneg",
+  ),
+  "money flow see-also includes fear-big-money",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",

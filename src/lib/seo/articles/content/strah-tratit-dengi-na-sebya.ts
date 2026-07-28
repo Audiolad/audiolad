@@ -443,6 +443,11 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
       title: "Как изменить отношение к деньгам",
       description: "Семейные установки и привычные реакции на деньги",
     },
+    {
+      href: "/articles/kak-perestat-boyatsya-bolshih-deneg",
+      title: "Как перестать бояться больших денег",
+      description: "Тревога перед крупными суммами и ростом дохода",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -453,5 +458,5 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T19:00:00.000Z",
+  updatedAt: "2026-07-28T12:00:00.000Z",
 } as const satisfies ArticleDefinition;

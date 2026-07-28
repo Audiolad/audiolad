@@ -617,6 +617,11 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
       title: "Денежные установки",
       description: "Убеждения о деньгах и привычные финансовые правила",
     },
+    {
+      href: "/articles/kak-perestat-boyatsya-bolshih-deneg",
+      title: "Как перестать бояться больших денег",
+      description: "Тревога перед крупной оплатой и ростом дохода",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -627,5 +632,5 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T08:00:00.000Z",
+  updatedAt: "2026-07-28T12:00:00.000Z",
 } as const satisfies ArticleDefinition;
