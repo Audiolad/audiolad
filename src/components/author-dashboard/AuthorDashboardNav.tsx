@@ -80,6 +80,43 @@ function FinanceIcon() {
   );
 }
 
+function StatusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 8v4l2.5 1.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DocumentsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M8 7h8M8 12h8M8 17h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <rect
+        x="5"
+        y="4"
+        width="14"
+        height="16"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 type AuthorDashboardNavProps = {
   authorSlug?: string;
 };
@@ -124,9 +161,15 @@ export default function AuthorDashboardNav({
       active: pathname.startsWith("/author-dashboard/finance"),
     },
     {
+      href: `/author-dashboard/status${authorQuery}`,
+      label: "Статус",
+      icon: StatusIcon,
+      active: pathname.startsWith("/author-dashboard/status"),
+    },
+    {
       href: `/author-dashboard/legal${authorQuery}`,
       label: "Документы",
-      icon: ProfileIcon,
+      icon: DocumentsIcon,
       active: pathname.startsWith("/author-dashboard/legal"),
     },
   ];

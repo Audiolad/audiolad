@@ -1,6 +1,7 @@
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorTermsAcceptPanel from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
+import { loadAuthorCommercialShareSummary } from "@/lib/author-commercial/share-summary";
 import {
   authorHasAnyTermsAcceptance,
   loadAuthorTermsStatus,
@@ -24,8 +25,11 @@ export default async function AuthorCommercialTermsPage({
   });
 
   const { role } = await requireAuthorMembership(author.id);
-  const status = await loadAuthorTermsStatus({ authorId: author.id, role });
-  const hadPrior = await authorHasAnyTermsAcceptance(author.id);
+  const [status, hadPrior, commercialShare] = await Promise.all([
+    loadAuthorTermsStatus({ authorId: author.id, role }),
+    authorHasAnyTermsAcceptance(author.id),
+    loadAuthorCommercialShareSummary(author.id),
+  ]);
   const backHref = `/author-dashboard?author=${encodeURIComponent(author.slug)}`;
 
   return (
@@ -72,6 +76,7 @@ export default async function AuthorCommercialTermsPage({
           authorSlug={author.slug}
           status={status}
           mode={hadPrior ? "updated" : "first"}
+          commercialShare={commercialShare}
         />
       )}
     </AuthorShell>

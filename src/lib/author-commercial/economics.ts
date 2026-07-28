@@ -31,3 +31,73 @@ export const DEFAULT_COMMERCIAL_SHARE = {
   /** Alias matching the DB column name. */
   platformFeeBps: PLATFORM_COMMERCIAL_SHARE_BPS,
 } as const;
+
+export type CommercialShareBps = {
+  authorShareBps: number;
+  platformShareBps: number;
+};
+
+/** Author-facing explanation of what the platform share covers (display only). */
+export const PLATFORM_COMMISSION_SCOPE_TEXT =
+  "Комиссия Платформы включает использование технической инфраструктуры АудиоЛада, размещение продуктов, предоставление доступа слушателям, приём платежей, работу кабинета, учёт продаж и организацию выплат.";
+
+export function bpsToPercentNumber(bps: number): number {
+  return bps / 100;
+}
+
+export function formatShareBpsAsPercent(bps: number): string {
+  const value = bpsToPercentNumber(bps);
+  return `${value.toLocaleString("ru-RU", {
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+export function resolveDisplayCommercialShare(input?: {
+  authorShareBps?: number | null;
+  platformShareBps?: number | null;
+  platformFeeBps?: number | null;
+} | null): CommercialShareBps & { isIndividual: boolean } {
+  const authorShareBps = input?.authorShareBps;
+  const platformShareBps =
+    input?.platformShareBps ?? input?.platformFeeBps ?? null;
+
+  if (
+    typeof authorShareBps === "number" &&
+    typeof platformShareBps === "number" &&
+    assertCommercialShareBpsPair(authorShareBps, platformShareBps)
+  ) {
+    const isDefault =
+      authorShareBps === AUTHOR_COMMERCIAL_SHARE_BPS &&
+      platformShareBps === PLATFORM_COMMERCIAL_SHARE_BPS;
+    return {
+      authorShareBps,
+      platformShareBps,
+      isIndividual: !isDefault,
+    };
+  }
+
+  return {
+    authorShareBps: DEFAULT_COMMERCIAL_SHARE.authorShareBps,
+    platformShareBps: DEFAULT_COMMERCIAL_SHARE.platformShareBps,
+    isIndividual: false,
+  };
+}
+
+export function getCommercialShareDisplayLines(
+  share: CommercialShareBps = DEFAULT_COMMERCIAL_SHARE,
+): {
+  authorLine: string;
+  platformLine: string;
+  authorPercentLabel: string;
+  platformPercentLabel: string;
+} {
+  const authorPercentLabel = formatShareBpsAsPercent(share.authorShareBps);
+  const platformPercentLabel = formatShareBpsAsPercent(share.platformShareBps);
+
+  return {
+    authorPercentLabel,
+    platformPercentLabel,
+    authorLine: `Вознаграждение автора – ${authorPercentLabel} от стоимости продажи.`,
+    platformLine: `Вознаграждение Платформы – ${platformPercentLabel} от стоимости продажи.`,
+  };
+}

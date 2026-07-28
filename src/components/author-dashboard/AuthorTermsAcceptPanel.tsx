@@ -10,6 +10,13 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
 
+export type AuthorTermsCommercialShareSummary = {
+  authorLine: string;
+  platformLine: string;
+  scopeText: string;
+  isIndividual: boolean;
+};
+
 type Props = {
   authorId: string;
   authorSlug: string;
@@ -17,6 +24,8 @@ type Props = {
   mode: "first" | "updated";
   /** `card` — standalone block; `embedded` — controls only inside a parent card. */
   variant?: "card" | "embedded";
+  /** Current commercial parameters shown before the acceptance checkbox. */
+  commercialShare?: AuthorTermsCommercialShareSummary | null;
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -43,6 +52,7 @@ export default function AuthorTermsAcceptPanel({
   status,
   mode,
   variant = "card",
+  commercialShare = null,
 }: Props) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
@@ -127,6 +137,22 @@ export default function AuthorTermsAcceptPanel({
           {openLabel}
         </Link>
       </div>
+
+      {commercialShare ? (
+        <div className="mt-5 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#4c3d78]">
+          <p className="font-semibold text-[#25135c]">
+            Актуальные коммерческие параметры
+          </p>
+          <p className="mt-2">{commercialShare.authorLine}</p>
+          <p className="mt-1">{commercialShare.platformLine}</p>
+          <p className="mt-2 text-[#8c7dab]">
+            {commercialShare.isIndividual
+              ? "Для вашего кабинета назначены индивидуальные параметры."
+              : "Стандартные условия Платформы."}
+          </p>
+          <p className="mt-2 text-[#8c7dab]">{commercialShare.scopeText}</p>
+        </div>
+      ) : null}
 
       {status.role === "editor" ? (
         <p className="mt-5 text-sm leading-6 text-[#8c7dab]">
