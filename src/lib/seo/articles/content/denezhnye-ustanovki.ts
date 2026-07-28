@@ -580,6 +580,11 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-nayti-novye-istochniki-dohoda",
+      title: "Как найти новые источники дохода",
+      description: "Дополнительный канал поступлений и первые шаги проверки",
+    },
+    {
       href: "/articles/kak-povysit-dohod",
       title: "Как повысить доход",
       description: "Реалистичные способы и практические шаги роста заработка",
@@ -635,5 +640,5 @@ export const DENEZHNYE_USTANOVKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T20:00:00.000Z",
+  updatedAt: "2026-07-28T22:00:00.000Z",
 } as const satisfies ArticleDefinition;

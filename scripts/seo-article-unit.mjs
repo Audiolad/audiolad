@@ -4066,6 +4066,81 @@ assert(
   "money-beliefs see-also includes raise-income",
 );
 
+const newIncomeSourcesArticle = getArticleBySlug(
+  "kak-nayti-novye-istochniki-dohoda",
+);
+assert(newIncomeSourcesArticle, "new-income-sources article registered");
+assert(
+  newIncomeSourcesArticle.title ===
+    "Как найти новые источники дохода: реалистичные направления и первые шаги",
+  "new-income-sources H1",
+);
+assert(
+  newIncomeSourcesArticle.metaTitle ===
+    "Как найти новые источники дохода – идеи и первые шаги | АудиоЛад",
+  "new-income-sources SEO title",
+);
+assert(
+  newIncomeSourcesArticle.topicSlug === "besplatnye-meditatsii",
+  "new-income-sources hub",
+);
+assert(
+  newIncomeSourcesArticle.primaryPractice.practiceKey ===
+    "energiya-denezhnogo-puti",
+  "new-income-sources practice",
+);
+assert(
+  newIncomeSourcesArticle.primaryPracticeIntro.includes(
+    "Энергия Денежного Пути",
+  ),
+  "new-income-sources practice intro",
+);
+assert(
+  newIncomeSourcesArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует появление нового источника дохода"),
+    ),
+  "new-income-sources practice disclaimer",
+);
+assert(
+  newIncomeSourcesArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-povysit-dohod",
+  "new-income-sources priority link to raise-income",
+);
+assert(
+  newIncomeSourcesArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "new-income-sources links to money-thinking",
+);
+assert(
+  listArticleSlugs().includes("kak-nayti-novye-istochniki-dohoda"),
+  "new-income-sources in slug list",
+);
+assert(
+  !newIncomeSourcesArticle.metaTitle.includes("—"),
+  "new-income-sources uses medium dash",
+);
+assert(
+  raiseIncomeArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+  ) ||
+    raiseIncomeArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+    ),
+  "raise-income reverse-links to new-income-sources",
+);
+assert(
+  moneyThinkingArticle.seeAlsoLinks.some(
+    (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+  ) ||
+    moneyThinkingArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+    ),
+  "money-thinking reverse-links to new-income-sources",
+);
+
 assert(
   abundanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/chto-takoe-denezhnyy-potok",
