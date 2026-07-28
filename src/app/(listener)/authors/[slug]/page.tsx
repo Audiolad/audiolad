@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import AuthorPageViewTracker from "@/components/analytics/AuthorPageViewTracker";
 import AuthorAboutSection from "@/components/authors/AuthorAboutSection";
 import AuthorFeaturedSection, {
   AuthorProductsSection,
@@ -87,8 +88,11 @@ export default async function AuthorPublicPage({ params }: PageProps) {
       })
     : null;
 
+  const authorPath = buildAuthorPublicPath(data.slug);
+
   return (
     <>
+      <AuthorPageViewTracker authorId={data.id} path={authorPath} />
       <JsonLd data={structuredData} />
       <div className="hidden px-5 pt-2 xl:block xl:px-6">
         <Link
