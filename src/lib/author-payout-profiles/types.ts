@@ -10,6 +10,14 @@ export type AuthorPayoutRecipientType =
 /** UI-only; never accepted by API/SQL. */
 export const AUTHOR_PAYOUT_RECIPIENT_TYPE_COMING_SOON = "legal_entity" as const;
 
+export const AUTHOR_PAYOUT_METHODS = [
+  "card",
+  "sbp",
+  "bank_account",
+] as const;
+
+export type AuthorPayoutMethod = (typeof AUTHOR_PAYOUT_METHODS)[number];
+
 export const AUTHOR_PAYOUT_PROFILE_STATUSES = [
   "draft",
   "submitted",
@@ -33,26 +41,34 @@ export const AUTHOR_PAYOUT_NPD_CHECK_RESULTS = [
 export type AuthorPayoutNpdCheckResult =
   (typeof AUTHOR_PAYOUT_NPD_CHECK_RESULTS)[number];
 
-/** Sensitive fields stored inside the encrypted envelope only. */
+/**
+ * Sensitive fields stored inside the encrypted envelope only.
+ * Full card/account/SBP phone/INN/FIO never appear in open columns.
+ */
 export type AuthorPayoutProfileSensitivePayload = {
+  payout_method: AuthorPayoutMethod | null;
   legal_name: string | null;
   first_name: string;
   last_name: string;
   middle_name: string | null;
-  inn: string;
+  inn: string | null;
   ogrnip: string | null;
   email: string;
   phone: string;
-  bank_account: string;
-  bank_bik: string;
-  bank_name: string;
+  /** Digits-only card PAN when payout_method === card. */
+  card_number: string | null;
+  bank_account: string | null;
+  bank_bik: string | null;
+  bank_name: string | null;
   bank_correspondent_account: string | null;
+  /** Legacy; no longer collected by the minimal form. */
   registration_address: string | null;
   tax_residency_note: string | null;
 };
 
 export type AuthorPayoutProfileFormValues = {
   recipient_type: AuthorPayoutRecipientType | "";
+  payout_method: AuthorPayoutMethod | "";
   legal_name: string;
   first_name: string;
   last_name: string;
@@ -61,6 +77,7 @@ export type AuthorPayoutProfileFormValues = {
   ogrnip: string;
   email: string;
   phone: string;
+  card_number: string;
   bank_account: string;
   bank_bik: string;
   bank_name: string;
@@ -68,6 +85,7 @@ export type AuthorPayoutProfileFormValues = {
   registration_address: string;
   tax_residency_note: string;
   is_npd_declared: boolean;
+  details_confirmed: boolean;
   author_revision_comment: string;
 };
 
@@ -77,6 +95,8 @@ export type AuthorPayoutProfilePublicView = {
   recipient_type: AuthorPayoutRecipientType;
   status: AuthorPayoutProfileStatus;
   version: number;
+  payout_method: AuthorPayoutMethod | null;
+  bank_display_name: string | null;
   inn_last4: string | null;
   account_last4: string | null;
   is_npd_declared: boolean;
@@ -102,6 +122,8 @@ export type AuthorPayoutProfileAdminListItem = {
   author_name: string;
   author_slug: string | null;
   recipient_type: AuthorPayoutRecipientType;
+  payout_method: AuthorPayoutMethod | null;
+  bank_display_name: string | null;
   status: AuthorPayoutProfileStatus;
   version: number;
   inn_last4: string | null;
@@ -135,6 +157,15 @@ export function isAuthorPayoutRecipientType(
   );
 }
 
+export function isAuthorPayoutMethod(
+  value: unknown,
+): value is AuthorPayoutMethod {
+  return (
+    typeof value === "string" &&
+    (AUTHOR_PAYOUT_METHODS as readonly string[]).includes(value)
+  );
+}
+
 export function isAuthorPayoutProfileStatus(
   value: unknown,
 ): value is AuthorPayoutProfileStatus {
@@ -159,6 +190,32 @@ export function getAuthorPayoutRecipientTypeLabel(
   }
 }
 
+export function getAuthorPayoutMethodLabel(method: AuthorPayoutMethod): string {
+  switch (method) {
+    case "card":
+      return "Банковская карта";
+    case "sbp":
+      return "СБП";
+    case "bank_account":
+      return "Банковский счёт";
+    default:
+      return method;
+  }
+}
+
+/** Simplified author-facing status (DB statuses stay unchanged). */
+export function getAuthorPayoutProfileDisplayState(
+  status: AuthorPayoutProfileStatus | null | undefined,
+): "empty" | "filled" | "needs_changes" {
+  if (!status || status === "draft") {
+    return "empty";
+  }
+  if (status === "needs_changes" || status === "rejected") {
+    return "needs_changes";
+  }
+  return "filled";
+}
+
 export function getAuthorPayoutProfileStatusLabel(
   status: AuthorPayoutProfileStatus,
 ): string {
@@ -166,15 +223,15 @@ export function getAuthorPayoutProfileStatusLabel(
     case "draft":
       return "Черновик";
     case "submitted":
-      return "Отправлено";
+      return "Данные отправлены";
     case "in_review":
       return "На проверке";
     case "needs_changes":
-      return "Нужны исправления";
+      return "Требуется уточнение";
     case "verified":
-      return "Проверено";
+      return "Данные заполнены";
     case "rejected":
-      return "Отклонено";
+      return "Требуется уточнение";
     default:
       return status;
   }

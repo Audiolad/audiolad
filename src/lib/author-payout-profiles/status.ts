@@ -90,28 +90,30 @@ export function mapPayoutProfileStatusToOnboardingVisual(input: {
     case "draft":
       return {
         state: "active",
-        statusLabel: "Черновик",
+        statusLabel: "Не заполнено",
         actionLabel: "Продолжить",
       };
     case "submitted":
     case "in_review":
       return {
-        state: "active",
-        statusLabel: "На проверке",
-        hint: "Данные проверяются. Обычно это занимает до нескольких рабочих дней.",
+        state: "completed",
+        statusLabel: "Данные отправлены",
       };
     case "needs_changes":
       return {
         state: "active",
-        statusLabel: "Нужны исправления",
-        actionLabel: "Исправить данные",
+        statusLabel: "Требуется уточнение",
+        actionLabel: "Уточнить данные",
       };
     case "verified":
-      return { state: "completed" };
+      return {
+        state: "completed",
+        statusLabel: "Данные заполнены",
+      };
     case "rejected":
       return {
         state: "active",
-        statusLabel: "Отклонено",
+        statusLabel: "Требуется уточнение",
         actionLabel: "Открыть решение",
       };
     default:

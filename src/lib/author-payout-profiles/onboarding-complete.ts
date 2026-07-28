@@ -14,7 +14,13 @@ export function resolvePayoutStepCompleteForLegacyOnboarding(input: {
     return true;
   }
 
-  return input.payoutProfileStatus === "verified";
+  // Checklist presentation: saved/submitted counts as filled.
+  // Activation / paid access still require isPayoutProfileVerified().
+  return (
+    input.payoutProfileStatus === "verified" ||
+    input.payoutProfileStatus === "submitted" ||
+    input.payoutProfileStatus === "in_review"
+  );
 }
 
 /** Strict verification signal for future activation / payout eligibility. */

@@ -1,26 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  AUTHOR_COMMERCIAL_SHARE_BPS,
-  PLATFORM_COMMERCIAL_SHARE_BPS,
-} from "@/lib/author-commercial/economics";
-import {
-  maskBankAccount,
+  formatPayoutRequisitesSummary,
   maskEmail,
   maskInn,
   maskPhone,
 } from "@/lib/author-payout-profiles/masking";
 import { sensitivePayloadToFormValues } from "@/lib/author-payout-profiles/payload";
 import type {
+  AuthorPayoutMethod,
   AuthorPayoutProfileFormValues,
   AuthorPayoutProfilePublicView,
   AuthorPayoutRecipientType,
 } from "@/lib/author-payout-profiles/types";
 import {
-  AUTHOR_PAYOUT_RECIPIENT_TYPE_COMING_SOON,
+  getAuthorPayoutMethodLabel,
   getAuthorPayoutProfileStatusLabel,
   getAuthorPayoutRecipientTypeLabel,
 } from "@/lib/author-payout-profiles/types";
@@ -32,80 +30,101 @@ import {
 type AuthorPayoutProfileFormProps = {
   authorId: string;
   backHref: string;
+  initialEmail?: string | null;
 };
 
-type RecipientCard = {
-  type: AuthorPayoutRecipientType | typeof AUTHOR_PAYOUT_RECIPIENT_TYPE_COMING_SOON;
+const RECIPIENT_OPTIONS: Array<{
+  type: AuthorPayoutRecipientType;
   label: string;
   description: string;
-  disabled?: boolean;
-};
-
-const RECIPIENT_CARDS: RecipientCard[] = [
+}> = [
   {
     type: "self_employed",
     label: "Самозанятый",
-    description: "Режим «Налог на профессиональный доход»",
+    description: "Налог на профессиональный доход",
   },
   {
     type: "individual_entrepreneur",
     label: "Индивидуальный предприниматель",
-    description: "ИП с расчётным счётом",
+    description: "ИП",
   },
   {
     type: "individual",
     label: "Физическое лицо",
-    description: "Выплаты как физлицу",
-  },
-  {
-    type: AUTHOR_PAYOUT_RECIPIENT_TYPE_COMING_SOON,
-    label: "ООО",
-    description: "Скоро",
-    disabled: true,
+    description: "Без статуса ИП или самозанятого",
   },
 ];
 
-function formatSharePercent(bps: number): string {
-  return String(bps / 100);
-}
-
-function profileToFormValues(
-  profile: AuthorPayoutProfilePublicView,
-): AuthorPayoutProfileFormValues {
-  if (profile.fields) {
-    return sensitivePayloadToFormValues(profile.recipient_type, profile.fields, {
-      is_npd_declared: profile.is_npd_declared,
-      author_revision_comment: profile.author_revision_comment,
-    });
-  }
-
-  return {
-    ...emptyAuthorPayoutProfileFormValues(),
-    recipient_type: profile.recipient_type,
-  };
-}
+const METHOD_OPTIONS: Array<{
+  method: AuthorPayoutMethod;
+  label: string;
+  description: string;
+}> = [
+  {
+    method: "card",
+    label: "Банковская карта",
+    description: "Перевод на карту",
+  },
+  {
+    method: "sbp",
+    label: "СБП",
+    description: "По номеру телефона",
+  },
+  {
+    method: "bank_account",
+    label: "Банковский счёт",
+    description: "Расчётный или личный счёт",
+  },
+];
 
 function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null;
-  }
-
+  if (!message) return null;
   return <p className="mt-1 text-sm text-[#b34f63]">{message}</p>;
 }
 
 const inputClassName =
   "mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c] disabled:opacity-70";
 
+function profileToFormValues(
+  profile: AuthorPayoutProfilePublicView,
+  initialEmail?: string | null,
+): AuthorPayoutProfileFormValues {
+  if (profile.fields) {
+    const values = sensitivePayloadToFormValues(
+      profile.recipient_type,
+      profile.fields,
+      {
+        is_npd_declared: profile.is_npd_declared,
+        author_revision_comment: profile.author_revision_comment,
+      },
+    );
+    if (!values.email && initialEmail) {
+      values.email = initialEmail;
+    }
+    return values;
+  }
+
+  return {
+    ...emptyAuthorPayoutProfileFormValues(),
+    recipient_type: profile.recipient_type,
+    payout_method: profile.payout_method ?? "",
+    bank_name: profile.bank_display_name ?? "",
+    email: initialEmail?.trim() || "",
+  };
+}
+
 export default function AuthorPayoutProfileForm({
   authorId,
   backHref,
+  initialEmail = null,
 }: AuthorPayoutProfileFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [beginningEdit, setBeginningEdit] = useState(false);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [replaceRequisites, setReplaceRequisites] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] =
@@ -113,9 +132,10 @@ export default function AuthorPayoutProfileForm({
   const [profile, setProfile] = useState<AuthorPayoutProfilePublicView | null>(
     null,
   );
-  const [values, setValues] = useState<AuthorPayoutProfileFormValues>(
-    emptyAuthorPayoutProfileFormValues(),
-  );
+  const [values, setValues] = useState<AuthorPayoutProfileFormValues>(() => ({
+    ...emptyAuthorPayoutProfileFormValues(),
+    email: initialEmail?.trim() || "",
+  }));
 
   useEffect(() => {
     let cancelled = false;
@@ -125,44 +145,41 @@ export default function AuthorPayoutProfileForm({
       setError(null);
       setSuccess(null);
       setFieldErrors({});
+      setReplaceRequisites(false);
 
       try {
         const response = await fetch(
           `/api/author/payout-profile?author_id=${encodeURIComponent(authorId)}`,
         );
-
-        if (!response.ok) {
-          throw new Error("load_failed");
-        }
+        if (!response.ok) throw new Error("load_failed");
 
         const payload = (await response.json()) as {
           profile: AuthorPayoutProfilePublicView | null;
         };
-
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         const row = payload.profile ?? null;
         setProfile(row);
-        setValues(row ? profileToFormValues(row) : emptyAuthorPayoutProfileFormValues());
+        setValues(
+          row
+            ? profileToFormValues(row, initialEmail)
+            : {
+                ...emptyAuthorPayoutProfileFormValues(),
+                email: initialEmail?.trim() || "",
+              },
+        );
       } catch {
-        if (!cancelled) {
-          setError("Не удалось загрузить данные.");
-        }
+        if (!cancelled) setError("Не удалось загрузить данные.");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
     void loadProfile();
-
     return () => {
       cancelled = true;
     };
-  }, [authorId]);
+  }, [authorId, initialEmail]);
 
   function updateField<K extends keyof AuthorPayoutProfileFormValues>(
     key: K,
@@ -175,6 +192,7 @@ export default function AuthorPayoutProfileForm({
     return {
       author_id: authorId,
       recipient_type: values.recipient_type,
+      payout_method: values.payout_method,
       legal_name: values.legal_name,
       first_name: values.first_name,
       last_name: values.last_name,
@@ -183,13 +201,13 @@ export default function AuthorPayoutProfileForm({
       ogrnip: values.ogrnip,
       email: values.email,
       phone: values.phone,
+      card_number: values.card_number,
       bank_account: values.bank_account,
       bank_bik: values.bank_bik,
       bank_name: values.bank_name,
       bank_correspondent_account: values.bank_correspondent_account,
-      registration_address: values.registration_address,
-      tax_residency_note: values.tax_residency_note,
       is_npd_declared: values.is_npd_declared,
+      details_confirmed: values.details_confirmed,
       author_revision_comment: values.author_revision_comment,
     };
   }
@@ -206,7 +224,6 @@ export default function AuthorPayoutProfileForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
-
       const payload = (await response.json()) as {
         error?: string;
         fieldErrors?: AuthorPayoutProfileFieldErrors;
@@ -214,18 +231,20 @@ export default function AuthorPayoutProfileForm({
       };
 
       if (!response.ok) {
-        if (payload.fieldErrors) {
-          setFieldErrors(payload.fieldErrors);
-        }
-        setError(payload.error ?? "Не удалось сохранить черновик.");
+        if (payload.fieldErrors) setFieldErrors(payload.fieldErrors);
+        setError(
+          payload.error === "feature_not_available"
+            ? "Заполнение данных для выплат временно недоступно. Попробуйте позднее."
+            : "Не удалось сохранить черновик.",
+        );
         return;
       }
 
       if (payload.profile) {
         setProfile(payload.profile);
-        setValues(profileToFormValues(payload.profile));
+        setValues(profileToFormValues(payload.profile, initialEmail));
+        setReplaceRequisites(false);
       }
-
       setSuccess("Черновик сохранён.");
       router.refresh();
     } catch {
@@ -235,8 +254,8 @@ export default function AuthorPayoutProfileForm({
     }
   }
 
-  async function submitProfile() {
-    setSubmitting(true);
+  async function saveComplete() {
+    setSaving(true);
     setError(null);
     setSuccess(null);
     setFieldErrors({});
@@ -250,7 +269,6 @@ export default function AuthorPayoutProfileForm({
           action: "submit",
         }),
       });
-
       const payload = (await response.json()) as {
         error?: string;
         fieldErrors?: AuthorPayoutProfileFieldErrors;
@@ -258,24 +276,26 @@ export default function AuthorPayoutProfileForm({
       };
 
       if (!response.ok) {
-        if (payload.fieldErrors) {
-          setFieldErrors(payload.fieldErrors);
-        }
-        setError(payload.error ?? "Не удалось отправить данные.");
+        if (payload.fieldErrors) setFieldErrors(payload.fieldErrors);
+        setError(
+          payload.error === "feature_not_available"
+            ? "Заполнение данных для выплат временно недоступно. Попробуйте позднее."
+            : "Не удалось сохранить данные.",
+        );
         return;
       }
 
       if (payload.profile) {
         setProfile(payload.profile);
-        setValues(profileToFormValues(payload.profile));
+        setValues(profileToFormValues(payload.profile, initialEmail));
+        setReplaceRequisites(false);
       }
-
-      setSuccess("Данные отправлены на проверку.");
+      setSuccess("Данные для выплат сохранены.");
       router.refresh();
     } catch {
-      setError("Не удалось отправить данные.");
+      setError("Не удалось сохранить данные.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
@@ -294,7 +314,6 @@ export default function AuthorPayoutProfileForm({
           confirm: true,
         }),
       });
-
       const payload = (await response.json()) as {
         error?: string;
         profile?: AuthorPayoutProfilePublicView;
@@ -307,11 +326,11 @@ export default function AuthorPayoutProfileForm({
 
       if (payload.profile) {
         setProfile(payload.profile);
-        setValues(profileToFormValues(payload.profile));
+        setValues(profileToFormValues(payload.profile, initialEmail));
+        setReplaceRequisites(true);
       }
-
       setShowEditConfirm(false);
-      setSuccess("Форма открыта для редактирования. После изменений потребуется повторная проверка.");
+      setSuccess("Форма открыта для изменения реквизитов.");
       router.refresh();
     } catch {
       setError("Не удалось открыть редактирование.");
@@ -321,19 +340,27 @@ export default function AuthorPayoutProfileForm({
   }
 
   const status = profile?.status ?? null;
-  const statusLabel = status ? getAuthorPayoutProfileStatusLabel(status) : null;
   const editable = profile?.can_edit ?? true;
-  const canSubmit = profile?.can_submit ?? true;
-  const busy = savingDraft || submitting || beginningEdit;
+  const busy = savingDraft || saving || beginningEdit;
   const recipientType = values.recipient_type;
-  const showFormFields =
-    !profile ||
-    editable ||
-    status === "draft" ||
-    status === "needs_changes";
+  const payoutMethod = values.payout_method;
+  const locked =
+    status === "submitted" || status === "in_review" || status === "verified";
+  const showForm = !locked || editable;
 
-  const authorShare = formatSharePercent(AUTHOR_COMMERCIAL_SHARE_BPS);
-  const platformShare = formatSharePercent(PLATFORM_COMMERCIAL_SHARE_BPS);
+  const summary = useMemo(
+    () =>
+      formatPayoutRequisitesSummary({
+        payout_method: profile?.payout_method ?? null,
+        bank_display_name: profile?.bank_display_name ?? null,
+        account_last4: profile?.account_last4 ?? null,
+      }),
+    [profile],
+  );
+
+  const hasStoredRequisites = Boolean(profile?.account_last4);
+  const showRequisiteInputs =
+    !hasStoredRequisites || replaceRequisites || !profile;
 
   return (
     <div
@@ -345,108 +372,100 @@ export default function AuthorPayoutProfileForm({
           Данные для выплат
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#796ba0]">
-          Укажите сведения, необходимые для начисления и перечисления авторского
-          вознаграждения. Данные хранятся в зашифрованном виде и доступны только
-          уполномоченным сотрудникам платформы.
+          Укажите, как вам удобно получать авторское вознаграждение. Если перед
+          первой выплатой потребуются дополнительные сведения, мы свяжемся с
+          вами.
         </p>
 
-        {statusLabel ? (
+        {status ? (
           <p className="mt-4 inline-flex rounded-full bg-[#f3edfb] px-3 py-1 text-sm font-medium text-[#7042c5]">
-            Статус: {statusLabel}
-          </p>
-        ) : null}
-
-        <div className="mt-4 rounded-[18px] border border-[#e8dff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#5f5484]">
-          <p className="font-medium text-[#25135c]">Как распределяется доход</p>
-          <p className="mt-1">
-            Автор получает {authorShare}% от суммы продажи, платформа —{" "}
-            {platformShare}%. Точные условия фиксируются в соглашении о
-            сотрудничестве.
-          </p>
-        </div>
-
-        {status === "submitted" || status === "in_review" ? (
-          <p className="mt-4 text-sm leading-6 text-[#796ba0]">
-            Данные проверяются. Обычно это занимает до нескольких рабочих дней.
-            Пока проверка не завершена, редактирование недоступно.
+            {getAuthorPayoutProfileStatusLabel(status)}
           </p>
         ) : null}
 
         {(status === "needs_changes" || status === "rejected") &&
         profile?.review_comment ? (
           <div className="mt-4 rounded-[18px] border border-[#f0dfab] bg-[#fffaf0] px-4 py-3 text-sm leading-6 text-[#8a6a1f]">
-            <p className="font-medium">Комментарий команды</p>
+            <p className="font-medium">Нужно уточнение</p>
             <p className="mt-1 whitespace-pre-wrap">{profile.review_comment}</p>
           </div>
         ) : null}
 
-        {status === "verified" && profile?.fields ? (
+        {locked && !editable ? (
           <div className="mt-4 space-y-3 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm text-[#2f5f45]">
-            <p className="font-medium">Подтверждённые данные</p>
+            <p className="font-medium">Сохранённые данные</p>
             <dl className="space-y-2">
               <div>
-                <dt className="text-[#5f8a72]">Статус</dt>
-                <dd>{getAuthorPayoutRecipientTypeLabel(profile.recipient_type)}</dd>
-              </div>
-              <div>
-                <dt className="text-[#5f8a72]">ИНН</dt>
-                <dd className="font-mono">{maskInn(profile.fields.inn)}</dd>
-              </div>
-              <div>
-                <dt className="text-[#5f8a72]">Счёт</dt>
-                <dd className="font-mono">
-                  {maskBankAccount(profile.fields.bank_account)}
+                <dt className="text-[#5f8a72]">Кто вы</dt>
+                <dd>
+                  {getAuthorPayoutRecipientTypeLabel(profile!.recipient_type)}
                 </dd>
               </div>
-              <div>
-                <dt className="text-[#5f8a72]">Email</dt>
-                <dd className="font-mono">{maskEmail(profile.fields.email)}</dd>
-              </div>
-              <div>
-                <dt className="text-[#5f8a72]">Телефон</dt>
-                <dd className="font-mono">{maskPhone(profile.fields.phone)}</dd>
-              </div>
-            </dl>
-            {!showEditConfirm ? (
-              <button
-                type="button"
-                onClick={() => setShowEditConfirm(true)}
-                className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full border border-[#9bc9b0] px-5 text-sm font-medium text-[#2f5f45]"
-              >
-                Изменить данные
-              </button>
-            ) : (
-              <div className="mt-3 rounded-[16px] border border-[#cfe8d9] bg-white px-4 py-3 text-[#2f5f45]">
-                <p>
-                  После изменения данные снова отправятся на проверку. До
-                  подтверждения шаг «Данные для выплат» будет считаться
-                  незавершённым.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void beginVerifiedEdit()}
-                    disabled={beginningEdit}
-                    className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3d8d65] px-5 text-sm font-medium text-white disabled:opacity-60"
-                  >
-                    {beginningEdit ? "Открытие…" : "Подтвердить изменение"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowEditConfirm(false)}
-                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
-                  >
-                    Отмена
-                  </button>
+              {profile?.payout_method ? (
+                <div>
+                  <dt className="text-[#5f8a72]">Способ выплаты</dt>
+                  <dd>{getAuthorPayoutMethodLabel(profile.payout_method)}</dd>
                 </div>
+              ) : null}
+              <div>
+                <dt className="text-[#5f8a72]">Реквизиты</dt>
+                <dd className="font-mono">{summary}</dd>
               </div>
+              {profile?.inn_last4 ? (
+                <div>
+                  <dt className="text-[#5f8a72]">ИНН</dt>
+                  <dd className="font-mono">•••• {profile.inn_last4}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            {status === "verified" ? (
+              !showEditConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEditConfirm(true)}
+                  className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full border border-[#9bc9b0] px-5 text-sm font-medium text-[#2f5f45]"
+                >
+                  Изменить реквизиты
+                </button>
+              ) : (
+                <div className="mt-3 rounded-[16px] border border-[#cfe8d9] bg-white px-4 py-3">
+                  <p>
+                    После изменения данные снова нужно будет сохранить. Полный
+                    номер карты или счёта заново вводится вручную и не
+                    подставляется в форму.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void beginVerifiedEdit()}
+                      disabled={beginningEdit}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3d8d65] px-5 text-sm font-medium text-white disabled:opacity-60"
+                    >
+                      {beginningEdit ? "Открытие…" : "Продолжить"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditConfirm(false)}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <p className="mt-2 text-[#5f8a72]">
+                Данные сохранены. Редактирование откроется, если потребуются
+                уточнения.
+              </p>
             )}
           </div>
         ) : null}
 
         {loading ? (
           <p className="mt-5 text-sm text-[#7d70a2]">Загрузка…</p>
-        ) : showFormFields ? (
+        ) : showForm ? (
           <form
             className="mt-5 space-y-5"
             autoComplete="off"
@@ -457,7 +476,6 @@ export default function AuthorPayoutProfileForm({
                 {error}
               </div>
             ) : null}
-
             {success ? (
               <div className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm text-[#3d8d65]">
                 {success}
@@ -466,45 +484,38 @@ export default function AuthorPayoutProfileForm({
 
             <fieldset>
               <legend className="text-sm font-medium text-[#25135c]">
-                Правовой статус получателя выплат
+                Кто вы?
               </legend>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {RECIPIENT_CARDS.map((card) => {
-                  const selected = recipientType === card.type;
-                  const disabled = card.disabled || !editable || busy;
-
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {RECIPIENT_OPTIONS.map((option) => {
+                  const selected = recipientType === option.type;
                   return (
                     <label
-                      key={card.type}
+                      key={option.type}
                       className={`flex min-h-[88px] cursor-pointer flex-col rounded-[18px] border px-4 py-3 ${
                         selected
                           ? "border-[#7042c5] bg-[#f3edfb]"
                           : "border-[#eadff8] bg-[#faf6ff]"
-                      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+                      } ${!editable || busy ? "opacity-60" : ""}`}
                     >
                       <span className="flex items-start gap-3">
                         <input
                           type="radio"
                           name="recipient_type"
-                          value={card.type}
+                          value={option.type}
                           checked={selected}
-                          disabled={disabled || card.disabled}
-                          onChange={() => {
-                            if (!card.disabled) {
-                              updateField(
-                                "recipient_type",
-                                card.type as AuthorPayoutRecipientType,
-                              );
-                            }
-                          }}
+                          disabled={!editable || busy}
+                          onChange={() =>
+                            updateField("recipient_type", option.type)
+                          }
                           className="mt-1 h-4 w-4 accent-[#7042c5]"
                         />
                         <span>
                           <span className="block text-sm font-semibold text-[#25135c]">
-                            {card.label}
+                            {option.label}
                           </span>
                           <span className="mt-1 block text-sm text-[#796ba0]">
-                            {card.description}
+                            {option.description}
                           </span>
                         </span>
                       </span>
@@ -515,338 +526,370 @@ export default function AuthorPayoutProfileForm({
               <FieldError message={fieldErrors.recipient_type} />
             </fieldset>
 
-            {recipientType === "individual" ? (
-              <div className="rounded-[18px] border border-[#f0dfab] bg-[#fffaf0] px-4 py-3 text-sm leading-6 text-[#8a6a1f]">
-                Выплаты физическому лицу могут облагаться налогом у источника.
-                Убедитесь, что выбранный статус соответствует вашей ситуации.
-              </div>
-            ) : null}
-
-            {recipientType === "individual_entrepreneur" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Полное наименование ИП
-                </span>
-                <input
-                  type="text"
-                  value={values.legal_name}
-                  onChange={(event) =>
-                    updateField("legal_name", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.legal_name} />
-              </label>
-            ) : null}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">Фамилия</span>
-                <input
-                  type="text"
-                  value={values.last_name}
-                  onChange={(event) =>
-                    updateField("last_name", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.last_name} />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">Имя</span>
-                <input
-                  type="text"
-                  value={values.first_name}
-                  onChange={(event) =>
-                    updateField("first_name", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.first_name} />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="text-sm font-medium text-[#25135c]">
-                Отчество{" "}
-                <span className="font-normal text-[#9485b4]">(необязательно)</span>
-              </span>
-              <input
-                type="text"
-                value={values.middle_name}
-                onChange={(event) =>
-                  updateField("middle_name", event.target.value)
-                }
-                disabled={!editable || busy}
-                autoComplete="off"
-                className={inputClassName}
-              />
-              <FieldError message={fieldErrors.middle_name} />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-[#25135c]">ИНН</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={values.inn}
-                onChange={(event) => updateField("inn", event.target.value)}
-                disabled={!editable || busy}
-                autoComplete="off"
-                data-mask="true"
-                className={inputClassName}
-              />
-              <FieldError message={fieldErrors.inn} />
-            </label>
-
-            {recipientType === "individual_entrepreneur" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">ОГРНИП</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={values.ogrnip}
-                  onChange={(event) =>
-                    updateField("ogrnip", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.ogrnip} />
-              </label>
-            ) : null}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">Email</span>
-                <input
-                  type="email"
-                  value={values.email}
-                  onChange={(event) => updateField("email", event.target.value)}
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.email} />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">Телефон</span>
-                <input
-                  type="tel"
-                  value={values.phone}
-                  onChange={(event) => updateField("phone", event.target.value)}
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.phone} />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="text-sm font-medium text-[#25135c]">
-                Наименование банка
-              </span>
-              <input
-                type="text"
-                value={values.bank_name}
-                onChange={(event) =>
-                  updateField("bank_name", event.target.value)
-                }
-                disabled={!editable || busy}
-                autoComplete="off"
-                className={inputClassName}
-              />
-              <FieldError message={fieldErrors.bank_name} />
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">БИК</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={values.bank_bik}
-                  onChange={(event) =>
-                    updateField("bank_bik", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.bank_bik} />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Расчётный счёт
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={values.bank_account}
-                  onChange={(event) =>
-                    updateField("bank_account", event.target.value)
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.bank_account} />
-              </label>
-            </div>
-
-            {recipientType === "individual_entrepreneur" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Корреспондентский счёт
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={values.bank_correspondent_account}
-                  onChange={(event) =>
-                    updateField(
-                      "bank_correspondent_account",
-                      event.target.value,
-                    )
-                  }
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.bank_correspondent_account} />
-              </label>
-            ) : null}
-
-            {recipientType === "individual_entrepreneur" ||
-            recipientType === "individual" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Адрес регистрации
-                </span>
-                <textarea
-                  value={values.registration_address}
-                  onChange={(event) =>
-                    updateField("registration_address", event.target.value)
-                  }
-                  rows={3}
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  data-mask="true"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.registration_address} />
-              </label>
-            ) : null}
-
-            {recipientType === "individual" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Примечание о налоговом резидентстве{" "}
-                  <span className="font-normal text-[#9485b4]">(необязательно)</span>
-                </span>
-                <textarea
-                  value={values.tax_residency_note}
-                  onChange={(event) =>
-                    updateField("tax_residency_note", event.target.value)
-                  }
-                  rows={3}
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.tax_residency_note} />
-              </label>
-            ) : null}
-
-            {recipientType === "self_employed" ? (
+            {recipientType ? (
               <>
-                <label className="flex items-start gap-3 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#25135c]">
+                {recipientType === "individual" ? (
+                  <div className="rounded-[18px] border border-[#e8dff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#5f5484]">
+                    Налоги и обязательные удержания применяются в соответствии с
+                    законодательством и статусом получателя.
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      Фамилия
+                    </span>
+                    <input
+                      type="text"
+                      value={values.last_name}
+                      onChange={(e) => updateField("last_name", e.target.value)}
+                      disabled={!editable || busy}
+                      autoComplete="off"
+                      className={inputClassName}
+                    />
+                    <FieldError message={fieldErrors.last_name} />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      Имя
+                    </span>
+                    <input
+                      type="text"
+                      value={values.first_name}
+                      onChange={(e) =>
+                        updateField("first_name", e.target.value)
+                      }
+                      disabled={!editable || busy}
+                      autoComplete="off"
+                      className={inputClassName}
+                    />
+                    <FieldError message={fieldErrors.first_name} />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-[#25135c]">
+                    Отчество{" "}
+                    <span className="font-normal text-[#9485b4]">
+                      (необязательно)
+                    </span>
+                  </span>
+                  <input
+                    type="text"
+                    value={values.middle_name}
+                    onChange={(e) => updateField("middle_name", e.target.value)}
+                    disabled={!editable || busy}
+                    autoComplete="off"
+                    className={inputClassName}
+                  />
+                  <FieldError message={fieldErrors.middle_name} />
+                </label>
+
+                {recipientType === "self_employed" ||
+                recipientType === "individual_entrepreneur" ? (
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      ИНН
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={values.inn}
+                      onChange={(e) => updateField("inn", e.target.value)}
+                      disabled={!editable || busy}
+                      autoComplete="off"
+                      data-mask="true"
+                      className={inputClassName}
+                    />
+                    <FieldError message={fieldErrors.inn} />
+                  </label>
+                ) : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      Email для связи по выплатам
+                    </span>
+                    <input
+                      type="email"
+                      value={values.email}
+                      onChange={(e) => updateField("email", e.target.value)}
+                      disabled={!editable || busy}
+                      autoComplete="off"
+                      className={inputClassName}
+                    />
+                    <FieldError message={fieldErrors.email} />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-[#25135c]">
+                      Телефон
+                    </span>
+                    <input
+                      type="tel"
+                      value={values.phone}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                      disabled={!editable || busy}
+                      autoComplete="off"
+                      inputMode="tel"
+                      placeholder="+7 …"
+                      data-mask="true"
+                      className={inputClassName}
+                    />
+                    <FieldError message={fieldErrors.phone} />
+                  </label>
+                </div>
+
+                <fieldset>
+                  <legend className="text-sm font-medium text-[#25135c]">
+                    Способ получения выплаты
+                  </legend>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {METHOD_OPTIONS.map((option) => {
+                      const selected = payoutMethod === option.method;
+                      return (
+                        <label
+                          key={option.method}
+                          className={`flex min-h-[88px] cursor-pointer flex-col rounded-[18px] border px-4 py-3 ${
+                            selected
+                              ? "border-[#7042c5] bg-[#f3edfb]"
+                              : "border-[#eadff8] bg-[#faf6ff]"
+                          }`}
+                        >
+                          <span className="flex items-start gap-3">
+                            <input
+                              type="radio"
+                              name="payout_method"
+                              value={option.method}
+                              checked={selected}
+                              disabled={!editable || busy}
+                              onChange={() => {
+                                updateField("payout_method", option.method);
+                                setReplaceRequisites(true);
+                                updateField("card_number", "");
+                                updateField("bank_account", "");
+                              }}
+                              className="mt-1 h-4 w-4 accent-[#7042c5]"
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-[#25135c]">
+                                {option.label}
+                              </span>
+                              <span className="mt-1 block text-sm text-[#796ba0]">
+                                {option.description}
+                              </span>
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <FieldError message={fieldErrors.payout_method} />
+                </fieldset>
+
+                {payoutMethod ? (
+                  <div className="space-y-4 rounded-[18px] border border-[#eadff8] bg-[#fcfaff] px-4 py-4">
+                    {hasStoredRequisites && !replaceRequisites ? (
+                      <div className="space-y-2 text-sm text-[#5f5484]">
+                        <p className="font-medium text-[#25135c]">
+                          Сохранённые реквизиты
+                        </p>
+                        <p className="font-mono">{summary}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplaceRequisites(true);
+                            updateField("card_number", "");
+                            updateField("bank_account", "");
+                          }}
+                          className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] px-4 text-sm font-medium text-[#7042c5]"
+                        >
+                          Изменить реквизиты
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {showRequisiteInputs ? (
+                      <>
+                        <label className="block">
+                          <span className="text-sm font-medium text-[#25135c]">
+                            Банк получателя
+                          </span>
+                          <input
+                            type="text"
+                            value={values.bank_name}
+                            onChange={(e) =>
+                              updateField("bank_name", e.target.value)
+                            }
+                            disabled={!editable || busy}
+                            autoComplete="off"
+                            className={inputClassName}
+                          />
+                          <FieldError message={fieldErrors.bank_name} />
+                        </label>
+
+                        {payoutMethod === "card" ? (
+                          <label className="block">
+                            <span className="text-sm font-medium text-[#25135c]">
+                              Номер карты
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={values.card_number}
+                              onChange={(e) =>
+                                updateField("card_number", e.target.value)
+                              }
+                              disabled={!editable || busy}
+                              autoComplete="off"
+                              data-mask="true"
+                              className={inputClassName}
+                            />
+                            <FieldError message={fieldErrors.card_number} />
+                          </label>
+                        ) : null}
+
+                        {payoutMethod === "sbp" ? (
+                          <p className="text-sm leading-6 text-[#796ba0]">
+                            Укажите номер телефона, подключённый к СБП в
+                            выбранном банке. Используется телефон из поля выше.
+                          </p>
+                        ) : null}
+
+                        {payoutMethod === "bank_account" ? (
+                          <>
+                            <label className="block">
+                              <span className="text-sm font-medium text-[#25135c]">
+                                БИК
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={values.bank_bik}
+                                onChange={(e) =>
+                                  updateField("bank_bik", e.target.value)
+                                }
+                                disabled={!editable || busy}
+                                autoComplete="off"
+                                data-mask="true"
+                                className={inputClassName}
+                              />
+                              <FieldError message={fieldErrors.bank_bik} />
+                            </label>
+                            <label className="block">
+                              <span className="text-sm font-medium text-[#25135c]">
+                                Номер счёта
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={values.bank_account}
+                                onChange={(e) =>
+                                  updateField("bank_account", e.target.value)
+                                }
+                                disabled={!editable || busy}
+                                autoComplete="off"
+                                data-mask="true"
+                                className={inputClassName}
+                              />
+                              <FieldError message={fieldErrors.bank_account} />
+                            </label>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {recipientType === "self_employed" ? (
+                  <label className="flex items-start gap-3 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#5f5484]">
+                    <input
+                      type="checkbox"
+                      checked={values.is_npd_declared}
+                      onChange={(e) =>
+                        updateField("is_npd_declared", e.target.checked)
+                      }
+                      disabled={!editable || busy}
+                      className="mt-1 h-4 w-4 accent-[#7042c5]"
+                    />
+                    <span>
+                      Я применяю налог на профессиональный доход и сообщу
+                      Платформе, если мой статус изменится.
+                      <FieldError message={fieldErrors.is_npd_declared} />
+                    </span>
+                  </label>
+                ) : null}
+
+                <label className="flex items-start gap-3 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#5f5484]">
                   <input
                     type="checkbox"
-                    checked={values.is_npd_declared}
-                    disabled={!editable || busy}
-                    onChange={(event) =>
-                      updateField("is_npd_declared", event.target.checked)
+                    checked={values.details_confirmed}
+                    onChange={(e) =>
+                      updateField("details_confirmed", e.target.checked)
                     }
+                    disabled={!editable || busy}
                     className="mt-1 h-4 w-4 accent-[#7042c5]"
                   />
                   <span>
-                    Подтверждаю, что применяю режим «Налог на профессиональный
-                    доход» (самозанятость) и зарегистрирован в приложении «Мой
-                    налог» или через банк-партнёр.
+                    Я подтверждаю, что указанные сведения верны и принадлежат
+                    мне.
+                    <FieldError message={fieldErrors.details_confirmed} />
                   </span>
                 </label>
-                <FieldError message={fieldErrors.is_npd_declared} />
+
                 <p className="text-sm leading-6 text-[#796ba0]">
-                  Проверить статус самозанятого можно в приложении «Мой налог».
-                  Команда платформы может запросить дополнительное подтверждение.
+                  Данные используются только для организации авторских выплат и
+                  связи по вопросам расчётов. При необходимости перед первой
+                  выплатой Платформа может запросить дополнительные сведения.{" "}
+                  <Link
+                    href="/privacy"
+                    className="font-medium text-[#7042c5] underline-offset-2 hover:underline"
+                  >
+                    Политика обработки персональных данных
+                  </Link>
+                  .
                 </p>
+
+                {profile?.fields ? (
+                  <p className="text-xs text-[#9485b4]">
+                    Контакты в сохранённом профиле:{" "}
+                    {maskEmail(profile.fields.email)} ·{" "}
+                    {maskPhone(profile.fields.phone)}
+                    {profile.fields.inn
+                      ? ` · ИНН ${maskInn(profile.fields.inn)}`
+                      : ""}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void saveComplete()}
+                    disabled={!editable || busy}
+                    className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {saving ? "Сохранение…" : "Сохранить данные"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveDraft()}
+                    disabled={!editable || busy}
+                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-6 text-sm font-medium text-[#7042c5] disabled:opacity-60"
+                  >
+                    {savingDraft ? "Сохранение…" : "Сохранить черновик"}
+                  </button>
+                  <Link
+                    href={backHref}
+                    className="inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-medium text-[#796ba0]"
+                  >
+                    Назад
+                  </Link>
+                </div>
               </>
-            ) : null}
-
-            {status === "needs_changes" ? (
-              <label className="block">
-                <span className="text-sm font-medium text-[#25135c]">
-                  Комментарий для команды{" "}
-                  <span className="font-normal text-[#9485b4]">(необязательно)</span>
-                </span>
-                <textarea
-                  value={values.author_revision_comment}
-                  onChange={(event) =>
-                    updateField("author_revision_comment", event.target.value)
-                  }
-                  rows={3}
-                  disabled={!editable || busy}
-                  autoComplete="off"
-                  className={inputClassName}
-                />
-                <FieldError message={fieldErrors.author_revision_comment} />
-              </label>
-            ) : null}
-
-            {editable && canSubmit ? (
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void saveDraft()}
-                  disabled={busy}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5] disabled:opacity-60"
-                >
-                  {savingDraft ? "Сохранение…" : "Сохранить черновик"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void submitProfile()}
-                  disabled={busy}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
-                >
-                  {submitting ? "Отправка…" : "Отправить на проверку"}
-                </button>
-              </div>
             ) : null}
           </form>
         ) : null}
       </section>
-
-      <a
-        href={backHref}
-        className="inline-flex min-h-11 items-center text-sm font-medium text-[#7042c5]"
-      >
-        ← Вернуться в чеклист подключения
-      </a>
     </div>
   );
 }

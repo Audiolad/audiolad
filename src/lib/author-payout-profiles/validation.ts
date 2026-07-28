@@ -1,4 +1,5 @@
 import {
+  isAuthorPayoutMethod,
   isAuthorPayoutRecipientType,
   type AuthorPayoutProfileFormValues,
 } from "./types";
@@ -7,11 +8,18 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const HTML_LIKE = /[<>]/;
 
 export type AuthorPayoutProfileFieldErrors = Partial<
-  Record<keyof AuthorPayoutProfileFormValues | "recipient_type" | "form", string>
+  Record<
+    keyof AuthorPayoutProfileFormValues | "recipient_type" | "payout_method" | "form",
+    string
+  >
 >;
 
 function stripSpaces(value: string): string {
   return value.replace(/\s+/g, "");
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
 }
 
 function cleanText(value: unknown, maxLength: number): string {
@@ -74,7 +82,7 @@ export function isValidRussianPersonalInn(raw: string): boolean {
   return digits[10] === n11 && digits[11] === n12;
 }
 
-/** OGRNIP (15 digits) with checksum. */
+/** OGRNIP (15 digits) with checksum — optional field. */
 export function isValidOgrnip(raw: string): boolean {
   const value = stripSpaces(raw);
 
@@ -82,7 +90,6 @@ export function isValidOgrnip(raw: string): boolean {
     return false;
   }
 
-  // 14-digit prefix fits in Number.MAX_SAFE_INTEGER.
   const check = Math.floor(Number(value.slice(0, 14)) % 13) % 10;
   return check === Number(value[14]);
 }
@@ -93,6 +100,40 @@ export function isValidBik(raw: string): boolean {
 
 export function isValidBankAccount(raw: string): boolean {
   return /^\d{20}$/.test(stripSpaces(raw));
+}
+
+export function normalizeCardNumber(raw: string): string {
+  return digitsOnly(raw);
+}
+
+/**
+ * Soft card check: 13–19 digits.
+ * Luhn is advisory — invalid Luhn still accepted if length is OK
+ * (rare issuer formats / test bins); we only warn via return flag.
+ */
+export function isValidCardNumberLength(raw: string): boolean {
+  const digits = normalizeCardNumber(raw);
+  return digits.length >= 13 && digits.length <= 19;
+}
+
+export function passesLuhnCheck(raw: string): boolean {
+  const digits = normalizeCardNumber(raw);
+  if (!isValidCardNumberLength(digits)) {
+    return false;
+  }
+
+  let sum = 0;
+  let alt = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
 }
 
 export function isValidEmail(raw: string): boolean {
@@ -126,6 +167,7 @@ export function isValidPhone(raw: string): boolean {
 export function emptyAuthorPayoutProfileFormValues(): AuthorPayoutProfileFormValues {
   return {
     recipient_type: "",
+    payout_method: "",
     legal_name: "",
     first_name: "",
     last_name: "",
@@ -134,6 +176,7 @@ export function emptyAuthorPayoutProfileFormValues(): AuthorPayoutProfileFormVal
     ogrnip: "",
     email: "",
     phone: "",
+    card_number: "",
     bank_account: "",
     bank_bik: "",
     bank_name: "",
@@ -141,6 +184,7 @@ export function emptyAuthorPayoutProfileFormValues(): AuthorPayoutProfileFormVal
     registration_address: "",
     tax_residency_note: "",
     is_npd_declared: false,
+    details_confirmed: false,
     author_revision_comment: "",
   };
 }
@@ -150,11 +194,14 @@ export function normalizeAuthorPayoutProfileFormValues(
 ): AuthorPayoutProfileFormValues {
   const recipientRaw =
     typeof input.recipient_type === "string" ? input.recipient_type.trim() : "";
+  const methodRaw =
+    typeof input.payout_method === "string" ? input.payout_method.trim() : "";
 
   return {
     recipient_type: isAuthorPayoutRecipientType(recipientRaw)
       ? recipientRaw
       : "",
+    payout_method: isAuthorPayoutMethod(methodRaw) ? methodRaw : "",
     legal_name: cleanText(input.legal_name, 300),
     first_name: cleanText(input.first_name, 100),
     last_name: cleanText(input.last_name, 100),
@@ -163,6 +210,7 @@ export function normalizeAuthorPayoutProfileFormValues(
     ogrnip: stripSpaces(cleanText(input.ogrnip, 20)),
     email: cleanText(input.email, 320).toLowerCase(),
     phone: normalizePhone(cleanText(input.phone, 40)),
+    card_number: normalizeCardNumber(cleanText(input.card_number, 40)),
     bank_account: stripSpaces(cleanText(input.bank_account, 40)),
     bank_bik: stripSpaces(cleanText(input.bank_bik, 20)),
     bank_name: cleanText(input.bank_name, 200),
@@ -172,6 +220,7 @@ export function normalizeAuthorPayoutProfileFormValues(
     registration_address: cleanText(input.registration_address, 500),
     tax_residency_note: cleanText(input.tax_residency_note, 500),
     is_npd_declared: input.is_npd_declared === true,
+    details_confirmed: input.details_confirmed === true,
     author_revision_comment: cleanText(input.author_revision_comment, 4000),
   };
 }
@@ -192,7 +241,7 @@ function requireName(value: string, label: string): string | undefined {
 
 /**
  * Server-side validation before encryption.
- * `mode: draft` allows incomplete fields; `submit` requires type-specific rules.
+ * `mode: draft` allows incomplete fields; `submit` requires type/method rules.
  */
 export function validateAuthorPayoutProfileFormValues(
   values: AuthorPayoutProfileFormValues,
@@ -206,7 +255,7 @@ export function validateAuthorPayoutProfileFormValues(
     !isAuthorPayoutRecipientType(values.recipient_type)
   ) {
     if (requireSubmit || values.recipient_type !== "") {
-      errors.recipient_type = "Выберите правовой статус.";
+      errors.recipient_type = "Выберите, кто вы.";
     }
 
     if (requireSubmit) {
@@ -214,8 +263,19 @@ export function validateAuthorPayoutProfileFormValues(
     }
   }
 
+  if (
+    values.payout_method !== "" &&
+    !isAuthorPayoutMethod(values.payout_method)
+  ) {
+    errors.payout_method = "Выберите способ получения выплаты.";
+  }
+
   const type = values.recipient_type;
-  const checkUnsafe = (key: keyof AuthorPayoutProfileFormValues, value: string) => {
+  const method = values.payout_method;
+  const checkUnsafe = (
+    key: keyof AuthorPayoutProfileFormValues,
+    value: string,
+  ) => {
     const unsafe = rejectUnsafeText(value);
     if (unsafe) {
       errors[key] = unsafe;
@@ -227,8 +287,6 @@ export function validateAuthorPayoutProfileFormValues(
   checkUnsafe("last_name", values.last_name);
   checkUnsafe("middle_name", values.middle_name);
   checkUnsafe("bank_name", values.bank_name);
-  checkUnsafe("registration_address", values.registration_address);
-  checkUnsafe("tax_residency_note", values.tax_residency_note);
   checkUnsafe("author_revision_comment", values.author_revision_comment);
 
   if (!requireSubmit) {
@@ -242,7 +300,7 @@ export function validateAuthorPayoutProfileFormValues(
       errors.bank_bik = "БИК должен содержать 9 цифр.";
     }
     if (values.bank_account && !isValidBankAccount(values.bank_account)) {
-      errors.bank_account = "Расчётный счёт должен содержать 20 цифр.";
+      errors.bank_account = "Номер счёта должен содержать 20 цифр.";
     }
     if (
       values.bank_correspondent_account &&
@@ -250,6 +308,9 @@ export function validateAuthorPayoutProfileFormValues(
     ) {
       errors.bank_correspondent_account =
         "Корреспондентский счёт должен содержать 20 цифр.";
+    }
+    if (values.card_number && !isValidCardNumberLength(values.card_number)) {
+      errors.card_number = "Проверьте номер карты.";
     }
     if (values.email && !isValidEmail(values.email)) {
       errors.email = "Укажите корректный email.";
@@ -260,17 +321,17 @@ export function validateAuthorPayoutProfileFormValues(
     return errors;
   }
 
-  // Submit rules
+  // Submit / complete-save rules
+  if (!isAuthorPayoutMethod(method)) {
+    errors.payout_method = "Выберите способ получения выплаты.";
+  }
+
   const lastNameError = requireName(values.last_name, "фамилию");
   if (lastNameError) errors.last_name = lastNameError;
   const firstNameError = requireName(values.first_name, "имя");
   if (firstNameError) errors.first_name = firstNameError;
   if (values.middle_name) {
     checkUnsafe("middle_name", values.middle_name);
-  }
-
-  if (!isValidRussianPersonalInn(values.inn)) {
-    errors.inn = "Укажите корректный ИНН (12 цифр).";
   }
 
   if (!isValidEmail(values.email)) {
@@ -281,44 +342,62 @@ export function validateAuthorPayoutProfileFormValues(
     errors.phone = "Укажите телефон в формате +7…";
   }
 
-  if (!isValidBik(values.bank_bik)) {
-    errors.bank_bik = "БИК должен содержать 9 цифр.";
+  if (!values.details_confirmed) {
+    errors.details_confirmed =
+      "Подтвердите, что указанные сведения верны и принадлежат вам.";
   }
 
-  if (!isValidBankAccount(values.bank_account)) {
-    errors.bank_account = "Расчётный счёт должен содержать 20 цифр.";
-  }
-
-  if (!values.bank_name) {
-    errors.bank_name = "Укажите наименование банка.";
-  }
-
-  if (type === "self_employed") {
-    if (!values.is_npd_declared) {
-      errors.is_npd_declared =
-        "Подтвердите применение режима «Налог на профессиональный доход».";
+  if (type === "self_employed" || type === "individual_entrepreneur") {
+    if (!isValidRussianPersonalInn(values.inn)) {
+      errors.inn = "Укажите корректный ИНН (12 цифр).";
     }
   }
 
-  if (type === "individual_entrepreneur") {
-    if (!values.legal_name) {
-      errors.legal_name = "Укажите полное наименование ИП.";
+  if (type === "self_employed" && !values.is_npd_declared) {
+    errors.is_npd_declared =
+      "Подтвердите, что вы применяете налог на профессиональный доход.";
+  }
+
+  if (values.ogrnip && !isValidOgrnip(values.ogrnip)) {
+    errors.ogrnip = "Укажите корректный ОГРНИП (15 цифр).";
+  }
+
+  if (method === "card") {
+    if (!values.bank_name) {
+      errors.bank_name = "Укажите банк получателя.";
     }
-    if (!isValidOgrnip(values.ogrnip)) {
-      errors.ogrnip = "Укажите корректный ОГРНИП (15 цифр).";
+    if (!isValidCardNumberLength(values.card_number)) {
+      errors.card_number = "Укажите номер карты (от 13 до 19 цифр).";
     }
-    if (!isValidBankAccount(values.bank_correspondent_account)) {
+  }
+
+  if (method === "sbp") {
+    if (!values.bank_name) {
+      errors.bank_name = "Укажите банк, подключённый к СБП.";
+    }
+    // SBP phone uses the contact phone field.
+    if (!isValidPhone(values.phone)) {
+      errors.phone =
+        "Укажите номер телефона, подключённый к СБП в выбранном банке.";
+    }
+  }
+
+  if (method === "bank_account") {
+    if (!values.bank_name) {
+      errors.bank_name = "Укажите банк.";
+    }
+    if (!isValidBik(values.bank_bik)) {
+      errors.bank_bik = "БИК должен содержать 9 цифр.";
+    }
+    if (!isValidBankAccount(values.bank_account)) {
+      errors.bank_account = "Номер счёта должен содержать 20 цифр.";
+    }
+    if (
+      values.bank_correspondent_account &&
+      !isValidBankAccount(values.bank_correspondent_account)
+    ) {
       errors.bank_correspondent_account =
-        "Укажите корреспондентский счёт (20 цифр).";
-    }
-    if (!values.registration_address) {
-      errors.registration_address = "Укажите адрес регистрации.";
-    }
-  }
-
-  if (type === "individual") {
-    if (!values.registration_address) {
-      errors.registration_address = "Укажите адрес регистрации.";
+        "Корреспондентский счёт должен содержать 20 цифр.";
     }
   }
 
@@ -327,12 +406,12 @@ export function validateAuthorPayoutProfileFormValues(
 
 /**
  * Soft scrub of obvious account/INN-length digit runs from staff/author comments.
- * Does not redact short digit mentions (e.g. «должно быть 9 цифр»).
  */
 export function sanitizeStaffFacingComment(raw: string): string {
   return cleanText(raw, 4000)
     .replace(CONTROL_CHARS, "")
     .replace(/\b\d{20}\b/g, "[скрыто]")
+    .replace(/\b\d{16,19}\b/g, "[скрыто]")
     .replace(/\b\d{15}\b/g, "[скрыто]")
     .replace(/\b\d{12}\b/g, "[скрыто]");
 }

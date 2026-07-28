@@ -268,9 +268,9 @@ export function resolveAuthorStatusView(
         paidProductsLocked: true,
         cta: {
           label: payoutPending
-            ? "Данные для выплат на проверке"
+            ? "Данные для выплат отправлены"
             : payoutNeedsChanges
-              ? "Исправить данные для выплат"
+              ? "Уточнить данные для выплат"
               : "Заполнить данные для выплат",
           href: capabilities.can_edit_payout_profile ? payoutHref : null,
           disabled: payoutPending || !capabilities.can_edit_payout_profile,

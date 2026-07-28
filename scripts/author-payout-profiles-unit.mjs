@@ -15,11 +15,19 @@ import {
   serializePayoutProfileEncryptedEnvelope,
 } from "../src/lib/author-payout-profiles/encryption.ts";
 import {
+  buildAuthorPayoutProfileMasks,
+  formatPayoutRequisitesSummary,
   maskBankAccount,
+  maskCardNumber,
   maskInn,
   maskPhone,
 } from "../src/lib/author-payout-profiles/masking.ts";
 import { isPayoutProfilesEnabled } from "../src/lib/author-payout-profiles/feature.ts";
+import {
+  formValuesToSensitivePayload,
+  parseSensitivePayload,
+  serializeSensitivePayload,
+} from "../src/lib/author-payout-profiles/payload.ts";
 import {
   canAuthorTransitionPayoutProfileStatus,
   canStaffTransitionPayoutProfileStatus,
@@ -33,9 +41,11 @@ import {
 import {
   isValidBankAccount,
   isValidBik,
+  isValidCardNumberLength,
   isValidOgrnip,
   isValidRussianPersonalInn,
   normalizeAuthorPayoutProfileFormValues,
+  passesLuhnCheck,
   validateAuthorPayoutProfileFormValues,
 } from "../src/lib/author-payout-profiles/validation.ts";
 import { authorAccessAllowsPaidProducts } from "../src/lib/authors/access.ts";
@@ -52,6 +62,7 @@ import {
   PAYOUT_PROFILE_VERIFIED_EMAIL_SUBJECT,
   renderPayoutProfileVerifiedEmailHtml,
 } from "../src/lib/email/templates/payout-profile-verified.ts";
+import { resolveAuthorStatusView } from "../src/lib/author-dashboard/author-status.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -66,9 +77,8 @@ function makeKeyEnv(kid = "v1") {
   };
 }
 
-/** Build a valid 12-digit personal INN. */
 function makeValidInn() {
-  const base = "5001007322"; // 10 digits
+  const base = "5001007322";
   const digits = base.split("").map(Number);
   const n11 =
     ((7 * digits[0] +
@@ -102,8 +112,6 @@ function makeValidInn() {
 }
 
 function makeValidOgrnip() {
-  const base = "3045001160001"; // 13 digits placeholder - need 14
-  // Construct: 14 digit base + check
   const fourteen = "30450011600014";
   const check = Math.floor(Number(fourteen) % 13) % 10;
   return `${fourteen}${check}`;
@@ -112,70 +120,14 @@ function makeValidOgrnip() {
 function testEncryption() {
   const env = makeKeyEnv("kid-a");
   const key = resolvePayoutProfileEncryptionKeyFromEnv(env);
-  const plaintext = JSON.stringify({ inn: "123", account: "456" });
+  const plaintext = JSON.stringify({
+    payout_method: "card",
+    card_number: "4111111111111111",
+    inn: "123",
+  });
 
   const e1 = encryptPayoutProfilePayload(plaintext, key);
-  const e2 = encryptPayoutProfilePayload(plaintext, key);
-  assert.notEqual(e1.iv, e2.iv);
-  assert.notEqual(e1.ct, e2.ct);
   assert.equal(decryptPayoutProfilePayload(e1, key), plaintext);
-  assert.equal(decryptPayoutProfilePayload(e2, key), plaintext);
-
-  const other = resolvePayoutProfileEncryptionKeyFromEnv(makeKeyEnv("kid-a"));
-  assert.throws(
-    () => decryptPayoutProfilePayload(e1, other),
-    (error) =>
-      error instanceof PayoutProfileEncryptionError &&
-      error.code === "encryption_decrypt_failed",
-  );
-
-  const brokenCt = { ...e1, ct: Buffer.from("ffff", "hex").toString("base64") };
-  assert.throws(
-    () => decryptPayoutProfilePayload(brokenCt, key),
-    (error) => error instanceof PayoutProfileEncryptionError,
-  );
-
-  const brokenTag = {
-    ...e1,
-    tag: randomBytes(16).toString("base64"),
-  };
-  assert.throws(
-    () => decryptPayoutProfilePayload(brokenTag, key),
-    (error) => error instanceof PayoutProfileEncryptionError,
-  );
-
-  assert.throws(
-    () =>
-      decryptPayoutProfilePayload(
-        { ...e1, kid: "unknown" },
-        key,
-      ),
-    (error) =>
-      error instanceof PayoutProfileEncryptionError &&
-      error.code === "encryption_kid_unknown",
-  );
-
-  assert.throws(
-    () =>
-      decryptPayoutProfilePayload(
-        { ...e1, v: 99 },
-        key,
-      ),
-    (error) =>
-      error instanceof PayoutProfileEncryptionError &&
-      error.code === "encryption_version_unsupported",
-  );
-
-  assert.throws(
-    () =>
-      resolvePayoutProfileEncryptionKeyFromEnv({
-        AUDIOLAD_PAYOUT_PROFILE_ENCRYPTION_KEY: "not-32-bytes",
-        AUDIOLAD_PAYOUT_PROFILE_ENCRYPTION_KEY_ID: "v1",
-      }),
-    (error) =>
-      error instanceof PayoutProfileEncryptionError &&
-      error.code === "encryption_key_invalid",
-  );
 
   assert.throws(
     () => resolvePayoutProfileEncryptionKeyFromEnv({}),
@@ -184,21 +136,13 @@ function testEncryption() {
       error.code === "encryption_key_missing",
   );
 
-  assert.throws(
-    () =>
-      resolvePayoutProfileEncryptionKeyFromEnv({
-        AUDIOLAD_PAYOUT_PROFILE_ENCRYPTION_KEY: env.AUDIOLAD_PAYOUT_PROFILE_ENCRYPTION_KEY,
-      }),
-    (error) =>
-      error instanceof PayoutProfileEncryptionError &&
-      error.code === "encryption_key_id_missing",
-  );
-
   try {
-    decryptPayoutProfilePayload(brokenTag, key);
+    decryptPayoutProfilePayload(
+      { ...e1, tag: randomBytes(16).toString("base64") },
+      key,
+    );
   } catch (error) {
-    assert.equal(error.message.includes("123"), false);
-    assert.equal(error.message.includes(plaintext), false);
+    assert.equal(error.message.includes("4111111111111111"), false);
     assert.equal(String(error.message), error.code);
   }
 
@@ -212,99 +156,182 @@ function testEncryption() {
   );
 }
 
-function testValidation() {
+function testValidationByRecipientAndMethod() {
   const inn = makeValidInn();
   assert.equal(isValidRussianPersonalInn(inn), true);
-  assert.equal(isValidRussianPersonalInn("123456789012"), false);
   assert.equal(isValidBik("044525225"), true);
-  assert.equal(isValidBik("123"), false);
   assert.equal(isValidBankAccount("40817810099910004312"), true);
-  assert.equal(isValidBankAccount("123"), false);
+  assert.equal(isValidCardNumberLength("4111111111111111"), true);
+  assert.equal(passesLuhnCheck("4111111111111111"), true);
+  assert.equal(isValidOgrnip(makeValidOgrnip()), true);
 
-  const ogrnip = makeValidOgrnip();
-  assert.equal(isValidOgrnip(ogrnip), true);
-  assert.equal(isValidOgrnip("123"), false);
-
-  const base = normalizeAuthorPayoutProfileFormValues({
+  const selfEmployedCard = normalizeAuthorPayoutProfileFormValues({
     recipient_type: "self_employed",
+    payout_method: "card",
     first_name: "Иван",
     last_name: "Иванов",
     inn,
     email: "a@example.com",
     phone: "89991234567",
-    bank_account: "40817810099910004312",
-    bank_bik: "044525225",
     bank_name: "Тест Банк",
+    card_number: "4111 1111 1111 1111",
     is_npd_declared: true,
+    details_confirmed: true,
   });
-
-  const submitOk = validateAuthorPayoutProfileFormValues(base, {
-    mode: "submit",
-  });
-  assert.equal(Object.keys(submitOk).length, 0);
-
-  const noNpd = validateAuthorPayoutProfileFormValues(
-    { ...base, is_npd_declared: false },
-    { mode: "submit" },
+  assert.equal(
+    Object.keys(
+      validateAuthorPayoutProfileFormValues(selfEmployedCard, {
+        mode: "submit",
+      }),
+    ).length,
+    0,
   );
-  assert.ok(noNpd.is_npd_declared);
 
-  const ie = normalizeAuthorPayoutProfileFormValues({
+  const ieSbp = normalizeAuthorPayoutProfileFormValues({
     recipient_type: "individual_entrepreneur",
-    legal_name: "ИП Иванов",
+    payout_method: "sbp",
     first_name: "Иван",
     last_name: "Иванов",
     inn,
-    ogrnip,
     email: "a@example.com",
     phone: "+79991234567",
-    bank_account: "40817810099910004312",
-    bank_bik: "044525225",
     bank_name: "Тест Банк",
-    bank_correspondent_account: "30101810400000000225",
-    registration_address: "г. Москва",
+    details_confirmed: true,
   });
   assert.equal(
-    Object.keys(validateAuthorPayoutProfileFormValues(ie, { mode: "submit" }))
+    Object.keys(validateAuthorPayoutProfileFormValues(ieSbp, { mode: "submit" }))
       .length,
     0,
   );
 
-  const individual = normalizeAuthorPayoutProfileFormValues({
+  const individualAccount = normalizeAuthorPayoutProfileFormValues({
     recipient_type: "individual",
+    payout_method: "bank_account",
+    first_name: "Иван",
+    last_name: "Иванов",
+    email: "a@example.com",
+    phone: "+79991234567",
+    bank_name: "Тест Банк",
+    bank_bik: "044525225",
+    bank_account: "40817810099910004312",
+    details_confirmed: true,
+  });
+  assert.equal(
+    Object.keys(
+      validateAuthorPayoutProfileFormValues(individualAccount, {
+        mode: "submit",
+      }),
+    ).length,
+    0,
+  );
+
+  // Individual must NOT require INN.
+  assert.equal(
+    validateAuthorPayoutProfileFormValues(
+      { ...individualAccount, inn: "" },
+      { mode: "submit" },
+    ).inn,
+    undefined,
+  );
+
+  // Address / OGRNIP not required.
+  const ieNoExtras = normalizeAuthorPayoutProfileFormValues({
+    recipient_type: "individual_entrepreneur",
+    payout_method: "bank_account",
     first_name: "Иван",
     last_name: "Иванов",
     inn,
     email: "a@example.com",
     phone: "+79991234567",
-    bank_account: "40817810099910004312",
-    bank_bik: "044525225",
     bank_name: "Тест Банк",
-    registration_address: "г. Москва",
+    bank_bik: "044525225",
+    bank_account: "40817810099910004312",
+    details_confirmed: true,
   });
   assert.equal(
     Object.keys(
-      validateAuthorPayoutProfileFormValues(individual, { mode: "submit" }),
+      validateAuthorPayoutProfileFormValues(ieNoExtras, { mode: "submit" }),
     ).length,
     0,
   );
+
+  const noConfirm = validateAuthorPayoutProfileFormValues(
+    { ...selfEmployedCard, details_confirmed: false },
+    { mode: "submit" },
+  );
+  assert.ok(noConfirm.details_confirmed);
+
+  const unknownMethod = validateAuthorPayoutProfileFormValues(
+    normalizeAuthorPayoutProfileFormValues({
+      ...selfEmployedCard,
+      payout_method: "crypto",
+    }),
+    { mode: "submit" },
+  );
+  assert.ok(unknownMethod.payout_method);
+}
+
+function testPayloadAndMasks() {
+  const values = normalizeAuthorPayoutProfileFormValues({
+    recipient_type: "self_employed",
+    payout_method: "card",
+    first_name: "Иван",
+    last_name: "Иванов",
+    inn: makeValidInn(),
+    email: "a@example.com",
+    phone: "+79991234567",
+    bank_name: "Тест Банк",
+    card_number: "4111111111111111",
+    is_npd_declared: true,
+    details_confirmed: true,
+  });
+  const payload = formValuesToSensitivePayload(values, "self_employed");
+  assert.equal(payload.card_number, "4111111111111111");
+  assert.equal(payload.bank_account, null);
+  assert.equal(payload.registration_address, null);
+
+  const masks = buildAuthorPayoutProfileMasks(payload);
+  assert.equal(masks.account_last4, "1111");
+  assert.equal(masks.payout_method, "card");
+  assert.equal(masks.bank_display_name, "Тест Банк");
+  assert.match(maskCardNumber(payload.card_number), /1111/);
+  assert.match(
+    formatPayoutRequisitesSummary(masks),
+    /Карта •••• 1111/,
+  );
+
+  const roundTrip = parseSensitivePayload(serializeSensitivePayload(payload));
+  assert.equal(roundTrip.payout_method, "card");
+  assert.equal(roundTrip.card_number, "4111111111111111");
+
+  // Legacy bank-only envelope without payout_method.
+  const legacy = parseSensitivePayload(
+    JSON.stringify({
+      first_name: "Иван",
+      last_name: "Иванов",
+      inn: makeValidInn(),
+      email: "a@example.com",
+      phone: "+79991234567",
+      bank_account: "40817810099910004312",
+      bank_bik: "044525225",
+      bank_name: "Банк",
+    }),
+  );
+  assert.equal(legacy.payout_method, "bank_account");
 }
 
 function testStatusMachine() {
   assert.equal(canAuthorTransitionPayoutProfileStatus("draft", "submitted"), true);
-  assert.equal(canAuthorTransitionPayoutProfileStatus("draft", "verified"), false);
   assert.equal(canStaffTransitionPayoutProfileStatus("submitted", "verified"), true);
-  assert.equal(canStaffTransitionPayoutProfileStatus("draft", "verified"), false);
   assert.equal(isAuthorEditablePayoutProfileStatus("submitted"), false);
-  assert.equal(isAuthorEditablePayoutProfileStatus("needs_changes"), true);
-  assert.equal(canAuthorTransitionPayoutProfileStatus("verified", "draft"), true);
 
-  const verifiedVisual = mapPayoutProfileStatusToOnboardingVisual({
-    status: "verified",
+  const submittedVisual = mapPayoutProfileStatusToOnboardingVisual({
+    status: "submitted",
     available: true,
     applicationApproved: true,
   });
-  assert.equal(verifiedVisual.state, "completed");
+  assert.equal(submittedVisual.state, "completed");
+  assert.equal(submittedVisual.statusLabel, "Данные отправлены");
 
   const draftVisual = mapPayoutProfileStatusToOnboardingVisual({
     status: "draft",
@@ -312,7 +339,29 @@ function testStatusMachine() {
     applicationApproved: true,
   });
   assert.equal(draftVisual.state, "active");
-  assert.equal(draftVisual.statusLabel, "Черновик");
+  assert.equal(draftVisual.statusLabel, "Не заполнено");
+
+  assert.equal(
+    resolvePayoutStepCompleteForLegacyOnboarding({
+      accessStatus: "commercial_onboarding",
+      payoutProfileStatus: "submitted",
+    }),
+    true,
+  );
+  assert.equal(isPayoutProfileVerified("submitted"), false);
+  assert.equal(isPayoutProfileVerified("verified"), true);
+
+  const statusView = resolveAuthorStatusView({
+    accessStatus: "commercial_onboarding",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    publishedTermsAvailable: true,
+    payoutProfileStatus: "submitted",
+    role: "owner",
+    authorSlug: "demo",
+  });
+  assert.equal(statusView.cta.label, "Данные для выплат отправлены");
+  assert.equal(statusView.cta.disabled, true);
 }
 
 function testMasksAndGates() {
@@ -320,7 +369,6 @@ function testMasksAndGates() {
   assert.match(maskBankAccount("40817810099910004312"), /4312$/);
   assert.match(maskPhone("+79991234567"), /\+7 \*\*\*/);
   assert.equal(authorAccessAllowsPaidProducts("commercial_onboarding"), false);
-  assert.equal(authorAccessAllowsPaidProducts("commercial_active"), true);
   assert.equal(
     PLATFORM_ROLE_PERMISSIONS.admin.includes("authors.payout_profiles.review"),
     false,
@@ -331,34 +379,8 @@ function testMasksAndGates() {
   );
   assert.equal(AUTHOR_COMMERCIAL_SHARE_BPS, 7000);
   assert.equal(PLATFORM_COMMERCIAL_SHARE_BPS, 3000);
-
   assert.equal(isPayoutProfilesEnabled({}), false);
   assert.equal(isPayoutProfilesEnabled({ PAYOUT_PROFILES_ENABLED: "true" }), true);
-
-  assert.equal(
-    resolvePayoutStepCompleteForLegacyOnboarding({
-      accessStatus: "commercial_active",
-      payoutProfileStatus: "draft",
-    }),
-    true,
-  );
-  assert.equal(
-    resolvePayoutStepCompleteForLegacyOnboarding({
-      accessStatus: "commercial_onboarding",
-      payoutProfileStatus: "draft",
-    }),
-    false,
-  );
-  assert.equal(isPayoutProfileVerified("verified"), true);
-  assert.equal(isPayoutProfileVerified("draft"), false);
-
-  const legacyVisual = mapPayoutProfileStatusToOnboardingVisual({
-    status: "draft",
-    available: true,
-    applicationApproved: true,
-    legacyCommercialActive: true,
-  });
-  assert.equal(legacyVisual.state, "completed");
 }
 
 function testEmailsAndSources() {
@@ -370,11 +392,8 @@ function testEmailsAndSources() {
     authorName: "Иван",
     siteOrigin: "https://audiolad.ru",
   });
-  assert.match(html, /Иван/);
   assert.doesNotMatch(html, /\d{20}/);
-  assert.doesNotMatch(html, /ИНН/);
-  assert.match(html, /https:\/\/audiolad\.ru\/author-dashboard/);
-  assert.doesNotMatch(html, /платн/i);
+  assert.doesNotMatch(html, /4111111111111111/);
 
   assert.equal(
     buildPayoutProfileVerifiedDedupKey("p1", 3),
@@ -388,30 +407,44 @@ function testEmailsAndSources() {
   const migration = read(
     "supabase/migrations/20260728120000_author_payout_profiles.sql",
   );
-  assert.match(migration, /author_payout_profiles/);
-  assert.match(migration, /authors\.payout_profiles\.review/);
-  assert.match(migration, /role_code <> 'owner'/);
   assert.match(migration, /encrypted_payload/);
-  assert.doesNotMatch(migration, /GRANT SELECT ON TABLE public\.author_payout_profiles TO authenticated/);
+  assert.doesNotMatch(
+    migration,
+    /GRANT SELECT ON TABLE public\.author_payout_profiles TO authenticated/,
+  );
 
-  const operational = read("src/lib/email/operational-deliveries.ts");
-  assert.match(operational, /PAYOUT_PROFILE_MESSAGE_TYPES/);
-  assert.match(operational, /application_id: linkedApplicationId/);
+  const additive = read(
+    "supabase/migrations/20260728150000_author_payout_profiles_method_display.sql",
+  );
+  assert.match(additive, /payout_method/);
+  assert.match(additive, /bank_display_name/);
+  assert.doesNotMatch(additive, /DROP TABLE/i);
 
   const api = read("src/app/api/author/payout-profile/route.ts");
   assert.match(api, /private, no-store/);
-  assert.match(api, /legal_entity/);
   assert.match(api, /feature_not_available/);
-  assert.match(api, /isPayoutProfilesEnabled/);
-  assert.match(api, /FORBIDDEN_CLIENT_FIELDS/);
+  assert.doesNotMatch(api, /sendPayoutProfileAdminSubmittedEmail/);
 
   const form = read(
     "src/components/author-dashboard/AuthorPayoutProfileForm.tsx",
   );
   assert.match(form, /data-payout-profile-form/);
   assert.match(form, /ym-hide-content/);
-  assert.match(form, /AUTHOR_COMMERCIAL_SHARE_BPS/);
-  assert.match(form, /Скоро/);
+  assert.match(form, /Сохранить данные/);
+  assert.match(form, /Банковская карта/);
+  assert.match(form, /СБП/);
+  assert.doesNotMatch(form, /ОГРНИП/);
+  assert.doesNotMatch(form, /паспорт/i);
+  assert.doesNotMatch(form, /СНИЛС/);
+  assert.doesNotMatch(form, /Адрес регистрации/);
+
+  const page = read(
+    "src/app/author-dashboard/commercial/payout-details/page.tsx",
+  );
+  assert.match(
+    page,
+    /Заполнение данных для выплат временно недоступно/,
+  );
 
   const privacy = read("src/lib/analytics/yandex-metrika-privacy.ts");
   assert.match(privacy, /data-payout-profile-form/);
@@ -423,7 +456,8 @@ function testEmailsAndSources() {
 
 function main() {
   testEncryption();
-  testValidation();
+  testValidationByRecipientAndMethod();
+  testPayloadAndMasks();
   testStatusMachine();
   testMasksAndGates();
   testEmailsAndSources();

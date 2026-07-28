@@ -15,8 +15,6 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
-import { sendPayoutProfileAdminSubmittedEmail } from "@/lib/email/send-payout-profile-admin-submitted-email";
-import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const FORBIDDEN_CLIENT_FIELDS = [
@@ -31,6 +29,7 @@ const FORBIDDEN_CLIENT_FIELDS = [
   "version",
   "inn_last4",
   "account_last4",
+  "bank_display_name",
 ] as const;
 
 function sanitizeAuthorBody(body: Record<string, unknown>) {
@@ -103,35 +102,6 @@ function handlePayoutProfileError(error: unknown) {
   }
 
   return handleAuthorRouteError(error);
-}
-
-async function notifyAdminAboutPayoutProfileSubmit(input: {
-  authorId: string;
-  profileId: string;
-}) {
-  try {
-    const service = createServiceRoleClient();
-    const { data: author } = await service
-      .from("authors")
-      .select("name")
-      .eq("id", input.authorId)
-      .maybeSingle();
-
-    const emailResult = await sendPayoutProfileAdminSubmittedEmail({
-      authorName: author?.name?.trim() || "Автор",
-      profileId: input.profileId,
-      siteOrigin: getAppOrigin(),
-    });
-
-    if (!emailResult.ok) {
-      console.error(
-        "payout_profile_admin_submitted_email_failed",
-        emailResult.code,
-      );
-    }
-  } catch (error) {
-    console.error("payout_profile_admin_submitted_email_unexpected", error);
-  }
 }
 
 export async function GET(request: Request) {
@@ -254,12 +224,7 @@ export async function POST(request: Request) {
       body,
     });
 
-    if (result.transitioned && result.profile.id) {
-      await notifyAdminAboutPayoutProfileSubmit({
-        authorId,
-        profileId: result.profile.id,
-      });
-    }
+    // Intentionally no author/admin email on save in the minimal payout form flow.
 
     return jsonWithNoStore({
       ok: true,

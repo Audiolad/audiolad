@@ -1,14 +1,27 @@
 import type {
+  AuthorPayoutMethod,
   AuthorPayoutProfileFormValues,
   AuthorPayoutProfileSensitivePayload,
   AuthorPayoutRecipientType,
 } from "./types";
+import { isAuthorPayoutMethod } from "./types";
 
 export function formValuesToSensitivePayload(
   values: AuthorPayoutProfileFormValues,
   recipientType: AuthorPayoutRecipientType,
 ): AuthorPayoutProfileSensitivePayload {
+  const method: AuthorPayoutMethod | null = isAuthorPayoutMethod(
+    values.payout_method,
+  )
+    ? values.payout_method
+    : null;
+
+  const needsInn =
+    recipientType === "self_employed" ||
+    recipientType === "individual_entrepreneur";
+
   return {
+    payout_method: method,
     legal_name:
       recipientType === "individual_entrepreneur"
         ? values.legal_name || null
@@ -16,26 +29,24 @@ export function formValuesToSensitivePayload(
     first_name: values.first_name,
     last_name: values.last_name,
     middle_name: values.middle_name || null,
-    inn: values.inn,
+    inn: needsInn ? values.inn || null : values.inn || null,
     ogrnip:
-      recipientType === "individual_entrepreneur" ? values.ogrnip || null : null,
+      recipientType === "individual_entrepreneur"
+        ? values.ogrnip || null
+        : null,
     email: values.email,
     phone: values.phone,
-    bank_account: values.bank_account,
-    bank_bik: values.bank_bik,
-    bank_name: values.bank_name,
+    card_number: method === "card" ? values.card_number || null : null,
+    bank_account:
+      method === "bank_account" ? values.bank_account || null : null,
+    bank_bik: method === "bank_account" ? values.bank_bik || null : null,
+    bank_name: values.bank_name || null,
     bank_correspondent_account:
-      recipientType === "individual_entrepreneur"
+      method === "bank_account"
         ? values.bank_correspondent_account || null
-        : values.bank_correspondent_account || null,
-    registration_address:
-      recipientType === "self_employed"
-        ? values.registration_address || null
-        : values.registration_address || null,
-    tax_residency_note:
-      recipientType === "individual"
-        ? values.tax_residency_note || null
         : null,
+    registration_address: null,
+    tax_residency_note: null,
   };
 }
 
@@ -49,6 +60,7 @@ export function sensitivePayloadToFormValues(
 ): AuthorPayoutProfileFormValues {
   return {
     recipient_type: recipientType,
+    payout_method: fields.payout_method ?? "",
     legal_name: fields.legal_name ?? "",
     first_name: fields.first_name ?? "",
     last_name: fields.last_name ?? "",
@@ -57,13 +69,16 @@ export function sensitivePayloadToFormValues(
     ogrnip: fields.ogrnip ?? "",
     email: fields.email ?? "",
     phone: fields.phone ?? "",
-    bank_account: fields.bank_account ?? "",
+    // Never re-populate card/account into inputs after save — blank until re-entry.
+    card_number: "",
+    bank_account: "",
     bank_bik: fields.bank_bik ?? "",
     bank_name: fields.bank_name ?? "",
     bank_correspondent_account: fields.bank_correspondent_account ?? "",
-    registration_address: fields.registration_address ?? "",
-    tax_residency_note: fields.tax_residency_note ?? "",
+    registration_address: "",
+    tax_residency_note: "",
     is_npd_declared: extras?.is_npd_declared === true,
+    details_confirmed: false,
     author_revision_comment: extras?.author_revision_comment ?? "",
   };
 }
@@ -77,19 +92,33 @@ export function serializeSensitivePayload(
 export function parseSensitivePayload(
   plaintext: string,
 ): AuthorPayoutProfileSensitivePayload {
-  const parsed = JSON.parse(plaintext) as AuthorPayoutProfileSensitivePayload;
+  const parsed = JSON.parse(plaintext) as Partial<AuthorPayoutProfileSensitivePayload> & {
+    // Legacy rows before payout_method existed treated bank_account as required.
+    bank_account?: string | null;
+  };
+
+  const legacyMethod: AuthorPayoutMethod | null = isAuthorPayoutMethod(
+    parsed.payout_method,
+  )
+    ? parsed.payout_method
+    : parsed.bank_account
+      ? "bank_account"
+      : null;
+
   return {
+    payout_method: legacyMethod,
     legal_name: parsed.legal_name ?? null,
     first_name: String(parsed.first_name ?? ""),
     last_name: String(parsed.last_name ?? ""),
     middle_name: parsed.middle_name ?? null,
-    inn: String(parsed.inn ?? ""),
+    inn: parsed.inn != null && String(parsed.inn) !== "" ? String(parsed.inn) : null,
     ogrnip: parsed.ogrnip ?? null,
     email: String(parsed.email ?? ""),
     phone: String(parsed.phone ?? ""),
-    bank_account: String(parsed.bank_account ?? ""),
-    bank_bik: String(parsed.bank_bik ?? ""),
-    bank_name: String(parsed.bank_name ?? ""),
+    card_number: parsed.card_number ?? null,
+    bank_account: parsed.bank_account ?? null,
+    bank_bik: parsed.bank_bik ?? null,
+    bank_name: parsed.bank_name ?? null,
     bank_correspondent_account: parsed.bank_correspondent_account ?? null,
     registration_address: parsed.registration_address ?? null,
     tax_residency_note: parsed.tax_residency_note ?? null,
@@ -101,6 +130,7 @@ export function listChangedSensitiveFields(
   after: AuthorPayoutProfileSensitivePayload,
 ): string[] {
   const keys: Array<keyof AuthorPayoutProfileSensitivePayload> = [
+    "payout_method",
     "legal_name",
     "first_name",
     "last_name",
@@ -109,6 +139,7 @@ export function listChangedSensitiveFields(
     "ogrnip",
     "email",
     "phone",
+    "card_number",
     "bank_account",
     "bank_bik",
     "bank_name",

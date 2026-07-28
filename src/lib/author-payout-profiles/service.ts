@@ -33,8 +33,10 @@ import type {
   AuthorPayoutRecipientType,
 } from "./types";
 import {
+  isAuthorPayoutMethod,
   isAuthorPayoutProfileStatus,
   isAuthorPayoutRecipientType,
+  type AuthorPayoutMethod,
 } from "./types";
 import {
   hasAuthorPayoutProfileFieldErrors,
@@ -50,6 +52,8 @@ type ProfileRow = {
   status: string;
   version: number;
   encrypted_payload: string | null;
+  payout_method: string | null;
+  bank_display_name: string | null;
   inn_last4: string | null;
   account_last4: string | null;
   is_npd_declared: boolean;
@@ -90,6 +94,45 @@ function assertRecipientType(value: string): AuthorPayoutRecipientType {
     throw new AuthorPayoutProfileError("invalid_recipient_type", 400);
   }
   return value;
+}
+
+/**
+ * Form never re-fills card/account after load. Keep previous secrets unless
+ * the author entered new values or changed payout method.
+ */
+function mergeSensitivePayloadPreservingSecrets(
+  next: AuthorPayoutProfileSensitivePayload,
+  previous: AuthorPayoutProfileSensitivePayload | null,
+): AuthorPayoutProfileSensitivePayload {
+  if (!previous) {
+    return next;
+  }
+
+  const methodChanged = next.payout_method !== previous.payout_method;
+
+  return {
+    ...next,
+    card_number:
+      next.card_number ||
+      (!methodChanged && next.payout_method === "card"
+        ? previous.card_number
+        : null),
+    bank_account:
+      next.bank_account ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_account
+        : null),
+    bank_bik:
+      next.bank_bik ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_bik
+        : null),
+    bank_correspondent_account:
+      next.bank_correspondent_account ||
+      (!methodChanged && next.payout_method === "bank_account"
+        ? previous.bank_correspondent_account
+        : null),
+  };
 }
 
 function assertStatus(value: string): AuthorPayoutProfileStatus {
@@ -220,12 +263,19 @@ export function toAuthorPublicView(
         ? decryptRowFields(row)
         : null;
 
+  const payoutMethod =
+    row.payout_method && isAuthorPayoutMethod(row.payout_method)
+      ? (row.payout_method as AuthorPayoutMethod)
+      : fields?.payout_method ?? null;
+
   return {
     id: row.id,
     author_id: row.author_id,
     recipient_type: assertRecipientType(row.recipient_type),
     status,
     version: row.version,
+    payout_method: payoutMethod,
+    bank_display_name: row.bank_display_name,
     inn_last4: row.inn_last4,
     account_last4: row.account_last4,
     is_npd_declared: row.is_npd_declared,
@@ -246,28 +296,44 @@ export function toAuthorPublicView(
   };
 }
 
+function hydrateSecretsForValidation(
+  values: AuthorPayoutProfileFormValues,
+  previous: AuthorPayoutProfileSensitivePayload | null,
+): AuthorPayoutProfileFormValues {
+  if (!previous) {
+    return values;
+  }
+
+  const methodUnchanged =
+    values.payout_method === "" ||
+    values.payout_method === previous.payout_method;
+
+  return {
+    ...values,
+    card_number:
+      values.card_number ||
+      (methodUnchanged && previous.payout_method === "card"
+        ? previous.card_number ?? ""
+        : ""),
+    bank_account:
+      values.bank_account ||
+      (methodUnchanged && previous.payout_method === "bank_account"
+        ? previous.bank_account ?? ""
+        : ""),
+    bank_bik:
+      values.bank_bik ||
+      (methodUnchanged && previous.payout_method === "bank_account"
+        ? previous.bank_bik ?? ""
+        : ""),
+  };
+}
+
 export async function saveAuthorPayoutProfileDraft(input: {
   supabase: SupabaseClient;
   authorId: string;
   actorUserId: string;
   body: Record<string, unknown>;
 }): Promise<AuthorPayoutProfilePublicView> {
-  const values = normalizeAuthorPayoutProfileFormValues(input.body);
-  const errors = validateAuthorPayoutProfileFormValues(values, {
-    mode: "draft",
-  });
-
-  if (hasAuthorPayoutProfileFieldErrors(errors)) {
-    throw new AuthorPayoutProfileError("validation_failed", 400, errors);
-  }
-
-  if (!values.recipient_type) {
-    throw new AuthorPayoutProfileError("validation_failed", 400, {
-      recipient_type: "Выберите правовой статус.",
-    });
-  }
-
-  const recipientType = values.recipient_type;
   const existing = await getAuthorPayoutProfileRow(
     input.supabase,
     input.authorId,
@@ -281,7 +347,29 @@ export async function saveAuthorPayoutProfileDraft(input: {
   }
 
   const previousFields = existing ? decryptRowFields(existing) : null;
-  const fields = formValuesToSensitivePayload(values, recipientType);
+  const values = hydrateSecretsForValidation(
+    normalizeAuthorPayoutProfileFormValues(input.body),
+    previousFields,
+  );
+  const errors = validateAuthorPayoutProfileFormValues(values, {
+    mode: "draft",
+  });
+
+  if (hasAuthorPayoutProfileFieldErrors(errors)) {
+    throw new AuthorPayoutProfileError("validation_failed", 400, errors);
+  }
+
+  if (!values.recipient_type) {
+    throw new AuthorPayoutProfileError("validation_failed", 400, {
+      recipient_type: "Выберите, кто вы.",
+    });
+  }
+
+  const recipientType = values.recipient_type;
+  const fields = mergeSensitivePayloadPreservingSecrets(
+    formValuesToSensitivePayload(values, recipientType),
+    previousFields,
+  );
   const encrypted = encryptFields(fields);
   const masks = buildAuthorPayoutProfileMasks(fields);
   const changedFields = listChangedSensitiveFields(previousFields, fields);
@@ -315,6 +403,8 @@ export async function saveAuthorPayoutProfileDraft(input: {
         status: "draft",
         version: 1,
         encrypted_payload: encrypted,
+        payout_method: masks.payout_method,
+        bank_display_name: masks.bank_display_name,
         inn_last4: masks.inn_last4,
         account_last4: masks.account_last4,
         is_npd_declared: values.is_npd_declared,
@@ -356,6 +446,8 @@ export async function saveAuthorPayoutProfileDraft(input: {
       status: nextStatus,
       version: nextVersion,
       encrypted_payload: encrypted,
+      payout_method: masks.payout_method,
+      bank_display_name: masks.bank_display_name,
       inn_last4: masks.inn_last4,
       account_last4: masks.account_last4,
       is_npd_declared: values.is_npd_declared,
@@ -404,21 +496,6 @@ export async function submitAuthorPayoutProfile(input: {
   actorUserId: string;
   body: Record<string, unknown>;
 }): Promise<{ profile: AuthorPayoutProfilePublicView; transitioned: boolean }> {
-  const values = normalizeAuthorPayoutProfileFormValues(input.body);
-  const errors = validateAuthorPayoutProfileFormValues(values, {
-    mode: "submit",
-  });
-
-  if (hasAuthorPayoutProfileFieldErrors(errors)) {
-    throw new AuthorPayoutProfileError("validation_failed", 400, errors);
-  }
-
-  if (!values.recipient_type) {
-    throw new AuthorPayoutProfileError("validation_failed", 400, {
-      recipient_type: "Выберите правовой статус.",
-    });
-  }
-
   const existing = await getAuthorPayoutProfileRow(
     input.supabase,
     input.authorId,
@@ -434,7 +511,27 @@ export async function submitAuthorPayoutProfile(input: {
     }
   }
 
+  const previousFields = existing ? decryptRowFields(existing) : null;
+  const values = hydrateSecretsForValidation(
+    normalizeAuthorPayoutProfileFormValues(input.body),
+    previousFields,
+  );
+  const errors = validateAuthorPayoutProfileFormValues(values, {
+    mode: "submit",
+  });
+
+  if (hasAuthorPayoutProfileFieldErrors(errors)) {
+    throw new AuthorPayoutProfileError("validation_failed", 400, errors);
+  }
+
+  if (!values.recipient_type) {
+    throw new AuthorPayoutProfileError("validation_failed", 400, {
+      recipient_type: "Выберите, кто вы.",
+    });
+  }
+
   // Persist validated payload as draft (also moves needs_changes → draft).
+  // Body is re-normalized inside draft save; secrets are re-hydrated there too.
   await saveAuthorPayoutProfileDraft({
     supabase: input.supabase,
     authorId: input.authorId,
@@ -566,7 +663,7 @@ export async function listAdminPayoutProfiles(
   let query = supabase
     .from("author_payout_profiles")
     .select(
-      "id, author_id, recipient_type, status, version, inn_last4, account_last4, submitted_at, updated_at, authors!inner(name, slug)",
+      "id, author_id, recipient_type, payout_method, bank_display_name, status, version, inn_last4, account_last4, submitted_at, updated_at, authors!inner(name, slug)",
     )
     .order("updated_at", { ascending: false })
     .limit(200);
@@ -597,12 +694,18 @@ export async function listAdminPayoutProfiles(
       | null;
     const author = Array.isArray(authors) ? authors[0] : authors;
 
+    const payoutMethodRaw = row.payout_method as string | null;
     return {
       id: row.id as string,
       author_id: row.author_id as string,
       author_name: author?.name ?? "Автор",
       author_slug: author?.slug ?? null,
       recipient_type: assertRecipientType(row.recipient_type as string),
+      payout_method:
+        payoutMethodRaw && isAuthorPayoutMethod(payoutMethodRaw)
+          ? payoutMethodRaw
+          : null,
+      bank_display_name: (row.bank_display_name as string | null) ?? null,
       status: assertStatus(row.status as string),
       version: row.version as number,
       inn_last4: (row.inn_last4 as string | null) ?? null,
@@ -652,6 +755,11 @@ export async function getAdminPayoutProfileDetail(
     author_name: author?.name ?? "Автор",
     author_slug: author?.slug ?? null,
     recipient_type: assertRecipientType(row.recipient_type),
+    payout_method:
+      row.payout_method && isAuthorPayoutMethod(row.payout_method)
+        ? row.payout_method
+        : fields.payout_method,
+    bank_display_name: row.bank_display_name,
     status: assertStatus(row.status),
     version: row.version,
     inn_last4: row.inn_last4,
