@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -23,6 +24,11 @@ import {
   getAuthorFinanceTypeLabel,
 } from "@/lib/author-finance/labels";
 import {
+  AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY,
+  buildPayoutDetailsHref,
+  shouldShowFinancePayoutProfileBanner,
+} from "@/lib/author-finance/payout-profile-banner";
+import {
   AUTHOR_FINANCE_PERIODS,
   AUTHOR_FINANCE_TYPE_KEYS,
   isAuthorFinancePeriod,
@@ -35,6 +41,7 @@ import {
   type AuthorFinanceSummary,
   type AuthorFinanceTermsRow,
 } from "@/lib/author-finance/types";
+import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type AuthorFinanceClientProps = {
@@ -152,6 +159,11 @@ export default function AuthorFinanceClient({
   const [payouts, setPayouts] = useState<AuthorFinancePayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [payoutProfileStatus, setPayoutProfileStatus] = useState<
+    AuthorPayoutProfileStatus | null
+  >(null);
+  const [payoutProfilesFeatureEnabled, setPayoutProfilesFeatureEnabled] =
+    useState(false);
 
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
   const [entryDetail, setEntryDetail] =
@@ -190,23 +202,31 @@ export default function AuthorFinanceClient({
       setOpenPayoutId(null);
 
       try {
-        const [summaryResponse, termsResponse, ledgerResponse, payoutsResponse] =
-          await Promise.all([
-            fetch(`/api/author/finance/summary?${authorParam}`, {
-              cache: "no-store",
-            }),
-            fetch(`/api/author/finance/terms?${authorParam}`, {
-              cache: "no-store",
-            }),
-            fetch(
-              `/api/author/finance/ledger?${authorParam}&${activityQuery}&limit=100`,
-              { cache: "no-store" },
-            ),
-            fetch(
-              `/api/author/finance/payouts?${authorParam}&${activityQuery}&limit=100`,
-              { cache: "no-store" },
-            ),
-          ]);
+        const [
+          summaryResponse,
+          termsResponse,
+          ledgerResponse,
+          payoutsResponse,
+          payoutProfileResponse,
+        ] = await Promise.all([
+          fetch(`/api/author/finance/summary?${authorParam}`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/author/finance/terms?${authorParam}`, {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/author/finance/ledger?${authorParam}&${activityQuery}&limit=100`,
+            { cache: "no-store" },
+          ),
+          fetch(
+            `/api/author/finance/payouts?${authorParam}&${activityQuery}&limit=100`,
+            { cache: "no-store" },
+          ),
+          fetch(`/api/author/payout-profile?${authorParam}`, {
+            cache: "no-store",
+          }),
+        ]);
 
         if (cancelled) return;
 
@@ -231,6 +251,12 @@ export default function AuthorFinanceClient({
         const payoutsPayload = payoutsResponse.ok
           ? ((await payoutsResponse.json()) as { rows: AuthorFinancePayoutRow[] })
           : { rows: [] };
+        const payoutProfilePayload = payoutProfileResponse.ok
+          ? ((await payoutProfileResponse.json()) as {
+              featureEnabled?: boolean;
+              profile?: { status?: AuthorPayoutProfileStatus | null } | null;
+            })
+          : { featureEnabled: false, profile: null };
 
         if (cancelled) return;
 
@@ -240,6 +266,10 @@ export default function AuthorFinanceClient({
         setLedger(ledgerPayload.rows ?? []);
         setLedgerTotal(ledgerPayload.total ?? 0);
         setPayouts(payoutsPayload.rows ?? []);
+        setPayoutProfilesFeatureEnabled(
+          payoutProfilePayload.featureEnabled === true,
+        );
+        setPayoutProfileStatus(payoutProfilePayload.profile?.status ?? null);
       } catch {
         if (!cancelled) setError("Не удалось загрузить финансовые данные.");
       } finally {
@@ -320,6 +350,10 @@ export default function AuthorFinanceClient({
     : null;
   const integrityMessage = getAuthorFinanceIntegrityMessage(integrityStatus);
   const activeTerms = terms.find((row) => row.isActiveNow) ?? null;
+  const showPayoutProfileBanner = shouldShowFinancePayoutProfileBanner({
+    featureEnabled: payoutProfilesFeatureEnabled,
+    payoutProfileStatus,
+  });
 
   return (
     <div className="min-w-0">
@@ -362,6 +396,23 @@ export default function AuthorFinanceClient({
             <p className="mt-5 rounded-[20px] border border-[#e6ddc0] bg-[#fdfaf0] px-4 py-3 text-sm text-[#7a6a3c]">
               {integrityMessage}
             </p>
+          ) : null}
+
+          {showPayoutProfileBanner ? (
+            <div className="mt-5 rounded-[20px] border border-[#eadff8] bg-[#fcfbfe] px-4 py-3">
+              <p className="text-sm font-semibold text-[#25135c]">
+                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.title}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.description}
+              </p>
+              <Link
+                href={buildPayoutDetailsHref(selectedAuthor.slug)}
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-semibold text-[#7042c5]"
+              >
+                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.ctaLabel}
+              </Link>
+            </div>
           ) : null}
 
           {summary.negative ? (

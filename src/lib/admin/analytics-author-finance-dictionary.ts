@@ -124,6 +124,7 @@ export const ADMIN_AUTHOR_FINANCE_BLOCKER_LABELS: Record<string, string> = {
   payment_not_succeeded: "Оплата не подтверждена",
   author_snapshot_missing: "Нет привязки автора в заказе",
   author_not_payout_eligible: "Автор не получает выплаты",
+  payout_profile_required: "Для выплаты сначала заполните реквизиты автора",
   no_active_terms: "Нет утверждённых условий",
   ambiguous_terms: "Несколько подходящих условий",
   platform_owned_no_payout: "Продукт платформы",

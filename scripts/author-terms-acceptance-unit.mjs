@@ -190,10 +190,12 @@ const stepIds = pendingTerms.steps.map((s) => s.id);
 assert.deepEqual(stepIds.slice(0, 3), [
   "commercial_application",
   "terms_acceptance",
-  "payout_details",
+  "paid_product",
 ]);
+assert.equal(stepIds.at(-1), "payout_details");
 assert.equal(pendingTerms.steps[1].state, "active");
 assert.equal(pendingTerms.steps[2].state, "locked");
+assert.equal(pendingTerms.steps.at(-1)?.state, "locked");
 
 const acceptedTerms = evaluateCommercialOnboardingChecklist({
   authorSlug: "demo",
@@ -209,11 +211,17 @@ const acceptedTerms = evaluateCommercialOnboardingChecklist({
   },
   applicationStatus: "approved",
   termsAccepted: true,
-  payoutDetailsComplete: true,
-  legacyCommercialActive: true,
+  payoutDetailsComplete: false,
+  payoutProfileStatus: null,
+  legacyCommercialActive: false,
 });
 assert.equal(acceptedTerms.steps[1].state, "completed");
-assert.equal(acceptedTerms.steps[2].state, "completed");
+assert.equal(acceptedTerms.steps[2].id, "paid_product");
+assert.equal(acceptedTerms.steps[2].state, "active");
+assert.equal(acceptedTerms.steps.at(-1)?.id, "payout_details");
+assert.equal(acceptedTerms.steps.at(-1)?.statusLabel, "Необязательно");
+assert.equal(acceptedTerms.complete, false);
+assert.equal(acceptedTerms.totalCount, 6);
 
 // error code contract
 assert.equal(AUTHOR_TERMS_ACCEPTANCE_REQUIRED, "AUTHOR_TERMS_ACCEPTANCE_REQUIRED");

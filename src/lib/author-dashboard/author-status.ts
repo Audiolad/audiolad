@@ -6,7 +6,6 @@ import {
   type CommercialShareBps,
 } from "@/lib/author-commercial/economics";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
-import { isPayoutProfileVerified } from "@/lib/author-payout-profiles/onboarding-complete";
 import {
   isAuthorCommercialActiveAccess,
   type AuthorAccessStatus,
@@ -32,6 +31,12 @@ export type AuthorStatusCta = {
   hint: string | null;
 };
 
+export type AuthorStatusOptionalPayoutSection = {
+  title: string;
+  description: string;
+  cta: AuthorStatusCta;
+};
+
 export type AuthorStatusViewModel = {
   kind: AuthorStatusViewKind;
   currentTierLabel: "Стартовый" | "Коммерческий" | "Приостановлен";
@@ -54,6 +59,8 @@ export type AuthorStatusViewModel = {
   applicationReviewComment: string | null;
   payoutReviewComment: string | null;
   cta: AuthorStatusCta;
+  secondaryCtas: AuthorStatusCta[];
+  optionalPayout: AuthorStatusOptionalPayoutSection | null;
   starterCapabilities: string[];
   commercialCapabilities: string[];
   premiumCapabilities: string[];
@@ -146,6 +153,8 @@ export function resolveAuthorStatusView(
     applicationSubmittedAt: input.applicationSubmittedAt ?? null,
     applicationReviewComment: input.applicationReviewComment ?? null,
     payoutReviewComment: input.payoutReviewComment ?? null,
+    secondaryCtas: [] as AuthorStatusCta[],
+    optionalPayout: null as AuthorStatusOptionalPayoutSection | null,
     starterCapabilities: [...STARTER_CAPABILITIES],
     commercialCapabilities: [...COMMERCIAL_CAPABILITIES],
     premiumCapabilities: [...PREMIUM_CAPABILITIES],
@@ -165,6 +174,56 @@ export function resolveAuthorStatusView(
     input.authorSlug,
   );
   const legalHref = withAuthorQuery("/author-dashboard/legal", input.authorSlug);
+  const productsHref = withAuthorQuery(
+    "/author-dashboard/products",
+    input.authorSlug,
+  );
+  const financeHref = withAuthorQuery(
+    "/author-dashboard/finance",
+    input.authorSlug,
+  );
+
+  function buildOptionalPayoutSection(): AuthorStatusOptionalPayoutSection {
+    const hasProfile = input.payoutProfileStatus != null;
+    const pending =
+      input.payoutProfileStatus === "submitted" ||
+      input.payoutProfileStatus === "in_review";
+    const needsChanges =
+      input.payoutProfileStatus === "needs_changes" ||
+      input.payoutProfileStatus === "rejected";
+    const verified = input.payoutProfileStatus === "verified";
+
+    return {
+      title: "Данные для выплат",
+      description:
+        "Заполните реквизиты, когда захотите получить первое авторское вознаграждение.",
+      cta: {
+        label: verified
+          ? "Реквизиты заполнены"
+          : pending
+            ? "Реквизиты отправлены"
+            : needsChanges
+              ? "Уточнить реквизиты"
+              : hasProfile
+                ? "Продолжить заполнение реквизитов"
+                : "Заполнить реквизиты",
+        href:
+          verified || pending || !capabilities.can_edit_payout_profile
+            ? null
+            : payoutHref,
+        disabled:
+          verified ||
+          pending ||
+          !capabilities.can_edit_payout_profile ||
+          input.role === "editor",
+        hint:
+          input.payoutReviewComment?.trim() ||
+          (input.role === "editor"
+            ? "Заполнить реквизиты может владелец кабинета автора."
+            : null),
+      },
+    };
+  }
 
   if (accessStatus === "suspended" || accessStatus === "terminated") {
     return {
@@ -215,13 +274,20 @@ export function resolveAuthorStatusView(
       showStandardCommercialOffer: true,
       paidProductsLocked: false,
       cta: {
-        label: "Коммерческий статус подключён",
-        href: null,
-        disabled: true,
-        hint: share.isIndividual
-          ? "Действуют индивидуальные коммерческие параметры."
-          : "Действуют стандартные коммерческие условия Платформы.",
+        label: "Создать платный продукт",
+        href: productsHref,
+        disabled: false,
+        hint: "Коммерческий статус активен. Можно создавать и публиковать платные продукты.",
       },
+      secondaryCtas: [
+        {
+          label: "Перейти к финансам",
+          href: financeHref,
+          disabled: false,
+          hint: null,
+        },
+      ],
+      optionalPayout: buildOptionalPayoutSection(),
     };
   }
 
@@ -245,59 +311,28 @@ export function resolveAuthorStatusView(
           hint:
             input.role === "editor"
               ? "Принять условия может только владелец кабинета автора."
-              : "После принятия условий заполните данные для выплат.",
+              : "После принятия условий коммерческий статус станет активным.",
         },
       };
     }
 
-    const payoutVerified = isPayoutProfileVerified(input.payoutProfileStatus);
-    if (!payoutVerified) {
-      const payoutPending =
-        input.payoutProfileStatus === "submitted" ||
-        input.payoutProfileStatus === "in_review";
-      const payoutNeedsChanges =
-        input.payoutProfileStatus === "needs_changes" ||
-        input.payoutProfileStatus === "rejected";
-
-      return {
-        ...base,
-        kind: "commercial_ready_for_payout",
-        currentTierLabel: "Стартовый",
-        currentTierDescription: STARTER_DESCRIPTION,
-        showStandardCommercialOffer: true,
-        paidProductsLocked: true,
-        cta: {
-          label: payoutPending
-            ? "Данные для выплат отправлены"
-            : payoutNeedsChanges
-              ? "Уточнить данные для выплат"
-              : "Заполнить данные для выплат",
-          href: capabilities.can_edit_payout_profile ? payoutHref : null,
-          disabled: payoutPending || !capabilities.can_edit_payout_profile,
-          hint:
-            input.payoutReviewComment?.trim() ||
-            (payoutPending
-              ? "Мы проверяем реквизиты. Обычно это занимает немного времени."
-              : input.role === "editor"
-                ? "Заполнить реквизиты может владелец кабинета автора."
-                : null),
-        },
-      };
-    }
-
+    // Terms accepted but access not yet flipped (rare race / legacy).
+    // Do not block on payout profile — paid unlock follows access_status.
     return {
       ...base,
-      kind: "commercial_ready_for_payout",
+      kind: "commercial_ready_for_terms",
       currentTierLabel: "Стартовый",
       currentTierDescription: STARTER_DESCRIPTION,
       showStandardCommercialOffer: true,
       paidProductsLocked: true,
       cta: {
-        label: "Ожидается активация коммерческого статуса",
+        label: "Коммерческий статус активируется",
         href: null,
         disabled: true,
-        hint: "Условия приняты и данные для выплат заполнены. Платные продажи откроются после активации коммерческого статуса.",
+        hint:
+          "Условия приняты. Обновите страницу через несколько секунд — коммерческий доступ откроется автоматически.",
       },
+      optionalPayout: buildOptionalPayoutSection(),
     };
   }
 

@@ -119,7 +119,7 @@ function baseInput(overrides = {}) {
   assert.ok(view.cta.href?.includes("/author-dashboard/commercial/terms"));
 }
 
-// terms accepted, payout missing
+// terms accepted, access not yet flipped (legacy/race) — payout optional
 {
   const view = resolveAuthorStatusView(
     baseInput({
@@ -129,9 +129,35 @@ function baseInput(overrides = {}) {
       payoutProfileStatus: "draft",
     }),
   );
-  assert.equal(view.kind, "commercial_ready_for_payout");
-  assert.equal(view.cta.label, "Заполнить данные для выплат");
-  assert.ok(view.cta.href?.includes("/author-dashboard/commercial/payout-details"));
+  assert.equal(view.kind, "commercial_ready_for_terms");
+  assert.equal(view.cta.label, "Коммерческий статус активируется");
+  assert.equal(view.cta.disabled, true);
+  assert.ok(view.optionalPayout);
+  assert.equal(view.optionalPayout?.cta.label, "Продолжить заполнение реквизитов");
+  assert.equal(view.paidProductsLocked, true);
+}
+
+// commercial active without payout profile
+{
+  const view = resolveAuthorStatusView(
+    baseInput({
+      accessStatus: "commercial_active",
+      applicationStatus: "approved",
+      termsAccepted: true,
+      payoutProfileStatus: null,
+    }),
+  );
+  assert.equal(view.kind, "commercial_active");
+  assert.equal(view.cta.label, "Создать платный продукт");
+  assert.equal(view.cta.disabled, false);
+  assert.equal(view.paidProductsLocked, false);
+  assert.equal(view.secondaryCtas[0]?.label, "Перейти к финансам");
+  assert.ok(view.optionalPayout);
+  assert.equal(view.optionalPayout?.cta.label, "Заполнить реквизиты");
+  assert.match(
+    view.optionalPayout?.description ?? "",
+    /когда захотите получить первое авторское вознаграждение/,
+  );
 }
 
 // commercial active + individual share
@@ -146,8 +172,8 @@ function baseInput(overrides = {}) {
     }),
   );
   assert.equal(view.kind, "commercial_active");
-  assert.equal(view.cta.label, "Коммерческий статус подключён");
-  assert.equal(view.cta.disabled, true);
+  assert.equal(view.cta.label, "Создать платный продукт");
+  assert.equal(view.cta.disabled, false);
   assert.equal(view.share.isIndividual, true);
   assert.ok(view.shareLines.authorLine.includes("75%"));
   assert.equal(view.paidProductsLocked, false);

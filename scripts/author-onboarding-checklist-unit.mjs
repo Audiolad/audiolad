@@ -764,7 +764,7 @@ function testCommercialScenarios() {
   });
   assert.equal(rejected.steps[0].statusLabel, "Заявка не одобрена");
 
-  // 8–9. After approve (commercial_onboarding) payout/terms open; paid locked
+  // 8–9. After approve: terms open; paid locked until access flips; payout optional
   const approved = evaluateCommercial({
     freeGateReady: true,
     accessStatus: "commercial_onboarding",
@@ -779,13 +779,16 @@ function testCommercialScenarios() {
   });
   assert.equal(approved.steps[0].state, "completed");
   assert.equal(approved.steps[0].statusLabel, "Одобрена");
+  assert.equal(approved.steps[1].id, "terms_acceptance");
   assert.equal(approved.steps[1].state, "active");
-  assert.equal(approved.steps[2].state, "active");
-  assert.equal(approved.steps[3].state, "locked");
+  assert.equal(approved.steps[2].id, "paid_product");
+  assert.equal(approved.steps[2].state, "locked");
   assert.match(
-    approved.steps[3].hint ?? "",
-    /данные для выплат|условия сотрудничества/i,
+    approved.steps[2].hint ?? "",
+    /условия сотрудничества/i,
   );
+  assert.equal(approved.steps.at(-1)?.id, "payout_details");
+  assert.equal(approved.steps.at(-1)?.state, "locked");
 
   // Explicit application href is respected
   const applyReady = evaluateCommercial({
@@ -800,7 +803,7 @@ function testCommercialScenarios() {
     "/author-dashboard/commercial-application",
   );
 
-  // Requirements met unlocks paid create
+  // Requirements met unlocks paid create (payout not required)
   const requirementsMet = evaluateCommercial({
     freeGateReady: true,
     accessStatus: "commercial",
@@ -809,13 +812,16 @@ function testCommercialScenarios() {
       payoutDetailsAvailable: true,
       termsAcceptanceAvailable: true,
     },
-    payoutDetailsComplete: true,
+    payoutDetailsComplete: false,
+    payoutProfileStatus: null,
     termsAccepted: true,
   });
   assert.equal(requirementsMet.steps[1].state, "completed");
-  assert.equal(requirementsMet.steps[2].state, "completed");
-  assert.equal(requirementsMet.steps[3].state, "active");
-  assert.equal(requirementsMet.steps[3].actionLabel, "Создать платный продукт");
+  assert.equal(requirementsMet.steps[2].id, "paid_product");
+  assert.equal(requirementsMet.steps[2].state, "active");
+  assert.equal(requirementsMet.steps[2].actionLabel, "Создать платный продукт");
+  assert.equal(requirementsMet.steps.at(-1)?.id, "payout_details");
+  assert.equal(requirementsMet.steps.at(-1)?.statusLabel, "Необязательно");
 
   // 10. Paid draft created
   const paidDraft = evaluateCommercial({
@@ -826,7 +832,7 @@ function testCommercialScenarios() {
       payoutDetailsAvailable: true,
       termsAcceptanceAvailable: true,
     },
-    payoutDetailsComplete: true,
+    payoutDetailsComplete: false,
     termsAccepted: true,
     products: [
       product(
@@ -840,8 +846,8 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidDraft.steps[3].state, "completed");
-  assert.equal(paidDraft.steps[4].state, "active");
+  assert.equal(paidDraft.steps[2].state, "completed");
+  assert.equal(paidDraft.steps[3].state, "active");
   assert.equal(paidDraft.focusPaidProductId, "paid-1");
 
   // 11. Paid product previewed / ready to publish
@@ -853,7 +859,7 @@ function testCommercialScenarios() {
       payoutDetailsAvailable: true,
       termsAcceptanceAvailable: true,
     },
-    payoutDetailsComplete: true,
+    payoutDetailsComplete: false,
     termsAccepted: true,
     products: [
       product(
@@ -867,9 +873,9 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidReady.steps[4].state, "completed");
-  assert.equal(paidReady.steps[5].state, "active");
-  assert.match(paidReady.steps[5].href ?? "", /preview=publish/);
+  assert.equal(paidReady.steps[3].state, "completed");
+  assert.equal(paidReady.steps[4].state, "active");
+  assert.match(paidReady.steps[4].href ?? "", /preview=publish/);
 
   // 12. First paid product published
   const paidPublished = evaluateCommercial({
@@ -880,7 +886,7 @@ function testCommercialScenarios() {
       payoutDetailsAvailable: true,
       termsAcceptanceAvailable: true,
     },
-    payoutDetailsComplete: true,
+    payoutDetailsComplete: false,
     termsAccepted: true,
     products: [
       product(
@@ -894,11 +900,11 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidPublished.steps[5].state, "completed");
-  assert.equal(paidPublished.steps[6].state, "active");
-  assert.equal(paidPublished.steps[6].actionLabel, "Создать ссылку");
+  assert.equal(paidPublished.steps[4].state, "completed");
+  assert.equal(paidPublished.steps[5].state, "active");
+  assert.equal(paidPublished.steps[5].actionLabel, "Создать ссылку");
 
-  // 13. Promo link for paid product
+  // 13. Promo link for paid product — onboarding complete without payout
   const paidPromo = evaluateCommercial({
     freeGateReady: true,
     accessStatus: "commercial",
@@ -907,7 +913,8 @@ function testCommercialScenarios() {
       payoutDetailsAvailable: true,
       termsAcceptanceAvailable: true,
     },
-    payoutDetailsComplete: true,
+    payoutDetailsComplete: false,
+    payoutProfileStatus: null,
     termsAccepted: true,
     products: [
       product(
@@ -930,8 +937,11 @@ function testCommercialScenarios() {
     ],
   });
   assert.equal(paidPromo.complete, true);
-  assert.equal(paidPromo.completedCount, 7);
-  assert.equal(paidPromo.steps[6].state, "completed");
+  assert.equal(paidPromo.completedCount, 6);
+  assert.equal(paidPromo.totalCount, 6);
+  assert.equal(paidPromo.steps[5].state, "completed");
+  assert.equal(paidPromo.steps[6].id, "payout_details");
+  assert.equal(paidPromo.steps[6].statusLabel, "Необязательно");
 }
 
 function main() {

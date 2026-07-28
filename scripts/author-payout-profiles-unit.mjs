@@ -352,7 +352,7 @@ function testStatusMachine() {
   assert.equal(isPayoutProfileVerified("verified"), true);
 
   const statusView = resolveAuthorStatusView({
-    accessStatus: "commercial_onboarding",
+    accessStatus: "commercial_active",
     applicationStatus: "approved",
     termsAccepted: true,
     publishedTermsAvailable: true,
@@ -360,8 +360,24 @@ function testStatusMachine() {
     role: "owner",
     authorSlug: "demo",
   });
-  assert.equal(statusView.cta.label, "Данные для выплат отправлены");
-  assert.equal(statusView.cta.disabled, true);
+  assert.equal(statusView.kind, "commercial_active");
+  assert.equal(statusView.cta.label, "Создать платный продукт");
+  assert.equal(statusView.paidProductsLocked, false);
+  assert.equal(statusView.optionalPayout?.cta.label, "Реквизиты отправлены");
+  assert.equal(statusView.optionalPayout?.cta.disabled, true);
+
+  const needsChangesView = resolveAuthorStatusView({
+    accessStatus: "commercial_active",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    publishedTermsAvailable: true,
+    payoutProfileStatus: "needs_changes",
+    role: "owner",
+    authorSlug: "demo",
+  });
+  assert.equal(needsChangesView.kind, "commercial_active");
+  assert.equal(needsChangesView.paidProductsLocked, false);
+  assert.equal(authorAccessAllowsPaidProducts("commercial_active"), true);
 }
 
 function testMasksAndGates() {

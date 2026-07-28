@@ -64,7 +64,11 @@ function testAccessModel() {
 
   assert.match(
     getPaidPricingDisabledReason("commercial_onboarding") ?? "",
-    /данные для выплат|условия сотрудничества/,
+    /условия сотрудничества/,
+  );
+  assert.doesNotMatch(
+    getPaidPricingDisabledReason("commercial_onboarding") ?? "",
+    /данные для выплат|реквизит/i,
   );
 
   const onboardingCaps = resolveAuthorCommercialCapabilities({
@@ -108,9 +112,10 @@ function testOnboardingStates() {
   assert.equal(approved.steps[0].state, "completed");
   assert.equal(approved.steps[1].id, "terms_acceptance");
   assert.equal(approved.steps[1].state, "active");
-  assert.equal(approved.steps[2].id, "payout_details");
+  assert.equal(approved.steps[2].id, "paid_product");
   assert.equal(approved.steps[2].state, "locked");
-  assert.equal(approved.steps[3].state, "locked");
+  assert.equal(approved.steps.at(-1)?.id, "payout_details");
+  assert.equal(approved.steps.at(-1)?.state, "locked");
   assert.match(approved.steps[1].href ?? "", /\/terms/);
   assert.equal(approved.steps[1].actionLabel, "Открыть условия");
   assert.match(
@@ -118,12 +123,12 @@ function testOnboardingStates() {
     /Сначала примите Авторские условия сотрудничества/,
   );
   assert.match(
-    approved.steps[3].hint ?? "",
-    /Сначала заполните данные для выплат и примите условия сотрудничества/,
+    approved.steps.at(-1)?.hint ?? "",
+    /Сначала примите Авторские условия сотрудничества/,
   );
 
   const afterTerms = evaluate({
-    accessStatus: "commercial_onboarding",
+    accessStatus: "commercial_active",
     applicationStatus: "approved",
     capabilities: {
       ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
@@ -135,8 +140,17 @@ function testOnboardingStates() {
     termsHref: "/author-dashboard/commercial/terms?author=demo",
   });
   assert.equal(afterTerms.steps[1].state, "completed");
+  assert.equal(afterTerms.steps[2].id, "paid_product");
   assert.equal(afterTerms.steps[2].state, "active");
-  assert.match(afterTerms.steps[2].href ?? "", /payout-details/);
+  assert.equal(afterTerms.steps.at(-1)?.id, "payout_details");
+  assert.equal(afterTerms.steps.at(-1)?.state, "active");
+  assert.equal(afterTerms.steps.at(-1)?.statusLabel, "Необязательно");
+  assert.match(
+    afterTerms.steps.at(-1)?.hint ?? "",
+    /Реквизиты можно заполнить позднее/,
+  );
+  assert.equal(afterTerms.complete, false);
+  assert.equal(afterTerms.totalCount, 6);
 
   const rejected = evaluate({
     accessStatus: "free",

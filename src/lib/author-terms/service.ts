@@ -17,6 +17,7 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT,
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
+import { activateCommercialAccessAfterTermsAccepted } from "@/lib/authors/activate-commercial-after-terms";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 assertAuthorTermsContentHash(
@@ -174,6 +175,11 @@ export async function acceptCurrentAuthorTerms(input: {
     currentVersion.id,
   );
   if (existing) {
+    // Self-heal: previously accepted terms but still stuck in onboarding.
+    await activateCommercialAccessAfterTermsAccepted({
+      authorId: input.authorId,
+      actorUserId: input.userId,
+    });
     return {
       acceptance: existing,
       created: false,
@@ -207,6 +213,10 @@ export async function acceptCurrentAuthorTerms(input: {
         currentVersion.id,
       );
       if (again) {
+        await activateCommercialAccessAfterTermsAccepted({
+          authorId: input.authorId,
+          actorUserId: input.userId,
+        });
         return {
           acceptance: again,
           created: false,
@@ -218,6 +228,11 @@ export async function acceptCurrentAuthorTerms(input: {
     console.error("author_terms_accept_insert_error", error.message);
     throw new AuthorTermsError("internal_error", 500);
   }
+
+  await activateCommercialAccessAfterTermsAccepted({
+    authorId: input.authorId,
+    actorUserId: input.userId,
+  });
 
   return {
     acceptance: data as AuthorTermsAcceptanceRow,

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import {
   AUTHOR_STATUS_COPY,
+  type AuthorStatusCta,
   type AuthorStatusViewModel,
 } from "@/lib/author-dashboard/author-status";
 
@@ -48,6 +49,30 @@ function StatusCard({
   );
 }
 
+function CtaButton({ cta, primary }: { cta: AuthorStatusCta; primary?: boolean }) {
+  const className = primary
+    ? "mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-semibold text-white"
+    : "mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-[#bda6e1] px-6 text-sm font-semibold text-[#7042c5]";
+
+  if (cta.href && !cta.disabled) {
+    return (
+      <Link href={cta.href} className={className}>
+        {cta.label}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled
+      className={`${className} cursor-not-allowed opacity-40`}
+    >
+      {cta.label}
+    </button>
+  );
+}
+
 export default function AuthorStatusClient({ authorSlug, view }: Props) {
   const showStarterAsCurrent =
     view.kind === "starter" ||
@@ -74,7 +99,7 @@ export default function AuthorStatusClient({ authorSlug, view }: Props) {
       ) : null}
 
       {view.kind === "commercial_active" ? (
-        <StatusCard title="Ваш текущий статус – Коммерческий" tone="accent">
+        <StatusCard title="Коммерческий статус активен" tone="accent">
           <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">
             {view.currentTierDescription}
           </p>
@@ -127,26 +152,30 @@ export default function AuthorStatusClient({ authorSlug, view }: Props) {
       ) : null}
 
       <StatusCard title="Что дальше">
-        {view.cta.href && !view.cta.disabled ? (
-          <Link
-            href={view.cta.href}
-            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-semibold text-white"
-          >
-            {view.cta.label}
-          </Link>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="mt-4 inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-semibold text-white opacity-40"
-          >
-            {view.cta.label}
-          </button>
-        )}
+        <div className="flex flex-wrap gap-3">
+          <CtaButton cta={view.cta} primary />
+          {view.secondaryCtas.map((cta) => (
+            <CtaButton key={cta.label} cta={cta} />
+          ))}
+        </div>
         {view.cta.hint ? (
           <p className="mt-3 text-sm leading-6 text-[#8c7dab]">{view.cta.hint}</p>
         ) : null}
       </StatusCard>
+
+      {view.optionalPayout ? (
+        <StatusCard title={view.optionalPayout.title} tone="muted">
+          <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">
+            {view.optionalPayout.description}
+          </p>
+          <CtaButton cta={view.optionalPayout.cta} />
+          {view.optionalPayout.cta.hint ? (
+            <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
+              {view.optionalPayout.cta.hint}
+            </p>
+          ) : null}
+        </StatusCard>
+      ) : null}
 
       <StatusCard title={AUTHOR_STATUS_COPY.premiumTitle} tone="muted">
         <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">

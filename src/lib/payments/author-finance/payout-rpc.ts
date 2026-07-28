@@ -168,6 +168,7 @@ export const AUTHOR_PAYOUT_VALIDATION_CODES = [
   "author_id_required",
   "author_not_found",
   "author_not_payout_eligible",
+  "payout_profile_required",
   "payout_id_required",
   "payout_not_found",
   "idempotency_key_required",
@@ -228,7 +229,40 @@ export async function createAuthorPayoutDraft(input: {
   includeTest?: boolean;
   actorUserId: string | null;
   correlationId?: string | null;
+  /** When true, skip payout-profile gate (emergency/admin tooling only). */
+  skipPayoutProfileGate?: boolean;
 }): Promise<AuthorPayoutRpcResult> {
+  if (!input.skipPayoutProfileGate) {
+    const { isPayoutProfilesEnabled } = await import(
+      "@/lib/author-payout-profiles/feature"
+    );
+    if (isPayoutProfilesEnabled()) {
+      const { getAuthorPayoutProfileRow } = await import(
+        "@/lib/author-payout-profiles/service"
+      );
+      const { isPayoutProfileReadyForWithdrawal } = await import(
+        "@/lib/author-payout-profiles/onboarding-complete"
+      );
+      const { createServiceRoleClient } = await import(
+        "@/lib/supabase/service-role"
+      );
+
+      const { isAuthorPayoutProfileStatus } = await import(
+        "@/lib/author-payout-profiles/types"
+      );
+      const row = await getAuthorPayoutProfileRow(
+        createServiceRoleClient(),
+        input.authorId,
+      );
+      const status = isAuthorPayoutProfileStatus(row?.status)
+        ? row.status
+        : null;
+      if (!isPayoutProfileReadyForWithdrawal(status)) {
+        return rpcFailure("payout_profile_required");
+      }
+    }
+  }
+
   return callPayoutRpc("create_author_payout_draft", {
     p_author_id: input.authorId,
     p_idempotency_key: input.idempotencyKey,

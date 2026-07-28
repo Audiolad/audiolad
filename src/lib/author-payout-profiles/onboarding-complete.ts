@@ -14,18 +14,26 @@ export function resolvePayoutStepCompleteForLegacyOnboarding(input: {
     return true;
   }
 
-  // Checklist presentation: saved/submitted counts as filled.
-  // Activation / paid access still require isPayoutProfileVerified().
+  // Optional step: any saved/submitted profile counts as "filled" for display.
+  // Commercial activation does NOT depend on payout profile.
   return (
     input.payoutProfileStatus === "verified" ||
     input.payoutProfileStatus === "submitted" ||
-    input.payoutProfileStatus === "in_review"
+    input.payoutProfileStatus === "in_review" ||
+    input.payoutProfileStatus === "draft"
   );
 }
 
-/** Strict verification signal for future activation / payout eligibility. */
+/** Strict verification signal for payout/withdrawal eligibility only. */
 export function isPayoutProfileVerified(
   payoutProfileStatus: AuthorPayoutProfileStatus | null | undefined,
 ): boolean {
   return payoutProfileStatus === "verified";
+}
+
+/** True when author may request a payout / withdrawal. */
+export function isPayoutProfileReadyForWithdrawal(
+  payoutProfileStatus: AuthorPayoutProfileStatus | null | undefined,
+): boolean {
+  return isPayoutProfileVerified(payoutProfileStatus);
 }
