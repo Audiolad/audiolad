@@ -408,6 +408,12 @@ assert(
   "free hub includes female-energy-meditation SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "zhenskaya-energiya-chto-eto",
+  ),
+  "free hub includes female-energy-what-is SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

@@ -36,6 +36,7 @@ import { ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE } from "./content/zhenskaya-samo
 import { ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE } from "./content/zhenshchina-i-dengi-psihologiya";
 import { ZHENSKAYA_SILA_ARTICLE } from "./content/zhenskaya-sila";
 import { MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE } from "./content/meditatsiya-na-zhenskuyu-energiyu";
+import { ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE } from "./content/zhenskaya-energiya-chto-eto";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -77,6 +78,7 @@ const ARTICLE_DEFINITIONS = [
   ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE,
   ZHENSKAYA_SILA_ARTICLE,
   MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE,
+  ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

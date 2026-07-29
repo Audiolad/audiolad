@@ -295,6 +295,14 @@ export const MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, что обычно понимают под выражением «женская энергия» и как найти собственное понимание без стереотипов, можно прочитать статью ",
+      linkLabel:
+        "«Женская энергия: что обычно понимают под этим выражением»",
+      href: "/articles/zhenskaya-energiya-chto-eto",
+      after: ".",
+    },
+    {
+      before:
         "Если тема женской энергии близка как отдельный угол, может быть полезна подборка ",
       linkLabel:
         "«Женская энергия»",
@@ -327,6 +335,11 @@ export const MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE = {
       href: "/articles/kak-razvit-lyubov-k-sebe",
       title: "Как развить любовь к себе",
       description: "Бережное отношение к себе и внутренняя опора",
+    },
+    {
+      href: "/articles/zhenskaya-energiya-chto-eto",
+      title: "Женская энергия: что это",
+      description: "Что обычно понимают под этим выражением простыми словами",
     },
     {
       href: "/topics/zhenskaya-energiya",

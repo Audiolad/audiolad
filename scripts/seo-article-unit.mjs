@@ -5340,6 +5340,131 @@ assert(
   "love-to-self reverse-links to female-energy-meditation",
 );
 
+const femaleEnergyWhatIsArticle = getArticleBySlug("zhenskaya-energiya-chto-eto");
+assert(femaleEnergyWhatIsArticle, "female-energy-what-is article registered");
+assert(
+  femaleEnergyWhatIsArticle.title ===
+    "Женская энергия: что обычно понимают под этим выражением",
+  "female-energy-what-is H1",
+);
+assert(
+  femaleEnergyWhatIsArticle.breadcrumbTitle === "Женская энергия",
+  "female-energy-what-is breadcrumb",
+);
+assert(
+  femaleEnergyWhatIsArticle.metaTitle ===
+    "Женская энергия – что это такое простыми словами | АудиоЛад",
+  "female-energy-what-is SEO title",
+);
+assert(
+  femaleEnergyWhatIsArticle.topicSlug === "besplatnye-meditatsii",
+  "female-energy-what-is free hub",
+);
+assert(
+  femaleEnergyWhatIsArticle.primaryPractice.practiceKey === "zhenskaya-energiya",
+  "female-energy-what-is practice zhenskaya-energiya",
+);
+assert(
+  femaleEnergyWhatIsArticle.primaryPracticeIntro.includes("Женская энергия"),
+  "female-energy-what-is practice intro",
+);
+assert(
+  femaleEnergyWhatIsArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не создаёт гарантированного результата"),
+    ),
+  "female-energy-what-is audiopraktika disclaimer",
+);
+assert(femaleEnergyWhatIsArticle.faq.length === 6, "female-energy-what-is faq count");
+assert(
+  femaleEnergyWhatIsArticle.faq[0]?.question.startsWith("### "),
+  "female-energy-what-is faq first question uses ### prefix",
+);
+assert(
+  femaleEnergyWhatIsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+  ),
+  "female-energy-what-is links to female-energy-meditation",
+);
+assert(
+  femaleEnergyWhatIsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ),
+  "female-energy-what-is links to how-to-fill female-energy",
+);
+assert(
+  femaleEnergyWhatIsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ),
+  "female-energy-what-is links to female-strength",
+);
+assert(
+  femaleEnergyWhatIsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-razvit-lyubov-k-sebe",
+  ),
+  "female-energy-what-is links to love-to-self",
+);
+assert(
+  !femaleEnergyWhatIsArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya",
+  ) &&
+    !femaleEnergyWhatIsArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya",
+    ),
+  "female-energy-what-is has no links to bare unpublished zhenskaya-energiya slug",
+);
+assert(
+  femaleEnergyWhatIsArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "female-energy-what-is see-also includes hub",
+);
+assert(
+  listArticleSlugs().includes("zhenskaya-energiya-chto-eto"),
+  "female-energy-what-is in slug list",
+);
+assert(
+  !JSON.stringify(femaleEnergyWhatIsArticle).includes("—"),
+  "female-energy-what-is uses medium dash not em dash",
+);
+assert(
+  femaleEnergyMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+  ) ||
+    femaleEnergyMeditationArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+    ),
+  "female-energy-meditation reverse-links to female-energy-what-is",
+);
+assert(
+  femaleEnergyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+  ) ||
+    femaleEnergyArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+    ),
+  "female-energy reverse-links to female-energy-what-is",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+  ) ||
+    femaleStrengthArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+    ),
+  "female-strength reverse-links to female-energy-what-is",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+  ) ||
+    article.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya-chto-eto",
+    ),
+  "love-to-self reverse-links to female-energy-what-is",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
