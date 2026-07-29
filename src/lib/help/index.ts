@@ -5,6 +5,10 @@ export type {
   HelpAudience,
   HelpCategory,
   HelpCategoryId,
+  HelpInlineLink,
+  HelpInlineNode,
+  HelpInlineText,
+  HelpRichText,
   HelpSearchHit,
   SupportRequestCategory,
   SupportRequestStatus,
@@ -46,6 +50,16 @@ export {
 export type { HelpSearchDocument } from "@/lib/help/search";
 
 export { sanitizeSupportSourceUrl } from "@/lib/help/source-url";
+
+export {
+  collectHelpRichTexts,
+  findBareRoutesInProse,
+  flattenHelpRichText,
+  helpPublicLink,
+  helpRich,
+  helpText,
+  isHelpRichNodes,
+} from "@/lib/help/rich-text";
 
 export { ALL_HELP_ARTICLES } from "@/lib/help/articles";
 

@@ -11,12 +11,37 @@ export const HELP_CATEGORY_IDS = [
 ] as const;
 export type HelpCategoryId = (typeof HELP_CATEGORY_IDS)[number];
 
+/** Plain text segment inside a help paragraph/step/note. */
+export type HelpInlineText = {
+  type: "text";
+  value: string;
+};
+
+/**
+ * Explicit link segment. Prefer relative `href` for internal pages;
+ * `label` is the user-visible absolute URL (e.g. https://audiolad.ru/...).
+ */
+export type HelpInlineLink = {
+  type: "link";
+  href: string;
+  label: string;
+  external?: boolean;
+};
+
+export type HelpInlineNode = HelpInlineText | HelpInlineLink;
+
+/**
+ * Body content may stay a plain string (no links) or use typed inline nodes.
+ * Do not embed bare "/path" routes inside plain strings for user destinations.
+ */
+export type HelpRichText = string | HelpInlineNode[];
+
 export type HelpArticleSection = {
   id: string;
   title?: string;
-  paragraphs?: string[];
-  steps?: string[];
-  notes?: string[];
+  paragraphs?: HelpRichText[];
+  steps?: HelpRichText[];
+  notes?: HelpRichText[];
 };
 
 export type HelpArticleCta = {

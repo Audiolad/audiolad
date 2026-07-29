@@ -1,12 +1,50 @@
 import { ALL_HELP_ARTICLES } from "@/lib/help/articles";
 import { isHelpCategoryId } from "@/lib/help/categories";
+import {
+  findBareRoutesInProse,
+  flattenHelpRichText,
+  isHelpRichNodes,
+} from "@/lib/help/rich-text";
 import { buildHelpSearchIndex } from "@/lib/help/search";
 import type {
   HelpArticle,
   HelpCategoryId,
+  HelpRichText,
   HelpSearchHit,
 } from "@/lib/help/types";
 import type { HelpSearchDocument } from "@/lib/help/search";
+
+function validateRichTextField(
+  articleId: string,
+  field: string,
+  values: readonly HelpRichText[] | undefined,
+  errors: string[],
+): void {
+  if (!values) return;
+
+  values.forEach((value, index) => {
+    if (isHelpRichNodes(value)) {
+      for (const node of value) {
+        if (node.type === "link") {
+          if (!node.href?.trim() || !node.label?.trim()) {
+            errors.push(`invalid_link:${articleId}:${field}:${index}`);
+          } else if (
+            !node.external &&
+            !node.href.startsWith("/") &&
+            !/^https?:\/\//i.test(node.href)
+          ) {
+            errors.push(`invalid_link_href:${articleId}:${field}:${index}`);
+          }
+        }
+      }
+      return;
+    }
+
+    for (const bare of findBareRoutesInProse(value)) {
+      errors.push(`bare_route_in_prose:${articleId}:${field}:${index}:${bare}`);
+    }
+  });
+}
 
 const BY_ID = new Map<string, HelpArticle>();
 const BY_CATEGORY_SLUG = new Map<string, HelpArticle>();
@@ -99,6 +137,36 @@ export function validateHelpRegistry(): HelpRegistryValidationResult {
     for (const relatedId of article.relatedArticleIds) {
       if (!BY_ID.has(relatedId)) {
         errors.push(`missing_related_article:${article.id}:${relatedId}`);
+      }
+    }
+
+    for (const section of article.sections) {
+      validateRichTextField(
+        article.id,
+        `${section.id}.paragraphs`,
+        section.paragraphs,
+        errors,
+      );
+      validateRichTextField(
+        article.id,
+        `${section.id}.steps`,
+        section.steps,
+        errors,
+      );
+      validateRichTextField(
+        article.id,
+        `${section.id}.notes`,
+        section.notes,
+        errors,
+      );
+
+      // Ensure search can flatten every rich block.
+      for (const value of [
+        ...(section.paragraphs ?? []),
+        ...(section.steps ?? []),
+        ...(section.notes ?? []),
+      ]) {
+        flattenHelpRichText(value);
       }
     }
   }

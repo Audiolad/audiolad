@@ -11,6 +11,13 @@ import {
   validateHelpRegistry,
 } from "../src/lib/help/registry.ts";
 import {
+  findBareRoutesInProse,
+  flattenHelpRichText,
+  helpPublicLink,
+  helpRich,
+  isHelpRichNodes,
+} from "../src/lib/help/rich-text.ts";
+import {
   searchHelpArticles,
   tokenizeHelpSearchText,
 } from "../src/lib/help/search.ts";
@@ -50,7 +57,60 @@ for (const article of articles) {
   }
   assert.ok(article.sections.length > 0, `${article.id} needs sections`);
   assert.ok(article.keywords.length > 0, `${article.id} needs keywords`);
+
+  for (const section of article.sections) {
+    for (const field of ["paragraphs", "steps", "notes"]) {
+      const values = section[field] ?? [];
+      for (const value of values) {
+        if (isHelpRichNodes(value)) {
+          for (const node of value) {
+            if (node.type === "link") {
+              assert.ok(node.href.startsWith("/"), `${article.id} link href relative`);
+              assert.match(
+                node.label,
+                /^https:\/\/audiolad\.ru\//,
+                `${article.id} link label must be absolute audiolad.ru URL`,
+              );
+              assert.equal(
+                node.label,
+                `https://audiolad.ru${node.href}`,
+                `${article.id} label must match href path`,
+              );
+            }
+          }
+        } else {
+          assert.deepEqual(
+            findBareRoutesInProse(value),
+            [],
+            `${article.id} still has bare route in ${field}: ${value}`,
+          );
+        }
+      }
+    }
+  }
 }
+
+const sampleRich = helpRich(
+  "Откройте ",
+  helpPublicLink("/auth/sign-up"),
+  ".",
+);
+assert.equal(
+  flattenHelpRichText(sampleRich),
+  "Откройте https://audiolad.ru/auth/sign-up.",
+);
+assert.deepEqual(findBareRoutesInProse("Откройте /auth/sign-up."), [
+  "/auth/sign-up",
+]);
+assert.deepEqual(findBareRoutesInProse("Шаблон /d/{token} ок"), []);
+
+const articleView = read("src/components/help/HelpArticleView.tsx");
+assert.match(articleView, /HelpRichText/);
+assert.doesNotMatch(
+  articleView,
+  /replace\(.*\/auth/,
+  "no regex rewriting of routes in article view",
+);
 
 const index = getHelpSearchIndex();
 assert.equal(index.length, articles.length);

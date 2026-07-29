@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+import HelpRichText from "@/components/help/HelpRichText";
 import {
   trackHelpArticleCtaClick,
   trackHelpArticleView,
@@ -82,7 +83,12 @@ export default function HelpArticleView({
 
       <div className="mt-8 max-w-3xl space-y-8">
         {article.sections.map((section) => (
-          <section key={section.id} aria-labelledby={section.title ? `help-section-${section.id}` : undefined}>
+          <section
+            key={section.id}
+            aria-labelledby={
+              section.title ? `help-section-${section.id}` : undefined
+            }
+          >
             {section.title ? (
               <h2
                 id={`help-section-${section.id}`}
@@ -92,20 +98,23 @@ export default function HelpArticleView({
               </h2>
             ) : null}
 
-            {section.paragraphs?.map((paragraph) => (
-              <p
-                key={paragraph.slice(0, 48)}
+            {section.paragraphs?.map((paragraph, index) => (
+              <HelpRichText
+                key={`${section.id}-p-${index}`}
+                as="p"
+                value={paragraph}
                 className="mt-3 text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8"
-              >
-                {paragraph}
-              </p>
+              />
             ))}
 
             {section.steps && section.steps.length > 0 ? (
               <ol className="mt-4 list-decimal space-y-3 pl-5 marker:font-semibold marker:text-[#7042c5]">
-                {section.steps.map((step) => (
-                  <li key={step.slice(0, 48)} className="text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8">
-                    {step}
+                {section.steps.map((step, index) => (
+                  <li
+                    key={`${section.id}-s-${index}`}
+                    className="text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8"
+                  >
+                    <HelpRichText value={step} />
                   </li>
                 ))}
               </ol>
@@ -113,9 +122,12 @@ export default function HelpArticleView({
 
             {section.notes && section.notes.length > 0 ? (
               <ul className="mt-4 space-y-2 rounded-[20px] border border-[#eadff8] bg-[#fcfbfe] px-4 py-4">
-                {section.notes.map((note) => (
-                  <li key={note.slice(0, 48)} className="text-sm leading-6 text-[#5f5484]">
-                    {note}
+                {section.notes.map((note, index) => (
+                  <li
+                    key={`${section.id}-n-${index}`}
+                    className="text-sm leading-6 text-[#5f5484]"
+                  >
+                    <HelpRichText value={note} />
                   </li>
                 ))}
               </ul>
@@ -139,7 +151,10 @@ export default function HelpArticleView({
       ) : null}
 
       {related.length > 0 ? (
-        <section className="mt-12 max-w-3xl" aria-labelledby="help-related-heading">
+        <section
+          className="mt-12 max-w-3xl"
+          aria-labelledby="help-related-heading"
+        >
           <h2
             id="help-related-heading"
             className="text-xl font-semibold tracking-tight text-[#25135c]"
@@ -153,7 +168,9 @@ export default function HelpArticleView({
                   href={helpArticlePath(item)}
                   className="block rounded-[20px] border border-[#eadff8] bg-white px-4 py-4 transition hover:border-[#c9b6ea] hover:bg-[#faf7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                 >
-                  <span className="font-semibold text-[#25135c]">{item.title}</span>
+                  <span className="font-semibold text-[#25135c]">
+                    {item.title}
+                  </span>
                   <span className="mt-1 block text-sm leading-6 text-[#5f5484]">
                     {item.description}
                   </span>

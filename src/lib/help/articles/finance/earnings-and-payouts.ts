@@ -1,3 +1,4 @@
+import { helpPublicLink, helpRich } from "@/lib/help/rich-text";
 import type { HelpArticle } from "@/lib/help/types";
 
 export const earningsAndPayoutsArticle: HelpArticle = {
@@ -16,17 +17,14 @@ export const earningsAndPayoutsArticle: HelpArticle = {
     "финансы",
     "продажи",
     "реквизиты",
-    "доход",
   ],
   updatedAt: "2026-07-29",
-  version: 1,
+  version: 2,
   relatedRoutes: [
     "/author-dashboard/finance",
     "/author-dashboard/commercial/payout-details",
   ],
-  relatedArticleIds: [
-    "help.finance.commercial-status",
-  ],
+  relatedArticleIds: ["help.finance.commercial-status"],
   sections: [
     {
       id: "intro",
@@ -36,28 +34,29 @@ export const earningsAndPayoutsArticle: HelpArticle = {
     },
     {
       id: "steps",
-      title: "Как проверить финансы",
+      title: "Где смотреть деньги",
       steps: [
-        "Откройте кабинет автора → «Финансы» (/author-dashboard/finance).",
-        "Просмотрите сводку по продажам и начислениям за выбранный период.",
-        "Проверьте статус выплат и ожидаемые суммы.",
-        "Если реквизиты ещё не заполнены, перейдите в «Данные для выплат» (/author-dashboard/commercial/payout-details).",
-        "Заполните или обновите реквизиты и отправьте на проверку.",
+        helpRich(
+          "Откройте кабинет автора → «Финансы» (",
+          helpPublicLink("/author-dashboard/finance"),
+          ").",
+        ),
+        "Проверьте начисления и продажи за выбранный период.",
+        "Откройте историю выплат и статусы переводов.",
+        helpRich(
+          "Если реквизиты ещё не заполнены, перейдите в «Данные для выплат» (",
+          helpPublicLink("/author-dashboard/commercial/payout-details"),
+          ").",
+        ),
       ],
-    },
-    {
-      id: "notes",
-      title: "Ограничения",
       notes: [
-        "Финансовая статистика доступна после активации коммерческого статуса.",
-        "Выплата возможна только при проверенных реквизитах.",
-        "Если реквизиты отправлены на проверку, редактирование временно недоступно — дождитесь результата или комментария модератора.",
-        "Редактор авторского пространства не может менять реквизиты — это делает владелец кабинета.",
+        "Без коммерческого статуса раздел финансов может быть недоступен или показывать подсказку о подключении.",
+        "Выплаты выполняются по правилам платформы после проверки реквизитов.",
       ],
     },
   ],
   cta: {
-    label: "Перейти к финансам",
+    label: "Открыть финансы",
     href: "/author-dashboard/finance",
   },
 };

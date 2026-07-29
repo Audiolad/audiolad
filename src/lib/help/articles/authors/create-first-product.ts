@@ -1,3 +1,4 @@
+import { helpPublicLink, helpRich } from "@/lib/help/rich-text";
 import type { HelpArticle } from "@/lib/help/types";
 
 export const createFirstProductArticle: HelpArticle = {
@@ -19,11 +20,8 @@ export const createFirstProductArticle: HelpArticle = {
     "аудио",
   ],
   updatedAt: "2026-07-29",
-  version: 1,
-  relatedRoutes: [
-    "/author-dashboard",
-    "/author-dashboard/products/new",
-  ],
+  version: 2,
+  relatedRoutes: ["/author-dashboard", "/author-dashboard/products/new"],
   relatedArticleIds: [
     "help.authors.publish-product",
     "help.authors.author-page",
@@ -41,7 +39,11 @@ export const createFirstProductArticle: HelpArticle = {
       title: "Как создать черновик",
       steps: [
         "Откройте кабинет автора и перейдите в раздел «Продукты».",
-        "Нажмите «Создать аудиопродукт» — откроется форма нового продукта по адресу /author-dashboard/products/new.",
+        helpRich(
+          "Нажмите «Создать аудиопродукт» — откроется форма нового продукта по адресу ",
+          helpPublicLink("/author-dashboard/products/new"),
+          ".",
+        ),
         "Заполните название, формат, описание и другие обязательные поля.",
         "Загрузите аудиофайл или добавьте материалы курса, если выбран соответствующий формат.",
         "Нажмите «Сохранить черновик», чтобы сохранить прогресс без публикации.",

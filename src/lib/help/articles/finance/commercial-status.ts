@@ -1,11 +1,12 @@
+import { helpPublicLink, helpRich } from "@/lib/help/rich-text";
 import type { HelpArticle } from "@/lib/help/types";
 
 export const commercialStatusArticle: HelpArticle = {
   id: "help.finance.commercial-status",
   slug: "commercial-status",
-  title: "Как получить коммерческий статус автора",
+  title: "Как получить коммерческий статус",
   description:
-    "Подайте заявку на коммерческое подключение, примите условия и заполните реквизиты для выплат.",
+    "Подайте заявку на коммерческое подключение, примите условия автора и подготовьте данные для выплат.",
   category: "finance",
   audience: "author",
   order: 10,
@@ -13,13 +14,12 @@ export const commercialStatusArticle: HelpArticle = {
     "коммерческий автор",
     "коммерческий статус",
     "заявка",
-    "условия для авторов",
-    "платные продукты",
-    "продажи",
+    "условия автора",
+    "выплаты",
     "авторское вознаграждение",
   ],
   updatedAt: "2026-07-29",
-  version: 1,
+  version: 2,
   relatedRoutes: [
     "/author-dashboard/status",
     "/author-dashboard/commercial-application",
@@ -28,7 +28,7 @@ export const commercialStatusArticle: HelpArticle = {
   ],
   relatedArticleIds: [
     "help.finance.earnings-and-payouts",
-    "help.authors.publish-product",
+    "help.authors.create-first-product",
   ],
   sections: [
     {
@@ -41,22 +41,33 @@ export const commercialStatusArticle: HelpArticle = {
       id: "steps",
       title: "Как подключить коммерцию",
       steps: [
-        "Откройте раздел статуса автора (/author-dashboard/status).",
-        "Подайте заявку на коммерческое подключение — кнопка ведёт на форму заявки (/author-dashboard/commercial-application).",
-        "Дождитесь одобрения заявки. Статус отображается на странице статуса.",
-        "Примите условия для авторов — документ доступен на /author-terms и в кабинете (/author-dashboard/commercial/terms).",
-        "При необходимости заполните «Данные для выплат» (/author-dashboard/commercial/payout-details).",
-        "После активации коммерческого статуса можно создавать платные продукты и принимать оплату.",
+        helpRich(
+          "Откройте раздел статуса автора (",
+          helpPublicLink("/author-dashboard/status"),
+          ").",
+        ),
+        helpRich(
+          "Подайте заявку на коммерческое подключение — кнопка ведёт на форму заявки (",
+          helpPublicLink("/author-dashboard/commercial-application"),
+          ").",
+        ),
+        "Дождитесь рассмотрения заявки администрацией АудиоЛада.",
+        helpRich(
+          "Примите условия для авторов — документ доступен на ",
+          helpPublicLink("/author-terms"),
+          " и в кабинете (",
+          helpPublicLink("/author-dashboard/commercial/terms"),
+          ").",
+        ),
+        helpRich(
+          "При необходимости заполните «Данные для выплат» (",
+          helpPublicLink("/author-dashboard/commercial/payout-details"),
+          ").",
+        ),
       ],
-    },
-    {
-      id: "notes",
-      title: "Важно",
       notes: [
         "Реквизиты можно заполнить позже — до первой выплаты.",
-        "Заполнить реквизиты может только владелец авторского пространства.",
-        "При приостановке коммерции бесплатные материалы и страница автора остаются доступны.",
-        "Доля авторского вознаграждения и условия платформы указаны на странице статуса.",
+        "Пока заявка на рассмотрении или требуется доработка, статус и доступные действия отображаются на странице статуса автора.",
       ],
     },
   ],

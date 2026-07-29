@@ -1,4 +1,5 @@
 import { helpArticlePath } from "@/lib/help/paths";
+import { collectHelpRichTexts } from "@/lib/help/rich-text";
 import type { HelpArticle, HelpSearchHit } from "@/lib/help/types";
 
 export type HelpSearchDocument = {
@@ -41,9 +42,9 @@ function collectSectionText(article: HelpArticle): {
 
   for (const section of article.sections) {
     if (section.title) sectionTitles.push(section.title);
-    if (section.paragraphs) body.push(...section.paragraphs);
-    if (section.steps) body.push(...section.steps);
-    if (section.notes) body.push(...section.notes);
+    body.push(...collectHelpRichTexts(section.paragraphs));
+    body.push(...collectHelpRichTexts(section.steps));
+    body.push(...collectHelpRichTexts(section.notes));
   }
 
   return { sectionTitles, body };
