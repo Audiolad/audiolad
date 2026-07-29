@@ -138,8 +138,10 @@ export function useSequentialPlayer({
 }: UseSequentialPlayerOptions) {
   const isPrivateAudio = sourceType === "private_audio";
   const urlRequestRef = useRef(0);
+  const urlAbortRef = useRef<AbortController | null>(null);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef<PendingSavePayload | null>(null);
+  const urlRetryCountRef = useRef(0);
   const lastSaveAtRef = useRef(0);
   const progressRef = useRef<ListenProgressEntry[]>(initialProgress);
   const wasPlayingBeforeSwitchRef = useRef(false);
@@ -344,11 +346,15 @@ export function useSequentialPlayer({
         return;
       }
 
+      // Snapshot routing for this flush — never follow a later session switch.
+      // Private progress never touches practice_audio_progress / catalog listen APIs.
+      const saveAsPrivate = isPrivateAudioRef.current;
+      const saveApiBase = listenApiBaseRef.current;
+      const saveGeneration = getSessionGenerationRef.current?.() ?? 0;
+
       updateProgressEntry(audioItemId, positionSeconds, completed);
 
-      if (isPrivateAudio) {
-        // Private progress never touches practice_audio_progress / guest promo storage.
-      } else if (guestProgressMode && guestProgressMeta) {
+      if (!saveAsPrivate && guestProgressMode && guestProgressMeta) {
         const track = tracks.find((item) => item.id === audioItemId);
 
         saveGuestPracticeProgress(
@@ -391,9 +397,12 @@ export function useSequentialPlayer({
       pendingSaveRef.current = null;
       saveInFlightRef.current = true;
 
+      const isSaveStale = () =>
+        saveGeneration !== (getSessionGenerationRef.current?.() ?? 0);
+
       try {
         const track = tracks.find((item) => item.id === payload.audioItemId);
-        const response = isPrivateAudio
+        const response = saveAsPrivate
           ? await fetch(
               `/api/my-library/private-audio/${encodeURIComponent(payload.audioItemId)}/progress`,
               {
@@ -407,7 +416,7 @@ export function useSequentialPlayer({
                 }),
               },
             )
-          : await fetch(`${listenApiBaseRef.current}/progress`, {
+          : await fetch(`${saveApiBase}/progress`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -417,7 +426,12 @@ export function useSequentialPlayer({
               }),
             });
 
+        if (isSaveStale()) {
+          return;
+        }
+
         if (!response.ok) {
+          // Best-effort: never treat progress failure as a fatal player/nav error.
           setProgressError("Не удалось сохранить прогресс прослушивания.");
           return;
         }
@@ -425,18 +439,24 @@ export function useSequentialPlayer({
         lastSaveAtRef.current = Date.now();
         setProgressError(null);
       } catch {
+        if (isSaveStale()) {
+          return;
+        }
+
         setProgressError("Не удалось сохранить прогресс прослушивания.");
       } finally {
         saveInFlightRef.current = false;
-        drainPendingSave(pendingSaveRef, (...args) => {
-          void saveProgressRef.current(...args);
-        });
+
+        if (!isSaveStale()) {
+          drainPendingSave(pendingSaveRef, (...args) => {
+            void saveProgressRef.current(...args);
+          });
+        }
       }
     },
     [
       guestProgressMeta,
       guestProgressMode,
-      isPrivateAudio,
       practiceId,
       tracks,
       updateProgressEntry,
@@ -484,9 +504,17 @@ export function useSequentialPlayer({
       const capturedGeneration = getSessionGenerationRef.current?.() ?? 0;
       urlRequestRef.current = requestId;
 
+      urlAbortRef.current?.abort();
+      const abortController = new AbortController();
+      urlAbortRef.current = abortController;
+
+      const fetchAsPrivate = isPrivateAudioRef.current;
+      const fetchApiBase = listenApiBaseRef.current;
+
       const isStale = () =>
         requestId !== urlRequestRef.current ||
-        capturedGeneration !== (getSessionGenerationRef.current?.() ?? 0);
+        capturedGeneration !== (getSessionGenerationRef.current?.() ?? 0) ||
+        abortController.signal.aborted;
 
       setIsUrlLoading(true);
       setUrlError(null);
@@ -495,14 +523,25 @@ export function useSequentialPlayer({
       let settled = false;
 
       try {
-        const response = isPrivateAudio
+        const response = fetchAsPrivate
           ? await fetch(
               `/api/my-library/private-audio/${encodeURIComponent(audioItemId)}/audio`,
-              { credentials: "same-origin", cache: "no-store" },
+              {
+                credentials: "same-origin",
+                cache: "no-store",
+                signal: abortController.signal,
+              },
             )
-          : await fetch(`${listenApiBase}/audio/${audioItemId}`);
+          : await fetch(`${fetchApiBase}/audio/${audioItemId}`, {
+              signal: abortController.signal,
+            });
 
         if (isStale()) {
+          console.info("private_audio_session_switch", {
+            stage: "url_fetch_stale_ignored",
+            generation: capturedGeneration,
+            private: fetchAsPrivate,
+          });
           return;
         }
 
@@ -516,9 +555,17 @@ export function useSequentialPlayer({
         }
 
         if (!response.ok || !payload.url) {
+          console.error("private_audio_session_switch", {
+            stage: "url_fetch_failed",
+            status: response.status,
+            generation: capturedGeneration,
+            private: fetchAsPrivate,
+            retries: urlRetryCountRef.current,
+          });
+
           if (response.status === 401 || response.status === 403) {
             setUrlError(
-              isPrivateAudio
+              fetchAsPrivate
                 ? "Нет доступа к этому аудиоматериалу."
                 : "Доступ к прослушиванию не открыт.",
             );
@@ -534,22 +581,36 @@ export function useSequentialPlayer({
           return;
         }
 
+        urlRetryCountRef.current = 0;
         setSrc(payload.url);
         settled = true;
-      } catch {
+      } catch (error) {
+        if (
+          abortController.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+
         if (isStale()) {
           return;
         }
+
+        console.error("private_audio_session_switch", {
+          stage: "url_fetch_exception",
+          generation: capturedGeneration,
+          private: fetchAsPrivate,
+          error: error instanceof Error ? error.message : "unknown",
+        });
 
         setUrlError(PREPARE_AUDIO_ERROR);
         setSrc(null);
         setIsLoading(false);
         settled = true;
       } finally {
+        // Never auto-retry after generation change — that poisoned catalog loads
+        // when a private→catalog remount invalidated an in-flight fetch.
         if (isStale()) {
-          if (requestId === urlRequestRef.current) {
-            void loadSignedUrlRef.current(audioItemId);
-          }
           return;
         }
 
@@ -558,7 +619,7 @@ export function useSequentialPlayer({
         }
       }
     },
-    [isPrivateAudio, listenApiBase],
+    [],
   );
 
   useEffect(() => {
@@ -685,7 +746,17 @@ export function useSequentialPlayer({
       return;
     }
 
+    // Shared <audio>: ignore events from a previous session after generation bump
+    // (e.g. error/emptied fired by stopAndClear clearing the old private src).
+    const handlersGeneration = getSessionGenerationRef.current?.() ?? 0;
+    const isHandlerCurrent = () =>
+      handlersGeneration === (getSessionGenerationRef.current?.() ?? 0);
+
     const applyStartPosition = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       if (pendingStartPosition <= 0) {
         return;
       }
@@ -698,6 +769,10 @@ export function useSequentialPlayer({
     };
 
     const updateDuration = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
         setIsLoading(false);
@@ -707,16 +782,28 @@ export function useSequentialPlayer({
     };
 
     const handleTimeUpdate = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       currentTimeRef.current = audio.currentTime;
       setCurrentTime(audio.currentTime);
     };
 
     const handlePlay = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       setPlayerError(null);
       setStatusMessage("");
     };
 
     const handlePlaying = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       setPlayingState(true);
       setIsRecovering(false);
       setPlayerError(null);
@@ -727,11 +814,19 @@ export function useSequentialPlayer({
     };
 
     const handlePause = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       setPlayingState(false);
       debugSnapshot("audio-event", "pause");
     };
 
     const handleWaiting = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         setStatusMessage("Загрузка…");
       }
@@ -740,6 +835,10 @@ export function useSequentialPlayer({
     };
 
     const handleCanPlay = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       setIsLoading(false);
 
       if (!playerError) {
@@ -751,6 +850,10 @@ export function useSequentialPlayer({
       if (wasPlayingBeforeSwitchRef.current) {
         wasPlayingBeforeSwitchRef.current = false;
         void audio.play().catch(() => {
+          if (!isHandlerCurrent()) {
+            return;
+          }
+
           setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
         });
         return;
@@ -766,6 +869,10 @@ export function useSequentialPlayer({
         userWantsPlaybackRef.current = true;
 
         void audio.play().catch((error: unknown) => {
+          if (!isHandlerCurrent()) {
+            return;
+          }
+
           const name =
             error && typeof error === "object" && "name" in error
               ? String((error as { name?: string }).name)
@@ -778,12 +885,16 @@ export function useSequentialPlayer({
     };
 
     const handleStalled = () => {
+      if (!isHandlerCurrent()) {
+        return;
+      }
+
       setPlayingState(false);
       debugSnapshot("audio-event", "stalled");
     };
 
     const handleEnded = async () => {
-      if (!currentTrack) {
+      if (!isHandlerCurrent() || !currentTrack) {
         return;
       }
 
@@ -816,6 +927,20 @@ export function useSequentialPlayer({
     };
 
     const handleError = () => {
+      if (!isHandlerCurrent()) {
+        console.info("private_audio_session_switch", {
+          stage: "audio_error_stale_ignored",
+          generation: handlersGeneration,
+          code: audio.error?.code ?? null,
+        });
+        return;
+      }
+
+      // Teardown during session replace clears src and can emit error — ignore.
+      if (!src || (!audio.getAttribute("src") && !audio.currentSrc)) {
+        return;
+      }
+
       setPlayingState(false);
       setIsRecovering(false);
 
@@ -826,6 +951,12 @@ export function useSequentialPlayer({
       setIsLoading(false);
 
       const mediaError = audio.error;
+
+      console.error("private_audio_session_switch", {
+        stage: "audio_error",
+        generation: handlersGeneration,
+        code: mediaError?.code ?? null,
+      });
 
       if (mediaError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
         setPlayerError("Формат аудио не поддерживается на этом устройстве.");
@@ -872,6 +1003,7 @@ export function useSequentialPlayer({
     pendingStartPosition,
     playerError,
     practiceId,
+    sessionGeneration,
     switchToTrack,
     tracks.length,
     saveProgress,
@@ -1259,7 +1391,11 @@ export function useSequentialPlayer({
     initialAutoplayPendingRef.current = false;
     wasPlayingBeforeSwitchRef.current = false;
     urlRequestRef.current += 1;
+    urlAbortRef.current?.abort();
+    urlAbortRef.current = null;
+    urlRetryCountRef.current = 0;
 
+    // Flush with this engine's snapshot (private/catalog) before clearing audio.
     void flushProgress();
 
     const audio = audioRef.current;
@@ -1277,6 +1413,7 @@ export function useSequentialPlayer({
     setIsUrlLoading(false);
     setPlayerError(null);
     setUrlError(null);
+    setProgressError(null);
     setAutoplayHint(null);
     setStatusMessage("");
     debugSnapshot("stop-and-clear", "cleared");
@@ -1286,6 +1423,12 @@ export function useSequentialPlayer({
     registerCleanup?.(performStopAndClear);
 
     return () => {
+      // Do not stop/clear the shared <audio> on remount — loadSession stops the
+      // previous engine explicitly on session-key change before replacing state.
+      // Clearing here would wipe a same-key remount (autoplay bump) mid-flight.
+      urlAbortRef.current?.abort();
+      urlAbortRef.current = null;
+      urlRequestRef.current += 1;
       registerCleanup?.(() => {});
     };
   }, [performStopAndClear, registerCleanup]);

@@ -106,6 +106,13 @@ export default function ListenPageClient({
     isQueueDrivenPractice,
   } = useGlobalAudioPlayer();
 
+  // Primitives only — never put the whole session object in effect deps.
+  const activeCatalogPracticeId =
+    activeSession && isCatalogGlobalPlayerSession(activeSession)
+      ? activeSession.practiceId
+      : null;
+  const activeRequestAutoplay = Boolean(activeSession?.requestAutoplay);
+
   useEffect(() => {
     if (dismissedPracticeId === practiceId && !autoplay) {
       return;
@@ -116,16 +123,21 @@ export default function ListenPageClient({
       return;
     }
 
-    const activeCatalogPracticeId =
-      activeSession && isCatalogGlobalPlayerSession(activeSession)
-        ? activeSession.practiceId
-        : null;
-
     if (
       activeQueue &&
       activeCatalogPracticeId &&
       activeCatalogPracticeId !== practiceId &&
       isQueueDrivenPractice(practiceId)
+    ) {
+      return;
+    }
+
+    // Already on this catalog practice: only bump when autoplay is newly requested.
+    // Depending on full `activeSession` caused an infinite loadSession loop
+    // (private → catalog hang).
+    if (
+      activeCatalogPracticeId === practiceId &&
+      !(autoplay && !activeRequestAutoplay)
     ) {
       return;
     }
@@ -157,8 +169,9 @@ export default function ListenPageClient({
       promoAttribution: resolvedAttribution,
     });
   }, [
+    activeCatalogPracticeId,
     activeQueue,
-    activeSession,
+    activeRequestAutoplay,
     authorName,
     authorSlug,
     autoplay,

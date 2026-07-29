@@ -60,6 +60,42 @@ function testProviderAndUi() {
   assert(provider.includes("getGlobalPlayerSessionKey"), "identity by key");
   assert(provider.includes("session.detailPath"), "open private detail");
   assert(provider.includes("onActivePrivateDetail"), "hide mini on private detail");
+  assert(provider.includes('mode: "replace"'), "key-change replace path");
+  assert(provider.includes("stopEngineRef.current"), "stops old engine on replace");
+  assert(
+    provider.includes("bail without setState") ||
+      provider.includes("Same session key, no material change"),
+    "same-key bailout prevents loops",
+  );
+
+  const listenPage = read("src/components/audio/ListenPageClient.tsx");
+  assert(
+    listenPage.includes("Already on this catalog practice"),
+    "listen page early-return for same practice",
+  );
+  assert(
+    listenPage.includes("activeCatalogPracticeId"),
+    "listen page uses practiceId primitive",
+  );
+  assert(
+    listenPage.includes("never put the whole session object"),
+    "listen page documents no full-session deps",
+  );
+
+  const player = read("src/components/audio/useSequentialPlayer.ts");
+  assert(player.includes("AbortController"), "URL fetch abortable");
+  assert(
+    player.includes("url_fetch_stale_ignored") ||
+      player.includes("Never auto-retry after generation change"),
+    "no stale URL retry after generation bump",
+  );
+  assert(player.includes("saveAsPrivate"), "progress snapshot uses private flag");
+  assert(player.includes("isSaveStale"), "progress ignores stale generation");
+  assert(
+    player.includes("audio_error_stale_ignored") ||
+      player.includes("isHandlerCurrent"),
+    "stale audio events ignored after session switch",
+  );
 
   const detail = read("src/components/private-audio/PrivateAudioDetailClient.tsx");
   assert(
@@ -87,6 +123,14 @@ function testProviderAndUi() {
   );
   assert(personal.includes("STOP_LOCAL_AUDIO_EVENT"), "listens for stop event");
   assert(personal.includes("stopAndClear"), "stops global on local play");
+
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  assert(library.includes('kind: "private_audio"'), "All tab merges private");
+  assert(library.includes("allEntries"), "All tab merged entries");
+  assert(
+    library.includes('activeFilter === "all"'),
+    "All filter special-case rendering",
+  );
 }
 
 function main() {

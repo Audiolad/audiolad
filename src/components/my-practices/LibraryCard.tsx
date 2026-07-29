@@ -19,6 +19,8 @@ import {
 export type LibraryCardItem = {
   id: string;
   accessSource: string;
+  /** When the practice was added to the library (for All-tab merge sort). */
+  grantedAt?: string | null;
   practice: {
     id: string;
     title: string;

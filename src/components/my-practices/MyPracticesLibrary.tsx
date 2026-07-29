@@ -104,6 +104,45 @@ export default function MyPracticesLibrary({
     [activeFilter, items],
   );
 
+  type AllLibraryEntry =
+    | { kind: "catalog"; sortAt: number; item: LibraryCardItem }
+    | { kind: "private_audio"; sortAt: number; item: PrivateAudioListItemDto };
+
+  const allEntries = useMemo(() => {
+    if (activeFilter !== "all") {
+      return [] as AllLibraryEntry[];
+    }
+
+    const catalogEntries: AllLibraryEntry[] = filteredItems.map((item) => {
+      const sortSource = item.grantedAt ?? item.practice?.updatedAt ?? null;
+      const sortAt = sortSource ? Date.parse(sortSource) : 0;
+
+      return {
+        kind: "catalog" as const,
+        sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+        item,
+      };
+    });
+
+    const privateEntries: AllLibraryEntry[] = privateItems.map((item) => {
+      const sortAt = Date.parse(item.createdAt);
+
+      return {
+        kind: "private_audio" as const,
+        sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+        item,
+      };
+    });
+
+    return [...catalogEntries, ...privateEntries].sort(
+      (left, right) => right.sortAt - left.sortAt,
+    );
+  }, [activeFilter, filteredItems, privateItems]);
+
+  const allCount = filteredItems.length + privateItems.length;
+  const libraryIsEmpty =
+    items.length === 0 && privateItems.length === 0 && !privateError;
+
   function selectFilter(filter: LibraryFilterId) {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -168,7 +207,9 @@ export default function MyPracticesLibrary({
           <p className="text-sm text-[#7d70a2]">
             {showingUploads
               ? `В загрузках: ${formatUploadsCount(privateItems.length)}`
-              : `В библиотеке: ${formatPracticesCount(filteredItems.length)}`}
+              : activeFilter === "all"
+                ? `В библиотеке: ${formatPracticesCount(allCount)}`
+                : `В библиотеке: ${formatPracticesCount(filteredItems.length)}`}
           </p>
 
           <button
@@ -211,7 +252,7 @@ export default function MyPracticesLibrary({
               ))}
             </div>
           )
-        ) : error ? (
+        ) : error && activeFilter !== "all" ? (
           <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
             <p className="text-[17px] font-semibold">
               Не удалось загрузить библиотеку
@@ -226,7 +267,7 @@ export default function MyPracticesLibrary({
               Обновить
             </Link>
           </div>
-        ) : items.length === 0 ? (
+        ) : libraryIsEmpty ? (
           <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
             <p className="text-[17px] font-semibold">
               В вашей библиотеке пока нет практик
@@ -250,6 +291,45 @@ export default function MyPracticesLibrary({
               </Link>
             </div>
           </div>
+        ) : activeFilter === "all" ? (
+          error && privateItems.length === 0 ? (
+            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+              <p className="text-[17px] font-semibold">
+                Не удалось загрузить библиотеку
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                Попробуйте обновить страницу.
+              </p>
+            </div>
+          ) : allEntries.length === 0 ? (
+            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+              <p className="text-[17px] font-semibold">Пока пусто</p>
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                {getLibraryFilterEmptyMessage("all")}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-4">
+              {allEntries.map((entry, index) =>
+                entry.kind === "private_audio" ? (
+                  <PrivateAudioCard
+                    key={`private-${entry.item.id}`}
+                    item={entry.item}
+                  />
+                ) : (
+                  <LibraryCard
+                    key={`catalog-${entry.item.id}`}
+                    item={entry.item}
+                    index={index}
+                    highlighted={
+                      normalizedPurchasedSlug !== null &&
+                      entry.item.practice?.slug === normalizedPurchasedSlug
+                    }
+                  />
+                ),
+              )}
+            </div>
+          )
         ) : filteredItems.length === 0 ? (
           <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
             <p className="text-[17px] font-semibold">
@@ -260,15 +340,13 @@ export default function MyPracticesLibrary({
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
               {getLibraryFilterEmptyMessage(activeFilter)}
             </p>
-            {activeFilter !== "all" ? (
-              <button
-                type="button"
-                onClick={() => selectFilter("all")}
-                className="mt-4 text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-              >
-                Показать все материалы
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => selectFilter("all")}
+              className="mt-4 text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              Показать все материалы
+            </button>
           </div>
         ) : (
           <div className="mt-5 space-y-4">

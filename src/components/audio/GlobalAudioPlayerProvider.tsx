@@ -508,41 +508,74 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     requestStopLocalAudioPlayers();
 
     const requestAutoplay = input.requestAutoplay ?? false;
+    const nextSession: LoadSessionInput = { ...input, requestAutoplay };
     const current = sessionRef.current;
-    const inputKey = getGlobalPlayerSessionKey(input);
-    let shouldBumpGeneration = true;
-    let shouldBumpPlaybackInstance = true;
+    const inputKey = getGlobalPlayerSessionKey(nextSession);
+    const currentKey = current ? getGlobalPlayerSessionKey(current) : null;
 
-    if (current && getGlobalPlayerSessionKey(current) === inputKey) {
+    if (current && currentKey === inputKey) {
       const trackSelectionChanged =
         Boolean(input.initialTrackId) &&
         input.initialTrackId !== current.initialTrackId;
+      const autoplayBump = requestAutoplay && !current.requestAutoplay;
 
-      shouldBumpPlaybackInstance =
-        (requestAutoplay && !current.requestAutoplay) || trackSelectionChanged;
-      shouldBumpGeneration = shouldBumpPlaybackInstance;
-    }
-
-    if (shouldBumpGeneration) {
-      sessionGenerationRef.current += 1;
-      setSessionGeneration(sessionGenerationRef.current);
-    }
-
-    setSession((previous) => {
-      if (previous && getGlobalPlayerSessionKey(previous) === inputKey) {
-        if (shouldBumpPlaybackInstance) {
-          setPlaybackInstanceId((value) => value + 1);
-        }
-
-        return {
-          ...previous,
-          ...input,
-          requestAutoplay,
-        };
+      if (!trackSelectionChanged && !autoplayBump) {
+        // Same session key, no material change — bail without setState to avoid
+        // ListenPageClient effect loops (new object identity every call).
+        return;
       }
 
+      sessionGenerationRef.current += 1;
+      setSessionGeneration(sessionGenerationRef.current);
       setPlaybackInstanceId((value) => value + 1);
-      return input;
+
+      const merged: LoadSessionInput = {
+        ...current,
+        ...nextSession,
+      };
+      // Sync ref immediately so nested effects don't see a stale private key.
+      sessionRef.current = merged;
+      setSession(merged);
+
+      if (process.env.NODE_ENV !== "production") {
+        console.info("private_audio_session_switch", {
+          from: currentKey,
+          to: inputKey,
+          generation: sessionGenerationRef.current,
+          mode: "same_key_bump",
+        });
+      }
+
+      return;
+    }
+
+    // Different session key (e.g. private_audio → catalog): invalidate generation,
+    // flush/stop the old engine with its own closures, then install the new session.
+    sessionGenerationRef.current += 1;
+    setSessionGeneration(sessionGenerationRef.current);
+
+    try {
+      stopEngineRef.current?.();
+    } catch (error) {
+      console.error("private_audio_session_switch", {
+        stage: "stop_engine",
+        from: currentKey,
+        to: inputKey,
+        generation: sessionGenerationRef.current,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
+
+    stopEngineRef.current = null;
+    setPlaybackInstanceId((value) => value + 1);
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+
+    console.info("private_audio_session_switch", {
+      from: currentKey,
+      to: inputKey,
+      generation: sessionGenerationRef.current,
+      mode: "replace",
     });
   }, []);
 

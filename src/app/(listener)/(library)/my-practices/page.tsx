@@ -101,6 +101,7 @@ function mapLibraryItems(rows: LibraryRow[] | null): LibraryCardItem[] {
       return {
         id: row.id,
         accessSource: row.access_source,
+        grantedAt: row.granted_at,
         practice: practice
           ? {
               id: practice.id,
