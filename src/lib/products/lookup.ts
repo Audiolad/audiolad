@@ -17,6 +17,8 @@ export type PublicPracticeRow = {
   subtitle: string | null;
   description: string | null;
   format: string | null;
+  product_kind?: string | null;
+  music_usage_permission?: string | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -71,6 +73,8 @@ export async function getPracticeByAuthorAndSlug(
       subtitle,
       description,
       format,
+      product_kind,
+      music_usage_permission,
       duration_minutes,
       price,
       is_free,

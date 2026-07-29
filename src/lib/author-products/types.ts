@@ -4,8 +4,15 @@ import {
   authorAccessAllowsContentMutations,
   authorAccessAllowsPaidProducts,
 } from "@/lib/authors/access";
+import type {
+  MusicUsagePermission,
+  ProductKind,
+} from "@/lib/author-products/product-kind";
+import { normalizeProductKind } from "@/lib/author-products/product-kind";
 
 export const PAID_PRICE_OPTIONS = [99, 199, 299, 444, 888, 1888, 2888] as const;
+
+export type { MusicUsagePermission, ProductKind };
 
 export const PRACTICE_STATUS = {
   DRAFT: "draft",
@@ -53,6 +60,8 @@ export type PracticeRow = {
   subtitle: string | null;
   description: string | null;
   format: string | null;
+  product_kind: ProductKind;
+  music_usage_permission: MusicUsagePermission | null;
   duration_minutes: number | null;
   price: number;
   is_free: boolean;
@@ -75,6 +84,7 @@ export type AuthorProductListItem = {
   title: string;
   slug: string;
   format: string | null;
+  product_kind: ProductKind;
   price: number;
   is_free: boolean;
   status: string;
@@ -83,6 +93,23 @@ export type AuthorProductListItem = {
   updated_at: string;
   audio_count: number;
 };
+
+export function coercePracticeRow(
+  row: Omit<PracticeRow, "product_kind" | "music_usage_permission"> & {
+    product_kind?: string | null;
+    music_usage_permission?: string | null;
+  },
+): PracticeRow {
+  return {
+    ...row,
+    product_kind: normalizeProductKind(row.product_kind),
+    music_usage_permission:
+      row.music_usage_permission === "listen_only" ||
+      row.music_usage_permission === "platform_reuse_allowed"
+        ? row.music_usage_permission
+        : null,
+  };
+}
 
 export type AuthorProductDetail = {
   practice: PracticeRow;

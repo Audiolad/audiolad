@@ -20,6 +20,14 @@ import {
   getDeleteBlockers,
   getProductLifecycleBlockers,
 } from "@/lib/author-products/lifecycle";
+import {
+  assertMusicUsagePermissionForKind,
+  canChangeProductKind,
+  MUSIC_USAGE_PERMISSION,
+  normalizeProductKind,
+  PRODUCT_KIND,
+  PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
+} from "@/lib/author-products/product-kind";
 import { PRODUCT_CONTENT_LOCKED_AFTER_SALE } from "@/lib/author-products/sale-lock";
 import {
   generateUniqueSlug,
@@ -213,6 +221,98 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (formatError) {
         return NextResponse.json({ error: formatError }, { status: 400 });
       }
+    }
+
+    let nextProductKind = normalizeProductKind(
+      "product_kind" in body && typeof body.product_kind === "string"
+        ? body.product_kind
+        : practice.product_kind,
+    );
+
+    if ("product_kind" in body) {
+      if (
+        typeof body.product_kind !== "string" ||
+        (body.product_kind !== PRODUCT_KIND.PRACTICE &&
+          body.product_kind !== PRODUCT_KIND.MUSIC)
+      ) {
+        return NextResponse.json(
+          { error: "invalid_product_kind" },
+          { status: 400 },
+        );
+      }
+
+      nextProductKind = normalizeProductKind(body.product_kind);
+
+      if (
+        nextProductKind !== normalizeProductKind(practice.product_kind) &&
+        !canChangeProductKind(practice.published_at)
+      ) {
+        return NextResponse.json(
+          {
+            error: PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
+            message:
+              "Тип продукта нельзя изменить после первой публикации.",
+          },
+          { status: 409 },
+        );
+      }
+
+      updates.product_kind = nextProductKind;
+
+      if (nextProductKind === PRODUCT_KIND.PRACTICE) {
+        updates.music_usage_permission = null;
+      } else if (
+        !("music_usage_permission" in body) &&
+        !practice.music_usage_permission
+      ) {
+        updates.music_usage_permission = MUSIC_USAGE_PERMISSION.LISTEN_ONLY;
+      }
+    }
+
+    if ("music_usage_permission" in body) {
+      const rawPermission =
+        body.music_usage_permission === null
+          ? null
+          : typeof body.music_usage_permission === "string"
+            ? body.music_usage_permission.trim()
+            : "";
+
+      if (nextProductKind === PRODUCT_KIND.PRACTICE) {
+        if (rawPermission) {
+          return NextResponse.json(
+            {
+              error: "music_usage_not_allowed_for_practice",
+              message:
+                "Условия использования музыки недоступны для аудиопрактики.",
+            },
+            { status: 400 },
+          );
+        }
+
+        updates.music_usage_permission = null;
+      } else {
+        const permissionCheck = assertMusicUsagePermissionForKind(
+          PRODUCT_KIND.MUSIC,
+          rawPermission,
+        );
+
+        if (!permissionCheck.ok) {
+          return NextResponse.json(
+            {
+              error: permissionCheck.code,
+              message: permissionCheck.message,
+            },
+            { status: 400 },
+          );
+        }
+
+        updates.music_usage_permission = permissionCheck.permission;
+      }
+    } else if (
+      nextProductKind === PRODUCT_KIND.PRACTICE &&
+      "product_kind" in body
+    ) {
+      updates.music_usage_permission = null;
     }
 
     const settingFree =

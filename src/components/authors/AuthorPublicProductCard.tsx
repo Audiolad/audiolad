@@ -17,7 +17,11 @@ export default function AuthorPublicProductCard({
 }: AuthorPublicProductCardProps) {
   const summary = product.subtitle?.trim() || product.description?.trim() || null;
   const showPrice = !isProductFree(product.is_free, product.price);
-  const productTypeLabel = getAuthorProductTypeLabel(product.format);
+  const productTypeLabel = getAuthorProductTypeLabel(
+    product.format,
+    product.productKind,
+    product.audioCount,
+  );
 
   return (
     <article className="flex h-full flex-col rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-sm">

@@ -9,6 +9,7 @@ import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
   evaluatePublishReadiness,
   publishPracticeProduct,
+  resolveFormatForPublish,
 } from "@/lib/author-products/publish";
 import { registerPracticeLegacySlug } from "@/lib/products/lookup";
 import {
@@ -38,6 +39,31 @@ export async function POST(_request: Request, context: RouteContext) {
         practice.author_id,
         accessStatus,
       );
+    }
+
+    const resolvedFormat = resolveFormatForPublish(
+      detail.practice,
+      detail.audio_items,
+    );
+
+    if (
+      resolvedFormat &&
+      resolvedFormat !== (detail.practice.format?.trim() || null)
+    ) {
+      const { error: formatSyncError } = await supabase
+        .from("practices")
+        .update({
+          format: resolvedFormat,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (formatSyncError) {
+        console.error("author_publish_format_sync_error", id, formatSyncError.message);
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      detail.practice.format = resolvedFormat;
     }
 
     const activeTopicCount = await countActivePracticeTopics(supabase, id);

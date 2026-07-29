@@ -23,13 +23,24 @@
 
 ### practices
 
-Используется в `/catalog`. Запрос выбирает поля:
+Единая сущность аудиопродукта (практика или музыка). Используется в `/catalog` и кабинете автора.
 
-`id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`
+Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `music_usage_permission`.
 
 Фильтр: `status=eq.published`, сортировка: `created_at.desc`.
 
 RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published'`.
+
+#### product_kind / music_usage_permission (2026-07-29)
+
+Миграция: `20260729200000_practice_product_kind_music.sql`.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером |
+| `music_usage_permission` | text NULL | для `practice` всегда NULL; для `music` при публикации обязательно `listen_only` \| `platform_reuse_allowed` |
+
+Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 
 ### profiles
 

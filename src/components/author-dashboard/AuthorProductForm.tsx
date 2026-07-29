@@ -22,11 +22,22 @@ import {
 import {
   CUSTOM_FORMAT_LABEL,
   CUSTOM_FORMAT_VALUE,
+  MUSIC_PRESET_FORMATS,
   PRODUCT_PRESET_FORMATS,
   isCustomFormatSelection,
   resolveFormatForStorage,
   validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
+import {
+  MUSIC_USAGE_PERMISSION,
+  PRODUCT_KIND,
+  canChangeProductKind,
+  getMusicReleaseLabel,
+  getMusicUsagePermissionDescription,
+  isMusicProductKind,
+  type MusicUsagePermission,
+  type ProductKind,
+} from "@/lib/author-products/product-kind";
 import {
   PRODUCT_CONTENT_LIMITS,
   getAudioUploadErrorMessage,
@@ -86,6 +97,8 @@ type FormState = {
   title: string;
   subtitle: string;
   description: string;
+  productKind: ProductKind;
+  musicUsagePermission: MusicUsagePermission | null;
   formatPreset: string;
   customFormat: string;
   slug: string;
@@ -144,7 +157,10 @@ function isDefaultAudioTitle(title: string, slotNumber: number): boolean {
     return true;
   }
 
-  return trimmed === `Аудио ${slotNumber}`;
+  return (
+    trimmed === `Аудио ${slotNumber}` ||
+    trimmed === `Трек ${slotNumber}`
+  );
 }
 
 function deriveTitleFromFilename(fileName: string): {
@@ -194,6 +210,8 @@ function buildInitialForm(
     title: "",
     subtitle: "",
     description: "",
+    productKind: PRODUCT_KIND.PRACTICE,
+    musicUsagePermission: null,
     formatPreset: "",
     customFormat: "",
     slug: "",
@@ -270,11 +288,19 @@ function buildProductSavePayload(
     title: form.title.trim(),
     subtitle: form.subtitle.trim() || null,
     description: form.description.trim() || null,
+    product_kind: form.productKind,
+    music_usage_permission:
+      form.productKind === PRODUCT_KIND.MUSIC
+        ? form.musicUsagePermission
+        : null,
     format: resolveFormatForStorage(form.formatPreset, form.customFormat),
     is_free: form.isFree,
     price: form.isFree ? 0 : form.price,
     use_shared_cover: form.useSharedCover,
-    listening_notice_enabled: form.listeningNoticeEnabled,
+    listening_notice_enabled:
+      form.productKind === PRODUCT_KIND.MUSIC
+        ? false
+        : form.listeningNoticeEnabled,
     listening_notice_title: form.listeningNoticeTitle,
     listening_notice_text: form.listeningNoticeText,
   };
@@ -596,6 +622,7 @@ export default function AuthorProductForm({
       body: JSON.stringify({
         author_id: form.authorId,
         title: form.title.trim(),
+        product_kind: form.productKind,
       }),
     });
 
@@ -1807,6 +1834,77 @@ export default function AuthorProductForm({
           </select>
         </label>
 
+        <fieldset className="block">
+          <legend className="mb-2 block text-sm font-medium">Тип продукта</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.productKind === PRODUCT_KIND.PRACTICE ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}>
+              <input
+                type="radio"
+                name="product_kind"
+                className="mt-1"
+                checked={form.productKind === PRODUCT_KIND.PRACTICE}
+                disabled={busy || !canChangeProductKind(form.publishedAt)}
+                onChange={() => {
+                  setForm((current) => ({
+                    ...current,
+                    productKind: PRODUCT_KIND.PRACTICE,
+                    musicUsagePermission: null,
+                    formatPreset: "",
+                    customFormat: "",
+                  }));
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">Аудиопрактика</span>
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  Медитации, практики, программы и другие аудиоматериалы.
+                </span>
+              </span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.productKind === PRODUCT_KIND.MUSIC ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}>
+              <input
+                type="radio"
+                name="product_kind"
+                className="mt-1"
+                checked={form.productKind === PRODUCT_KIND.MUSIC}
+                disabled={busy || !canChangeProductKind(form.publishedAt)}
+                onChange={() => {
+                  setForm((current) => ({
+                    ...current,
+                    productKind: PRODUCT_KIND.MUSIC,
+                    musicUsagePermission:
+                      current.musicUsagePermission ??
+                      MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
+                    formatPreset: getMusicReleaseLabel(
+                      Math.max(audioItems.length, 1),
+                    ),
+                    customFormat: "",
+                    listeningNoticeEnabled: false,
+                  }));
+                  setAudioItems((current) =>
+                    current.map((item, index) =>
+                      isDefaultAudioTitle(item.title, index + 1)
+                        ? { ...item, title: `Трек ${index + 1}` }
+                        : item,
+                    ),
+                  );
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">Музыка</span>
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  Отдельный трек или альбом из нескольких аудиофайлов.
+                </span>
+              </span>
+            </label>
+          </div>
+          {!canChangeProductKind(form.publishedAt) ? (
+            <p className="mt-2 text-sm text-[#7d70a2]">
+              Тип продукта нельзя изменить после первой публикации.
+            </p>
+          ) : null}
+        </fieldset>
+
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Название</span>
           <input
@@ -1895,12 +1993,17 @@ export default function AuthorProductForm({
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           >
             <option value="">Выберите формат</option>
-            {PRODUCT_PRESET_FORMATS.map((format) => (
+            {(form.productKind === PRODUCT_KIND.MUSIC
+              ? MUSIC_PRESET_FORMATS
+              : PRODUCT_PRESET_FORMATS
+            ).map((format) => (
               <option key={format} value={format}>
                 {format}
               </option>
             ))}
-            <option value={CUSTOM_FORMAT_VALUE}>{CUSTOM_FORMAT_LABEL}</option>
+            {form.productKind === PRODUCT_KIND.PRACTICE ? (
+              <option value={CUSTOM_FORMAT_VALUE}>{CUSTOM_FORMAT_LABEL}</option>
+            ) : null}
           </select>
         </label>
 
@@ -1944,6 +2047,57 @@ export default function AuthorProductForm({
             </label>
           </div>
         </div>
+
+        {form.productKind === PRODUCT_KIND.MUSIC ? (
+          <fieldset className="block space-y-3">
+            <legend className="mb-1 block text-sm font-medium">
+              Условия использования музыки
+            </legend>
+            <p className="text-sm leading-5 text-[#7d70a2]">
+              Сейчас разрешение только сохраняется. Фактическое использование
+              музыки другими авторами пока недоступно.
+            </p>
+            {(
+              [
+                MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
+                MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+              ] as const
+            ).map((value) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${
+                  form.musicUsagePermission === value
+                    ? "border-[#9a74d8] bg-[#f8f4ff]"
+                    : "border-[#e4d7f4] bg-white"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="music_usage_permission"
+                  className="mt-1"
+                  checked={form.musicUsagePermission === value}
+                  disabled={busy}
+                  onChange={() =>
+                    setForm((current) => ({
+                      ...current,
+                      musicUsagePermission: value,
+                    }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[#3f3560]">
+                    {value === MUSIC_USAGE_PERMISSION.LISTEN_ONLY
+                      ? "Только для прослушивания"
+                      : "Разрешить использование внутри АудиоЛада"}
+                  </span>
+                  <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                    {getMusicUsagePermissionDescription(value)}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
 
         <div>
           <span className="mb-2 block text-sm font-medium">Темы</span>
@@ -2077,6 +2231,7 @@ export default function AuthorProductForm({
         </div>
       </section>
 
+      {form.productKind === PRODUCT_KIND.PRACTICE ? (
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
           Рекомендации перед прослушиванием
@@ -2188,9 +2343,14 @@ export default function AuthorProductForm({
           </button>
         </div>
       </section>
+      ) : null}
 
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
-        <h2 className="text-[20px] font-semibold">Содержание аудиопродукта</h2>
+        <h2 className="text-[20px] font-semibold">
+          {form.productKind === PRODUCT_KIND.MUSIC
+            ? "Треки"
+            : "Содержание аудиопродукта"}
+        </h2>
 
         {reorderNotice ? (
           <p className="text-sm text-[#9b3d3d]">{reorderNotice}</p>
