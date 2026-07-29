@@ -9,8 +9,8 @@ import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
 import {
   assertMusicUsagePermissionForKind,
-  getMusicReleaseLabel,
   isMusicProductKind,
+  MUSIC_KIND_LABEL,
   normalizeProductKind,
   PRODUCT_KIND,
 } from "./product-kind";
@@ -167,19 +167,24 @@ export function validateAudioItemsStructure(
   return { ok: true };
 }
 
-/** Effective display format for publish: music may fall back to track/album label. */
+/**
+ * Effective format for publish.
+ * Music always stores/shows the system label «Музыка» (no author format picker).
+ */
 export function resolveFormatForPublish(
   practice: Pick<PracticeRow, "format" | "product_kind">,
-  audioItems: ReadonlyArray<Pick<AudioItemRow, "id">>,
+  audioItems: ReadonlyArray<Pick<AudioItemRow, "id">> = [],
 ): string | null {
+  void audioItems;
+
+  if (isMusicProductKind(practice.product_kind)) {
+    return MUSIC_KIND_LABEL;
+  }
+
   const format = practice.format?.trim() || null;
 
   if (format && format !== LEGACY_OTHER_FORMAT) {
     return format;
-  }
-
-  if (isMusicProductKind(practice.product_kind)) {
-    return getMusicReleaseLabel(audioItems.length);
   }
 
   return format === LEGACY_OTHER_FORMAT ? LEGACY_OTHER_FORMAT : null;

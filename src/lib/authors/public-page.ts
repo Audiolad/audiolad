@@ -252,7 +252,7 @@ export function getAuthorProductTypeLabel(
   audioCount = 1,
 ): string {
   if (isMusicProductKind(productKind)) {
-    return getMusicProductTypeLabel(audioCount);
+    return getMusicProductTypeLabel();
   }
 
   return getDisplayFormat(format) ?? "Аудиопрактика";
