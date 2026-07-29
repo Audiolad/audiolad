@@ -49,14 +49,15 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     return true;
   }
 
-  // Editorial SEO articles, help center and about page are not primary tabs –
-  // keep BottomNav visible without an active item.
+  // Editorial SEO articles, help center, about and philosophy pages are not
+  // primary tabs – keep BottomNav visible without an active item.
   return (
     pathname === "/articles" ||
     pathname.startsWith("/articles/") ||
     pathname === "/help" ||
     pathname.startsWith("/help/") ||
-    pathname === "/about"
+    pathname === "/about" ||
+    pathname === "/philosophy"
   );
 }
 

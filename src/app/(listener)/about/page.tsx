@@ -358,6 +358,31 @@ export default function AboutPage() {
 
         <section
           className="mt-12 max-w-3xl"
+          aria-labelledby="about-beliefs-heading"
+        >
+          <h2
+            id="about-beliefs-heading"
+            className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl"
+          >
+            Во что мы верим
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+            АудиоЛад развивается на основе принципов, которые помогают нам
+            принимать решения, выстраивать отношения с авторами и создавать
+            полезный опыт для слушателей.
+          </p>
+          <p className="mt-4">
+            <Link
+              href="/philosophy"
+              className={`text-base font-medium text-[#7042c5] underline-offset-2 hover:underline ${linkFocusClass}`}
+            >
+              Познакомиться с принципами АудиоЛада
+            </Link>
+          </p>
+        </section>
+
+        <section
+          className="mt-12 max-w-3xl"
           aria-labelledby="about-next-heading"
         >
           <h2

@@ -172,6 +172,16 @@ assert(
   "LegalFooter reuses PUBLIC_FOOTER_LINKS",
 );
 assert(
+  publicFooterLinks.includes('href: "/about"') &&
+    publicFooterLinks.includes('title: "О платформе"'),
+  "PUBLIC_FOOTER_LINKS keeps about discovery link",
+);
+assert(
+  publicFooterLinks.includes('href: "/philosophy"') &&
+    publicFooterLinks.includes('title: "Принципы"'),
+  "PUBLIC_FOOTER_LINKS keeps philosophy discovery link",
+);
+assert(
   publicFooterLinks.includes('href: "/articles"') &&
     publicFooterLinks.includes('title: "Статьи"'),
   "PUBLIC_FOOTER_LINKS keeps articles discovery link",
@@ -182,9 +192,13 @@ assert(
   "PUBLIC_FOOTER_LINKS keeps help discovery link",
 );
 assert(
-  publicFooterLinks.indexOf('href: "/help"') <
-    publicFooterLinks.indexOf('href: "/articles"'),
-  "PUBLIC_FOOTER_LINKS orders help before articles",
+  publicFooterLinks.indexOf('href: "/about"') <
+    publicFooterLinks.indexOf('href: "/philosophy"') &&
+    publicFooterLinks.indexOf('href: "/philosophy"') <
+      publicFooterLinks.indexOf('href: "/articles"') &&
+    publicFooterLinks.indexOf('href: "/articles"') <
+      publicFooterLinks.indexOf('href: "/help"'),
+  "PUBLIC_FOOTER_LINKS orders about, philosophy, articles, then help",
 );
 assert(
   homeLayout.includes("!shellData.isAuthenticated") &&

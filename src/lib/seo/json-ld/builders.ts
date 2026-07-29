@@ -197,6 +197,86 @@ export function buildAboutPageJsonLd(
   };
 }
 
+export type PhilosophyFaqJsonLdInput = {
+  question: string;
+  answer: string;
+};
+
+export type PhilosophyPageJsonLdInput = {
+  title: string;
+  description: string;
+  path?: string;
+  faq?: ReadonlyArray<PhilosophyFaqJsonLdInput>;
+};
+
+/**
+ * Organization and WebSite are not emitted from the root layout –
+ * include them here so `/philosophy` remains a complete official page graph.
+ * Uses WebPage (not AboutPage) to keep `/about` distinct.
+ */
+export function buildPhilosophyPageJsonLd(
+  input: PhilosophyPageJsonLdInput,
+  origin = getAppOrigin(),
+): JsonLdNode {
+  const siteOrigin = originUrl(origin);
+  const path = input.path ?? "/philosophy";
+  const pageUrl = absolutePath(path, origin);
+  const breadcrumbs = buildBreadcrumbListJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Принципы АудиоЛада", path },
+    ],
+    origin,
+  );
+
+  const webPage: JsonLdNode = {
+    "@type": "WebPage",
+    "@id": `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    isPartOf: {
+      "@id": `${siteOrigin}/#website`,
+    },
+    about: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+  };
+
+  const graph: JsonLdNode[] = [
+    buildOrganizationJsonLd(origin),
+    buildWebSiteJsonLd(origin),
+    webPage,
+  ];
+
+  if (breadcrumbs) {
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
+    graph.push(breadcrumbNode);
+  }
+
+  if (input.faq && input.faq.length > 0) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${pageUrl}#faq`,
+      mainEntity: input.faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    });
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": graph,
+  };
+}
+
 export function buildBreadcrumbListJsonLd(
   items: ReadonlyArray<BreadcrumbItemInput>,
   origin = getAppOrigin(),

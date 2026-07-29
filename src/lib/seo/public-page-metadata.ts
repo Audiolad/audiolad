@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import {
+  PHILOSOPHY_SEO_DESCRIPTION,
+  PHILOSOPHY_SEO_TITLE,
+} from "@/lib/seo/philosophy/content";
+import {
   HOME_SEO_DESCRIPTION,
   HOME_SEO_TITLE,
   SITE_BRAND,
@@ -15,6 +19,12 @@ export {
   SITE_PLATFORM_POSITIONING,
   SITE_TITLE,
 } from "@/lib/seo/site-copy";
+
+export {
+  PHILOSOPHY_PAGE_H1,
+  PHILOSOPHY_SEO_DESCRIPTION,
+  PHILOSOPHY_SEO_TITLE,
+} from "@/lib/seo/philosophy/content";
 
 export function buildSiteCanonicalUrl(path = "/"): string {
   const origin = getAppOrigin().replace(/\/$/, "");
@@ -130,6 +140,31 @@ export function buildAboutMetadata(): Metadata {
       card: "summary",
       title: ABOUT_SEO_TITLE,
       description: ABOUT_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildPhilosophyMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl("/philosophy");
+
+  return {
+    title: PHILOSOPHY_SEO_TITLE,
+    description: PHILOSOPHY_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: PHILOSOPHY_SEO_TITLE,
+      description: PHILOSOPHY_SEO_DESCRIPTION,
+      url: canonical,
+      type: "website",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: PHILOSOPHY_SEO_TITLE,
+      description: PHILOSOPHY_SEO_DESCRIPTION,
     },
   };
 }
