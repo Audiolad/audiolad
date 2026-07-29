@@ -100,3 +100,36 @@ export function buildAuthorsIndexMetadata(): Metadata {
     },
   };
 }
+
+export const ABOUT_SEO_TITLE =
+  "АудиоЛад – платформа авторских аудиопрактик, медитаций и программ";
+
+export const ABOUT_SEO_DESCRIPTION =
+  "АудиоЛад – платформа авторских аудиопрактик, медитаций и программ. Бесплатные и платные материалы, страницы авторов, личная аудиотека и удобное прослушивание онлайн.";
+
+export const ABOUT_PAGE_H1 = "О платформе АудиоЛад";
+
+export function buildAboutMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl("/about");
+
+  return {
+    title: ABOUT_SEO_TITLE,
+    description: ABOUT_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: ABOUT_SEO_TITLE,
+      description: ABOUT_SEO_DESCRIPTION,
+      url: canonical,
+      type: "website",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: ABOUT_SEO_TITLE,
+      description: ABOUT_SEO_DESCRIPTION,
+    },
+  };
+}

@@ -1,4 +1,5 @@
 export {
+  buildAboutPageJsonLd,
   buildAuthorJsonLd,
   buildBreadcrumbListJsonLd,
   buildHomeJsonLd,
@@ -9,6 +10,7 @@ export {
   buildWebSiteJsonLd,
   shouldEmitAuthorJsonLd,
   shouldEmitPracticeJsonLd,
+  type AboutPageJsonLdInput,
   type AuthorJsonLdInput,
   type BreadcrumbItemInput,
   type JsonLdNode,

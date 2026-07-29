@@ -136,6 +136,67 @@ export function buildHomeJsonLd(origin = getAppOrigin()): JsonLdNode {
   };
 }
 
+export type AboutPageJsonLdInput = {
+  title: string;
+  description: string;
+  path?: string;
+};
+
+/**
+ * Organization and WebSite are not emitted from the root layout –
+ * include them here so `/about` remains a complete official landing graph.
+ */
+export function buildAboutPageJsonLd(
+  input: AboutPageJsonLdInput,
+  origin = getAppOrigin(),
+): JsonLdNode {
+  const siteOrigin = originUrl(origin);
+  const path = input.path ?? "/about";
+  const pageUrl = absolutePath(path, origin);
+  const breadcrumbs = buildBreadcrumbListJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "О платформе", path },
+    ],
+    origin,
+  );
+
+  const aboutPage: JsonLdNode = {
+    "@type": "AboutPage",
+    "@id": `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    isPartOf: {
+      "@id": `${siteOrigin}/#website`,
+    },
+    about: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+    mainEntity: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+  };
+
+  const graph: JsonLdNode[] = [
+    buildOrganizationJsonLd(origin),
+    buildWebSiteJsonLd(origin),
+    aboutPage,
+  ];
+
+  if (breadcrumbs) {
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
+    graph.push(breadcrumbNode);
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": graph,
+  };
+}
+
 export function buildBreadcrumbListJsonLd(
   items: ReadonlyArray<BreadcrumbItemInput>,
   origin = getAppOrigin(),
