@@ -199,7 +199,11 @@ async function runViewport(label, viewport) {
       timeout: 45_000,
     });
 
-    const play = page.getByRole("button", { name: /Воспроизвести|Play|Слушать/i }).first();
+    const play = page
+      .locator(
+        'button[aria-label*="Воспроизвести"], button[aria-label*="Play"], button:has-text("▶")',
+      )
+      .first();
     await play.click({ timeout: 15_000 });
     await waitForAudioPlaying(page);
     const privateState = await readAudio(page);
@@ -207,19 +211,15 @@ async function runViewport(label, viewport) {
       throw new Error(`expected 1 audio, got ${privateState.count}`);
     }
 
-    // Prefer in-app nav (client transition); fall back to goto on desktop shell.
-    const catalogNav = page.locator(
-      '.bottom-nav a[aria-label="Каталог"], nav[aria-label="Моё пространство"] a[href="/catalog"]',
-    ).first();
-    if (await catalogNav.isVisible().catch(() => false)) {
-      await catalogNav.click({ timeout: 10_000 });
-      await page.waitForURL(/\/catalog/, { timeout: 15_000 });
-    } else {
-      await page.goto(`${BASE}/catalog`, {
-        waitUntil: "domcontentloaded",
-        timeout: 45_000,
-      });
-    }
+    // Client-side nav only — hard page.goto remounts the app and drops the player.
+    const catalogNav = page
+      .locator(
+        'nav[aria-label="Моё пространство"] a[href="/catalog"], .bottom-nav a[aria-label="Каталог"]',
+      )
+      .locator("visible=true")
+      .first();
+    await catalogNav.click({ timeout: 10_000 });
+    await page.waitForURL(/\/catalog/, { timeout: 15_000 });
     await page.waitForTimeout(800);
     const afterNav = await readAudio(page);
     if (afterNav.paused) {
@@ -243,16 +243,23 @@ async function runViewport(label, viewport) {
     // Progress error may appear briefly; it must not freeze navigation.
     const hadProgressError = bodyText.includes("Не удалось сохранить прогресс");
 
-    await page.goto(`${BASE}/catalog`, {
-      waitUntil: "domcontentloaded",
-      timeout: 45_000,
-    });
+    const catalogAgain = page
+      .locator(
+        'nav[aria-label="Моё пространство"] a[href="/catalog"], .bottom-nav a[aria-label="Каталог"]',
+      )
+      .locator("visible=true")
+      .first();
+    await catalogAgain.click({ timeout: 10_000 });
+    await page.waitForURL(/\/catalog/, { timeout: 15_000 });
     await page.waitForTimeout(500);
 
-    await page.goto(`${BASE}/my-practices`, {
-      waitUntil: "domcontentloaded",
-      timeout: 45_000,
-    });
+    const libraryNav = page
+      .locator(
+        'nav[aria-label="Моё пространство"] a[href="/my-practices"], .bottom-nav a[aria-label="Аудиотека"]',
+      )
+      .locator("visible=true")
+      .first();
+    await libraryNav.click({ timeout: 10_000 });
     await page.waitForURL(/\/my-practices/, { timeout: 15_000 });
 
     // Private must appear in All filter (default).
@@ -262,9 +269,25 @@ async function runViewport(label, viewport) {
     await page.waitForSelector("text=Race Smoke Private Track", { timeout: 10_000 });
 
     await page.getByRole("button", { name: "Купленные" }).click();
-    await page.waitForTimeout(500);
-    if (await page.locator("text=Race Smoke Private Track").count()) {
+    await page.waitForURL(/filter=purchased/, { timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const leakedInPurchased = await page
+      .locator("text=Race Smoke Private Track")
+      .locator("visible=true")
+      .count();
+    if (leakedInPurchased > 0) {
       throw new Error("private item leaked into Купленные");
+    }
+
+    await page.getByRole("button", { name: "Подарки" }).click();
+    await page.waitForURL(/filter=gifts/, { timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const leakedInGifts = await page
+      .locator("text=Race Smoke Private Track")
+      .locator("visible=true")
+      .count();
+    if (leakedInGifts > 0) {
+      throw new Error("private item leaked into Подарки");
     }
 
     const fatalConsole = consoleErrors.filter(
