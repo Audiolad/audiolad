@@ -1,5 +1,9 @@
+import { Suspense } from "react";
+
 import MyPracticesLibrary from "@/components/my-practices/MyPracticesLibrary";
 import type { LibraryCardItem } from "@/components/my-practices/LibraryCard";
+import { listPrivateAudioItems } from "@/lib/private-audio/server/repository";
+import type { PrivateAudioListItemDto } from "@/lib/private-audio/types";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -173,20 +177,38 @@ export default async function MyPracticesPage({
     (libraryRows as LibraryRow[] | null) ?? null,
   );
 
+  let initialPrivateItems: PrivateAudioListItemDto[] = [];
+  let privateError = false;
+
+  try {
+    initialPrivateItems = await listPrivateAudioItems(supabase, user.id);
+  } catch {
+    initialPrivateItems = [];
+    privateError = true;
+  }
+
   return (
     <>
       <div className="hidden xl:block">
         <h1 className="text-[28px] font-semibold">Аудиотека</h1>
         <p className="mt-1 text-sm text-[#7d70a2]">
-          Ваши подарки и купленные материалы
+          Ваши подарки, купленные и личные материалы
         </p>
       </div>
 
-      <MyPracticesLibrary
-        items={libraryItems}
-        error={Boolean(error)}
-        purchasedSlug={purchasedSlug}
-      />
+      <Suspense
+        fallback={
+          <div className="mt-6 text-sm text-[#7d70a2]">Загружаем аудиотеку…</div>
+        }
+      >
+        <MyPracticesLibrary
+          items={libraryItems}
+          error={Boolean(error)}
+          purchasedSlug={purchasedSlug}
+          initialPrivateItems={initialPrivateItems}
+          privateError={privateError}
+        />
+      </Suspense>
     </>
   );
 }

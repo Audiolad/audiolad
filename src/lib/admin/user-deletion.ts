@@ -11,6 +11,7 @@ import {
   type UserDeletionDependencies,
   type UserDeletionEligibility,
 } from "@/lib/admin/user-deletion-policy";
+import { cleanupPrivateAudioStorageForUser } from "@/lib/private-audio/server/uploads";
 
 export type AdminUserDeletionItemResult = {
   userId: string;
@@ -272,6 +273,9 @@ export async function deleteSingleAdminUser(
       input.userId,
       input.avatarPath ?? null,
     );
+    // Private listener uploads are owned solely by the user: remove DB + Storage
+    // before auth deletion so objects are not orphaned after CASCADE.
+    await cleanupPrivateAudioStorageForUser(input.userId);
 
     const deleted = await deleteAuthUser(service, input.userId);
 

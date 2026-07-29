@@ -74,7 +74,7 @@ export default function OfferPage() {
           </p>
 
           <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-            Последнее обновление: 28 июля 2026 года
+            Последнее обновление: 29 июля 2026 года
           </p>
 
           <Section id="section-1" title="1. Общие положения">
@@ -411,35 +411,75 @@ export default function OfferPage() {
             </p>
           </Section>
 
-          <Section id="section-11" title="11. Заключительные положения">
+          <Section
+            id="section-private-audio"
+            title="11. Личные аудиоматериалы пользователя"
+          >
             <p className={bodyClassName}>
               <strong className="font-semibold text-[#25135c]">11.1.</strong>{" "}
+              Пользователь может загружать в свой аккаунт аудиоматериалы
+              исключительно для личного прослушивания на Платформе.
+            </p>
+
+            <p className={bodyClassName}>
+              <strong className="font-semibold text-[#25135c]">11.2.</strong>{" "}
+              Загружая файл, Пользователь подтверждает, что имеет право хранить
+              и использовать этот материал для личного прослушивания и не
+              нарушает права третьих лиц.
+            </p>
+
+            <p className={bodyClassName}>
+              <strong className="font-semibold text-[#25135c]">11.3.</strong>{" "}
+              Личные аудиоматериалы не предназначены для публикации, продажи,
+              передачи другим пользователям или иного распространения через
+              АудиоЛад.
+            </p>
+
+            <p className={bodyClassName}>
+              <strong className="font-semibold text-[#25135c]">11.4.</strong>{" "}
+              Пользователь несёт ответственность за содержимое загружаемых
+              файлов. Платформа вправе удалить материал при нарушении
+              законодательства или прав третьих лиц, а также по иным законным
+              основаниям.
+            </p>
+
+            <p className={bodyClassName}>
+              <strong className="font-semibold text-[#25135c]">11.5.</strong>{" "}
+              Приватность загрузки не означает гарантию бессрочного хранения.
+              Пользователь обязан самостоятельно хранить резервную копию своих
+              файлов.
+            </p>
+          </Section>
+
+          <Section id="section-12" title="12. Заключительные положения">
+            <p className={bodyClassName}>
+              <strong className="font-semibold text-[#25135c]">12.1.</strong>{" "}
               Настоящая оферта регулируется законодательством Российской
               Федерации.
             </p>
 
             <p className={bodyClassName}>
-              <strong className="font-semibold text-[#25135c]">11.2.</strong>{" "}
+              <strong className="font-semibold text-[#25135c]">12.2.</strong>{" "}
               Все возникающие разногласия стороны стремятся разрешить путём
               переговоров.
             </p>
 
             <p className={bodyClassName}>
-              <strong className="font-semibold text-[#25135c]">11.3.</strong>{" "}
+              <strong className="font-semibold text-[#25135c]">12.3.</strong>{" "}
               Если соглашение не достигнуто, спор рассматривается в порядке,
               установленном законодательством Российской Федерации.
             </p>
 
             <p className={bodyClassName}>
-              <strong className="font-semibold text-[#25135c]">11.4.</strong>{" "}
+              <strong className="font-semibold text-[#25135c]">12.4.</strong>{" "}
               Продавец вправе вносить изменения в настоящую оферту. Новая
               редакция вступает в силу с момента её публикации на Сайте.
             </p>
           </Section>
 
-          <section className="mt-10" aria-labelledby="section-12">
-            <h2 id="section-12" className={sectionTitleClassName}>
-              12. Реквизиты Продавца
+          <section className="mt-10" aria-labelledby="section-13">
+            <h2 id="section-13" className={sectionTitleClassName}>
+              13. Реквизиты Продавца
             </h2>
 
             <div className="mt-4 overflow-hidden rounded-[22px] border border-[#eadff8] bg-gradient-to-r from-[#faf4ff] to-[#f1e4fc] p-6 lg:p-7">

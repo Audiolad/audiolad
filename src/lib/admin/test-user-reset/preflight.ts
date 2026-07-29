@@ -39,6 +39,7 @@ function emptyCounts(): TestUserResetPreflightCounts {
     refundedOrders: 0,
     personalMaterialsCreated: 0,
     personalMaterialsClaimed: 0,
+    privateAudioItems: 0,
     authorMembers: 0,
     authorApplications: 0,
     promotionCampaigns: 0,
@@ -328,6 +329,12 @@ export async function getTestUserResetPreflight(
       service,
       "personal_materials",
       "claimed_by_user_id",
+      authUserId,
+    );
+    counts.privateAudioItems = await countRows(
+      service,
+      "private_audio_items",
+      "owner_user_id",
       authUserId,
     );
     counts.authorMembers = await countRows(

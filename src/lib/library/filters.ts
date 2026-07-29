@@ -4,7 +4,8 @@ export type LibraryFilterId =
   | "all"
   | "purchased"
   | "gifts"
-  | "downloaded";
+  | "downloaded"
+  | "uploads";
 
 export type LibraryFilterPractice = {
   isFree: boolean | null;
@@ -56,6 +57,9 @@ export function matchesLibraryFilter(
       return isLibraryGiftItem(item);
     case "downloaded":
       return false;
+    case "uploads":
+      // Catalog entitlement rows never match; uploads render from a separate source.
+      return false;
     default:
       return true;
   }
@@ -69,6 +73,8 @@ export function getLibraryFilterEmptyMessage(filter: LibraryFilterId): string {
       return "Здесь появятся подарочные материалы из вашей Аудиотеки.";
     case "downloaded":
       return "Скачанных материалов пока нет. Когда офлайн-доступ появится, они будут здесь.";
+    case "uploads":
+      return "Добавьте свой аудиофайл – он будет доступен только в вашем аккаунте.";
     default:
       return "В этой подборке пока нет материалов.";
   }

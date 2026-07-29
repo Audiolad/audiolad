@@ -13,6 +13,7 @@ export const SEO_ROBOTS_DISALLOWED_PATHS = [
   "/profile/",
   "/my-practices/",
   "/my-materials/",
+  "/my-library/",
   "/favorites/",
   "/history/",
   "/downloads/",

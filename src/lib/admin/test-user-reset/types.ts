@@ -39,6 +39,7 @@ export type TestUserResetPreflightCounts = {
   refundedOrders: number;
   personalMaterialsCreated: number;
   personalMaterialsClaimed: number;
+  privateAudioItems: number;
   authorMembers: number;
   authorApplications: number;
   promotionCampaigns: number;
@@ -69,6 +70,7 @@ export type TestUserResetDeletedCounts = {
   analyticsEvents: number;
   analyticsSessions: number;
   avatarRemoved: boolean;
+  privateAudioItemsRemoved: number;
   authUserDeleted: boolean;
 };
 

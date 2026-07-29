@@ -270,6 +270,28 @@ RLS: существующие политики author members на `practices/{p
 - Чтение `platform_user_roles` — свои строки или при наличии `team.view`.
 - Мутации назначений — через `service_role` / SQL (UI назначения ролей пока нет).
 
+## private_audio_items (MVP, 2026-07-29)
+
+Миграция: `supabase/migrations/20260729190000_private_audio_items.sql`.
+
+Listener-owned private audio (ручная загрузка MP3). Не связано с `practices`, `audio_items`, `user_practices`, `personal_materials`.
+
+### private_audio_items
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `owner_user_id` | uuid | владелец (`auth.users`), CASCADE |
+| `source_type` | text | MVP: только `manual_upload` |
+| `title` / `author_text` | text | метаданные слушателя |
+| `audio_path` / `cover_path` | text | пути в private bucket `private-audio-items` |
+| `rights_accepted_at` | timestamptz | подтверждение права на личное использование |
+
+RLS: authenticated SELECT только своих строк. INSERT/UPDATE/DELETE — через server API + service role.
+
+Прогресс: `private_audio_item_progress` + RPC `get/upsert_private_audio_item_progress` (no-regress).
+
+Storage: bucket `private-audio-items` (private, без browser policies).
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

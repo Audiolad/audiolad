@@ -25,6 +25,7 @@ import {
   joinScopedAnalyticsFilters,
 } from "@/lib/admin/test-user-reset/analytics-scope";
 import { fetchUserPlatformRole } from "@/lib/auth/platform-admin";
+import { cleanupPrivateAudioStorageForUser } from "@/lib/private-audio/server/uploads";
 import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type ServiceClient = ReturnType<typeof createServiceRoleClient>;
@@ -51,6 +52,7 @@ function emptyDeletedCounts(): TestUserResetDeletedCounts {
     analyticsEvents: 0,
     analyticsSessions: 0,
     avatarRemoved: false,
+    privateAudioItemsRemoved: 0,
     authUserDeleted: false,
   };
 }
@@ -163,6 +165,9 @@ async function cleanupNonFkData(
       );
       deleted.avatarRemoved = removed.ok;
     }
+
+    const privateAudioCleanup = await cleanupPrivateAudioStorageForUser(userId);
+    deleted.privateAudioItemsRemoved = privateAudioCleanup.removedItems;
   }
 
   const outboxFilters: string[] = [];

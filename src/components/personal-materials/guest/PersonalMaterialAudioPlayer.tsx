@@ -17,6 +17,8 @@ type PersonalMaterialAudioPlayerProps = {
   initialPositionSeconds?: number;
   /** Throttled persist for server mode (default 12000ms). Local mode uses 500ms. */
   persistIntervalMs?: number;
+  /** Accessible name; keep product-facing copy, not technical ids. */
+  ariaLabel?: string;
   onProgressPersist?: (input: {
     positionSeconds: number;
     durationSeconds: number;
@@ -80,6 +82,7 @@ export default function PersonalMaterialAudioPlayer({
   progressMode = "local",
   initialPositionSeconds = 0,
   persistIntervalMs,
+  ariaLabel = "Плеер персональной диагностики",
   onProgressPersist,
 }: PersonalMaterialAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -439,7 +442,7 @@ export default function PersonalMaterialAudioPlayer({
 
   return (
     <section
-      aria-label="Плеер персональной диагностики"
+      aria-label={ariaLabel}
       className="rounded-2xl border border-[#ece6f5] bg-[#fcfbfe] p-4 sm:p-5"
     >
       <audio ref={audioRef} preload="none" playsInline />
