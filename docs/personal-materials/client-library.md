@@ -72,15 +72,18 @@ On first detail open after claim:
 
 ## Navigation
 
-- Desktop sidebar: **Мои материалы**
-- Profile quick links (mobile)
-- BottomNav stays 5 tabs (no sixth icon)
+- Desktop sidebar and profile quick links show **Личные материалы** only when
+  `has_claimed_personal_materials()` is true for the current user
+  (`claimed_by_user_id = auth.uid()` and `status <> 'deleted'`).
+- Flag is resolved in `getListenerShellData` as `showMyMaterialsNav`
+  (guest / RPC error → hidden; no client fetch, no loading flash).
+- Direct `/my-materials` URL still works and shows the existing empty state.
+- BottomNav stays 5 tabs (no sixth icon).
 
 ## Migration
 
-`supabase/migrations/20260720190000_personal_materials_owner_library.sql` — additive owner RPC v2.
-
-Not applied to production yet.
+- `supabase/migrations/20260720190000_personal_materials_owner_library.sql` — additive owner RPC v2.
+- `supabase/migrations/20260729120000_has_claimed_personal_materials.sql` — lightweight EXISTS RPC for listener nav.
 
 ## Tests
 

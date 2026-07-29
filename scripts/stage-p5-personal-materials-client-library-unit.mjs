@@ -46,7 +46,7 @@ function testUiAndNav() {
   const nav = read("src/lib/navigation/listener-nav.ts");
   const auth = read("src/lib/auth/routes.ts");
   const player = read("src/components/personal-materials/guest/PersonalMaterialAudioPlayer.tsx");
-  const robots = read("src/app/robots.ts");
+  const robots = read("src/lib/seo/robots-config.ts");
   const profile = read("src/components/profile/ProfileSections.tsx");
 
   assert(card.includes("Открыть"), "card cta");
@@ -62,6 +62,10 @@ function testUiAndNav() {
   assert(nav.includes('title: "Личные материалы"'), "sidebar nav");
   assert(nav.includes('icon: "lock"'), "sidebar lock icon");
   assert(!nav.includes('title: "Мои материалы"'), "old sidebar title removed");
+  assert(
+    nav.includes("getListenerSidebarNavItems"),
+    "sidebar nav filters my-materials via showMyMaterialsNav",
+  );
   assert(auth.includes('"/my-materials"'), "private route");
   assert(player.includes('progressMode === "server"'), "player server mode");
   assert(player.includes("visibilitychange"), "visibility save");
@@ -69,6 +73,10 @@ function testUiAndNav() {
   assert(profile.includes("/my-materials"), "profile quick link");
   assert(profile.includes("Личные материалы"), "profile label");
   assert(!profile.includes("Мои материалы"), "old profile label removed");
+  assert(
+    profile.includes("showMyMaterialsNav"),
+    "profile quick link gated by showMyMaterialsNav",
+  );
 }
 
 function testSecurity() {

@@ -5,17 +5,24 @@ import { usePathname } from "next/navigation";
 
 import PersonalMaterialLockIcon from "@/components/personal-materials/PersonalMaterialLockIcon";
 import {
+  getListenerSidebarNavItems,
   isListenerPrimaryNavItemActive,
-  LISTENER_SIDEBAR_NAV_ITEMS,
 } from "@/lib/navigation/listener-nav";
 
-export default function DesktopSidebarNav() {
+type DesktopSidebarNavProps = {
+  showMyMaterialsNav: boolean;
+};
+
+export default function DesktopSidebarNav({
+  showMyMaterialsNav,
+}: DesktopSidebarNavProps) {
   const pathname = usePathname();
+  const items = getListenerSidebarNavItems({ showMyMaterialsNav });
 
   return (
     <nav aria-label="Моё пространство">
       <ul className="space-y-1">
-        {LISTENER_SIDEBAR_NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = isListenerPrimaryNavItemActive(pathname, item.href, {
             isNeutralPath: pathname === "/",
           });

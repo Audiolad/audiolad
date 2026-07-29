@@ -62,6 +62,20 @@ export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
 ] as const;
 
 /**
+ * Sidebar items for the current listener. Hides «Личные материалы» until the
+ * shell confirms at least one claimed, non-deleted personal material.
+ */
+export function getListenerSidebarNavItems(options: {
+  showMyMaterialsNav: boolean;
+}): readonly ListenerSidebarNavItem[] {
+  if (options.showMyMaterialsNav) {
+    return LISTENER_SIDEBAR_NAV_ITEMS;
+  }
+
+  return LISTENER_SIDEBAR_NAV_ITEMS.filter((item) => item.key !== "my-materials");
+}
+
+/**
  * Active-state rules for primary listener nav items (BottomNav parity).
  * Neutral paths (legal, auth) never highlight a tab.
  */

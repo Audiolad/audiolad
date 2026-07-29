@@ -36,6 +36,19 @@ export async function listMyPersonalMaterials(
   );
 }
 
+/** Lightweight EXISTS for listener nav; mirrors list_claimed visibility. */
+export async function hasClaimedPersonalMaterials(
+  supabase: SupabaseClient,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("has_claimed_personal_materials");
+
+  if (error) {
+    throwMappedRpc(error);
+  }
+
+  return data === true;
+}
+
 export async function getMyPersonalMaterial(
   supabase: SupabaseClient,
   materialId: string,

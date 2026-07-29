@@ -11,6 +11,7 @@ import {
   ProfileUserCard,
 } from "@/components/profile/ProfileSections";
 import { signOut } from "@/app/auth/sign-out/actions";
+import { getListenerShellData } from "@/lib/listener/shell-data";
 import { profilePageFullWidthClassName } from "@/lib/profile/layout";
 import { getProfilePageData } from "@/lib/profile/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +37,10 @@ export default async function ProfilePage({
     redirect("/auth/sign-in");
   }
 
-  const profileData = await getProfilePageData(supabase, user);
+  const [profileData, shellData] = await Promise.all([
+    getProfilePageData(supabase, user),
+    getListenerShellData(),
+  ]);
 
   return (
     <ProfilePageShell>
@@ -53,7 +57,7 @@ export default async function ProfilePage({
       <ProfileUserCard card={profileData.card} />
       <ProfileContinueSection state={profileData.continueState} />
       <ProfileCounters counters={profileData.counters} />
-      <ProfileQuickLinks />
+      <ProfileQuickLinks showMyMaterialsNav={shellData.showMyMaterialsNav} />
       <ProfileAuthorBlock section={profileData.authorSection} />
       {profileData.showAdminPanel ? <ProfileAdminPanelSection /> : null}
       <ProfileAccountSection />

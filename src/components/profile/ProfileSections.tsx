@@ -129,7 +129,13 @@ export function ProfileCounters({ counters }: ProfileCountersProps) {
   );
 }
 
-export function ProfileQuickLinks() {
+type ProfileQuickLinksProps = {
+  showMyMaterialsNav?: boolean;
+};
+
+export function ProfileQuickLinks({
+  showMyMaterialsNav = false,
+}: ProfileQuickLinksProps) {
   return (
     <section className="mt-6 min-w-0" aria-label="Быстрые разделы">
       <div className="grid grid-cols-2 gap-3">
@@ -153,31 +159,33 @@ export function ProfileQuickLinks() {
           <span className="mt-2 text-[11px] leading-4">Плейлисты</span>
         </Link>
 
-        <Link
-          href="/my-materials"
-          className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-        >
-          <span className="text-[#7042c5]" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="mx-auto h-6 w-6" fill="none">
-              <rect
-                x="5"
-                y="11"
-                width="14"
-                height="10"
-                rx="2"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M8 11V8a4 4 0 0 1 8 0v3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <span className="mt-2 text-[11px] leading-4">Личные материалы</span>
-        </Link>
+        {showMyMaterialsNav ? (
+          <Link
+            href="/my-materials"
+            className="flex min-h-[94px] flex-col items-center justify-center rounded-[22px] border border-[#eadff8] bg-white px-2 text-center shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            <span className="text-[#7042c5]" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="mx-auto h-6 w-6" fill="none">
+                <rect
+                  x="5"
+                  y="11"
+                  width="14"
+                  height="10"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M8 11V8a4 4 0 0 1 8 0v3"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <span className="mt-2 text-[11px] leading-4">Личные материалы</span>
+          </Link>
+        ) : null}
 
         <Link
           href="/history"

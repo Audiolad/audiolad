@@ -45,7 +45,7 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
       </Link>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
-        <DesktopSidebarNav />
+        <DesktopSidebarNav showMyMaterialsNav={shellData.showMyMaterialsNav} />
       </div>
 
       {shellData.showSidebarAuthorPromo ? (

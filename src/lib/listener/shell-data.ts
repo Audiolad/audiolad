@@ -13,6 +13,7 @@ import {
   resolveShowSidebarAuthorPromo,
   type ListenerAuthorCta,
 } from "@/lib/listener/author-cta";
+import { hasClaimedPersonalMaterials } from "@/lib/personal-materials/client-library/repository";
 import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import { getDisplayName, getInitial } from "@/lib/profile/display-name";
 import { createClient } from "@/lib/supabase/server";
@@ -36,6 +37,8 @@ export type ListenerShellData = {
   showAdminPanel: boolean;
   adminPanelHref: string;
   showSidebarAuthorPromo: boolean;
+  /** True only after confirmed claimed personal material (no loading flash). */
+  showMyMaterialsNav: boolean;
 };
 
 type ProfileRow = {
@@ -71,10 +74,11 @@ async function loadListenerShellData(
       showAdminPanel: false,
       adminPanelHref: "/admin",
       showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(guestAuthorInput),
+      showMyMaterialsNav: false,
     };
   }
 
-  const [profileResult, workspaces, application, showAdminPanel] =
+  const [profileResult, workspaces, application, showAdminPanel, showMyMaterialsNav] =
     await Promise.all([
       client
         .from("profiles")
@@ -91,6 +95,10 @@ async function loadListenerShellData(
       }),
       hasAdminPanelAccess(client, user.id).catch((error) => {
         console.error("listener_shell_admin_panel_access_error", error);
+        return false;
+      }),
+      hasClaimedPersonalMaterials(client).catch((error) => {
+        console.error("listener_shell_my_materials_nav_error", error);
         return false;
       }),
     ]);
@@ -129,6 +137,7 @@ async function loadListenerShellData(
     showAdminPanel,
     adminPanelHref: "/admin",
     showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(authorInput),
+    showMyMaterialsNav,
   };
 }
 
