@@ -276,9 +276,11 @@ function testFooterContainsArticlesOnce() {
     "footer label Помощь и поддержка",
   );
   assert(
-    PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/help") <
-      PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/articles"),
-    "help precedes articles in footer registry",
+    PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/for-authors") <
+      PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/articles") &&
+      PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/articles") <
+        PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/help"),
+    "footer order keeps for-authors before articles before help",
   );
 
   const hrefs = PUBLIC_FOOTER_LINKS.map((item) => item.href);

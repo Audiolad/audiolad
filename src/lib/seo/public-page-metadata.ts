@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import {
+  FOR_AUTHORS_SEO_DESCRIPTION,
+  FOR_AUTHORS_SEO_TITLE,
+} from "@/lib/seo/for-authors/content";
+import {
   PHILOSOPHY_SEO_DESCRIPTION,
   PHILOSOPHY_SEO_TITLE,
 } from "@/lib/seo/philosophy/content";
@@ -25,6 +29,12 @@ export {
   PHILOSOPHY_SEO_DESCRIPTION,
   PHILOSOPHY_SEO_TITLE,
 } from "@/lib/seo/philosophy/content";
+
+export {
+  FOR_AUTHORS_PAGE_H1,
+  FOR_AUTHORS_SEO_DESCRIPTION,
+  FOR_AUTHORS_SEO_TITLE,
+} from "@/lib/seo/for-authors/content";
 
 export function buildSiteCanonicalUrl(path = "/"): string {
   const origin = getAppOrigin().replace(/\/$/, "");
@@ -165,6 +175,31 @@ export function buildPhilosophyMetadata(): Metadata {
       card: "summary",
       title: PHILOSOPHY_SEO_TITLE,
       description: PHILOSOPHY_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildForAuthorsMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl("/for-authors");
+
+  return {
+    title: FOR_AUTHORS_SEO_TITLE,
+    description: FOR_AUTHORS_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: FOR_AUTHORS_SEO_TITLE,
+      description: FOR_AUTHORS_SEO_DESCRIPTION,
+      url: canonical,
+      type: "website",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: FOR_AUTHORS_SEO_TITLE,
+      description: FOR_AUTHORS_SEO_DESCRIPTION,
     },
   };
 }

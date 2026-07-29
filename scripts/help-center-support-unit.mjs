@@ -295,19 +295,23 @@ const footer = read("src/lib/navigation/public-footer-links.ts");
 assert.match(footer, /href: "\/help"/);
 assert.match(footer, /title: "Помощь и поддержка"/);
 assert.match(footer, /href: "\/philosophy"/);
+assert.match(footer, /href: "\/for-authors"/);
 const aboutFooterIndex = footer.indexOf('href: "/about"');
 const philosophyFooterIndex = footer.indexOf('href: "/philosophy"');
+const forAuthorsFooterIndex = footer.indexOf('href: "/for-authors"');
 const helpFooterIndex = footer.indexOf('href: "/help"');
 const articlesFooterIndex = footer.indexOf('href: "/articles"');
 assert.ok(aboutFooterIndex >= 0, "footer registry includes /about");
 assert.ok(philosophyFooterIndex >= 0, "footer registry includes /philosophy");
+assert.ok(forAuthorsFooterIndex >= 0, "footer registry includes /for-authors");
 assert.ok(helpFooterIndex >= 0, "footer registry includes /help");
 assert.ok(articlesFooterIndex >= 0, "footer registry includes /articles");
 assert.ok(
   aboutFooterIndex < philosophyFooterIndex &&
-    philosophyFooterIndex < articlesFooterIndex &&
+    philosophyFooterIndex < forAuthorsFooterIndex &&
+    forAuthorsFooterIndex < articlesFooterIndex &&
     articlesFooterIndex < helpFooterIndex,
-  "footer order: about, philosophy, articles, then help",
+  "footer order: about, philosophy, for-authors, articles, then help",
 );
 assert.equal(
   (footer.match(/href: "\/help"/g) ?? []).length,

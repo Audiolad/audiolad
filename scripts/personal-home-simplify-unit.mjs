@@ -182,6 +182,11 @@ assert(
   "PUBLIC_FOOTER_LINKS keeps philosophy discovery link",
 );
 assert(
+  publicFooterLinks.includes('href: "/for-authors"') &&
+    publicFooterLinks.includes('title: "Авторам"'),
+  "PUBLIC_FOOTER_LINKS keeps for-authors discovery link",
+);
+assert(
   publicFooterLinks.includes('href: "/articles"') &&
     publicFooterLinks.includes('title: "Статьи"'),
   "PUBLIC_FOOTER_LINKS keeps articles discovery link",
@@ -195,10 +200,12 @@ assert(
   publicFooterLinks.indexOf('href: "/about"') <
     publicFooterLinks.indexOf('href: "/philosophy"') &&
     publicFooterLinks.indexOf('href: "/philosophy"') <
+      publicFooterLinks.indexOf('href: "/for-authors"') &&
+    publicFooterLinks.indexOf('href: "/for-authors"') <
       publicFooterLinks.indexOf('href: "/articles"') &&
     publicFooterLinks.indexOf('href: "/articles"') <
       publicFooterLinks.indexOf('href: "/help"'),
-  "PUBLIC_FOOTER_LINKS orders about, philosophy, articles, then help",
+  "PUBLIC_FOOTER_LINKS orders about, philosophy, for-authors, articles, then help",
 );
 assert(
   homeLayout.includes("!shellData.isAuthenticated") &&

@@ -392,6 +392,15 @@ function testRouteFiles() {
     STATIC_SITEMAP_PAGES.some((page) => page.path === "/become-author"),
     "become-author included in static sitemap pages",
   );
+  const forAuthorsEntry = STATIC_SITEMAP_PAGES.find(
+    (page) => page.path === "/for-authors",
+  );
+  assert(forAuthorsEntry, "for-authors included in static sitemap pages");
+  assert(
+    forAuthorsEntry.changeFrequency === "monthly" &&
+      forAuthorsEntry.priority === 0.7,
+    "for-authors sitemap uses monthly / 0.7",
+  );
 }
 
 const tests = [

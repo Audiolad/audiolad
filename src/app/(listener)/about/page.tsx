@@ -130,9 +130,10 @@ const NEXT_LINKS = [
     description: "Найти инструкции для слушателей и авторов или обратиться в поддержку.",
   },
   {
-    href: "/become-author",
-    title: "Стать автором",
-    description: "Узнать, как подать заявку и начать публиковать материалы на АудиоЛаде.",
+    href: "/for-authors",
+    title: "Авторам",
+    description:
+      "Познакомиться с возможностями для авторов и перейти к заявке на АудиоЛаде.",
   },
 ] as const;
 
@@ -212,10 +213,10 @@ export default function AboutPage() {
               Перейти в каталог
             </Link>
             <Link
-              href="/become-author"
+              href="/for-authors"
               className={`inline-flex min-h-11 items-center justify-center rounded-[22px] border border-[#c9b5e8] bg-white px-5 py-3 text-[16px] font-medium text-[#7042c5] hover:bg-[#faf7ff] ${linkFocusClass}`}
             >
-              Стать автором
+              Авторам
             </Link>
           </div>
         </header>
@@ -294,12 +295,19 @@ export default function AboutPage() {
             Мы относимся к автору как к партнёру платформы: его голос, подход и
             ответственность за материал остаются на первом плане. Если вы
             создаёте аудиопрактики, медитации или программы и хотите публиковать
-            их на АудиоЛаде, можно{" "}
+            их на АудиоЛаде,{" "}
+            <Link
+              href="/for-authors"
+              className={`font-medium text-[#7042c5] underline-offset-2 hover:underline ${linkFocusClass}`}
+            >
+              познакомьтесь с возможностями для авторов
+            </Link>{" "}
+            или сразу{" "}
             <Link
               href="/become-author"
               className={`font-medium text-[#7042c5] underline-offset-2 hover:underline ${linkFocusClass}`}
             >
-              подать заявку
+              подайте заявку
             </Link>
             .
           </p>

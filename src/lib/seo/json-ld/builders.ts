@@ -277,6 +277,85 @@ export function buildPhilosophyPageJsonLd(
   };
 }
 
+export type ForAuthorsFaqJsonLdInput = {
+  question: string;
+  answer: string;
+};
+
+export type ForAuthorsPageJsonLdInput = {
+  title: string;
+  description: string;
+  path?: string;
+  faq?: ReadonlyArray<ForAuthorsFaqJsonLdInput>;
+};
+
+/**
+ * Product landing for authors. Uses WebPage (not AboutPage/Course/Product)
+ * so it stays distinct from `/about` and catalog entities.
+ */
+export function buildForAuthorsPageJsonLd(
+  input: ForAuthorsPageJsonLdInput,
+  origin = getAppOrigin(),
+): JsonLdNode {
+  const siteOrigin = originUrl(origin);
+  const path = input.path ?? "/for-authors";
+  const pageUrl = absolutePath(path, origin);
+  const breadcrumbs = buildBreadcrumbListJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Авторам", path },
+    ],
+    origin,
+  );
+
+  const webPage: JsonLdNode = {
+    "@type": "WebPage",
+    "@id": `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: input.title,
+    description: input.description,
+    inLanguage: "ru-RU",
+    isPartOf: {
+      "@id": `${siteOrigin}/#website`,
+    },
+    about: {
+      "@id": `${siteOrigin}/#organization`,
+    },
+  };
+
+  const graph: JsonLdNode[] = [
+    buildOrganizationJsonLd(origin),
+    buildWebSiteJsonLd(origin),
+    webPage,
+  ];
+
+  if (breadcrumbs) {
+    const breadcrumbNode = { ...breadcrumbs };
+    delete breadcrumbNode["@context"];
+    graph.push(breadcrumbNode);
+  }
+
+  if (input.faq && input.faq.length > 0) {
+    graph.push({
+      "@type": "FAQPage",
+      "@id": `${pageUrl}#faq`,
+      mainEntity: input.faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    });
+  }
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": graph,
+  };
+}
+
 export function buildBreadcrumbListJsonLd(
   items: ReadonlyArray<BreadcrumbItemInput>,
   origin = getAppOrigin(),
