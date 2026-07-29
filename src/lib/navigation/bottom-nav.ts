@@ -49,8 +49,14 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     return true;
   }
 
-  // Editorial SEO articles are not primary tabs – keep BottomNav visible without an active item.
-  return pathname === "/articles" || pathname.startsWith("/articles/");
+  // Editorial SEO articles and help center are not primary tabs –
+  // keep BottomNav visible without an active item.
+  return (
+    pathname === "/articles" ||
+    pathname.startsWith("/articles/") ||
+    pathname === "/help" ||
+    pathname.startsWith("/help/")
+  );
 }
 
 export const platformTopSafePaddingClass = "platform-top-safe-padding";

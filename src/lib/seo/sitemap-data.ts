@@ -16,6 +16,8 @@ import {
   buildArticlePath,
   listArticleDefinitions,
 } from "@/lib/seo/articles";
+import { helpArticlePath } from "@/lib/help/paths";
+import { listHelpArticles } from "@/lib/help/registry";
 import {
   buildTopicHubPath,
   listTopicHubDefinitions,
@@ -38,6 +40,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
   { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/help", changeFrequency: "weekly", priority: 0.5 },
   { path: "/become-author", changeFrequency: "monthly", priority: 0.5 },
   { path: "/first-audio-course", changeFrequency: "monthly", priority: 0.6 },
   { path: "/offer", changeFrequency: "yearly", priority: 0.3 },
@@ -568,6 +571,19 @@ export function mapArticleDefinitionsToSitemapEntries(
   }));
 }
 
+/** Indexable help hub + stable how-to articles (not /help/support). */
+export function mapHelpArticlesToSitemapEntries(
+  articles = listHelpArticles(),
+  origin: string = getAppOrigin(),
+): SitemapEntry[] {
+  return articles.map((article) => ({
+    url: toAbsoluteSitemapUrl(helpArticlePath(article), origin),
+    changeFrequency: "monthly" as const,
+    priority: 0.4,
+    lastModified: resolveContentLastModified(article.updatedAt),
+  }));
+}
+
 async function fetchTopicHubSitemapEntries(
   supabase: SupabaseClient,
 ): Promise<SitemapEntry[]> {
@@ -623,6 +639,7 @@ export type SitemapBuildStats = {
   promos: number;
   topicHubs: number;
   articles: number;
+  helpArticles: number;
   total: number;
 };
 
@@ -638,6 +655,7 @@ export async function buildSitemapEntries(): Promise<{
   let promoEntries: SitemapEntry[] = [];
   let topicHubEntries: SitemapEntry[] = [];
   const articleEntries = mapArticleDefinitionsToSitemapEntries();
+  const helpArticleEntries = mapHelpArticlesToSitemapEntries();
 
   try {
     const supabase = await createClient();
@@ -667,6 +685,7 @@ export async function buildSitemapEntries(): Promise<{
     promoEntries,
     topicHubEntries,
     articleEntries,
+    helpArticleEntries,
   );
 
   return {
@@ -679,6 +698,7 @@ export async function buildSitemapEntries(): Promise<{
       promos: promoEntries.length,
       topicHubs: topicHubEntries.length,
       articles: articleEntries.length,
+      helpArticles: helpArticleEntries.length,
       total: entries.length,
     },
   };
