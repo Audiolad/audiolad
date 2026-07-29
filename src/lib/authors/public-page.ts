@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getMusicProductTypeLabel,
+  isMusicProductKind,
+  normalizeProductKind,
+  type ProductKind,
+} from "@/lib/author-products/product-kind";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { sanitizePublicImageManifest } from "@/lib/images/image-manifest";
 import {
@@ -27,6 +33,8 @@ import { findSimilarAuthors } from "./similar-authors";
 export type AuthorPublicProduct = AuthorPublishedPractice &
   ProductCoverFields & {
   description: string | null;
+  productKind: ProductKind;
+  audioCount: number;
   isProgram: boolean;
   isFreeLabel: boolean;
 };
@@ -59,6 +67,7 @@ function mapPracticeRow(
     subtitle: string | null;
     description?: string | null;
     format: string | null;
+    product_kind?: string | null;
     duration_minutes: number | null;
     price: number | null;
     is_free: boolean | null;
@@ -67,7 +76,10 @@ function mapPracticeRow(
     updated_at?: string | null;
   },
   authorSlug: string,
+  audioCount = 1,
 ): AuthorPublicProduct {
+  const productKind = normalizeProductKind(row.product_kind);
+
   return {
     id: row.id,
     title: row.title,
@@ -81,7 +93,10 @@ function mapPracticeRow(
     href: buildPracticePublicPath(authorSlug, row.slug),
     priceLabel: getProductPriceLabel(row.price, row.is_free),
     ...mapProductCoverFields(row),
-    isProgram: isProgramFormat(row.format),
+    productKind,
+    audioCount,
+    isProgram:
+      !isMusicProductKind(productKind) && isProgramFormat(row.format),
     isFreeLabel: row.is_free === true,
   };
 }
@@ -105,7 +120,7 @@ export async function loadAuthorPublicPageData(
   const { data: practiceRows, error: practicesError } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, subtitle, description, format, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at",
+      "id, title, slug, subtitle, description, format, product_kind, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at",
     )
     .eq("author_id", author.id)
     .eq("status", "published")
@@ -114,6 +129,22 @@ export async function loadAuthorPublicPageData(
 
   if (practicesError) {
     return { data: null, error: true };
+  }
+
+  const practiceIds = (practiceRows ?? []).map((row) => row.id as string);
+  const audioCountMap = new Map<string, number>();
+
+  if (practiceIds.length > 0) {
+    const { data: audioRows } = await supabase
+      .from("audio_items")
+      .select("practice_id")
+      .in("practice_id", practiceIds)
+      .eq("status", "published");
+
+    for (const row of audioRows ?? []) {
+      const practiceId = row.practice_id as string;
+      audioCountMap.set(practiceId, (audioCountMap.get(practiceId) ?? 0) + 1);
+    }
   }
 
   const allProducts = (practiceRows ?? []).map((row) =>
@@ -125,6 +156,7 @@ export async function loadAuthorPublicPageData(
         subtitle: string | null;
         description: string | null;
         format: string | null;
+        product_kind?: string | null;
         duration_minutes: number | null;
         price: number | null;
         is_free: boolean | null;
@@ -133,6 +165,7 @@ export async function loadAuthorPublicPageData(
         updated_at?: string | null;
       },
       author.slug,
+      audioCountMap.get(row.id as string) ?? 1,
     ),
   );
 
@@ -213,6 +246,14 @@ export async function loadAuthorPublicPageData(
   };
 }
 
-export function getAuthorProductTypeLabel(format: string | null): string {
+export function getAuthorProductTypeLabel(
+  format: string | null,
+  productKind?: string | null,
+  audioCount = 1,
+): string {
+  if (isMusicProductKind(productKind)) {
+    return getMusicProductTypeLabel(audioCount);
+  }
+
   return getDisplayFormat(format) ?? "Аудиопрактика";
 }

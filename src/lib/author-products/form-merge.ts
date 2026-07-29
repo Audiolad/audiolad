@@ -2,6 +2,13 @@ import {
   parsePracticeFormat,
 } from "@/lib/author-products/format";
 import {
+  MUSIC_USAGE_PERMISSION,
+  normalizeMusicUsagePermission,
+  normalizeProductKind,
+  type MusicUsagePermission,
+  type ProductKind,
+} from "@/lib/author-products/product-kind";
+import {
   createDefaultListeningNoticeFormState,
 } from "@/lib/products/listening-notice";
 import type {
@@ -14,6 +21,8 @@ export type ProductFormSnapshot = {
   title: string;
   subtitle: string;
   description: string;
+  productKind: ProductKind;
+  musicUsagePermission: MusicUsagePermission | null;
   formatPreset: string;
   customFormat: string;
   slug: string;
@@ -37,11 +46,19 @@ export function productDetailToFormSnapshot(
   const { preset, customFormat } = parsePracticeFormat(practice.format);
   const listeningDefaults = createDefaultListeningNoticeFormState();
 
+  const productKind = normalizeProductKind(practice.product_kind);
+
   return {
     authorId: practice.author_id,
     title: practice.title,
     subtitle: practice.subtitle ?? "",
     description: practice.description ?? "",
+    productKind,
+    musicUsagePermission:
+      productKind === "music"
+        ? (normalizeMusicUsagePermission(practice.music_usage_permission) ??
+          MUSIC_USAGE_PERMISSION.LISTEN_ONLY)
+        : null,
     formatPreset: preset,
     customFormat,
     slug: practice.slug,
@@ -74,6 +91,11 @@ export function mergeServerProductIntoForm(
     title: current.title.trim() ? current.title : server.title,
     subtitle: current.subtitle,
     description: current.description,
+    productKind: current.productKind || server.productKind,
+    musicUsagePermission:
+      current.productKind === "music"
+        ? (current.musicUsagePermission ?? server.musicUsagePermission)
+        : null,
     formatPreset: current.formatPreset || server.formatPreset,
     customFormat: current.customFormat,
     isFree: current.isFree,

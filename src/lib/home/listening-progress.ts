@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  getMusicProductTypeLabel,
+  isMusicProductKind,
+  normalizeProductKind,
+} from "@/lib/author-products/product-kind";
+import {
   calculateProgramProgressPercent,
   isTrackCompleted,
   resolveInitialPlayback,
@@ -32,6 +37,7 @@ type PracticeRow = {
   subtitle: string | null;
   description: string | null;
   format: string | null;
+  product_kind?: string | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -113,6 +119,7 @@ function mapPracticeToHomeProduct(
 
   const audioSummary = audioSummaryMap.get(practice.id);
   const audioCount = audioSummary?.audioCount ?? 0;
+  const productKind = normalizeProductKind(practice.product_kind);
 
   return {
     id: practice.id,
@@ -121,6 +128,7 @@ function mapPracticeToHomeProduct(
     subtitle: practice.subtitle?.trim() || null,
     description: practice.description?.trim() || null,
     format: practice.format?.trim() || null,
+    productKind,
     price: practice.price,
     isFree: practice.is_free === true,
     ...mapProductCoverFields(practice),
@@ -129,7 +137,11 @@ function mapPracticeToHomeProduct(
     href: `/practice/${author.slug}/${practice.slug}`,
     meta: null,
     statsLabel: null,
-    productTypeLabel: audioCount >= 2 ? "Программа аудиопрактик" : "Аудиопрактика",
+    productTypeLabel: isMusicProductKind(productKind)
+      ? getMusicProductTypeLabel(audioCount)
+      : audioCount >= 2
+        ? "Программа аудиопрактик"
+        : "Аудиопрактика",
     priceLabel: practice.is_free ? "Подарок" : `${practice.price ?? 0} ₽`,
     sortTimestamp: getSortTimestamp(practice.published_at, practice.created_at),
     audioCount,
@@ -303,6 +315,7 @@ export async function getContinueListening(
       subtitle,
       description,
       format,
+      product_kind,
       duration_minutes,
       price,
       is_free,
@@ -404,6 +417,7 @@ export async function getRecentlyListenedProducts(
       subtitle,
       description,
       format,
+      product_kind,
       duration_minutes,
       price,
       is_free,
@@ -486,6 +500,7 @@ export async function getActivePrograms(
       subtitle,
       description,
       format,
+      product_kind,
       duration_minutes,
       price,
       is_free,

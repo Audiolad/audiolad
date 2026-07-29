@@ -7,6 +7,13 @@ import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
 
 import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
+import {
+  assertMusicUsagePermissionForKind,
+  getMusicReleaseLabel,
+  isMusicProductKind,
+  normalizeProductKind,
+  PRODUCT_KIND,
+} from "./product-kind";
 import { minutesFromSeconds } from "./utils";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 
@@ -23,7 +30,8 @@ export type PublishReadinessRequirementKey =
   | "cover"
   | "audio"
   | "price"
-  | "topics";
+  | "topics"
+  | "music_usage";
 
 export type PublishReadinessRequirement = {
   key: PublishReadinessRequirementKey;
@@ -159,11 +167,31 @@ export function validateAudioItemsStructure(
   return { ok: true };
 }
 
+/** Effective display format for publish: music may fall back to track/album label. */
+export function resolveFormatForPublish(
+  practice: Pick<PracticeRow, "format" | "product_kind">,
+  audioItems: ReadonlyArray<Pick<AudioItemRow, "id">>,
+): string | null {
+  const format = practice.format?.trim() || null;
+
+  if (format && format !== LEGACY_OTHER_FORMAT) {
+    return format;
+  }
+
+  if (isMusicProductKind(practice.product_kind)) {
+    return getMusicReleaseLabel(audioItems.length);
+  }
+
+  return format === LEGACY_OTHER_FORMAT ? LEGACY_OTHER_FORMAT : null;
+}
+
 function buildCorePublishRequirements(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
   accessStatus?: AuthorAccessStatus,
 ): PublishReadinessRequirement[] {
+  const isMusic = normalizeProductKind(practice.product_kind) === PRODUCT_KIND.MUSIC;
+
   const authorFailure = !practice.author_id
     ? {
         code: "missing_author",
@@ -192,7 +220,7 @@ function buildCorePublishRequirements(
       }
     : null;
 
-  const format = practice.format?.trim();
+  const format = resolveFormatForPublish(practice, audioItems);
   const formatFailure =
     !format || format === LEGACY_OTHER_FORMAT
       ? {
@@ -249,7 +277,18 @@ function buildCorePublishRequirements(
     }
   }
 
-  return [
+  const musicUsageCheck = assertMusicUsagePermissionForKind(
+    practice.product_kind,
+    practice.music_usage_permission,
+  );
+  const musicUsageFailure =
+    isMusic && !musicUsageCheck.ok
+      ? { code: musicUsageCheck.code, message: musicUsageCheck.message }
+      : !isMusic && !musicUsageCheck.ok
+        ? { code: musicUsageCheck.code, message: musicUsageCheck.message }
+        : null;
+
+  const requirements: PublishReadinessRequirement[] = [
     requirement("author", "Авторское пространство", authorFailure),
     requirement("title", "Название", titleFailure),
     requirement("slug", "Адрес", slugFailure),
@@ -259,6 +298,14 @@ function buildCorePublishRequirements(
     requirement("audio", "Аудиозапись", audioFailure),
     requirement("price", "Цена и доступ", priceFailure),
   ];
+
+  if (isMusic || musicUsageFailure) {
+    requirements.push(
+      requirement("music_usage", "Условия использования музыки", musicUsageFailure),
+    );
+  }
+
+  return requirements;
 }
 
 /**

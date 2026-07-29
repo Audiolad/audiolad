@@ -11,11 +11,13 @@ import { shouldTrackPageView } from "@/lib/analytics/dedup";
 type PracticeViewTrackerProps = {
   practiceId: string;
   path: string;
+  productKind?: string | null;
 };
 
 export default function PracticeViewTracker({
   practiceId,
   path,
+  productKind,
 }: PracticeViewTrackerProps) {
   const trackedRef = useRef(false);
 
@@ -37,8 +39,13 @@ export default function PracticeViewTracker({
       event_name: "practice_view",
       path,
       practice_id: practiceId,
+      properties: productKind
+        ? {
+            product_kind: productKind,
+          }
+        : undefined,
     });
-  }, [path, practiceId]);
+  }, [path, practiceId, productKind]);
 
   return null;
 }

@@ -1,9 +1,15 @@
+import {
+  getMusicReleaseLabel,
+  isMusicProductKind,
+} from "@/lib/author-products/product-kind";
 import { isProgramFormat } from "@/lib/products/practice-access-ui";
 
 type ProductCoverAltInput = {
   title: string;
   authorName?: string | null;
   format?: string | null;
+  productKind?: string | null;
+  audioCount?: number | null;
 };
 
 function normalizeTitle(title: string): string {
@@ -22,6 +28,13 @@ function authorSuffix(authorName?: string | null): string {
 export function buildProductCoverAlt(input: ProductCoverAltInput): string {
   const title = normalizeTitle(input.title);
   const suffix = authorSuffix(input.authorName);
+
+  if (isMusicProductKind(input.productKind)) {
+    const release = getMusicReleaseLabel(
+      typeof input.audioCount === "number" ? input.audioCount : 1,
+    );
+    return `Обложка: ${release.toLowerCase()} «${title}»${suffix}`;
+  }
 
   if (isProgramFormat(input.format ?? null)) {
     return `Обложка программы аудиопрактик «${title}»${suffix}`;

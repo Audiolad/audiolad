@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-07-29 — Музыка как product_kind на practices
+
+**Контекст:** нужен MVP типа контента «Музыка» без параллельной платформы.
+
+**Решение:**
+
+- Переиспользовать `practices` + `audio_items`; отдельную сущность альбома не создавать.
+- Добавить `product_kind` (`practice` | `music`) и `music_usage_permission` (`listen_only` | `platform_reuse_allowed`).
+- Трек/альбом определять по числу `audio_items`.
+- URL `/practice/...` сохранить; SEO-хабы и статьи ограничить `product_kind = practice`.
+- `product_kind` неизменяем после первой публикации (`published_at`).
+
+**Принято:** владелец проекта (по результатам технического аудита).
+
+---
+
 ## 2026-07-05 — Self-hosted Supabase на Timeweb Cloud
 
 **Контекст:** проекту нужна база данных и аутентификация.

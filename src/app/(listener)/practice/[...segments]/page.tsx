@@ -17,6 +17,11 @@ import {
   getProductCoverSymbol,
 } from "@/lib/products/cover-display";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
+import {
+  getMusicProductTypeLabel,
+  isMusicProductKind,
+  normalizeProductKind,
+} from "@/lib/author-products/product-kind";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
@@ -157,7 +162,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (segments.length !== 2) {
     return {
-      title: "Практика – АудиоЛад",
+      title: "Аудиопродукт – АудиоЛад",
       robots: { index: false, follow: false },
     };
   }
@@ -172,7 +177,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (error || !practice) {
     return {
-      title: "Практика – АудиоЛад",
+      title: "Аудиопродукт – АудиоЛад",
       robots: {
         index: false,
         follow: false,
@@ -186,12 +191,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       : "";
   const canonical = buildPracticeCanonicalUrl(authorSlug, productSlug);
   const indexable = shouldIndexPracticePage(practice.status);
+  const isMusic = isMusicProductKind(practice.product_kind);
+  const descriptionFallback = isMusic
+    ? "Музыкальный продукт на платформе АудиоЛад."
+    : METADATA_DESCRIPTION_FALLBACK;
 
   return {
     title: `${practice.title} – АудиоЛад`,
     description: trimmedDescription
       ? truncateDescription(trimmedDescription)
-      : METADATA_DESCRIPTION_FALLBACK,
+      : descriptionFallback,
     alternates: {
       canonical,
     },
@@ -311,8 +320,12 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
   const authorName = getAuthorName(practice);
+  const productKind = normalizeProductKind(practice.product_kind);
+  const musicTypeLabel = isMusicProductKind(productKind)
+    ? getMusicProductTypeLabel(publicAudioItems.length)
+    : null;
   const meta = formatProductMeta({
-    format: practice.format,
+    format: musicTypeLabel ?? practice.format,
     audioCount: publicAudioItems.length,
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
@@ -324,6 +337,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     title: practice.title,
     authorName,
     format: practice.format,
+    productKind,
+    audioCount: publicAudioItems.length,
   });
   const subtitle = practice.subtitle?.trim() || null;
   const listenDeniedMessage =
@@ -486,6 +501,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         <PracticeViewTracker
           practiceId={practice.id}
           path={practicePagePath}
+          productKind={productKind}
         />
       ) : null}
       {presentation.showBuyerPreviewExit ? (

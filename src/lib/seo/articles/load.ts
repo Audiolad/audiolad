@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
 import { resolveProductAccess } from "@/lib/products/access";
 import {
   getPublishedCatalogProducts,
@@ -76,7 +77,9 @@ export async function loadArticlePageData(
     return null;
   }
 
-  const catalog = await getPublishedCatalogProducts(supabase);
+  const catalog = await getPublishedCatalogProducts(supabase, {
+    productKind: PRODUCT_KIND.PRACTICE,
+  });
   const catalogByKey = buildCatalogPracticeKeyIndex(catalog);
   const primaryPractice = resolveArticlePrimaryPractice(article, catalogByKey);
 

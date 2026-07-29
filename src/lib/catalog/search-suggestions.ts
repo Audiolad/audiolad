@@ -254,7 +254,7 @@ export function mapCatalogProductToSuggestion(
     title: product.title.trim(),
     authorName,
     subtitle,
-    format: getDisplayFormat(product.format),
+    format: product.productTypeLabel || getDisplayFormat(product.format),
     coverUrl: getProductCoverDisplayUrl(
       product.coverUrl,
       product.updatedAt,

@@ -9,6 +9,10 @@ import {
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 import {
+  PRODUCT_KIND,
+  normalizeProductKind,
+} from "@/lib/author-products/product-kind";
+import {
   createDraftProduct,
   listAuthorProducts,
 } from "@/lib/author-products/products";
@@ -57,6 +61,17 @@ export async function POST(request: Request) {
         : "";
     const title =
       "title" in body && typeof body.title === "string" ? body.title.trim() : "";
+    const productKindRaw =
+      "product_kind" in body && typeof body.product_kind === "string"
+        ? body.product_kind.trim()
+        : PRODUCT_KIND.PRACTICE;
+
+    if (
+      productKindRaw !== PRODUCT_KIND.PRACTICE &&
+      productKindRaw !== PRODUCT_KIND.MUSIC
+    ) {
+      return NextResponse.json({ error: "invalid_product_kind" }, { status: 400 });
+    }
 
     if (!authorId || !title) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
@@ -72,6 +87,7 @@ export async function POST(request: Request) {
     const product = await createDraftProduct(supabase, {
       authorId,
       title,
+      productKind: normalizeProductKind(productKindRaw),
     });
 
     return NextResponse.json({ product }, { status: 201 });

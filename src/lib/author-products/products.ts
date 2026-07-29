@@ -3,13 +3,47 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import {
+  MUSIC_USAGE_PERMISSION,
+  PRODUCT_KIND,
+  normalizeProductKind,
+  type ProductKind,
+} from "./product-kind";
 import type {
   AuthorProductDetail,
   AuthorProductListItem,
   AudioItemRow,
   PracticeRow,
 } from "./types";
+import { coercePracticeRow } from "./types";
 import { slugifyTitle } from "./utils";
+
+const PRACTICE_DETAIL_SELECT = `
+  id,
+  author_id,
+  title,
+  slug,
+  subtitle,
+  description,
+  format,
+  product_kind,
+  music_usage_permission,
+  duration_minutes,
+  price,
+  is_free,
+  cover_url,
+  cover_image,
+  use_shared_cover,
+  audio_url,
+  status,
+  currency,
+  published_at,
+  listening_notice_enabled,
+  listening_notice_title,
+  listening_notice_text,
+  created_at,
+  updated_at
+`;
 
 async function resolveContentLockedAfterSale(
   practiceId: string,
@@ -49,7 +83,7 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, price, is_free, status, cover_url, cover_image, updated_at",
+      "id, title, slug, format, product_kind, price, is_free, status, cover_url, cover_image, updated_at",
     )
     .eq("author_id", authorId)
     .order("updated_at", { ascending: false });
@@ -59,7 +93,9 @@ export async function listAuthorProducts(
   }
 
   const practiceRows = (practices ?? []) as Array<
-    Omit<AuthorProductListItem, "audio_count">
+    Omit<AuthorProductListItem, "audio_count" | "product_kind"> & {
+      product_kind?: string | null;
+    }
   >;
 
   if (practiceRows.length === 0) {
@@ -86,6 +122,7 @@ export async function listAuthorProducts(
 
   return practiceRows.map((row) => ({
     ...row,
+    product_kind: normalizeProductKind(row.product_kind),
     audio_count: countMap.get(row.id) ?? 0,
   }));
 }
@@ -96,32 +133,7 @@ export async function getAuthorProductDetail(
 ): Promise<AuthorProductDetail | null> {
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
-    .select(
-      `
-      id,
-      author_id,
-      title,
-      slug,
-      subtitle,
-      description,
-      format,
-      duration_minutes,
-      price,
-      is_free,
-      cover_url,
-      cover_image,
-      use_shared_cover,
-      audio_url,
-      status,
-      currency,
-      published_at,
-      listening_notice_enabled,
-      listening_notice_title,
-      listening_notice_text,
-      created_at,
-      updated_at
-    `,
-    )
+    .select(PRACTICE_DETAIL_SELECT)
     .eq("id", practiceId)
     .maybeSingle();
 
@@ -146,7 +158,7 @@ export async function getAuthorProductDetail(
   const contentLockedAfterSale = await resolveContentLockedAfterSale(practiceId);
 
   return {
-    practice: practice as PracticeRow,
+    practice: coercePracticeRow(practice as PracticeRow),
     audio_items: (audioItems ?? []) as AudioItemRow[],
     contentLockedAfterSale,
   };
@@ -203,6 +215,7 @@ export async function createDraftProduct(
     authorId: string;
     title: string;
     slug?: string;
+    productKind?: ProductKind;
   },
 ): Promise<AuthorProductDetail> {
   const title = input.title.trim();
@@ -211,6 +224,7 @@ export async function createDraftProduct(
     throw new Error("missing_title");
   }
 
+  const productKind = normalizeProductKind(input.productKind);
   const slug =
     input.slug?.trim() ||
     (await generateUniqueSlug(supabase, title, input.authorId, undefined));
@@ -225,33 +239,15 @@ export async function createDraftProduct(
       price: 0,
       is_free: true,
       currency: "RUB",
+      product_kind: productKind,
+      music_usage_permission:
+        productKind === PRODUCT_KIND.MUSIC
+          ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
+          : null,
+      format:
+        productKind === PRODUCT_KIND.MUSIC ? "Музыкальный трек" : null,
     })
-    .select(
-      `
-      id,
-      author_id,
-      title,
-      slug,
-      subtitle,
-      description,
-      format,
-      duration_minutes,
-      price,
-      is_free,
-      cover_url,
-      cover_image,
-      use_shared_cover,
-      audio_url,
-      status,
-      currency,
-      published_at,
-      listening_notice_enabled,
-      listening_notice_title,
-      listening_notice_text,
-      created_at,
-      updated_at
-    `,
-    )
+    .select(PRACTICE_DETAIL_SELECT)
     .single();
 
   if (practiceError || !practice?.id) {
@@ -262,7 +258,7 @@ export async function createDraftProduct(
     .from("audio_items")
     .insert({
       practice_id: practice.id,
-      title: "Аудио 1",
+      title: productKind === PRODUCT_KIND.MUSIC ? "Трек 1" : "Аудио 1",
       position: 1,
       status: "draft",
     })
@@ -274,7 +270,7 @@ export async function createDraftProduct(
   }
 
   return {
-    practice: practice as PracticeRow,
+    practice: coercePracticeRow(practice as PracticeRow),
     audio_items: [audioItem as AudioItemRow],
     contentLockedAfterSale: false,
   };

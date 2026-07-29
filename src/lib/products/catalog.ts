@@ -4,6 +4,12 @@ import {
   filterPublicCatalogPracticeRows,
 } from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getMusicProductTypeLabel,
+  isMusicProductKind,
+  normalizeProductKind,
+  type ProductKind,
+} from "@/lib/author-products/product-kind";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
@@ -21,6 +27,7 @@ type CatalogPracticeRow = {
   subtitle: string | null;
   description: string | null;
   format: string | null;
+  product_kind?: string | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -41,6 +48,8 @@ export type CatalogProduct = ProductCoverFields & {
   subtitle: string | null;
   description: string | null;
   format: string | null;
+  /** Defaults to practice when absent (legacy callers / partial maps). */
+  productKind?: ProductKind;
   price: number | null;
   isFree: boolean;
   authorName: string | null;
@@ -60,6 +69,8 @@ export type CatalogSections = {
 
 export type CatalogQueryOptions = {
   topicKey?: string | null;
+  /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
+  productKind?: ProductKind | null;
 };
 
 export async function getPublishedPracticeIdsForTopicKey(
@@ -132,7 +143,12 @@ function normalizeAuthor(
 function getProductTypeLabel(
   audioCount: number,
   format: string | null,
+  productKind?: string | null,
 ): string {
+  if (isMusicProductKind(productKind)) {
+    return getMusicProductTypeLabel(audioCount);
+  }
+
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
 
   if (
@@ -194,6 +210,7 @@ export async function getPublishedCatalogProducts(
       subtitle,
       description,
       format,
+      product_kind,
       duration_minutes,
       price,
       is_free,
@@ -214,6 +231,10 @@ export async function getPublishedCatalogProducts(
     .eq("is_catalog_listed", true)
     .not("slug", "is", null)
     .not("author_id", "is", null);
+
+  if (options?.productKind) {
+    query = query.eq("product_kind", options.productKind);
+  }
 
   if (practiceIdsForTopic) {
     query = query.in("id", practiceIdsForTopic);
@@ -273,6 +294,7 @@ export async function mapPracticeRowsToCatalogProducts(
         subtitle: practice.subtitle?.trim() || null,
         description: practice.description?.trim() || null,
         format: practice.format?.trim() || null,
+        productKind: normalizeProductKind(practice.product_kind),
         price: practice.price,
         isFree: isProductFree(practice.is_free, practice.price),
         ...mapProductCoverFields(practice),
@@ -280,7 +302,9 @@ export async function mapPracticeRowsToCatalogProducts(
         authorSlug: author.slug,
         href: buildPracticePublicPath(author.slug, practice.slug),
         meta: formatProductMeta({
-          format: practice.format,
+          format: isMusicProductKind(practice.product_kind)
+            ? getMusicProductTypeLabel(audioCount)
+            : practice.format,
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
@@ -290,9 +314,10 @@ export async function mapPracticeRowsToCatalogProducts(
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
         }),
-        productTypeLabel:
-          getDisplayFormat(practice.format) ??
-          getProductTypeLabel(audioCount, practice.format),
+        productTypeLabel: isMusicProductKind(practice.product_kind)
+          ? getMusicProductTypeLabel(audioCount)
+          : (getDisplayFormat(practice.format) ??
+            getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
         priceLabel: getProductPriceLabel(practice.price, practice.is_free),
         sortTimestamp: getSortTimestamp(
           practice.published_at,

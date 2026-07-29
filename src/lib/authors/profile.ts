@@ -33,6 +33,7 @@ export type AuthorFeaturedProductSummary = {
   title: string;
   slug: string;
   format: string | null;
+  product_kind?: string | null;
   subtitle: string | null;
   description: string | null;
   cover_url: string | null;
@@ -105,6 +106,7 @@ export async function getAuthorProfileDetail(
         title,
         slug,
         format,
+        product_kind,
         subtitle,
         description,
         cover_url,
@@ -138,6 +140,7 @@ export async function getAuthorProfileDetail(
       title: practice.title as string,
       slug: practice.slug as string,
       format: (practice.format as string | null) ?? null,
+      product_kind: (practice.product_kind as string | null) ?? null,
       subtitle: (practice.subtitle as string | null) ?? null,
       description: (practice.description as string | null) ?? null,
       cover_url: (practice.cover_url as string | null) ?? null,

@@ -19,9 +19,20 @@ export const PRODUCT_PRESET_FORMATS = [
   "Аудиокнига",
 ] as const;
 
-export type ProductPresetFormat = (typeof PRODUCT_PRESET_FORMATS)[number];
+/** Compact music presets for practices.format when product_kind = music. */
+export const MUSIC_PRESET_FORMATS = [
+  "Музыкальный трек",
+  "Музыкальный альбом",
+  "Медитативная музыка",
+] as const;
 
-const PRESET_FORMAT_SET = new Set<string>(PRODUCT_PRESET_FORMATS);
+export type ProductPresetFormat = (typeof PRODUCT_PRESET_FORMATS)[number];
+export type MusicPresetFormat = (typeof MUSIC_PRESET_FORMATS)[number];
+
+const PRESET_FORMAT_SET = new Set<string>([
+  ...PRODUCT_PRESET_FORMATS,
+  ...MUSIC_PRESET_FORMATS,
+]);
 
 export function isPresetFormat(value: string | null | undefined): boolean {
   if (!value?.trim()) {
