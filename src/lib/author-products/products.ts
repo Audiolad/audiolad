@@ -4,6 +4,7 @@ import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
+  MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
   PRODUCT_KIND,
   normalizeProductKind,
@@ -244,8 +245,7 @@ export async function createDraftProduct(
         productKind === PRODUCT_KIND.MUSIC
           ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
           : null,
-      format:
-        productKind === PRODUCT_KIND.MUSIC ? "Музыкальный трек" : null,
+      format: productKind === PRODUCT_KIND.MUSIC ? MUSIC_KIND_LABEL : null,
     })
     .select(PRACTICE_DETAIL_SELECT)
     .single();

@@ -22,19 +22,19 @@ import {
 import {
   CUSTOM_FORMAT_LABEL,
   CUSTOM_FORMAT_VALUE,
-  MUSIC_PRESET_FORMATS,
   PRODUCT_PRESET_FORMATS,
   isCustomFormatSelection,
   resolveFormatForStorage,
   validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
 import {
+  MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
+  MUSIC_USAGE_PERMISSION_INTRO,
   PRODUCT_KIND,
   canChangeProductKind,
-  getMusicReleaseLabel,
   getMusicUsagePermissionDescription,
-  isMusicProductKind,
+  getMusicUsagePermissionLabel,
   type MusicUsagePermission,
   type ProductKind,
 } from "@/lib/author-products/product-kind";
@@ -293,7 +293,10 @@ function buildProductSavePayload(
       form.productKind === PRODUCT_KIND.MUSIC
         ? form.musicUsagePermission
         : null,
-    format: resolveFormatForStorage(form.formatPreset, form.customFormat),
+    format:
+      form.productKind === PRODUCT_KIND.MUSIC
+        ? MUSIC_KIND_LABEL
+        : resolveFormatForStorage(form.formatPreset, form.customFormat),
     is_free: form.isFree,
     price: form.isFree ? 0 : form.price,
     use_shared_cover: form.useSharedCover,
@@ -1066,23 +1069,25 @@ export default function AuthorProductForm({
     setFieldErrors({});
     setTopicError(undefined);
 
-    if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
-      setFieldErrors({
-        formatCustom: "Укажите название своего формата",
-      });
-      setBusy(false);
-      return;
-    }
-
-    if (isCustomFormatSelection(form.formatPreset)) {
-      const lengthError = validateStoredFormatLength(form.customFormat);
-
-      if (lengthError) {
+    if (form.productKind === PRODUCT_KIND.PRACTICE) {
+      if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
         setFieldErrors({
-          formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
+          formatCustom: "Укажите название своего формата",
         });
         setBusy(false);
         return;
+      }
+
+      if (isCustomFormatSelection(form.formatPreset)) {
+        const lengthError = validateStoredFormatLength(form.customFormat);
+
+        if (lengthError) {
+          setFieldErrors({
+            formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
+          });
+          setBusy(false);
+          return;
+        }
       }
     }
 
@@ -1875,9 +1880,7 @@ export default function AuthorProductForm({
                     musicUsagePermission:
                       current.musicUsagePermission ??
                       MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
-                    formatPreset: getMusicReleaseLabel(
-                      Math.max(audioItems.length, 1),
-                    ),
+                    formatPreset: "",
                     customFormat: "",
                     listeningNoticeEnabled: false,
                   }));
@@ -1972,6 +1975,8 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
+        {form.productKind === PRODUCT_KIND.PRACTICE ? (
+        <>
         <label className="block">
           <span className="mb-2 block text-sm font-medium">Публичный формат</span>
           <select
@@ -1993,17 +1998,12 @@ export default function AuthorProductForm({
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           >
             <option value="">Выберите формат</option>
-            {(form.productKind === PRODUCT_KIND.MUSIC
-              ? MUSIC_PRESET_FORMATS
-              : PRODUCT_PRESET_FORMATS
-            ).map((format) => (
+            {PRODUCT_PRESET_FORMATS.map((format) => (
               <option key={format} value={format}>
                 {format}
               </option>
             ))}
-            {form.productKind === PRODUCT_KIND.PRACTICE ? (
-              <option value={CUSTOM_FORMAT_VALUE}>{CUSTOM_FORMAT_LABEL}</option>
-            ) : null}
+            <option value={CUSTOM_FORMAT_VALUE}>{CUSTOM_FORMAT_LABEL}</option>
           </select>
         </label>
 
@@ -2047,6 +2047,8 @@ export default function AuthorProductForm({
             </label>
           </div>
         </div>
+        </>
+        ) : null}
 
         {form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
@@ -2054,8 +2056,7 @@ export default function AuthorProductForm({
               Условия использования музыки
             </legend>
             <p className="text-sm leading-5 text-[#7d70a2]">
-              Сейчас разрешение только сохраняется. Фактическое использование
-              музыки другими авторами пока недоступно.
+              {MUSIC_USAGE_PERMISSION_INTRO}
             </p>
             {(
               [
@@ -2086,9 +2087,7 @@ export default function AuthorProductForm({
                 />
                 <span>
                   <span className="block text-sm font-medium text-[#3f3560]">
-                    {value === MUSIC_USAGE_PERMISSION.LISTEN_ONLY
-                      ? "Только для прослушивания"
-                      : "Разрешить использование внутри АудиоЛада"}
+                    {getMusicUsagePermissionLabel(value)}
                   </span>
                   <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
                     {getMusicUsagePermissionDescription(value)}

@@ -146,7 +146,7 @@ function getProductTypeLabel(
   productKind?: string | null,
 ): string {
   if (isMusicProductKind(productKind)) {
-    return getMusicProductTypeLabel(audioCount);
+    return getMusicProductTypeLabel();
   }
 
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
@@ -303,7 +303,7 @@ export async function mapPracticeRowsToCatalogProducts(
         href: buildPracticePublicPath(author.slug, practice.slug),
         meta: formatProductMeta({
           format: isMusicProductKind(practice.product_kind)
-            ? getMusicProductTypeLabel(audioCount)
+            ? getMusicProductTypeLabel()
             : practice.format,
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
@@ -315,7 +315,7 @@ export async function mapPracticeRowsToCatalogProducts(
           durationMinutesFallback: practice.duration_minutes,
         }),
         productTypeLabel: isMusicProductKind(practice.product_kind)
-          ? getMusicProductTypeLabel(audioCount)
+          ? getMusicProductTypeLabel()
           : (getDisplayFormat(practice.format) ??
             getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
         priceLabel: getProductPriceLabel(practice.price, practice.is_free),

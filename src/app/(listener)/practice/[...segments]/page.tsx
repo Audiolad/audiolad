@@ -322,7 +322,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const authorName = getAuthorName(practice);
   const productKind = normalizeProductKind(practice.product_kind);
   const musicTypeLabel = isMusicProductKind(productKind)
-    ? getMusicProductTypeLabel(publicAudioItems.length)
+    ? getMusicProductTypeLabel()
     : null;
   const meta = formatProductMeta({
     format: musicTypeLabel ?? practice.format,

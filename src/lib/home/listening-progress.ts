@@ -138,7 +138,7 @@ function mapPracticeToHomeProduct(
     meta: null,
     statsLabel: null,
     productTypeLabel: isMusicProductKind(productKind)
-      ? getMusicProductTypeLabel(audioCount)
+      ? getMusicProductTypeLabel()
       : audioCount >= 2
         ? "Программа аудиопрактик"
         : "Аудиопрактика",

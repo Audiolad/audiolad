@@ -15,6 +15,8 @@ import {
   canChangeProductKind,
   getMusicProductTypeLabel,
   getMusicReleaseLabel,
+  getMusicUsagePermissionDescription,
+  getMusicUsagePermissionLabel,
   normalizeProductKind,
 } from "../src/lib/author-products/product-kind.ts";
 import {
@@ -98,8 +100,26 @@ assert.equal(PRODUCT_KIND_LOCKED_AFTER_PUBLISH, "PRODUCT_KIND_LOCKED_AFTER_PUBLI
 // 5–6. Release labels from audio count
 assert.equal(getMusicReleaseLabel(1), "Музыкальный трек");
 assert.equal(getMusicReleaseLabel(2), "Музыкальный альбом");
-assert.equal(getMusicProductTypeLabel(1), "Музыка · Музыкальный трек");
-assert.equal(getMusicProductTypeLabel(3), "Музыка · Музыкальный альбом");
+assert.equal(getMusicProductTypeLabel(), "Музыка");
+
+assert.equal(
+  getMusicUsagePermissionLabel(MUSIC_USAGE_PERMISSION.LISTEN_ONLY),
+  "Только для прослушивания",
+);
+assert.equal(
+  getMusicUsagePermissionLabel(MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED),
+  "Для прослушивания и использования авторами",
+);
+assert.match(
+  getMusicUsagePermissionDescription(MUSIC_USAGE_PERMISSION.LISTEN_ONLY) ?? "",
+  /при создании аудиопродуктов других авторов/,
+);
+assert.match(
+  getMusicUsagePermissionDescription(
+    MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+  ) ?? "",
+  /добавлять поверх неё голос/,
+);
 
 // 7. Music publish requires usage permission
 {
@@ -134,28 +154,26 @@ assert.equal(getMusicProductTypeLabel(3), "Музыка · Музыкальны�
   assert.equal(readiness.ok, true, readiness.firstFailure?.message);
 }
 
-// Publish music with several tracks
+// Publish music with several tracks (no author format required)
 {
-  const practice = basePractice({ format: "Музыкальный альбом" });
+  const practice = basePractice({ format: null });
   const readiness = evaluatePublishReadiness(
     practice,
     [audioItem(1), audioItem(2), audioItem(3)],
     { activeTopicCount: 1 },
   );
   assert.equal(readiness.ok, true, readiness.firstFailure?.message);
-  assert.equal(
-    resolveFormatForPublish(practice, [audioItem(1), audioItem(2)]),
-    "Музыкальный альбом",
-  );
+  assert.equal(resolveFormatForPublish(practice), "Музыка");
 }
 
-// Music format fallback from audio count
+// Music format is always the system label «Музыка»
 assert.equal(
-  resolveFormatForPublish(
-    basePractice({ format: null }),
-    [audioItem(1), audioItem(2)],
-  ),
-  "Музыкальный альбом",
+  resolveFormatForPublish(basePractice({ format: "Медитативная музыка" })),
+  "Музыка",
+);
+assert.equal(
+  resolveFormatForPublish(basePractice({ format: null })),
+  "Музыка",
 );
 
 // Legacy practice still publishes without music_usage requirement

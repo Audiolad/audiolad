@@ -18,8 +18,12 @@ export const PRODUCT_KIND_LOCKED_AFTER_PUBLISH =
 
 export const MUSIC_RELEASE_TRACK_LABEL = "Музыкальный трек";
 export const MUSIC_RELEASE_ALBUM_LABEL = "Музыкальный альбом";
+/** Public card/page label and system-stored practices.format for music. */
 export const MUSIC_KIND_LABEL = "Музыка";
 export const PRACTICE_KIND_LABEL = "Аудиопрактика";
+
+export const MUSIC_USAGE_PERMISSION_INTRO =
+  "Выберите, смогут ли в будущем другие авторы АудиоЛада использовать эту музыку в своих аудиопродуктах.";
 
 export function normalizeProductKind(
   value: string | null | undefined,
@@ -58,9 +62,12 @@ export function getMusicReleaseLabel(audioCount: number): string {
     : MUSIC_RELEASE_TRACK_LABEL;
 }
 
-/** Card / page type line for music: «Музыка · Музыкальный трек». */
-export function getMusicProductTypeLabel(audioCount: number): string {
-  return `${MUSIC_KIND_LABEL} · ${getMusicReleaseLabel(audioCount)}`;
+/**
+ * Public type line for music products.
+ * Track/album remains derived from audio_items count but is not the display label.
+ */
+export function getMusicProductTypeLabel(): string {
+  return MUSIC_KIND_LABEL;
 }
 
 export function getProductKindLabel(kind: string | null | undefined): string {
@@ -74,7 +81,7 @@ export function getMusicUsagePermissionLabel(
     case MUSIC_USAGE_PERMISSION.LISTEN_ONLY:
       return "Только для прослушивания";
     case MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED:
-      return "Разрешено использование внутри АудиоЛада";
+      return "Для прослушивания и использования авторами";
     default:
       return null;
   }
@@ -85,9 +92,9 @@ export function getMusicUsagePermissionDescription(
 ): string | null {
   switch (normalizeMusicUsagePermission(value)) {
     case MUSIC_USAGE_PERMISSION.LISTEN_ONLY:
-      return "Музыку можно слушать в АудиоЛаде, но нельзя использовать в аудиопродуктах других авторов.";
+      return "Музыку можно слушать в АудиоЛаде, но нельзя использовать при создании аудиопродуктов других авторов.";
     case MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED:
-      return "В будущем другие авторы смогут добавлять голос поверх музыки и использовать её в аудиопродуктах, публикуемых внутри АудиоЛада. Исходный музыкальный файл нельзя будет распространять или продавать отдельно.";
+      return "Музыку можно слушать в АудиоЛаде. В будущем другие авторы смогут добавлять поверх неё голос и использовать её в аудиопродуктах, публикуемых внутри АудиоЛада. Исходный музыкальный файл нельзя будет распространять или продавать отдельно.";
     default:
       return null;
   }
