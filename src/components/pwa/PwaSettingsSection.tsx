@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
 import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
 
@@ -8,6 +10,7 @@ type SettingsApplicationSectionProps = {
     icon: string;
     title: string;
     description: string;
+    href?: string | null;
   }>;
 };
 
@@ -27,31 +30,44 @@ export default function SettingsApplicationSection({
           </div>
         ) : null}
 
-        {items.map((item, index) => (
-          <button
-            key={item.title}
-            type="button"
-            className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
-              index !== items.length - 1 ? "border-b border-[#eee6f7]" : ""
-            }`}
-          >
-            <span className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
-                {item.icon}
-              </span>
+        {items.map((item, index) => {
+          const className = `flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
+            index !== items.length - 1 ? "border-b border-[#eee6f7]" : ""
+          }`;
+          const content = (
+            <>
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4ecfb] text-[#7042c5]">
+                  {item.icon}
+                </span>
 
-              <span className="min-w-0">
-                <span className="block font-medium">{item.title}</span>
+                <span className="min-w-0">
+                  <span className="block font-medium">{item.title}</span>
 
-                <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
-                  {item.description}
+                  <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
+                    {item.description}
+                  </span>
                 </span>
               </span>
-            </span>
 
-            <span className="shrink-0 text-xl text-[#7042c5]">›</span>
-          </button>
-        ))}
+              <span className="shrink-0 text-xl text-[#7042c5]">›</span>
+            </>
+          );
+
+          if (item.href) {
+            return (
+              <Link key={item.title} href={item.href} className={className}>
+                {content}
+              </Link>
+            );
+          }
+
+          return (
+            <button key={item.title} type="button" className={className}>
+              {content}
+            </button>
+          );
+        })}
       </div>
     </section>
   );

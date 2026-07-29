@@ -29,6 +29,12 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "article_final_audio_click",
   "buy_clicked",
   "author_page_view",
+  "help_article_view",
+  "help_search",
+  "help_search_no_results",
+  "help_support_open",
+  "help_support_submit",
+  "help_article_cta_click",
 ] as const;
 
 export type PlatformAnalyticsEventName =

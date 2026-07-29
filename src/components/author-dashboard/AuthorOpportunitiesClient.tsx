@@ -220,6 +220,17 @@ export default function AuthorOpportunitiesClient({ view }: Props) {
           ))}
         </ul>
       </SectionCard>
+
+      <p className="text-sm leading-6 text-[#5f5484]">
+        Нужна пошаговая инструкция?{" "}
+        <Link
+          href={`/help/authors?author=${encodeURIComponent(view.authorSlug)}`}
+          className="font-semibold text-[#7042c5] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          Откройте Справочный центр
+        </Link>
+        .
+      </p>
     </div>
   );
 }

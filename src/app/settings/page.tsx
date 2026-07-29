@@ -95,6 +95,7 @@ export default async function SettingsPage() {
       icon: "?",
       title: "Помощь и поддержка",
       description: "Ответы на вопросы и связь с нами",
+      href: "/help",
     },
   ];
 
