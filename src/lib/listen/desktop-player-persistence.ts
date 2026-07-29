@@ -1,4 +1,7 @@
-import type { LoadSessionInput } from "./global-player-types";
+import {
+  isCatalogGlobalPlayerSession,
+  type LoadSessionInput,
+} from "./global-player-types";
 
 const STORAGE_KEY = "audiolad:desktop-player-last-session";
 const COMPLETION_THRESHOLD_SECONDS = 2;
@@ -79,6 +82,11 @@ export function mergeDesktopPlaybackIntoSession(
   session: LoadSessionInput,
   snapshot: DesktopPlayerLastSession | null,
 ): LoadSessionInput {
+  // Private audio sessions are not restored from desktop localStorage.
+  if (!isCatalogGlobalPlayerSession(session)) {
+    return session;
+  }
+
   if (
     !snapshot ||
     snapshot.practiceId !== session.practiceId ||

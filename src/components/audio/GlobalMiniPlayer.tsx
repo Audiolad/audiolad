@@ -7,6 +7,7 @@ import {
   useGlobalAudioPlayer,
   usePlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import { BOTTOM_NAV_MAIN_HEIGHT_PX } from "@/lib/navigation/bottom-nav";
 
 function MiniRewindIcon() {
@@ -112,7 +113,9 @@ export default function GlobalMiniPlayer() {
 
   const title =
     engine.currentTrack?.title?.trim() || activeSession.practiceTitle;
-  const subtitle = activeSession.authorName;
+  const subtitle = isPrivateAudioSession(activeSession)
+    ? activeSession.authorText || activeSession.authorName
+    : activeSession.authorName;
 
   function handleOpenFullPlayer() {
     openFullPlayer();
@@ -166,12 +169,16 @@ export default function GlobalMiniPlayer() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{title}</p>
               {subtitle ? (
-                <AuthorLink
-                  authorSlug={activeSession.authorSlug}
-                  authorName={subtitle}
-                  stopPropagation
-                  className="truncate text-xs text-white/70 hover:text-white"
-                />
+                isPrivateAudioSession(activeSession) ? (
+                  <p className="truncate text-xs text-white/70">{subtitle}</p>
+                ) : (
+                  <AuthorLink
+                    authorSlug={activeSession.authorSlug}
+                    authorName={subtitle}
+                    stopPropagation
+                    className="truncate text-xs text-white/70 hover:text-white"
+                  />
+                )
               ) : null}
             </div>
           </button>

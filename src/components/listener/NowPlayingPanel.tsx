@@ -8,6 +8,7 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import {
   buildListenPath,
   buildPracticePublicPath,
@@ -240,18 +241,19 @@ export default function NowPlayingPanel({
     );
   }
 
-  const {
-    practiceTitle,
-    authorName,
-    authorSlug,
-    productSlug,
-    tracks,
-    coverImageUrl,
-    coverImage,
-    coverUpdatedAt,
-    coverSymbol,
-    coverGradient,
-  } = session;
+  const isPrivate = isPrivateAudioSession(session);
+  const practiceTitle = session.practiceTitle;
+  const authorName = isPrivate
+    ? session.authorText || session.authorName
+    : session.authorName;
+  const authorSlug = isPrivate ? "" : session.authorSlug;
+  const productSlug = isPrivate ? "" : session.productSlug;
+  const tracks = session.tracks;
+  const coverImageUrl = session.coverImageUrl;
+  const coverImage = session.coverImage;
+  const coverUpdatedAt = session.coverUpdatedAt;
+  const coverSymbol = session.coverSymbol;
+  const coverGradient = session.coverGradient;
 
   const currentTrack =
     isEngineReady && engine?.currentTrack
@@ -259,7 +261,7 @@ export default function NowPlayingPanel({
       : (tracks[0] ?? null);
   const currentTrackIndex =
     isEngineReady && engine ? engine.currentTrackIndex : 0;
-  const isMultiTrack = tracks.length > 1;
+  const isMultiTrack = !isPrivate && tracks.length > 1;
   const displayDuration =
     isEngineReady && engine && engine.displayDuration > 0
       ? engine.displayDuration
@@ -282,14 +284,16 @@ export default function NowPlayingPanel({
       : coverUpdatedAt ?? null;
   const description = currentTrack?.description?.trim() ?? "";
 
-  const nextTrack = tracks[currentTrackIndex + 1] ?? null;
+  const nextTrack = isPrivate ? null : (tracks[currentTrackIndex + 1] ?? null);
 
-  const listenHref =
-    authorSlug && productSlug
+  const listenHref = isPrivate
+    ? session.detailPath
+    : authorSlug && productSlug
       ? buildListenPath(authorSlug, productSlug)
       : null;
-  const practiceHref =
-    authorSlug && productSlug
+  const practiceHref = isPrivate
+    ? session.detailPath
+    : authorSlug && productSlug
       ? buildPracticePublicPath(authorSlug, productSlug)
       : null;
 
@@ -326,11 +330,17 @@ export default function NowPlayingPanel({
         </h3>
 
         {authorName ? (
-          <AuthorLink
-            authorSlug={authorSlug}
-            authorName={authorName}
-            className="mt-1.5 inline-block max-w-full truncate text-[14px] font-medium text-[#7042c5]"
-          />
+          isPrivate || !authorSlug ? (
+            <p className="mt-1.5 inline-block max-w-full truncate text-[14px] font-medium text-[#7042c5]">
+              {authorName}
+            </p>
+          ) : (
+            <AuthorLink
+              authorSlug={authorSlug}
+              authorName={authorName}
+              className="mt-1.5 inline-block max-w-full truncate text-[14px] font-medium text-[#7042c5]"
+            />
+          )
         ) : null}
 
         {displayDuration > 0 ? (

@@ -18,9 +18,12 @@ import {
   guestProgressToListenEntries,
   readGuestPracticeProgress,
 } from "@/lib/promo/guest-progress";
-import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import {
+  isCatalogGlobalPlayerSession,
+} from "@/lib/listen/global-player-types";
 
-type ListenPageClientProps = LoadSessionInput & {
+type ListenPageClientProps = CatalogGlobalPlayerSession & {
   autoplay?: boolean;
   promoConversionMode?: boolean;
   isAuthenticated?: boolean;
@@ -113,10 +116,15 @@ export default function ListenPageClient({
       return;
     }
 
+    const activeCatalogPracticeId =
+      activeSession && isCatalogGlobalPlayerSession(activeSession)
+        ? activeSession.practiceId
+        : null;
+
     if (
       activeQueue &&
-      activeSession?.practiceId &&
-      activeSession.practiceId !== practiceId &&
+      activeCatalogPracticeId &&
+      activeCatalogPracticeId !== practiceId &&
       isQueueDrivenPractice(practiceId)
     ) {
       return;
@@ -127,6 +135,7 @@ export default function ListenPageClient({
     }
 
     loadSession({
+      sourceType: "catalog",
       practiceId,
       authorSlug,
       productSlug,
@@ -149,7 +158,7 @@ export default function ListenPageClient({
     });
   }, [
     activeQueue,
-    activeSession?.practiceId,
+    activeSession,
     authorName,
     authorSlug,
     autoplay,

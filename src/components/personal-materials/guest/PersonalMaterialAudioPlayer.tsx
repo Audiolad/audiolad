@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useGlobalAudioPlayer } from "@/components/audio/GlobalAudioPlayerProvider";
+import { STOP_LOCAL_AUDIO_EVENT } from "@/lib/audio/local-audio-coordination";
 import {
   clearPersonalMaterialGuestProgress,
   readPersonalMaterialGuestProgress,
@@ -85,6 +87,7 @@ export default function PersonalMaterialAudioPlayer({
   ariaLabel = "Плеер персональной диагностики",
   onProgressPersist,
 }: PersonalMaterialAudioPlayerProps) {
+  const { stopAndClear } = useGlobalAudioPlayer();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const signedRef = useRef<SignedAudioResponse | null>(null);
   const retryTimeoutRef = useRef<number | null>(null);
@@ -272,6 +275,29 @@ export default function PersonalMaterialAudioPlayer({
     pendingSeekRef.current = saved.positionSeconds;
   }, [materialId, progressMode]);
 
+  useEffect(() => {
+    const onStopLocal = () => {
+      const audio = audioRef.current;
+
+      if (!audio) {
+        return;
+      }
+
+      audio.pause();
+      scheduleProgressSave(
+        audio.currentTime,
+        audio.duration || duration,
+        true,
+      );
+    };
+
+    window.addEventListener(STOP_LOCAL_AUDIO_EVENT, onStopLocal);
+
+    return () => {
+      window.removeEventListener(STOP_LOCAL_AUDIO_EVENT, onStopLocal);
+    };
+  }, [duration, scheduleProgressSave]);
+
   const handlePlayPause = useCallback(async () => {
     const audio = audioRef.current;
 
@@ -284,6 +310,9 @@ export default function PersonalMaterialAudioPlayer({
         audio.pause();
         return;
       }
+
+      // Mutual exclusion: stop Global Player before local <audio> starts.
+      stopAndClear();
 
       await ensureAudioSource();
 
@@ -308,7 +337,13 @@ export default function PersonalMaterialAudioPlayer({
         );
       }
     }
-  }, [ensureAudioSource, fetchState, isPlaying, restoreSavedPosition]);
+  }, [
+    ensureAudioSource,
+    fetchState,
+    isPlaying,
+    restoreSavedPosition,
+    stopAndClear,
+  ]);
 
   const handleRetry = useCallback(async () => {
     clearRetryTimeout();

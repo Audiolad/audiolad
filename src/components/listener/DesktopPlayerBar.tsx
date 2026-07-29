@@ -8,6 +8,7 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 
 export const DESKTOP_PLAYER_BAR_HEIGHT_PX = 96;
 
@@ -174,7 +175,10 @@ function DesktopPlayerActiveState({
       : session.coverUpdatedAt ?? null;
   const title =
     engine.currentTrack?.title?.trim() || session.practiceTitle;
-  const subtitle = session.authorName;
+  const isPrivate = isPrivateAudioSession(session);
+  const subtitle = isPrivate
+    ? session.authorText || session.authorName
+    : session.authorName;
 
   const progressPercent =
     engine.displayDuration > 0
@@ -209,11 +213,17 @@ function DesktopPlayerActiveState({
               {title}
             </p>
             {subtitle ? (
-              <AuthorLink
-                authorSlug={session.authorSlug}
-                authorName={subtitle}
-                className="mt-0.5 block truncate text-[13px] text-[#7042c5]"
-              />
+              isPrivateAudioSession(session) ? (
+                <p className="mt-0.5 block truncate text-[13px] text-[#7042c5]">
+                  {subtitle}
+                </p>
+              ) : (
+                <AuthorLink
+                  authorSlug={session.authorSlug}
+                  authorName={subtitle}
+                  className="mt-0.5 block truncate text-[13px] text-[#7042c5]"
+                />
+              )
             ) : null}
           </div>
         </div>

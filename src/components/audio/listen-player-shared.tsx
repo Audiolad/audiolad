@@ -15,7 +15,8 @@ import {
 import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracker";
 import ListenPageViewTracker from "@/components/analytics/ListenPageViewTracker";
 import PromoPlaybackPrompts from "@/components/promo/PromoPlaybackPrompts";
-import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
 
@@ -31,7 +32,7 @@ export type ListenPlayerProps = {
   coverImage?: unknown;
   coverUpdatedAt?: string | null;
   isAuthorPreview?: boolean;
-  sessionPayload?: LoadSessionInput;
+  sessionPayload?: CatalogGlobalPlayerSession;
   promoConversionMode?: boolean;
   authorSlug?: string;
   productSlug?: string;
@@ -351,7 +352,11 @@ export function ListenPlayerPromoSlot({ forDesktop }: { forDesktop: boolean }) {
       duration={displayDuration}
       isPlaying={isPlaying}
       programCompleted={programCompleted}
-      attribution={session?.promoAttribution ?? null}
+      attribution={
+        session && isCatalogGlobalPlayerSession(session)
+          ? session.promoAttribution ?? null
+          : null
+      }
       onReplay={() => void handleStartOver()}
     />
   );
@@ -393,7 +398,10 @@ export function ListenPlayerProvider({
   } = useGlobalAudioPlayer();
   const engine = useOptionalPlayerEngine();
   const isEngineReady =
-    Boolean(engine) && session?.practiceId === practiceId;
+    Boolean(engine) &&
+    !!session &&
+    isCatalogGlobalPlayerSession(session) &&
+    session.practiceId === practiceId;
   const isDismissedIdle =
     dismissedPracticeId === practiceId && !isEngineReady;
 

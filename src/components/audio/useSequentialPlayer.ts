@@ -64,6 +64,8 @@ import { logPlayerDebug } from "@/lib/audio/player-debug";
 type TracksExhaustedResult = "advanced" | "completed" | "none";
 
 type UseSequentialPlayerOptions = {
+  /** Discriminator: private_audio uses private signed URL + progress APIs. */
+  sourceType?: "catalog" | "private_audio";
   authorSlug: string;
   productSlug: string;
   practiceId: string;
@@ -113,6 +115,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function useSequentialPlayer({
+  sourceType = "catalog",
   authorSlug,
   productSlug,
   practiceId,
@@ -133,6 +136,7 @@ export function useSequentialPlayer({
   guestProgressMeta,
   audioRef,
 }: UseSequentialPlayerOptions) {
+  const isPrivateAudio = sourceType === "private_audio";
   const urlRequestRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef<PendingSavePayload | null>(null);
@@ -307,8 +311,11 @@ export function useSequentialPlayer({
     [],
   );
 
-  const listenApiBase = buildListenApiBase(authorSlug, productSlug);
+  const listenApiBase = isPrivateAudio
+    ? ""
+    : buildListenApiBase(authorSlug, productSlug);
   const listenApiBaseRef = useRef(listenApiBase);
+  const isPrivateAudioRef = useRef(isPrivateAudio);
   const saveProgressRef = useRef<
     (
       audioItemId: string,
@@ -321,6 +328,10 @@ export function useSequentialPlayer({
   useEffect(() => {
     listenApiBaseRef.current = listenApiBase;
   }, [listenApiBase]);
+
+  useEffect(() => {
+    isPrivateAudioRef.current = isPrivateAudio;
+  }, [isPrivateAudio]);
 
   const saveProgress = useCallback(
     async (
@@ -335,7 +346,9 @@ export function useSequentialPlayer({
 
       updateProgressEntry(audioItemId, positionSeconds, completed);
 
-      if (guestProgressMode && guestProgressMeta) {
+      if (isPrivateAudio) {
+        // Private progress never touches practice_audio_progress / guest promo storage.
+      } else if (guestProgressMode && guestProgressMeta) {
         const track = tracks.find((item) => item.id === audioItemId);
 
         saveGuestPracticeProgress(
@@ -379,15 +392,30 @@ export function useSequentialPlayer({
       saveInFlightRef.current = true;
 
       try {
-        const response = await fetch(`${listenApiBaseRef.current}/progress`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            audio_item_id: payload.audioItemId,
-            position_seconds: Math.floor(payload.positionSeconds),
-            completed: payload.completed,
-          }),
-        });
+        const track = tracks.find((item) => item.id === payload.audioItemId);
+        const response = isPrivateAudio
+          ? await fetch(
+              `/api/my-library/private-audio/${encodeURIComponent(payload.audioItemId)}/progress`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                  positionSeconds: Math.floor(payload.positionSeconds),
+                  durationSeconds: track?.durationSeconds ?? null,
+                  completed: payload.completed,
+                }),
+              },
+            )
+          : await fetch(`${listenApiBaseRef.current}/progress`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                audio_item_id: payload.audioItemId,
+                position_seconds: Math.floor(payload.positionSeconds),
+                completed: payload.completed,
+              }),
+            });
 
         if (!response.ok) {
           setProgressError("Не удалось сохранить прогресс прослушивания.");
@@ -405,7 +433,14 @@ export function useSequentialPlayer({
         });
       }
     },
-    [guestProgressMeta, guestProgressMode, practiceId, tracks, updateProgressEntry],
+    [
+      guestProgressMeta,
+      guestProgressMode,
+      isPrivateAudio,
+      practiceId,
+      tracks,
+      updateProgressEntry,
+    ],
   );
 
   useEffect(() => {
@@ -460,9 +495,12 @@ export function useSequentialPlayer({
       let settled = false;
 
       try {
-        const response = await fetch(
-          `${listenApiBase}/audio/${audioItemId}`,
-        );
+        const response = isPrivateAudio
+          ? await fetch(
+              `/api/my-library/private-audio/${encodeURIComponent(audioItemId)}/audio`,
+              { credentials: "same-origin", cache: "no-store" },
+            )
+          : await fetch(`${listenApiBase}/audio/${audioItemId}`);
 
         if (isStale()) {
           return;
@@ -478,8 +516,12 @@ export function useSequentialPlayer({
         }
 
         if (!response.ok || !payload.url) {
-          if (response.status === 403) {
-            setUrlError("Доступ к прослушиванию не открыт.");
+          if (response.status === 401 || response.status === 403) {
+            setUrlError(
+              isPrivateAudio
+                ? "Нет доступа к этому аудиоматериалу."
+                : "Доступ к прослушиванию не открыт.",
+            );
           } else if (response.status === 404) {
             setUrlError("Аудиофайл не найден.");
           } else {
@@ -516,7 +558,7 @@ export function useSequentialPlayer({
         }
       }
     },
-    [listenApiBase],
+    [isPrivateAudio, listenApiBase],
   );
 
   useEffect(() => {
@@ -1177,7 +1219,9 @@ export function useSequentialPlayer({
 
   const handleStartOver = async () => {
     try {
-      if (guestProgressModeRef.current) {
+      if (isPrivateAudio) {
+        // Private items have no DELETE progress route; restart + forced save is enough.
+      } else if (guestProgressModeRef.current) {
         clearGuestPracticeProgress(practiceIdRef.current);
       } else {
         const response = await fetch(`${listenApiBase}/progress`, {

@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
-import PersonalMaterialAudioPlayer from "@/components/personal-materials/guest/PersonalMaterialAudioPlayer";
+import { useGlobalAudioPlayer } from "@/components/audio/GlobalAudioPlayerProvider";
+import PrivateAudioGlobalPlayerControls from "@/components/private-audio/PrivateAudioGlobalPlayerControls";
+import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import {
   deletePrivateAudioCoverRequest,
   deletePrivateAudioItemRequest,
-  savePrivateAudioProgressRequest,
   updatePrivateAudioItemRequest,
   uploadPrivateAudioCoverRequest,
 } from "@/lib/private-audio/client/api";
@@ -29,6 +30,7 @@ export default function PrivateAudioDetailClient({
   item: initialItem,
 }: PrivateAudioDetailClientProps) {
   const router = useRouter();
+  const { session, stopAndClear } = useGlobalAudioPlayer();
   const [item, setItem] = useState(initialItem);
   const [title, setTitle] = useState(initialItem.title);
   const [authorText, setAuthorText] = useState(initialItem.authorText ?? "");
@@ -40,7 +42,7 @@ export default function PrivateAudioDetailClient({
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const handlePersist = useCallback(
+  const handleProgressLabelChange = useCallback(
     (input: {
       positionSeconds: number;
       durationSeconds: number;
@@ -55,17 +57,8 @@ export default function PrivateAudioDetailClient({
           updatedAt: null,
         }),
       );
-
-      void savePrivateAudioProgressRequest(item.id, {
-        positionSeconds: input.positionSeconds,
-        durationSeconds:
-          input.durationSeconds || item.progress.durationSeconds || undefined,
-        completed: input.completed,
-      }).catch(() => {
-        // Silent autosave failure.
-      });
     },
-    [item.id, item.progress.durationSeconds],
+    [item.progress.durationSeconds],
   );
 
   async function handleSaveMetadata() {
@@ -140,7 +133,17 @@ export default function PrivateAudioDetailClient({
     setBusy(true);
     setErrorMessage(null);
 
+    const isCurrentlyPlaying =
+      Boolean(session) &&
+      isPrivateAudioSession(session!) &&
+      session!.itemId === item.id;
+
     try {
+      // Stop global session before hard-delete so signed URL / audio src are cleared.
+      if (isCurrentlyPlaying) {
+        stopAndClear();
+      }
+
       await deletePrivateAudioItemRequest(item.id);
       router.push("/my-practices?filter=uploads");
       router.refresh();
@@ -201,13 +204,9 @@ export default function PrivateAudioDetailClient({
         </div>
       </header>
 
-      <PersonalMaterialAudioPlayer
-        materialId={item.id}
-        audioApiPath={`/api/my-library/private-audio/${encodeURIComponent(item.id)}/audio`}
-        progressMode="server"
-        initialPositionSeconds={item.progress.positionSeconds}
-        ariaLabel="Плеер аудиоматериала"
-        onProgressPersist={handlePersist}
+      <PrivateAudioGlobalPlayerControls
+        item={item}
+        onProgressLabelChange={handleProgressLabelChange}
       />
 
       <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">

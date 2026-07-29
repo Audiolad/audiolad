@@ -1,8 +1,8 @@
-import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { buildListenApiBase, buildListenPath } from "@/lib/products/paths";
 
 export type FetchListenSessionResult =
-  | { ok: true; session: LoadSessionInput }
+  | { ok: true; session: CatalogGlobalPlayerSession }
   | { ok: false; reason: string };
 
 export function isSafeListenPath(pathname: string): boolean {
@@ -37,7 +37,7 @@ export async function fetchListenSessionPayload(
 
     const data = (await response.json().catch(() => null)) as {
       ok?: boolean;
-      session?: LoadSessionInput;
+      session?: CatalogGlobalPlayerSession;
       reason?: string;
     } | null;
 

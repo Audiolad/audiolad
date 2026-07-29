@@ -49,8 +49,10 @@ export function useProductContentsPlayback({
 
       try {
         const isSameProduct =
-          session?.authorSlug === authorSlug &&
-          session?.productSlug === productSlug;
+          !!session &&
+          session.sourceType !== "private_audio" &&
+          session.authorSlug === authorSlug &&
+          session.productSlug === productSlug;
 
         if (isSameProduct && engine && session) {
           clearPlaylistQueue();
@@ -95,7 +97,10 @@ export function useProductContentsPlayback({
   );
 
   const isActiveProduct =
-    session?.authorSlug === authorSlug && session?.productSlug === productSlug;
+    !!session &&
+    session.sourceType !== "private_audio" &&
+    session.authorSlug === authorSlug &&
+    session.productSlug === productSlug;
 
   return {
     playTrack,

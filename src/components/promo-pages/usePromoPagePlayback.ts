@@ -8,6 +8,7 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { readGuestPracticeProgress } from "@/lib/promo/guest-progress";
 
 const GESTURE_HINT_MARKERS = [
@@ -108,7 +109,10 @@ export function usePromoPagePlayback({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const activePracticeId = session?.practiceId ?? null;
+  const activePracticeId =
+    session && isCatalogGlobalPlayerSession(session)
+      ? session.practiceId
+      : null;
   const engineIsPlaying = Boolean(engine?.isPlaying);
   const engineStatusMessage = engine?.statusMessage ?? null;
   const engineIsLoading = Boolean(engine?.isLoading);
@@ -212,7 +216,7 @@ export function usePromoPagePlayback({
   }, [activePracticeId, engine?.currentTrack?.id, engineIsPlaying, onPlayStarted]);
 
   const resumeActiveProduct = useCallback(async () => {
-    if (!engine || !session) {
+    if (!engine || !session || !isCatalogGlobalPlayerSession(session)) {
       return false;
     }
 
@@ -244,8 +248,10 @@ export function usePromoPagePlayback({
   const playProduct = useCallback(
     async (productSlug: string, practiceId: string) => {
       const isSameProduct =
-        session?.authorSlug === authorSlug &&
-        session?.productSlug === productSlug;
+        !!session &&
+        isCatalogGlobalPlayerSession(session) &&
+        session.authorSlug === authorSlug &&
+        session.productSlug === productSlug;
 
       if (isSameProduct && engine && session) {
         clearPlaylistQueue();

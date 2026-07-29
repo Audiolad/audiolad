@@ -21,7 +21,13 @@ import {
   syncMediaSessionPlaybackState,
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
+import { requestStopLocalAudioPlayers } from "@/lib/audio/local-audio-coordination";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import {
+  getGlobalPlayerSessionKey,
+  isCatalogGlobalPlayerSession,
+  isPrivateAudioSession,
+} from "@/lib/listen/global-player-types";
 import {
   clearDesktopPlayerLastSession,
   mergeDesktopPlaybackIntoSession,
@@ -123,8 +129,14 @@ function GlobalPlayerEngine({
   const router = useRouter();
   const recoveryTimerRef = useRef<number | null>(null);
 
+  const catalogSession = isCatalogGlobalPlayerSession(session)
+    ? session
+    : null;
+  const privateSession = isPrivateAudioSession(session) ? session : null;
+
   const handleInitialAutoplayAttempted = useCallback(() => {
     if (
+      !catalogSession ||
       !session.requestAutoplay ||
       skipAutoplayUrlSync ||
       session.suppressListenUrlSync
@@ -133,8 +145,8 @@ function GlobalPlayerEngine({
     }
 
     const path = buildSafeListenReplacePath(
-      session.authorSlug,
-      session.productSlug,
+      catalogSession.authorSlug,
+      catalogSession.productSlug,
     );
 
     if (!path) {
@@ -143,9 +155,8 @@ function GlobalPlayerEngine({
 
     router.replace(path, { scroll: false });
   }, [
+    catalogSession,
     router,
-    session.authorSlug,
-    session.productSlug,
     session.requestAutoplay,
     session.suppressListenUrlSync,
     skipAutoplayUrlSync,
@@ -159,24 +170,27 @@ function GlobalPlayerEngine({
   );
 
   const engine = useSequentialPlayer({
-    authorSlug: session.authorSlug,
-    productSlug: session.productSlug,
-    practiceId: session.practiceId,
+    sourceType: privateSession ? "private_audio" : "catalog",
+    authorSlug: catalogSession?.authorSlug ?? "",
+    productSlug: catalogSession?.productSlug ?? "",
+    practiceId: privateSession?.itemId ?? catalogSession?.practiceId ?? "",
     tracks: session.tracks,
     initialProgress: session.initialProgress,
     requestInitialAutoplay: Boolean(session.requestAutoplay),
     forceStartAtBeginning: Boolean(session.forceStartAtBeginning),
     initialTrackId: session.initialTrackId ?? null,
-    queueHasNext,
-    queueHasPrevious,
-    onTracksExhausted,
-    onRequestPreviousProduct,
+    queueHasNext: privateSession ? false : queueHasNext,
+    queueHasPrevious: privateSession ? false : queueHasPrevious,
+    onTracksExhausted: privateSession ? undefined : onTracksExhausted,
+    onRequestPreviousProduct: privateSession
+      ? undefined
+      : onRequestPreviousProduct,
     onInitialAutoplayAttempted: handleInitialAutoplayAttempted,
     getSessionGeneration: () => sessionGenerationRef.current,
     sessionGeneration,
     registerCleanup,
-    guestProgressMode: Boolean(session.guestProgressMode),
-    guestProgressMeta: session.guestProgressMeta,
+    guestProgressMode: Boolean(catalogSession?.guestProgressMode),
+    guestProgressMeta: catalogSession?.guestProgressMeta,
     audioRef: persistentAudioRef,
   });
 
@@ -243,6 +257,10 @@ function GlobalPlayerEngine({
     }
 
     const persistPlaybackSnapshot = () => {
+      if (!isCatalogGlobalPlayerSession(session)) {
+        return;
+      }
+
       writeDesktopPlayerLastSession({
         practiceId: session.practiceId,
         authorSlug: session.authorSlug,
@@ -267,16 +285,14 @@ function GlobalPlayerEngine({
     currentTime,
     currentTrack?.id,
     isPlaying,
-    session.authorSlug,
-    session.practiceId,
-    session.productSlug,
+    session,
   ]);
 
   useEffect(() => {
     const handlePageHide = () => {
       const trackId = currentTrack?.id;
 
-      if (!trackId) {
+      if (!trackId || !isCatalogGlobalPlayerSession(session)) {
         return;
       }
 
@@ -298,9 +314,7 @@ function GlobalPlayerEngine({
     audioRef,
     currentTime,
     currentTrack?.id,
-    session.authorSlug,
-    session.practiceId,
-    session.productSlug,
+    session,
   ]);
 
   useEffect(() => {
@@ -490,13 +504,16 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const loadSession = useCallback((input: LoadSessionInput) => {
     setDismissedPracticeId(null);
+    // Stop any page-level PersonalMaterialAudioPlayer before owning the single audio element.
+    requestStopLocalAudioPlayers();
 
     const requestAutoplay = input.requestAutoplay ?? false;
     const current = sessionRef.current;
+    const inputKey = getGlobalPlayerSessionKey(input);
     let shouldBumpGeneration = true;
     let shouldBumpPlaybackInstance = true;
 
-    if (current?.practiceId === input.practiceId) {
+    if (current && getGlobalPlayerSessionKey(current) === inputKey) {
       const trackSelectionChanged =
         Boolean(input.initialTrackId) &&
         input.initialTrackId !== current.initialTrackId;
@@ -512,7 +529,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     }
 
     setSession((previous) => {
-      if (previous?.practiceId === input.practiceId) {
+      if (previous && getGlobalPlayerSessionKey(previous) === inputKey) {
         if (shouldBumpPlaybackInstance) {
           setPlaybackInstanceId((value) => value + 1);
         }
@@ -532,7 +549,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const stopAndClear = useCallback(() => {
     sessionGenerationRef.current += 1;
     setSessionGeneration(sessionGenerationRef.current);
-    setDismissedPracticeId(sessionRef.current?.practiceId ?? null);
+    const current = sessionRef.current;
+    setDismissedPracticeId(
+      current && isCatalogGlobalPlayerSession(current)
+        ? current.practiceId
+        : null,
+    );
     stopEngineRef.current?.();
     stopEngineRef.current = null;
     clearMediaSession();
@@ -544,10 +566,18 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const mergeGuestProgressIntoSession = useCallback(
     (input: LoadSessionInput): LoadSessionInput => {
+      if (!isCatalogGlobalPlayerSession(input)) {
+        return input;
+      }
+
       const withDesktopPlayback = mergeDesktopPlaybackIntoSession(
         input,
         readDesktopPlayerLastSession(),
       );
+
+      if (!isCatalogGlobalPlayerSession(withDesktopPlayback)) {
+        return input;
+      }
 
       const guestProgress = readGuestPracticeProgress(withDesktopPlayback.practiceId);
 
@@ -598,6 +628,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
   const openFullPlayer = useCallback(() => {
     if (!session) {
+      return;
+    }
+
+    if (isPrivateAudioSession(session)) {
+      router.push(session.detailPath);
       return;
     }
 
@@ -714,8 +749,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             runtimeSkippedCount: runtimeSkipped,
           };
 
+          const currentSession = sessionRef.current;
           const fromPracticeId =
-            sessionRef.current?.practiceId ??
+            (currentSession && isCatalogGlobalPlayerSession(currentSession)
+              ? currentSession.practiceId
+              : null) ??
             (queue.entries[queue.currentIndex]
               ? getQueueEntryPracticeId(queue.entries[queue.currentIndex])
               : null);
@@ -891,7 +929,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         return "none";
       }
 
-      if (currentSession.practiceId !== fromPracticeId) {
+      if (
+        !isCatalogGlobalPlayerSession(currentSession) ||
+        currentSession.practiceId !== fromPracticeId
+      ) {
         return "none";
       }
 
@@ -959,12 +1000,18 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     activeQueue && !queueCompleted && activeQueue.currentIndex > 0,
   );
 
+  const onActivePrivateDetail =
+    Boolean(session) &&
+    isPrivateAudioSession(session!) &&
+    pathname === session!.detailPath;
+
   const showMiniPlayer = Boolean(
     session &&
       session.tracks.length > 0 &&
       !isListenPlayerPathname(pathname) &&
       !isWorkspaceDashboardPathname(pathname) &&
-      !queueCompleted,
+      !queueCompleted &&
+      !onActivePrivateDetail,
   );
 
   useEffect(() => {
@@ -983,7 +1030,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   }, [showMiniPlayer]);
 
   useEffect(() => {
-    if (!session) {
+    if (!session || !isCatalogGlobalPlayerSession(session)) {
       return;
     }
 
@@ -1149,7 +1196,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       />
       {session && !isWorkspaceDashboardPathname(pathname) ? (
         <GlobalPlayerEngine
-          key={`${session.practiceId}:${playbackInstanceId}`}
+          key={`${getGlobalPlayerSessionKey(session)}:${playbackInstanceId}`}
           session={session}
           sessionGeneration={sessionGeneration}
           sessionGenerationRef={sessionGenerationRef}
