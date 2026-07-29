@@ -9,15 +9,30 @@ import type {
 async function parseJson<T>(response: Response): Promise<T> {
   const payload = (await response.json().catch(() => ({}))) as T & {
     error?: string;
+    opId?: string;
   };
 
   if (!response.ok) {
-    const error = new Error(
-      typeof payload.error === "string" ? payload.error : "request_failed",
-    ) as Error & { status: number; code: string };
-    error.status = response.status;
-    error.code =
+    const headerOpId = response.headers.get("x-audiolad-op-id");
+    let code =
       typeof payload.error === "string" ? payload.error : "request_failed";
+
+    // Nginx (and other proxies) may return HTML 413 before Next.js runs.
+    if (response.status === 413) {
+      code = "file_too_large";
+    }
+
+    const error = new Error(code) as Error & {
+      status: number;
+      code: string;
+      opId?: string;
+    };
+    error.status = response.status;
+    error.code = code;
+    error.opId =
+      (typeof payload.opId === "string" && payload.opId) ||
+      headerOpId ||
+      undefined;
     throw error;
   }
 

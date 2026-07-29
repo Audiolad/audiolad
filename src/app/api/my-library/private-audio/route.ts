@@ -6,6 +6,7 @@ import {
   PrivateAudioApiError,
   privateNoStoreHeaders,
 } from "@/lib/private-audio/server/errors";
+import { createPrivateAudioOpId } from "@/lib/private-audio/server/logging";
 import {
   getPrivateAudioDetail,
   listPrivateAudioItems,
@@ -14,6 +15,8 @@ import { createPrivateAudioItemWithUpload } from "@/lib/private-audio/server/upl
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
+  const opId = createPrivateAudioOpId();
+
   try {
     const supabase = await createClient();
     const user = await requirePrivateAudioUser(supabase);
@@ -21,19 +24,51 @@ export async function GET() {
 
     return NextResponse.json(
       { items },
-      { headers: privateNoStoreHeaders() },
+      { headers: privateNoStoreHeaders(opId) },
     );
   } catch (error) {
-    return handlePrivateAudioRouteError(error);
+    if (error instanceof PrivateAudioApiError && !error.opId) {
+      error.opId = opId;
+      if (error.stage === "unknown") {
+        error.stage = "auth";
+      }
+    }
+
+    return handlePrivateAudioRouteError(error, opId);
   }
 }
 
 export async function POST(request: Request) {
+  const opId = createPrivateAudioOpId();
+
   try {
     const supabase = await createClient();
-    const user = await requirePrivateAudioUser(supabase);
+    let user;
 
-    const formData = await request.formData();
+    try {
+      user = await requirePrivateAudioUser(supabase);
+    } catch (error) {
+      if (error instanceof PrivateAudioApiError) {
+        throw new PrivateAudioApiError(error.code, error.status, {
+          stage: "auth",
+          opId,
+        });
+      }
+
+      throw error;
+    }
+
+    let formData: FormData;
+
+    try {
+      formData = await request.formData();
+    } catch {
+      throw new PrivateAudioApiError("invalid_request", 400, {
+        stage: "parse_form",
+        opId,
+      });
+    }
+
     const titleValue = formData.get("title");
     const authorValue = formData.get("authorText");
     const rightsValue = formData.get("rightsAccepted");
@@ -41,11 +76,17 @@ export async function POST(request: Request) {
     const coverFile = formData.get("cover");
 
     if (!(audioFile instanceof File)) {
-      throw new PrivateAudioApiError("invalid_request", 400);
+      throw new PrivateAudioApiError("invalid_request", 400, {
+        stage: "parse_form",
+        opId,
+      });
     }
 
     if (typeof titleValue !== "string") {
-      throw new PrivateAudioApiError("invalid_title", 422);
+      throw new PrivateAudioApiError("invalid_title", 422, {
+        stage: "validate_metadata",
+        opId,
+      });
     }
 
     const rightsAccepted =
@@ -60,15 +101,20 @@ export async function POST(request: Request) {
       rightsAccepted,
       audioFile,
       coverFile: coverFile instanceof File ? coverFile : null,
+      opId,
     });
 
     const item = await getPrivateAudioDetail(supabase, user.id, row.id);
 
     return NextResponse.json(
       { item },
-      { status: 201, headers: privateNoStoreHeaders() },
+      { status: 201, headers: privateNoStoreHeaders(opId) },
     );
   } catch (error) {
-    return handlePrivateAudioRouteError(error);
+    if (error instanceof PrivateAudioApiError && !error.opId) {
+      error.opId = opId;
+    }
+
+    return handlePrivateAudioRouteError(error, opId);
   }
 }

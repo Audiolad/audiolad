@@ -77,8 +77,12 @@ export default function PrivateAudioForm() {
         error && typeof error === "object" && "code" in error
           ? String((error as { code: string }).code)
           : "internal_error";
+      const opId =
+        error && typeof error === "object" && "opId" in error
+          ? String((error as { opId?: string }).opId ?? "")
+          : "";
       setPhase("error");
-      setErrorMessage(getPrivateAudioErrorMessage(code));
+      setErrorMessage(getPrivateAudioErrorMessage(code, opId || null));
     }
   }
 

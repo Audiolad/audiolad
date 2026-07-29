@@ -14,6 +14,7 @@ import {
   PRIVATE_AUDIO_BUCKET,
 } from "@/lib/private-audio/storage";
 import { PrivateAudioApiError } from "@/lib/private-audio/server/errors";
+import type { PrivateAudioStage } from "@/lib/private-audio/server/logging";
 import {
   deletePrivateAudioItemRow,
   getOwnedPrivateAudioItem,
@@ -30,6 +31,15 @@ import {
   wouldExceedPrivateAudioQuota,
 } from "@/lib/private-audio/validation";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+function fail(
+  code: string,
+  status: number,
+  stage: PrivateAudioStage,
+  opId?: string | null,
+): never {
+  throw new PrivateAudioApiError(code, status, { stage, opId });
+}
 
 async function removeStorageObjects(paths: string[]): Promise<void> {
   const unique = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
@@ -54,24 +64,25 @@ async function uploadCoverBuffer(input: {
   ownerUserId: string;
   itemId: string;
   file: File;
+  opId?: string | null;
 }): Promise<string> {
   if (!isAllowedPrivateCoverFile(input.file)) {
-    throw new PrivateAudioApiError("invalid_cover_type", 400);
+    fail("invalid_cover_type", 400, "validate_audio", input.opId);
   }
 
   if (input.file.size <= 0) {
-    throw new PrivateAudioApiError("empty_file", 400);
+    fail("empty_file", 400, "validate_audio", input.opId);
   }
 
   if (input.file.size > PRIVATE_AUDIO_LIMITS.maxCoverBytes) {
-    throw new PrivateAudioApiError("cover_too_large", 400);
+    fail("cover_too_large", 400, "validate_audio", input.opId);
   }
 
   const buffer = Buffer.from(await input.file.arrayBuffer());
   const processed = await processPlaylistCoverImage(buffer, input.file.type);
 
   if (!processed.ok) {
-    throw new PrivateAudioApiError("cover_process_failed", 400);
+    fail("cover_process_failed", 400, "storage_cover", input.opId);
   }
 
   const coverPath = buildPrivateCoverPath(input.ownerUserId, input.itemId);
@@ -79,7 +90,7 @@ async function uploadCoverBuffer(input: {
   if (
     !isPathInsidePrivateAudioRoot(coverPath, input.ownerUserId, input.itemId)
   ) {
-    throw new PrivateAudioApiError("invalid_request", 400);
+    fail("invalid_request", 400, "storage_cover", input.opId);
   }
 
   const service = createServiceRoleClient();
@@ -92,7 +103,7 @@ async function uploadCoverBuffer(input: {
 
   if (error) {
     console.error("private_audio_cover_upload_error", error.message);
-    throw new PrivateAudioApiError("storage_upload_failed", 500);
+    fail("storage_upload_failed", 500, "storage_cover", input.opId);
   }
 
   return coverPath;
@@ -105,15 +116,18 @@ export async function createPrivateAudioItemWithUpload(input: {
   rightsAccepted: boolean;
   audioFile: File;
   coverFile?: File | null;
+  opId?: string | null;
 }): Promise<PrivateAudioItemRow> {
+  const opId = input.opId ?? null;
+
   if (!input.rightsAccepted) {
-    throw new PrivateAudioApiError("rights_required", 422);
+    fail("rights_required", 422, "validate_metadata", opId);
   }
 
   const title = normalizePrivateTitle(input.title);
 
   if (!title) {
-    throw new PrivateAudioApiError("invalid_title", 422);
+    fail("invalid_title", 422, "validate_metadata", opId);
   }
 
   const authorText = normalizePrivateAuthorText(input.authorText);
@@ -123,19 +137,19 @@ export async function createPrivateAudioItemWithUpload(input: {
     String(input.authorText).trim() !== "" &&
     authorText === null
   ) {
-    throw new PrivateAudioApiError("invalid_author_text", 422);
+    fail("invalid_author_text", 422, "validate_metadata", opId);
   }
 
   if (!isAllowedPrivateMp3File(input.audioFile)) {
-    throw new PrivateAudioApiError("invalid_file_type", 400);
+    fail("invalid_file_type", 400, "validate_audio", opId);
   }
 
   if (input.audioFile.size <= 0) {
-    throw new PrivateAudioApiError("empty_file", 400);
+    fail("empty_file", 400, "validate_audio", opId);
   }
 
   if (input.audioFile.size > PRIVATE_AUDIO_LIMITS.maxAudioBytes) {
-    throw new PrivateAudioApiError("file_too_large", 400);
+    fail("file_too_large", 400, "validate_audio", opId);
   }
 
   const quota = await getPrivateAudioQuotaUsage(input.ownerUserId);
@@ -148,21 +162,21 @@ export async function createPrivateAudioItemWithUpload(input: {
       additionalItems: 1,
     })
   ) {
-    throw new PrivateAudioApiError("quota_exceeded", 422);
+    fail("quota_exceeded", 422, "quota", opId);
   }
 
   const audioBuffer = Buffer.from(await input.audioFile.arrayBuffer());
   const durationSeconds = await getMp3DurationSeconds(audioBuffer);
 
   if (!durationSeconds) {
-    throw new PrivateAudioApiError("invalid_audio_duration", 400);
+    fail("invalid_audio_duration", 400, "ffprobe", opId);
   }
 
   const itemId = randomUUID();
   const audioPath = buildPrivateAudioPath(input.ownerUserId, itemId);
 
   if (!isPathInsidePrivateAudioRoot(audioPath, input.ownerUserId, itemId)) {
-    throw new PrivateAudioApiError("invalid_request", 400);
+    fail("invalid_request", 400, "storage_audio", opId);
   }
 
   const service = createServiceRoleClient();
@@ -178,7 +192,7 @@ export async function createPrivateAudioItemWithUpload(input: {
 
     if (audioUploadError) {
       console.error("private_audio_upload_error", audioUploadError.message);
-      throw new PrivateAudioApiError("storage_upload_failed", 500);
+      fail("storage_upload_failed", 500, "storage_audio", opId);
     }
 
     uploadedPaths.push(audioPath);
@@ -190,6 +204,7 @@ export async function createPrivateAudioItemWithUpload(input: {
         ownerUserId: input.ownerUserId,
         itemId,
         file: input.coverFile,
+        opId,
       });
       uploadedPaths.push(coverPath);
     }
@@ -205,26 +220,34 @@ export async function createPrivateAudioItemWithUpload(input: {
         additionalItems: 1,
       })
     ) {
-      throw new PrivateAudioApiError("quota_exceeded", 422);
+      fail("quota_exceeded", 422, "quota", opId);
     }
 
     void PRIVATE_AUDIO_DEFAULT_SOURCE_TYPE;
 
-    const row = await insertPrivateAudioItem({
-      id: itemId,
-      ownerUserId: input.ownerUserId,
-      title,
-      authorText,
-      audioPath,
-      audioMimeType: "audio/mpeg",
-      audioSizeBytes: input.audioFile.size,
-      durationSeconds,
-      originalFilename: input.audioFile.name.slice(0, 240) || null,
-      coverPath,
-      rightsAcceptedAt: new Date().toISOString(),
-    });
+    try {
+      const row = await insertPrivateAudioItem({
+        id: itemId,
+        ownerUserId: input.ownerUserId,
+        title,
+        authorText,
+        audioPath,
+        audioMimeType: "audio/mpeg",
+        audioSizeBytes: input.audioFile.size,
+        durationSeconds,
+        originalFilename: input.audioFile.name.slice(0, 240) || null,
+        coverPath,
+        rightsAcceptedAt: new Date().toISOString(),
+      });
 
-    return row;
+      return row;
+    } catch (error) {
+      if (error instanceof PrivateAudioApiError) {
+        throw error;
+      }
+
+      fail("internal_error", 500, "db_insert", opId);
+    }
   } catch (error) {
     await removeStorageObjects(uploadedPaths);
     throw error;

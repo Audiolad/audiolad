@@ -191,6 +191,50 @@ function testSourceGuards() {
     "form no service role client",
   );
 
+  const clientApi = read("src/lib/private-audio/client/api.ts");
+  assert(
+    clientApi.includes('response.status === 413'),
+    "client maps HTTP 413 from proxy/nginx",
+  );
+  assert(
+    clientApi.includes("file_too_large"),
+    "413 maps to file_too_large for UI",
+  );
+
+  const messages = read("src/lib/private-audio/error-messages.ts");
+  assert(
+    messages.includes("Файл превышает допустимый размер."),
+    "user-facing oversized file message",
+  );
+  assert(
+    messages.includes("Код ошибки:"),
+    "unknown errors expose short op code",
+  );
+
+  const nginxSnippet = read(
+    "deploy/nginx/private-audio-upload.location.conf",
+  );
+  assert(
+    nginxSnippet.includes("location = /api/my-library/private-audio"),
+    "nginx create-upload location documented",
+  );
+  assert(
+    nginxSnippet.includes("client_max_body_size 55m"),
+    "nginx allows 55m for private audio create",
+  );
+  assert(
+    nginxSnippet.includes(
+      "location ~ ^/api/my-library/private-audio/[^/]+/cover$",
+    ),
+    "nginx cover-upload location documented",
+  );
+
+  const logging = read("src/lib/private-audio/server/logging.ts");
+  assert(logging.includes("createPrivateAudioOpId"), "op id helper");
+  assert(logging.includes("private_audio_failure"), "structured failure log");
+  assert(logging.includes("ffprobe"), "ffprobe stage");
+  assert(logging.includes("storage_audio"), "storage_audio stage");
+
   const detail = read(
     "src/components/private-audio/PrivateAudioDetailClient.tsx",
   );
