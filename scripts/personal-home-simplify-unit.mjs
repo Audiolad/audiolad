@@ -177,9 +177,20 @@ assert(
   "PUBLIC_FOOTER_LINKS keeps articles discovery link",
 );
 assert(
+  publicFooterLinks.includes('href: "/help"') &&
+    publicFooterLinks.includes('title: "Помощь и поддержка"'),
+  "PUBLIC_FOOTER_LINKS keeps help discovery link",
+);
+assert(
+  publicFooterLinks.indexOf('href: "/help"') <
+    publicFooterLinks.indexOf('href: "/articles"'),
+  "PUBLIC_FOOTER_LINKS orders help before articles",
+);
+assert(
   homeLayout.includes("!shellData.isAuthenticated") &&
-    homeLayout.includes("<LegalFooter"),
-  "home layout keeps LegalFooter for guest home only",
+    homeLayout.includes("<LegalFooter") &&
+    !homeLayout.includes("xl:hidden"),
+  "home layout keeps LegalFooter for guest home on mobile and desktop",
 );
 assert(
   personalHome.lastIndexOf("<LegalFooter") >

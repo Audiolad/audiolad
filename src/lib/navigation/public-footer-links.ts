@@ -4,8 +4,8 @@
  */
 export const PUBLIC_FOOTER_LINKS = [
   { href: "/about", title: "О платформе" },
+  { href: "/help", title: "Помощь и поддержка" },
   { href: "/articles", title: "Статьи" },
-  { href: "/help", title: "Помощь" },
 ] as const;
 
 export type PublicFooterLinkHref = (typeof PUBLIC_FOOTER_LINKS)[number]["href"];

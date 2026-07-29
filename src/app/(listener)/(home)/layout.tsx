@@ -19,10 +19,10 @@ export default async function HomeListenerLayout({
         {children}
       </div>
 
-      {/* Guest home keeps the mobile footer here. Authenticated personal home
-          renders LegalFooter inside PersonalHome for desktop + mobile. */}
+      {/* Guest home keeps LegalFooter here (mobile + desktop). Authenticated
+          personal home renders LegalFooter inside PersonalHome instead. */}
       {!shellData.isAuthenticated ? (
-        <div className="px-5 pb-6 lg:px-10 xl:hidden">
+        <div className="px-5 pb-6 lg:px-10 xl:px-6">
           <LegalFooter className="mt-6" />
         </div>
       ) : null}

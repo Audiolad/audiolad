@@ -76,6 +76,13 @@ assert(
 );
 
 assert(
+  listenerNav.includes(
+    '{ key: "help", title: "Помощь", href: "/help", icon: "help" }',
+  ),
+  "sidebar nav must include compact help item near profile",
+);
+
+assert(
   listenerNav.includes("pathname.startsWith(`${href}/`)"),
   "sidebar active helper must support nested profile routes",
 );

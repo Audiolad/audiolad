@@ -288,10 +288,116 @@ assert.match(analyticsMigration, /author_page_view/);
 assert.equal(resolveSupportNotificationEmail(), "1@audiolad.ru");
 
 const settings = read("src/app/settings/page.tsx");
+assert.match(settings, /title: "Помощь и поддержка"/);
 assert.match(settings, /href: "\/help"/);
 
 const footer = read("src/lib/navigation/public-footer-links.ts");
 assert.match(footer, /href: "\/help"/);
+assert.match(footer, /title: "Помощь и поддержка"/);
+const helpFooterIndex = footer.indexOf('href: "/help"');
+const articlesFooterIndex = footer.indexOf('href: "/articles"');
+assert.ok(helpFooterIndex >= 0, "footer registry includes /help");
+assert.ok(articlesFooterIndex >= 0, "footer registry includes /articles");
+assert.ok(
+  helpFooterIndex < articlesFooterIndex,
+  "footer order: help before articles",
+);
+assert.equal(
+  (footer.match(/href: "\/help"/g) ?? []).length,
+  1,
+  "footer registry has a single /help link",
+);
+
+const profileAccount = read("src/components/profile/ProfileSections.tsx");
+const accountSectionStart = profileAccount.indexOf(
+  "export function ProfileAccountSection",
+);
+assert.ok(accountSectionStart >= 0, "ProfileAccountSection exists");
+const accountSection = profileAccount.slice(accountSectionStart);
+assert.match(accountSection, /href="\/help"/);
+assert.match(accountSection, /Помощь и поддержка/);
+const settingsRow = accountSection.indexOf('href="/settings"');
+const helpRow = accountSection.indexOf('href="/help"');
+const legalRow = accountSection.indexOf("SETTINGS_LEGAL_SECTION_ID");
+assert.ok(settingsRow >= 0 && helpRow > settingsRow && legalRow > helpRow,
+  "profile account order: settings → help → legal");
+assert.equal(
+  (accountSection.match(/href="\/help"/g) ?? []).length,
+  1,
+  "profile account has a single /help link",
+);
+
+const {
+  LISTENER_SIDEBAR_NAV_ITEMS,
+  getListenerSidebarNavItems,
+  isListenerPrimaryNavItemActive,
+} = await import("../src/lib/navigation/listener-nav.ts");
+const helpSidebarItems = LISTENER_SIDEBAR_NAV_ITEMS.filter(
+  (item) => item.key === "help" || item.href === "/help",
+);
+assert.equal(helpSidebarItems.length, 1, "sidebar registry has one help item");
+assert.equal(helpSidebarItems[0].title, "Помощь");
+assert.equal(helpSidebarItems[0].href, "/help");
+assert.equal(helpSidebarItems[0].icon, "help");
+const profileSidebarIndex = LISTENER_SIDEBAR_NAV_ITEMS.findIndex(
+  (item) => item.key === "profile",
+);
+const helpSidebarIndex = LISTENER_SIDEBAR_NAV_ITEMS.findIndex(
+  (item) => item.key === "help",
+);
+assert.ok(
+  helpSidebarIndex === profileSidebarIndex + 1,
+  "sidebar help sits next to profile",
+);
+const sidebarVisible = getListenerSidebarNavItems({ showMyMaterialsNav: false });
+assert.equal(
+  sidebarVisible.filter((item) => item.href === "/help").length,
+  1,
+  "filtered sidebar keeps a single help link",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/help", "/help", { isNeutralPath: false }),
+  true,
+  "/help activates sidebar help item",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/help/listeners", "/help", {
+    isNeutralPath: false,
+  }),
+  true,
+  "/help/** activates sidebar help item",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/help/support", "/profile", {
+    isNeutralPath: false,
+  }),
+  false,
+  "/help does not activate profile item",
+);
+
+const sidebarNav = read("src/components/listener/DesktopSidebarNav.tsx");
+assert.match(sidebarNav, /item\.icon === "help"/);
+assert.match(sidebarNav, /isListenerPrimaryNavItemActive/);
+
+const homeLayout = read("src/app/(listener)/(home)/layout.tsx");
+assert.match(homeLayout, /!shellData\.isAuthenticated/);
+assert.match(homeLayout, /<LegalFooter/);
+assert.doesNotMatch(
+  homeLayout,
+  /xl:hidden/,
+  "guest home LegalFooter is visible on desktop too",
+);
+
+const personalHome = read("src/components/home/PersonalHome.tsx");
+assert.match(personalHome, /<LegalFooter/);
+
+const legalFooter = read("src/components/LegalFooter.tsx");
+assert.match(legalFooter, /PUBLIC_FOOTER_LINKS/);
+assert.doesNotMatch(
+  legalFooter,
+  /href=["']\/help["']/,
+  "LegalFooter does not hardcode /help (uses registry)",
+);
 
 const opportunities = read(
   "src/components/author-dashboard/AuthorOpportunitiesClient.tsx",

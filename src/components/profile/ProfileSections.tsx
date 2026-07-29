@@ -392,6 +392,18 @@ export function ProfileAccountSection() {
         </Link>
 
         <Link
+          href="/help"
+          className="flex min-h-[56px] w-full items-center justify-between border-b border-[#eee6f7] px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+        >
+          <span className="text-[15px] leading-6 text-[#25135c]">
+            Помощь и поддержка
+          </span>
+          <span className="text-xl text-[#7042c5]" aria-hidden="true">
+            ›
+          </span>
+        </Link>
+
+        <Link
           href={`/settings#${SETTINGS_LEGAL_SECTION_ID}`}
           className="flex min-h-[56px] w-full items-center justify-between px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
         >

@@ -269,6 +269,18 @@ function testFooterContainsArticlesOnce() {
   assert(articlesLinks.length === 1, "exactly one /articles footer link");
   assert(articlesLinks[0].title === "Статьи", "footer label Статьи");
 
+  const helpLinks = PUBLIC_FOOTER_LINKS.filter((item) => item.href === "/help");
+  assert(helpLinks.length === 1, "exactly one /help footer link");
+  assert(
+    helpLinks[0].title === "Помощь и поддержка",
+    "footer label Помощь и поддержка",
+  );
+  assert(
+    PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/help") <
+      PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/articles"),
+    "help precedes articles in footer registry",
+  );
+
   const hrefs = PUBLIC_FOOTER_LINKS.map((item) => item.href);
   assert(new Set(hrefs).size === hrefs.length, "no duplicate footer hrefs");
 

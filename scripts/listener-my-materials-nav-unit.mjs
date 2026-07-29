@@ -4,13 +4,15 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { getListenerSidebarNavItems } from "../src/lib/navigation/listener-nav.ts";
 
-const root = "/var/www/audiolad";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(relPath) {
-  return readFileSync(`${root}/${relPath}`, "utf8");
+  return readFileSync(path.join(root, relPath), "utf8");
 }
 
 const shellData = read("src/lib/listener/shell-data.ts");
@@ -122,6 +124,16 @@ assert.equal(
   visible.find((item) => item.key === "my-materials")?.title,
   "Личные материалы",
   "my-materials title preserved",
+);
+assert.equal(
+  visible.filter((item) => item.key === "help").length,
+  1,
+  "sidebar keeps a single help item when my-materials is visible",
+);
+assert.equal(
+  hidden.filter((item) => item.key === "help").length,
+  1,
+  "sidebar keeps a single help item when my-materials is hidden",
 );
 
 console.log("listener-my-materials-nav-unit: ok");

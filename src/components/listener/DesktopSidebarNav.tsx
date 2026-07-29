@@ -13,6 +13,26 @@ type DesktopSidebarNavProps = {
   showMyMaterialsNav: boolean;
 };
 
+function HelpNavIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M9.6 9.4a2.4 2.4 0 0 1 4.7.8c0 1.4-1.3 2-2.1 2.5-.6.4-.9.8-.9 1.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function DesktopSidebarNav({
   showMyMaterialsNav,
 }: DesktopSidebarNavProps) {
@@ -40,6 +60,9 @@ export default function DesktopSidebarNav({
               >
                 {item.icon === "lock" ? (
                   <PersonalMaterialLockIcon className="h-4 w-4 shrink-0" />
+                ) : null}
+                {item.icon === "help" ? (
+                  <HelpNavIcon className="h-4 w-4 shrink-0" />
                 ) : null}
                 <span className="min-w-0 break-words">{item.title}</span>
               </Link>

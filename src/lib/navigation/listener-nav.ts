@@ -37,7 +37,7 @@ export const LISTENER_PRIMARY_NAV_ITEMS: readonly ListenerPrimaryNavItem[] = [
   { key: "profile", title: "Профиль", href: "/profile", icon: "profile" },
 ] as const;
 
-export type ListenerSidebarNavIconKey = "lock";
+export type ListenerSidebarNavIconKey = "lock" | "help";
 
 export type ListenerSidebarNavItem = {
   key: string;
@@ -59,6 +59,7 @@ export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
   { key: "playlists", title: "Плейлисты", href: "/playlists" },
   { key: "history", title: "Недавно слушали", href: "/history" },
   { key: "profile", title: "Профиль", href: "/profile" },
+  { key: "help", title: "Помощь", href: "/help", icon: "help" },
 ] as const;
 
 /**
