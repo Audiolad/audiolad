@@ -306,6 +306,14 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, как провести медитацию на женскую энергию спокойно и без завышенных ожиданий, можно прочитать статью ",
+      linkLabel:
+        "«Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий»",
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -341,6 +349,11 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
       href: "/articles/zhenskaya-sila",
       title: "Женская сила",
       description: "Что обычно понимают под женской силой и как она проявляется",
+    },
+    {
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      title: "Медитация на женскую энергию",
+      description: "Как провести практику спокойно и без завышенных ожиданий",
     },
     {
       href: "/topics/besplatnye-meditatsii",

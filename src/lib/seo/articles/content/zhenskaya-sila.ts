@@ -293,6 +293,14 @@ export const ZHENSKAYA_SILA_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, как провести медитацию на женскую энергию спокойно и без завышенных ожиданий, можно прочитать статью ",
+      linkLabel:
+        "«Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий»",
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel:
         "«Бесплатные медитации»",
@@ -330,6 +338,11 @@ export const ZHENSKAYA_SILA_ARTICLE = {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
       title: "Как выйти из состояния нехватки",
       description: "Объективная нехватка и привычка ожидать потерь",
+    },
+    {
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      title: "Медитация на женскую энергию",
+      description: "Как провести практику спокойно и без завышенных ожиданий",
     },
     {
       href: "/topics/besplatnye-meditatsii",

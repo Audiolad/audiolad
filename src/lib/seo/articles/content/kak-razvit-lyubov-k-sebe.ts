@@ -210,8 +210,22 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       href: "/articles/zhenskaya-sila",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, как провести медитацию на женскую энергию спокойно и без завышенных ожиданий, можно прочитать статью ",
+      linkLabel:
+        "«Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий»",
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      after: ".",
+    },
+
   ],
   seeAlsoLinks: [
+    {
+      href: "/articles/meditatsiya-na-zhenskuyu-energiyu",
+      title: "Медитация на женскую энергию",
+      description: "Как провести практику спокойно и без завышенных ожиданий",
+    },
     {
       href: "/topics/lyubov-k-sebe",
       title: "Все практики о любви к себе",

@@ -5220,6 +5220,126 @@ assert(
   "gratitude-abundance reverse-links to female-strength",
 );
 
+const femaleEnergyMeditationArticle = getArticleBySlug(
+  "meditatsiya-na-zhenskuyu-energiyu",
+);
+assert(
+  femaleEnergyMeditationArticle,
+  "female-energy-meditation article registered",
+);
+assert(
+  femaleEnergyMeditationArticle.title ===
+    "Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий",
+  "female-energy-meditation H1",
+);
+assert(
+  femaleEnergyMeditationArticle.breadcrumbTitle ===
+    "Медитация на женскую энергию",
+  "female-energy-meditation breadcrumb",
+);
+assert(
+  femaleEnergyMeditationArticle.metaTitle ===
+    "Медитация на женскую энергию – как выполнять практику | АудиоЛад",
+  "female-energy-meditation SEO title",
+);
+assert(
+  femaleEnergyMeditationArticle.topicSlug === "besplatnye-meditatsii",
+  "female-energy-meditation free hub",
+);
+assert(
+  femaleEnergyMeditationArticle.primaryPractice.practiceKey ===
+    "zhenskaya-energiya",
+  "female-energy-meditation practice zhenskaya-energiya",
+);
+assert(
+  femaleEnergyMeditationArticle.primaryPracticeIntro.includes("Женская энергия"),
+  "female-energy-meditation practice intro",
+);
+assert(
+  femaleEnergyMeditationArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует улучшения"),
+    ),
+  "female-energy-meditation audiopraktika disclaimer",
+);
+assert(
+  femaleEnergyMeditationArticle.faq.length === 5,
+  "female-energy-meditation faq count",
+);
+assert(
+  femaleEnergyMeditationArticle.faq[0]?.question.startsWith("### "),
+  "female-energy-meditation faq first question uses ### prefix",
+);
+assert(
+  femaleEnergyMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ),
+  "female-energy-meditation links to female-energy article",
+);
+assert(
+  femaleEnergyMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ),
+  "female-energy-meditation links to female-strength",
+);
+assert(
+  femaleEnergyMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-razvit-lyubov-k-sebe",
+  ),
+  "female-energy-meditation links to love-to-self",
+);
+assert(
+  !femaleEnergyMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya",
+  ) &&
+    !femaleEnergyMeditationArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya",
+    ),
+  "female-energy-meditation has no links to unpublished zhenskaya-energiya article",
+);
+assert(
+  femaleEnergyMeditationArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "female-energy-meditation see-also includes hub",
+);
+assert(
+  listArticleSlugs().includes("meditatsiya-na-zhenskuyu-energiyu"),
+  "female-energy-meditation in slug list",
+);
+assert(
+  !JSON.stringify(femaleEnergyMeditationArticle).includes("—"),
+  "female-energy-meditation uses medium dash not em dash",
+);
+assert(
+  femaleEnergyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+  ) ||
+    femaleEnergyArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    ),
+  "female-energy reverse-links to female-energy-meditation",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+  ) ||
+    femaleStrengthArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    ),
+  "female-strength reverse-links to female-energy-meditation",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+  ) ||
+    article.seeAlsoLinks.some(
+      (item) => item.href === "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    ),
+  "love-to-self reverse-links to female-energy-meditation",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
