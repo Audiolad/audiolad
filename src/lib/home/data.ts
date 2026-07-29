@@ -239,7 +239,8 @@ export async function getPersonalHomeData(
   }
 
   const startSuggestions = takeUniqueProducts([freeProducts, allProducts], 4);
-  const newProducts = excludeProducts(allProducts.slice(0, 8), shownIds);
+  // Keep absolute newest by catalog order; do not dedupe against upper rails.
+  const newProducts = allProducts.slice(0, 8);
   const greetingFirstName = getGreetingFirstName(profile, userMetadata);
 
   return {
