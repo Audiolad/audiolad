@@ -396,6 +396,12 @@ assert(
   "free hub includes woman-money-psychology SEO article",
 );
 assert(
+  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+    (article) => article.slug === "zhenskaya-sila",
+  ),
+  "free hub includes female-strength SEO article",
+);
+assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
     (article) => article.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),

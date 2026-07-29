@@ -202,6 +202,14 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       href: "/articles/kak-prinyat-svoy-vozrast",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, что обычно понимают под женской силой и как она проявляется в повседневной жизни, можно прочитать статью ",
+      linkLabel:
+        "«Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни»",
+      href: "/articles/zhenskaya-sila",
+      after: ".",
+    },
   ],
   seeAlsoLinks: [
     {
@@ -224,6 +232,11 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
       title: "Как принять свой возраст",
       description: "Спокойнее относиться к возрастным изменениям и жизненному опыту",
     },
+    {
+      href: "/articles/zhenskaya-sila",
+      title: "Женская сила",
+      description: "Что обычно понимают под женской силой и как она проявляется",
+    },
   ],
   closingSection: {
     id: "skladyvaetsya-postepenno",
@@ -235,5 +248,5 @@ export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-24T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

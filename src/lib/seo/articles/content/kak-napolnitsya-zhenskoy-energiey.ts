@@ -298,6 +298,14 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать, что обычно понимают под женской силой и как она проявляется в повседневной жизни, можно прочитать статью ",
+      linkLabel:
+        "«Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни»",
+      href: "/articles/zhenskaya-sila",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -330,6 +338,11 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
       description: "Объективная нехватка и привычка ожидать потерь",
     },
     {
+      href: "/articles/zhenskaya-sila",
+      title: "Женская сила",
+      description: "Что обычно понимают под женской силой и как она проявляется",
+    },
+    {
       href: "/topics/besplatnye-meditatsii",
       title: "Бесплатные медитации",
       description: "Тематическая подборка АудиоЛада",
@@ -351,5 +364,5 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
 } as const satisfies ArticleDefinition;

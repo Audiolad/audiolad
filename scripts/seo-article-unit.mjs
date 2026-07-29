@@ -4869,13 +4869,13 @@ assert(
   "female-energy priority link to love-to-self",
 );
 assert(
-  !femaleEnergyArticle.afterFinalAudio?.some(
+  femaleEnergyArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/zhenskaya-sila",
   ) &&
-    !femaleEnergyArticle.seeAlsoLinks.some(
+    femaleEnergyArticle.seeAlsoLinks.some(
       (item) => item.href === "/articles/zhenskaya-sila",
     ),
-  "female-energy has no links to unpublished zhenskaya-sila article",
+  "female-energy reverse-links to zhenskaya-sila",
 );
 assert(
   listArticleSlugs().includes("kak-napolnitsya-zhenskoy-energiey"),
@@ -4949,13 +4949,13 @@ assert(
   "age-acceptance priority link to love-to-self",
 );
 assert(
-  !ageAcceptanceArticle.afterFinalAudio?.some(
+  ageAcceptanceArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/zhenskaya-sila",
   ) &&
-    !ageAcceptanceArticle.seeAlsoLinks.some(
+    ageAcceptanceArticle.seeAlsoLinks.some(
       (item) => item.href === "/articles/zhenskaya-sila",
     ),
-  "age-acceptance has no links to unpublished zhenskaya-sila article",
+  "age-acceptance reverse-links to zhenskaya-sila",
 );
 assert(
   listArticleSlugs().includes("kak-prinyat-svoy-vozrast"),
@@ -5112,6 +5112,112 @@ assert(
     (item) => item.href === "/articles/zhenshchina-i-dengi-psihologiya",
   ),
   "stop-saving-on-self reverse-links to woman-money-psychology",
+);
+
+const femaleStrengthArticle = getArticleBySlug("zhenskaya-sila");
+assert(femaleStrengthArticle, "female-strength article registered");
+assert(
+  femaleStrengthArticle.title ===
+    "Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни",
+  "female-strength H1",
+);
+assert(
+  femaleStrengthArticle.breadcrumbTitle === "Женская сила",
+  "female-strength breadcrumb",
+);
+assert(
+  femaleStrengthArticle.metaTitle ===
+    "Женская сила – что это такое и как она проявляется | АудиоЛад",
+  "female-strength SEO title",
+);
+assert(
+  femaleStrengthArticle.topicSlug === "besplatnye-meditatsii",
+  "female-strength free hub",
+);
+assert(
+  femaleStrengthArticle.primaryPractice.practiceKey === "zhenskaya-energiya",
+  "female-strength practice zhenskaya-energiya",
+);
+assert(
+  femaleStrengthArticle.primaryPracticeIntro.includes("Женская энергия"),
+  "female-strength practice intro",
+);
+assert(
+  femaleStrengthArticle.sections
+    .find((section) => section.id === "audiopraktika")
+    ?.paragraphs.some((paragraph) =>
+      paragraph.includes("не гарантирует успеха"),
+    ),
+  "female-strength audiopraktika disclaimer",
+);
+assert(femaleStrengthArticle.faq.length === 4, "female-strength faq count");
+assert(
+  femaleStrengthArticle.faq[0]?.question.startsWith("### "),
+  "female-strength faq first question uses ### prefix",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.[0]?.href ===
+    "/articles/kak-razvit-lyubov-k-sebe",
+  "female-strength priority link to love-to-self",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-napolnitsya-zhenskoy-energiey",
+  ),
+  "female-strength links to female-energy article",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/blagodarnost-i-izobilie",
+  ),
+  "female-strength links to gratitude-abundance",
+);
+assert(
+  femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ),
+  "female-strength links to scarcity-state",
+);
+assert(
+  !femaleStrengthArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-energiya",
+  ) &&
+    !femaleStrengthArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-energiya",
+    ),
+  "female-strength has no links to unpublished zhenskaya-energiya article",
+);
+assert(
+  femaleStrengthArticle.seeAlsoLinks.some(
+    (item) => item.href === "/topics/besplatnye-meditatsii",
+  ),
+  "female-strength see-also includes hub",
+);
+assert(
+  listArticleSlugs().includes("zhenskaya-sila"),
+  "female-strength in slug list",
+);
+assert(
+  !JSON.stringify(femaleStrengthArticle).includes("—"),
+  "female-strength uses medium dash not em dash",
+);
+assert(
+  article.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ) ||
+    article.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-sila",
+    ),
+  "love-to-self reverse-links to female-strength",
+);
+assert(
+  gratitudeAbundanceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhenskaya-sila",
+  ) ||
+    gratitudeAbundanceArticle.seeAlsoLinks.some(
+      (item) => item.href === "/articles/zhenskaya-sila",
+    ),
+  "gratitude-abundance reverse-links to female-strength",
 );
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");

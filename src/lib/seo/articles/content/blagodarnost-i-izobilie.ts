@@ -1105,6 +1105,14 @@ export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
       href: "/articles/kak-prinyat-svoy-vozrast",
       after: ".",
     },
+    {
+      before:
+        "Если важно отдельно разобрать, что обычно понимают под женской силой и как она проявляется в повседневной жизни, можно прочитать статью ",
+      linkLabel:
+        "«Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни»",
+      href: "/articles/zhenskaya-sila",
+      after: ".",
+    },
   ],
   brandNote:
     "Аудиопрактики могут поддерживать внутреннее состояние, внимание и способность замечать опоры, но не заменяют реальные решения, профессиональную помощь, финансовое планирование, поиск дохода, лечение и юридические меры.",
@@ -1154,6 +1162,11 @@ export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
       title: "Как принять свой возраст",
       description: "Спокойнее относиться к возрастным изменениям и жизненному опыту",
     },
+    {
+      href: "/articles/zhenskaya-sila",
+      title: "Женская сила",
+      description: "Что обычно понимают под женской силой и как она проявляется",
+    },
   ],
   closingSection: {
     id: "glavnoe",
@@ -1168,5 +1181,5 @@ export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
 } as const satisfies ArticleDefinition;
