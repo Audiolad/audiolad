@@ -70,7 +70,8 @@ export default function PublishPreviewBanner({
         return;
       }
 
-      window.location.replace(publicPath);
+      const separator = publicPath.includes("?") ? "&" : "?";
+      window.location.replace(`${publicPath}${separator}published=1`);
     } catch {
       setError("Не удалось опубликовать аудиопродукт.");
     } finally {

@@ -215,7 +215,12 @@ const createRoute = read("src/app/api/author/products/route.ts");
 assert.match(createRoute, /product_kind/);
 
 const topicHubs = read("src/lib/seo/topic-hubs/load.ts");
-assert.match(topicHubs, /PRODUCT_KIND\.PRACTICE/);
+assert.doesNotMatch(
+  topicHubs,
+  /productKind:\s*PRODUCT_KIND\.PRACTICE/,
+  "topic hubs include music catalog products for assigned topics",
+);
+assert.match(topicHubs, /including music/);
 
 const articles = read("src/lib/seo/articles/load.ts");
 assert.match(articles, /PRODUCT_KIND\.PRACTICE/);

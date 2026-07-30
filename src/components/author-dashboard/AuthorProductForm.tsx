@@ -525,6 +525,42 @@ export default function AuthorProductForm({
   );
 
   useEffect(() => {
+    if (mode !== "edit" || !practiceId || form.status !== "draft") {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function refreshIfPublishedElsewhere() {
+      const response = await fetch(`/api/author/products/${practiceId}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+      };
+
+      if (cancelled || !response.ok || !payload.product) {
+        return;
+      }
+
+      if (payload.product.practice.status === "published") {
+        applyServerProductPreservingDraft(payload.product);
+        setMessage("Продукт опубликован и доступен в каталоге.");
+      }
+    }
+
+    function onWindowFocus() {
+      void refreshIfPublishedElsewhere();
+    }
+
+    window.addEventListener("focus", onWindowFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onWindowFocus);
+    };
+  }, [mode, practiceId, form.status]);
+
+  useEffect(() => {
     if (!practiceId) {
       return;
     }
@@ -1048,6 +1084,9 @@ export default function AuthorProductForm({
         window.open(href, "_blank");
       }
 
+      setMessage(
+        "Открыт предпросмотр. Нажмите «Опубликовать» на странице предпросмотра, чтобы продукт появился в каталоге.",
+      );
       return true;
     } catch {
       previewTab?.close();
@@ -1154,7 +1193,7 @@ export default function AuthorProductForm({
         applyServerProductPreservingDraft(payload.product);
       }
 
-      setMessage(payload.message ?? "Аудиопродукт опубликован.");
+      setMessage("Продукт опубликован и доступен в каталоге.");
     } catch {
       setError("Не удалось опубликовать аудиопродукт.");
     } finally {
@@ -2797,7 +2836,7 @@ export default function AuthorProductForm({
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
-              Опубликовать
+              Предпросмотр и публикация
             </button>
           </>
         ) : null}
@@ -2835,8 +2874,9 @@ export default function AuthorProductForm({
       </div>
 
       {selectedAuthor ? (
-        <p className="text-xs text-[#7d70a2]">
-          Работаете от имени: {selectedAuthor.name}
+        <p className="break-words text-xs leading-5 text-[#7d70a2]">
+          Работаете от имени:{" "}
+          <span className="font-medium text-[#5f5484]">{selectedAuthor.name}</span>
           {mode === "create" ? " · новый аудиопродукт" : ""}
         </p>
       ) : null}

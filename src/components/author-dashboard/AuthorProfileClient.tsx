@@ -480,6 +480,12 @@ export default function AuthorProfileClient({
             </p>
           ) : null}
 
+          <p className="text-sm leading-6 text-[#7d70a2]">
+            Страница проекта доступна по ссылке сразу после сохранения профиля.
+            В общем списке авторов проект появляется после публикации хотя бы
+            одного продукта.
+          </p>
+
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
