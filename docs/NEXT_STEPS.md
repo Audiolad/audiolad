@@ -2,6 +2,10 @@
 
 Ближайшие технические задачи «АудиоЛад».
 
+## Технический backlog
+
+- `fix(next): remove invalid headers export from src/app/d/layout.tsx` — устранить baseline-ошибку Next.js build: `headers` не является допустимым export поля layout.
+
 ## 0. SEO — после PR1 (приоритет: средний)
 
 SEO PR1 на production (`89abe17`, release `20260716-065224-89abe17`).
