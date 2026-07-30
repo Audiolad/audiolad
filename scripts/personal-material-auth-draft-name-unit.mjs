@@ -66,9 +66,21 @@ function testDraftName() {
 }
 
 function testParseModules() {
+  const stubPath = path.join(ROOT, "scripts/cjs-stub-server-only.cjs");
+  const previousNodeOptions = process.env.NODE_OPTIONS ?? "";
+  const nodeOptions = [previousNodeOptions, `--require ${stubPath}`]
+    .filter(Boolean)
+    .join(" ");
   const output = execSync(
     `npx --yes tsx ${path.join(ROOT, "scripts/stage-p2-personal-materials-api-module-unit.mjs")}`,
-    { encoding: "utf8" },
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+      },
+    },
   );
   process.stdout.write(output);
 }
