@@ -27,6 +27,7 @@ import {
   resolveFormatForStorage,
   validateCustomFormatForPublish,
 } from "@/lib/author-products/format";
+import { PRODUCT_LANGUAGE_GUIDELINES } from "@/lib/author-products/language-guidelines";
 import {
   MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
@@ -1821,6 +1822,25 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
+        <div
+          className="rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] px-4 py-3"
+          role="note"
+          aria-label={PRODUCT_LANGUAGE_GUIDELINES.formNotice.title}
+        >
+          <p className="text-sm font-semibold text-[#3f3560]">
+            {PRODUCT_LANGUAGE_GUIDELINES.formNotice.title}
+          </p>
+          <p className="mt-1.5 text-sm leading-5 text-[#5f5484]">
+            {PRODUCT_LANGUAGE_GUIDELINES.formNotice.body}{" "}
+            <Link
+              href={PRODUCT_LANGUAGE_GUIDELINES.helpArticlePath}
+              className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              Подробнее в справке
+            </Link>
+          </p>
+        </div>
+
         {mode === "create" && selectedAuthor ? (
           <p className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
             Продукт будет опубликован от проекта{" "}
@@ -1933,6 +1953,9 @@ export default function AuthorProductForm({
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
             placeholder="Название аудиопродукта"
           />
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_LANGUAGE_GUIDELINES.fieldHints.title}
+          </p>
           <CharCounter value={form.title} max={PRODUCT_CONTENT_LIMITS.title} />
           {fieldErrors.title ? (
             <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.title}</p>
@@ -1950,6 +1973,9 @@ export default function AuthorProductForm({
             }}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           />
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_LANGUAGE_GUIDELINES.fieldHints.subtitle}
+          </p>
           <CharCounter
             value={form.subtitle}
             max={PRODUCT_CONTENT_LIMITS.subtitle}
@@ -1977,6 +2003,9 @@ export default function AuthorProductForm({
             rows={5}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
           />
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            {PRODUCT_LANGUAGE_GUIDELINES.fieldHints.description}
+          </p>
           <CharCounter
             value={form.description}
             max={PRODUCT_CONTENT_LIMITS.description}
@@ -2157,7 +2186,7 @@ export default function AuthorProductForm({
           buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
           getPracticeId={getPracticeIdForCoverUpload}
           onUpdated={handleProductCoverUpdated}
-          hint="Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до 3 МБ"
+          hint={`${PRODUCT_LANGUAGE_GUIDELINES.coverTechnicalHint}. ${PRODUCT_LANGUAGE_GUIDELINES.fieldHints.cover}`}
           uploadLabel="Загрузить обложку"
           replaceLabel="Заменить обложку"
         />

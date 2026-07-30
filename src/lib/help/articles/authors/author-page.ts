@@ -24,6 +24,7 @@ export const authorPageArticle: HelpArticle = {
   relatedArticleIds: [
     "help.authors.create-first-product",
     "help.authors.publish-product",
+    "help.authors.language-and-formatting",
   ],
   sections: [
     {
@@ -48,6 +49,13 @@ export const authorPageArticle: HelpArticle = {
       ],
       notes: [
         "Короткое позиционирование видно в карточках и на публичной странице — формулируйте его ясно и по делу.",
+        helpRich(
+          "Публичное название проекта и тексты на странице оформляйте преимущественно на русском языке кириллицей — см. статью ",
+          helpPublicLink("/help/authors/language-and-formatting", {
+            label: "«Язык и оформление материалов»",
+          }),
+          ".",
+        ),
         "Публичная страница становится полезнее, когда у вас уже есть хотя бы один опубликованный продукт.",
       ],
     },

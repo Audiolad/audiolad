@@ -2,6 +2,7 @@ import type { HelpArticle } from "@/lib/help/types";
 
 import { authorPageArticle } from "@/lib/help/articles/authors/author-page";
 import { createFirstProductArticle } from "@/lib/help/articles/authors/create-first-product";
+import { languageAndFormattingArticle } from "@/lib/help/articles/authors/language-and-formatting";
 import { publishProductArticle } from "@/lib/help/articles/authors/publish-product";
 import { commercialStatusArticle } from "@/lib/help/articles/finance/commercial-status";
 import { earningsAndPayoutsArticle } from "@/lib/help/articles/finance/earnings-and-payouts";
@@ -22,6 +23,7 @@ export const ALL_HELP_ARTICLES: readonly HelpArticle[] = [
   saveToLibraryArticle,
   installOnPhoneArticle,
   createFirstProductArticle,
+  languageAndFormattingArticle,
   publishProductArticle,
   authorPageArticle,
   createPersonalMaterialArticle,
@@ -45,6 +47,7 @@ export {
   earningsAndPayoutsArticle,
   emailNotReceivedArticle,
   installOnPhoneArticle,
+  languageAndFormattingArticle,
   publishProductArticle,
   resetPasswordArticle,
   saveToLibraryArticle,

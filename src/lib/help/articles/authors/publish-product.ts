@@ -1,3 +1,4 @@
+import { helpPublicLink, helpRich } from "@/lib/help/rich-text";
 import type { HelpArticle } from "@/lib/help/types";
 
 export const publishProductArticle: HelpArticle = {
@@ -25,6 +26,7 @@ export const publishProductArticle: HelpArticle = {
   ],
   relatedArticleIds: [
     "help.authors.create-first-product",
+    "help.authors.language-and-formatting",
     "help.authors.author-page",
     "help.finance.commercial-status",
   ],
@@ -44,6 +46,19 @@ export const publishProductArticle: HelpArticle = {
         "Если продукт платный, убедитесь, что коммерческий статус активен и приняты условия для авторов.",
         "Нажмите «Опубликовать» и дождитесь подтверждения.",
         "После публикации продукт появится в каталоге и на вашей странице автора.",
+      ],
+    },
+    {
+      id: "language",
+      title: "Язык и оформление материалов",
+      paragraphs: [
+        helpRich(
+          "Перед публикацией убедитесь, что публичные тексты и основные надписи на обложке оформлены преимущественно на русском языке кириллицей. Подробности — в статье ",
+          helpPublicLink("/help/authors/language-and-formatting", {
+            label: "«Язык и оформление материалов»",
+          }),
+          ".",
+        ),
       ],
     },
     {

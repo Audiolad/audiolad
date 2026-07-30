@@ -23,6 +23,7 @@ export const createFirstProductArticle: HelpArticle = {
   version: 2,
   relatedRoutes: ["/author-dashboard", "/author-dashboard/products/new"],
   relatedArticleIds: [
+    "help.authors.language-and-formatting",
     "help.authors.publish-product",
     "help.authors.author-page",
     "help.finance.commercial-status",
@@ -47,6 +48,20 @@ export const createFirstProductArticle: HelpArticle = {
         "Заполните название, формат, описание и другие обязательные поля.",
         "Загрузите аудиофайл или добавьте материалы курса, если выбран соответствующий формат.",
         "Нажмите «Сохранить черновик», чтобы сохранить прогресс без публикации.",
+      ],
+    },
+    {
+      id: "language",
+      title: "Язык и оформление материалов",
+      paragraphs: [
+        "АудиоЛад — русскоязычная платформа. Название продукта, подзаголовок, описание, названия аудиозаписей и основные надписи на обложке оформляйте преимущественно на русском языке кириллицей.",
+        helpRich(
+          "Подробные правила, исключения и примеры — в статье ",
+          helpPublicLink("/help/authors/language-and-formatting", {
+            label: "«Язык и оформление материалов»",
+          }),
+          ".",
+        ),
       ],
     },
     {
