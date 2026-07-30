@@ -20,6 +20,7 @@ export const AUTHOR_DIRECTION_PRESETS = [
   "Телесные практики",
   "Энергопрактики",
   "Духовные практики",
+  "Эзотерика",
   "Работа с детьми",
   "Здоровье",
   AUTHOR_DIRECTION_OTHER,
@@ -59,7 +60,10 @@ export function parseStoredDirection(stored: string): {
   let directionOther = "";
   const unmatched: string[] = [];
 
-  for (const part of trimmed.split(",").map((item) => item.trim()).filter(Boolean)) {
+  for (const part of trimmed
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)) {
     if (part.startsWith(OTHER_PREFIX)) {
       selectedDirections.push(AUTHOR_DIRECTION_OTHER);
       directionOther = part.slice(OTHER_PREFIX.length).trim();
@@ -186,7 +190,9 @@ export function normalizeAuthorApplicationFormValues(
   };
 }
 
-export function isAuthorApplicationContactUpdateOnly(formData: FormData): boolean {
+export function isAuthorApplicationContactUpdateOnly(
+  formData: FormData,
+): boolean {
   return formData.get("updateContactsOnly") === "on";
 }
 
@@ -202,7 +208,8 @@ export function validateAuthorApplicationContactFields(
   }
 
   if (
-    values.contactDetails.length < AUTHOR_APPLICATION_LIMITS.contactDetailsMin ||
+    values.contactDetails.length <
+      AUTHOR_APPLICATION_LIMITS.contactDetailsMin ||
     values.contactDetails.length > AUTHOR_APPLICATION_LIMITS.contactDetailsMax
   ) {
     errors.contactDetails =
