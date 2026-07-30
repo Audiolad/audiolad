@@ -254,6 +254,8 @@ export function selectAuthorFinanceEmptyState(input: {
   accessStatus: string;
   approvedTermsCount: number;
   entryCount: number;
+  /** Canonical sales count; when > 0, "no_sales" must not hide confirmed purchases. */
+  saleCount?: number;
   payableMinor: number;
   reservedMinor: number;
   heldMinor: number;
@@ -306,12 +308,15 @@ export function selectAuthorFinanceEmptyState(input: {
   if (input.approvedTermsCount === 0 && !ignoreFinanceTermsGap) {
     return "terms_missing";
   }
-  if (input.entryCount === 0) return "no_sales";
+  const saleCount = input.saleCount ?? 0;
+  // Confirmed canonical sales must not disappear behind "no_sales" when accrual lags.
+  if (input.entryCount === 0 && saleCount === 0) return "no_sales";
   if (input.payableMinor >= threshold) return "active_ok";
   if (input.payableMinor > 0) return "below_threshold";
   if (input.reservedMinor > 0) return "reserved_in_progress";
   if (input.heldMinor > 0) return "held_only";
   if (input.paidPayoutCount > 0) return "has_paid_history";
+  if (saleCount > 0) return "active_ok";
   return "no_sales";
 }
 
@@ -488,6 +493,7 @@ export type AuthorFinanceSummary = {
   paidMinor: number;
   paidPayoutCount: number;
   entryCount: number;
+  saleCount?: number;
 
   negative: boolean;
   negativeMinor: number;

@@ -15,6 +15,15 @@ import {
   isAuthorFinancePeriod,
   resolveAuthorFinancePeriodRange,
 } from "@/lib/author-finance/types";
+import {
+  buildAuthorSalesCsv,
+  buildAuthorSalesExportFilename,
+} from "@/lib/author-sales/csv";
+import { getAuthorSalesList } from "@/lib/author-sales/queries";
+import {
+  isAuthorSaleAccrualStatus,
+  isAuthorSalePayoutStatus,
+} from "@/lib/author-sales/types";
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +35,20 @@ const EXPORT_ROW_LIMIT = 5000;
  * accepts rows from the client: a CSV is the easiest place to smuggle a field
  * or another author's line into, so nothing the browser sends is echoed back.
  */
-export async function GET(request: Request) {
+type SalesExportDependencies = {
+  requireAccess: typeof requireAuthorFinanceAccess;
+  getSalesList: typeof getAuthorSalesList;
+};
+
+export function createAuthorFinanceExportHandler(
+  dependencies: SalesExportDependencies = {
+    requireAccess: requireAuthorFinanceAccess,
+    getSalesList: getAuthorSalesList,
+  },
+) {
+  return async function GET(request: Request) {
   try {
-    const { authorId } = await requireAuthorFinanceAccess(request);
+    const { authorId } = await dependencies.requireAccess(request);
     const url = new URL(request.url);
 
     const kindParam = url.searchParams.get("kind");
@@ -45,36 +65,58 @@ export async function GET(request: Request) {
       },
     );
 
-    const csv =
-      kindParam === "ledger"
-        ? buildAuthorFinanceLedgerCsv(
-            (
-              await getAuthorFinanceLedger({
-                authorId,
-                from: range.from,
-                to: range.to,
-                type: url.searchParams.get("type"),
-                search: url.searchParams.get("search"),
-                limit: EXPORT_ROW_LIMIT,
-              })
-            ).rows,
-          )
-        : buildAuthorFinancePayoutsCsv(
-            (
-              await getAuthorFinancePayouts({
-                authorId,
-                from: range.from,
-                to: range.to,
-                status: url.searchParams.get("status"),
-                limit: EXPORT_ROW_LIMIT,
-              })
-            ).rows,
-          );
+    const productSlug = url.searchParams.get("product_slug");
+    const accrualRaw = url.searchParams.get("accrual_status");
+    const payoutRaw = url.searchParams.get("payout_status");
 
-    const filename = buildAuthorFinanceExportFilename(kindParam);
+    let body: string;
+    let filename: string;
 
-    // The BOM is what makes Excel on Windows read Cyrillic correctly.
-    return new NextResponse(`\uFEFF${csv}`, {
+    if (kindParam === "sales") {
+      const list = await dependencies.getSalesList({
+        authorId,
+        from: range.from,
+        to: range.to,
+        productSlug,
+        accrualStatus: isAuthorSaleAccrualStatus(accrualRaw)
+          ? accrualRaw
+          : null,
+        payoutStatus: isAuthorSalePayoutStatus(payoutRaw) ? payoutRaw : null,
+        limit: EXPORT_ROW_LIMIT,
+        offset: 0,
+      });
+      body = buildAuthorSalesCsv(list.rows);
+      filename = buildAuthorSalesExportFilename();
+    } else if (kindParam === "ledger") {
+      body = `\uFEFF${buildAuthorFinanceLedgerCsv(
+        (
+          await getAuthorFinanceLedger({
+            authorId,
+            from: range.from,
+            to: range.to,
+            type: url.searchParams.get("type"),
+            search: url.searchParams.get("search"),
+            limit: EXPORT_ROW_LIMIT,
+          })
+        ).rows,
+      )}`;
+      filename = buildAuthorFinanceExportFilename(kindParam);
+    } else {
+      body = `\uFEFF${buildAuthorFinancePayoutsCsv(
+        (
+          await getAuthorFinancePayouts({
+            authorId,
+            from: range.from,
+            to: range.to,
+            status: url.searchParams.get("status"),
+            limit: EXPORT_ROW_LIMIT,
+          })
+        ).rows,
+      )}`;
+      filename = buildAuthorFinanceExportFilename(kindParam);
+    }
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
@@ -85,4 +127,7 @@ export async function GET(request: Request) {
   } catch (error) {
     return handleAuthorRouteError(error);
   }
+  };
 }
+
+export const GET = createAuthorFinanceExportHandler();

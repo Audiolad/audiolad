@@ -9,7 +9,17 @@ export type AuthorStatsSummary = {
   progress25: number;
   completions: number;
   librarySaves: number;
-  paidPurchases: number;
+  /** Gross canonical purchases (including later refunded). */
+  grossPurchases: number;
+  /** Canonical sales with at least one confirmed refund. */
+  refundSales: number;
+  fullRefunds: number;
+  partialRefunds: number;
+  /** Gross purchases excluding fully refunded sales. */
+  netSales: number;
+  grossRevenueMinor: number;
+  refundedAmountMinor: number;
+  netRevenueMinor: number;
   viewToPlayRate: number | null;
   playToCompleteRate: number | null;
   viewToSaveRate: number | null;
@@ -24,7 +34,11 @@ export type AuthorStatsTimeseriesPoint = {
   progress25: number;
   completions: number;
   librarySaves: number;
-  paidPurchases: number;
+  grossPurchases: number;
+  refundSales: number;
+  fullRefunds: number;
+  partialRefunds: number;
+  netSales: number;
   authorPageViews: number;
   authorPageUniqueVisitors: number;
 };
@@ -36,7 +50,7 @@ export type AuthorStatsTimeseries = {
 };
 
 export type AuthorStatsProductRow = {
-  practiceId: string;
+  productSlug: string;
   title: string;
   slug: string;
   status: string;
@@ -48,7 +62,14 @@ export type AuthorStatsProductRow = {
   progress25: number;
   completions: number;
   librarySaves: number;
-  paidPurchases: number;
+  grossPurchases: number;
+  refundSales: number;
+  fullRefunds: number;
+  partialRefunds: number;
+  netSales: number;
+  grossRevenueMinor: number;
+  refundedAmountMinor: number;
+  netRevenueMinor: number;
   viewToPlayRate: number | null;
   playToCompleteRate: number | null;
 };
@@ -76,6 +97,8 @@ export type AuthorStatsChartMetric =
   | "plays"
   | "completions"
   | "library_saves"
-  | "paid_purchases"
+  | "gross_purchases"
+  | "refund_sales"
+  | "net_sales"
   | "author_page_views"
   | "author_page_unique_visitors";

@@ -84,8 +84,12 @@ function pointValue(
       return point.completions;
     case "library_saves":
       return point.librarySaves;
-    case "paid_purchases":
-      return point.paidPurchases;
+    case "gross_purchases":
+      return point.grossPurchases;
+    case "refund_sales":
+      return point.refundSales;
+    case "net_sales":
+      return point.netSales;
     case "author_page_views":
       return point.authorPageViews;
     case "author_page_unique_visitors":
@@ -93,6 +97,13 @@ function pointValue(
     default:
       return 0;
   }
+}
+
+function formatRubMinor(value: number): string {
+  return `${(value / 100).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ₽`;
 }
 
 function StatsSparkline({
@@ -355,7 +366,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
       summary.practiceViews > 0 ||
       summary.plays > 0 ||
       summary.librarySaves > 0 ||
-      summary.paidPurchases > 0);
+      summary.grossPurchases > 0);
 
   const anyError =
     summaryState === "error" ||
@@ -444,8 +455,8 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
             </div>
           </Section>
 
-          <Section title="Прослушивания и действия">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <Section title="Прослушивания, действия и продажи">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Запуски"
                 value={formatAuthorStatsCount(summary.plays)}
@@ -464,7 +475,28 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
               />
               <MetricCard
                 label="Покупки"
-                value={formatAuthorStatsCount(summary.paidPurchases)}
+                value={formatAuthorStatsCount(summary.grossPurchases)}
+              />
+              <MetricCard
+                label="Возвраты"
+                value={formatAuthorStatsCount(summary.refundSales)}
+                hint={`Полных: ${formatAuthorStatsCount(summary.fullRefunds)}, частичных: ${formatAuthorStatsCount(summary.partialRefunds)}`}
+              />
+              <MetricCard
+                label="Чистые продажи"
+                value={formatAuthorStatsCount(summary.netSales)}
+              />
+              <MetricCard
+                label="Валовая выручка"
+                value={formatRubMinor(summary.grossRevenueMinor)}
+              />
+              <MetricCard
+                label="Возвращено"
+                value={formatRubMinor(summary.refundedAmountMinor)}
+              />
+              <MetricCard
+                label="Чистая выручка"
+                value={formatRubMinor(summary.netRevenueMinor)}
               />
             </div>
           </Section>
@@ -542,13 +574,15 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                     <th className="px-3 py-3 font-medium">Завершения</th>
                     <th className="px-3 py-3 font-medium">Сохранения</th>
                     <th className="px-3 py-3 font-medium">Покупки</th>
+                    <th className="px-3 py-3 font-medium">Возвраты</th>
+                    <th className="px-3 py-3 font-medium">Чистые продажи</th>
                     <th className="px-3 py-3 font-medium">Просмотр → запуск</th>
                   </tr>
                 </thead>
                 <tbody>
                   {products.map((product) => (
                     <tr
-                      key={product.practiceId}
+                      key={product.productSlug}
                       className="border-t border-[#f0e8fb]"
                     >
                       <td className="max-w-[220px] truncate px-3 py-3 font-medium text-[#2b2145]">
@@ -576,7 +610,13 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                         {formatAuthorStatsCount(product.librarySaves)}
                       </td>
                       <td className="px-3 py-3">
-                        {formatAuthorStatsCount(product.paidPurchases)}
+                        {formatAuthorStatsCount(product.grossPurchases)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatAuthorStatsCount(product.refundSales)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatAuthorStatsCount(product.netSales)}
                       </td>
                       <td className="px-3 py-3">
                         {formatAuthorStatsRate(product.viewToPlayRate)}
@@ -590,7 +630,7 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
             <div className="space-y-3 md:hidden">
               {products.map((product) => (
                 <article
-                  key={product.practiceId}
+                  key={product.productSlug}
                   className="rounded-[20px] border border-[#eadff8] bg-white px-4 py-4"
                 >
                   <h3 className="break-words text-base font-semibold text-[#2b2145]">
@@ -640,7 +680,19 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
                     <div>
                       <dt className="text-[#9a8bb8]">Покупки</dt>
                       <dd className="font-semibold">
-                        {formatAuthorStatsCount(product.paidPurchases)}
+                        {formatAuthorStatsCount(product.grossPurchases)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Возвраты</dt>
+                      <dd className="font-semibold">
+                        {formatAuthorStatsCount(product.refundSales)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#9a8bb8]">Чистые продажи</dt>
+                      <dd className="font-semibold">
+                        {formatAuthorStatsCount(product.netSales)}
                       </dd>
                     </div>
                     <div>

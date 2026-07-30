@@ -141,7 +141,8 @@ export function buildWelcomeCompatibleMime(message: EmailProviderMessage): strin
     subject: message.subject,
     html: message.html,
     replyTo: message.replyTo,
-    includeMessageId: false,
+    includeMessageId: Boolean(message.headers?.["Message-ID"]),
+    messageId: message.headers?.["Message-ID"],
   });
 }
 

@@ -112,7 +112,11 @@ export function buildAuthorFinancePayoutsCsv(
   );
 }
 
-export const AUTHOR_FINANCE_EXPORT_KINDS = ["ledger", "payouts"] as const;
+export const AUTHOR_FINANCE_EXPORT_KINDS = [
+  "ledger",
+  "payouts",
+  "sales",
+] as const;
 
 export type AuthorFinanceExportKind =
   (typeof AUTHOR_FINANCE_EXPORT_KINDS)[number];
