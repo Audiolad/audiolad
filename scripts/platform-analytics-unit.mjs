@@ -3,10 +3,10 @@
  * Platform analytics unit checks — safe to run without database access.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function assert(condition, message) {
   if (!condition) {
@@ -14,12 +14,12 @@ function assert(condition, message) {
   }
 }
 
-function read(relativePath) {
-  return readFileSync(join(ROOT, relativePath), "utf8");
+function readSource(relativePath) {
+  return readFileSync(resolve(ROOT, relativePath), "utf8");
 }
 
 function testMigrationContract() {
-  const sql = read("supabase/migrations/20260717120000_platform_analytics.sql");
+  const sql = readSource("supabase/migrations/20260717120000_platform_analytics.sql");
 
   assert(sql.includes("analytics_sessions"), "analytics_sessions table");
   assert(sql.includes("insert_platform_analytics_event"), "platform event rpc");
@@ -30,7 +30,7 @@ function testMigrationContract() {
 }
 
 function testDashboardSnapshotMigration() {
-  const sql = read(
+  const sql = readSource(
     "supabase/migrations/20260725140000_admin_analytics_dashboard_snapshot.sql",
   );
 
@@ -48,7 +48,7 @@ function testDashboardSnapshotMigration() {
 }
 
 function testEventConstants() {
-  const source = read("src/lib/analytics/constants.ts");
+  const source = readSource("src/lib/analytics/constants.ts");
 
   assert(source.includes('"page_view"'), "page_view event");
   assert(source.includes('"audio_progress_90"'), "90% milestone");
@@ -56,15 +56,15 @@ function testEventConstants() {
 }
 
 function testListeningMilestones() {
-  const source = read("src/lib/analytics/listening.ts");
+  const source = readSource("src/lib/analytics/listening.ts");
 
   assert(source.includes("SEEK_JUMP_THRESHOLD_SECONDS"), "seek guard exists");
   assert(source.includes("listenedSeconds"), "listened seconds tracking");
 }
 
 function testApiRoutes() {
-  const sessionRoute = read("src/app/api/analytics/session/route.ts");
-  const trackRoute = read("src/app/api/analytics/track/route.ts");
+  const sessionRoute = readSource("src/app/api/analytics/session/route.ts");
+  const trackRoute = readSource("src/app/api/analytics/track/route.ts");
 
   assert(sessionRoute.includes("upsert_analytics_session"), "session rpc wired");
   assert(trackRoute.includes("insert_platform_analytics_event"), "track rpc wired");
@@ -72,15 +72,15 @@ function testApiRoutes() {
 }
 
 function testAdminDashboard() {
-  const page = read("src/app/admin/page.tsx");
-  const queries = read("src/lib/admin/analytics-queries.ts");
-  const controls = read(
+  const page = readSource("src/app/admin/page.tsx");
+  const queries = readSource("src/lib/admin/analytics-queries.ts");
+  const controls = readSource(
     "src/components/admin/AdminAnalyticsTestTrafficControls.tsx",
   );
-  const p2sql = read(
+  const p2sql = readSource(
     "supabase/migrations/20260725180000_admin_analytics_p2_dashboard.sql",
   );
-  const dictionary = read("src/lib/admin/analytics-metrics-dictionary.ts");
+  const dictionary = readSource("src/lib/admin/analytics-metrics-dictionary.ts");
 
   assert(
     page.includes("getAdminAnalyticsSummaryBundle") ||
@@ -92,19 +92,19 @@ function testAdminDashboard() {
       page.includes("AdminAnalyticsPeriodPicker"),
     "period picker / workbench in admin page",
   );
-  const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
+  const workbench = readSource("src/components/admin/AdminAnalyticsWorkbench.tsx");
   assert(
     workbench.includes("AdminAnalyticsFunnelPanel"),
     "funnel panel",
   );
   assert(
-    read("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
+    readSource("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
       "AdminAnalyticsTimeseriesChart",
     ),
     "timeseries chart",
   );
   assert(
-    read("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
+    readSource("src/components/admin/AdminAnalyticsWorkbench.tsx").includes(
       "AdminAnalyticsBreakdownPanel",
     ) ||
       page.includes("AdminAnalyticsBreakdownTabs"),
@@ -154,7 +154,7 @@ function testAdminDashboard() {
 }
 
 function testPercentRounding() {
-  const period = read("src/lib/admin/analytics-period.ts");
+  const period = readSource("src/lib/admin/analytics-period.ts");
   assert(period.includes("Math.round"), "percent uses Math.round");
 
   // Mirror production helper.
@@ -173,9 +173,12 @@ function testPercentRounding() {
 }
 
 function testIntegrations() {
-  const providers = read("src/components/AppProviders.tsx");
-  const player = read("src/components/audio/AudioPlayer.tsx");
-  const migration = read(
+  const providers = readSource("src/components/AppProviders.tsx");
+  const listenPlayer = readSource(
+    "src/components/audio/listen-player-shared.tsx",
+  );
+  const legacyPlayer = readSource("src/components/audio/AudioPlayer.tsx");
+  const migration = readSource(
     "supabase/migrations/20260717130000_platform_analytics_signup_completion.sql",
   );
 
@@ -183,7 +186,29 @@ function testIntegrations() {
   assert(migration.includes("signup_completed_user_uidx"), "unique signup index");
   assert(providers.includes("PlatformAnalyticsProvider"), "global analytics provider");
   assert(providers.includes("YandexMetrika"), "yandex metrika provider");
-  assert(player.includes("ListenAnalyticsTracker"), "player analytics tracker");
+  assert(
+    listenPlayer.includes(
+      'from "@/components/analytics/ListenAnalyticsTracker"',
+    ),
+    "listen player imports ListenAnalyticsTracker",
+  );
+  assert(
+    listenPlayer.includes("<ListenAnalyticsTracker"),
+    "ListenAnalyticsTracker is mounted in shared listen player",
+  );
+  assert(
+    listenPlayer.includes("practiceId={practiceId}") &&
+      listenPlayer.includes("trackId={currentTrack?.id ?? null}") &&
+      listenPlayer.includes("currentTime={currentTime}") &&
+      listenPlayer.includes("duration={displayDuration}") &&
+      listenPlayer.includes("isPlaying={isPlaying}") &&
+      listenPlayer.includes("programCompleted={programCompleted}"),
+    "tracker receives current listen session and track state",
+  );
+  assert(
+    !legacyPlayer.includes("ListenAnalyticsTracker"),
+    "legacy AudioPlayer re-export is not the analytics wiring source",
+  );
 }
 
 function main() {
