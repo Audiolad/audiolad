@@ -2,7 +2,30 @@
 /**
  * Yandex Metrika integration unit checks — no network or browser required.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+const SOURCES = [
+  "src/lib/analytics/yandex-metrika.ts",
+  "src/lib/analytics/analytics-consent.ts",
+  "src/lib/analytics/yandex-metrika-goals.ts",
+  "src/components/analytics/YandexMetrika.tsx",
+  "src/components/analytics/AnalyticsConsentBanner.tsx",
+  "src/lib/analytics/client.ts",
+  "src/lib/pwa/analytics-client.ts",
+  "src/components/AppProviders.tsx",
+  "src/app/privacy/page.tsx",
+  "src/lib/analytics/yandex-metrika-privacy.ts",
+  "src/components/analytics/ListenAnalyticsTracker.tsx",
+  "src/components/become-author/AuthorApplicationPanel.tsx",
+];
+
+function readSource(relativePath) {
+  return readFileSync(resolve(ROOT, relativePath), "utf8");
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -10,19 +33,19 @@ function assert(condition, message) {
   }
 }
 
+function testSourcesExistInCurrentTree() {
+  for (const relativePath of SOURCES) {
+    assert(
+      existsSync(resolve(ROOT, relativePath)),
+      `source exists in current tree: ${relativePath}`,
+    );
+  }
+}
+
 function testLibraryContract() {
-  const library = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/yandex-metrika.ts",
-    "utf8",
-  );
-  const consent = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/analytics-consent.ts",
-    "utf8",
-  );
-  const goals = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/yandex-metrika-goals.ts",
-    "utf8",
-  );
+  const library = readSource("src/lib/analytics/yandex-metrika.ts");
+  const consent = readSource("src/lib/analytics/analytics-consent.ts");
+  const goals = readSource("src/lib/analytics/yandex-metrika-goals.ts");
 
   assert(
     library.includes("NEXT_PUBLIC_YANDEX_METRIKA_ID"),
@@ -45,17 +68,13 @@ function testLibraryContract() {
     "server-only first save is not mirrored",
   );
   assert(consent.includes('"unknown"'), "unknown consent state");
-  assert(consent.includes('writeAnalyticsConsent'), "explicit consent write");
+  assert(consent.includes("writeAnalyticsConsent"), "explicit consent write");
 }
 
 function testComponentContract() {
-  const component = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/YandexMetrika.tsx",
-    "utf8",
-  );
-  const banner = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/AnalyticsConsentBanner.tsx",
-    "utf8",
+  const component = readSource("src/components/analytics/YandexMetrika.tsx");
+  const banner = readSource(
+    "src/components/analytics/AnalyticsConsentBanner.tsx",
   );
 
   assert(component.includes('id="yandex-metrika-stub"'), "ym queue stub before tag.js");
@@ -68,14 +87,8 @@ function testComponentContract() {
 }
 
 function testClientHooks() {
-  const client = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/analytics/client.ts",
-    "utf8",
-  );
-  const pwaClient = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/lib/pwa/analytics-client.ts",
-    "utf8",
-  );
+  const client = readSource("src/lib/analytics/client.ts");
+  const pwaClient = readSource("src/lib/pwa/analytics-client.ts");
 
   assert(client.includes("sendYandexGoal"), "platform client mirrors metrika goals");
   assert(client.includes("isYandexMetrikaGoalName"), "goal allowlist used");
@@ -88,14 +101,8 @@ function testClientHooks() {
 }
 
 function testProvidersAndSettings() {
-  const providers = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/AppProviders.tsx",
-    "utf8",
-  );
-  const privacy = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/app/privacy/page.tsx",
-    "utf8",
-  );
+  const providers = readSource("src/components/AppProviders.tsx");
+  const privacy = readSource("src/app/privacy/page.tsx");
 
   assert(providers.includes("YandexMetrika"), "metrika mounted in providers");
   assert(privacy.includes("Яндекс Метрика"), "privacy mentions metrika");
@@ -103,10 +110,7 @@ function testProvidersAndSettings() {
 }
 
 function testPrivacyContract() {
-  const privacy = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-privacy-leaf/src/lib/analytics/yandex-metrika-privacy.ts",
-    "utf8",
-  );
+  const privacy = readSource("src/lib/analytics/yandex-metrika-privacy.ts");
 
   assert(
     privacy.includes("root.matches(INPUT_SELECTOR)"),
@@ -115,19 +119,18 @@ function testPrivacyContract() {
 }
 
 function testNoDuplicateEmitters() {
-  const tracker = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/analytics/ListenAnalyticsTracker.tsx",
-    "utf8",
+  const tracker = readSource(
+    "src/components/analytics/ListenAnalyticsTracker.tsx",
   );
-  const authorPanel = readFileSync(
-    "/var/www/audiolad/.worktrees/yandex-metrika-retention-pwa/src/components/become-author/AuthorApplicationPanel.tsx",
-    "utf8",
+  const authorPanel = readSource(
+    "src/components/become-author/AuthorApplicationPanel.tsx",
   );
 
   assert(!tracker.includes("sendYandexGoal"), "player tracker does not duplicate metrika");
   assert(!authorPanel.includes("sendYandexGoal"), "author panel does not duplicate metrika");
 }
 
+testSourcesExistInCurrentTree();
 testLibraryContract();
 testComponentContract();
 testClientHooks();
