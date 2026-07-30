@@ -3,6 +3,14 @@
  * Listen autoplay intent unit checks — no browser required.
  */
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function readSource(relativePath) {
+  return readFileSync(resolve(ROOT, relativePath), "utf8");
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -11,60 +19,42 @@ function assert(condition, message) {
 }
 
 function testAutoplayIntentModule() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/listen/autoplay-intent.ts",
-    "utf8",
-  );
+  const source = readSource("src/lib/listen/autoplay-intent.ts");
 
   assert(source.includes('LISTEN_AUTOPLAY_QUERY_VALUE = "1"'), "canonical value is 1");
   assert(source.includes("parseListenAutoplayIntent"), "parser exists");
-  assert(source.includes('value === LISTEN_AUTOPLAY_QUERY_VALUE'), "strict parse");
+  assert(source.includes("value === LISTEN_AUTOPLAY_QUERY_VALUE"), "strict parse");
 }
 
 function testBuildListenPath() {
-  const paths = readFileSync(
-    "/var/www/audiolad/src/lib/products/paths.ts",
-    "utf8",
-  );
+  const paths = readSource("src/lib/products/paths.ts");
 
   assert(paths.includes("LISTEN_AUTOPLAY_QUERY_PARAM"), "uses shared param name");
   assert(paths.includes("shouldRequestListenAutoplay"), "uses shared autoplay helper");
 }
 
 function testGuestPracticeCtaIncludesAutoplay() {
-  const ui = readFileSync(
-    "/var/www/audiolad/src/lib/products/practice-access-ui.ts",
-    "utf8",
-  );
+  const ui = readSource("src/lib/products/practice-access-ui.ts");
 
-  assert(ui.includes('autoplay: true'), "guest CTA enables autoplay");
+  assert(ui.includes("autoplay: true"), "guest CTA enables autoplay");
   assert(ui.includes('"Начать слушать"'), "guest label preserved");
   assert(!ui.includes("autoplay: !guestListenWithoutAutoplay"), "removed guest autoplay block");
 }
 
 function testListenPageClientPassesAutoplay() {
-  const client = readFileSync(
-    "/var/www/audiolad/src/components/audio/ListenPageClient.tsx",
-    "utf8",
-  );
+  const client = readSource("src/components/audio/ListenPageClient.tsx");
 
   assert(client.includes("requestAutoplay: autoplay"), "URL autoplay forwarded directly");
 }
 
 function testListenRouteParser() {
-  const page = readFileSync(
-    "/var/www/audiolad/src/app/listen/[...segments]/page.tsx",
-    "utf8",
-  );
+  const page = readSource("src/app/listen/[...segments]/page.tsx");
 
   assert(page.includes("parseListenAutoplayIntent"), "route uses shared parser");
 }
 
 function testSequentialPlayerAutoplayOnce() {
-  const player = readFileSync(
-    "/var/www/audiolad/src/components/audio/useSequentialPlayer.ts",
-    "utf8",
-  );
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
 
   assert(player.includes("initialAutoplayAttemptedRef"), "single autoplay attempt guard");
   assert(player.includes("initialAutoplayPendingRef"), "pending autoplay flag");
@@ -74,25 +64,47 @@ function testSequentialPlayerAutoplayOnce() {
 }
 
 function testStartOverFromClick() {
-  const audioPlayer = readFileSync(
-    "/var/www/audiolad/src/components/audio/AudioPlayer.tsx",
-    "utf8",
-  );
-  const promo = readFileSync(
-    "/var/www/audiolad/src/components/promo/PromoPlaybackPrompts.tsx",
-    "utf8",
-  );
+  const sequential = readSource("src/components/audio/useSequentialPlayer.ts");
+  const shared = readSource("src/components/audio/listen-player-shared.tsx");
+  const mobile = readSource("src/components/audio/ListenPlayerMobile.tsx");
+  const desktop = readSource("src/components/audio/ListenPlayerDesktop.tsx");
+  const promo = readSource("src/components/promo/PromoPlaybackPrompts.tsx");
+  const legacy = readSource("src/components/audio/AudioPlayer.tsx");
 
-  assert(audioPlayer.includes("onClick={() => void handleStartOver()}"), "start over wired");
+  assert(
+    sequential.includes("const handleStartOver"),
+    "handleStartOver exists in sequential player",
+  );
+  assert(
+    sequential.includes("restartPlaybackFromBeginning({ autoPlay: true })"),
+    "start over restarts playback from the beginning",
+  );
+  assert(
+    sequential.includes("clearGuestPracticeProgress"),
+    "start over clears guest progress when needed",
+  );
+  assert(
+    shared.includes("onReplay={() => void handleStartOver()}"),
+    "promo slot wires replay to handleStartOver",
+  );
+  assert(
+    mobile.includes("handleStartOver") && mobile.includes("void handleStartOver()"),
+    "mobile start-over control calls handleStartOver",
+  );
+  assert(
+    desktop.includes("handleStartOver") && desktop.includes("void handleStartOver()"),
+    "desktop start-over control calls handleStartOver",
+  );
   assert(promo.includes("onClick={onReplay}"), "replay button wired");
-  assert(audioPlayer.includes("onReplay={() => void handleStartOver()}"), "promo replay uses start over");
+  assert(
+    legacy.includes("ListenPlayerProvider") &&
+      !legacy.includes("void handleStartOver()"),
+    "legacy AudioPlayer re-export is not the start-over wiring source",
+  );
 }
 
 function testPlayRejectionHandling() {
-  const player = readFileSync(
-    "/var/www/audiolad/src/components/audio/useSequentialPlayer.ts",
-    "utf8",
-  );
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
 
   assert(
     player.includes('setAutoplayHint("Нажмите Play, чтобы начать прослушивание")'),
@@ -102,20 +114,21 @@ function testPlayRejectionHandling() {
 }
 
 function testSignedUrlRaceHandling() {
-  const player = readFileSync(
-    "/var/www/audiolad/src/components/audio/useSequentialPlayer.ts",
-    "utf8",
-  );
-  const provider = readFileSync(
-    "/var/www/audiolad/src/components/audio/GlobalAudioPlayerProvider.tsx",
-    "utf8",
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
   );
 
-  assert(player.includes("loadSignedUrlRef"), "signed url loader supports self-retry");
+  assert(player.includes("loadSignedUrlRef"), "signed url loader keeps a stable ref");
   assert(player.includes("finally {"), "signed url loader always settles in finally");
   assert(
-    player.includes("void loadSignedUrlRef.current(audioItemId)"),
-    "stale signed url fetch retries automatically",
+    player.includes("void loadSignedUrl(trackId)"),
+    "track/session generation reloads the signed url",
+  );
+  assert(
+    player.includes("url_fetch_stale_ignored") ||
+      player.includes("Never auto-retry after generation change"),
+    "stale signed url fetches are ignored after generation change",
   );
   assert(
     player.includes("sessionGeneration"),
@@ -134,8 +147,8 @@ function testSignedUrlRaceHandling() {
     "provider exposes reactive session generation",
   );
   assert(
-    provider.includes("shouldBumpGeneration = shouldBumpPlaybackInstance"),
-    "same-practice refresh does not invalidate signed url fetch",
+    provider.includes("Same session key, no material change"),
+    "same-practice refresh without material change does not invalidate signed url fetch",
   );
 }
 
