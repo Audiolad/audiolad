@@ -13,6 +13,13 @@ import {
   renderAuthorApplicationSubmittedEmailText,
 } from "./author-application-submitted";
 import {
+  AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
+  AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
+  buildAuthorApplicationAdminAlertSubject,
+  renderAuthorApplicationAdminAlertEmailHtml,
+  renderAuthorApplicationAdminAlertEmailText,
+} from "./author-application-admin-alert";
+import {
   COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
   COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
   buildCommercialApplicationAdminAlertSubject,
@@ -143,6 +150,50 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
         subject: AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
         html: renderAuthorApplicationApprovedEmailHtml({ siteOrigin }),
         text: renderAuthorApplicationApprovedEmailText({ siteOrigin }),
+      };
+    }
+
+    if (input.templateKey === AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+      const applicationId = readString(input.payload, "applicationId");
+      const displayName = readString(input.payload, "displayName");
+      const contactEmail = readString(input.payload, "contactEmail");
+      const direction = readString(input.payload, "direction");
+      const submittedAtLabel = readString(input.payload, "submittedAtLabel");
+
+      if (
+        !applicationId ||
+        !displayName ||
+        !contactEmail ||
+        !direction ||
+        !submittedAtLabel
+      ) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const contactDetails = readString(input.payload, "contactDetails") ?? "";
+
+      return {
+        ok: true,
+        subject: buildAuthorApplicationAdminAlertSubject(displayName),
+        html: renderAuthorApplicationAdminAlertEmailHtml({
+          applicationId,
+          displayName,
+          contactEmail,
+          contactDetails,
+          direction,
+          submittedAtLabel,
+          siteOrigin,
+        }),
+        text: renderAuthorApplicationAdminAlertEmailText({
+          applicationId,
+          displayName,
+          contactEmail,
+          contactDetails,
+          direction,
+          submittedAtLabel,
+          siteOrigin,
+        }),
       };
     }
 
@@ -298,6 +349,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY) {
     return AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION;
   }
 
   if (templateKey === COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {

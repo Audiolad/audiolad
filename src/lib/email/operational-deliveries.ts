@@ -30,6 +30,8 @@ export type OperationalEmailDeliveryRow = {
 export const AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE = "author_access_granted";
 export const AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE =
   "author_application_approved";
+export const AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE =
+  "author_application_submitted_admin";
 export const COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE =
   "commercial_application_approved";
 
@@ -55,6 +57,13 @@ export function buildAuthorApplicationApprovedDedupKey(
   applicationId: string,
 ): string {
   return `author_application_approved:${applicationId.trim()}`;
+}
+
+export function buildAuthorApplicationSubmittedAdminDedupKey(
+  applicationId: string,
+  submissionAttempt: string,
+): string {
+  return `author-application:${applicationId.trim()}:submitted:${submissionAttempt.trim()}:admin`;
 }
 
 export function buildCommercialApplicationApprovedDedupKey(
@@ -95,6 +104,7 @@ function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
   profileVersion?: number,
+  submissionAttempt?: string,
 ): string {
   if (messageType === AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE) {
     return buildAuthorApplicationApprovedDedupKey(applicationId);
@@ -102,6 +112,13 @@ function resolveOperationalEmailDedupKey(
 
   if (messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE) {
     return buildCommercialApplicationApprovedDedupKey(applicationId);
+  }
+
+  if (messageType === AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE) {
+    return buildAuthorApplicationSubmittedAdminDedupKey(
+      applicationId,
+      submissionAttempt ?? "",
+    );
   }
 
   const version = profileVersion ?? 1;
@@ -132,6 +149,8 @@ export type AcquireOperationalEmailDeliveryInput = {
   forceResend?: boolean;
   /** Required for payout profile dedup keys that include version. */
   profileVersion?: number;
+  /** Required for author application submission admin alerts. */
+  submissionAttempt?: string;
 };
 
 export type AcquireOperationalEmailDeliveryResult =
@@ -188,9 +207,17 @@ export async function acquireOperationalEmailDelivery(
     applicationId,
     messageType,
     input.profileVersion,
+    input.submissionAttempt,
   );
 
   if (!applicationId || !recipientEmail) {
+    return { ok: false, code: "invalid_input" };
+  }
+
+  if (
+    messageType === AUTHOR_APPLICATION_SUBMITTED_ADMIN_MESSAGE_TYPE &&
+    !input.submissionAttempt?.trim()
+  ) {
     return { ok: false, code: "invalid_input" };
   }
 

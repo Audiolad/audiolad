@@ -21,6 +21,8 @@ const FILTER_TO_STATUS = new Map(
   ADMIN_APPLICATION_STATUS_OPTIONS.map((option) => [option.filterKey, option.value]),
 );
 
+export const AUTHOR_APPLICATION_ATTENTION_FILTER_KEY = "attention";
+
 export function getAdminApplicationStatusLabel(
   status: AuthorApplicationStatus,
 ): string {
@@ -51,6 +53,17 @@ export function resolveAdminApplicationFilterStatus(
   }
 
   return null;
+}
+
+export function resolveAdminAuthorApplicationFilterStatuses(
+  filter: string | null | undefined,
+): AuthorApplicationStatus[] | null {
+  if (filter === AUTHOR_APPLICATION_ATTENTION_FILTER_KEY) {
+    return ["submitted", "needs_changes"];
+  }
+
+  const status = resolveAdminApplicationFilterStatus(filter);
+  return status ? [status] : null;
 }
 
 export function isNewAuthorApplicationStatus(

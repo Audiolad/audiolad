@@ -1,5 +1,6 @@
 import AdminNav from "@/components/admin/AdminNav";
 import AdminShell from "@/components/admin/AdminShell";
+import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
 import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
 import { requireAdminPanelAccess } from "@/lib/admin/guard";
 import { getVisibleAdminNavItems } from "@/lib/admin/nav";
@@ -17,14 +18,18 @@ export default async function AdminLayout({
   const canViewAuthors = snapshotHasPermission(session.access, "authors.view");
 
   let commercialNewCount = 0;
+  let authorApplicationAttentionCount = 0;
 
   if (canViewAuthors) {
     try {
-      const attention =
-        await getCachedAdminCommercialApplicationAttentionSummary();
+      const [attention, authorApplicationAttention] = await Promise.all([
+        getCachedAdminCommercialApplicationAttentionSummary(),
+        getCachedAdminAuthorApplicationAttentionSummary(),
+      ]);
       commercialNewCount = attention.newCount;
+      authorApplicationAttentionCount = authorApplicationAttention.attentionCount;
     } catch (error) {
-      console.error("admin_layout_commercial_attention_error", error);
+      console.error("admin_layout_author_attention_error", error);
     }
   }
 
@@ -32,7 +37,9 @@ export default async function AdminLayout({
     href: item.href,
     label: item.label,
     badgeCount:
-      item.href === "/admin/commercial-applications"
+      item.href === "/admin/author-applications"
+        ? authorApplicationAttentionCount
+        : item.href === "/admin/commercial-applications"
         ? commercialNewCount
         : undefined,
   }));

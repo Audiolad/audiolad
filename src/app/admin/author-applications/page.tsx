@@ -3,7 +3,8 @@ import Link from "next/link";
 import AuthorApplicationsList from "@/components/admin/AuthorApplicationsList";
 import {
   ADMIN_APPLICATION_STATUS_OPTIONS,
-  resolveAdminApplicationFilterStatus,
+  AUTHOR_APPLICATION_ATTENTION_FILTER_KEY,
+  resolveAdminAuthorApplicationFilterStatuses,
 } from "@/lib/admin/application-status";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { listAdminAuthorApplications } from "@/lib/admin/queries";
@@ -17,12 +18,12 @@ export default async function AdminAuthorApplicationsPage({
 }) {
   await requireAdminPermission("authors.view");
   const params = await searchParams;
-  const status = resolveAdminApplicationFilterStatus(params.status);
+  const statuses = resolveAdminAuthorApplicationFilterStatuses(params.status);
 
   let applications;
 
   try {
-    applications = await listAdminAuthorApplications({ status });
+    applications = await listAdminAuthorApplications({ statuses });
   } catch (error) {
     console.error("admin_applications_page_error", error);
 
@@ -51,6 +52,16 @@ export default async function AdminAuthorApplicationsPage({
           }`}
         >
           Все
+        </Link>
+        <Link
+          href={`/admin/author-applications?status=${AUTHOR_APPLICATION_ATTENTION_FILTER_KEY}`}
+          className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold ${
+            activeFilter === AUTHOR_APPLICATION_ATTENTION_FILTER_KEY
+              ? "bg-[#7042c5] text-white"
+              : "border border-[#e4d7f4] bg-white text-[#7042c5]"
+          }`}
+        >
+          Требуют внимания
         </Link>
         {ADMIN_APPLICATION_STATUS_OPTIONS.map((option) => (
           <Link

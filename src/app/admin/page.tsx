@@ -2,9 +2,12 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import AdminAnalyticsWorkbench from "@/components/admin/AdminAnalyticsWorkbench";
+import AuthorApplicationsAttentionCard from "@/components/admin/AuthorApplicationsAttentionCard";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
 import CommercialApplicationsAttentionCard from "@/components/admin/CommercialApplicationsAttentionCard";
 import { getAdminAnalyticsSummaryBundle } from "@/lib/admin/analytics-queries";
+import type { AuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention";
+import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
 import type { CommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention";
 import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
 import {
@@ -50,14 +53,18 @@ export default async function AdminOverviewPage({
   let overviewStats;
   let analyticsSummary = null;
   let commercialAttention: CommercialApplicationAttentionSummary | null = null;
+  let authorApplicationAttention: AuthorApplicationAttentionSummary | null = null;
 
   try {
     const commercialPromise = canViewAuthors
       ? getCachedAdminCommercialApplicationAttentionSummary()
       : Promise.resolve(null);
+    const authorApplicationPromise = canViewAuthors
+      ? getCachedAdminAuthorApplicationAttentionSummary()
+      : Promise.resolve(null);
 
     if (canViewAnalytics) {
-      [overviewStats, analyticsSummary, commercialAttention] = await Promise.all([
+      [overviewStats, analyticsSummary, commercialAttention, authorApplicationAttention] = await Promise.all([
         getAdminOverviewStats(),
         getAdminAnalyticsSummaryBundle({
           period: params.period,
@@ -68,11 +75,13 @@ export default async function AdminOverviewPage({
           deviceType: params.deviceType,
         }),
         commercialPromise,
+        authorApplicationPromise,
       ]);
     } else {
-      [overviewStats, commercialAttention] = await Promise.all([
+      [overviewStats, commercialAttention, authorApplicationAttention] = await Promise.all([
         getAdminOverviewStats(),
         commercialPromise,
+        authorApplicationPromise,
       ]);
     }
   } catch (error) {
@@ -87,6 +96,10 @@ export default async function AdminOverviewPage({
 
   return (
     <div className="space-y-8">
+      {authorApplicationAttention ? (
+        <AuthorApplicationsAttentionCard summary={authorApplicationAttention} />
+      ) : null}
+
       {commercialAttention ? (
         <CommercialApplicationsAttentionCard summary={commercialAttention} />
       ) : null}

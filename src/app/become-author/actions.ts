@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import {
   getCurrentAuthorApplication,
   isDuplicateActiveApplicationError,
@@ -27,6 +29,7 @@ import {
   validateAuthorApplicationFormValues,
 } from "@/lib/author-applications/validation";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-application-admin-alert-email";
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
 import { createClient } from "@/lib/supabase/server";
 
@@ -166,12 +169,18 @@ export async function submitAuthorApplication(
       );
     }
 
+    let submittedApplication: { id: string; submitted_at: string | null } | null =
+      null;
+
     if (existing && isEditableAuthorApplicationStatus(existing.status)) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("author_applications")
         .update(mapApplicationUpdatePayload(values, existing, "submitted"))
         .eq("id", existing.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("status", existing.status)
+        .select("id, submitted_at")
+        .single();
 
       if (error) {
         console.error("author_application_submit_update_error", {
@@ -192,10 +201,14 @@ export async function submitAuthorApplication(
           values,
         );
       }
+
+      submittedApplication = data;
     } else if (!existing) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("author_applications")
-        .insert(mapApplicationInsertPayload(user.id, values, "submitted"));
+        .insert(mapApplicationInsertPayload(user.id, values, "submitted"))
+        .select("id, submitted_at")
+        .single();
 
       if (error) {
         console.error("author_application_submit_insert_error", {
@@ -216,6 +229,8 @@ export async function submitAuthorApplication(
           values,
         );
       }
+
+      submittedApplication = data;
     } else {
       return failureState(
         { conflict: "Заявка уже отправлена и находится на рассмотрении." },
@@ -224,6 +239,10 @@ export async function submitAuthorApplication(
     }
 
     await persistProfileContactEmail(supabase, user.id, values.contactEmail);
+    revalidatePath("/admin");
+    revalidatePath("/admin/author-applications");
+    revalidatePath("/become-author");
+    revalidatePath("/profile");
 
     const emailResult = await sendAuthorApplicationSubmittedEmail({
       toEmail: values.contactEmail.trim(),
@@ -234,6 +253,26 @@ export async function submitAuthorApplication(
         "author_application_submitted_email_failed",
         emailResult.code,
       );
+    }
+
+    if (submittedApplication?.submitted_at) {
+      const adminEmailResult = await sendAuthorApplicationAdminAlertEmail({
+        applicationId: submittedApplication.id,
+        displayName: values.displayName,
+        contactEmail: values.contactEmail.trim(),
+        contactDetails: values.contactDetails.trim(),
+        direction: values.direction,
+        submittedAt: submittedApplication.submitted_at,
+      });
+
+      if (!adminEmailResult.ok) {
+        console.error(
+          "author_application_admin_alert_email_failed",
+          adminEmailResult.code,
+        );
+      }
+    } else {
+      console.error("author_application_admin_alert_missing_submission_attempt");
     }
 
     return successState(values, "initial");

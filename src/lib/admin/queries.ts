@@ -8,6 +8,11 @@ import {
   AUTHOR_APPLICATION_COLUMNS,
   formatApplicationContactSummary,
 } from "@/lib/author-applications/queries";
+import {
+  AUTHOR_APPLICATION_ATTENTION_STATUSES,
+  summarizeAuthorApplicationAttention,
+  type AuthorApplicationAttentionSummary,
+} from "@/lib/admin/author-application-attention";
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -248,8 +253,24 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   };
 }
 
+export async function getAdminAuthorApplicationAttentionSummary(): Promise<AuthorApplicationAttentionSummary> {
+  const service = createServiceRoleClient();
+  const { data, error } = await service
+    .from("author_applications")
+    .select("status")
+    .in("status", [...AUTHOR_APPLICATION_ATTENTION_STATUSES]);
+
+  if (error) {
+    throw new Error("admin_author_application_attention_load_failed");
+  }
+
+  return summarizeAuthorApplicationAttention(
+    (data ?? []).map((application) => application.status),
+  );
+}
+
 export async function listAdminAuthorApplications(input?: {
-  status?: AuthorApplicationRow["status"] | null;
+  statuses?: AuthorApplicationRow["status"][] | null;
 }): Promise<AdminApplicationListItem[]> {
   const service = createServiceRoleClient();
 
@@ -261,8 +282,8 @@ export async function listAdminAuthorApplications(input?: {
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  if (input?.status) {
-    query = query.eq("status", input.status);
+  if (input?.statuses?.length) {
+    query = query.in("status", input.statuses);
   }
 
   const { data, error } = await query;
