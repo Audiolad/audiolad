@@ -8,6 +8,43 @@ export type IntervalProgressSnapshot = {
   isPlaying: boolean;
 };
 
+export type ProgressIntervalClock = {
+  setTimeout: (callback: () => void, delay?: number) => unknown;
+  clearTimeout: (id: unknown) => void;
+  setInterval: (callback: () => void, interval?: number) => unknown;
+  clearInterval: (id: unknown) => void;
+  /** When present, waits advance virtual time instead of parking on the event loop. */
+  advanceBy?: (ms: number) => void;
+};
+
+function resolveClock(clock?: ProgressIntervalClock): ProgressIntervalClock {
+  if (clock) {
+    return clock;
+  }
+
+  return {
+    setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
+    clearTimeout: (id) => {
+      globalThis.clearTimeout(id as NodeJS.Timeout);
+    },
+    setInterval: (callback, interval) => globalThis.setInterval(callback, interval),
+    clearInterval: (id) => {
+      globalThis.clearInterval(id as NodeJS.Timeout);
+    },
+  };
+}
+
+function waitMs(ms: number, clock: ProgressIntervalClock): Promise<void> {
+  if (typeof clock.advanceBy === "function") {
+    clock.advanceBy(ms);
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    clock.setTimeout(() => resolve(), ms);
+  });
+}
+
 export function shouldSkipIntervalProgressSave(
   snapshot: IntervalProgressSnapshot,
   lastSavedPositionSeconds: number,
@@ -44,12 +81,6 @@ export function shouldSkipIntervalProgressSave(
   return false;
 }
 
-function waitMs(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 /**
  * Simulates the pre-fix interval pattern where the effect re-runs whenever
  * playback time updates (e.g. on every audio timeupdate).
@@ -59,20 +90,22 @@ export async function simulateBuggyProgressInterval(options: {
   tick: () => void;
   advanceMs: number;
   timeupdateEveryMs: number;
+  clock?: ProgressIntervalClock;
 }): Promise<{ tickCount: number; effectRuns: number }> {
+  const clock = resolveClock(options.clock);
   let tickCount = 0;
   let effectRuns = 0;
-  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let intervalId: unknown = null;
 
   const setupEffect = () => {
     effectRuns += 1;
 
     if (intervalId !== null) {
-      clearInterval(intervalId);
+      clock.clearInterval(intervalId);
       intervalId = null;
     }
 
-    intervalId = setInterval(() => {
+    intervalId = clock.setInterval(() => {
       tickCount += 1;
       options.tick();
     }, options.intervalMs);
@@ -83,14 +116,17 @@ export async function simulateBuggyProgressInterval(options: {
   const steps = Math.floor(options.advanceMs / options.timeupdateEveryMs);
 
   for (let step = 0; step < steps; step += 1) {
-    await waitMs(options.timeupdateEveryMs);
+    await waitMs(options.timeupdateEveryMs, clock);
     setupEffect();
   }
 
-  await waitMs(options.advanceMs % options.timeupdateEveryMs || 0);
+  const remainder = options.advanceMs % options.timeupdateEveryMs;
+  if (remainder > 0) {
+    await waitMs(remainder, clock);
+  }
 
   if (intervalId !== null) {
-    clearInterval(intervalId);
+    clock.clearInterval(intervalId);
   }
 
   return { tickCount, effectRuns };
@@ -104,18 +140,19 @@ export async function simulateStableProgressInterval(options: {
   tick: (positionSeconds: number) => void;
   advanceMs: number;
   timeupdateEveryMs: number;
+  clock?: ProgressIntervalClock;
 }): Promise<{
   tickCount: number;
   effectRuns: number;
   lastSavedPosition: number | null;
 }> {
+  const clock = resolveClock(options.clock);
   let tickCount = 0;
   const effectRuns = 1;
   let lastSavedPosition: number | null = null;
   const positionRef = { current: 0 };
-  let intervalId: ReturnType<typeof setInterval> | null = null;
 
-  intervalId = setInterval(() => {
+  const intervalId = clock.setInterval(() => {
     tickCount += 1;
     options.tick(positionRef.current);
     lastSavedPosition = positionRef.current;
@@ -124,15 +161,19 @@ export async function simulateStableProgressInterval(options: {
   const steps = Math.floor(options.advanceMs / options.timeupdateEveryMs);
 
   for (let step = 0; step < steps; step += 1) {
-    await waitMs(options.timeupdateEveryMs);
+    // timeupdate lands before the virtual clock advances, so an interval
+    // that fires on this step reads the updated playback position.
     positionRef.current += options.timeupdateEveryMs / 1000;
+    await waitMs(options.timeupdateEveryMs, clock);
   }
 
-  await waitMs(options.advanceMs % options.timeupdateEveryMs || 0);
-
-  if (intervalId !== null) {
-    clearInterval(intervalId);
+  const remainder = options.advanceMs % options.timeupdateEveryMs;
+  if (remainder > 0) {
+    positionRef.current += remainder / 1000;
+    await waitMs(remainder, clock);
   }
+
+  clock.clearInterval(intervalId);
 
   return { tickCount, effectRuns, lastSavedPosition };
 }
@@ -144,18 +185,20 @@ export async function simulateIntervalCleanup(options: {
   intervalMs: number;
   tick: () => void;
   runMs: number;
+  clock?: ProgressIntervalClock;
 }): Promise<number> {
+  const clock = resolveClock(options.clock);
   let tickCount = 0;
 
-  const intervalId = setInterval(() => {
+  const intervalId = clock.setInterval(() => {
     tickCount += 1;
     options.tick();
   }, options.intervalMs);
 
-  await waitMs(options.runMs);
-  clearInterval(intervalId);
+  await waitMs(options.runMs, clock);
+  clock.clearInterval(intervalId);
   const countAfterCleanup = tickCount;
-  await waitMs(options.intervalMs + 100);
+  await waitMs(options.intervalMs + 100, clock);
 
   return countAfterCleanup;
 }
