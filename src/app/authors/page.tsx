@@ -98,7 +98,7 @@ export default async function AuthorsPage() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-[21px] font-semibold">
                 {authors.length > 0
-                  ? `Все авторы — ${authors.length}`
+                  ? `Все авторы – ${authors.length}`
                   : "Все авторы"}
               </h2>
 
