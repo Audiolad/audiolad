@@ -3,13 +3,13 @@
 import Link from "next/link";
 
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
 import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
+import { useAuthorProjectSelection } from "@/components/author-dashboard/useAuthorProjectSelection";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
@@ -110,17 +110,14 @@ function ProductCard({
 export default function AuthorDashboardClient({
   authors,
 }: AuthorDashboardClientProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [listView, setListView] = useState<ProductListView>("active");
-
-  const selectedAuthor = useMemo(() => {
-    const slug = searchParams.get("author");
-    return authors.find((author) => author.slug === slug) ?? authors[0] ?? null;
-  }, [authors, searchParams]);
+  const { selectedAuthor } = useAuthorProjectSelection(
+    authors,
+    "/author-dashboard",
+  );
 
   useEffect(() => {
     if (!selectedAuthor) {
@@ -169,12 +166,6 @@ export default function AuthorDashboardClient({
       cancelled = true;
     };
   }, [selectedAuthor]);
-
-  function handleAuthorChange(slug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("author", slug);
-    router.replace(`/author-dashboard?${params.toString()}`);
-  }
 
   if (!selectedAuthor) {
     return null;
@@ -225,23 +216,13 @@ export default function AuthorDashboardClient({
         newProductHref={newProductHref}
       />
 
-      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <label className="block flex-1">
-          <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-            Авторское пространство
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-[#5f5484]">
+          Продукты текущего проекта{" "}
+          <span className="font-semibold text-[#25135c]">
+            «{selectedAuthor.name}»
           </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleAuthorChange(event.target.value)}
-            className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        </p>
 
         <Link
           href={newProductHref}

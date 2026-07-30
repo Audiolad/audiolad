@@ -165,12 +165,6 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
     };
   }, [selectedAuthor, refreshToken, activeTab]);
 
-  function handleAuthorChange(slug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("author", slug);
-    router.replace(`/author-dashboard/diagnostics?${params.toString()}`);
-  }
-
   function setTab(tab: "materials" | "templates") {
     const params = new URLSearchParams(searchParams.toString());
     if (tab === "templates") {
@@ -198,23 +192,13 @@ export default function AuthorDiagnosticsClient({ authors }: AuthorDiagnosticsCl
     <div className="min-w-0">
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
 
-      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <label className="block min-w-0 flex-1">
-          <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-            Авторское пространство
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-[#5f5484]">
+          Личная работа проекта{" "}
+          <span className="font-semibold text-[#25135c]">
+            «{selectedAuthor.name}»
           </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleAuthorChange(event.target.value)}
-            className="w-full min-w-0 rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        </p>
 
         {activeTab === "materials" ? (
           <Link

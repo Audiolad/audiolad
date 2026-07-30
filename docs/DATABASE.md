@@ -55,10 +55,25 @@ RLS включён. Политика SELECT: `Public can read published practice
 | `full_name` | `text` | YES | — |
 | `role` | `text` | NOT NULL | `'listener'` |
 | `created_at` | `timestamptz` | YES | `now()` |
+| `author_project_limit_override` | `integer` | YES | — |
+| `author_premium_enabled` | `boolean` | NOT NULL | `false` |
 
 Primary key: `id`.
 
 Foreign key: `profiles.id` → `auth.users(id)` ON DELETE CASCADE.
+
+#### Лимит авторских проектов (2026-07-30)
+
+Миграция: `20260730120000_author_multi_project_limits.sql`.
+
+Эффективный лимит owned-проектов (`author_members.role = 'owner'`):
+
+`admin_override ?? (premium → 3) ?? 1`
+
+Создание проекта: RPC `create_author_project` (advisory lock + проверка лимита).  
+JWT-сессии не могут сами менять `author_project_limit_override` / `author_premium_enabled` (триггер-защита).
+
+Проект в продуктовой модели = строка `authors` + membership; отдельной таблицы projects нет.
 
 #### RLS
 

@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
+
+import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 
 function ProfileIcon() {
   return (
@@ -194,25 +197,36 @@ export default function AuthorDashboardNav({
   ];
 
   return (
-    <nav className="flex flex-wrap gap-2">
-      {items.map((item) => {
-        const Icon = item.icon;
+    <div className="space-y-3">
+      <Suspense
+        fallback={
+          <div className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3 text-sm text-[#7d70a2]">
+            Загрузка проектов…
+          </div>
+        }
+      >
+        <AuthorProjectSwitcher currentSlug={authorSlug} />
+      </Suspense>
+      <nav className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          const Icon = item.icon;
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-              item.active
-                ? "bg-[#7042c5] text-white"
-                : "border border-[#e4d7f4] bg-white text-[#7042c5]"
-            }`}
-          >
-            <Icon />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                item.active
+                  ? "bg-[#7042c5] text-white"
+                  : "border border-[#e4d7f4] bg-white text-[#7042c5]"
+              }`}
+            >
+              <Icon />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }

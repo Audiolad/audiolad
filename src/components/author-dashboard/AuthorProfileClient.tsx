@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
@@ -53,7 +53,6 @@ export default function AuthorProfileClient({
   authors,
   topicOptions,
 }: AuthorProfileClientProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const selectedAuthor = useMemo(() => {
@@ -141,12 +140,6 @@ export default function AuthorProfileClient({
       cancelled = true;
     };
   }, [selectedAuthor]);
-
-  function handleWorkspaceChange(nextSlug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("author", nextSlug);
-    router.replace(`/author-dashboard/profile?${params.toString()}`);
-  }
 
   function moveFeaturedProduct(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
@@ -265,25 +258,6 @@ export default function AuthorProfileClient({
   return (
     <div>
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
-
-      {authors.length > 1 ? (
-        <label className="mt-5 block">
-          <span className="mb-2 block text-sm font-medium text-[#65577f]">
-            Авторское пространство
-          </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleWorkspaceChange(event.target.value)}
-            className="w-full rounded-[18px] border border-[#ddcfef] bg-white px-4 py-3 text-sm"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
 
       {loading ? (
         <p className="mt-6 text-sm text-[#7d70a2]">Загрузка профиля…</p>
