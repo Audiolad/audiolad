@@ -10,6 +10,7 @@ import TopicSelector, {
 } from "@/components/author-products/TopicSelector";
 import {
   AUTHOR_TYPE_LABELS,
+  MAX_AUTHOR_PROFILE_TOPICS,
   MAX_FEATURED_PRODUCTS,
   MAX_FULL_BIO_LENGTH,
   MAX_SHORT_POSITIONING_LENGTH,
@@ -361,7 +362,8 @@ export default function AuthorProfileClient({
               <TopicSelector
                 options={topicOptions}
                 value={topicKeys}
-                limit={6}
+                limit={MAX_AUTHOR_PROFILE_TOPICS}
+                hint={`Выберите до ${MAX_AUTHOR_PROFILE_TOPICS} тем, которые лучше всего описывают ваш проект.`}
                 disabled={saving}
                 onChange={setTopicKeys}
               />

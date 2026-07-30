@@ -14,6 +14,8 @@ type TopicSelectorProps = {
   archivedTopics?: TopicSelectorOption[];
   value: string[];
   limit: number;
+  /** Overrides default product-oriented hint (profile uses project wording). */
+  hint?: string;
   disabled?: boolean;
   error?: string;
   onChange: (keys: string[]) => void;
@@ -24,6 +26,7 @@ export default function TopicSelector({
   archivedTopics = [],
   value,
   limit,
+  hint,
   disabled = false,
   error,
   onChange,
@@ -65,7 +68,8 @@ export default function TopicSelector({
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-[#7d70a2]">
-          Выберите до {limit} тем, которые лучше всего описывают эту практику.
+          {hint ??
+            `Выберите до ${limit} тем, которые лучше всего описывают эту практику.`}
         </p>
         <p className="text-sm font-medium text-[#5f3f9d]">
           Выбрано {activeSelectedCount} из {limit}

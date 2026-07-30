@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  MAX_AUTHOR_PROFILE_TOPICS,
   MAX_FULL_BIO_LENGTH,
   MAX_SHORT_POSITIONING_LENGTH,
 } from "../src/lib/authors/constants.ts";
@@ -87,9 +88,44 @@ function testPositioningUnchanged() {
   assert(MAX_SHORT_POSITIONING_LENGTH === 100, "positioning limit still 100");
 }
 
+function testProfileTopicLimit() {
+  assert(MAX_AUTHOR_PROFILE_TOPICS === 3, "author profile topic limit is 3");
+
+  const source = read("src/components/author-dashboard/AuthorProfileClient.tsx");
+  const route = read("src/app/api/author/profile/route.ts");
+  const selector = read("src/components/author-products/TopicSelector.tsx");
+
+  assert(
+    source.includes("MAX_AUTHOR_PROFILE_TOPICS"),
+    "profile client uses shared topic limit constant",
+  );
+  assert(
+    source.includes("лучше всего описывают ваш проект"),
+    "profile topic hint uses project wording",
+  );
+  assert(
+    !source.includes("эту практику"),
+    "profile form does not reuse product practice hint",
+  );
+  assert(!source.includes("limit={6}"), "profile no longer hardcodes limit 6");
+  assert(
+    route.includes("MAX_AUTHOR_PROFILE_TOPICS"),
+    "profile API enforces the same topic limit",
+  );
+  assert(
+    selector.includes("hint ??"),
+    "TopicSelector hint override keeps product default intact",
+  );
+  assert(
+    selector.includes("эту практику"),
+    "product default hint remains practice-oriented",
+  );
+}
+
 testProfileClientUi();
 testValidationLimits();
 testProfileApi();
 testPositioningUnchanged();
+testProfileTopicLimit();
 
 console.log("author-profile-description-unit: ok");
