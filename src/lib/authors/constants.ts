@@ -12,7 +12,7 @@ export const MAX_SHORT_BIO_LENGTH = 180;
 export const MAX_FULL_BIO_LENGTH = 700;
 export const MAX_SHORT_POSITIONING_LENGTH = 100;
 export const MAX_FEATURED_PRODUCTS = 5;
-export const MAX_AUTHOR_PROFILE_TOPICS = 6;
+export const MAX_AUTHOR_PROFILE_TOPICS = 3;
 export const AUTHOR_PRODUCTS_INITIAL_COUNT = 8;
 
 export const AUTHOR_ASSETS_BUCKET = "author-assets";

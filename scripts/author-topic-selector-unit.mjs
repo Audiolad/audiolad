@@ -78,6 +78,14 @@ assert(topicSelector.includes("limit"), "limit comes through props");
 assert(!topicSelector.includes("MAX_TOPICS"), "limit is not hardcoded in UI");
 assert(topicSelector.includes("Выбрано"), "counter is present");
 assert(topicSelector.includes("из {limit}"), "counter uses limit prop");
+assert(
+  topicSelector.includes("эту практику"),
+  "default hint remains product/practice oriented",
+);
+assert(
+  topicSelector.includes("hint"),
+  "optional hint prop allows profile project wording",
+);
 assert(topicSelector.includes("aria-pressed"), "chip buttons use aria-pressed");
 assert(topicSelector.includes('type="button"'), "uses real button elements");
 assert(!/<div[^>]*onClick/.test(topicSelector), "no div onClick pattern");
