@@ -10,6 +10,7 @@ import {
   AUTHOR_SALES_CSV_COLUMNS,
   getAuthorSaleAccrualStatusLabel,
   getAuthorSalePayoutStatusLabel,
+  getAuthorSaleStatusDisplay,
 } from "../src/lib/author-sales/labels.ts";
 import {
   AUTHOR_SALES_FORBIDDEN_FIELDS,
@@ -44,6 +45,11 @@ function assertEqual(actual, expected, label) {
 
 function testLabels() {
   assertEqual(
+    getAuthorSaleAccrualStatusLabel("accrued"),
+    "Начислено",
+    "accrued label",
+  );
+  assertEqual(
     getAuthorSaleAccrualStatusLabel("pending"),
     "Начисление обрабатывается",
     "pending label",
@@ -52,6 +58,21 @@ function testLabels() {
     getAuthorSaleAccrualStatusLabel("requires_review"),
     "Требуется проверка",
     "review label",
+  );
+  assertEqual(
+    getAuthorSaleAccrualStatusLabel("failed"),
+    "Требуется проверка",
+    "failed uses safe public wording",
+  );
+  assertEqual(
+    getAuthorSaleAccrualStatusLabel("not_applicable"),
+    "Без начисления",
+    "historical not_applicable label",
+  );
+  assertEqual(
+    getAuthorSaleAccrualStatusLabel("refunded"),
+    "Возвращено",
+    "accrual refunded label",
   );
   assertEqual(
     getAuthorSalePayoutStatusLabel("held"),
@@ -63,7 +84,109 @@ function testLabels() {
     "Доступно к выплате",
     "available label",
   );
+  assertEqual(
+    getAuthorSalePayoutStatusLabel("reserved"),
+    "Зарезервировано",
+    "reserved label",
+  );
+  assertEqual(
+    getAuthorSalePayoutStatusLabel("paid"),
+    "Выплачено",
+    "paid label",
+  );
+  assertEqual(
+    getAuthorSalePayoutStatusLabel("refunded"),
+    "Возвращено",
+    "payout refunded label",
+  );
+  assertEqual(
+    getAuthorSalePayoutStatusLabel(null),
+    "—",
+    "null payout stays neutral",
+  );
   assert(isAuthorSaleAccrualStatus("accrued"), "accrued is status");
+}
+
+function testIndependentStatusDisplay() {
+  const pending = getAuthorSaleStatusDisplay({
+    accrualStatus: "pending",
+    payoutStatus: null,
+  });
+  assertEqual(pending.accrualLabel, "Начисление обрабатывается", "pending accrual");
+  assertEqual(pending.payoutLabel, "—", "pending payout null");
+  assertEqual(pending.refundLabel, null, "pending no refund chip");
+
+  const held = getAuthorSaleStatusDisplay({
+    accrualStatus: "accrued",
+    payoutStatus: "held",
+  });
+  assertEqual(held.accrualLabel, "Начислено", "held accrual");
+  assertEqual(held.payoutLabel, "Удерживается", "held payout");
+
+  const paid = getAuthorSaleStatusDisplay({
+    accrualStatus: "accrued",
+    payoutStatus: "paid",
+  });
+  assertEqual(paid.accrualLabel, "Начислено", "paid accrual");
+  assertEqual(paid.payoutLabel, "Выплачено", "paid payout");
+
+  const historical = getAuthorSaleStatusDisplay({
+    accrualStatus: "not_applicable",
+    payoutStatus: null,
+  });
+  assertEqual(historical.accrualLabel, "Без начисления", "historical accrual");
+  assertEqual(historical.payoutLabel, "—", "historical payout null");
+  assert(
+    historical.payoutLabel !== historical.accrualLabel,
+    "no accrual→payout fallback for historical sale",
+  );
+
+  const refund = getAuthorSaleStatusDisplay({
+    accrualStatus: "refunded",
+    payoutStatus: "refunded",
+    refundStatus: "full",
+  });
+  assertEqual(refund.accrualLabel, "Возвращено", "refund accrual");
+  assertEqual(refund.payoutLabel, "Возвращено", "refund payout");
+  assertEqual(refund.refundLabel, "Возвращено", "full refund chip");
+
+  const partial = getAuthorSaleStatusDisplay({
+    accrualStatus: "accrued",
+    payoutStatus: "held",
+    refundStatus: "partial",
+  });
+  assertEqual(partial.refundLabel, "Частичный возврат", "partial refund chip");
+  assertEqual(partial.accrualLabel, "Начислено", "partial keeps accrual");
+  assertEqual(partial.payoutLabel, "Удерживается", "partial keeps payout");
+
+  const sectionSource = readFileSync(
+    join(ROOT, "src/components/author-dashboard/AuthorSalesSection.tsx"),
+    "utf8",
+  );
+  assert(
+    !sectionSource.includes(
+      "detail.payoutStatus\n                                ? getAuthorSalePayoutStatusLabel(\n                                    detail.payoutStatus,\n                                  )\n                                : getAuthorSaleAccrualStatusLabel",
+    ),
+    "detail must not fall back payout←accrual",
+  );
+  assert(
+    sectionSource.includes("Статус начисления"),
+    "detail shows accrual status label",
+  );
+  assert(
+    sectionSource.includes("Статус выплаты"),
+    "detail shows payout status label",
+  );
+  assert(
+    sectionSource.includes("getAuthorSaleStatusDisplay"),
+    "list uses independent status display helper",
+  );
+  assert(
+    !sectionSource.includes(
+      "row.payoutStatus\n                          ? getAuthorSalePayoutStatusLabel(row.payoutStatus)\n                          : getAuthorSaleAccrualStatusLabel(row.accrualStatus)",
+    ),
+    "list must not replace accrual with payout",
+  );
 }
 
 function testBuyerName() {
@@ -235,6 +358,7 @@ function testMigrationContracts() {
 
 function main() {
   testLabels();
+  testIndependentStatusDisplay();
   testBuyerName();
   testEmptyStateWithSalesWithoutLedger();
   testCsvNoPii();

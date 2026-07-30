@@ -178,7 +178,7 @@ export default function AuthorDashboardNav({
     },
     {
       href: `/author-dashboard/finance${authorQuery}`,
-      label: "Финансы",
+      label: "Продажи и финансы",
       icon: FinanceIcon,
       active: pathname.startsWith("/author-dashboard/finance"),
     },

@@ -51,8 +51,33 @@ export function getAuthorSalePayoutStatusLabel(
     case "refunded":
       return "Возвращено";
     default:
+      // Null payout is not a missing accrual status — keep the fields independent.
       return "—";
   }
+}
+
+/**
+ * Independent author-facing status chips for a sale row / detail.
+ * Accrual and payout must never fall back into each other.
+ */
+export function getAuthorSaleStatusDisplay(input: {
+  accrualStatus: AuthorSaleAccrualStatus | string;
+  payoutStatus: AuthorSalePayoutStatus | string | null | undefined;
+  refundStatus?: "none" | "partial" | "full";
+}): {
+  accrualLabel: string;
+  payoutLabel: string;
+  refundLabel: string | null;
+} {
+  const refundStatus = input.refundStatus ?? "none";
+  return {
+    accrualLabel: getAuthorSaleAccrualStatusLabel(input.accrualStatus),
+    payoutLabel: getAuthorSalePayoutStatusLabel(input.payoutStatus),
+    refundLabel:
+      refundStatus === "none"
+        ? null
+        : getAuthorSaleRefundStatusLabel(refundStatus),
+  };
 }
 
 export const AUTHOR_SALES_CSV_COLUMNS = [

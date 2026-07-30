@@ -22,7 +22,7 @@ import type {
   AuthorFinanceTypeKey,
 } from "./types";
 
-export const AUTHOR_FINANCE_SECTION_TITLE = "Финансы";
+export const AUTHOR_FINANCE_SECTION_TITLE = "Продажи и финансы";
 export const AUTHOR_FINANCE_SECTION_SUBTITLE =
   "Начисления, удержание и выплаты по вашим продуктам";
 

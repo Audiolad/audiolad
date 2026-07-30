@@ -11,6 +11,7 @@ import {
   getAuthorSaleAccrualStatusLabel,
   getAuthorSalePayoutStatusLabel,
   getAuthorSaleRefundStatusLabel,
+  getAuthorSaleStatusDisplay,
 } from "@/lib/author-sales/labels";
 import {
   AUTHOR_SALE_ACCRUAL_STATUSES,
@@ -224,6 +225,11 @@ export default function AuthorSalesSection({
           <ul className="mt-3 divide-y divide-[#f0e8fb]">
             {rows.map((row) => {
               const open = openSaleId === row.saleId;
+              const statusDisplay = getAuthorSaleStatusDisplay({
+                accrualStatus: row.accrualStatus,
+                payoutStatus: row.payoutStatus,
+                refundStatus: row.refundStatus,
+              });
               return (
                 <li key={row.saleId} className="py-3">
                   <button
@@ -252,18 +258,23 @@ export default function AuthorSalesSection({
                           </span>
                         ) : null}
                       </span>
-                      <span className="inline-flex rounded-full bg-[#f3ecfd] px-2.5 py-1 text-[11px] font-semibold text-[#7042c5]">
-                        {row.refundStatus !== "none"
-                          ? getAuthorSaleRefundStatusLabel(row.refundStatus)
-                          : row.payoutStatus
-                          ? getAuthorSalePayoutStatusLabel(row.payoutStatus)
-                          : getAuthorSaleAccrualStatusLabel(row.accrualStatus)}
-                      </span>
-                      {row.refundStatus !== "none" && row.payoutStatus ? (
+                      {statusDisplay.refundLabel ? (
                         <span className="inline-flex rounded-full bg-[#f3ecfd] px-2.5 py-1 text-[11px] font-semibold text-[#7042c5]">
-                          {getAuthorSalePayoutStatusLabel(row.payoutStatus)}
+                          {statusDisplay.refundLabel}
                         </span>
                       ) : null}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#f3ecfd] px-2.5 py-1 text-[11px] font-semibold text-[#7042c5]">
+                        <span className="font-medium text-[#9a8fb8]">
+                          Начисление
+                        </span>
+                        {statusDisplay.accrualLabel}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#f3ecfd] px-2.5 py-1 text-[11px] font-semibold text-[#7042c5]">
+                        <span className="font-medium text-[#9a8fb8]">
+                          Выплата
+                        </span>
+                        {statusDisplay.payoutLabel}
+                      </span>
                     </div>
                   </button>
 
@@ -310,16 +321,22 @@ export default function AuthorSalesSection({
                           </div>
                           <div>
                             <dt className="text-xs text-[#9a8fb8]">
+                              Статус начисления
+                            </dt>
+                            <dd>
+                              {getAuthorSaleAccrualStatusLabel(
+                                detail.accrualStatus,
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-[#9a8fb8]">
                               Статус выплаты
                             </dt>
                             <dd>
-                              {detail.payoutStatus
-                                ? getAuthorSalePayoutStatusLabel(
-                                    detail.payoutStatus,
-                                  )
-                                : getAuthorSaleAccrualStatusLabel(
-                                    detail.accrualStatus,
-                                  )}
+                              {getAuthorSalePayoutStatusLabel(
+                                detail.payoutStatus,
+                              )}
                             </dd>
                           </div>
                           <div className="sm:col-span-2">
