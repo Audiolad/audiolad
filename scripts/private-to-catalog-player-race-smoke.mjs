@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import "./lib/assert-playwright-allowed.mjs";
 /**
  * Browser smoke: private_audio → navigate → catalog ?autoplay=1 must not hang.
  *
@@ -11,10 +10,9 @@ import "./lib/assert-playwright-allowed.mjs";
  */
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { chromium } from "playwright";
 
-const BASE = process.argv[2] ?? "https://audiolad.ru";
 const LISTEN_PATH = "/listen/sergey-and-zoya/klyuch-k-izobiliyu?autoplay=1";
 const MOBILE = process.env.AUDIOLAD_SMOKE_VIEWPORT === "mobile";
 const MP3_CANDIDATES = [
@@ -22,16 +20,45 @@ const MP3_CANDIDATES = [
   "/tmp/private-audio-smoke-2833083/tone.mp3",
 ];
 
-function loadEnv() {
-  return Object.fromEntries(
-    readFileSync("/var/www/audiolad/.env.local", "utf8")
-      .split("\n")
-      .filter((line) => line && line.includes("=") && !line.startsWith("#"))
-      .map((line) => {
-        const index = line.indexOf("=");
-        return [line.slice(0, index), line.slice(index + 1)];
-      }),
-  );
+function assertSafeTestEnvironment(env = process.env) {
+  const required = [
+    "AUDIOLAD_TEST_BASE_URL",
+    "AUDIOLAD_TEST_SUPABASE_URL",
+    "AUDIOLAD_TEST_SUPABASE_SERVICE_ROLE_KEY",
+  ];
+  if (env.AUDIOLAD_TEST_DATABASE !== "1") {
+    throw new Error("private_catalog_race_requires_test_database_marker");
+  }
+  if (env.AUDIOLAD_ALLOW_MUTATING_SMOKE !== "1") {
+    throw new Error("private_catalog_race_requires_explicit_mutation_opt_in");
+  }
+  for (const key of required) {
+    if (!env[key]?.trim()) throw new Error(`private_catalog_race_missing_${key.toLowerCase()}`);
+  }
+  if (env.AUDIOLAD_TEST_DB_CONTAINER !== "audiolad-test-db") {
+    throw new Error("private_catalog_race_requires_audiolad_test_db_container");
+  }
+  if (!/^audiolad_[a-z0-9_]+_test$/.test(env.AUDIOLAD_TEST_DB_NAME ?? "")) {
+    throw new Error("private_catalog_race_requires_disposable_test_database");
+  }
+  const allowed = (value, label) => {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (
+      host === "audiolad.ru" ||
+      host.endsWith(".audiolad.ru") ||
+      !(host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".test"))
+    ) {
+      throw new Error(`private_catalog_race_rejected_${label}_host`);
+    }
+    return url.toString().replace(/\/$/, "");
+  };
+  return {
+    baseUrl: allowed(env.AUDIOLAD_TEST_BASE_URL, "base_url"),
+    supabaseUrl: allowed(env.AUDIOLAD_TEST_SUPABASE_URL, "supabase_url"),
+    serviceRoleKey: env.AUDIOLAD_TEST_SUPABASE_SERVICE_ROLE_KEY,
+    publishableKey: env.AUDIOLAD_TEST_SUPABASE_PUBLISHABLE_KEY ?? "",
+  };
 }
 
 function findMp3() {
@@ -44,10 +71,11 @@ function findMp3() {
 }
 
 async function createPrivateFixture(env) {
-  const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  const admin = createClient(env.supabaseUrl, env.serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const email = `private-catalog-race-${Date.now()}@audiolad.local`;
+  const prefix = `e2e-private-catalog-race-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const email = `${prefix}@example.test`;
   const password = `Sm0ke-${randomUUID().slice(0, 12)}!aA`;
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
@@ -60,7 +88,7 @@ async function createPrivateFixture(env) {
 
   const userId = created.user.id;
   const itemId = randomUUID();
-  const audioPath = `${userId}/${itemId}/audio.mp3`;
+  const audioPath = `${prefix}/${userId}/${itemId}/audio.mp3`;
   const mp3 = readFileSync(findMp3());
 
   const { error: uploadError } = await admin.storage
@@ -74,7 +102,7 @@ async function createPrivateFixture(env) {
     id: itemId,
     owner_user_id: userId,
     source_type: "manual_upload",
-    title: "Race Smoke Private Track",
+    title: `${prefix} Race Smoke Private Track`,
     author_text: "Smoke",
     audio_path: audioPath,
     cover_path: null,
@@ -92,9 +120,10 @@ async function createPrivateFixture(env) {
 }
 
 async function authCookies(env, baseUrl, email, password) {
+  if (!env.publishableKey) throw new Error("private_catalog_race_missing_publishable_key");
   const pub = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    env.supabaseUrl,
+    env.publishableKey,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
   const { data, error } = await pub.auth.signInWithPassword({ email, password });
@@ -175,7 +204,7 @@ async function cleanupFixture(fixture) {
 }
 
 async function runViewport(label, viewport) {
-  const env = loadEnv();
+  const env = assertSafeTestEnvironment();
   const fixture = await createPrivateFixture(env);
   const browser = await chromium.launch({ headless: true });
   const consoleErrors = [];
@@ -183,7 +212,7 @@ async function runViewport(label, viewport) {
 
   try {
     const context = await browser.newContext({ viewport });
-    await context.addCookies(await authCookies(env, BASE, fixture.email, fixture.password));
+    await context.addCookies(await authCookies(env, env.baseUrl, fixture.email, fixture.password));
     const page = await context.newPage();
     page.on("console", (msg) => {
       if (msg.type() === "error") {
@@ -194,7 +223,7 @@ async function runViewport(label, viewport) {
       pageErrors.push(error.message);
     });
 
-    await page.goto(`${BASE}/my-library/private-audio/${fixture.itemId}`, {
+    await page.goto(`${env.baseUrl}/my-library/private-audio/${fixture.itemId}`, {
       waitUntil: "domcontentloaded",
       timeout: 45_000,
     });
@@ -226,7 +255,7 @@ async function runViewport(label, viewport) {
       throw new Error("private audio paused after catalog nav");
     }
 
-    await page.goto(`${BASE}${LISTEN_PATH}`, {
+    await page.goto(`${env.baseUrl}${LISTEN_PATH}`, {
       waitUntil: "domcontentloaded",
       timeout: 45_000,
     });
@@ -318,6 +347,7 @@ async function runViewport(label, viewport) {
 }
 
 async function main() {
+  await import("./lib/assert-playwright-allowed.mjs");
   const viewport = MOBILE
     ? { width: 390, height: 844 }
     : { width: 1440, height: 900 };
@@ -325,7 +355,11 @@ async function main() {
   console.log("private-to-catalog-player-race-smoke: ok");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta.url) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : "private_catalog_race_failed");
+    process.exit(1);
+  });
+}
+
+export { assertSafeTestEnvironment };

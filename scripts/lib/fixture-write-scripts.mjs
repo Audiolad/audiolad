@@ -3,6 +3,7 @@
  */
 export const GUARDED_WRITE_SCRIPTS = [
   "scripts/author-access-provisioning-integration.mjs",
+  "scripts/author-commercial-application-integration.mjs",
   "scripts/author-promotion-practice-change-integration.mjs",
   "scripts/test-user-reset-integration.mjs",
   "scripts/admin-operation-log-migration-validation.mjs",
@@ -28,6 +29,7 @@ export const GUARDED_WRITE_SCRIPTS = [
   "scripts/stage-bc-product-contents-check.mjs",
   "scripts/global-mini-player-e2e.mjs",
   "scripts/promo-funnel-production-smoke.mjs",
+  "scripts/private-to-catalog-player-race-smoke.mjs",
 ];
 
 export const READ_ONLY_SQL_SCRIPTS = [
@@ -59,6 +61,7 @@ export const REQUIRED_GUARD_MARKERS = [
   "assertAdminInteractiveConfirmed",
   // Isolated personal-materials test DB scripts use this production hard-fail.
   "assertPersonalMaterialsTestDbAllowed",
+  "assertSafeTestEnvironment",
 ];
 
 export const REQUIRED_ADMIN_MARKERS = [
