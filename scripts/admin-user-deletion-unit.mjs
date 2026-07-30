@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * Unit and integration checks for admin user deletion policy and service logic.
+ * Deterministic unit checks for admin user deletion policy and orchestration.
+ *
+ * No network, no .env.local, no Supabase credentials, no real mutations.
  *
  * Usage:
- *   node scripts/admin-user-deletion-unit.mjs
+ *   npx tsx scripts/admin-user-deletion-unit.mjs
  */
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
 
 import {
   USER_DELETION_BLOCK_CODES,
@@ -19,25 +20,12 @@ import {
 import {
   authorizeAdminUserDeletion,
   deleteAdminUsersBatch,
-  loadUserDeletionDependencies,
 } from "../src/lib/admin/user-deletion.ts";
 import {
   LISTENER_ROLE,
   PLATFORM_ADMIN_ROLE,
   PLATFORM_OWNER_ROLE,
 } from "../src/lib/auth/platform-admin.ts";
-
-function loadEnv() {
-  return Object.fromEntries(
-    readFileSync("/var/www/audiolad/.env.local", "utf8")
-      .split("\n")
-      .filter((line) => line && line.includes("=") && !line.startsWith("#"))
-      .map((line) => {
-        const index = line.indexOf("=");
-        return [line.slice(0, index), line.slice(index + 1)];
-      }),
-  );
-}
 
 function assert(condition, message) {
   if (!condition) {
@@ -174,175 +162,518 @@ function testStaticWiring() {
   assert(!table.includes("createServiceRoleClient"), "service role not in client table");
   assert(!table.includes("SUPABASE_SERVICE_ROLE_KEY"), "service key not in client table");
   assert(table.includes("Удалить пользователя"), "single delete action");
+  assert(
+    !deletion.includes("/var/www/audiolad"),
+    "deletion module has no absolute production path",
+  );
 }
 
-async function createTempListener(service, prefix) {
-  const email = `${prefix}-${randomUUID()}@audiolad.test`;
-  const password = `Temp-${randomUUID()}-Aa1!`;
+/**
+ * In-memory fake service role client for deletion orchestration.
+ * Records auth/storage/table calls; never opens a network socket.
+ */
+function createFakeService(scenario = {}) {
+  const actorUserId = scenario.actorUserId ?? randomUUID();
+  const profiles = new Map(scenario.profiles ?? []);
+  const authorMemberIds = new Set(scenario.authorMemberIds ?? []);
+  const orderUserIds = new Set(scenario.orderUserIds ?? []);
+  const personalMaterialUserIds = new Set(scenario.personalMaterialUserIds ?? []);
+  const promotionCreatorIds = new Set(scenario.promotionCreatorIds ?? []);
+  const authUsers = new Set(scenario.authUsers ?? [...profiles.keys()]);
+  const permissionByActor = scenario.permissionByActor ?? new Map([
+    [actorUserId, true],
+  ]);
 
-  const { data, error } = await service.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: "Admin",
-      last_name: "DeleteTest",
-      full_name: "Admin DeleteTest",
+  const calls = {
+    deleteUser: [],
+    getUserById: [],
+    rpc: [],
+    tables: [],
+    cleanupPrivateAudio: [],
+    updates: [],
+  };
+
+  class QueryBuilder {
+    #table;
+    #mode = "select";
+    #columns = "*";
+    #filters = [];
+    #inFilter = null;
+    #updatePayload = null;
+
+    constructor(table) {
+      this.#table = table;
+      calls.tables.push(table);
+    }
+
+    select(columns) {
+      this.#columns = columns;
+      return this;
+    }
+
+    eq(column, value) {
+      this.#filters.push({ column, value });
+      return this;
+    }
+
+    in(column, values) {
+      this.#inFilter = { column, values: [...values] };
+      return this;
+    }
+
+    update(payload) {
+      this.#mode = "update";
+      this.#updatePayload = payload;
+      return this;
+    }
+
+    maybeSingle() {
+      return Promise.resolve(this.#resolveMaybeSingle());
+    }
+
+    then(resolve, reject) {
+      return Promise.resolve(this.#resolve()).then(resolve, reject);
+    }
+
+    #idsInFilter() {
+      if (this.#inFilter?.column === "id" || this.#inFilter?.column === "user_id") {
+        return this.#inFilter.values;
+      }
+      if (this.#inFilter?.column === "created_by") {
+        return this.#inFilter.values;
+      }
+      if (this.#inFilter?.column === "claimed_by_user_id") {
+        return this.#inFilter.values;
+      }
+      if (this.#inFilter?.column === "updated_by") {
+        return this.#inFilter.values;
+      }
+      return [];
+    }
+
+    #resolveMaybeSingle() {
+      if (this.#table === "profiles") {
+        const idFilter = this.#filters.find((f) => f.column === "id");
+        if (!idFilter) {
+          return { data: null, error: null };
+        }
+        const profile = profiles.get(idFilter.value);
+        if (!profile) {
+          return { data: null, error: null };
+        }
+        if (this.#columns === "id") {
+          return { data: { id: profile.id }, error: null };
+        }
+        return { data: profile, error: null };
+      }
+
+      return { data: null, error: null };
+    }
+
+    #resolve() {
+      if (this.#mode === "update") {
+        calls.updates.push({
+          table: this.#table,
+          payload: this.#updatePayload,
+          filters: [...this.#filters],
+        });
+        if (scenario.failUpdateOn === this.#table) {
+          return { error: { message: "update failed" } };
+        }
+        return { error: null };
+      }
+
+      const ids = this.#idsInFilter();
+
+      if (this.#table === "profiles") {
+        const rows = ids
+          .map((id) => profiles.get(id))
+          .filter(Boolean)
+          .map((profile) => ({
+            id: profile.id,
+            role: profile.role,
+            avatar_path: profile.avatar_path ?? null,
+          }));
+        return { data: rows, error: null };
+      }
+
+      if (this.#table === "author_members") {
+        return {
+          data: ids
+            .filter((id) => authorMemberIds.has(id))
+            .map((user_id) => ({ user_id })),
+          error: null,
+        };
+      }
+
+      if (this.#table === "orders") {
+        return {
+          data: ids
+            .filter((id) => orderUserIds.has(id))
+            .map((user_id) => ({ user_id })),
+          error: null,
+        };
+      }
+
+      if (this.#table === "personal_materials") {
+        if (this.#inFilter?.column === "created_by") {
+          return {
+            data: ids
+              .filter((id) => personalMaterialUserIds.has(id))
+              .map((created_by) => ({ created_by })),
+            error: null,
+          };
+        }
+        if (this.#inFilter?.column === "claimed_by_user_id") {
+          return {
+            data: ids
+              .filter((id) => personalMaterialUserIds.has(id))
+              .map((claimed_by_user_id) => ({ claimed_by_user_id })),
+            error: null,
+          };
+        }
+      }
+
+      if (this.#table === "personal_material_author_notes") {
+        return {
+          data: ids
+            .filter((id) => personalMaterialUserIds.has(id))
+            .map((updated_by) => ({ updated_by })),
+          error: null,
+        };
+      }
+
+      if (this.#table === "promotion_campaigns") {
+        return {
+          data: ids
+            .filter((id) => promotionCreatorIds.has(id))
+            .map((created_by) => ({ created_by })),
+          error: null,
+        };
+      }
+
+      return { data: [], error: null };
+    }
+  }
+
+  return {
+    actorUserId,
+    calls,
+    profiles,
+    authUsers,
+    from(table) {
+      return new QueryBuilder(table);
     },
+    rpc(name, args) {
+      calls.rpc.push({ name, args });
+      if (name === "has_platform_permission") {
+        const allowed = permissionByActor.get(args.p_user_id) === true;
+        return Promise.resolve({ data: allowed, error: null });
+      }
+      return Promise.resolve({ data: null, error: { message: `unknown_rpc:${name}` } });
+    },
+    auth: {
+      admin: {
+        async getUserById(userId) {
+          calls.getUserById.push(userId);
+          if (!authUsers.has(userId)) {
+            return { data: { user: null }, error: null };
+          }
+          return { data: { user: { id: userId } }, error: null };
+        },
+        async deleteUser(userId) {
+          calls.deleteUser.push(userId);
+          if (scenario.deleteUserErrorFor === userId) {
+            return { error: { message: scenario.deleteUserErrorMessage ?? "auth failed" } };
+          }
+          if (!authUsers.has(userId) && !profiles.has(userId)) {
+            return { error: { message: "User not found" } };
+          }
+          authUsers.delete(userId);
+          profiles.delete(userId);
+          return { error: null };
+        },
+      },
+    },
+    storage: {
+      from() {
+        return {
+          async remove() {
+            return { error: null };
+          },
+        };
+      },
+    },
+  };
+}
+
+function noopCleanup(calls) {
+  return async (ownerUserId) => {
+    calls.cleanupPrivateAudio.push(ownerUserId);
+    return { removedItems: 0, removedPaths: 0 };
+  };
+}
+
+function listenerProfile(userId) {
+  return {
+    id: userId,
+    role: LISTENER_ROLE,
+    avatar_path: null,
+  };
+}
+
+async function testDeletesExpectedListenerOnly() {
+  const actorUserId = randomUUID();
+  const targetId = randomUUID();
+  const otherId = randomUUID();
+
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+      [targetId, listenerProfile(targetId)],
+      [otherId, listenerProfile(otherId)],
+    ],
+    authUsers: new Set([actorUserId, targetId, otherId]),
   });
 
-  if (error || !data.user?.id) {
-    throw new Error(`temp_user_create_failed:${error?.message ?? "missing_user"}`);
-  }
-
-  return { userId: data.user.id, email };
-}
-
-async function deleteTempUserSafe(service, userId) {
-  if (!userId) {
-    return;
-  }
-
-  await service.auth.admin.deleteUser(userId).catch(() => {});
-}
-
-async function getOwnerActor(service) {
-  const { data, error } = await service
-    .from("profiles")
-    .select("id, role")
-    .eq("role", PLATFORM_OWNER_ROLE)
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data?.id) {
-    throw new Error("platform_owner_not_found_for_tests");
-  }
-
-  return data;
-}
-
-async function testIntegration() {
-  const env = loadEnv();
-  const service = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } },
+  const result = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [targetId] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
   );
 
-  const owner = await getOwnerActor(service);
-  const tempUsers = [];
+  assert(result.ok, "batch delete ok");
+  assert(result.deletedCount === 1, "one user deleted");
+  assert(result.results[0]?.ok, "item delete ok");
+  assert(service.calls.deleteUser.length === 1, "auth delete called once");
+  assert(service.calls.deleteUser[0] === targetId, "auth delete uses target id");
+  assert(!service.calls.deleteUser.includes(otherId), "other user not deleted");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 1 &&
+      service.calls.cleanupPrivateAudio[0] === targetId,
+    "private audio cleanup runs for target before auth delete",
+  );
+  assert(!service.profiles.has(targetId), "target profile removed from fake store");
+  assert(service.profiles.has(otherId), "other profile remains");
+}
 
-  try {
-    const listener = await createTempListener(service, "admin-delete-listener");
-    tempUsers.push(listener.userId);
+async function testAuthDeleteFailureIsNotSuccess() {
+  const actorUserId = randomUUID();
+  const targetId = randomUUID();
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+      [targetId, listenerProfile(targetId)],
+    ],
+    authUsers: new Set([actorUserId, targetId]),
+    deleteUserErrorFor: targetId,
+    deleteUserErrorMessage: "auth boom",
+  });
 
-    const dependencies = await loadUserDeletionDependencies(service, [
-      listener.userId,
-    ]);
-    const eligibility = evaluateUserDeletionEligibility({
-      userId: listener.userId,
-      actorUserId: owner.id,
-      dependencies: dependencies.get(listener.userId) ?? null,
-    });
-    assert(eligibility.canDelete, "temp listener eligible before delete");
+  const result = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [targetId] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
 
-    const deleteResult = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: [listener.userId],
-    });
+  assert(result.ok, "batch wrapper still returns item-level results");
+  assert(result.deletedCount === 0, "failed auth delete is not counted as deleted");
+  assert(result.failedCount === 1, "failed count recorded");
+  assert(!result.results[0]?.ok, "item marked failed");
+  assert(service.profiles.has(targetId), "failed delete keeps profile");
+}
 
-    assert(deleteResult.ok, "batch delete ok");
-    assert(deleteResult.deletedCount === 1, "one user deleted");
-    assert(deleteResult.results[0]?.ok, "item delete ok");
-    tempUsers.pop();
+async function testAlreadyDeletedRepeatIsSuccess() {
+  const actorUserId = randomUUID();
+  const missingId = randomUUID();
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+    ],
+    authUsers: new Set([actorUserId]),
+  });
 
-    const { data: profileAfterDelete } = await service
-      .from("profiles")
-      .select("id")
-      .eq("id", listener.userId)
-      .maybeSingle();
-    assert(!profileAfterDelete, "profile removed after auth delete");
+  const result = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [missingId] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
 
-    const { data: authAfterDelete } = await service.auth.admin.getUserById(
-      listener.userId,
-    );
-    assert(!authAfterDelete.user, "auth user removed");
+  assert(result.results[0]?.ok, "repeat/missing delete treated as success");
+  assert(result.results[0]?.alreadyDeleted, "alreadyDeleted flagged");
+  assert(service.calls.deleteUser.length === 0, "auth delete skipped when already gone");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 0,
+    "cleanup skipped for already-deleted missing profile",
+  );
+}
 
-    const repeatDelete = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: [listener.userId],
-    });
-    assert(repeatDelete.results[0]?.ok, "repeat delete treated as success");
-    assert(repeatDelete.results[0]?.alreadyDeleted, "repeat delete flagged");
+async function testSelfAndInvalidIdsRejected() {
+  const actorUserId = randomUUID();
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+    ],
+    authUsers: new Set([actorUserId]),
+  });
 
-    const invalid = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: ["not-a-uuid"],
-    });
-    assert(!invalid.results[0]?.ok, "invalid uuid rejected");
+  const invalid = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: ["not-a-uuid"] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
+  assert(!invalid.results[0]?.ok, "invalid uuid rejected");
+  assert(service.calls.deleteUser.length === 0, "invalid uuid never reaches auth delete");
 
-    const selfDelete = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: [owner.id],
-    });
-    assert(!selfDelete.results[0]?.ok, "owner cannot delete self");
-    assert(
-      selfDelete.results[0]?.error?.includes("свой аккаунт"),
-      "self delete reason",
-    );
+  const selfDelete = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [actorUserId] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
+  assert(!selfDelete.results[0]?.ok, "owner cannot delete self");
+  assert(
+    selfDelete.results[0]?.error?.includes("свой аккаунт"),
+    "self delete reason",
+  );
+  assert(service.calls.deleteUser.length === 0, "self delete never reaches auth delete");
+}
 
-    const bulkA = await createTempListener(service, "admin-delete-bulk-a");
-    const bulkB = await createTempListener(service, "admin-delete-bulk-b");
-    tempUsers.push(bulkA.userId, bulkB.userId);
+async function testBulkPartialSuccessAndBatchLimit() {
+  const actorUserId = randomUUID();
+  const bulkA = randomUUID();
+  const bulkB = randomUUID();
+  const protectedAdmin = randomUUID();
 
-    const bulkResult = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: [bulkA.userId, owner.id, bulkB.userId, "bad-id"],
-    });
-    assert(bulkResult.deletedCount === 2, "bulk partial success deletes listeners");
-    assert(bulkResult.failedCount === 2, "bulk partial success keeps failures");
-    tempUsers.length = 0;
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+      [bulkA, listenerProfile(bulkA)],
+      [bulkB, listenerProfile(bulkB)],
+      [protectedAdmin, { id: protectedAdmin, role: PLATFORM_ADMIN_ROLE, avatar_path: null }],
+    ],
+    authUsers: new Set([actorUserId, bulkA, bulkB, protectedAdmin]),
+  });
 
-    const listenerActor = await createTempListener(service, "admin-delete-actor");
-    tempUsers.push(listenerActor.userId);
+  const bulkResult = await deleteAdminUsersBatch(
+    service,
+    {
+      actorUserId,
+      userIds: [bulkA, actorUserId, bulkB, "bad-id", protectedAdmin],
+    },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
 
-    const forbidden = await authorizeAdminUserDeletion(service, listenerActor.userId);
-    assert(!forbidden.ok && forbidden.status === 403, "non-admin gets 403");
+  assert(bulkResult.deletedCount === 2, "bulk partial success deletes listeners");
+  assert(bulkResult.failedCount === 3, "bulk partial success keeps failures");
+  assert(
+    service.calls.deleteUser.length === 2 &&
+      service.calls.deleteUser.includes(bulkA) &&
+      service.calls.deleteUser.includes(bulkB),
+    "only eligible listeners reach auth delete",
+  );
 
-    const adminProfiles = await service
-      .from("profiles")
-      .select("id")
-      .eq("role", PLATFORM_ADMIN_ROLE)
-      .limit(1)
-      .maybeSingle();
+  const tooMany = Array.from({ length: 101 }, () => randomUUID());
+  const batchLimit = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: tooMany },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
+  assert(!batchLimit.ok, "batch limit rejects >100");
+  assert(batchLimit.batchError, "batch limit message");
+  assert(batchLimit.results.length === 0, "batch limit returns no partial deletes");
+}
 
-    if (adminProfiles.data?.id) {
-      const protectedAdmin = await deleteAdminUsersBatch(service, {
-        actorUserId: owner.id,
-        userIds: [adminProfiles.data.id],
-      });
-      assert(!protectedAdmin.results[0]?.ok, "protected platform admin blocked");
-    }
+async function testNonAdminForbidden() {
+  const actorUserId = randomUUID();
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: LISTENER_ROLE, avatar_path: null }],
+    ],
+    authUsers: new Set([actorUserId]),
+    permissionByActor: new Map([[actorUserId, false]]),
+  });
 
-    const tooMany = Array.from({ length: 101 }, () => randomUUID());
-    const batchLimit = await deleteAdminUsersBatch(service, {
-      actorUserId: owner.id,
-      userIds: tooMany,
-    });
-    assert(!batchLimit.ok, "batch limit rejects >100");
-    assert(batchLimit.batchError, "batch limit message");
-    assert(batchLimit.results.length === 0, "batch limit returns no partial deletes");
-  } finally {
-    for (const userId of tempUsers) {
-      await deleteTempUserSafe(service, userId);
-    }
-  }
+  const forbidden = await authorizeAdminUserDeletion(service, actorUserId);
+  assert(!forbidden.ok && forbidden.status === 403, "non-admin gets 403");
+
+  const targetId = randomUUID();
+  service.profiles.set(targetId, listenerProfile(targetId));
+  service.authUsers.add(targetId);
+
+  const batch = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [targetId] },
+    { cleanupPrivateAudioStorageForUser: noopCleanup(service.calls) },
+  );
+  assert(batch.forbidden, "batch forbidden for non-admin");
+  assert(service.calls.deleteUser.length === 0, "forbidden actor deletes nobody");
+}
+
+async function testCleanupFailureIsNotFullSuccess() {
+  const actorUserId = randomUUID();
+  const targetId = randomUUID();
+  const service = createFakeService({
+    actorUserId,
+    profiles: [
+      [actorUserId, { id: actorUserId, role: PLATFORM_OWNER_ROLE, avatar_path: null }],
+      [targetId, listenerProfile(targetId)],
+    ],
+    authUsers: new Set([actorUserId, targetId]),
+  });
+
+  const result = await deleteAdminUsersBatch(
+    service,
+    { actorUserId, userIds: [targetId] },
+    {
+      cleanupPrivateAudioStorageForUser: async () => {
+        throw new Error("cleanup boom");
+      },
+    },
+  );
+
+  assert(result.deletedCount === 0, "cleanup failure is not counted as deleted");
+  assert(!result.results[0]?.ok, "cleanup failure surfaces as item failure");
+  assert(service.calls.deleteUser.length === 0, "auth delete not called after cleanup failure");
+}
+
+function testNoEnvOrNetworkImports() {
+  const source = readRepoFile("scripts", "admin-user-deletion-unit.mjs");
+  const productionEnvPath = ["", "var", "www", "audiolad", ".env.local"].join("/");
+  const supabaseImport = "@" + "supabase/supabase-js";
+  const productionHost = "audiolad" + ".ru";
+
+  assert(!source.includes(productionEnvPath), "unit does not read production env path");
+  assert(!source.includes(`from "${supabaseImport}"`), "unit does not import live supabase sdk");
+  assert(!source.includes(productionHost), "unit does not target production host");
+  assert(
+    !source.includes("process.env." + "SUPABASE_SERVICE_ROLE_KEY"),
+    "unit does not read service role from process.env",
+  );
+  assert(source.includes("createFakeService"), "unit uses in-memory fake service");
+  assert(
+    source.includes("cleanupPrivateAudioStorageForUser: noopCleanup") ||
+      source.includes("cleanupPrivateAudioStorageForUser: async"),
+    "orchestration uses injected fake cleanup, not live service-role cleanup",
+  );
 }
 
 async function main() {
   testPolicyGuards();
   testStaticWiring();
-  await testIntegration();
+  testNoEnvOrNetworkImports();
+  await testDeletesExpectedListenerOnly();
+  await testAuthDeleteFailureIsNotSuccess();
+  await testAlreadyDeletedRepeatIsSuccess();
+  await testSelfAndInvalidIdsRejected();
+  await testBulkPartialSuccessAndBatchLimit();
+  await testNonAdminForbidden();
+  await testCleanupFailureIsNotFullSuccess();
   console.log("admin-user-deletion-unit: ok");
 }
 

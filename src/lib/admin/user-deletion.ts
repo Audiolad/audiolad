@@ -31,6 +31,13 @@ export type AdminUserDeletionBatchResult = {
 
 type ServiceClient = ReturnType<typeof createServiceRoleClient>;
 
+/** Optional test/runtime overrides; production callers leave this empty. */
+export type AdminUserDeletionDeps = {
+  cleanupPrivateAudioStorageForUser?: (
+    ownerUserId: string,
+  ) => Promise<{ removedItems: number; removedPaths: number }>;
+};
+
 export async function loadUserDeletionDependencies(
   service: ServiceClient,
   userIds: string[],
@@ -225,6 +232,7 @@ export async function deleteSingleAdminUser(
     dependencies: UserDeletionDependencies | null;
     avatarPath?: string | null;
   },
+  deps: AdminUserDeletionDeps = {},
 ): Promise<AdminUserDeletionItemResult> {
   if (!isValidUserId(input.userId)) {
     return {
@@ -275,7 +283,10 @@ export async function deleteSingleAdminUser(
     );
     // Private listener uploads are owned solely by the user: remove DB + Storage
     // before auth deletion so objects are not orphaned after CASCADE.
-    await cleanupPrivateAudioStorageForUser(input.userId);
+    const cleanupPrivateAudio =
+      deps.cleanupPrivateAudioStorageForUser ??
+      cleanupPrivateAudioStorageForUser;
+    await cleanupPrivateAudio(input.userId);
 
     const deleted = await deleteAuthUser(service, input.userId);
 
@@ -325,6 +336,7 @@ export async function deleteAdminUsersBatch(
     actorUserId: string;
     userIds: string[];
   },
+  deps: AdminUserDeletionDeps = {},
 ): Promise<AdminUserDeletionBatchResult> {
   const authorization = await authorizeAdminUserDeletion(service, input.actorUserId);
 
@@ -382,12 +394,16 @@ export async function deleteAdminUsersBatch(
       continue;
     }
 
-    const itemResult = await deleteSingleAdminUser(service, {
-      userId,
-      actorUserId: input.actorUserId,
-      dependencies: dependencies.get(userId) ?? null,
-      avatarPath: avatarPathMap.get(userId) ?? null,
-    });
+    const itemResult = await deleteSingleAdminUser(
+      service,
+      {
+        userId,
+        actorUserId: input.actorUserId,
+        dependencies: dependencies.get(userId) ?? null,
+        avatarPath: avatarPathMap.get(userId) ?? null,
+      },
+      deps,
+    );
 
     results.push(itemResult);
   }
