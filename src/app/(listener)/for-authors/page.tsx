@@ -104,7 +104,10 @@ export default function ForAuthorsPage() {
             <Link href="/become-author" className={primaryCtaClassName}>
               Стать автором
             </Link>
-            <a href="#for-authors-capabilities" className={secondaryCtaClassName}>
+            <a
+              href="#for-authors-capabilities"
+              className={secondaryCtaClassName}
+            >
               Посмотреть возможности
             </a>
           </div>
@@ -126,9 +129,12 @@ export default function ForAuthorsPage() {
             могут отличаться. Ниже – типичные ситуации, в которых АудиоЛад
             помогает автору работать спокойнее и понятнее для слушателя.
           </p>
-          <ul className="mt-5 grid list-none gap-3 p-0 sm:grid-cols-2">
+          <ul className="mt-5 flex list-none flex-col gap-3 p-0 sm:flex-row sm:flex-wrap sm:justify-center">
             {FOR_AUTHORS_AUDIENCE.map((item) => (
-              <li key={item.title} className={cardClassName}>
+              <li
+                key={item.title}
+                className={`${cardClassName} sm:w-[calc(50%-0.375rem)] lg:w-[calc((100%-1.5rem)/3)]`}
+              >
                 <h3 className="text-base font-semibold text-[#25135c]">
                   {item.title}
                 </h3>
@@ -140,10 +146,24 @@ export default function ForAuthorsPage() {
           </ul>
         </section>
 
+        <Section id="for-authors-why-audio" title="Почему именно аудио">
+          <p>
+            Аудио можно слушать без постоянного взгляда на экран – дома, в
+            дороге, во время отдыха или самой практики.
+          </p>
+          <p>
+            Голос автора передаёт смысл, интонацию, состояние и энергетику. Для
+            медитаций, энергопрактик и духовных материалов это особенно важно:
+            живое звучание помогает сохранить присутствие автора и глубже
+            погрузиться в практику.
+          </p>
+        </Section>
+
         <Section id="for-authors-formats" title="Что можно публиковать">
           <p>
             Основой авторского материала на АудиоЛаде должен быть живой голос
-            автора. В зависимости от формата можно публиковать:
+            автора. Через него слушатель воспринимает смысл, интонацию,
+            состояние и энергетику. В зависимости от формата можно публиковать:
           </p>
           <ul className="list-disc space-y-2 pl-5">
             {FOR_AUTHORS_FORMATS.map((item) => (
@@ -151,16 +171,16 @@ export default function ForAuthorsPage() {
             ))}
           </ul>
           <p>
-            Видеокурсы, вебинары, встроенные чаты и системы записи на консультации
-            не являются частью текущей модели платформы.
+            Видеокурсы, вебинары, встроенные чаты и системы записи на
+            консультации не являются частью текущей модели платформы.
           </p>
         </Section>
 
         <Section id="for-authors-page" title="Публичная страница автора">
           <p>
             После одобрения у автора появляется собственная публичная страница.
-            На ней собраны опубликованные материалы и представление автора, чтобы
-            слушатель мог познакомиться с подходом до прослушивания.
+            На ней собраны опубликованные материалы и представление автора,
+            чтобы слушатель мог познакомиться с подходом до прослушивания.
           </p>
           <p>
             Материалы можно открывать и сохранять. Ссылку на страницу или на
@@ -251,10 +271,7 @@ export default function ForAuthorsPage() {
           </p>
         </Section>
 
-        <Section
-          id="for-authors-programs"
-          title="Программы и аудиокурсы"
-        >
+        <Section id="for-authors-programs" title="Программы и аудиокурсы">
           <p>
             Один материал – хороший старт. Когда появляется линейка, автор может
             объединять несколько аудио в последовательный опыт: тематическую
@@ -272,7 +289,10 @@ export default function ForAuthorsPage() {
           className="mt-12 max-w-3xl scroll-mt-24"
           aria-labelledby="for-authors-capabilities-heading"
         >
-          <h2 id="for-authors-capabilities-heading" className={headingClassName}>
+          <h2
+            id="for-authors-capabilities-heading"
+            className={headingClassName}
+          >
             Возможности для автора
           </h2>
           <ul className="mt-5 grid list-none gap-3 p-0 sm:grid-cols-2">
@@ -289,10 +309,7 @@ export default function ForAuthorsPage() {
           </ul>
         </section>
 
-        <Section
-          id="for-authors-promotion"
-          title="Продвижение и статистика"
-        >
+        <Section id="for-authors-promotion" title="Продвижение и статистика">
           <p>
             АудиоЛад предоставляет инструменты публикации и аналитики, а автор
             сохраняет контроль над своими каналами продвижения.
@@ -303,9 +320,9 @@ export default function ForAuthorsPage() {
             помогает понимать, какие материалы и какие источники работают лучше.
           </p>
           <p>
-            Платформа не ведёт рекламу вместо автора и не обещает поток клиентов.
-            Инструменты нужны для прозрачной работы с вашими собственными
-            запусками и ссылками.
+            Платформа не ведёт рекламу вместо автора и не обещает поток
+            клиентов. Инструменты нужны для прозрачной работы с вашими
+            собственными запусками и ссылками.
           </p>
         </Section>
 
@@ -340,7 +357,8 @@ export default function ForAuthorsPage() {
           </h2>
           <p className={proseClassName}>
             Мы строим сотрудничество спокойно и без манипулятивного продвижения.
-            Для автора важны ясность, уважение к аудитории и качество материалов.
+            Для автора важны ясность, уважение к аудитории и качество
+            материалов.
           </p>
           <ul className="mt-5 space-y-3">
             {FOR_AUTHORS_PARTNERSHIP_PRINCIPLES.map((item) => (

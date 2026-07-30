@@ -35,13 +35,7 @@ function BackIcon() {
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
-      <circle
-        cx="11"
-        cy="11"
-        r="7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
       <path
         d="m16.5 16.5 4 4"
         stroke="currentColor"
@@ -104,7 +98,7 @@ export default async function AuthorsPage() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-[21px] font-semibold">
                 {authors.length > 0
-                  ? `Все авторы — ${authors.length}`
+                  ? `Все авторы – ${authors.length}`
                   : "Все авторы"}
               </h2>
 
@@ -139,8 +133,8 @@ export default async function AuthorsPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-[#70628e]">
-              Размещайте медитации, энергопрактики, молитвы, программы и
-              аудиокурсы.
+              Размещайте медитации, энергопрактики, эзотерические практики,
+              молитвы, программы и аудиокурсы.
             </p>
 
             <Link

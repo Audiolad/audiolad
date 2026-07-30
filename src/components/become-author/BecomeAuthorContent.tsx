@@ -22,8 +22,17 @@ function BecomeAuthorBackButton({
   backLabel: string;
 }) {
   return (
-    <Link href={backHref} aria-label={backLabel} className={becomeAuthorBackButtonClassName}>
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+    <Link
+      href={backHref}
+      aria-label={backLabel}
+      className={becomeAuthorBackButtonClassName}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-6 w-6"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M15 5 8 12l7 7"
           stroke="currentColor"
@@ -36,7 +45,11 @@ function BecomeAuthorBackButton({
   );
 }
 
-function BecomeAuthorHeaderActions({ audience }: { audience: BecomeAuthorAudience }) {
+function BecomeAuthorHeaderActions({
+  audience,
+}: {
+  audience: BecomeAuthorAudience;
+}) {
   if (audience === "guest") {
     return (
       <Link
@@ -55,9 +68,12 @@ type BecomeAuthorHeaderProps = {
   audience: BecomeAuthorAudience;
 };
 
-export default function BecomeAuthorHeader({ audience }: BecomeAuthorHeaderProps) {
+export default function BecomeAuthorHeader({
+  audience,
+}: BecomeAuthorHeaderProps) {
   const backHref = audience === "guest" ? "/catalog" : "/profile";
-  const backLabel = audience === "guest" ? "Назад в каталог" : "Назад в профиль";
+  const backLabel =
+    audience === "guest" ? "Назад в каталог" : "Назад в профиль";
 
   return (
     <header>
@@ -110,8 +126,8 @@ export function BecomeAuthorHero() {
       </p>
 
       <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-        АудиоЛад помогает авторам публиковать материалы живым голосом,
-        оформлять продукты, собирать аудиторию и подключать продажи.
+        АудиоЛад помогает авторам публиковать материалы живым голосом, оформлять
+        продукты, собирать аудиторию и подключать продажи.
       </p>
     </section>
   );
@@ -121,11 +137,16 @@ export function BecomeAuthorInfoSections() {
   return (
     <div className="mt-8 space-y-8">
       <section aria-labelledby="become-author-fit-heading">
-        <h2 id="become-author-fit-heading" className="text-[21px] font-semibold">
+        <h2
+          id="become-author-fit-heading"
+          className="text-[21px] font-semibold"
+        >
           Кому подходит
         </h2>
 
-        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
+        <div
+          className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}
+        >
           <p>Авторство подойдёт вам, если вы:</p>
           <ul className="mt-3 list-disc space-y-2 pl-5">
             <li>создаёте медитации и аудиопрактики;</li>
@@ -133,6 +154,7 @@ export function BecomeAuthorInfoSections() {
               работаете как психолог, наставник или специалист помогающей
               профессии;
             </li>
+            <li>работаете как энергопрактик или эзотерик;</li>
             <li>
               проводите занятия, практики, молитвы, настрои или аудиоуроки;
             </li>
@@ -146,19 +168,26 @@ export function BecomeAuthorInfoSections() {
       </section>
 
       <section aria-labelledby="become-author-formats-heading">
-        <h2 id="become-author-formats-heading" className="text-[21px] font-semibold">
+        <h2
+          id="become-author-formats-heading"
+          className="text-[21px] font-semibold"
+        >
           Что можно размещать
         </h2>
 
-        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
+        <div
+          className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}
+        >
           <ul className="list-disc space-y-2 pl-5">
             <li>одиночные аудиопрактики;</li>
             <li>программы из нескольких аудио;</li>
-            <li>медитации, молитвы, настрои, аудиоуроки;</li>
-            <li>авторские курсы и восстановительные программы;</li>
             <li>
-              другие содержательные голосовые форматы после согласования.
+              медитации, энергопрактики, квант-медитации и духовные
+              аудиоматериалы;
             </li>
+            <li>молитвы, настрои, аудиоуроки;</li>
+            <li>авторские курсы и восстановительные программы;</li>
+            <li>другие содержательные голосовые форматы после согласования.</li>
           </ul>
 
           <p className="mt-4 font-medium text-[#7042c5]">
@@ -168,11 +197,16 @@ export function BecomeAuthorInfoSections() {
       </section>
 
       <section aria-labelledby="become-author-benefits-heading">
-        <h2 id="become-author-benefits-heading" className="text-[21px] font-semibold">
+        <h2
+          id="become-author-benefits-heading"
+          className="text-[21px] font-semibold"
+        >
           Что получает автор
         </h2>
 
-        <div className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}>
+        <div
+          className={`mt-4 rounded-[22px] border border-[#eadff8] bg-white p-5 ${becomeAuthorBodyClass}`}
+        >
           <ul className="list-disc space-y-2 pl-5">
             <li>страницу автора и авторский кабинет;</li>
             <li>публикацию подарочных и платных продуктов;</li>
@@ -187,7 +221,10 @@ export function BecomeAuthorInfoSections() {
       </section>
 
       <section aria-labelledby="become-author-path-heading">
-        <h2 id="become-author-path-heading" className="text-[21px] font-semibold">
+        <h2
+          id="become-author-path-heading"
+          className="text-[21px] font-semibold"
+        >
           Путь автора
         </h2>
 
@@ -199,7 +236,7 @@ export function BecomeAuthorInfoSections() {
             },
             {
               title: "Подать заявку",
-              text: "Расскажите о себе, своём опыте и направлении — это займёт несколько минут.",
+              text: "Расскажите о себе, своём опыте и направлении – это займёт несколько минут.",
             },
             {
               title: "Подготовить профиль и материалы в подарок",
@@ -232,14 +269,19 @@ export function BecomeAuthorInfoSections() {
       </section>
 
       <section aria-labelledby="become-author-levels-heading">
-        <h2 id="become-author-levels-heading" className="text-[21px] font-semibold">
+        <h2
+          id="become-author-levels-heading"
+          className="text-[21px] font-semibold"
+        >
           Два уровня авторства
         </h2>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <article className="rounded-[22px] border border-[#eadff8] bg-white p-5">
             <h3 className="text-[17px] font-semibold">Публикации в подарок</h3>
-            <ul className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}>
+            <ul
+              className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}
+            >
               <li>оформить авторский профиль;</li>
               <li>размещать согласованные материалы в подарок;</li>
               <li>знакомить слушателей со своим подходом;</li>
@@ -249,7 +291,9 @@ export function BecomeAuthorInfoSections() {
 
           <article className="rounded-[22px] border border-[#eadff8] bg-white p-5">
             <h3 className="text-[17px] font-semibold">Коммерческий автор</h3>
-            <ul className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}>
+            <ul
+              className={`mt-3 list-disc space-y-2 pl-5 ${becomeAuthorBodyClass}`}
+            >
               <li>размещать платные продукты;</li>
               <li>получать выплаты;</li>
               <li>видеть коммерческую статистику;</li>
@@ -263,7 +307,10 @@ export function BecomeAuthorInfoSections() {
         aria-labelledby="become-author-training-heading"
         className="rounded-[22px] border border-[#eadff8] bg-[#faf6ff] p-5"
       >
-        <h2 id="become-author-training-heading" className="text-[17px] font-semibold">
+        <h2
+          id="become-author-training-heading"
+          className="text-[17px] font-semibold"
+        >
           Нужна помощь с созданием аудиопрактик?
         </h2>
         <p className={`mt-3 ${becomeAuthorBodyClass}`}>

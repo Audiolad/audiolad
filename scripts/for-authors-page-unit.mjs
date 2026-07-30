@@ -6,7 +6,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  FOR_AUTHORS_AUDIENCE,
   FOR_AUTHORS_FAQ,
+  FOR_AUTHORS_FORMATS,
   FOR_AUTHORS_PAGE_H1,
   FOR_AUTHORS_PATH,
   FOR_AUTHORS_SEO_DESCRIPTION,
@@ -35,10 +37,16 @@ function testMetadata() {
     metadata.alternates?.canonical,
     buildSiteCanonicalUrl(FOR_AUTHORS_PATH),
   );
-  assert.equal(metadata.openGraph?.url, buildSiteCanonicalUrl(FOR_AUTHORS_PATH));
+  assert.equal(
+    metadata.openGraph?.url,
+    buildSiteCanonicalUrl(FOR_AUTHORS_PATH),
+  );
   assert.equal(metadata.openGraph?.type, "website");
   assert.equal(metadata.twitter?.card, "summary");
-  assert.equal(FOR_AUTHORS_PAGE_H1, "Платформа для авторов медитаций и аудиопрактик");
+  assert.equal(
+    FOR_AUTHORS_PAGE_H1,
+    "Платформа для авторов медитаций и аудиопрактик",
+  );
 }
 
 function testJsonLd() {
@@ -97,12 +105,28 @@ function testPageContent() {
   assert.match(page, /href="\/author-terms"/);
   assert.match(page, /href="\/authors"/);
   assert.match(page, /#for-authors-capabilities/);
+  assert.match(page, /id="for-authors-why-audio"/);
+  assert.match(page, /Почему именно аудио/);
+  assert.match(
+    page,
+    /Голос автора передаёт смысл, интонацию, состояние и энергетику/,
+  );
   assert.doesNotMatch(page, /\bCRM\b/);
   assert.doesNotMatch(page, /пассивный доход/);
   assert.doesNotMatch(page, /доступ навсегда/);
   assert.doesNotMatch(page, /маркетплейс/i);
   assert.doesNotMatch(page, /гарантированн/i);
   assert.equal(FOR_AUTHORS_FAQ.length, 12);
+  assert.equal(FOR_AUTHORS_AUDIENCE.length, 5);
+  assert.equal(FOR_AUTHORS_AUDIENCE[4]?.title, "Энергопрактики и эзотерики");
+  assert.match(
+    FOR_AUTHORS_AUDIENCE[4]?.description ?? "",
+    /смысл, состояние и энергетику/,
+  );
+  assert.ok(FOR_AUTHORS_FORMATS.includes("энергопрактики;"));
+  assert.ok(FOR_AUTHORS_FORMATS.includes("квант-медитации;"));
+  assert.ok(FOR_AUTHORS_FORMATS.includes("духовные аудиоматериалы;"));
+  assert.match(FOR_AUTHORS_FAQ[0].answer, /энергопрактики, эзотерики/);
 }
 
 function testNavigationAndSitemap() {
@@ -110,7 +134,9 @@ function testNavigationAndSitemap() {
     PUBLIC_FOOTER_LINKS.find((item) => item.href === "/for-authors")?.title,
     "Авторам",
   );
-  const aboutIdx = PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/about");
+  const aboutIdx = PUBLIC_FOOTER_LINKS.findIndex(
+    (item) => item.href === "/about",
+  );
   const philosophyIdx = PUBLIC_FOOTER_LINKS.findIndex(
     (item) => item.href === "/philosophy",
   );
@@ -120,7 +146,9 @@ function testNavigationAndSitemap() {
   const articlesIdx = PUBLIC_FOOTER_LINKS.findIndex(
     (item) => item.href === "/articles",
   );
-  const helpIdx = PUBLIC_FOOTER_LINKS.findIndex((item) => item.href === "/help");
+  const helpIdx = PUBLIC_FOOTER_LINKS.findIndex(
+    (item) => item.href === "/help",
+  );
   assert.ok(
     aboutIdx < philosophyIdx &&
       philosophyIdx < forAuthorsIdx &&
