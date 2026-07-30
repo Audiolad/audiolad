@@ -11,6 +11,7 @@ import {
   resolveInitialPlayback,
 } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
+import { isPracticeCatalogListed } from "@/lib/products/access";
 import { formatAudioDuration } from "@/lib/products/duration";
 import { buildListenPath } from "@/lib/products/paths";
 import { mapProductCoverFields } from "@/lib/products/cover-display";
@@ -38,6 +39,8 @@ type PracticeRow = {
   description: string | null;
   format: string | null;
   product_kind?: string | null;
+  status?: string | null;
+  is_catalog_listed?: boolean | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -105,6 +108,16 @@ function mapPracticeToHomeProduct(
   >,
   catalogProductMap: Map<string, HomeProduct>,
 ): HomeProduct | null {
+  // Personal rails must not surface author-preview / draft listens as public picks.
+  if (
+    !isPracticeCatalogListed({
+      status: practice.status,
+      is_catalog_listed: practice.is_catalog_listed,
+    })
+  ) {
+    return null;
+  }
+
   const catalogProduct = catalogProductMap.get(practice.id);
 
   if (catalogProduct) {
@@ -316,6 +329,8 @@ export async function getContinueListening(
       description,
       format,
       product_kind,
+      status,
+      is_catalog_listed,
       duration_minutes,
       price,
       is_free,
@@ -327,7 +342,9 @@ export async function getContinueListening(
       authors!practices_author_id_fkey (name, slug)
     `,
     )
-    .in("id", practiceIds);
+    .in("id", practiceIds)
+    .eq("status", "published")
+    .eq("is_catalog_listed", true);
 
   if (practicesError || !practices?.length) {
     return null;
@@ -418,6 +435,8 @@ export async function getRecentlyListenedProducts(
       description,
       format,
       product_kind,
+      status,
+      is_catalog_listed,
       duration_minutes,
       price,
       is_free,
@@ -429,7 +448,9 @@ export async function getRecentlyListenedProducts(
       authors!practices_author_id_fkey (name, slug)
     `,
     )
-    .in("id", orderedPracticeIds);
+    .in("id", orderedPracticeIds)
+    .eq("status", "published")
+    .eq("is_catalog_listed", true);
 
   if (practicesError || !practices?.length) {
     return [];
@@ -501,6 +522,8 @@ export async function getActivePrograms(
       description,
       format,
       product_kind,
+      status,
+      is_catalog_listed,
       duration_minutes,
       price,
       is_free,
@@ -512,7 +535,9 @@ export async function getActivePrograms(
       authors!practices_author_id_fkey (name, slug)
     `,
     )
-    .in("id", multiTrackPracticeIds);
+    .in("id", multiTrackPracticeIds)
+    .eq("status", "published")
+    .eq("is_catalog_listed", true);
 
   if (practicesError || !practices?.length) {
     return [];

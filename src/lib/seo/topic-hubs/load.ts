@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
 import {
   getPublishedCatalogProducts,
   type CatalogProduct,
@@ -82,8 +81,8 @@ export async function loadTopicHubPageData(
   const [productsRaw, activeTopics] = await Promise.all([
     getPublishedCatalogProducts(supabase, {
       topicKey,
-      // SEO hubs are practice-oriented; exclude music products.
-      productKind: PRODUCT_KIND.PRACTICE,
+      // Topic hubs list all published catalog products for the topic,
+      // including music (same eligibility as /catalog?topic=…).
     }),
     listActiveTopics(supabase).catch(() => []),
   ]);
