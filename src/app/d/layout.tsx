@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 
-import {
-  buildPersonalMaterialGuestMetadata,
-  personalMaterialGuestPrivacyHeaders,
-} from "@/lib/personal-materials/guest/privacy";
+import { buildPersonalMaterialGuestMetadata } from "@/lib/personal-materials/guest/privacy";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +12,4 @@ export default function PersonalMaterialGuestLayout({
   children: React.ReactNode;
 }) {
   return children;
-}
-
-export function headers() {
-  return personalMaterialGuestPrivacyHeaders;
 }
