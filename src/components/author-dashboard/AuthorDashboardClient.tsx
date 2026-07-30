@@ -124,6 +124,7 @@ export default function AuthorDashboardClient({
       return;
     }
 
+    const authorId = selectedAuthor.id;
     let cancelled = false;
 
     async function loadProducts() {
@@ -132,7 +133,7 @@ export default function AuthorDashboardClient({
 
       try {
         const response = await fetch(
-          `/api/author/products?author_id=${encodeURIComponent(selectedAuthor.id)}`,
+          `/api/author/products?author_id=${encodeURIComponent(authorId)}`,
           { cache: "no-store" },
         );
 
