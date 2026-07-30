@@ -117,9 +117,51 @@ function testServerLayer() {
   assert(!delivery.includes("console.log(rawToken"), "no raw token logging");
 
   const download = read("src/lib/personal-materials/server/download.ts");
+  const clientDownload = read("src/lib/personal-materials/client/download.ts");
+  const filenameHelper = read("src/lib/personal-materials/download-filename.ts");
+
   assert(download.includes("resolvePersonalMaterialDownloadFilename"), "download filename helper");
   assert(download.includes("getTrustedAttachmentPath"), "trusted storage path");
-  assert(download.includes('download: filename'), "attachment signed url");
+  assert(
+    download.includes("createAuthorAttachmentDownloadSignedUrl"),
+    "author attachment signed url helper",
+  );
+  assert(
+    download.includes(".createSignedUrl(storagePath, expiresIn)"),
+    "signed url created for trusted storage path",
+  );
+  assert(
+    !/\bdownload\s*:\s*filename\b/.test(download),
+    "storage signed url no longer uses download option",
+  );
+  assert(
+    download.includes("sanitizePersonalMaterialDownloadFilename") &&
+      download.includes("filename"),
+    "sanitized filename returned with signed url payload",
+  );
+  assert(
+    download.includes("toAuthorAttachmentDownloadJsonResponse") &&
+      download.includes("downloadUrl"),
+    "attachment download json response exposes downloadUrl",
+  );
+  assert(
+    download.includes("PERSONAL_MATERIAL_LIMITS.signedUrlTtlSeconds"),
+    "signed url ttl comes from personal material limits",
+  );
+  assert(
+    download.includes('throw new PersonalMaterialApiError("not_found", 404)'),
+    "missing/deleted attachment returns not_found",
+  );
+  assert(
+    filenameHelper.includes("sanitizePersonalMaterialDownloadFilename") &&
+      filenameHelper.includes("basename"),
+    "filename sanitizer strips path segments",
+  );
+  assert(
+    clientDownload.includes("anchor.download = filename") &&
+      clientDownload.includes("triggerBrowserDownload"),
+    "client applies filename via browser download attribute",
+  );
 
   assert(uploads.includes("createServiceRoleClient"), "upload uses service role");
   assert(uploads.includes("PERSONAL_MATERIALS_BUCKET"), "private bucket");
@@ -156,9 +198,20 @@ async function testModuleImports() {
   }
 
   const { execSync } = await import("node:child_process");
+  const stubPath = path.join(ROOT, "scripts/cjs-stub-server-only.cjs");
+  const previousNodeOptions = process.env.NODE_OPTIONS ?? "";
+  const nodeOptions = [previousNodeOptions, `--require ${stubPath}`]
+    .filter(Boolean)
+    .join(" ");
   const output = execSync(
     `npx --yes tsx ${path.join(ROOT, "scripts/stage-p2-personal-materials-api-module-unit.mjs")}`,
-    { encoding: "utf8" },
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+      },
+    },
   );
   process.stdout.write(output);
 }
