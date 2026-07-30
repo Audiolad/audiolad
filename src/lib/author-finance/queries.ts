@@ -9,6 +9,7 @@
  * Test money is never included: the cabinet shows real money only.
  */
 
+import { getAuthorSalesCounts } from "@/lib/author-sales/queries";
 import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -139,6 +140,11 @@ export async function getAuthorFinanceSummary(input: {
   const authorTermsAccepted = authorTerms.accepted;
   const authorTermsVersion = authorTerms.currentVersion?.version ?? null;
 
+  // A failed canonical-sales query must surface as a finance load failure;
+  // treating it as zero would incorrectly show the author an empty state.
+  const sales = await getAuthorSalesCounts({ authorId: input.authorId });
+  const saleCount = sales.grossPurchases;
+
   // Recompute from access/Author Terms/balance fields so a stale SQL CASE
   // cannot mislabel a commercial author in the UI.
   const emptyStateCode = selectAuthorFinanceEmptyState({
@@ -146,6 +152,7 @@ export async function getAuthorFinanceSummary(input: {
     accessStatus,
     approvedTermsCount,
     entryCount,
+    saleCount,
     payableMinor,
     reservedMinor,
     heldMinor,
@@ -173,6 +180,7 @@ export async function getAuthorFinanceSummary(input: {
     paidMinor: asNumber(row.paid_minor),
     paidPayoutCount,
     entryCount,
+    saleCount,
 
     negative: row.negative === true,
     negativeMinor: asNumber(row.negative_minor),

@@ -1,5 +1,6 @@
 import { ensureFinanceObligationProcessed } from "@/lib/payments/author-finance/finance-rpc";
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
+import { notifyAuthorOfCanonicalSale } from "@/lib/payments/notify-author-sale";
 import type { PaymentRow } from "@/lib/payments/payment-api";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -239,6 +240,20 @@ export async function fulfillSucceededTochkaPayment(input: {
 
   if (result.paymentId && result.paymentStatus === "succeeded") {
     await settleAuthorAccrual(result.paymentId, result.webhookEventId);
+  }
+
+  if (
+    result.ok &&
+    result.orderId &&
+    result.paymentId &&
+    !result.isTest
+  ) {
+    // Enqueue on every successful fulfillment/replay. The SQL enqueue function
+    // re-checks canonical-sale conditions and is idempotent by sale_id, so a
+    // handler crash after fulfillment cannot permanently lose the notification.
+    await notifyAuthorOfCanonicalSale({
+      orderId: result.orderId,
+    });
   }
 
   return result;

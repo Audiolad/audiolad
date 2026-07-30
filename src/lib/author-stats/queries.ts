@@ -65,7 +65,14 @@ function mapSummary(raw: unknown): AuthorStatsSummary | null {
     progress25: asNumber(row.progress_25),
     completions: asNumber(row.completions),
     librarySaves: asNumber(row.library_saves),
-    paidPurchases: asNumber(row.paid_purchases),
+    grossPurchases: asNumber(row.gross_purchases),
+    refundSales: asNumber(row.refund_sales),
+    fullRefunds: asNumber(row.full_refunds),
+    partialRefunds: asNumber(row.partial_refunds),
+    netSales: asNumber(row.net_sales),
+    grossRevenueMinor: asNumber(row.gross_revenue_minor),
+    refundedAmountMinor: asNumber(row.refunded_amount_minor),
+    netRevenueMinor: asNumber(row.net_revenue_minor),
     viewToPlayRate: asNullableNumber(row.view_to_play_rate),
     playToCompleteRate: asNullableNumber(row.play_to_complete_rate),
     viewToSaveRate: asNullableNumber(row.view_to_save_rate),
@@ -86,7 +93,11 @@ function mapPoint(raw: unknown): AuthorStatsTimeseriesPoint | null {
     progress25: asNumber(row.progress_25),
     completions: asNumber(row.completions),
     librarySaves: asNumber(row.library_saves),
-    paidPurchases: asNumber(row.paid_purchases),
+    grossPurchases: asNumber(row.gross_purchases),
+    refundSales: asNumber(row.refund_sales),
+    fullRefunds: asNumber(row.full_refunds),
+    partialRefunds: asNumber(row.partial_refunds),
+    netSales: asNumber(row.net_sales),
     authorPageViews: asNumber(row.author_page_views),
     authorPageUniqueVisitors: asNumber(row.author_page_unique_visitors),
   };
@@ -94,11 +105,11 @@ function mapPoint(raw: unknown): AuthorStatsTimeseriesPoint | null {
 
 function mapProduct(raw: unknown): AuthorStatsProductRow | null {
   const row = asRecord(raw);
-  const practiceId = asText(row.practice_id);
-  if (!practiceId) return null;
+  const productSlug = asText(row.product_slug);
+  if (!productSlug) return null;
 
   return {
-    practiceId,
+    productSlug,
     title: asText(row.title) ?? "Без названия",
     slug: asText(row.slug) ?? "",
     status: asText(row.status) ?? "unknown",
@@ -113,7 +124,14 @@ function mapProduct(raw: unknown): AuthorStatsProductRow | null {
     progress25: asNumber(row.progress_25),
     completions: asNumber(row.completions),
     librarySaves: asNumber(row.library_saves),
-    paidPurchases: asNumber(row.paid_purchases),
+    grossPurchases: asNumber(row.gross_purchases),
+    refundSales: asNumber(row.refund_sales),
+    fullRefunds: asNumber(row.full_refunds),
+    partialRefunds: asNumber(row.partial_refunds),
+    netSales: asNumber(row.net_sales),
+    grossRevenueMinor: asNumber(row.gross_revenue_minor),
+    refundedAmountMinor: asNumber(row.refunded_amount_minor),
+    netRevenueMinor: asNumber(row.net_revenue_minor),
     viewToPlayRate: asNullableNumber(row.view_to_play_rate),
     playToCompleteRate: asNullableNumber(row.play_to_complete_rate),
   };

@@ -14,6 +14,7 @@ export const AUTHOR_STATS_METHOD_NOTES = [
   "Один человек на разных устройствах или после очистки данных может учитываться несколько раз.",
   "Статистика страницы автора собирается с даты запуска этого раздела.",
   "Показатели могут отличаться от Яндекс.Метрики из-за другой методики.",
+  "«Покупки» — исходные подтверждённые оплаты с доступом. «Возвраты» — продажи с хотя бы одним возвратом. «Чистые продажи» исключают только полностью возвращённые продажи.",
 ] as const;
 
 export const AUTHOR_STATS_SOURCE_LABELS: Record<AuthorStatsSourceBucket, string> =
@@ -37,7 +38,9 @@ export const AUTHOR_STATS_CHART_METRIC_LABELS: Record<
   plays: "Запуски",
   completions: "Завершения",
   library_saves: "Сохранения",
-  paid_purchases: "Покупки",
+  gross_purchases: "Покупки",
+  refund_sales: "Возвраты",
+  net_sales: "Чистые продажи",
   author_page_views: "Просмотры страницы автора",
   author_page_unique_visitors: "Посетители страницы автора",
 };

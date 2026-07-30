@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorSalesSection from "@/components/author-dashboard/AuthorSalesSection";
 import { formatRubFromMinor } from "@/lib/admin/analytics-money-format";
 import {
   AUTHOR_FINANCE_BALANCE_AS_OF_TEXT,
@@ -539,6 +540,15 @@ export default function AuthorFinanceClient({
               </ul>
             ) : null}
           </Section>
+
+          {selectedAuthor ? (
+            <AuthorSalesSection
+              authorId={selectedAuthor.id}
+              period={period}
+              customFrom={customFrom}
+              customTo={customTo}
+            />
+          ) : null}
 
           <Section title="Операции">
             <div className="flex flex-wrap items-center gap-2">

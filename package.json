@@ -41,6 +41,8 @@
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
     "test:help-center-support": "npx tsx scripts/help-center-support-unit.mjs",
     "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs",
+    "test:author-canonical-sales": "npx tsx scripts/author-canonical-sales-unit.mjs && npx tsx scripts/author-sale-email-outbox-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-finance-sales-route-unit.mts && node scripts/author-canonical-sales-sql-unit.mjs",
+    "run:author-sale-email-outbox": "npx tsx scripts/process-author-sale-email-outbox.ts",
     "test:commercial-activation-without-payout": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/commercial-activation-without-payout-unit.mjs",
     "indexnow:dry-run": "npx tsx scripts/indexnow-submit.mjs",
     "test:indexnow": "npx tsx scripts/indexnow-unit.mjs",

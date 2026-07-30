@@ -41,12 +41,19 @@ export const PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE =
   "payout_profile_needs_changes";
 export const PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE = "payout_profile_verified";
 export const PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE = "payout_profile_rejected";
+export const AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE = "author_product_sold";
 
 const PAYOUT_PROFILE_MESSAGE_TYPES = new Set([
   PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE,
   PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE,
   PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE,
   PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE,
+]);
+
+const NULL_APPLICATION_FK_MESSAGE_TYPES = new Set([
+  ...PAYOUT_PROFILE_MESSAGE_TYPES,
+  COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE,
+  AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE,
 ]);
 
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
@@ -100,6 +107,10 @@ export function buildPayoutProfileRejectedDedupKey(
   return `payout_profile_rejected:${profileId.trim()}:${version}`;
 }
 
+export function buildAuthorProductSoldDedupKey(saleId: string): string {
+  return `author_product_sold:${saleId.trim()}`;
+}
+
 function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
@@ -119,6 +130,10 @@ function resolveOperationalEmailDedupKey(
       applicationId,
       submissionAttempt ?? "",
     );
+  }
+
+  if (messageType === AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE) {
+    return buildAuthorProductSoldDedupKey(applicationId);
   }
 
   const version = profileVersion ?? 1;
@@ -249,14 +264,14 @@ export async function acquireOperationalEmailDelivery(
   }
 
   if (intent.mode === "insert") {
-    // commercial / payout profile ids are not in author_applications;
+    // commercial / payout profile / sale ids are not in author_applications;
     // operational_email_deliveries.application_id FK points only at
     // author_applications, so keep it null and rely on dedup_key.
-    const linkedApplicationId =
-      messageType === COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE ||
-      PAYOUT_PROFILE_MESSAGE_TYPES.has(messageType)
-        ? null
-        : applicationId;
+    const linkedApplicationId = NULL_APPLICATION_FK_MESSAGE_TYPES.has(
+      messageType,
+    )
+      ? null
+      : applicationId;
 
     const { data: inserted, error: insertError } = await client
       .from("operational_email_deliveries")

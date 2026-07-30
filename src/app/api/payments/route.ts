@@ -19,6 +19,7 @@ import {
   type CreateTochkaPaymentResult,
 } from "@/lib/payments/tochka-client";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
+import { getOrderSaleAccrualReady } from "@/lib/author-sales/queries";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -183,6 +184,21 @@ export async function POST(request: Request) {
   ) {
     console.error("create_payment_order_amount_invalid", orderRow.id);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (orderRow.amount_minor > 0) {
+    const accrualReady = await getOrderSaleAccrualReady(orderRow.id);
+    if (!accrualReady.ready) {
+      console.error(
+        "create_payment_accrual_not_ready",
+        orderRow.id,
+        accrualReady.code,
+      );
+      return NextResponse.json(
+        { error: "author_finance_not_ready" },
+        { status: 409 },
+      );
+    }
   }
 
   let serviceRoleClient;

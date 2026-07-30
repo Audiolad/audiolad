@@ -32,6 +32,12 @@ PR1–PR5 на production (`6a692a2`). Play All реализован в рабо
 
 **Маршруты:** `/profile`, `/profile/edit`, `/my-practices`, `/favorites`, `/history`, `/downloads`, `/purchases` и др.
 
+## Pre-deploy: author sales Auth/IDOR smoke (обязательно)
+
+`test(author-sales): run real bearer-token membership and HTTP IDOR checks in isolated Supabase Auth/API staging`
+
+Предпочтительный экономный вариант — временный локальный Supabase stack с отдельной тестовой БД и реальными Auth bearer tokens. Перед production deploy проверить RLS и HTTP IDOR для author sales без использования production endpoint, production пользователей или production данных.
+
 ## 2. Закоммитить накопленные изменения (приоритет: средний)
 
 В рабочей копии есть незакоммиченные правки (профиль, брендинг, layout, PWA-иконки, `docs/`). Согласовать состав коммита с владельцем.

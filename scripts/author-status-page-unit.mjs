@@ -220,7 +220,7 @@ const nav = readFileSync(
 assert.ok(nav.includes('label: "Статус"'));
 assert.ok(nav.includes("/author-dashboard/status"));
 assert.ok(nav.includes('label: "Документы"'));
-assert.ok(nav.includes('label: "Финансы"'));
+assert.ok(nav.includes('label: "Продажи и финансы"'));
 
 const page = readFileSync(
   path.join(root, "src/app/author-dashboard/status/page.tsx"),
