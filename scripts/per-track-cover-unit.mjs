@@ -3,6 +3,14 @@
  * Per-track cover unit checks — safe to run without database access.
  */
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function readSource(relativePath) {
+  return readFileSync(resolve(ROOT, relativePath), "utf8");
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -10,10 +18,17 @@ function assert(condition, message) {
   }
 }
 
+/** Mirrors listen-player-shared showCoverImage predicate. */
+function isCoverVisible(failed, trackId, url) {
+  return (
+    Boolean(url) &&
+    !(failed?.trackId === trackId && failed.url === url)
+  );
+}
+
 function testMigrationContract() {
-  const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716180000_per_track_covers.sql",
-    "utf8",
+  const sql = readSource(
+    "supabase/migrations/20260716180000_per_track_covers.sql",
   );
 
   assert(sql.includes("use_shared_cover"), "practices.use_shared_cover column");
@@ -25,10 +40,7 @@ function testMigrationContract() {
 }
 
 function testStorageHelpers() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/author-products/utils.ts",
-    "utf8",
-  );
+  const source = readSource("src/lib/author-products/utils.ts");
 
   assert(
     source.includes("buildTrackCoverStoragePath"),
@@ -45,10 +57,7 @@ function testStorageHelpers() {
 }
 
 function testPlaybackResolver() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/products/cover-display.ts",
-    "utf8",
-  );
+  const source = readSource("src/lib/products/cover-display.ts");
 
   assert(
     source.includes("resolvePlaybackCoverUrl"),
@@ -61,18 +70,14 @@ function testPlaybackResolver() {
 }
 
 function testListenTrackType() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/listen/types.ts",
-    "utf8",
-  );
+  const source = readSource("src/lib/listen/types.ts");
 
   assert(source.includes("coverImageUrl"), "ListenTrack.coverImageUrl field");
 }
 
 function testTrackCoverApiRoute() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/app/api/author/products/[id]/audio/[audioId]/cover/route.ts",
-    "utf8",
+  const source = readSource(
+    "src/app/api/author/products/[id]/audio/[audioId]/cover/route.ts",
   );
 
   assert(source.includes("shared_cover_enabled"), "shared cover guard error code");
@@ -83,9 +88,8 @@ function testTrackCoverApiRoute() {
 }
 
 function testAuthorFormToggle() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorProductForm.tsx",
-    "utf8",
+  const source = readSource(
+    "src/components/author-dashboard/AuthorProductForm.tsx",
   );
 
   assert(
@@ -96,17 +100,14 @@ function testAuthorFormToggle() {
 }
 
 function testCoverUploadPreviewManifest() {
-  const hookSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/useCoverUpload.ts",
-    "utf8",
+  const hookSource = readSource(
+    "src/components/author-dashboard/useCoverUpload.ts",
   );
-  const blockSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/CoverUploadBlock.tsx",
-    "utf8",
+  const blockSource = readSource(
+    "src/components/author-dashboard/CoverUploadBlock.tsx",
   );
-  const formSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorProductForm.tsx",
-    "utf8",
+  const formSource = readSource(
+    "src/components/author-dashboard/AuthorProductForm.tsx",
   );
 
   assert(hookSource.includes("coverImage"), "useCoverUpload accepts coverImage");
@@ -133,15 +134,77 @@ function testCoverUploadPreviewManifest() {
 }
 
 function testPlayerActiveCover() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/components/audio/AudioPlayer.tsx",
-    "utf8",
-  );
+  const source = readSource("src/components/audio/listen-player-shared.tsx");
+  const legacy = readSource("src/components/audio/AudioPlayer.tsx");
 
-  assert(source.includes("coverImageFailedUrl"), "track-scoped cover error state");
+  assert(source.includes("coverImageFailedTrack"), "track-scoped cover error state");
   assert(
-    source.includes("coverImageFailedUrl !== activeCoverUrl"),
-    "cover error reset on track/url change",
+    source.includes("trackId: activeCoverTrackId"),
+    "cover error records the active track identity",
+  );
+  assert(
+    source.includes("coverImageFailedTrack?.trackId === activeCoverTrackId"),
+    "cover error is isolated to its track",
+  );
+  assert(
+    source.includes("coverImageFailedTrack.url === activeCoverUrl"),
+    "cover error resets when that track cover URL changes",
+  );
+  assert(
+    source.includes("currentTrack?.coverImageUrl ?? coverImageUrl"),
+    "track cover preferred over product-level cover URL",
+  );
+  assert(
+    !legacy.includes("coverImageFailedTrack") &&
+      !legacy.includes("coverImageFailedUrl"),
+    "legacy AudioPlayer re-export is not the cover error source",
+  );
+}
+
+function testCoverErrorIsolationSemantics() {
+  const failedA = { trackId: "track-a", url: "https://cdn.example/a.jpg" };
+  const failedB = { trackId: "track-b", url: "https://cdn.example/b.jpg" };
+  const productFailed = {
+    trackId: null,
+    url: "https://cdn.example/product.jpg",
+  };
+
+  assert(
+    isCoverVisible(failedA, "track-a", "https://cdn.example/a.jpg") === false,
+    "failed track hides its own cover",
+  );
+  assert(
+    isCoverVisible(failedA, "track-b", "https://cdn.example/b.jpg") === true,
+    "error of one track does not hide another track cover",
+  );
+  assert(
+    isCoverVisible(failedB, "track-a", "https://cdn.example/a.jpg") === true,
+    "second track failure does not hide the first track cover",
+  );
+  assert(
+    isCoverVisible(failedA, "track-a", "https://cdn.example/a-v2.jpg") === true,
+    "successful cover URL change clears error for that track",
+  );
+  assert(
+    isCoverVisible(null, "track-a", "https://cdn.example/a.jpg") === true,
+    "cleared failure state shows cover again",
+  );
+  assert(
+    isCoverVisible(failedA, "track-b", "https://cdn.example/a.jpg") === true,
+    "stale failed track id is ignored after track switch",
+  );
+  assert(
+    isCoverVisible(productFailed, "track-a", "https://cdn.example/a.jpg") ===
+      true,
+    "product-level failure does not hide a track-level cover",
+  );
+  assert(
+    isCoverVisible(
+      productFailed,
+      null,
+      "https://cdn.example/product.jpg",
+    ) === false,
+    "product-level failure still applies when active cover has no track id",
   );
 }
 
@@ -154,6 +217,7 @@ const tests = [
   ["author form toggle", testAuthorFormToggle],
   ["cover upload manifest preview", testCoverUploadPreviewManifest],
   ["player active cover", testPlayerActiveCover],
+  ["cover error isolation semantics", testCoverErrorIsolationSemantics],
 ];
 
 for (const [name, fn] of tests) {

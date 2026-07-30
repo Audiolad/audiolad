@@ -405,9 +405,10 @@ export function ListenPlayerProvider({
   const isDismissedIdle =
     dismissedPracticeId === practiceId && !isEngineReady;
 
-  const [coverImageFailedUrl, setCoverImageFailedUrl] = useState<string | null>(
-    null,
-  );
+  const [coverImageFailedTrack, setCoverImageFailedTrack] = useState<{
+    trackId: string | null;
+    url: string;
+  } | null>(null);
   const [restartingQueue, setRestartingQueue] = useState(false);
   const queueLabel =
     activeQueue && !queueCompleted
@@ -446,6 +447,7 @@ export function ListenPlayerProvider({
 
   const activeCoverUrl =
     currentTrack?.coverImageUrl ?? coverImageUrl ?? null;
+  const activeCoverTrackId = currentTrack?.id ?? null;
   const activeCoverImage =
     currentTrack?.coverImage ?? coverImage ?? session?.coverImage ?? null;
   const activeCoverUpdatedAt =
@@ -454,7 +456,16 @@ export function ListenPlayerProvider({
       : (coverUpdatedAt ?? session?.coverUpdatedAt ?? null);
 
   const showCoverImage =
-    Boolean(activeCoverUrl) && coverImageFailedUrl !== activeCoverUrl;
+    Boolean(activeCoverUrl) &&
+    !(
+      coverImageFailedTrack?.trackId === activeCoverTrackId &&
+      coverImageFailedTrack.url === activeCoverUrl
+    );
+  const setCoverImageFailedUrl = (url: string | null) => {
+    setCoverImageFailedTrack(
+      url ? { trackId: activeCoverTrackId, url } : null,
+    );
+  };
 
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
   const currentTrackTitle = currentTrack?.title?.trim() || practiceTitle;
