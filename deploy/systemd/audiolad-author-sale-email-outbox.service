@@ -1,0 +1,21 @@
+[Unit]
+Description=Audiolad author sale email outbox worker
+Documentation=file:/var/www/audiolad/deploy/docs/AUTHOR_SALE_EMAIL_OUTBOX.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/audiolad/run-author-sale-email-outbox.sh
+Environment=DEPLOY_ROOT=/var/www/audiolad-deploy
+Environment=LOCK_FILE=/run/audiolad-author-sale-email-outbox.lock
+Environment=LOG_FILE=/var/log/audiolad/author-sale-email-outbox.log
+Environment=TIMEOUT_SECONDS=90
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# Hard cap above wrapper timeout so a hung npm cannot linger forever.
+TimeoutStartSec=120
+SyslogIdentifier=audiolad-author-sale-email-outbox
+StandardOutput=journal
+StandardError=journal
