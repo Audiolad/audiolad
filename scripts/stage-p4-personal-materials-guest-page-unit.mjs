@@ -16,6 +16,7 @@ function testRouteAndLayout() {
   const notFound = read("src/app/d/[token]/not-found.tsx");
   const nextConfig = read("next.config.ts");
   const robots = read("src/app/robots.ts");
+  const robotsConfig = read("src/lib/seo/robots-config.ts");
 
   assert(page.includes("findGuestMaterialByRawToken"), "server metadata lookup");
   assert(page.includes("claimed_by_user_id"), "claimed landing branch");
@@ -29,7 +30,23 @@ function testRouteAndLayout() {
   assert(notFound.includes("PersonalMaterialUnavailable"), "neutral unavailable");
   assert(nextConfig.includes('source: "/d/:path*"'), "privacy headers in next config");
   assert(nextConfig.includes("no-referrer"), "referrer policy");
-  assert(robots.includes('"/d/"'), "robots disallow /d/");
+  assert(
+    robots.includes("buildRobotsRoute") &&
+      robots.includes('@/lib/seo/robots-config') &&
+      robots.includes("return buildRobotsRoute()"),
+    "robots route delegates to shared builder",
+  );
+  assert(
+    robotsConfig.includes("SEO_ROBOTS_DISALLOWED_PATHS") &&
+      robotsConfig.includes('"/d/"') &&
+      robotsConfig.includes("disallow: [...SEO_ROBOTS_DISALLOWED_PATHS]"),
+    "robots disallow /d/",
+  );
+  assert(
+    !robotsConfig.includes('"/catalog/"') &&
+      !robotsConfig.includes('"/articles/"'),
+    "robots disallow list does not block public catalog/articles",
+  );
 }
 
 function testGuestComponents() {
