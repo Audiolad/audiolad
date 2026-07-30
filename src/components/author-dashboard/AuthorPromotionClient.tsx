@@ -371,19 +371,6 @@ export default function AuthorPromotionClient({
     };
   }, [period, selectedCampaignId]);
 
-  function handleAuthorChange(slug: string) {
-    setCampaignStats(null);
-
-    replacePromotionUrl(
-      buildPromotionPageQuery({
-        author: slug,
-        campaign: null,
-        period,
-        existing: searchParams,
-      }),
-    );
-  }
-
   function handlePeriodChange(nextPeriod: PromotionPeriodKey) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("period", nextPeriod);
@@ -473,22 +460,12 @@ export default function AuthorPromotionClient({
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <label className="block flex-1">
-          <span className="mb-2 block text-sm font-medium text-[#5f5484]">
-            Авторское пространство
+        <p className="text-sm text-[#5f5484]">
+          Продвижение проекта{" "}
+          <span className="font-semibold text-[#25135c]">
+            «{selectedAuthor.name}»
           </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleAuthorChange(event.target.value)}
-            className="w-full rounded-[18px] border border-[#e4d7f4] bg-white px-4 py-3 text-[15px] outline-none focus:border-[#9a74d8]"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        </p>
 
         <label className="block sm:w-48">
           <span className="mb-2 block text-sm font-medium text-[#5f5484]">

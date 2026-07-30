@@ -368,23 +368,6 @@ export default function AuthorStatsClient({ authors }: AuthorStatsClientProps) {
       <AuthorDashboardNav authorSlug={selectedAuthor?.slug} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        {authors.length > 1 ? (
-          <label className="block text-sm text-[#5c5080]">
-            Автор
-            <select
-              className="mt-1 block w-full min-w-[220px] rounded-full border border-[#eadff8] bg-white px-4 py-2 text-sm font-semibold text-[#2b2145]"
-              value={selectedAuthor?.slug ?? ""}
-              onChange={(event) => updateQuery({ author: event.target.value })}
-            >
-              {authors.map((author) => (
-                <option key={author.id} value={author.slug}>
-                  {author.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
         <label className="block text-sm text-[#5c5080]">
           Период
           <select

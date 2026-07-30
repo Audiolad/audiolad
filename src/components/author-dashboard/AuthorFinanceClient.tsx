@@ -375,27 +375,6 @@ export default function AuthorFinanceClient({
     <div className="min-w-0">
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
 
-      {authors.length > 1 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {authors.map((author) => (
-            <button
-              key={author.id}
-              type="button"
-              onClick={() =>
-                updateUrl((params) => params.set("author", author.slug))
-              }
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                author.id === selectedAuthor.id
-                  ? "bg-[#7042c5] text-white"
-                  : "border border-[#e4d7f4] bg-white text-[#7042c5]"
-              }`}
-            >
-              {author.name}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       {error ? (
         <p className="mt-6 rounded-[20px] border border-[#f0d2d2] bg-[#fdf6f6] px-4 py-3 text-sm text-[#a24a4a]">
           {error}

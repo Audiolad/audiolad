@@ -106,14 +106,6 @@ export default function AuthorCommercialApplicationForm({
     };
   }, [selectedAuthor]);
 
-  function handleWorkspaceChange(nextSlug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("author", nextSlug);
-    router.replace(
-      `/author-dashboard/commercial-application?${params.toString()}`,
-    );
-  }
-
   function updateField<K extends keyof AuthorCommercialApplicationFormValues>(
     key: K,
     value: AuthorCommercialApplicationFormValues[K],
@@ -245,25 +237,6 @@ export default function AuthorCommercialApplicationForm({
   return (
     <div className="space-y-5">
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
-
-      {authors.length > 1 ? (
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[#65577f]">
-            Авторское пространство
-          </span>
-          <select
-            value={selectedAuthor.slug}
-            onChange={(event) => handleWorkspaceChange(event.target.value)}
-            className="w-full rounded-[18px] border border-[#ddcfef] bg-white px-4 py-3 text-sm"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.slug}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
 
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-lg font-semibold text-[#25135c]">

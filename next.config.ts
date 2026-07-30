@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   // Keep tracing rooted at this checkout so nested git worktrees are not
   // confused by a parent package-lock.json outside the worktree.
   outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
   experimental: {
     // App audio limit 50 MB; multipart overhead needs headroom (matches nginx 55m).
     proxyClientMaxBodySize: "55mb",

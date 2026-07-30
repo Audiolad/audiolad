@@ -1821,23 +1821,36 @@ export default function AuthorProductForm({
           ) : null}
         </div>
 
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium">Автор</span>
-          <select
-            value={form.authorId}
-            disabled={slugLocked}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, authorId: event.target.value }))
-            }
-            className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
-          >
-            {authors.map((author) => (
-              <option key={author.id} value={author.id}>
-                {author.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {mode === "create" && selectedAuthor ? (
+          <p className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
+            Продукт будет опубликован от проекта{" "}
+            <span className="font-semibold text-[#25135c]">
+              «{selectedAuthor.name}»
+            </span>
+            .
+          </p>
+        ) : (
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium">Проект</span>
+            <select
+              value={form.authorId}
+              disabled={slugLocked}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  authorId: event.target.value,
+                }))
+              }
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+            >
+              {authors.map((author) => (
+                <option key={author.id} value={author.id}>
+                  {author.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">Тип продукта</legend>

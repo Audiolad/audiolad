@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AuthorOpportunitiesClient from "@/components/author-dashboard/AuthorOpportunitiesClient";
@@ -48,27 +47,6 @@ export default async function AuthorOpportunitiesPage({
       subtitle="Как продвигать продукты и развивать аудиторию"
       internalBackHref={backHref}
     >
-      {workspaces.length > 1 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {workspaces.map((item) => {
-            const active = item.id === workspace.id;
-            return (
-              <Link
-                key={item.id}
-                href={`/author-dashboard/opportunities?author=${encodeURIComponent(item.slug)}`}
-                className={`inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold ${
-                  active
-                    ? "bg-[#7042c5] text-white"
-                    : "border border-[#e4d7f4] bg-white text-[#7042c5]"
-                }`}
-              >
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
       <AuthorOpportunitiesClient view={view} />
     </AuthorShell>
   );
