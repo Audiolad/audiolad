@@ -2,9 +2,12 @@
 /**
  * Mock service tests for resetAllowlistedTestUser auth.admin.deleteUser contract.
  *
- * Read-only: no DB, no production credentials, no Docker.
+ * Fully isolated: no DB, no Storage, no network, no credentials, no Docker.
  */
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   TEST_USER_RESET_CONFIRMATION_PHRASE,
@@ -23,11 +26,27 @@ function assert(condition, message) {
   }
 }
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function createFakeCleanup(calls, options = {}) {
+  return async (ownerUserId) => {
+    calls.cleanupPrivateAudio.push(ownerUserId);
+    if (options.fail) {
+      throw new Error(options.failMessage ?? "fake_private_audio_cleanup_failed");
+    }
+    return {
+      removedItems: options.removedItems ?? 0,
+      removedPaths: options.removedPaths ?? 0,
+    };
+  };
+}
+
 function createMockService(scenario) {
   const calls = {
     deleteUser: [],
     auditInserts: [],
     tables: [],
+    cleanupPrivateAudio: [],
   };
 
   const counts = scenario.counts ?? {};
@@ -268,10 +287,19 @@ async function testDeleteUserCalledWithTargetUuid() {
     authUserMissing: false,
   });
 
-  const result = await resetAllowlistedTestUser(service, {
-    actorUserId: service.actorUserId,
-    confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-  });
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls, {
+        removedItems: 2,
+        removedPaths: 3,
+      }),
+    },
+  );
 
   assert(result.ok, "reset ok");
   assert(result.result.status === "success", "reset success");
@@ -279,6 +307,18 @@ async function testDeleteUserCalledWithTargetUuid() {
   assert(
     service.calls.deleteUser[0] === service.targetUserId,
     "deleteUser called with target UUID",
+  );
+  assert(
+    service.calls.cleanupPrivateAudio.length === 1,
+    "private audio cleanup called once",
+  );
+  assert(
+    service.calls.cleanupPrivateAudio[0] === service.targetUserId,
+    "private audio cleanup receives target user id",
+  );
+  assert(
+    result.result.deletedCounts.privateAudioItemsRemoved === 2,
+    "cleanup removedItems surfaced in deletedCounts",
   );
 }
 
@@ -291,15 +331,25 @@ async function testDeleteUserSkippedOnBlocker() {
     },
   });
 
-  const result = await resetAllowlistedTestUser(service, {
-    actorUserId: service.actorUserId,
-    confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-  });
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
 
   assert(result.ok, "blocked wrapper ok");
   assert(result.result.status === "failed", "blocked status");
   assert(result.result.blockers?.length, "blockers returned");
   assert(service.calls.deleteUser.length === 0, "deleteUser not called on blocker");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 0,
+    "cleanup skipped when reset is blocked",
+  );
 }
 
 async function testDeleteUserSkippedOnCleanupFailure() {
@@ -311,15 +361,61 @@ async function testDeleteUserSkippedOnCleanupFailure() {
     failDeleteOn: "email_outbox",
   });
 
-  const result = await resetAllowlistedTestUser(service, {
-    actorUserId: service.actorUserId,
-    confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-  });
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
 
   assert(result.ok, "cleanup failure wrapper ok");
   assert(result.result.status === "failed", "cleanup failure status");
   assert(result.result.errorCode === "cleanup_failed", "cleanup failure code");
   assert(service.calls.deleteUser.length === 0, "deleteUser not called after cleanup failure");
+}
+
+async function testPrivateAudioCleanupFailureStopsAuthDelete() {
+  const service = createMockService({
+    counts: {
+      analytics_events: 0,
+      analytics_sessions: 0,
+    },
+    emailContacts: [],
+    authUserMissing: false,
+  });
+
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls, {
+        fail: true,
+      }),
+    },
+  );
+
+  assert(result.ok, "private audio cleanup failure wrapper ok");
+  assert(result.result.status === "failed", "private audio cleanup failure status");
+  assert(
+    result.result.errorCode === "cleanup_failed",
+    "private audio cleanup failure code",
+  );
+  assert(
+    service.calls.cleanupPrivateAudio.length === 1 &&
+      service.calls.cleanupPrivateAudio[0] === service.targetUserId,
+    "failing cleanup still receives target user id once",
+  );
+  assert(
+    service.calls.deleteUser.length === 0,
+    "auth delete not called after private audio cleanup failure",
+  );
 }
 
 async function testPartialWhenAuthDeleteFailsAfterCleanup() {
@@ -332,15 +428,25 @@ async function testPartialWhenAuthDeleteFailsAfterCleanup() {
     deleteUserError: { message: "auth delete failed" },
   });
 
-  const result = await resetAllowlistedTestUser(service, {
-    actorUserId: service.actorUserId,
-    confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-  });
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
 
   assert(result.ok, "partial wrapper ok");
   assert(result.result.status === "partial", "partial status after auth delete failure");
   assert(result.result.errorCode === "auth_delete_failed", "auth delete failed code");
   assert(service.calls.deleteUser.length === 1, "deleteUser attempted after cleanup");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 1,
+    "cleanup runs before failed auth delete",
+  );
 }
 
 async function testRepeatRunAlreadyResetSafe() {
@@ -354,21 +460,73 @@ async function testRepeatRunAlreadyResetSafe() {
     emailContacts: [],
   });
 
-  const result = await resetAllowlistedTestUser(service, {
-    actorUserId: service.actorUserId,
-    confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
-  });
+  const result = await resetAllowlistedTestUser(
+    service,
+    {
+      actorUserId: service.actorUserId,
+      confirmationPhrase: TEST_USER_RESET_CONFIRMATION_PHRASE,
+    },
+    {
+      cleanupPrivateAudioStorageForUser: createFakeCleanup(service.calls),
+    },
+  );
 
   assert(result.ok, "already reset ok");
   assert(result.result.alreadyReset, "already reset flagged");
   assert(service.calls.deleteUser.length === 0, "repeat run skips deleteUser");
   assert(service.calls.auditInserts.length === 0, "repeat run skips audit write");
+  assert(
+    service.calls.cleanupPrivateAudio.length === 0,
+    "repeat run skips private audio cleanup",
+  );
+}
+
+function testNoLiveCleanupOrCredentials() {
+  const unitSource = readFileSync(
+    path.join(REPO_ROOT, "scripts", "test-user-reset-service-mock-unit.mjs"),
+    "utf8",
+  );
+  const resetSource = readFileSync(
+    path.join(REPO_ROOT, "src", "lib", "admin", "test-user-reset", "reset.ts"),
+    "utf8",
+  );
+
+  assert(
+    unitSource.includes("createFakeCleanup"),
+    "unit injects fake private audio cleanup",
+  );
+  assert(
+    !unitSource.includes("@" + "supabase/supabase-js"),
+    "unit does not import live supabase sdk",
+  );
+  assert(
+    !unitSource.includes(["", "var", "www", "audiolad", ".env.local"].join("/")),
+    "unit does not read production env path",
+  );
+  assert(
+    !unitSource.includes("process.env." + "SUPABASE_SERVICE_ROLE_KEY"),
+    "unit does not read service role from process.env",
+  );
+  assert(
+    !unitSource.includes("audiolad" + ".ru"),
+    "unit does not target production host",
+  );
+  assert(
+    resetSource.includes("TestUserResetDeps"),
+    "reset service exposes injectable deps",
+  );
+  assert(
+    resetSource.includes("cleanupPrivateAudioStorageForUser ??"),
+    "production default cleanup preserved via nullish coalescing",
+  );
 }
 
 async function main() {
+  testNoLiveCleanupOrCredentials();
   await testDeleteUserCalledWithTargetUuid();
   await testDeleteUserSkippedOnBlocker();
   await testDeleteUserSkippedOnCleanupFailure();
+  await testPrivateAudioCleanupFailureStopsAuthDelete();
   await testPartialWhenAuthDeleteFailsAfterCleanup();
   await testRepeatRunAlreadyResetSafe();
   console.log("test-user-reset-service-mock-unit: ok");

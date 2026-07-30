@@ -30,6 +30,13 @@ import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type ServiceClient = ReturnType<typeof createServiceRoleClient>;
 
+/** Optional test/runtime overrides; production callers leave this empty. */
+export type TestUserResetDeps = {
+  cleanupPrivateAudioStorageForUser?: (
+    ownerUserId: string,
+  ) => Promise<{ removedItems: number; removedPaths: number }>;
+};
+
 const BROWSER_HINT =
   "Для полностью чистой проверки откройте новый профиль Chrome или окно инкогнито.";
 
@@ -144,6 +151,7 @@ async function cleanupNonFkData(
   service: ServiceClient,
   context: TestUserResetPreflight,
   userId: string | null,
+  deps: TestUserResetDeps = {},
 ): Promise<TestUserResetDeletedCounts> {
   const deleted = emptyDeletedCounts();
   const contactIds = context.emailContactIds;
@@ -166,7 +174,10 @@ async function cleanupNonFkData(
       deleted.avatarRemoved = removed.ok;
     }
 
-    const privateAudioCleanup = await cleanupPrivateAudioStorageForUser(userId);
+    const cleanupPrivateAudio =
+      deps.cleanupPrivateAudioStorageForUser ??
+      cleanupPrivateAudioStorageForUser;
+    const privateAudioCleanup = await cleanupPrivateAudio(userId);
     deleted.privateAudioItemsRemoved = privateAudioCleanup.removedItems;
   }
 
@@ -371,6 +382,7 @@ export async function resetAllowlistedTestUser(
     actorUserId: string;
     confirmationPhrase: string;
   },
+  deps: TestUserResetDeps = {},
 ): Promise<
   | { ok: false; forbidden?: boolean; invalidConfirmation?: boolean; result: TestUserResetResult }
   | { ok: true; result: TestUserResetResult }
@@ -486,6 +498,7 @@ export async function resetAllowlistedTestUser(
       service,
       preflight,
       targetUserId,
+      deps,
     );
   } catch (error) {
     console.error("test_user_reset_cleanup_failed", error);
