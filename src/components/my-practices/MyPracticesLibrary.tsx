@@ -176,7 +176,7 @@ export default function MyPracticesLibrary({
           href="/my-library/private-audio/new"
           className="inline-flex min-h-11 items-center justify-center rounded-[16px] border border-[#d9c7f4] bg-white px-4 text-sm font-semibold text-[#7042c5] hover:bg-[#faf6ff]"
         >
-          Добавить аудиоматериал
+          Добавить своё аудио
         </Link>
       </div>
 
@@ -242,7 +242,7 @@ export default function MyPracticesLibrary({
                 href="/my-library/private-audio/new"
                 className="mt-4 inline-block rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
               >
-                Добавить аудиоматериал
+                Добавить своё аудио
               </Link>
             </div>
           ) : (
@@ -287,7 +287,7 @@ export default function MyPracticesLibrary({
                 href="/my-library/private-audio/new"
                 className="inline-block rounded-[18px] border border-[#d9c7f4] bg-white px-5 py-3 text-sm font-semibold text-[#7042c5]"
               >
-                Добавить аудиоматериал
+                Добавить своё аудио
               </Link>
             </div>
           </div>

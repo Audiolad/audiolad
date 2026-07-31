@@ -155,7 +155,7 @@ function testSourceGuards() {
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
   assert(library.includes("Мои загрузки"), "uploads filter");
-  assert(library.includes("Добавить аудиоматериал"), "add CTA");
+  assert(library.includes("Добавить своё аудио"), "add CTA");
 
   const offer = read("src/app/offer/page.tsx");
   assert(offer.includes("section-private-audio"), "legal section");
