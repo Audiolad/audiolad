@@ -48,8 +48,36 @@ assert.ok(articles.length >= 10, "expected at least 10 help articles");
 
 const ids = new Set(articles.map((a) => a.id));
 const slugs = new Set(articles.map((a) => `${a.category}/${a.slug}`));
+const helpHrefs = new Set(
+  articles.map((article) => `/help/${article.category}/${article.slug}`),
+);
 assert.equal(ids.size, articles.length, "article ids must be unique");
 assert.equal(slugs.size, articles.length, "category/slug must be unique");
+
+const createFirstProduct = articles.find(
+  (article) => article.id === "help.authors.create-first-product",
+);
+assert.ok(createFirstProduct, "create-first-product article remains registered");
+assert.equal(createFirstProduct.slug, "create-first-product");
+assert.match(
+  createFirstProduct.title,
+  /первый аудиопродукт/i,
+  "create-first-product keeps product-creation title",
+);
+
+const languageFormatting = articles.find(
+  (article) => article.id === "help.authors.language-and-formatting",
+);
+assert.ok(
+  languageFormatting,
+  "language-and-formatting article remains registered",
+);
+assert.equal(languageFormatting.slug, "language-and-formatting");
+assert.equal(
+  languageFormatting.title,
+  "Язык и оформление материалов",
+  "language article title matches cross-link labels",
+);
 
 for (const article of articles) {
   for (const relatedId of article.relatedArticleIds) {
@@ -65,17 +93,54 @@ for (const article of articles) {
         if (isHelpRichNodes(value)) {
           for (const node of value) {
             if (node.type === "link") {
-              assert.ok(node.href.startsWith("/"), `${article.id} link href relative`);
-              assert.match(
-                node.label,
-                /^https:\/\/audiolad\.ru\//,
-                `${article.id} link label must be absolute audiolad.ru URL`,
+              assert.ok(
+                node.href.startsWith("/"),
+                `${article.id} link href relative`,
               );
-              assert.equal(
-                node.label,
-                `https://audiolad.ru${node.href}`,
-                `${article.id} label must match href path`,
+              assert.ok(
+                node.label.trim().length > 0,
+                `${article.id} link label must not be empty`,
               );
+
+              const absoluteLabel = `https://audiolad.ru${node.href}`;
+              const isHelpArticleLink = helpHrefs.has(node.href);
+              const isKnownHelpPage =
+                node.href === "/help" ||
+                node.href === "/help/support" ||
+                node.href.startsWith("/help/support?");
+
+              if (isHelpArticleLink) {
+                assert.ok(
+                  node.label === absoluteLabel ||
+                    !/^https?:\/\//i.test(node.label),
+                  `${article.id} help article link label is titled text or absolute audiolad.ru URL`,
+                );
+                assert.ok(
+                  !node.label.startsWith("/"),
+                  `${article.id} titled help link must not use bare path as label`,
+                );
+              } else if (node.href.startsWith("/help/")) {
+                assert.ok(
+                  isKnownHelpPage,
+                  `${article.id} unknown help href: ${node.href}`,
+                );
+                assert.equal(
+                  node.label,
+                  absoluteLabel,
+                  `${article.id} help page link label must match absolute audiolad.ru URL`,
+                );
+              } else {
+                assert.match(
+                  node.label,
+                  /^https:\/\/audiolad\.ru\//,
+                  `${article.id} product/app link label must be absolute audiolad.ru URL`,
+                );
+                assert.equal(
+                  node.label,
+                  absoluteLabel,
+                  `${article.id} product/app label must match href path`,
+                );
+              }
             }
           }
         } else {
@@ -89,6 +154,32 @@ for (const article of articles) {
     }
   }
 }
+
+const createFirstSource = read(
+  "src/lib/help/articles/authors/create-first-product.ts",
+);
+assert.match(
+  createFirstSource,
+  /helpPublicLink\("\/author-dashboard\/products\/new"\)/,
+  "create-first-product keeps absolute-label product route link",
+);
+assert.match(
+  createFirstSource,
+  /helpPublicLink\("\/help\/authors\/language-and-formatting"/,
+  "create-first-product cross-links language article by slug",
+);
+assert.match(
+  createFirstSource,
+  /label: "«Язык и оформление материалов»"/,
+  "create-first-product uses titled help cross-link label",
+);
+
+const richTextHelper = read("src/lib/help/rich-text.ts");
+assert.match(
+  richTextHelper,
+  /options\?\.label \?\? `\$\{origin\}\$\{normalizedHref\}`/,
+  "helpPublicLink defaults to absolute display label",
+);
 
 const sampleRich = helpRich(
   "Откройте ",
