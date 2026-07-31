@@ -21,7 +21,7 @@ export async function listPromotionWorkspaces(
 
   const { data, error } = await supabase
     .from("authors")
-    .select("id, name, slug, access_status")
+    .select("id, name, slug, access_status, can_bypass_product_moderation")
     .order("name", { ascending: true });
 
   if (error) {
@@ -37,6 +37,8 @@ export async function listPromotionWorkspaces(
       slug: author.slug,
       role: "owner" as AuthorMemberRole,
       accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
+      canBypassProductModeration:
+        author.can_bypass_product_moderation === true,
     }));
 }
 
