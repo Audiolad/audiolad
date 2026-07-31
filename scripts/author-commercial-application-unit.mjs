@@ -19,6 +19,10 @@ import {
   normalizeCommercialApplicationFormValues,
   validateCommercialApplicationFormValues,
 } from "../src/lib/author-commercial-applications/validation.ts";
+import {
+  authorAccessAllowsPaidProducts,
+  isAuthorCommercialApprovedAccess,
+} from "../src/lib/authors/access.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -36,6 +40,12 @@ function evaluateCommercial(overrides = {}) {
     capabilities: DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
     ...overrides,
   });
+}
+
+function stepById(section, id) {
+  const step = section.steps.find((item) => item.id === id);
+  assert.ok(step, `expected commercial onboarding step "${id}"`);
+  return step;
 }
 
 function validForm() {
@@ -123,23 +133,29 @@ function testOnboardingCommercialApplicationFlow() {
   assert.equal(draft.steps[0].statusLabel, "Черновик");
   assert.equal(draft.steps[0].actionLabel, "Продолжить заполнение");
 
-  // 4–6. Submitted
+  // 4–6. Submitted — application active; terms/paid/payout still locked
   const submitted = evaluateCommercial({
     accessStatus: "commercial_pending",
     applicationStatus: "submitted",
   });
-  assert.equal(submitted.steps[0].statusLabel, "Заявка отправлена");
-  assert.match(submitted.steps[0].description, /получили заявку/i);
-  assert.equal(submitted.steps[0].actionLabel, "Смотреть заявку");
-  assert.equal(submitted.steps[1].state, "locked");
-  assert.equal(submitted.steps[3].state, "locked");
+  const submittedApp = stepById(submitted, "commercial_application");
+  assert.equal(submittedApp.statusLabel, "Заявка отправлена");
+  assert.match(submittedApp.description, /получили заявку/i);
+  assert.equal(submittedApp.actionLabel, "Смотреть заявку");
+  assert.equal(stepById(submitted, "terms_acceptance").state, "locked");
+  assert.equal(stepById(submitted, "paid_product").state, "locked");
+  assert.equal(stepById(submitted, "payout_details").state, "locked");
+  assert.equal(authorAccessAllowsPaidProducts("commercial_pending"), false);
 
   // 7. In review
   const inReview = evaluateCommercial({
     accessStatus: "commercial_pending",
     applicationStatus: "in_review",
   });
-  assert.equal(inReview.steps[0].statusLabel, "На рассмотрении");
+  assert.equal(
+    stepById(inReview, "commercial_application").statusLabel,
+    "На рассмотрении",
+  );
 
   // 8. Needs changes with comment
   const needsChanges = evaluateCommercial({
@@ -147,14 +163,29 @@ function testOnboardingCommercialApplicationFlow() {
     applicationStatus: "needs_changes",
     applicationReviewComment: "Уточните тематику продуктов.",
   });
-  assert.equal(needsChanges.steps[0].statusLabel, "Нужно уточнить данные");
-  assert.equal(needsChanges.steps[0].actionLabel, "Исправить заявку");
-  assert.equal(needsChanges.steps[0].hint, "Уточните тематику продуктов.");
+  const needsChangesApp = stepById(needsChanges, "commercial_application");
+  assert.equal(needsChangesApp.statusLabel, "Нужно уточнить данные");
+  assert.equal(needsChangesApp.actionLabel, "Исправить заявку");
+  assert.equal(needsChangesApp.hint, "Уточните тематику продуктов.");
 
   // 9. Resubmit path after needs_changes stays editable CTA
-  assert.match(needsChanges.steps[0].href ?? "", /commercial-application/);
+  assert.match(needsChangesApp.href ?? "", /commercial-application/);
 
-  // 10–11. Approved onboarding → payout/terms active, paid locked
+  // 10–11. Approved → commercial_onboarding: terms first, paid locked, payout
+  // waits for terms. Approval ≠ commercial_active / paid rights.
+  assert.equal(
+    isAuthorCommercialApprovedAccess("commercial_onboarding"),
+    true,
+  );
+  assert.equal(authorAccessAllowsPaidProducts("commercial_onboarding"), false);
+  assert.equal(
+    resolveCommercialApplicationStatus({
+      accessStatus: "commercial_onboarding",
+      applicationStatus: "approved",
+    }),
+    "approved",
+  );
+
   const approved = evaluateCommercial({
     accessStatus: "commercial_onboarding",
     applicationStatus: "approved",
@@ -166,20 +197,79 @@ function testOnboardingCommercialApplicationFlow() {
     payoutDetailsHref: "/author-dashboard/commercial/payout-details",
     termsHref: "/author-dashboard/commercial/terms",
   });
-  assert.equal(approved.steps[0].state, "completed");
-  assert.equal(approved.steps[1].state, "active");
-  assert.equal(approved.steps[2].state, "active");
-  assert.equal(approved.steps[1].actionLabel, "Заполнить данные");
-  assert.equal(approved.steps[2].actionLabel, "Открыть условия");
-  assert.equal(approved.steps[3].state, "locked");
+  const approvedApp = stepById(approved, "commercial_application");
+  const approvedTerms = stepById(approved, "terms_acceptance");
+  const approvedPaid = stepById(approved, "paid_product");
+  const approvedPayout = stepById(approved, "payout_details");
+  assert.equal(approvedApp.state, "completed");
+  assert.equal(approvedTerms.state, "active");
+  assert.equal(approvedTerms.actionLabel, "Открыть условия");
+  assert.match(approvedTerms.href ?? "", /\/terms/);
+  assert.equal(approvedPaid.state, "locked");
   assert.match(
-    approved.steps[3].hint ?? "",
-    /данные для выплат|условия сотрудничества/i,
+    approvedPaid.hint ?? "",
+    /Сначала примите Авторские условия сотрудничества/,
   );
   assert.doesNotMatch(
-    approved.steps[3].hint ?? "",
+    approvedPaid.hint ?? "",
     /Сначала нужна одобренная коммерческая заявка/,
   );
+  assert.equal(approvedPayout.state, "locked");
+  assert.match(
+    approvedPayout.hint ?? "",
+    /Сначала примите Авторские условия сотрудничества/,
+  );
+
+  // Terms accepted while still commercial_onboarding: payout may open,
+  // but paid products stay gated until commercial_active.
+  const termsDoneOnboarding = evaluateCommercial({
+    accessStatus: "commercial_onboarding",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsHref: "/author-dashboard/commercial/payout-details",
+    termsHref: "/author-dashboard/commercial/terms",
+  });
+  assert.equal(
+    stepById(termsDoneOnboarding, "terms_acceptance").state,
+    "completed",
+  );
+  assert.equal(stepById(termsDoneOnboarding, "paid_product").state, "locked");
+  assert.equal(stepById(termsDoneOnboarding, "payout_details").state, "active");
+  assert.equal(
+    stepById(termsDoneOnboarding, "payout_details").actionLabel,
+    "Заполнить данные",
+  );
+  assert.equal(authorAccessAllowsPaidProducts("commercial_onboarding"), false);
+
+  // commercial_active after terms: paid create unlocks; payout stays optional
+  assert.equal(authorAccessAllowsPaidProducts("commercial_active"), true);
+  const commercialActive = evaluateCommercial({
+    accessStatus: "commercial_active",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    capabilities: {
+      ...DEFAULT_COMMERCIAL_ONBOARDING_CAPABILITIES,
+      payoutDetailsAvailable: true,
+      termsAcceptanceAvailable: true,
+    },
+    payoutDetailsHref: "/author-dashboard/commercial/payout-details",
+    termsHref: "/author-dashboard/commercial/terms",
+  });
+  assert.equal(
+    stepById(commercialActive, "terms_acceptance").state,
+    "completed",
+  );
+  assert.equal(stepById(commercialActive, "paid_product").state, "active");
+  assert.equal(
+    stepById(commercialActive, "paid_product").actionLabel,
+    "Создать платный продукт",
+  );
+  assert.equal(stepById(commercialActive, "payout_details").state, "active");
 
   // 12. Rejected — no reapply CTA
   const rejected = evaluateCommercial({
@@ -187,10 +277,12 @@ function testOnboardingCommercialApplicationFlow() {
     applicationStatus: "rejected",
     applicationReviewComment: "Пока недостаточно материалов.",
   });
-  assert.equal(rejected.steps[0].statusLabel, "Заявка не одобрена");
-  assert.equal(rejected.steps[0].actionLabel, "Смотреть заявку");
-  assert.notEqual(rejected.steps[0].actionLabel, "Подать заявку");
-  assert.equal(rejected.steps[0].hint, "Пока недостаточно материалов.");
+  const rejectedApp = stepById(rejected, "commercial_application");
+  assert.equal(rejectedApp.statusLabel, "Заявка не одобрена");
+  assert.equal(rejectedApp.actionLabel, "Смотреть заявку");
+  assert.notEqual(rejectedApp.actionLabel, "Подать заявку");
+  assert.equal(rejectedApp.hint, "Пока недостаточно материалов.");
+  assert.equal(stepById(rejected, "paid_product").state, "locked");
 
   // 13. Legacy commercial / commercial_active without application row
   assert.equal(
@@ -212,7 +304,10 @@ function testOnboardingCommercialApplicationFlow() {
     payoutDetailsComplete: true,
     termsAccepted: true,
   });
-  assert.equal(legacyCommercial.steps[0].state, "completed");
+  assert.equal(
+    stepById(legacyCommercial, "commercial_application").state,
+    "completed",
+  );
 
   // 14. Legacy commercial_pending without row
   const legacyPending = evaluateCommercial({
@@ -220,16 +315,10 @@ function testOnboardingCommercialApplicationFlow() {
     applicationStatus: null,
     legacyPendingWithoutApplication: true,
   });
-  assert.equal(legacyPending.steps[0].statusLabel, "На рассмотрении");
-  assert.equal(legacyPending.steps[0].actionLabel, undefined);
-  assert.equal(legacyPending.steps[0].href, undefined);
-
-  // 17–18. Paid product stays locked while payout/terms incomplete
-  assert.equal(approved.steps[3].state, "locked");
-  assert.match(
-    approved.steps[3].hint ?? "",
-    /данные для выплат|условия сотрудничества/i,
-  );
+  const legacyPendingApp = stepById(legacyPending, "commercial_application");
+  assert.equal(legacyPendingApp.statusLabel, "На рассмотрении");
+  assert.equal(legacyPendingApp.actionLabel, undefined);
+  assert.equal(legacyPendingApp.href, undefined);
 }
 
 function testSourceGuards() {
