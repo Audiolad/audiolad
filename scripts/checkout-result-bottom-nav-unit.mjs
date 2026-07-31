@@ -3,8 +3,10 @@
  * Checkout result BottomNav regression checks.
  */
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = "/var/www/audiolad/.worktrees/fix-checkout-result-bottom-nav";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function assert(condition, message) {
   if (!condition) {
@@ -12,11 +14,12 @@ function assert(condition, message) {
   }
 }
 
+function read(relativePath) {
+  return readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
 function testBottomNavVisibilityRules() {
-  const bottomNavConfig = readFileSync(
-    `${ROOT}/src/lib/navigation/bottom-nav.ts`,
-    "utf8",
-  );
+  const bottomNavConfig = read("src/lib/navigation/bottom-nav.ts");
 
   assert(
     bottomNavConfig.includes('"/checkout/result"'),
@@ -34,11 +37,8 @@ function testBottomNavVisibilityRules() {
 }
 
 function testCheckoutResultPageShell() {
-  const page = readFileSync(
-    `${ROOT}/src/app/checkout/result/page.tsx`,
-    "utf8",
-  );
-  const globals = readFileSync(`${ROOT}/src/app/globals.css`, "utf8");
+  const page = read("src/app/checkout/result/page.tsx");
+  const globals = read("src/app/globals.css");
 
   assert(page.includes('from "@/components/BottomNav"'), "page imports canonical BottomNav");
   assert(
@@ -59,8 +59,8 @@ function testCheckoutResultPageShell() {
 }
 
 function testOtherCheckoutRoutesStayHidden() {
-  const bottomNav = readFileSync(`${ROOT}/src/components/BottomNav.tsx`, "utf8");
-  const pwaInstall = readFileSync(`${ROOT}/scripts/pwa-install-unit.mjs`, "utf8");
+  const bottomNav = read("src/components/BottomNav.tsx");
+  const pwaInstall = read("scripts/pwa-install-unit.mjs");
 
   assert(
     bottomNav.includes("shouldShowBottomNav(pathname)"),
