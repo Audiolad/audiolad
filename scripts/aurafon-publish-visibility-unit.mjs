@@ -65,7 +65,12 @@ function main() {
   const banner = read(
     "src/components/products/practice-page/PublishPreviewBanner.tsx",
   );
-  assert.match(banner, /published=1/);
+  // After successful publish, leave preview via replace onto the public path.
+  assert.match(banner, /window\.location\.replace\(publicPath\)/);
+  assert.doesNotMatch(banner, /published=1/);
+  assert.doesNotMatch(banner, /location\.assign\(/);
+  assert.match(banner, /\/api\/author\/products\/\$\{practiceId\}\/publish/);
+  assert.match(banner, /if \(!response\.ok\)/);
 
   const authorsList = read("src/lib/authors/public-list-data.ts");
   assert.match(authorsList, /\.eq\("status", "published"\)/);

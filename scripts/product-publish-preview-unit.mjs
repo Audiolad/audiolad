@@ -437,7 +437,28 @@ function testSourceContracts() {
 
   assert.match(banner, /publishInFlightRef/);
   assert.match(banner, /isPublishNotReadyResponse/);
-  assert.match(banner, /location\.replace\(publicPath\)/);
+  // Successful publish replaces the preview URL with the public product path.
+  assert.match(banner, /window\.location\.replace\(publicPath\)/);
+  assert.doesNotMatch(banner, /published=1/);
+  assert.doesNotMatch(banner, /location\.assign\(/);
+  // Redirect runs only after a successful publish response.
+  const publishHandler = banner.slice(
+    banner.indexOf("async function handlePublish"),
+    banner.indexOf("return ("),
+  );
+  assert.match(publishHandler, /if \(!response\.ok\)/);
+  assert.match(
+    publishHandler,
+    /window\.location\.replace\(publicPath\)/,
+    "redirect uses publicPath after success",
+  );
+  const errorReturnIdx = publishHandler.indexOf(
+    "Не удалось опубликовать аудиопродукт.",
+  );
+  const replaceIdx = publishHandler.indexOf(
+    "window.location.replace(publicPath)",
+  );
+  assert.ok(errorReturnIdx >= 0 && replaceIdx > errorReturnIdx);
   assert.match(banner, /Вернуться к редактированию/);
   assert.match(banner, /Посмотреть глазами слушателя/);
   assert.match(banner, /Опубликовать/);
