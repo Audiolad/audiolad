@@ -176,11 +176,32 @@ function primary(input) {
 // ---------------------------------------------------------------------------
 {
   const page = read("src/app/author-dashboard/opportunities/page.tsx");
+  const shell = read("src/components/author-dashboard/AuthorShell.tsx");
   assert.match(page, /loadAuthorOpportunitiesView/);
   assert.match(page, /listAuthorWorkspacesForUser/);
   assert.match(page, /requireAuthorMembership/);
-  assert.match(page, /author-dashboard\/opportunities\?author=/);
+  assert.match(page, /internalBackHref=\{backHref\}/);
+  assert.match(
+    page,
+    /\/author-dashboard\?author=\$\{encodeURIComponent\(workspace\.slug\)\}/,
+    "hub back link returns to author dashboard with author context",
+  );
+  assert.doesNotMatch(
+    page,
+    /internalBackHref=\{`\/author-dashboard\/opportunities/,
+    "hub back link must not self-link to opportunities",
+  );
+  assert.match(
+    page,
+    /workspaces\.find\(\(item\) => item\.slug === requestedSlug\) \?\? workspaces\[0\]/,
+    "missing/unknown author falls back to first workspace",
+  );
   assert.doesNotMatch(page, /AuthorDashboardNav/);
+  assert.match(
+    shell,
+    /internalBackLabel = "Назад в кабинет"/,
+    "AuthorShell labels internal back as return to cabinet",
+  );
 
   const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
   assert.doesNotMatch(nav, /opportunities/);
@@ -188,14 +209,22 @@ function primary(input) {
   const home = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
   assert.match(home, /Возможности для авторов/);
   assert.match(home, /Посмотреть возможности/);
-  assert.match(home, /\/author-dashboard\/opportunities\?author=/);
+  assert.match(
+    home,
+    /\/author-dashboard\/opportunities\?author=/,
+    "dashboard entry links into opportunities hub with author query",
+  );
   assert.match(home, /AuthorOnboardingChecklist/);
 
   const promotion = read(
     "src/components/author-dashboard/AuthorPromotionClient.tsx",
   );
   assert.match(promotion, /готовые сценарии продвижения/);
-  assert.match(promotion, /\/author-dashboard\/opportunities\?author=/);
+  assert.match(
+    promotion,
+    /\/author-dashboard\/opportunities\?author=/,
+    "promotion entry links into opportunities hub with author query",
+  );
 
   const loader = read("src/lib/author-dashboard/load-author-opportunities.ts");
   assert.match(loader, /loadAuthorOnboardingChecklistState/);
