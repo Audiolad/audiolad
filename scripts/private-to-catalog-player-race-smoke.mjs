@@ -131,7 +131,7 @@ async function authCookies(env, baseUrl, email, password) {
     throw new Error(`signIn failed: ${error?.message ?? "no session"}`);
   }
 
-  const projectRef = new URL(env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
+  const projectRef = new URL(env.supabaseUrl).hostname.split(".")[0];
   const host = new URL(baseUrl).hostname;
   const cookieBase = {
     domain: host,
