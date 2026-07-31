@@ -8,6 +8,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  PRODUCT_DELETE_LOCKED_AFTER_PAID_PURCHASE_MESSAGE,
+  PRODUCT_PAID_PURCHASE_DELETE_LOCK,
+} from "../src/lib/author-products/delete-lock.ts";
+import {
   getDeleteBlockerMessage,
   getDeleteBlockers,
   getProductLifecycleBlockers,
@@ -15,7 +19,6 @@ import {
 import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
   PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-  PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE,
   assertPracticeContentMutable,
   getPracticeSaleLock,
 } from "../src/lib/author-products/sale-lock.ts";
@@ -53,7 +56,10 @@ function createSaleLockClient({
         },
         maybeSingle: async () => {
           if (table === "practices") {
-            return { data: { id: "practice-1", status }, error: null };
+            return {
+              data: { id: "practice-1", status, deleted_at: null },
+              error: null,
+            };
           }
 
           if (table === "starter_practices") {
@@ -132,12 +138,25 @@ async function testAssertPracticeContentMutableThrows() {
   );
 }
 
-async function testLifecycleDeleteUsesSaleLock() {
-  const blockers = getDeleteBlockers(
+async function testLifecycleDeleteUsesPaidDeleteLock() {
+  const freeClaimBlockers = getDeleteBlockers(
     await getProductLifecycleBlockers(
       createSaleLockClient({
         status: "unpublished",
         entitlementCount: 1,
+        anyOrderCount: 0,
+        paidOrderCount: 0,
+      }),
+      "practice-1",
+    ),
+  );
+  assert.ok(!freeClaimBlockers.includes(PRODUCT_PAID_PURCHASE_DELETE_LOCK));
+
+  const paidBlockers = getDeleteBlockers(
+    await getProductLifecycleBlockers(
+      createSaleLockClient({
+        status: "unpublished",
+        entitlementCount: 0,
         anyOrderCount: 1,
         paidOrderCount: 1,
       }),
@@ -145,14 +164,14 @@ async function testLifecycleDeleteUsesSaleLock() {
     ),
   );
 
-  assert.ok(blockers.includes(PRODUCT_CONTENT_LOCKED_AFTER_SALE));
+  assert.ok(paidBlockers.includes(PRODUCT_PAID_PURCHASE_DELETE_LOCK));
   assert.equal(
-    getDeleteBlockerMessage(blockers),
-    PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE,
+    getDeleteBlockerMessage(paidBlockers),
+    PRODUCT_DELETE_LOCKED_AFTER_PAID_PURCHASE_MESSAGE,
   );
 }
 
-async function testLifecyclePendingOrderStillBlocksDelete() {
+async function testLifecyclePendingOrderDoesNotBlockDelete() {
   const blockers = getDeleteBlockers(
     await getProductLifecycleBlockers(
       createSaleLockClient({
@@ -165,8 +184,7 @@ async function testLifecyclePendingOrderStillBlocksDelete() {
     ),
   );
 
-  assert.ok(blockers.includes("has_orders"));
-  assert.ok(!blockers.includes(PRODUCT_CONTENT_LOCKED_AFTER_SALE));
+  assert.deepEqual(blockers, []);
 }
 
 function testEntitledAccessByStatus() {
@@ -195,7 +213,8 @@ function testSourceWiring() {
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 
   assert.match(saleLockSource, /PRODUCT_CONTENT_LOCKED_AFTER_SALE/);
-  assert.match(lifecycleSource, /getPracticeSaleLock/);
+  assert.match(lifecycleSource, /getPracticeDeleteLock/);
+  assert.match(lifecycleSource, /softDeletePractice|soft_delete_practice/);
   assert.match(fileRoute, /assertPracticeContentMutable/);
   assert.match(uploadRoute, /getPracticeSaleLock/);
   assert.match(audioRoute, /assertPracticeContentMutable/);
@@ -203,6 +222,7 @@ function testSourceWiring() {
   assert.match(migration, /guard_audio_items_content_sale_lock/);
   assert.match(migration, /practice_is_content_locked_after_sale/);
   assert.match(form, /contentLockedAfterSale/);
+  assert.match(form, /deleteLockedAfterPaidPurchase/);
   assert.match(
     form,
     /Этот продукт уже приобретён слушателями/,
@@ -214,8 +234,8 @@ async function main() {
   await testSaleLockTrueWithEntitlement();
   await testSaleLockTrueWithPaidOrder();
   await testAssertPracticeContentMutableThrows();
-  await testLifecycleDeleteUsesSaleLock();
-  await testLifecyclePendingOrderStillBlocksDelete();
+  await testLifecycleDeleteUsesPaidDeleteLock();
+  await testLifecyclePendingOrderDoesNotBlockDelete();
   testEntitledAccessByStatus();
   testSourceWiring();
   console.log("practice-sale-lock-unit: ok");

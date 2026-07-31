@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mapPublishRpcError } from "@/lib/author-products/moderation";
 import { mapTopicRpcError } from "@/lib/topics/errors";
 
 import type { AuthorAccessStatus } from "@/lib/authors/access";
@@ -387,6 +388,11 @@ export async function publishPracticeProduct(
   });
 
   if (error) {
+    const publishMapped = mapPublishRpcError(error.message);
+    if (publishMapped) {
+      throw publishMapped;
+    }
+
     const mapped = mapTopicRpcError(error.message);
 
     if (mapped.code !== "topic_sync_failed") {
@@ -401,11 +407,15 @@ export async function unpublishPracticeProduct(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("unpublish_audio_product", {
+  const { error } = await supabase.rpc("unpublish_approved_practice", {
     p_practice_id: practiceId,
   });
 
   if (error) {
+    const mapped = mapPublishRpcError(error.message);
+    if (mapped) {
+      throw mapped;
+    }
     throw new Error("practice_unpublish_failed");
   }
 }

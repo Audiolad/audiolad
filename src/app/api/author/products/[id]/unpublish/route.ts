@@ -49,8 +49,28 @@ export async function POST(_request: Request, context: RouteContext) {
 
     try {
       await unpublishPracticeProduct(supabase, id);
-    } catch {
-      console.error("author_unpublish_error", id);
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof (error as { message: unknown }).message === "string"
+      ) {
+        const mapped = error as {
+          message: string;
+          code?: string;
+          status?: number;
+        };
+        return NextResponse.json(
+          {
+            error: mapped.code ?? "practice_unpublish_failed",
+            message: mapped.message,
+          },
+          { status: mapped.status ?? 409 },
+        );
+      }
+
+      console.error("author_unpublish_error", id, error);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 

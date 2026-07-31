@@ -6,6 +6,7 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
+import { assertPublishModerationAllowed } from "@/lib/author-products/moderation";
 import {
   evaluatePublishReadiness,
   publishPracticeProduct,
@@ -38,6 +39,21 @@ export async function POST(_request: Request, context: RouteContext) {
       await assertAuthorCommercialWriteAllowed(
         practice.author_id,
         accessStatus,
+      );
+    }
+
+    const moderationGate = await assertPublishModerationAllowed(
+      supabase,
+      detail.practice,
+    );
+
+    if (!moderationGate.ok) {
+      return NextResponse.json(
+        {
+          error: moderationGate.code,
+          message: moderationGate.message,
+        },
+        { status: moderationGate.status },
       );
     }
 

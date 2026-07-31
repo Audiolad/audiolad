@@ -8,9 +8,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  PRODUCT_DELETE_LOCKED_AFTER_PAID_PURCHASE_MESSAGE,
+  PRODUCT_PAID_PURCHASE_DELETE_LOCK,
+} from "../src/lib/author-products/delete-lock.ts";
+import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
   PRODUCT_CONTENT_LOCKED_AFTER_SALE,
-  PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE,
   saleLockConflictResponse,
 } from "../src/lib/author-products/sale-lock.ts";
 import { getDeleteBlockerMessage } from "../src/lib/author-products/lifecycle.ts";
@@ -29,14 +32,15 @@ function testConflictPayload() {
 
 function testDeleteMessage() {
   assert.equal(
-    getDeleteBlockerMessage([PRODUCT_CONTENT_LOCKED_AFTER_SALE]),
-    PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE,
+    getDeleteBlockerMessage([PRODUCT_PAID_PURCHASE_DELETE_LOCK]),
+    PRODUCT_DELETE_LOCKED_AFTER_PAID_PURCHASE_MESSAGE,
   );
 }
 
 function testRoutesGuardSaleLock() {
+  // Content/sale-lock remains on destructive audio mutations.
+  // Product PATCH uses moderation editability; DELETE uses paid delete-lock.
   const routes = [
-    "src/app/api/author/products/[id]/route.ts",
     "src/app/api/author/products/[id]/audio/[audioId]/file/route.ts",
     "src/app/api/author/products/[id]/audio/[audioId]/upload/route.ts",
     "src/app/api/author/products/[id]/audio/[audioId]/route.ts",
@@ -49,10 +53,15 @@ function testRoutesGuardSaleLock() {
       /PRODUCT_CONTENT_LOCKED_AFTER_SALE|getPracticeSaleLock|assertPracticeContentMutable/,
       `${relativePath} must gate sale-lock`,
     );
-    if (relativePath.includes("/audio/")) {
-      assert.match(source, /status: 409/);
-    }
+    assert.match(source, /status: 409/);
   }
+
+  const productRoute = read("src/app/api/author/products/[id]/route.ts");
+  assert.match(
+    productRoute,
+    /PRODUCT_PAID_PURCHASE_DELETE_LOCK|getPracticeDeleteLock/,
+    "product route must gate paid delete-lock",
+  );
 }
 
 function testUnpublishArchiveRemainOpen() {

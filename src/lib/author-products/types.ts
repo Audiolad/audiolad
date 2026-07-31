@@ -9,6 +9,11 @@ import type {
   ProductKind,
 } from "@/lib/author-products/product-kind";
 import { normalizeProductKind } from "@/lib/author-products/product-kind";
+import {
+  getVisibleAuthorProductStatus,
+  getVisibleAuthorProductStatusClassName,
+  getVisibleAuthorProductStatusLabel,
+} from "@/lib/author-products/moderation";
 
 export const PAID_PRICE_OPTIONS = [99, 199, 299, 444, 888, 1888, 2888] as const;
 
@@ -18,7 +23,6 @@ export const PRACTICE_STATUS = {
   DRAFT: "draft",
   PUBLISHED: "published",
   UNPUBLISHED: "unpublished",
-  ARCHIVED: "archived",
 } as const;
 
 export type PracticeStatus =
@@ -32,6 +36,7 @@ export type AuthorWorkspace = {
   slug: string;
   role: AuthorMemberRole;
   accessStatus: AuthorAccessStatus;
+  canBypassProductModeration: boolean;
 };
 
 export type AudioItemRow = {
@@ -70,6 +75,13 @@ export type PracticeRow = {
   use_shared_cover: boolean;
   audio_url: string | null;
   status: string;
+  moderation_status: string;
+  moderation_attempt: number;
+  moderation_submitted_at: string | null;
+  moderation_review_comment: string | null;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  deletion_reason: string | null;
   currency: string;
   published_at: string | null;
   listening_notice_enabled: boolean;
@@ -88,6 +100,10 @@ export type AuthorProductListItem = {
   price: number;
   is_free: boolean;
   status: string;
+  moderation_status: string;
+  moderation_submitted_at: string | null;
+  moderation_review_comment: string | null;
+  moderation_attempt: number;
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string;
@@ -95,9 +111,27 @@ export type AuthorProductListItem = {
 };
 
 export function coercePracticeRow(
-  row: Omit<PracticeRow, "product_kind" | "music_usage_permission"> & {
+  row: Omit<
+    PracticeRow,
+    | "product_kind"
+    | "music_usage_permission"
+    | "moderation_status"
+    | "moderation_attempt"
+    | "moderation_submitted_at"
+    | "moderation_review_comment"
+    | "deleted_at"
+    | "deleted_by"
+    | "deletion_reason"
+  > & {
     product_kind?: string | null;
     music_usage_permission?: string | null;
+    moderation_status?: string | null;
+    moderation_attempt?: number | null;
+    moderation_submitted_at?: string | null;
+    moderation_review_comment?: string | null;
+    deleted_at?: string | null;
+    deleted_by?: string | null;
+    deletion_reason?: string | null;
   },
 ): PracticeRow {
   return {
@@ -108,6 +142,13 @@ export function coercePracticeRow(
       row.music_usage_permission === "platform_reuse_allowed"
         ? row.music_usage_permission
         : null,
+    moderation_status: row.moderation_status ?? "not_submitted",
+    moderation_attempt: row.moderation_attempt ?? 0,
+    moderation_submitted_at: row.moderation_submitted_at ?? null,
+    moderation_review_comment: row.moderation_review_comment ?? null,
+    deleted_at: row.deleted_at ?? null,
+    deleted_by: row.deleted_by ?? null,
+    deletion_reason: row.deletion_reason ?? null,
   };
 }
 
@@ -116,33 +157,41 @@ export type AuthorProductDetail = {
   audio_items: AudioItemRow[];
   /** True when entitlements or paid orders lock destructive content edits. */
   contentLockedAfterSale: boolean;
+  /** True when a paid order blocks soft delete (narrower than content lock). */
+  deleteLockedAfterPaidPurchase: boolean;
 };
 
-export function getStatusLabel(status: string): string {
-  switch (status) {
-    case "published":
-      return "Опубликован";
-    case "unpublished":
-      return "Снят с публикации";
-    case "archived":
-      return "В архиве";
-    case "draft":
-    default:
-      return "Черновик";
-  }
+/**
+ * Author-facing status label from technical fields.
+ * Prefer passing moderationStatus; bare lifecycle status is accepted for
+ * backward-compatible call sites that only have practice.status.
+ */
+export function getStatusLabel(
+  status: string,
+  moderationStatus?: string | null,
+  deletedAt?: string | null,
+): string {
+  return getVisibleAuthorProductStatusLabel(
+    getVisibleAuthorProductStatus({
+      status,
+      moderationStatus,
+      deletedAt,
+    }),
+  );
 }
 
-export function getStatusClassName(status: string): string {
-  switch (status) {
-    case "published":
-      return "bg-[#eaf7ef] text-[#3d8d65]";
-    case "unpublished":
-      return "bg-[#eef3ff] text-[#4f6db8]";
-    case "archived":
-      return "bg-[#f2f2f7] text-[#6d6d80]";
-    default:
-      return "bg-[#fff4df] text-[#b67a1d]";
-  }
+export function getStatusClassName(
+  status: string,
+  moderationStatus?: string | null,
+  deletedAt?: string | null,
+): string {
+  return getVisibleAuthorProductStatusClassName(
+    getVisibleAuthorProductStatus({
+      status,
+      moderationStatus,
+      deletedAt,
+    }),
+  );
 }
 
 export function formatPriceLabel(price: number, isFree: boolean): string {

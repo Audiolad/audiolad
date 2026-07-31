@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const PRODUCT_CONTENT_LOCKED_AFTER_SALE =
   "PRODUCT_CONTENT_LOCKED_AFTER_SALE" as const;
 
+/** @deprecated Prefer PRODUCT_DELETE_LOCKED_AFTER_PAID_PURCHASE_MESSAGE in delete-lock.ts */
 export const PRODUCT_DELETE_LOCKED_AFTER_SALE_MESSAGE =
-  "Продукт уже приобретён слушателями и не может быть удалён. Вы можете снять его с продажи или переместить в архив.";
+  "Удалить этот продукт нельзя, потому что его уже приобрели пользователи. Вы можете снять продукт с публикации – новые покупки прекратятся, а прежние покупатели сохранят доступ.";
 
 export const PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE =
   "Аудиоматериалы этого продукта нельзя удалить или заменить, потому что продукт уже приобретён слушателями.";

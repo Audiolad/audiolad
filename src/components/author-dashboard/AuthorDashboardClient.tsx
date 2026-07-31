@@ -12,6 +12,10 @@ import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTerms
 import { useAuthorProjectSelection } from "@/components/author-dashboard/useAuthorProjectSelection";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  getVisibleAuthorProductStatus,
+  VISIBLE_AUTHOR_PRODUCT_STATUS,
+} from "@/lib/author-products/moderation";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
 import {
@@ -24,8 +28,6 @@ import {
 type AuthorDashboardClientProps = {
   authors: AuthorWorkspace[];
 };
-
-type ProductListView = "active" | "archive";
 
 function PlusIcon() {
   return (
@@ -47,6 +49,19 @@ function ProductCard({
   product: AuthorProductListItem;
   authorSlug: string;
 }) {
+  const visibleStatus = getVisibleAuthorProductStatus({
+    status: product.status,
+    moderationStatus: product.moderation_status,
+  });
+  const isSubmitted =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED;
+  const needsChanges =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.CHANGES_REQUESTED;
+  const isPublished =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED;
+
+  const primaryActionLabel = isSubmitted ? "Просмотреть" : "Редактировать";
+
   return (
     <article className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -72,9 +87,12 @@ function ProductCard({
             </div>
 
             <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClassName(product.status)}`}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClassName(
+                product.status,
+                product.moderation_status,
+              )}`}
             >
-              {getStatusLabel(product.status)}
+              {getStatusLabel(product.status, product.moderation_status)}
             </span>
           </div>
 
@@ -82,17 +100,41 @@ function ProductCard({
             <span>{product.audio_count} аудио</span>
             <span>{formatPriceLabel(product.price, product.is_free)}</span>
             <span>Обновлён {formatUpdatedAt(product.updated_at)}</span>
+            {product.moderation_submitted_at ? (
+              <span>
+                Отправлен {formatUpdatedAt(product.moderation_submitted_at)}
+              </span>
+            ) : null}
           </div>
+
+          {needsChanges && product.moderation_review_comment ? (
+            <p className="mt-3 rounded-[14px] border border-[#f0d7a8] bg-[#fff8ec] px-3 py-2 text-sm leading-5 text-[#8a5a16]">
+              {product.moderation_review_comment}
+            </p>
+          ) : null}
+
+          {needsChanges && !product.moderation_review_comment ? (
+            <p className="mt-3 text-sm text-[#8a5a16]">
+              Внесите изменения по замечаниям модератора и отправьте продукт
+              повторно.
+            </p>
+          ) : null}
+
+          {isSubmitted ? (
+            <p className="mt-3 text-sm text-[#5f5484]">
+              Продукт на проверке. Основные данные сейчас нельзя изменять.
+            </p>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href={`/author-dashboard/products/${product.id}`}
               className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white"
             >
-              Редактировать
+              {primaryActionLabel}
             </Link>
 
-            {product.status === "published" ? (
+            {isPublished ? (
               <Link
                 href={buildPracticePublicPath(authorSlug, product.slug)}
                 className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"
@@ -113,7 +155,6 @@ export default function AuthorDashboardClient({
   const [products, setProducts] = useState<AuthorProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [listView, setListView] = useState<ProductListView>("active");
   const { selectedAuthor } = useAuthorProjectSelection(
     authors,
     "/author-dashboard",
@@ -173,9 +214,6 @@ export default function AuthorDashboardClient({
   }
 
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(selectedAuthor.slug)}`;
-  const activeProducts = products.filter((product) => product.status !== "archived");
-  const archivedProducts = products.filter((product) => product.status === "archived");
-  const visibleProducts = listView === "archive" ? archivedProducts : activeProducts;
 
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
@@ -240,34 +278,7 @@ export default function AuthorDashboardClient({
       </div>
 
       <section className="mt-8">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
-
-          <div className="inline-flex rounded-full border border-[#e4d7f4] bg-white p-1">
-            <button
-              type="button"
-              onClick={() => setListView("active")}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                listView === "active"
-                  ? "bg-[#7042c5] text-white"
-                  : "text-[#7042c5]"
-              }`}
-            >
-              Основной список
-            </button>
-            <button
-              type="button"
-              onClick={() => setListView("archive")}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                listView === "archive"
-                  ? "bg-[#7042c5] text-white"
-                  : "text-[#7042c5]"
-              }`}
-            >
-              Архив{archivedProducts.length > 0 ? ` (${archivedProducts.length})` : ""}
-            </button>
-          </div>
-        </div>
+        <h2 className="text-[21px] font-semibold">Аудиопродукты</h2>
 
         {loading ? (
           <p className="mt-4 text-sm text-[#7d70a2]">Загрузка списка…</p>
@@ -279,37 +290,31 @@ export default function AuthorDashboardClient({
           </p>
         ) : null}
 
-        {!loading && !error && visibleProducts.length === 0 ? (
-          listView === "archive" ? (
-            <p className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6 text-sm text-[#7d70a2]">
-              В архиве пока нет аудиопродуктов.
+        {!loading && !error && products.length === 0 ? (
+          <div className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6">
+            <h3 className="text-[17px] font-semibold text-[#2f2548]">
+              Создайте свою первую практику
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+              Начните с бесплатного аудиопродукта – так слушатели смогут
+              познакомиться с вами и вашим подходом.
             </p>
-          ) : (
-            <div className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6">
-              <h3 className="text-[17px] font-semibold text-[#2f2548]">
-                Создайте свою первую практику
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                Начните с бесплатного аудиопродукта – так слушатели смогут
-                познакомиться с вами и вашим подходом.
-              </p>
-              <Link
-                href={newProductHref}
-                aria-disabled={!canMutateContent}
-                className={`mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold text-white sm:w-auto ${
-                  canMutateContent
-                    ? "bg-[#7042c5]"
-                    : "pointer-events-none bg-[#b7a5df] opacity-70"
-                }`}
-              >
-                Создать бесплатный продукт
-              </Link>
-            </div>
-          )
+            <Link
+              href={newProductHref}
+              aria-disabled={!canMutateContent}
+              className={`mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold text-white sm:w-auto ${
+                canMutateContent
+                  ? "bg-[#7042c5]"
+                  : "pointer-events-none bg-[#b7a5df] opacity-70"
+              }`}
+            >
+              Создать бесплатный продукт
+            </Link>
+          </div>
         ) : null}
 
         <div className="mt-4 space-y-4">
-          {visibleProducts.map((product) => (
+          {products.map((product) => (
             <ProductCard
               key={product.id}
               product={product}

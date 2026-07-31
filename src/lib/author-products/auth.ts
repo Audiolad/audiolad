@@ -16,6 +16,11 @@ import {
 } from "@/lib/author-terms/errors";
 import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
 
+import {
+  isPracticeDeletedError,
+  isPracticePublishedImmutableError,
+  isPracticeUnderModerationError,
+} from "@/lib/author-products/moderation";
 import { isPracticeSaleLockError } from "@/lib/author-products/sale-lock";
 
 import type { AuthorMemberRole, AuthorWorkspace } from "./types";
@@ -96,7 +101,8 @@ export async function listAuthorWorkspacesForUser(
         id,
         name,
         slug,
-        access_status
+        access_status,
+        can_bypass_product_moderation
       )
     `,
     )
@@ -126,6 +132,8 @@ export async function listAuthorWorkspacesForUser(
       slug: author.slug,
       role: row.role as AuthorMemberRole,
       accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
+      canBypassProductModeration:
+        author.can_bypass_product_moderation === true,
     });
   }
 
@@ -220,7 +228,7 @@ export async function requirePracticeAccess(practiceId: string) {
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
     .select(
-      "id, author_id, status, slug, published_at, use_shared_cover, product_kind, music_usage_permission",
+      "id, author_id, status, moderation_status, deleted_at, slug, published_at, use_shared_cover, product_kind, music_usage_permission",
     )
     .eq("id", practiceId)
     .maybeSingle();
@@ -230,7 +238,7 @@ export async function requirePracticeAccess(practiceId: string) {
     throw new AuthorAccessError("internal_error", 500);
   }
 
-  if (!practice?.id || !practice.author_id) {
+  if (!practice?.id || !practice.author_id || practice.deleted_at) {
     throw new AuthorAccessError("not_found", 404);
   }
 
@@ -265,6 +273,8 @@ export async function requirePracticeAccess(practiceId: string) {
       id: string;
       author_id: string;
       status: string;
+      moderation_status: string | null;
+      deleted_at: string | null;
       slug: string;
       published_at: string | null;
       use_shared_cover: boolean;
@@ -290,6 +300,29 @@ export function handleAuthorRouteError(error: unknown) {
   }
 
   if (isPracticeSaleLockError(error)) {
+    return NextResponse.json(
+      {
+        error: error.code,
+        message: error.userMessage,
+      },
+      { status: error.status },
+    );
+  }
+
+  if (isPracticeUnderModerationError(error)) {
+    return NextResponse.json(
+      {
+        error: error.code,
+        message: error.userMessage,
+      },
+      { status: error.status },
+    );
+  }
+
+  if (
+    isPracticePublishedImmutableError(error) ||
+    isPracticeDeletedError(error)
+  ) {
     return NextResponse.json(
       {
         error: error.code,

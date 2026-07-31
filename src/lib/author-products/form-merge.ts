@@ -36,6 +36,10 @@ export type ProductFormSnapshot = {
   listeningNoticeTitle: string;
   listeningNoticeText: string;
   status: string;
+  moderationStatus: string;
+  moderationSubmittedAt: string | null;
+  moderationReviewComment: string | null;
+  moderationAttempt: number;
   publishedAt: string | null;
 };
 
@@ -74,6 +78,10 @@ export function productDetailToFormSnapshot(
     listeningNoticeText:
       practice.listening_notice_text ?? listeningDefaults.listeningNoticeText,
     status: practice.status,
+    moderationStatus: practice.moderation_status ?? "not_submitted",
+    moderationSubmittedAt: practice.moderation_submitted_at ?? null,
+    moderationReviewComment: practice.moderation_review_comment ?? null,
+    moderationAttempt: practice.moderation_attempt ?? 0,
     publishedAt: practice.published_at,
   };
 }

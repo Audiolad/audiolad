@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -37,6 +38,13 @@ const PRACTICE_DETAIL_SELECT = `
   use_shared_cover,
   audio_url,
   status,
+  moderation_status,
+  moderation_attempt,
+  moderation_submitted_at,
+  moderation_review_comment,
+  deleted_at,
+  deleted_by,
+  deletion_reason,
   currency,
   published_at,
   listening_notice_enabled,
@@ -56,6 +64,19 @@ async function resolveContentLockedAfterSale(
   } catch (error) {
     console.error("practice_sale_lock_lookup_failed", practiceId, error);
     throw new Error("sale_lock_lookup_failed");
+  }
+}
+
+async function resolveDeleteLockedAfterPaidPurchase(
+  practiceId: string,
+): Promise<boolean> {
+  try {
+    const serviceSupabase = createServiceRoleClient();
+    const lock = await getPracticeDeleteLock(serviceSupabase, practiceId);
+    return lock.locked;
+  } catch (error) {
+    console.error("practice_delete_lock_lookup_failed", practiceId, error);
+    throw new Error("delete_lock_lookup_failed");
   }
 }
 
@@ -84,9 +105,10 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, product_kind, price, is_free, status, cover_url, cover_image, updated_at",
+      "id, title, slug, format, product_kind, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at",
     )
     .eq("author_id", authorId)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -96,6 +118,10 @@ export async function listAuthorProducts(
   const practiceRows = (practices ?? []) as Array<
     Omit<AuthorProductListItem, "audio_count" | "product_kind"> & {
       product_kind?: string | null;
+      moderation_status?: string | null;
+      moderation_submitted_at?: string | null;
+      moderation_review_comment?: string | null;
+      moderation_attempt?: number | null;
     }
   >;
 
@@ -124,6 +150,10 @@ export async function listAuthorProducts(
   return practiceRows.map((row) => ({
     ...row,
     product_kind: normalizeProductKind(row.product_kind),
+    moderation_status: row.moderation_status ?? "not_submitted",
+    moderation_submitted_at: row.moderation_submitted_at ?? null,
+    moderation_review_comment: row.moderation_review_comment ?? null,
+    moderation_attempt: row.moderation_attempt ?? 0,
     audio_count: countMap.get(row.id) ?? 0,
   }));
 }
@@ -136,6 +166,7 @@ export async function getAuthorProductDetail(
     .from("practices")
     .select(PRACTICE_DETAIL_SELECT)
     .eq("id", practiceId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (practiceError) {
@@ -156,12 +187,17 @@ export async function getAuthorProductDetail(
     throw new Error("audio_items_lookup_failed");
   }
 
-  const contentLockedAfterSale = await resolveContentLockedAfterSale(practiceId);
+  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase] =
+    await Promise.all([
+      resolveContentLockedAfterSale(practiceId),
+      resolveDeleteLockedAfterPaidPurchase(practiceId),
+    ]);
 
   return {
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: (audioItems ?? []) as AudioItemRow[],
     contentLockedAfterSale,
+    deleteLockedAfterPaidPurchase,
   };
 }
 
@@ -273,5 +309,6 @@ export async function createDraftProduct(
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: [audioItem as AudioItemRow],
     contentLockedAfterSale: false,
+    deleteLockedAfterPaidPurchase: false,
   };
 }

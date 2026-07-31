@@ -20,6 +20,12 @@ import {
   getStatusClassName,
 } from "@/lib/author-products/types";
 import {
+  PRODUCT_UNDER_MODERATION_MESSAGE,
+  VISIBLE_AUTHOR_PRODUCT_STATUS,
+  canWithdrawPracticeFromModeration,
+  getVisibleAuthorProductStatus,
+} from "@/lib/author-products/moderation";
+import {
   CUSTOM_FORMAT_LABEL,
   CUSTOM_FORMAT_VALUE,
   PRODUCT_PRESET_FORMATS,
@@ -113,6 +119,10 @@ type FormState = {
   listeningNoticeTitle: string;
   listeningNoticeText: string;
   status: string;
+  moderationStatus: string;
+  moderationSubmittedAt: string | null;
+  moderationReviewComment: string | null;
+  moderationAttempt: number;
   publishedAt: string | null;
 };
 
@@ -226,6 +236,10 @@ function buildInitialForm(
     listeningNoticeTitle: listeningDefaults.listeningNoticeTitle,
     listeningNoticeText: listeningDefaults.listeningNoticeText,
     status: "draft",
+    moderationStatus: "not_submitted",
+    moderationSubmittedAt: null,
+    moderationReviewComment: null,
+    moderationAttempt: 0,
     publishedAt: null,
   };
 }
@@ -357,6 +371,8 @@ export default function AuthorProductForm({
   const [contentLockedAfterSale, setContentLockedAfterSale] = useState(
     initialProduct?.contentLockedAfterSale === true,
   );
+  const [deleteLockedAfterPaidPurchase, setDeleteLockedAfterPaidPurchase] =
+    useState(initialProduct?.deleteLockedAfterPaidPurchase === true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -525,42 +541,6 @@ export default function AuthorProductForm({
   );
 
   useEffect(() => {
-    if (mode !== "edit" || !practiceId || form.status !== "draft") {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function refreshIfPublishedElsewhere() {
-      const response = await fetch(`/api/author/products/${practiceId}`, {
-        cache: "no-store",
-      });
-      const payload = (await response.json()) as {
-        product?: AuthorProductDetail;
-      };
-
-      if (cancelled || !response.ok || !payload.product) {
-        return;
-      }
-
-      if (payload.product.practice.status === "published") {
-        applyServerProductPreservingDraft(payload.product);
-        setMessage("Продукт опубликован и доступен в каталоге.");
-      }
-    }
-
-    function onWindowFocus() {
-      void refreshIfPublishedElsewhere();
-    }
-
-    window.addEventListener("focus", onWindowFocus);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", onWindowFocus);
-    };
-  }, [mode, practiceId, form.status]);
-
-  useEffect(() => {
     if (!practiceId) {
       return;
     }
@@ -595,21 +575,33 @@ export default function AuthorProductForm({
   const slugLocked =
     form.status === "published" ||
     form.status === "unpublished" ||
-    form.status === "archived" ||
     Boolean(form.publishedAt);
-  const isPublished = form.status === "published";
-  const isUnpublished = form.status === "unpublished";
-  const isArchived = form.status === "archived";
-  const isDraft = form.status === "draft";
+  const visibleStatus = getVisibleAuthorProductStatus({
+    status: form.status,
+    moderationStatus: form.moderationStatus,
+  });
+  const isPublished =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED;
+  const isUnpublished =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.UNPUBLISHED;
+  const isSubmitted =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED;
+  const needsChanges =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.CHANGES_REQUESTED;
+  const isDraft = visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.DRAFT;
 
   const selectedAuthor = useMemo(
     () => authors.find((author) => author.id === form.authorId) ?? null,
     [authors, form.authorId],
   );
   const selectedAuthorAccessStatus = selectedAuthor?.accessStatus ?? "free";
+  const canBypassProductModeration =
+    selectedAuthor?.canBypassProductModeration === true;
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthorAccessStatus,
   );
+  const canEditPublicFields =
+    canMutateContent && (isDraft || needsChanges);
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
   );
@@ -711,6 +703,9 @@ export default function AuthorProductForm({
       mergeServerAudioItems(current, product.audio_items),
     );
     setContentLockedAfterSale(product.contentLockedAfterSale === true);
+    setDeleteLockedAfterPaidPurchase(
+      product.deleteLockedAfterPaidPurchase === true,
+    );
   }
 
   function handleProductCoverUpdated({
@@ -910,6 +905,10 @@ export default function AuthorProductForm({
   }
 
   async function saveProduct(): Promise<boolean> {
+    if (isSubmitted) {
+      setError(PRODUCT_UNDER_MODERATION_MESSAGE);
+      return false;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -1022,7 +1021,7 @@ export default function AuthorProductForm({
 
     if (saved) {
       setMessage(
-        isPublished || isArchived || form.publishedAt
+        isPublished || isUnpublished || form.publishedAt
           ? "Изменения сохранены."
           : "Черновик сохранён.",
       );
@@ -1084,9 +1083,6 @@ export default function AuthorProductForm({
         window.open(href, "_blank");
       }
 
-      setMessage(
-        "Открыт предпросмотр. Нажмите «Опубликовать» на странице предпросмотра, чтобы продукт появился в каталоге.",
-      );
       return true;
     } catch {
       previewTab?.close();
@@ -1193,7 +1189,7 @@ export default function AuthorProductForm({
         applyServerProductPreservingDraft(payload.product);
       }
 
-      setMessage("Продукт опубликован и доступен в каталоге.");
+      setMessage(payload.message ?? "Аудиопродукт опубликован.");
     } catch {
       setError("Не удалось опубликовать аудиопродукт.");
     } finally {
@@ -1208,7 +1204,7 @@ export default function AuthorProductForm({
 
     if (
       !window.confirm(
-        "Снять аудиопродукт с публикации? Он исчезнет из каталога, но останется в вашем списке и будет доступен пользователям с уже выданным доступом.",
+        "Продукт исчезнет из публичного каталога и станет недоступен для новых покупок. Пользователи, которые уже приобрели его, сохранят доступ.",
       )
     ) {
       return;
@@ -1245,58 +1241,18 @@ export default function AuthorProductForm({
     }
   }
 
-  async function archiveProduct() {
+  async function startEditingProduct() {
     if (!practiceId) {
       return;
     }
 
-    if (
-      !window.confirm(
-        "Переместить аудиопродукт в архив? Он исчезнет из основного списка, но останется доступен пользователям с уже выданным доступом.",
-      )
-    ) {
-      return;
-    }
+    const confirmed = window.confirm(
+      isPublished
+        ? "Продукт будет снят с публикации, а текущее одобрение модерации будет сброшено. После изменений его потребуется отправить на модерацию повторно."
+        : "После перехода к редактированию повторная публикация без модерации станет недоступна.",
+    );
 
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/author/products/${practiceId}/archive`, {
-        method: "POST",
-      });
-
-      const payload = (await response.json()) as {
-        product?: AuthorProductDetail;
-        message?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !payload.product) {
-        setError(payload.message ?? "Не удалось переместить аудиопродукт в архив.");
-        return;
-      }
-
-      applyServerProductPreservingDraft(payload.product);
-      setMessage(payload.message ?? "Аудиопродукт перемещён в архив.");
-    } catch {
-      setError("Не удалось переместить аудиопродукт в архив.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function restoreFromArchiveProduct() {
-    if (!practiceId) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Вернуть аудиопродукт из архива? Он появится в основном списке со статусом «Снят с публикации» и не будет автоматически опубликован в каталоге.",
-      )
-    ) {
+    if (!confirmed) {
       return;
     }
 
@@ -1306,24 +1262,152 @@ export default function AuthorProductForm({
 
     try {
       const response = await fetch(
-        `/api/author/products/${practiceId}/restore-from-archive`,
+        `/api/author/products/${practiceId}/start-editing`,
         { method: "POST" },
       );
-
       const payload = (await response.json()) as {
         product?: AuthorProductDetail;
         message?: string;
+        error?: string;
       };
 
       if (!response.ok || !payload.product) {
-        setError("Не удалось вернуть аудиопродукт из архива.");
+        setError(payload.message ?? "Не удалось перейти к редактированию.");
         return;
       }
 
       applyServerProductPreservingDraft(payload.product);
-      setMessage(payload.message ?? "Аудиопродукт возвращён из архива.");
+      setMessage(
+        payload.message ??
+          "Продукт готов к редактированию. После изменений отправьте его на модерацию.",
+      );
     } catch {
-      setError("Не удалось вернуть аудиопродукт из архива.");
+      setError("Не удалось перейти к редактированию.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitForModeration() {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    setFieldErrors({});
+    setTopicError(undefined);
+
+    if (form.productKind === PRODUCT_KIND.PRACTICE) {
+      if (!validateCustomFormatForPublish(form.formatPreset, form.customFormat)) {
+        setFieldErrors({
+          formatCustom: "Укажите название своего формата",
+        });
+        setBusy(false);
+        return;
+      }
+    }
+
+    const activeTopicCount = countActiveSelectedTopics(
+      topicKeys,
+      topicOptions,
+      archivedTopics,
+    );
+    const topicMinimumCheck = assertPublishedTopicMinimum(activeTopicCount);
+
+    if (!topicMinimumCheck.ok) {
+      setTopicError(topicMinimumCheck.message);
+      setBusy(false);
+      return;
+    }
+
+    try {
+      const ensured = await ensurePracticeId();
+      if (!ensured) {
+        return;
+      }
+      const id = ensured.practiceId;
+      const saved = await saveProduct();
+      if (!saved) {
+        return;
+      }
+
+      const response = await fetch(
+        `/api/author/products/${id}/submit-for-moderation`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        if (
+          payload.error === "topic_min_required" ||
+          payload.error === "topic_limit_exceeded" ||
+          payload.error === "topic_not_found"
+        ) {
+          setTopicError(
+            payload.message ?? "Не удалось отправить продукт на модерацию.",
+          );
+        } else {
+          setError(
+            payload.message ?? "Не удалось отправить продукт на модерацию.",
+          );
+        }
+        return;
+      }
+
+      if (payload.product) {
+        applyServerProductPreservingDraft(payload.product);
+      }
+      setMessage(payload.message ?? "Продукт отправлен на модерацию.");
+    } catch {
+      setError("Не удалось отправить продукт на модерацию.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdrawFromModeration() {
+    if (!practiceId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Отозвать продукт с модерации? После отзыва вы снова сможете его редактировать.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/author/products/${practiceId}/withdraw-from-moderation`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        setError(payload.message ?? "Не удалось отозвать продукт с модерации.");
+        return;
+      }
+
+      if (payload.product) {
+        applyServerProductPreservingDraft(payload.product);
+      }
+      setMessage(
+        payload.message ??
+          "Продукт отозван с модерации. Теперь его можно редактировать.",
+      );
+    } catch {
+      setError("Не удалось отозвать продукт с модерации.");
     } finally {
       setBusy(false);
     }
@@ -1336,7 +1420,7 @@ export default function AuthorProductForm({
 
     if (
       !window.confirm(
-        "Удалить аудиопродукт без возможности восстановления? Это действие необратимо.",
+        "Продукт будет удалён из кабинета, каталога и пользовательских библиотек. Восстановление через кабинет автора не предусмотрено.",
       )
     ) {
       return;
@@ -1832,8 +1916,8 @@ export default function AuthorProductForm({
 
       {contentLockedAfterSale ? (
         <p className="rounded-[18px] border border-[#e4d7f4] bg-[#f8f4ff] px-4 py-3 text-sm text-[#5f5484]">
-          Этот продукт уже приобретён слушателями. Его можно снять с продажи или
-          переместить в архив, но удалить продукт или аудиоматериалы нельзя.
+          Этот продукт уже приобретён слушателями. Его можно снять с публикации,
+          но удалить продукт или аудиоматериалы нельзя.
         </p>
       ) : null}
 
@@ -1849,14 +1933,42 @@ export default function AuthorProductForm({
         </p>
       ) : null}
 
+      {isSubmitted ? (
+        <div className="rounded-[18px] border border-[#c9d7f5] bg-[#f3f6ff] px-4 py-3 text-sm text-[#35518f]">
+          <p className="font-semibold">На модерации</p>
+          <p className="mt-1 leading-5">
+            Продукт отправлен на модерацию. Пока проверка не завершена, основные
+            данные и аудиоматериалы нельзя изменять.
+          </p>
+        </div>
+      ) : null}
+
+      {needsChanges ? (
+        <div className="rounded-[18px] border border-[#f0d7a8] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a16]">
+          <p className="font-semibold">Требуются изменения</p>
+          {form.moderationReviewComment ? (
+            <p className="mt-2 whitespace-pre-wrap leading-5">
+              {form.moderationReviewComment}
+            </p>
+          ) : null}
+          <p className="mt-2 leading-5">
+            Внесите необходимые изменения и повторно отправьте продукт на
+            модерацию.
+          </p>
+        </div>
+      ) : null}
+
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[20px] font-semibold">Основная информация</h2>
           {mode === "edit" ? (
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(form.status)}`}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
+                form.status,
+                form.moderationStatus,
+              )}`}
             >
-              {getStatusLabel(form.status)}
+              {getStatusLabel(form.status, form.moderationStatus)}
             </span>
           ) : null}
         </div>
@@ -2259,7 +2371,7 @@ export default function AuthorProductForm({
             <button
               type="button"
               onClick={() => setForm((current) => ({ ...current, isFree: true }))}
-              disabled={!canMutateContent}
+              disabled={!canEditPublicFields}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 form.isFree
                   ? "bg-[#7042c5] text-white"
@@ -2749,7 +2861,7 @@ export default function AuthorProductForm({
 
           <button
             type="button"
-            disabled={busy || reorderBusy}
+            disabled={busy || reorderBusy || !canEditPublicFields}
             onClick={() => void addAudioItem()}
             className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
           >
@@ -2761,11 +2873,11 @@ export default function AuthorProductForm({
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button
           type="button"
-          disabled={busy || !canMutateContent}
+          disabled={busy || !canEditPublicFields}
           onClick={() => void saveDraft()}
           className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
         >
-          {isPublished || isUnpublished || isArchived || form.publishedAt
+          {isPublished || isUnpublished || form.publishedAt
             ? "Сохранить изменения"
             : "Сохранить черновик"}
         </button>
@@ -2782,17 +2894,25 @@ export default function AuthorProductForm({
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void archiveProduct()}
+              disabled={busy || !canMutateContent}
+              onClick={() => void startEditingProduct()}
               className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
             >
-              Переместить в архив
+              Снять и редактировать
             </button>
           </>
         ) : null}
 
         {isUnpublished ? (
           <>
+            <button
+              type="button"
+              disabled={busy || !canMutateContent}
+              onClick={() => void startEditingProduct()}
+              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+            >
+              Перейти к редактированию
+            </button>
             <button
               type="button"
               disabled={busy || !canMutateContent || !publishPreviewPath}
@@ -2807,20 +2927,12 @@ export default function AuthorProductForm({
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
-              Опубликовать
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void archiveProduct()}
-              className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
-            >
-              Переместить в архив
+              Опубликовать снова
             </button>
           </>
         ) : null}
 
-        {isDraft ? (
+        {isDraft && canBypassProductModeration ? (
           <>
             <button
               type="button"
@@ -2836,19 +2948,54 @@ export default function AuthorProductForm({
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
-              Предпросмотр и публикация
+              Опубликовать
             </button>
           </>
         ) : null}
 
-        {isArchived ? (
+        {isDraft && !canBypassProductModeration ? (
+          <>
+            <button
+              type="button"
+              disabled={busy || !canEditPublicFields}
+              onClick={() => void openPublishPreviewTab()}
+              className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Предпросмотр
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canEditPublicFields}
+              onClick={() => void submitForModeration()}
+              className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
+            >
+              Отправить на модерацию
+            </button>
+          </>
+        ) : null}
+
+        {needsChanges ? (
+          <button
+            type="button"
+            disabled={busy || !canEditPublicFields}
+            onClick={() => void submitForModeration()}
+            className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
+          >
+            Повторно отправить на модерацию
+          </button>
+        ) : null}
+
+        {isSubmitted &&
+        canWithdrawPracticeFromModeration({
+          moderationStatus: form.moderationStatus,
+        }) ? (
           <button
             type="button"
             disabled={busy}
-            onClick={() => void restoreFromArchiveProduct()}
+            onClick={() => void withdrawFromModeration()}
             className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
           >
-            Вернуть из архива
+            Отозвать с модерации
           </button>
         ) : null}
 
@@ -2861,7 +3008,7 @@ export default function AuthorProductForm({
           </Link>
         ) : null}
 
-        {mode === "edit" && practiceId && isDraft && !contentLockedAfterSale ? (
+        {mode === "edit" && practiceId && !deleteLockedAfterPaidPurchase ? (
           <button
             type="button"
             disabled={busy}
@@ -2871,12 +3018,19 @@ export default function AuthorProductForm({
             Удалить продукт
           </button>
         ) : null}
+
+        {mode === "edit" && practiceId && deleteLockedAfterPaidPurchase ? (
+          <p className="w-full text-sm text-[#9b3d3d]">
+            Удалить этот продукт нельзя, потому что его уже приобрели
+            пользователи. Вы можете снять продукт с публикации – новые покупки
+            прекратятся, а прежние покупатели сохранят доступ.
+          </p>
+        ) : null}
       </div>
 
       {selectedAuthor ? (
-        <p className="break-words text-xs leading-5 text-[#7d70a2]">
-          Работаете от имени:{" "}
-          <span className="font-medium text-[#5f5484]">{selectedAuthor.name}</span>
+        <p className="text-xs text-[#7d70a2]">
+          Работаете от имени: {selectedAuthor.name}
           {mode === "create" ? " · новый аудиопродукт" : ""}
         </p>
       ) : null}

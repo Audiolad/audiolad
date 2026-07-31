@@ -15,6 +15,9 @@ import {
   validateTitleLength,
 } from "@/lib/author-products/limits";
 import {
+  PRODUCT_PAID_PURCHASE_DELETE_LOCK,
+} from "@/lib/author-products/delete-lock";
+import {
   deletePracticeProduct,
   getDeleteBlockerMessage,
   getDeleteBlockers,
@@ -28,7 +31,7 @@ import {
   PRODUCT_KIND,
   PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
 } from "@/lib/author-products/product-kind";
-import { PRODUCT_CONTENT_LOCKED_AFTER_SALE } from "@/lib/author-products/sale-lock";
+import { assertPracticePublicContentEditable } from "@/lib/author-products/moderation";
 import {
   generateUniqueSlug,
   getAuthorProductDetail,
@@ -151,6 +154,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { supabase, practice, user, accessStatus } =
       await requirePracticeMutationAccess(id);
+    assertPracticePublicContentEditable(practice);
 
     let body: unknown;
 
@@ -513,7 +517,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    await requirePracticeMutationAccess(id);
+    const { supabase } = await requirePracticeMutationAccess(id);
     const serviceSupabase = createServiceRoleClient();
 
     const blockers = getDeleteBlockers(
@@ -531,23 +535,50 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     try {
-      await deletePracticeProduct(serviceSupabase, id);
+      // Soft delete RPC requires the author session (auth.uid()).
+      await deletePracticeProduct(supabase, id);
     } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code: string }).code === PRODUCT_PAID_PURCHASE_DELETE_LOCK
+      ) {
+        return NextResponse.json(
+          {
+            error: PRODUCT_PAID_PURCHASE_DELETE_LOCK,
+            message: getDeleteBlockerMessage([PRODUCT_PAID_PURCHASE_DELETE_LOCK]),
+          },
+          { status: 409 },
+        );
+      }
+
       const code =
         error instanceof Error ? error.message : "practice_delete_failed";
 
-      if (
-        code === "published" ||
-        code === "starter_bundle" ||
-        code === PRODUCT_CONTENT_LOCKED_AFTER_SALE ||
-        code === "has_orders"
-      ) {
+      if (code === PRODUCT_PAID_PURCHASE_DELETE_LOCK) {
         return NextResponse.json(
           {
             error: code,
             message: getDeleteBlockerMessage([code]),
           },
           { status: 409 },
+        );
+      }
+
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof (error as { message: unknown }).message === "string"
+      ) {
+        const mapped = error as { message: string; code?: string; status?: number };
+        return NextResponse.json(
+          {
+            error: mapped.code ?? "practice_delete_failed",
+            message: mapped.message,
+          },
+          { status: mapped.status ?? 409 },
         );
       }
 
