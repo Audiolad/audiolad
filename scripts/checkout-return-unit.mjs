@@ -3,6 +3,8 @@
  * Checkout return flow regression checks.
  */
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 function assert(condition, message) {
   if (!condition) {
@@ -10,7 +12,11 @@ function assert(condition, message) {
   }
 }
 
-const ROOT = "/var/www/audiolad/.worktrees/fix-checkout-return";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function read(relativePath) {
+  return readFileSync(path.join(ROOT, relativePath), "utf8");
+}
 
 async function testSignedCheckoutToken() {
   const { execFileSync } = await import("node:child_process");
@@ -29,14 +35,8 @@ async function testSignedCheckoutToken() {
 }
 
 function testStatusEndpointContract() {
-  const route = readFileSync(
-    `${ROOT}/src/app/api/checkout/status/route.ts`,
-    "utf8",
-  );
-  const ordersRoute = readFileSync(
-    `${ROOT}/src/app/api/orders/[id]/route.ts`,
-    "utf8",
-  );
+  const route = read("src/app/api/checkout/status/route.ts");
+  const ordersRoute = read("src/app/api/orders/[id]/route.ts");
 
   assert(route.includes("verifySignedCheckoutToken"), "status route verifies token");
   assert(route.includes("createServiceRoleClient"), "status route uses service role read");
@@ -47,14 +47,8 @@ function testStatusEndpointContract() {
 }
 
 function testTochkaReturnUrlIncludesToken() {
-  const tochkaClient = readFileSync(
-    `${ROOT}/src/lib/payments/tochka-client.ts`,
-    "utf8",
-  );
-  const paymentsRoute = readFileSync(
-    `${ROOT}/src/app/api/payments/route.ts`,
-    "utf8",
-  );
+  const tochkaClient = read("src/lib/payments/tochka-client.ts");
+  const paymentsRoute = read("src/app/api/payments/route.ts");
 
   assert(
     tochkaClient.includes("checkoutToken"),
@@ -75,10 +69,7 @@ function testTochkaReturnUrlIncludesToken() {
 }
 
 function testCheckoutResultClientFlow() {
-  const client = readFileSync(
-    `${ROOT}/src/app/checkout/result/CheckoutResultClient.tsx`,
-    "utf8",
-  );
+  const client = read("src/app/checkout/result/CheckoutResultClient.tsx");
 
   assert(client.includes("/api/checkout/status"), "client polls checkout status endpoint");
   assert(!client.includes("/api/orders/"), "client no longer polls auth-only orders endpoint");
@@ -93,14 +84,8 @@ function testCheckoutResultClientFlow() {
 }
 
 function testLibraryPurchasedToast() {
-  const page = readFileSync(
-    `${ROOT}/src/app/(listener)/(library)/my-practices/page.tsx`,
-    "utf8",
-  );
-  const library = readFileSync(
-    `${ROOT}/src/components/my-practices/MyPracticesLibrary.tsx`,
-    "utf8",
-  );
+  const page = read("src/app/(listener)/(library)/my-practices/page.tsx");
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
 
   assert(page.includes("purchasedSlug"), "my-practices reads purchased query");
   assert(
@@ -111,11 +96,8 @@ function testLibraryPurchasedToast() {
 }
 
 function testLoggingAndWebhookUnchanged() {
-  const fulfill = readFileSync(`${ROOT}/src/lib/payments/fulfill-payment.ts`, "utf8");
-  const webhook = readFileSync(
-    `${ROOT}/src/app/api/webhooks/tochka/route.ts`,
-    "utf8",
-  );
+  const fulfill = read("src/lib/payments/fulfill-payment.ts");
+  const webhook = read("src/app/api/webhooks/tochka/route.ts");
 
   assert(
     fulfill.includes("fulfill_tochka_payment_transactional"),
