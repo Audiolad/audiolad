@@ -155,12 +155,25 @@ function testAccessAndErrors() {
 
 async function runModuleTests() {
   const { execSync } = await import("node:child_process");
+  const stubPath = path.join(ROOT, "scripts/cjs-stub-server-only.cjs");
+  const previousNodeOptions = process.env.NODE_OPTIONS ?? "";
+  const nodeOptions = [previousNodeOptions, `--require ${stubPath}`]
+    .filter(Boolean)
+    .join(" ");
+
   for (const script of [
     "scripts/personal-materials-author-download-module-unit.mjs",
     "scripts/personal-materials-author-download-client-module-unit.mjs",
     "scripts/personal-materials-download-filename-unit.mjs",
   ]) {
-    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, { encoding: "utf8" });
+    const output = execSync(`npx --yes tsx ${path.join(ROOT, script)}`, {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+      },
+    });
     process.stdout.write(output);
   }
 }
