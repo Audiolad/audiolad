@@ -63,6 +63,25 @@ assert.ok(
   "editor can moderate products",
 );
 assert.ok(
+  rolesGrantPermission(["editor"], "authors.view"),
+  "editor can view author and commercial applications",
+);
+assert.equal(
+  rolesGrantPermission(["editor"], "authors.manage"),
+  false,
+  "editor must not manage author/commercial application decisions",
+);
+assert.equal(
+  rolesGrantPermission(["editor"], "author_products.moderate"),
+  false,
+  "editor must not access product moderation queue",
+);
+assert.equal(
+  rolesGrantPermission(["editor"], "authors.payout_profiles.review"),
+  false,
+  "editor must not review payout profiles",
+);
+assert.ok(
   rolesGrantPermission(["editor"], "admin_panel.access"),
   "editor can enter panel",
 );
@@ -98,15 +117,38 @@ assert.equal(ownerNav.length, ADMIN_NAV_ITEMS.length, "owner sees all nav items"
 const editorNav = getVisibleAdminNavItems(accessForRoles(["editor"]));
 assert.deepEqual(
   editorNav.map((item) => item.href),
-  ["/admin", "/admin/author-applications"],
-  "editor sees overview + applications, not users",
+  [
+    "/admin",
+    "/admin/author-applications",
+    "/admin/commercial-applications",
+  ],
+  "editor sees overview + author/commercial applications, not users or finance",
+);
+assert.equal(
+  editorNav.some((item) => item.href === "/admin/users"),
+  false,
+  "editor must not see users nav",
+);
+assert.equal(
+  editorNav.some((item) => item.href === "/admin/product-moderation"),
+  false,
+  "editor must not see product moderation nav",
+);
+assert.equal(
+  editorNav.some((item) => item.href === "/admin/payout-profiles"),
+  false,
+  "editor must not see payout profiles nav",
 );
 
 const supportNav = getVisibleAdminNavItems(accessForRoles(["support"]));
 assert.deepEqual(
   supportNav.map((item) => item.href),
-  ["/admin/author-applications", "/admin/users"],
-  "support sees applications + users",
+  [
+    "/admin/author-applications",
+    "/admin/commercial-applications",
+    "/admin/users",
+  ],
+  "support sees applications + commercial applications + users",
 );
 
 const financeNav = getVisibleAdminNavItems(accessForRoles(["finance"]));
@@ -190,6 +232,54 @@ assert.doesNotMatch(actions, /requireAdminPanelAccess\(\)/);
 
 const usersActions = read("src/app/admin/users/actions.ts");
 assert.match(usersActions, /requireAdminPermission\("users\.manage"\)/);
+
+const commercialNav = ADMIN_NAV_ITEMS.find(
+  (item) => item.href === "/admin/commercial-applications",
+);
+assert.ok(commercialNav, "commercial applications nav item exists");
+assert.equal(
+  commercialNav.requiredPermission,
+  "authors.view",
+  "commercial applications nav shares authors.view with author applications",
+);
+
+const commercialList = read("src/app/admin/commercial-applications/page.tsx");
+const commercialDetail = read(
+  "src/app/admin/commercial-applications/[id]/page.tsx",
+);
+const commercialActions = read(
+  "src/app/admin/commercial-applications/actions.ts",
+);
+assert.match(
+  commercialList,
+  /requireAdminPermission\("authors\.view"\)/,
+  "commercial list is readable with authors.view",
+);
+assert.match(
+  commercialDetail,
+  /requireAdminPermission\("authors\.view"\)/,
+  "commercial detail is readable with authors.view",
+);
+assert.match(
+  commercialDetail,
+  /snapshotHasPermission\(session\.access, "authors\.manage"\)/,
+  "commercial detail gates review UI behind authors.manage",
+);
+assert.match(
+  commercialDetail,
+  /Изменение статуса для вашей роли недоступно/,
+  "commercial detail shows read-only message without manage permission",
+);
+assert.match(
+  commercialActions,
+  /requireAdminPermission\("authors\.manage"\)/,
+  "commercial mutations require authors.manage",
+);
+assert.doesNotMatch(
+  commercialActions,
+  /requireAdminPermission\("authors\.view"\)/,
+  "commercial mutations must not accept authors.view alone",
+);
 
 const playlistApi = read("src/app/api/playlists/route.ts");
 assert.match(playlistApi, /products\.moderate/);
