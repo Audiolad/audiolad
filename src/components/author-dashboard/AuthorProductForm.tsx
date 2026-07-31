@@ -68,7 +68,11 @@ import {
   getPaidPricingDisabledReason,
 } from "@/lib/authors/access";
 import { buildPracticePublishPreviewPath } from "@/lib/products/paths";
-import { requiresPublishPreviewBeforePublish } from "@/lib/products/publish-preview";
+import {
+  isPublishNotReadyResponse,
+  PUBLISH_PREVIEW_NOT_READY_MESSAGE,
+  shouldOpenPublishPreviewFromForm,
+} from "@/lib/products/publish-preview";
 import { formatRubles } from "@/lib/products/price-format";
 import {
   createDefaultListeningNoticeFormState,
@@ -376,6 +380,8 @@ export default function AuthorProductForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
   const [savingSharedCover, setSavingSharedCover] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -1094,11 +1100,22 @@ export default function AuthorProductForm({
   }
 
   async function publishProduct() {
-    if (requiresPublishPreviewBeforePublish(form.publishedAt)) {
+    if (publishInFlightRef.current) {
+      return;
+    }
+
+    if (
+      shouldOpenPublishPreviewFromForm({
+        publishedAt: form.publishedAt,
+        canBypassProductModeration,
+      })
+    ) {
       await openPublishPreviewTab();
       return;
     }
 
+    publishInFlightRef.current = true;
+    setPublishing(true);
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -1110,6 +1127,8 @@ export default function AuthorProductForm({
         setFieldErrors({
           formatCustom: "Укажите название своего формата",
         });
+        publishInFlightRef.current = false;
+        setPublishing(false);
         setBusy(false);
         return;
       }
@@ -1121,6 +1140,8 @@ export default function AuthorProductForm({
           setFieldErrors({
             formatCustom: getProductFieldErrorMessage(lengthError) ?? undefined,
           });
+          publishInFlightRef.current = false;
+          setPublishing(false);
           setBusy(false);
           return;
         }
@@ -1136,6 +1157,8 @@ export default function AuthorProductForm({
 
     if (!topicMinimumCheck.ok) {
       setTopicError(topicMinimumCheck.message);
+      publishInFlightRef.current = false;
+      setPublishing(false);
       setBusy(false);
       return;
     }
@@ -1155,6 +1178,10 @@ export default function AuthorProductForm({
         return;
       }
 
+      // saveProduct clears busy in its finally; keep publishing until redirect/error.
+      setBusy(true);
+      setPublishing(true);
+
       const response = await fetch(`/api/author/products/${id}/publish`, {
         method: "POST",
       });
@@ -1163,10 +1190,15 @@ export default function AuthorProductForm({
         product?: AuthorProductDetail;
         error?: string;
         message?: string;
+        publishReady?: boolean;
       };
 
       if (!response.ok) {
-        if (payload.error === "missing_custom_format") {
+        if (isPublishNotReadyResponse(payload)) {
+          setError(
+            payload.message ?? PUBLISH_PREVIEW_NOT_READY_MESSAGE,
+          );
+        } else if (payload.error === "missing_custom_format") {
           setFieldErrors({
             formatCustom:
               payload.message ?? "Укажите название своего формата",
@@ -1185,6 +1217,19 @@ export default function AuthorProductForm({
         return;
       }
 
+      const practice = payload.product?.practice;
+      const authorSlug =
+        authors.find((author) => author.id === practice?.author_id)?.slug ??
+        selectedAuthor?.slug;
+      const productSlug = practice?.slug?.trim();
+
+      if (authorSlug && productSlug) {
+        window.location.replace(
+          buildPracticePublicPath(authorSlug, productSlug),
+        );
+        return;
+      }
+
       if (payload.product) {
         applyServerProductPreservingDraft(payload.product);
       }
@@ -1193,6 +1238,8 @@ export default function AuthorProductForm({
     } catch {
       setError("Не удалось опубликовать аудиопродукт.");
     } finally {
+      publishInFlightRef.current = false;
+      setPublishing(false);
       setBusy(false);
     }
   }
@@ -2923,11 +2970,11 @@ export default function AuthorProductForm({
             </button>
             <button
               type="button"
-              disabled={busy || !canMutateContent}
+              disabled={busy || publishing || !canMutateContent}
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
-              Опубликовать снова
+              {publishing ? "Публикуем…" : "Опубликовать снова"}
             </button>
           </>
         ) : null}
@@ -2936,7 +2983,7 @@ export default function AuthorProductForm({
           <>
             <button
               type="button"
-              disabled={busy || !canMutateContent}
+              disabled={busy || publishing || !canMutateContent}
               onClick={() => void openPublishPreviewTab()}
               className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
             >
@@ -2944,11 +2991,11 @@ export default function AuthorProductForm({
             </button>
             <button
               type="button"
-              disabled={busy || !canMutateContent}
+              disabled={busy || publishing || !canMutateContent}
               onClick={() => void publishProduct()}
               className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
             >
-              Опубликовать
+              {publishing ? "Публикуем…" : "Опубликовать"}
             </button>
           </>
         ) : null}

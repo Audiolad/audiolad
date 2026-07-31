@@ -23,6 +23,7 @@ import {
   PUBLISH_PREVIEW_NOT_READY_MESSAGE,
   requiresPublishPreviewBeforePublish,
   shouldIndexPracticePage,
+  shouldOpenPublishPreviewFromForm,
   shouldTrackPracticeListenerAnalytics,
 } from "../src/lib/products/publish-preview.ts";
 
@@ -106,6 +107,23 @@ function testFirstPublishGate() {
   assert.equal(
     requiresPublishPreviewBeforePublish("2026-07-01T10:00:00.000Z"),
     false,
+  );
+
+  assert.equal(
+    shouldOpenPublishPreviewFromForm({
+      publishedAt: null,
+      canBypassProductModeration: true,
+    }),
+    false,
+    "bypass authors skip form publish-preview gate",
+  );
+  assert.equal(
+    shouldOpenPublishPreviewFromForm({
+      publishedAt: null,
+      canBypassProductModeration: false,
+    }),
+    true,
+    "non-bypass first publish still uses preview when form publish is invoked",
   );
 }
 
@@ -425,14 +443,19 @@ function testSourceContracts() {
   );
 
   assert.match(form, /openPublishPreviewTab/);
-  assert.match(form, /requiresPublishPreviewBeforePublish/);
+  assert.match(form, /shouldOpenPublishPreviewFromForm/);
   assert.match(form, /window\.open\("about:blank", "_blank"\)/);
   assert.match(form, /previewTab\?\.close\(\)/);
   assert.match(form, /Предпросмотр/);
   assert.match(
     form,
-    /requiresPublishPreviewBeforePublish\(form\.publishedAt\)/,
-    "first publish routes through preview by published_at",
+    /shouldOpenPublishPreviewFromForm\(\{\s*publishedAt: form\.publishedAt,\s*canBypassProductModeration,/,
+    "form publish gate is bypass-aware",
+  );
+  assert.match(
+    form,
+    /window\.location\.replace\(\s*buildPracticePublicPath\(authorSlug, productSlug\)/,
+    "direct form publish redirects to publicPath on success",
   );
 
   assert.match(banner, /publishInFlightRef/);

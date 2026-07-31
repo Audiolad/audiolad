@@ -59,6 +59,23 @@ export function requiresPublishPreviewBeforePublish(
 }
 
 /**
+ * Author form publish CTA routing.
+ * Bypass authors publish directly from the form (save → POST /publish).
+ * Ordinary authors still use publish-preview for first publish when that path
+ * is still invoked; draft ordinary authors submit for moderation instead.
+ */
+export function shouldOpenPublishPreviewFromForm(input: {
+  publishedAt: string | null | undefined;
+  canBypassProductModeration: boolean;
+}): boolean {
+  if (input.canBypassProductModeration) {
+    return false;
+  }
+
+  return requiresPublishPreviewBeforePublish(input.publishedAt);
+}
+
+/**
  * Publish button visibility mirrors existing author mutation membership:
  * any author_members row that grants practice page ownership
  * (reason "author_owner" for owner|editor) may publish via the API.
