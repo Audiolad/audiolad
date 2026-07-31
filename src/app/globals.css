@@ -7,6 +7,12 @@
   --bottom-nav-main-height: 68px;
   --bottom-nav-content-gap: 28px;
   --global-mini-player-height: 0px;
+  /*
+   * Keep mobile bottom chrome pinned to the small viewport. When iOS Safari
+   * collapses its toolbar, 100dvh grows while 100svh stays constant — without
+   * this offset, position:fixed; bottom:0 travels with the dynamic viewport.
+   */
+  --bottom-nav-viewport-offset: 0px;
   --home-page-gutter: 1.25rem;
 
   /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
@@ -15,6 +21,12 @@
   --listener-desktop-player-height: 0px;
   --listener-topbar-height: 56px;
   --listener-shell-gap: 16px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --bottom-nav-viewport-offset: max(0px, calc(100dvh - 100svh));
+  }
 }
 
 .platform-top-safe-padding {
@@ -32,7 +44,8 @@
 .analytics-consent-banner {
   bottom: calc(
     var(--bottom-nav-main-height) + var(--global-mini-player-height, 0px) +
-      env(safe-area-inset-bottom, 0px) + 20px
+      env(safe-area-inset-bottom, 0px) + var(--bottom-nav-viewport-offset, 0px) +
+      20px
   );
 }
 
@@ -234,11 +247,39 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--bottom-nav-viewport-offset, 0px);
   z-index: 20;
   width: 100%;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   transform: none;
+}
+
+.bottom-nav--default {
+  /*
+   * Safari 26+: fully opaque fixed layers can be shifted/clipped against the
+   * dynamic toolbar. Keep the bar visually white but slightly translucent.
+   */
+  background-color: rgb(255 255 255 / 0.99);
+}
+
+/* Fill the small-viewport gap when the Safari toolbar collapses. */
+.bottom-nav--default::after,
+.bottom-nav--player::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--bottom-nav-viewport-offset, 0px);
+  pointer-events: none;
+}
+
+.bottom-nav--default::after {
+  background-color: rgb(255 255 255 / 0.99);
+}
+
+.bottom-nav--player::after {
+  background-color: #24133f;
 }
 
 @media (min-width: 1280px) {

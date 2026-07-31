@@ -77,9 +77,7 @@ export function ListenerAppShell({
       </div>
 
       {config.showMobileBottomNav ? (
-        <div className="xl:hidden">
-          <BottomNav />
-        </div>
+        <BottomNav className="xl:hidden" />
       ) : null}
     </div>
   );

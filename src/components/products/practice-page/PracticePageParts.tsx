@@ -104,7 +104,7 @@ export function BuyerPreviewExitControl({
     <Link
       href={href}
       aria-label={label}
-      className="fixed right-3 z-[25] inline-flex min-h-11 max-w-[min(calc(100vw-1.5rem),17rem)] items-center gap-2 rounded-full border border-[#bda6e1] bg-white/95 px-3.5 py-2 text-sm font-semibold text-[#7042c5] shadow-[0_10px_28px_rgba(91,62,145,0.18)] backdrop-blur-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] bottom-[calc(var(--global-mini-player-height,0px)+var(--bottom-nav-main-height)+env(safe-area-inset-bottom,0px)+0.75rem)] xl:right-[calc(var(--listener-now-playing-width)+var(--listener-shell-gap)+1.25rem)] xl:bottom-[calc(var(--listener-desktop-player-height,0px)+1.5rem)] xl:px-4"
+      className="fixed right-3 z-[25] inline-flex min-h-11 max-w-[min(calc(100vw-1.5rem),17rem)] items-center gap-2 rounded-full border border-[#bda6e1] bg-white/95 px-3.5 py-2 text-sm font-semibold text-[#7042c5] shadow-[0_10px_28px_rgba(91,62,145,0.18)] backdrop-blur-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] bottom-[calc(var(--global-mini-player-height,0px)+var(--bottom-nav-main-height)+env(safe-area-inset-bottom,0px)+var(--bottom-nav-viewport-offset,0px)+0.75rem)] xl:right-[calc(var(--listener-now-playing-width)+var(--listener-shell-gap)+1.25rem)] xl:bottom-[calc(var(--listener-desktop-player-height,0px)+1.5rem)] xl:px-4"
     >
       <span aria-hidden="true">←</span>
       <span className="xl:hidden">{shortLabel}</span>

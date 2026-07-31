@@ -124,6 +124,11 @@ function collectNavMetrics() {
   const rect = nav.getBoundingClientRect();
   const viewportHeight = window.innerHeight;
   const gapToBottom = viewportHeight - rect.bottom;
+  const rootStyle = window.getComputedStyle(document.documentElement);
+  const viewportOffsetRaw = rootStyle
+    .getPropertyValue("--bottom-nav-viewport-offset")
+    .trim();
+  const viewportOffsetPx = Number.parseFloat(viewportOffsetRaw) || 0;
   const shellBody = document.querySelector(".listener-app-shell__body");
   const shellBodyStyle = shellBody ? window.getComputedStyle(shellBody) : null;
   const lastMainChild = document.querySelector(".listener-app-shell__body")
@@ -150,7 +155,9 @@ function collectNavMetrics() {
     rectHeight: rect.height,
     viewportHeight,
     gapToBottom,
-    flushToBottom: Math.abs(gapToBottom) <= 1,
+    viewportOffsetPx,
+    // Anchored to small-viewport bottom: gap equals --bottom-nav-viewport-offset.
+    flushToBottom: Math.abs(gapToBottom - viewportOffsetPx) <= 1.5,
     breakingAncestor: hasFixedBreakingAncestor(nav),
     parentTag: nav.parentElement?.tagName.toLowerCase() ?? null,
     parentClass: nav.parentElement?.className ?? null,
@@ -213,7 +220,12 @@ function evaluatePass(report) {
   const issues = [];
 
   for (const page of report.pages) {
-    for (const [posName, metrics] of Object.entries(page.scroll.results)) {
+    const scrollResults = page.scroll.results;
+    const tops = Object.values(scrollResults)
+      .filter((metrics) => metrics.found)
+      .map((metrics) => metrics.rectTop);
+
+    for (const [posName, metrics] of Object.entries(scrollResults)) {
       if (!metrics.found) {
         issues.push(`${page.path}@${posName}: nav not found`);
         continue;
@@ -221,9 +233,12 @@ function evaluatePass(report) {
       if (metrics.position !== "fixed") {
         issues.push(`${page.path}@${posName}: position=${metrics.position}`);
       }
+      if (metrics.transform !== "none") {
+        issues.push(`${page.path}@${posName}: transform=${metrics.transform}`);
+      }
       if (!metrics.flushToBottom) {
         issues.push(
-          `${page.path}@${posName}: gapToBottom=${metrics.gapToBottom.toFixed(2)}`,
+          `${page.path}@${posName}: gapToBottom=${metrics.gapToBottom.toFixed(2)} offset=${metrics.viewportOffsetPx}`,
         );
       }
       if (metrics.breakingAncestor) {
@@ -240,11 +255,29 @@ function evaluatePass(report) {
         issues.push(`${page.path}@${posName}: nav parent is not body`);
       }
     }
+
+    if (tops.length >= 2) {
+      const minTop = Math.min(...tops);
+      const maxTop = Math.max(...tops);
+      if (maxTop - minTop > 1.5) {
+        issues.push(
+          `${page.path}: nav rectTop moved across scroll (${minTop} → ${maxTop})`,
+        );
+      }
+    }
   }
 
   for (const [phase, metrics] of Object.entries(report.viewportResize)) {
     if (!metrics.flushToBottom) {
-      issues.push(`resize:${phase}: gapToBottom=${metrics.gapToBottom.toFixed(2)}`);
+      issues.push(
+        `resize:${phase}: gapToBottom=${metrics.gapToBottom.toFixed(2)} offset=${metrics.viewportOffsetPx}`,
+      );
+    }
+    if (!metrics.isDirectBodyChild) {
+      issues.push(`resize:${phase}: nav parent is not body`);
+    }
+    if (metrics.breakingAncestor) {
+      issues.push(`resize:${phase}: breaking ancestor`);
     }
   }
 

@@ -53,7 +53,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" className="bg-platform-surface">
-      <body className="min-h-dvh bg-platform-surface text-[#25135c] antialiased">
+      <body className="min-h-screen bg-platform-surface text-[#25135c] antialiased">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

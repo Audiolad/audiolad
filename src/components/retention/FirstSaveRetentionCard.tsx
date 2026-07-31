@@ -113,7 +113,7 @@ export default function FirstSaveRetentionCard({
   }
 
   const bottomOffset =
-    "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px))";
+    "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-viewport-offset, 0px))";
 
   const installButtonLabel = isMobile ? "Добавить на телефон" : "Установить АудиоЛад";
 
