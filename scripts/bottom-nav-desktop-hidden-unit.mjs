@@ -18,6 +18,11 @@ const miniPlayer = readFileSync(
   "src/components/audio/GlobalMiniPlayer.tsx",
   "utf8",
 );
+const consentLayout = readFileSync(
+  "src/lib/analytics/consent-banner-layout.ts",
+  "utf8",
+);
+const pwaBanner = readFileSync("src/components/pwa/PwaInstallBanner.tsx", "utf8");
 
 assert(
   bottomNav.includes("createPortal(nav, document.body)"),
@@ -42,22 +47,32 @@ assert(
   "globals.css must force-hide bottom nav on desktop",
 );
 assert(
-  /\.bottom-nav\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?bottom:\s*var\(--bottom-nav-viewport-offset/.test(
+  /\.bottom-nav\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?bottom:\s*0;/.test(
     globals,
   ),
-  "globals.css must pin .bottom-nav with fixed + small-viewport offset",
+  "globals.css must pin .bottom-nav with position:fixed and bottom:0",
 );
 assert(
   globals.includes("transform: none"),
   "globals.css must keep transform:none on .bottom-nav",
 );
 assert(
-  globals.includes("--bottom-nav-viewport-offset"),
-  "globals.css must define --bottom-nav-viewport-offset for Safari dynamic toolbar stability",
+  /--bottom-nav-viewport-offset:\s*0px/.test(globals),
+  "globals.css must keep --bottom-nav-viewport-offset at 0px for chrome stacking",
 );
 assert(
-  /@supports \(height: 100dvh\)[\s\S]*100dvh - 100svh/.test(globals),
-  "viewport offset must use 100dvh - 100svh under @supports",
+  !/100dvh\s*-\s*100svh/.test(globals),
+  "globals.css must not drive bottom-nav position/height from 100dvh - 100svh",
+);
+assert(
+  !/\.bottom-nav--default::after|\.bottom-nav--player::after/.test(globals),
+  "globals.css must not use ::after viewport-offset fill under bottom-nav",
+);
+assert(
+  /\.bottom-nav\s*\{[\s\S]*?padding-bottom:\s*env\(safe-area-inset-bottom/.test(
+    globals,
+  ),
+  "globals.css must apply safe-area once via padding-bottom on .bottom-nav",
 );
 assert(
   /\.bottom-nav--default\s*\{[\s\S]*?background-color:\s*rgb\(255 255 255 \/ 0\.99\)/.test(
@@ -82,8 +97,26 @@ assert(
   "root body must use stable min-h-screen instead of min-h-dvh",
 );
 assert(
-  miniPlayer.includes("var(--bottom-nav-viewport-offset, 0px)"),
-  "GlobalMiniPlayer must stack above the viewport-offset bottom nav",
+  miniPlayer.includes("BOTTOM_NAV_MAIN_HEIGHT_PX") &&
+    miniPlayer.includes("env(safe-area-inset-bottom") &&
+    miniPlayer.includes("var(--bottom-nav-viewport-offset, 0px)"),
+  "GlobalMiniPlayer must stack above bottom nav (main height + safe-area + zero viewport offset)",
+);
+assert(
+  consentLayout.includes("var(--bottom-nav-main-height)") &&
+    consentLayout.includes("env(safe-area-inset-bottom, 0px)") &&
+    consentLayout.includes("var(--bottom-nav-viewport-offset, 0px)"),
+  "consent banner must stack above bottom nav using main height + safe-area + zero viewport offset",
+);
+assert(
+  globals.includes(".analytics-consent-banner") &&
+    /var\(--bottom-nav-viewport-offset, 0px\)/.test(globals),
+  "analytics-consent-banner CSS must keep stacking offset var (value 0px)",
+);
+assert(
+  pwaBanner.includes("var(--bottom-nav-viewport-offset, 0px)") &&
+    pwaBanner.includes("env(safe-area-inset-bottom, 0px)"),
+  "PWA install banner must stack above bottom nav with safe-area and zero viewport offset",
 );
 assert(
   /@media \(min-width: 1280px\)[\s\S]*platform-mobile-shell[\s\S]*padding-bottom:\s*0/.test(

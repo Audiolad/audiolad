@@ -8,9 +8,9 @@
   --bottom-nav-content-gap: 28px;
   --global-mini-player-height: 0px;
   /*
-   * Keep mobile bottom chrome pinned to the small viewport. When iOS Safari
-   * collapses its toolbar, 100dvh grows while 100svh stays constant — without
-   * this offset, position:fixed; bottom:0 travels with the dynamic viewport.
+   * Reserved for stacking chrome above BottomNav (mini-player, consent, PWA).
+   * Must stay 0px: do not derive position/height from dynamic vs small viewport
+   * units — that made the bar float on scroll and grow a tall white strip.
    */
   --bottom-nav-viewport-offset: 0px;
   --home-page-gutter: 1.25rem;
@@ -21,12 +21,6 @@
   --listener-desktop-player-height: 0px;
   --listener-topbar-height: 56px;
   --listener-shell-gap: 16px;
-}
-
-@supports (height: 100dvh) {
-  :root {
-    --bottom-nav-viewport-offset: max(0px, calc(100dvh - 100svh));
-  }
 }
 
 .platform-top-safe-padding {
@@ -247,9 +241,10 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--bottom-nav-viewport-offset, 0px);
+  bottom: 0;
   z-index: 20;
   width: 100%;
+  /* Safe area exactly once — do not also offset via bottom/height. */
   padding-bottom: env(safe-area-inset-bottom, 0px);
   transform: none;
 }
@@ -260,26 +255,6 @@ body {
    * dynamic toolbar. Keep the bar visually white but slightly translucent.
    */
   background-color: rgb(255 255 255 / 0.99);
-}
-
-/* Fill the small-viewport gap when the Safari toolbar collapses. */
-.bottom-nav--default::after,
-.bottom-nav--player::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: var(--bottom-nav-viewport-offset, 0px);
-  pointer-events: none;
-}
-
-.bottom-nav--default::after {
-  background-color: rgb(255 255 255 / 0.99);
-}
-
-.bottom-nav--player::after {
-  background-color: #24133f;
 }
 
 @media (min-width: 1280px) {

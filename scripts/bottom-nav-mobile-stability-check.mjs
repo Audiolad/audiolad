@@ -2,6 +2,10 @@
 /**
  * Mobile bottom nav stability check (390px viewport, scroll + viewport resize).
  * Usage: AUDIT_BASE_URL=http://127.0.0.1:3017 node scripts/bottom-nav-mobile-stability-check.mjs
+ *
+ * Regression coverage:
+ * 1) Guest scrolls a long public page — nav stays flush to the viewport bottom.
+ * 2) Author cabinet → /author-terms → public home — nav stays compact (no tall white strip).
  */
 import { chromium, devices } from "playwright";
 import { createClient } from "@supabase/supabase-js";
@@ -11,8 +15,11 @@ import path from "node:path";
 
 const BASE_URL = process.env.AUDIT_BASE_URL ?? "http://127.0.0.1:3017";
 const OUT_DIR = path.resolve("scripts/screenshots/bottom-nav-mobile-stability");
+const BOTTOM_NAV_MAIN_HEIGHT_PX = 68;
+/** Allow border/subpixel; reject tall white-strip heights. */
+const COMPACT_HEIGHT_SLACK_PX = 4;
 
-const PAGES = [
+const AUTH_PAGES = [
   { path: "/", label: "home" },
   { path: "/catalog", label: "catalog" },
   { path: "/my-practices", label: "library", requiresAuth: true },
@@ -129,6 +136,16 @@ function collectNavMetrics() {
     .getPropertyValue("--bottom-nav-viewport-offset")
     .trim();
   const viewportOffsetPx = Number.parseFloat(viewportOffsetRaw) || 0;
+  const paddingBottomPx = Number.parseFloat(style.paddingBottom) || 0;
+  const afterStyle = window.getComputedStyle(nav, "::after");
+  const afterHeightPx = Number.parseFloat(afterStyle.height) || 0;
+  const afterContent = afterStyle.content;
+  const hasAfterFill =
+    afterContent !== "none" &&
+    afterContent !== '""' &&
+    afterContent !== "''" &&
+    afterHeightPx > 0.5;
+  const expectedCompactHeight = 68 + paddingBottomPx;
   const shellBody = document.querySelector(".listener-app-shell__body");
   const shellBodyStyle = shellBody ? window.getComputedStyle(shellBody) : null;
   const lastMainChild = document.querySelector(".listener-app-shell__body")
@@ -150,14 +167,20 @@ function collectNavMetrics() {
     transform: style.transform,
     zIndex: style.zIndex,
     paddingBottom: style.paddingBottom,
+    paddingBottomPx,
     rectTop: rect.top,
     rectBottom: rect.bottom,
     rectHeight: rect.height,
+    expectedCompactHeight,
+    compactHeight: Math.abs(rect.height - expectedCompactHeight) <= 4,
     viewportHeight,
     gapToBottom,
     viewportOffsetPx,
-    // Anchored to small-viewport bottom: gap equals --bottom-nav-viewport-offset.
-    flushToBottom: Math.abs(gapToBottom - viewportOffsetPx) <= 1.5,
+    // Pinned to viewport bottom; viewport offset must remain 0.
+    flushToBottom: Math.abs(gapToBottom) <= 1.5 && viewportOffsetPx === 0,
+    hasAfterFill,
+    afterHeightPx,
+    navCount: document.querySelectorAll(".bottom-nav").length,
     breakingAncestor: hasFixedBreakingAncestor(nav),
     parentTag: nav.parentElement?.tagName.toLowerCase() ?? null,
     parentClass: nav.parentElement?.className ?? null,
@@ -192,11 +215,11 @@ async function measureAtScrollPositions(page, label) {
   return { label, maxScroll, results };
 }
 
-async function measureViewportResize(page, label) {
+async function measureViewportResize(page) {
   const metrics = {};
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${BASE_URL}${label === "home" ? "/" : "/catalog"}`, {
+  await page.goto(`${BASE_URL}/`, {
     waitUntil: "networkidle",
   });
   await page.waitForSelector(".bottom-nav", { timeout: 15000 });
@@ -216,6 +239,56 @@ async function measureViewportResize(page, label) {
   return metrics;
 }
 
+function assertNavMetrics(issues, label, metrics) {
+  if (!metrics.found) {
+    issues.push(`${label}: nav not found`);
+    return;
+  }
+  if (metrics.position !== "fixed") {
+    issues.push(`${label}: position=${metrics.position}`);
+  }
+  if (metrics.transform !== "none") {
+    issues.push(`${label}: transform=${metrics.transform}`);
+  }
+  if (metrics.bottom !== "0px") {
+    issues.push(`${label}: bottom=${metrics.bottom} (expected 0px)`);
+  }
+  if (!metrics.flushToBottom) {
+    issues.push(
+      `${label}: gapToBottom=${metrics.gapToBottom.toFixed(2)} offset=${metrics.viewportOffsetPx}`,
+    );
+  }
+  if (metrics.viewportOffsetPx !== 0) {
+    issues.push(
+      `${label}: --bottom-nav-viewport-offset=${metrics.viewportOffsetPx} (must be 0)`,
+    );
+  }
+  if (!metrics.compactHeight) {
+    issues.push(
+      `${label}: rectHeight=${metrics.rectHeight.toFixed(2)} expected≈${metrics.expectedCompactHeight.toFixed(2)}`,
+    );
+  }
+  if (metrics.hasAfterFill) {
+    issues.push(
+      `${label}: ::after fill height=${metrics.afterHeightPx.toFixed(2)}`,
+    );
+  }
+  if (metrics.breakingAncestor) {
+    issues.push(
+      `${label}: breaking ancestor ${metrics.breakingAncestor.tag}.${metrics.breakingAncestor.className}`,
+    );
+  }
+  if (metrics.left !== "0px" || metrics.right !== "0px") {
+    issues.push(`${label}: inset left=${metrics.left} right=${metrics.right}`);
+  }
+  if (!metrics.isDirectBodyChild) {
+    issues.push(`${label}: nav parent is not body`);
+  }
+  if (metrics.navCount !== 1) {
+    issues.push(`${label}: bottom-nav count=${metrics.navCount}`);
+  }
+}
+
 function evaluatePass(report) {
   const issues = [];
 
@@ -226,34 +299,7 @@ function evaluatePass(report) {
       .map((metrics) => metrics.rectTop);
 
     for (const [posName, metrics] of Object.entries(scrollResults)) {
-      if (!metrics.found) {
-        issues.push(`${page.path}@${posName}: nav not found`);
-        continue;
-      }
-      if (metrics.position !== "fixed") {
-        issues.push(`${page.path}@${posName}: position=${metrics.position}`);
-      }
-      if (metrics.transform !== "none") {
-        issues.push(`${page.path}@${posName}: transform=${metrics.transform}`);
-      }
-      if (!metrics.flushToBottom) {
-        issues.push(
-          `${page.path}@${posName}: gapToBottom=${metrics.gapToBottom.toFixed(2)} offset=${metrics.viewportOffsetPx}`,
-        );
-      }
-      if (metrics.breakingAncestor) {
-        issues.push(
-          `${page.path}@${posName}: breaking ancestor ${metrics.breakingAncestor.tag}.${metrics.breakingAncestor.className}`,
-        );
-      }
-      if (metrics.left !== "0px" || metrics.right !== "0px") {
-        issues.push(
-          `${page.path}@${posName}: inset left=${metrics.left} right=${metrics.right}`,
-        );
-      }
-      if (!metrics.isDirectBodyChild) {
-        issues.push(`${page.path}@${posName}: nav parent is not body`);
-      }
+      assertNavMetrics(issues, `${page.path}@${posName}`, metrics);
     }
 
     if (tops.length >= 2) {
@@ -268,20 +314,103 @@ function evaluatePass(report) {
   }
 
   for (const [phase, metrics] of Object.entries(report.viewportResize)) {
-    if (!metrics.flushToBottom) {
+    assertNavMetrics(issues, `resize:${phase}`, metrics);
+  }
+
+  if (report.guestLongScroll) {
+    const { path: guestPath, scroll } = report.guestLongScroll;
+    const tops = Object.values(scroll.results)
+      .filter((metrics) => metrics.found)
+      .map((metrics) => metrics.rectTop);
+
+    for (const [posName, metrics] of Object.entries(scroll.results)) {
+      assertNavMetrics(issues, `guest:${guestPath}@${posName}`, metrics);
+    }
+
+    if (tops.length >= 2) {
+      const minTop = Math.min(...tops);
+      const maxTop = Math.max(...tops);
+      if (maxTop - minTop > 1.5) {
+        issues.push(
+          `guest:${guestPath}: nav rectTop moved across scroll (${minTop} → ${maxTop})`,
+        );
+      }
+    }
+
+    if (scroll.maxScroll < 200) {
       issues.push(
-        `resize:${phase}: gapToBottom=${metrics.gapToBottom.toFixed(2)} offset=${metrics.viewportOffsetPx}`,
+        `guest:${guestPath}: page not long enough to scroll (maxScroll=${scroll.maxScroll})`,
       );
     }
-    if (!metrics.isDirectBodyChild) {
-      issues.push(`resize:${phase}: nav parent is not body`);
-    }
-    if (metrics.breakingAncestor) {
-      issues.push(`resize:${phase}: breaking ancestor`);
+  }
+
+  if (report.authorTermsReturn) {
+    for (const [phase, metrics] of Object.entries(report.authorTermsReturn)) {
+      if (phase === "authorDashboard") {
+        if (metrics.found) {
+          issues.push(
+            `author-return:${phase}: bottom-nav should be hidden in author cabinet`,
+          );
+        }
+        continue;
+      }
+      assertNavMetrics(issues, `author-return:${phase}`, metrics);
     }
   }
 
   return issues;
+}
+
+async function runGuestLongScroll(browser) {
+  const context = await browser.newContext({
+    ...devices["iPhone 13"],
+    viewport: { width: 390, height: 844 },
+  });
+  await context.addInitScript(() => {
+    window.localStorage.setItem("audiolad_analytics_cookies", "denied");
+  });
+  const page = await context.newPage();
+  const guestPath = "/author-terms";
+
+  await page.goto(`${BASE_URL}${guestPath}`, { waitUntil: "networkidle" });
+  await page.waitForSelector(".bottom-nav", { timeout: 15000 });
+  const scroll = await measureAtScrollPositions(page, "guest-author-terms");
+
+  await page.screenshot({
+    path: path.join(OUT_DIR, "guest-author-terms-bottom.png"),
+    fullPage: false,
+  });
+
+  await context.close();
+  return { path: guestPath, scroll };
+}
+
+async function runAuthorTermsReturn(page) {
+  const result = {};
+
+  await page.goto(`${BASE_URL}/author-dashboard`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(500);
+  result.authorDashboard = await page.evaluate(collectNavMetrics);
+
+  await page.goto(`${BASE_URL}/author-terms`, { waitUntil: "networkidle" });
+  await page.waitForSelector(".bottom-nav", { timeout: 15000 });
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await page.waitForTimeout(200);
+  result.authorTermsBottom = await page.evaluate(collectNavMetrics);
+
+  await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
+  await page.waitForSelector(".bottom-nav", { timeout: 15000 });
+  await page.waitForTimeout(200);
+  result.publicHome = await page.evaluate(collectNavMetrics);
+
+  await page.screenshot({
+    path: path.join(OUT_DIR, "author-terms-return-home.png"),
+    fullPage: false,
+  });
+
+  return result;
 }
 
 async function main() {
@@ -298,9 +427,15 @@ async function main() {
   await context.addCookies(await getAuthCookies(BASE_URL));
   const page = await context.newPage();
 
-  const report = { baseUrl: BASE_URL, pages: [], viewportResize: {} };
+  const report = {
+    baseUrl: BASE_URL,
+    pages: [],
+    viewportResize: {},
+    guestLongScroll: null,
+    authorTermsReturn: null,
+  };
 
-  for (const item of PAGES) {
+  for (const item of AUTH_PAGES) {
     await page.goto(`${BASE_URL}${item.path}`, { waitUntil: "networkidle" });
     await page.waitForSelector(".bottom-nav", { timeout: 15000 });
     const scroll = await measureAtScrollPositions(page, item.label);
@@ -312,7 +447,9 @@ async function main() {
     });
   }
 
-  report.viewportResize = await measureViewportResize(page, "home");
+  report.viewportResize = await measureViewportResize(page);
+  report.guestLongScroll = await runGuestLongScroll(browser);
+  report.authorTermsReturn = await runAuthorTermsReturn(page);
 
   await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
   await page.waitForSelector(".bottom-nav", { timeout: 15000 });
@@ -326,7 +463,9 @@ async function main() {
     const navs = document.querySelectorAll(".bottom-nav");
     return {
       count: navs.length,
-      parentTags: [...navs].map((nav) => nav.parentElement?.tagName.toLowerCase() ?? null),
+      parentTags: [...navs].map(
+        (nav) => nav.parentElement?.tagName.toLowerCase() ?? null,
+      ),
     };
   });
 
@@ -338,6 +477,8 @@ async function main() {
 
   report.pass = issues.length === 0;
   report.issues = issues;
+  report.compactHeightSlackPx = COMPACT_HEIGHT_SLACK_PX;
+  report.bottomNavMainHeightPx = BOTTOM_NAV_MAIN_HEIGHT_PX;
 
   await writeFile(
     path.join(OUT_DIR, "results.json"),
