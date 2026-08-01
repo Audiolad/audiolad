@@ -13,6 +13,20 @@ import {
   renderAuthorApplicationSubmittedEmailText,
 } from "./author-application-submitted";
 import {
+  AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
+  AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorProductModerationApprovedEmailHtml,
+  renderAuthorProductModerationApprovedEmailText,
+} from "./author-product-moderation-approved";
+import {
+  AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_SUBJECT,
+  AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_KEY,
+  AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_VERSION,
+  renderAuthorProductModerationChangesRequestedEmailHtml,
+  renderAuthorProductModerationChangesRequestedEmailText,
+} from "./author-product-moderation-changes-requested";
+import {
   AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
   AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
   buildAuthorApplicationAdminAlertSubject,
@@ -330,6 +344,72 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (
+      input.templateKey === AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_KEY
+    ) {
+      const productTitle = readString(input.payload, "productTitle");
+      const moderatorComment = readString(input.payload, "moderatorComment");
+      const authorDashboardPath = readString(input.payload, "authorDashboardPath");
+
+      if (!productTitle || !moderatorComment || !authorDashboardPath) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const authorName = readString(input.payload, "authorName") ?? undefined;
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_SUBJECT,
+        html: renderAuthorProductModerationChangesRequestedEmailHtml({
+          authorName,
+          productTitle,
+          moderatorComment,
+          authorDashboardPath,
+          siteOrigin,
+        }),
+        text: renderAuthorProductModerationChangesRequestedEmailText({
+          authorName,
+          productTitle,
+          moderatorComment,
+          authorDashboardPath,
+          siteOrigin,
+        }),
+      };
+    }
+
+    if (input.templateKey === AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY) {
+      const productTitle = readString(input.payload, "productTitle");
+      const authorDashboardPath = readString(input.payload, "authorDashboardPath");
+
+      if (!productTitle || !authorDashboardPath) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const authorName = readString(input.payload, "authorName") ?? undefined;
+      const publicProductPath = readString(input.payload, "publicProductPath");
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
+        html: renderAuthorProductModerationApprovedEmailHtml({
+          authorName,
+          productTitle,
+          authorDashboardPath,
+          publicProductPath,
+          siteOrigin,
+        }),
+        text: renderAuthorProductModerationApprovedEmailText({
+          authorName,
+          productTitle,
+          authorDashboardPath,
+          publicProductPath,
+          siteOrigin,
+        }),
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
 }
@@ -377,6 +457,16 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_KEY) {
     return PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (
+    templateKey === AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_KEY
+  ) {
+    return AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;
