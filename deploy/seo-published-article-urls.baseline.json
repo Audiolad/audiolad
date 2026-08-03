@@ -43,6 +43,7 @@
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
     "/articles/myshlenie-izobiliya",
     "/articles/namerenie-chto-eto",
+    "/articles/nastroy-na-dengi",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
     "/articles/strah-deneg",
@@ -253,6 +254,11 @@
       "articleId": "ART_plan34_намерение-что-это",
       "slug": "namerenie-chto-eto",
       "path": "/articles/namerenie-chto-eto"
+    },
+    {
+      "articleId": "ART_plan16_как-настроиться-на-деньги",
+      "slug": "nastroy-na-dengi",
+      "path": "/articles/nastroy-na-dengi"
     },
     {
       "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",

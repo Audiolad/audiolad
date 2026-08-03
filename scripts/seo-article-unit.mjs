@@ -3016,6 +3016,59 @@ assert(
   "money-fear slug unique",
 );
 
+const moneyMindsetArticle = getArticleBySlug("nastroy-na-dengi");
+assert(moneyMindsetArticle, "money-mindset article registered");
+assert(
+  moneyMindsetArticle.title ===
+    "Настрой на деньги: как изменить внутреннее отношение к финансам и действовать спокойнее",
+  "money-mindset H1",
+);
+assert(
+  moneyMindsetArticle.metaTitle ===
+    "Настрой на деньги: как изменить внутреннее отношение к финансам – АудиоЛад",
+  "money-mindset SEO title",
+);
+assert(
+  moneyMindsetArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "money-mindset primary practice key",
+);
+assert(
+  moneyMindsetArticle.topicSlug === "meditatsii-na-dengi",
+  "money-mindset uses money meditations hub",
+);
+assert(
+  moneyMindsetArticle.finalAudioLead === "",
+  "money-mindset has one player only",
+);
+assert(
+  moneyMindsetArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/denezhnoe-myshlenie",
+  ),
+  "money-mindset links to money-thinking article",
+);
+assert(
+  moneyMindsetArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+  ),
+  "money-mindset links to name-price article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "nastroy-na-dengi").length === 1,
+  "money-mindset slug unique",
+);
+assert(
+  getArticleBySlug(
+    "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+  )?.afterFinalAudio?.some((item) => item.href === "/articles/nastroy-na-dengi"),
+  "money-meditation reverse-links to money-mindset",
+);
+assert(
+  getArticleBySlug("denezhnoe-myshlenie")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/nastroy-na-dengi",
+  ),
+  "money-thinking reverse-links to money-mindset",
+);
+
 const namePriceArticle = getArticleBySlug("kak-nazvat-tsenu-za-svoyu-rabotu");
 assert(namePriceArticle, "name-price article registered");
 assert(
