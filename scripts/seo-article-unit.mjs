@@ -3016,6 +3016,75 @@ assert(
   "money-fear slug unique",
 );
 
+const formulateDesireArticle = getArticleBySlug(
+  "kak-pravilno-sformulirovat-zhelanie",
+);
+assert(formulateDesireArticle, "formulate-desire article registered");
+assert(
+  formulateDesireArticle.title ===
+    "Как правильно сформулировать желание и перейти от мечты к ясному намерению",
+  "formulate-desire H1",
+);
+assert(
+  formulateDesireArticle.metaTitle ===
+    "Как правильно сформулировать желание и перейти к действиям – АудиоЛад",
+  "formulate-desire SEO title",
+);
+assert(
+  formulateDesireArticle.primaryPractice.practiceKey === "kod-prityazheniya",
+  "formulate-desire primary practice key",
+);
+assert(
+  formulateDesireArticle.topicSlug === "besplatnye-meditatsii",
+  "formulate-desire uses free meditations hub",
+);
+assert(
+  formulateDesireArticle.finalAudioLead === "",
+  "formulate-desire has one player only",
+);
+assert(
+  formulateDesireArticle.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "formulate-desire practice section enables afterFinalAudio render",
+);
+assert(
+  formulateDesireArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/namerenie-chto-eto",
+  ),
+  "formulate-desire links to intention article",
+);
+assert(
+  formulateDesireArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-ponyat-chego-ya-hochu",
+  ),
+  "formulate-desire links to understand-desire article",
+);
+assert(
+  listArticleSlugs().filter(
+    (slug) => slug === "kak-pravilno-sformulirovat-zhelanie",
+  ).length === 1,
+  "formulate-desire slug unique",
+);
+assert(
+  getArticleBySlug("namerenie-chto-eto")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-pravilno-sformulirovat-zhelanie",
+  ),
+  "intention reverse-links to formulate-desire",
+);
+assert(
+  getArticleBySlug("kak-ponyat-chego-ya-hochu")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-pravilno-sformulirovat-zhelanie",
+  ),
+  "understand-desire reverse-links to formulate-desire",
+);
+assert(
+  getArticleBySlug("namerenie-chto-eto")?.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "intention practice section enables afterFinalAudio render",
+);
+
 const askRaiseArticle = getArticleBySlug("kak-poprosit-povyshenie-zarplaty");
 assert(askRaiseArticle, "ask-raise article registered");
 assert(

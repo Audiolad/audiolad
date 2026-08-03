@@ -25,6 +25,7 @@
     "/articles/kak-poprosit-povyshenie-zarplaty",
     "/articles/kak-povysit-dohod",
     "/articles/kak-prinimat-dengi",
+    "/articles/kak-pravilno-sformulirovat-zhelanie",
     "/articles/kak-prinyat-sebya",
     "/articles/kak-prinyat-svoy-vozrast",
     "/articles/kak-privlech-dengi-v-svoyu-zhizn",
@@ -166,6 +167,11 @@
       "articleId": "ART_kak-prinimat-dengi",
       "slug": "kak-prinimat-dengi",
       "path": "/articles/kak-prinimat-dengi"
+    },
+    {
+      "articleId": "ART_plan33_как-сформулировать-желание",
+      "slug": "kak-pravilno-sformulirovat-zhelanie",
+      "path": "/articles/kak-pravilno-sformulirovat-zhelanie"
     },
     {
       "articleId": "ART_plan48_как-принять-себя",

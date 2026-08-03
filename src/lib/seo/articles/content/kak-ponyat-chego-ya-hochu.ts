@@ -209,6 +209,14 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
     },
     {
       before:
+        "Когда желание уже заметнее и важно выразить его простыми словами – ",
+      linkLabel:
+        "«Как правильно сформулировать желание и перейти от мечты к ясному намерению»",
+      href: "/articles/kak-pravilno-sformulirovat-zhelanie",
+      after: ".",
+    },
+    {
+      before:
         "Если желания уже заметнее и важно выбрать направление, которое будет влиять на решения, можно прочитать о том, ",
       linkLabel: "что такое намерение и чем оно отличается от желания, цели и плана",
       href: "/articles/namerenie-chto-eto",
@@ -243,6 +251,11 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
       description: "Когда прошлые планы мешают услышать новые желания",
     },
     {
+      href: "/articles/kak-pravilno-sformulirovat-zhelanie",
+      title: "Как правильно сформулировать желание",
+      description: "От мечты к понятной формулировке и первому действию",
+    },
+    {
       href: "/articles/namerenie-chto-eto",
       title: "Что такое намерение",
       description: "Чем намерение отличается от желания, цели и плана",
@@ -262,5 +275,5 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-08-03T10:00:00.000Z",
+  updatedAt: "2026-08-03T20:45:00.000Z",
 } as const satisfies ArticleDefinition;
