@@ -2977,6 +2977,12 @@ assert(
   "wish meditation updatedAt bumped for clarify-desires reverse",
 );
 assert(
+  wishMeditationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+  ),
+  "wish meditation reverse-links to why-wishes-fail article",
+);
+assert(
   wishMeditationArticle.publishedAt === "2026-07-25T00:00:00.000Z",
   "wish meditation publishedAt unchanged",
 );

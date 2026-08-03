@@ -146,6 +146,13 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
     },
     {
       before:
+        "Если желание уже есть, но результат долго не появляется, можно спокойно разобрать, ",
+      linkLabel: "почему желания не исполняются",
+      href: "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",

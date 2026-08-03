@@ -164,6 +164,13 @@ export const NAMERENIE_CHTO_ETO_ARTICLE = {
       href: "/articles/meditatsiya-na-ispolnenie-zhelaniy",
       after: ".",
     },
+    {
+      before:
+        "Если желание уже есть, но результат долго не появляется, можно спокойно разобрать, ",
+      linkLabel: "почему желания не исполняются",
+      href: "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+      after: ".",
+    },
   ],
   brandNote:
     "Аудиопрактики помогают сосредоточить внимание на выбранном направлении и являются дополнительной поддержкой, а не заменой цели, плана, реальных действий или изменения условий жизни.",
@@ -172,6 +179,11 @@ export const NAMERENIE_CHTO_ETO_ARTICLE = {
       href: "/articles/kak-ponyat-chego-ya-hochu",
       title: "Как понять, чего вы действительно хотите",
       description: "Вопросы, которые помогают услышать собственные желания",
+    },
+    {
+      href: "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+      title: "Почему желания не исполняются",
+      description: "Что действительно может мешать приблизиться к желаемому",
     },
     {
       href: "/articles/vizualizatsiya-zhelaniy",
@@ -198,5 +210,5 @@ export const NAMERENIE_CHTO_ETO_ARTICLE = {
     ],
   },
   publishedAt: "2026-08-03T10:00:00.000Z",
-  updatedAt: "2026-08-03T10:00:00.000Z",
+  updatedAt: "2026-08-03T11:00:00.000Z",
 } as const satisfies ArticleDefinition;
