@@ -1,0 +1,273 @@
+{
+  "version": 1,
+  "description": "Must-keep SEO article URLs. Candidate/public smoke fails if any path returns non-200.",
+  "updatedAt": "2026-08-03",
+  "paths": [
+    "/articles/affirmatsii-na-dengi",
+    "/articles/besplatnye-meditatsii-onlayn",
+    "/articles/blagodarnost-i-izobilie",
+    "/articles/chto-takoe-denezhnyy-potok",
+    "/articles/denezhnoe-myshlenie",
+    "/articles/denezhnye-ustanovki",
+    "/articles/kak-izmenit-otnoshenie-k-dengam",
+    "/articles/kak-napolnitsya-zhenskoy-energiey",
+    "/articles/kak-nayti-novye-istochniki-dohoda",
+    "/articles/kak-otpustit-obidu",
+    "/articles/kak-otpustit-proshloe",
+    "/articles/kak-perestat-boyatsya-bolshih-deneg",
+    "/articles/kak-perestat-ekonomit-na-sebe",
+    "/articles/kak-perestat-kritikovat-sebya",
+    "/articles/kak-perestat-perezhivat-iz-za-deneg",
+    "/articles/kak-perestat-zlitsya-na-cheloveka",
+    "/articles/kak-ponyat-chego-ya-hochu",
+    "/articles/kak-povysit-dohod",
+    "/articles/kak-prinimat-dengi",
+    "/articles/kak-prinyat-sebya",
+    "/articles/kak-prinyat-svoy-vozrast",
+    "/articles/kak-privlech-dengi-v-svoyu-zhizn",
+    "/articles/kak-prostit-cheloveka",
+    "/articles/kak-prostit-sebya",
+    "/articles/kak-razvit-lyubov-k-sebe",
+    "/articles/kak-umenshit-impulsivnye-pokupki",
+    "/articles/kak-vosstanovit-sily-zhenshchine",
+    "/articles/kak-vosstanovit-zhenskuyu-energiyu",
+    "/articles/kak-voyti-v-sostoyanie-izobiliya",
+    "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+    "/articles/kak-zabotitsya-o-sebe",
+    "/articles/kak-zhenshchine-razreshit-sebe-dengi",
+    "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+    "/articles/meditatsiya-na-ispolnenie-zhelaniy",
+    "/articles/meditatsiya-na-izobilie",
+    "/articles/meditatsiya-na-privlechenie-deneg",
+    "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    "/articles/pochemu-my-postoyanno-obizhaemsya",
+    "/articles/strah-tratit-dengi-na-sebya",
+    "/articles/vizualizatsiya-zhelaniy",
+    "/articles/zhenshchina-i-dengi-psihologiya",
+    "/articles/zhenskaya-energiya-chto-eto",
+    "/articles/zhenskaya-samotsennost-i-dengi",
+    "/articles/zhenskaya-sila"
+  ],
+  "articles": [
+    {
+      "articleId": "ART_affirmatsii-na-dengi",
+      "slug": "affirmatsii-na-dengi",
+      "path": "/articles/affirmatsii-na-dengi"
+    },
+    {
+      "articleId": "ART_besplatnye-meditatsii-onlayn",
+      "slug": "besplatnye-meditatsii-onlayn",
+      "path": "/articles/besplatnye-meditatsii-onlayn"
+    },
+    {
+      "articleId": "ART_blagodarnost-i-izobilie",
+      "slug": "blagodarnost-i-izobilie",
+      "path": "/articles/blagodarnost-i-izobilie"
+    },
+    {
+      "articleId": "ART_chto-takoe-denezhnyy-potok",
+      "slug": "chto-takoe-denezhnyy-potok",
+      "path": "/articles/chto-takoe-denezhnyy-potok"
+    },
+    {
+      "articleId": "ART_denezhnoe-myshlenie",
+      "slug": "denezhnoe-myshlenie",
+      "path": "/articles/denezhnoe-myshlenie"
+    },
+    {
+      "articleId": "ART_denezhnye-ustanovki",
+      "slug": "denezhnye-ustanovki",
+      "path": "/articles/denezhnye-ustanovki"
+    },
+    {
+      "articleId": "ART_kak-izmenit-otnoshenie-k-dengam",
+      "slug": "kak-izmenit-otnoshenie-k-dengam",
+      "path": "/articles/kak-izmenit-otnoshenie-k-dengam"
+    },
+    {
+      "articleId": "ART_kak-napolnitsya-zhenskoy-energiey",
+      "slug": "kak-napolnitsya-zhenskoy-energiey",
+      "path": "/articles/kak-napolnitsya-zhenskoy-energiey"
+    },
+    {
+      "articleId": "ART_kak-nayti-novye-istochniki-dohoda",
+      "slug": "kak-nayti-novye-istochniki-dohoda",
+      "path": "/articles/kak-nayti-novye-istochniki-dohoda"
+    },
+    {
+      "articleId": "ART_kak-otpustit-obidu",
+      "slug": "kak-otpustit-obidu",
+      "path": "/articles/kak-otpustit-obidu"
+    },
+    {
+      "articleId": "ART_kak-otpustit-proshloe",
+      "slug": "kak-otpustit-proshloe",
+      "path": "/articles/kak-otpustit-proshloe"
+    },
+    {
+      "articleId": "ART_kak-perestat-boyatsya-bolshih-deneg",
+      "slug": "kak-perestat-boyatsya-bolshih-deneg",
+      "path": "/articles/kak-perestat-boyatsya-bolshih-deneg"
+    },
+    {
+      "articleId": "ART_kak-perestat-ekonomit-na-sebe",
+      "slug": "kak-perestat-ekonomit-na-sebe",
+      "path": "/articles/kak-perestat-ekonomit-na-sebe"
+    },
+    {
+      "articleId": "ART_plan47_как-перестать-критиковать-себя",
+      "slug": "kak-perestat-kritikovat-sebya",
+      "path": "/articles/kak-perestat-kritikovat-sebya"
+    },
+    {
+      "articleId": "ART_kak-perestat-perezhivat-iz-za-deneg",
+      "slug": "kak-perestat-perezhivat-iz-za-deneg",
+      "path": "/articles/kak-perestat-perezhivat-iz-za-deneg"
+    },
+    {
+      "articleId": "ART_kak-perestat-zlitsya-na-cheloveka",
+      "slug": "kak-perestat-zlitsya-na-cheloveka",
+      "path": "/articles/kak-perestat-zlitsya-na-cheloveka"
+    },
+    {
+      "articleId": "ART_kak-ponyat-chego-ya-hochu",
+      "slug": "kak-ponyat-chego-ya-hochu",
+      "path": "/articles/kak-ponyat-chego-ya-hochu"
+    },
+    {
+      "articleId": "ART_kak-povysit-dohod",
+      "slug": "kak-povysit-dohod",
+      "path": "/articles/kak-povysit-dohod"
+    },
+    {
+      "articleId": "ART_kak-prinimat-dengi",
+      "slug": "kak-prinimat-dengi",
+      "path": "/articles/kak-prinimat-dengi"
+    },
+    {
+      "articleId": "ART_plan48_как-принять-себя",
+      "slug": "kak-prinyat-sebya",
+      "path": "/articles/kak-prinyat-sebya"
+    },
+    {
+      "articleId": "ART_kak-prinyat-svoy-vozrast",
+      "slug": "kak-prinyat-svoy-vozrast",
+      "path": "/articles/kak-prinyat-svoy-vozrast"
+    },
+    {
+      "articleId": "ART_kak-privlech-dengi-v-svoyu-zhizn",
+      "slug": "kak-privlech-dengi-v-svoyu-zhizn",
+      "path": "/articles/kak-privlech-dengi-v-svoyu-zhizn"
+    },
+    {
+      "articleId": "ART_kak-prostit-cheloveka",
+      "slug": "kak-prostit-cheloveka",
+      "path": "/articles/kak-prostit-cheloveka"
+    },
+    {
+      "articleId": "ART_kak-prostit-sebya",
+      "slug": "kak-prostit-sebya",
+      "path": "/articles/kak-prostit-sebya"
+    },
+    {
+      "articleId": "ART_kak-razvit-lyubov-k-sebe",
+      "slug": "kak-razvit-lyubov-k-sebe",
+      "path": "/articles/kak-razvit-lyubov-k-sebe"
+    },
+    {
+      "articleId": "ART_kak-umenshit-impulsivnye-pokupki",
+      "slug": "kak-umenshit-impulsivnye-pokupki",
+      "path": "/articles/kak-umenshit-impulsivnye-pokupki"
+    },
+    {
+      "articleId": "ART_plan45_как-восстановить-силы-женщине",
+      "slug": "kak-vosstanovit-sily-zhenshchine",
+      "path": "/articles/kak-vosstanovit-sily-zhenshchine"
+    },
+    {
+      "articleId": "ART_plan44_как-восстановить-женскую-энергию",
+      "slug": "kak-vosstanovit-zhenskuyu-energiyu",
+      "path": "/articles/kak-vosstanovit-zhenskuyu-energiyu"
+    },
+    {
+      "articleId": "ART_kak-voyti-v-sostoyanie-izobiliya",
+      "slug": "kak-voyti-v-sostoyanie-izobiliya",
+      "path": "/articles/kak-voyti-v-sostoyanie-izobiliya"
+    },
+    {
+      "articleId": "ART_kak-vyyti-iz-sostoyaniya-nehvatki",
+      "slug": "kak-vyyti-iz-sostoyaniya-nehvatki",
+      "path": "/articles/kak-vyyti-iz-sostoyaniya-nehvatki"
+    },
+    {
+      "articleId": "ART_plan38_как-заботиться-о-себе",
+      "slug": "kak-zabotitsya-o-sebe",
+      "path": "/articles/kak-zabotitsya-o-sebe"
+    },
+    {
+      "articleId": "ART_kak-zhenshchine-razreshit-sebe-dengi",
+      "slug": "kak-zhenshchine-razreshit-sebe-dengi",
+      "path": "/articles/kak-zhenshchine-razreshit-sebe-dengi"
+    },
+    {
+      "articleId": "ART_meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      "slug": "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      "path": "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem"
+    },
+    {
+      "articleId": "ART_meditatsiya-na-ispolnenie-zhelaniy",
+      "slug": "meditatsiya-na-ispolnenie-zhelaniy",
+      "path": "/articles/meditatsiya-na-ispolnenie-zhelaniy"
+    },
+    {
+      "articleId": "ART_meditatsiya-na-izobilie",
+      "slug": "meditatsiya-na-izobilie",
+      "path": "/articles/meditatsiya-na-izobilie"
+    },
+    {
+      "articleId": "ART_meditatsiya-na-privlechenie-deneg",
+      "slug": "meditatsiya-na-privlechenie-deneg",
+      "path": "/articles/meditatsiya-na-privlechenie-deneg"
+    },
+    {
+      "articleId": "ART_meditatsiya-na-zhenskuyu-energiyu",
+      "slug": "meditatsiya-na-zhenskuyu-energiyu",
+      "path": "/articles/meditatsiya-na-zhenskuyu-energiyu"
+    },
+    {
+      "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",
+      "slug": "pochemu-my-postoyanno-obizhaemsya",
+      "path": "/articles/pochemu-my-postoyanno-obizhaemsya"
+    },
+    {
+      "articleId": "ART_strah-tratit-dengi-na-sebya",
+      "slug": "strah-tratit-dengi-na-sebya",
+      "path": "/articles/strah-tratit-dengi-na-sebya"
+    },
+    {
+      "articleId": "ART_vizualizatsiya-zhelaniy",
+      "slug": "vizualizatsiya-zhelaniy",
+      "path": "/articles/vizualizatsiya-zhelaniy"
+    },
+    {
+      "articleId": "ART_zhenshchina-i-dengi-psihologiya",
+      "slug": "zhenshchina-i-dengi-psihologiya",
+      "path": "/articles/zhenshchina-i-dengi-psihologiya"
+    },
+    {
+      "articleId": "ART_zhenskaya-energiya-chto-eto",
+      "slug": "zhenskaya-energiya-chto-eto",
+      "path": "/articles/zhenskaya-energiya-chto-eto"
+    },
+    {
+      "articleId": "ART_zhenskaya-samotsennost-i-dengi",
+      "slug": "zhenskaya-samotsennost-i-dengi",
+      "path": "/articles/zhenskaya-samotsennost-i-dengi"
+    },
+    {
+      "articleId": "ART_zhenskaya-sila",
+      "slug": "zhenskaya-sila",
+      "path": "/articles/zhenskaya-sila"
+    }
+  ]
+}

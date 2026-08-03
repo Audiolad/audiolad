@@ -10,6 +10,9 @@ import { KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE } from "./content/kak-privlech
 import { KAK_PROSTIT_CHELOVEKA_ARTICLE } from "./content/kak-prostit-cheloveka";
 import { KAK_PROSTIT_SEBYA_ARTICLE } from "./content/kak-prostit-sebya";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "./content/kak-razvit-lyubov-k-sebe";
+import { KAK_ZABOTITSYA_O_SEBE_ARTICLE } from "./content/kak-zabotitsya-o-sebe";
+import { KAK_PRINYAT_SEBYA_ARTICLE } from "./content/kak-prinyat-sebya";
+import { KAK_PERESTAT_KRITIKOVAT_SEBYA_ARTICLE } from "./content/kak-perestat-kritikovat-sebya";
 import { KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE } from "./content/kak-voyti-v-sostoyanie-izobiliya";
 import { KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE } from "./content/kak-zhenshchine-razreshit-sebe-dengi";
 import { MEDITATSIYA_NA_DENGI_ARTICLE } from "./content/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem";
@@ -43,6 +46,9 @@ import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
   KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE,
+  KAK_ZABOTITSYA_O_SEBE_ARTICLE,
+  KAK_PRINYAT_SEBYA_ARTICLE,
+  KAK_PERESTAT_KRITIKOVAT_SEBYA_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,
