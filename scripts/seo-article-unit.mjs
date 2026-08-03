@@ -3016,6 +3016,67 @@ assert(
   "money-fear slug unique",
 );
 
+const askRaiseArticle = getArticleBySlug("kak-poprosit-povyshenie-zarplaty");
+assert(askRaiseArticle, "ask-raise article registered");
+assert(
+  askRaiseArticle.title ===
+    "Как попросить повышение зарплаты и спокойно подготовиться к разговору",
+  "ask-raise H1",
+);
+assert(
+  askRaiseArticle.metaTitle ===
+    "Как попросить повышение зарплаты и подготовиться к разговору – АудиоЛад",
+  "ask-raise SEO title",
+);
+assert(
+  askRaiseArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "ask-raise primary practice key",
+);
+assert(
+  askRaiseArticle.topicSlug === "meditatsii-na-dengi",
+  "ask-raise uses money meditations hub",
+);
+assert(askRaiseArticle.finalAudioLead === "", "ask-raise has one player only");
+assert(
+  askRaiseArticle.sections.some((section) => section.id === "audiopraktika"),
+  "ask-raise practice section enables afterFinalAudio render",
+);
+assert(
+  askRaiseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-povysit-dohod",
+  ),
+  "ask-raise links to raise-income article",
+);
+assert(
+  askRaiseArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+  ),
+  "ask-raise links to name-price article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-poprosit-povyshenie-zarplaty")
+    .length === 1,
+  "ask-raise slug unique",
+);
+assert(
+  getArticleBySlug("kak-povysit-dohod")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-poprosit-povyshenie-zarplaty",
+  ),
+  "raise-income reverse-links to ask-raise",
+);
+assert(
+  getArticleBySlug("kak-nazvat-tsenu-za-svoyu-rabotu")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-poprosit-povyshenie-zarplaty",
+  ),
+  "name-price reverse-links to ask-raise",
+);
+assert(
+  getArticleBySlug("kak-nazvat-tsenu-za-svoyu-rabotu")?.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "name-price practice section enables afterFinalAudio render",
+);
+
 const startSavingArticle = getArticleBySlug("kak-nachat-kopit-dengi");
 assert(startSavingArticle, "start-saving article registered");
 assert(

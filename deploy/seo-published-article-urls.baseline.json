@@ -22,6 +22,7 @@
     "/articles/kak-perestat-perezhivat-iz-za-deneg",
     "/articles/kak-perestat-zlitsya-na-cheloveka",
     "/articles/kak-ponyat-chego-ya-hochu",
+    "/articles/kak-poprosit-povyshenie-zarplaty",
     "/articles/kak-povysit-dohod",
     "/articles/kak-prinimat-dengi",
     "/articles/kak-prinyat-sebya",
@@ -150,6 +151,11 @@
       "articleId": "ART_kak-ponyat-chego-ya-hochu",
       "slug": "kak-ponyat-chego-ya-hochu",
       "path": "/articles/kak-ponyat-chego-ya-hochu"
+    },
+    {
+      "articleId": "ART_plan26_как-попросить-повышение-зарплаты",
+      "slug": "kak-poprosit-povyshenie-zarplaty",
+      "path": "/articles/kak-poprosit-povyshenie-zarplaty"
     },
     {
       "articleId": "ART_kak-povysit-dohod",
