@@ -135,7 +135,7 @@ export const KAK_NACHAT_KOPIT_DENGI_ARTICLE = {
       ],
     },
     {
-      id: "praktika-energiya-denezhnogo-puti",
+      id: "audiopraktika",
       title: "Практика «Энергия Денежного Пути»",
       paragraphs: [
         "Иногда начать копить мешает не отсутствие желания, а внутреннее напряжение. Кажется, что денег всегда будет недостаточно, поэтому любое решение вызывает тревогу.",

@@ -135,7 +135,7 @@ export const NASTROY_NA_DENGI_ARTICLE = {
       ],
     },
     {
-      id: "praktika-energiya-denezhnogo-puti",
+      id: "audiopraktika",
       title: "Практика «Энергия Денежного Пути»",
       paragraphs: [
         "Перед важными финансовыми решениями бывает полезно ненадолго остановиться и снизить внутреннее напряжение.",

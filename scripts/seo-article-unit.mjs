@@ -3041,6 +3041,16 @@ assert(
   "start-saving has one player only",
 );
 assert(
+  startSavingArticle.sections.some((section) => section.id === "audiopraktika"),
+  "start-saving practice section enables afterFinalAudio render",
+);
+assert(
+  getArticleBySlug("nastroy-na-dengi")?.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "money-mindset practice section enables afterFinalAudio render",
+);
+assert(
   startSavingArticle.afterFinalAudio?.some(
     (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
   ),
