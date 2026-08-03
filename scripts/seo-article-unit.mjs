@@ -2987,6 +2987,36 @@ assert(
   "wish meditation publishedAt unchanged",
 );
 
+const moneyFearArticle = getArticleBySlug("strah-deneg");
+assert(moneyFearArticle, "money-fear article registered");
+assert(
+  moneyFearArticle.title ===
+    "Страх денег: почему финансовые вопросы вызывают напряжение и как с ним справляться",
+  "money-fear H1",
+);
+assert(
+  moneyFearArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "money-fear primary practice key",
+);
+assert(
+  moneyFearArticle.topicSlug === "meditatsii-na-dengi",
+  "money-fear uses money meditations hub",
+);
+assert(
+  moneyFearArticle.finalAudioLead === "",
+  "money-fear has one player only",
+);
+assert(
+  moneyFearArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perestat-perezhivat-iz-za-deneg",
+  ),
+  "money-fear links to money-anxiety article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "strah-deneg").length === 1,
+  "money-fear slug unique",
+);
+
 const selfForgivenessArticle = getArticleBySlug("kak-prostit-sebya");
 assert(selfForgivenessArticle, "self-forgiveness article registered");
 assert(

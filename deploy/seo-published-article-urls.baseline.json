@@ -43,6 +43,7 @@
     "/articles/namerenie-chto-eto",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+    "/articles/strah-deneg",
     "/articles/strah-tratit-dengi-na-sebya",
     "/articles/vizualizatsiya-zhelaniy",
     "/articles/zhenshchina-i-dengi-psihologiya",
@@ -250,6 +251,11 @@
       "articleId": "ART_plan37_почему-желания-не-исполняются",
       "slug": "pochemu-zhelaniya-ne-ispolnyayutsya",
       "path": "/articles/pochemu-zhelaniya-ne-ispolnyayutsya"
+    },
+    {
+      "articleId": "ART_plan14_страх-денег",
+      "slug": "strah-deneg",
+      "path": "/articles/strah-deneg"
     },
     {
       "articleId": "ART_strah-tratit-dengi-na-sebya",
