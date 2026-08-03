@@ -223,10 +223,9 @@ assert(
 );
 assert(
   abundanceArticle.afterFinalAudio?.some(
-    (item) =>
-      !item.href && item.before.includes("Мышление дефицита"),
+    (item) => item.href === "/articles/myshlenie-izobiliya",
   ),
-  "deficit-thinking mention stays without live link",
+  "abundance reverse-links to abundance-mindset article",
 );
 assert(
   Boolean(abundanceArticle.brandNote?.includes("АудиоЛаде")),
@@ -3015,6 +3014,60 @@ assert(
 assert(
   listArticleSlugs().filter((slug) => slug === "strah-deneg").length === 1,
   "money-fear slug unique",
+);
+
+const abundanceMindsetArticle = getArticleBySlug("myshlenie-izobiliya");
+assert(abundanceMindsetArticle, "abundance-mindset article registered");
+assert(
+  abundanceMindsetArticle.title ===
+    "Мышление изобилия: что это такое и как оно влияет на нашу жизнь",
+  "abundance-mindset H1",
+);
+assert(
+  abundanceMindsetArticle.metaTitle ===
+    "Мышление изобилия: что это такое и как его развивать – АудиоЛад",
+  "abundance-mindset SEO title",
+);
+assert(
+  abundanceMindsetArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
+  "abundance-mindset primary practice key",
+);
+assert(
+  abundanceMindsetArticle.topicSlug === "izobilie",
+  "abundance-mindset uses abundance hub",
+);
+assert(
+  abundanceMindsetArticle.finalAudioLead === "",
+  "abundance-mindset has one player only",
+);
+assert(
+  abundanceMindsetArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-voyti-v-sostoyanie-izobiliya",
+  ),
+  "abundance-mindset links to abundance-state article",
+);
+assert(
+  abundanceMindsetArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+  ),
+  "abundance-mindset links to scarcity-state article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "myshlenie-izobiliya").length ===
+    1,
+  "abundance-mindset slug unique",
+);
+assert(
+  getArticleBySlug("kak-vyyti-iz-sostoyaniya-nehvatki")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/myshlenie-izobiliya",
+  ),
+  "scarcity-state reverse-links to abundance-mindset",
+);
+assert(
+  getArticleBySlug("denezhnoe-myshlenie")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/myshlenie-izobiliya",
+  ),
+  "money-thinking reverse-links to abundance-mindset",
 );
 
 const selfForgivenessArticle = getArticleBySlug("kak-prostit-sebya");

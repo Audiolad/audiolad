@@ -27,6 +27,7 @@ import { KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE } from "./content/kak-perestat-ek
 import { DENEZHNOE_MYSHLENIE_ARTICLE } from "./content/denezhnoe-myshlenie";
 import { DENEZHNYE_USTANOVKI_ARTICLE } from "./content/denezhnye-ustanovki";
 import { STRAH_DENEG_ARTICLE } from "./content/strah-deneg";
+import { MYSHLENIE_IZOBILIYA_ARTICLE } from "./content/myshlenie-izobiliya";
 import { KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE } from "./content/kak-perestat-boyatsya-bolshih-deneg";
 import { KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE } from "./content/kak-perestat-perezhivat-iz-za-deneg";
 import { KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE } from "./content/kak-umenshit-impulsivnye-pokupki";
@@ -79,6 +80,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PRINIMAT_DENGI_ARTICLE,
   DENEZHNYE_USTANOVKI_ARTICLE,
   STRAH_DENEG_ARTICLE,
+  MYSHLENIE_IZOBILIYA_ARTICLE,
   KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE,
   DENEZHNOE_MYSHLENIE_ARTICLE,
   KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE,

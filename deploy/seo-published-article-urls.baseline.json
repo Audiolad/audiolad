@@ -40,6 +40,7 @@
     "/articles/meditatsiya-na-izobilie",
     "/articles/meditatsiya-na-privlechenie-deneg",
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    "/articles/myshlenie-izobiliya",
     "/articles/namerenie-chto-eto",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
@@ -236,6 +237,11 @@
       "articleId": "ART_meditatsiya-na-zhenskuyu-energiyu",
       "slug": "meditatsiya-na-zhenskuyu-energiyu",
       "path": "/articles/meditatsiya-na-zhenskuyu-energiyu"
+    },
+    {
+      "articleId": "ART_plan28_мышление-изобилия",
+      "slug": "myshlenie-izobiliya",
+      "path": "/articles/myshlenie-izobiliya"
     },
     {
       "articleId": "ART_plan34_намерение-что-это",

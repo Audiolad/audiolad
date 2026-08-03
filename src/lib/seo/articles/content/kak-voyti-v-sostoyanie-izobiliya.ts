@@ -170,7 +170,11 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
     },
     {
       before:
-        "А если хочется лучше понять, почему ощущение нехватки иногда становится привычным способом мышления, обратите внимание на статью «Мышление дефицита: как перестать жить с ощущением постоянной нехватки».",
+        "А если хочется лучше понять привычный способ воспринимать ограничения, ресурсы и возможности, можно прочитать статью ",
+      linkLabel:
+        "«Мышление изобилия: что это такое и как оно влияет на нашу жизнь»",
+      href: "/articles/myshlenie-izobiliya",
+      after: ".",
     },
     {
       before:
@@ -252,5 +256,5 @@ export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-25T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
+  updatedAt: "2026-08-03T14:00:00.000Z",
 } as const satisfies ArticleDefinition;
