@@ -1176,6 +1176,14 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     },
     {
       before:
+        "Если нужно отдельно разобрать, как распознавать и проверять доступные варианты без спешки, может быть полезна статья ",
+      linkLabel:
+        "«Как замечать возможности и не проходить мимо важных перемен»",
+      href: "/articles/kak-zamechat-vozmozhnosti",
+      after: ".",
+    },
+    {
+      before:
         "Если хочется уточнить, что в материалах АудиоЛада под денежным потоком имеется в виду не магическое поступление денег, а более осознанное отношение к доходам, расходам и решениям, может быть полезна статья ",
       linkLabel:
         "«Что такое денежный поток и как изменить своё отношение к деньгам»",
@@ -1256,6 +1264,11 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
       description: "Тематическая подборка АудиоЛада",
     },
     {
+      href: "/articles/kak-zamechat-vozmozhnosti",
+      title: "Как замечать возможности",
+      description: "Распознавать, оценивать и проверять доступные варианты",
+    },
+    {
       href: "/articles/kak-voyti-v-sostoyanie-izobiliya",
       title: "Как войти в состояние изобилия",
       description: "Шире о восприятии ресурсов и возможностей",
@@ -1323,5 +1336,5 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-08-03T14:00:00.000Z",
+  updatedAt: "2026-08-03T21:00:00.000Z",
 } as const satisfies ArticleDefinition;

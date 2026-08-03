@@ -38,6 +38,7 @@
     "/articles/kak-voyti-v-sostoyanie-izobiliya",
     "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
     "/articles/kak-zabotitsya-o-sebe",
+    "/articles/kak-zamechat-vozmozhnosti",
     "/articles/kak-zhenshchine-razreshit-sebe-dengi",
     "/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
     "/articles/meditatsiya-na-ispolnenie-zhelaniy",
@@ -232,6 +233,11 @@
       "articleId": "ART_plan38_как-заботиться-о-себе",
       "slug": "kak-zabotitsya-o-sebe",
       "path": "/articles/kak-zabotitsya-o-sebe"
+    },
+    {
+      "articleId": "ART_plan30_как-замечать-возможности",
+      "slug": "kak-zamechat-vozmozhnosti",
+      "path": "/articles/kak-zamechat-vozmozhnosti"
     },
     {
       "articleId": "ART_kak-zhenshchine-razreshit-sebe-dengi",

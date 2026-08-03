@@ -3016,6 +3016,75 @@ assert(
   "money-fear slug unique",
 );
 
+const noticeOpportunitiesArticle = getArticleBySlug(
+  "kak-zamechat-vozmozhnosti",
+);
+assert(noticeOpportunitiesArticle, "notice-opportunities article registered");
+assert(
+  noticeOpportunitiesArticle.title ===
+    "Как замечать возможности и не проходить мимо важных перемен",
+  "notice-opportunities H1",
+);
+assert(
+  noticeOpportunitiesArticle.metaTitle ===
+    "Как замечать возможности и не упускать важные перемены – АудиоЛад",
+  "notice-opportunities SEO title",
+);
+assert(
+  noticeOpportunitiesArticle.primaryPractice.practiceKey ===
+    "klyuch-k-izobiliyu",
+  "notice-opportunities primary practice key",
+);
+assert(
+  noticeOpportunitiesArticle.topicSlug === "izobilie",
+  "notice-opportunities uses abundance hub",
+);
+assert(
+  noticeOpportunitiesArticle.finalAudioLead === "",
+  "notice-opportunities has one player only",
+);
+assert(
+  noticeOpportunitiesArticle.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "notice-opportunities practice section enables afterFinalAudio render",
+);
+assert(
+  noticeOpportunitiesArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/myshlenie-izobiliya",
+  ),
+  "notice-opportunities links to abundance-mindset article",
+);
+assert(
+  noticeOpportunitiesArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+  ),
+  "notice-opportunities links to new-income article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-zamechat-vozmozhnosti")
+    .length === 1,
+  "notice-opportunities slug unique",
+);
+assert(
+  getArticleBySlug("myshlenie-izobiliya")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zamechat-vozmozhnosti",
+  ),
+  "abundance-mindset reverse-links to notice-opportunities",
+);
+assert(
+  getArticleBySlug("kak-vyyti-iz-sostoyaniya-nehvatki")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zamechat-vozmozhnosti",
+  ),
+  "scarcity reverse-links to notice-opportunities",
+);
+assert(
+  getArticleBySlug("myshlenie-izobiliya")?.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "abundance-mindset practice section enables afterFinalAudio render",
+);
+
 const formulateDesireArticle = getArticleBySlug(
   "kak-pravilno-sformulirovat-zhelanie",
 );
