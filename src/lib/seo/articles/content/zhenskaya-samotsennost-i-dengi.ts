@@ -378,6 +378,14 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     },
     {
       before:
+        "Если напряжение возникает именно в момент озвучивания стоимости работы клиенту, отдельно можно прочитать статью ",
+      linkLabel:
+        "«Как назвать цену за свою работу и перестать бояться говорить о стоимости»",
+      href: "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",
@@ -437,5 +445,5 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-28T12:00:00.000Z",
+  updatedAt: "2026-08-03T15:00:00.000Z",
 } as const satisfies ArticleDefinition;

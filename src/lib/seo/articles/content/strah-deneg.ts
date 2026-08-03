@@ -182,6 +182,14 @@ export const STRAH_DENEG_ARTICLE = {
       href: "/articles/kak-perestat-perezhivat-iz-za-deneg",
       after: ".",
     },
+    {
+      before:
+        "Если напряжение проявляется именно в разговоре о стоимости работы – ",
+      linkLabel:
+        "«Как назвать цену за свою работу и перестать бояться говорить о стоимости»",
+      href: "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+      after: ".",
+    },
   ],
   brandNote:
     "Аудиопрактики помогают заметить внутреннее напряжение и спокойнее подойти к одному конкретному финансовому действию. Они являются дополнительной поддержкой, а не заменой финансового планирования, консультации специалиста или реальных решений.",
@@ -212,6 +220,11 @@ export const STRAH_DENEG_ARTICLE = {
       description: "Вернуть ощущение опоры при постоянной финансовой тревоге",
     },
     {
+      href: "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+      title: "Как назвать цену за свою работу",
+      description: "Спокойнее говорить о стоимости с клиентом",
+    },
+    {
       href: "/topics/meditatsii-na-dengi",
       title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
@@ -227,5 +240,5 @@ export const STRAH_DENEG_ARTICLE = {
     ],
   },
   publishedAt: "2026-08-03T13:00:00.000Z",
-  updatedAt: "2026-08-03T13:00:00.000Z",
+  updatedAt: "2026-08-03T15:00:00.000Z",
 } as const satisfies ArticleDefinition;

@@ -12,6 +12,7 @@
     "/articles/kak-izmenit-otnoshenie-k-dengam",
     "/articles/kak-napolnitsya-zhenskoy-energiey",
     "/articles/kak-nayti-novye-istochniki-dohoda",
+    "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
     "/articles/kak-otpustit-obidu",
     "/articles/kak-otpustit-proshloe",
     "/articles/kak-perestat-boyatsya-bolshih-deneg",
@@ -97,6 +98,11 @@
       "articleId": "ART_kak-nayti-novye-istochniki-dohoda",
       "slug": "kak-nayti-novye-istochniki-dohoda",
       "path": "/articles/kak-nayti-novye-istochniki-dohoda"
+    },
+    {
+      "articleId": "ART_plan27_как-назвать-цену-за-свою-работу",
+      "slug": "kak-nazvat-tsenu-za-svoyu-rabotu",
+      "path": "/articles/kak-nazvat-tsenu-za-svoyu-rabotu"
     },
     {
       "articleId": "ART_kak-otpustit-obidu",

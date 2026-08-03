@@ -3016,6 +3016,57 @@ assert(
   "money-fear slug unique",
 );
 
+const namePriceArticle = getArticleBySlug("kak-nazvat-tsenu-za-svoyu-rabotu");
+assert(namePriceArticle, "name-price article registered");
+assert(
+  namePriceArticle.title ===
+    "Как назвать цену за свою работу и перестать бояться говорить о стоимости",
+  "name-price H1",
+);
+assert(
+  namePriceArticle.metaTitle ===
+    "Как назвать цену за свою работу и говорить о стоимости спокойно – АудиоЛад",
+  "name-price SEO title",
+);
+assert(
+  namePriceArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "name-price primary practice key",
+);
+assert(
+  namePriceArticle.topicSlug === "meditatsii-na-dengi",
+  "name-price uses money meditations hub",
+);
+assert(namePriceArticle.finalAudioLead === "", "name-price has one player only");
+assert(
+  namePriceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/strah-deneg",
+  ),
+  "name-price links to money-fear article",
+);
+assert(
+  namePriceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-prinimat-dengi",
+  ),
+  "name-price links to accept-money article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-nazvat-tsenu-za-svoyu-rabotu")
+    .length === 1,
+  "name-price slug unique",
+);
+assert(
+  getArticleBySlug("strah-deneg")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+  ),
+  "money-fear reverse-links to name-price",
+);
+assert(
+  getArticleBySlug("zhenskaya-samotsennost-i-dengi")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+  ),
+  "self-worth reverse-links to name-price",
+);
+
 const abundanceMindsetArticle = getArticleBySlug("myshlenie-izobiliya");
 assert(abundanceMindsetArticle, "abundance-mindset article registered");
 assert(
