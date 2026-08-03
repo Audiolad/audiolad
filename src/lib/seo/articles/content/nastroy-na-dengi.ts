@@ -180,6 +180,14 @@ export const NASTROY_NA_DENGI_ARTICLE = {
     },
     {
       before:
+        "Если следующий шаг – именно сформировать привычку регулярных накоплений – ",
+      linkLabel:
+        "«Как начать копить деньги: почему это не получается и как превратить накопления в привычку»",
+      href: "/articles/kak-nachat-kopit-dengi",
+      after: ".",
+    },
+    {
+      before:
         "Если следующий шаг – именно разговор о стоимости работы – ",
       linkLabel:
         "«Как назвать цену за свою работу и перестать бояться говорить о стоимости»",
@@ -232,5 +240,5 @@ export const NASTROY_NA_DENGI_ARTICLE = {
     ],
   },
   publishedAt: "2026-08-03T16:00:00.000Z",
-  updatedAt: "2026-08-03T16:00:00.000Z",
+  updatedAt: "2026-08-03T17:00:00.000Z",
 } as const satisfies ArticleDefinition;

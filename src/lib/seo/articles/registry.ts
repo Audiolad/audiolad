@@ -29,6 +29,7 @@ import { DENEZHNYE_USTANOVKI_ARTICLE } from "./content/denezhnye-ustanovki";
 import { STRAH_DENEG_ARTICLE } from "./content/strah-deneg";
 import { KAK_NAZVAT_TSENU_ZA_SVOYU_RABOTU_ARTICLE } from "./content/kak-nazvat-tsenu-za-svoyu-rabotu";
 import { NASTROY_NA_DENGI_ARTICLE } from "./content/nastroy-na-dengi";
+import { KAK_NACHAT_KOPIT_DENGI_ARTICLE } from "./content/kak-nachat-kopit-dengi";
 import { MYSHLENIE_IZOBILIYA_ARTICLE } from "./content/myshlenie-izobiliya";
 import { KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE } from "./content/kak-perestat-boyatsya-bolshih-deneg";
 import { KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE } from "./content/kak-perestat-perezhivat-iz-za-deneg";
@@ -84,6 +85,7 @@ const ARTICLE_DEFINITIONS = [
   STRAH_DENEG_ARTICLE,
   KAK_NAZVAT_TSENU_ZA_SVOYU_RABOTU_ARTICLE,
   NASTROY_NA_DENGI_ARTICLE,
+  KAK_NACHAT_KOPIT_DENGI_ARTICLE,
   MYSHLENIE_IZOBILIYA_ARTICLE,
   KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE,
   DENEZHNOE_MYSHLENIE_ARTICLE,

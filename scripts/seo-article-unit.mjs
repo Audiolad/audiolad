@@ -3016,6 +3016,60 @@ assert(
   "money-fear slug unique",
 );
 
+const startSavingArticle = getArticleBySlug("kak-nachat-kopit-dengi");
+assert(startSavingArticle, "start-saving article registered");
+assert(
+  startSavingArticle.title ===
+    "Как начать копить деньги: почему это не получается и как превратить накопления в привычку",
+  "start-saving H1",
+);
+assert(
+  startSavingArticle.metaTitle ===
+    "Как начать копить деньги и превратить накопления в привычку – АудиоЛад",
+  "start-saving SEO title",
+);
+assert(
+  startSavingArticle.primaryPractice.practiceKey === "energiya-denezhnogo-puti",
+  "start-saving primary practice key",
+);
+assert(
+  startSavingArticle.topicSlug === "meditatsii-na-dengi",
+  "start-saving uses money meditations hub",
+);
+assert(
+  startSavingArticle.finalAudioLead === "",
+  "start-saving has one player only",
+);
+assert(
+  startSavingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-umenshit-impulsivnye-pokupki",
+  ),
+  "start-saving links to impulse-buying article",
+);
+assert(
+  startSavingArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nayti-novye-istochniki-dohoda",
+  ),
+  "start-saving links to new-income article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "kak-nachat-kopit-dengi")
+    .length === 1,
+  "start-saving slug unique",
+);
+assert(
+  getArticleBySlug("kak-umenshit-impulsivnye-pokupki")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nachat-kopit-dengi",
+  ),
+  "impulse-buying reverse-links to start-saving",
+);
+assert(
+  getArticleBySlug("nastroy-na-dengi")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-nachat-kopit-dengi",
+  ),
+  "money-mindset reverse-links to start-saving",
+);
+
 const moneyMindsetArticle = getArticleBySlug("nastroy-na-dengi");
 assert(moneyMindsetArticle, "money-mindset article registered");
 assert(

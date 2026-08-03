@@ -10,6 +10,7 @@
     "/articles/denezhnoe-myshlenie",
     "/articles/denezhnye-ustanovki",
     "/articles/kak-izmenit-otnoshenie-k-dengam",
+    "/articles/kak-nachat-kopit-dengi",
     "/articles/kak-napolnitsya-zhenskoy-energiey",
     "/articles/kak-nayti-novye-istochniki-dohoda",
     "/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
@@ -89,6 +90,11 @@
       "articleId": "ART_kak-izmenit-otnoshenie-k-dengam",
       "slug": "kak-izmenit-otnoshenie-k-dengam",
       "path": "/articles/kak-izmenit-otnoshenie-k-dengam"
+    },
+    {
+      "articleId": "ART_plan22_как-начать-копить-деньги",
+      "slug": "kak-nachat-kopit-dengi",
+      "path": "/articles/kak-nachat-kopit-dengi"
     },
     {
       "articleId": "ART_kak-napolnitsya-zhenskoy-energiey",
