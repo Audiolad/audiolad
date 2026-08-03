@@ -29,6 +29,7 @@ import { KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE } from "./content/kak-nayti-n
 import { KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE } from "./content/kak-vyyti-iz-sostoyaniya-nehvatki";
 import { KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE } from "./content/kak-napolnitsya-zhenskoy-energiey";
 import { KAK_VOSSTANOVIT_ZHENSKUYU_ENERGIYU_ARTICLE } from "./content/kak-vosstanovit-zhenskuyu-energiyu";
+import { KAK_VOSSTANOVIT_SILY_ZHENSHCHINE_ARTICLE } from "./content/kak-vosstanovit-sily-zhenshchine";
 import { BLAGODARNOST_I_IZOBILIE_ARTICLE } from "./content/blagodarnost-i-izobilie";
 import { KAK_PRINIMAT_DENGI_ARTICLE } from "./content/kak-prinimat-dengi";
 import { KAK_PRINYAT_SVOY_VOZRAST_ARTICLE } from "./content/kak-prinyat-svoy-vozrast";
@@ -76,6 +77,7 @@ const ARTICLE_DEFINITIONS = [
   BLAGODARNOST_I_IZOBILIE_ARTICLE,
   KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE,
   KAK_VOSSTANOVIT_ZHENSKUYU_ENERGIYU_ARTICLE,
+  KAK_VOSSTANOVIT_SILY_ZHENSHCHINE_ARTICLE,
   KAK_PRINYAT_SVOY_VOZRAST_ARTICLE,
   ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE,
   ZHENSKAYA_SILA_ARTICLE,

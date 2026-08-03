@@ -300,7 +300,7 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
       before:
         "Если силы уже заметно снижены и нужна опора именно на восстановление, можно прочитать о том, ",
       linkLabel: "как восстановить силы после длительной перегрузки",
-      href: "/articles/kak-vosstanovit-zhenskuyu-energiyu",
+      href: "/articles/kak-vosstanovit-sily-zhenshchine",
       after: ".",
     },
     {
@@ -361,9 +361,14 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
       description: "Объективная нехватка и привычка ожидать потерь",
     },
     {
+      href: "/articles/kak-vosstanovit-sily-zhenshchine",
+      title: "Как восстановить силы женщине",
+      description: "Как восстановить силы после длительной перегрузки",
+    },
+    {
       href: "/articles/kak-vosstanovit-zhenskuyu-energiyu",
       title: "Как восстановить женскую энергию",
-      description: "Как восстановить силы после длительной перегрузки",
+      description: "Как вернуть ресурс и ощущение внутренней живости",
     },
     {
       href: "/articles/zhenskaya-sila",
@@ -402,5 +407,5 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-08-01T07:00:00.000Z",
+  updatedAt: "2026-08-03T08:00:00.000Z",
 } as const satisfies ArticleDefinition;
