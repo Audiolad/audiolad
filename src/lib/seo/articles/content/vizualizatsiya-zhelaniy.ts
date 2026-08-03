@@ -141,6 +141,13 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
     },
     {
       before:
+        "Если желание уже есть и важно понять, как выбранное направление влияет на решения, можно прочитать о том, ",
+      linkLabel: "что такое намерение",
+      href: "/articles/namerenie-chto-eto",
+      after: ".",
+    },
+    {
+      before:
         "Если вы только начинаете знакомство с подобными практиками, обратите внимание и на подборку ",
       linkLabel: "«Бесплатные медитации»",
       href: "/topics/besplatnye-meditatsii",

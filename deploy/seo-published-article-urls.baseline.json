@@ -40,6 +40,7 @@
     "/articles/meditatsiya-na-izobilie",
     "/articles/meditatsiya-na-privlechenie-deneg",
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
+    "/articles/namerenie-chto-eto",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/strah-tratit-dengi-na-sebya",
     "/articles/vizualizatsiya-zhelaniy",
@@ -233,6 +234,11 @@
       "articleId": "ART_meditatsiya-na-zhenskuyu-energiyu",
       "slug": "meditatsiya-na-zhenskuyu-energiyu",
       "path": "/articles/meditatsiya-na-zhenskuyu-energiyu"
+    },
+    {
+      "articleId": "ART_plan34_намерение-что-это",
+      "slug": "namerenie-chto-eto",
+      "path": "/articles/namerenie-chto-eto"
     },
     {
       "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",

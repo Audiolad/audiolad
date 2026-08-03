@@ -2863,6 +2863,12 @@ assert(
 );
 assert(
   clarifyDesiresArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/namerenie-chto-eto",
+  ),
+  "clarify-desires links to intention article",
+);
+assert(
+  clarifyDesiresArticle.afterFinalAudio?.some(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
   "clarify-desires links to free meditations hub",
@@ -2943,6 +2949,12 @@ assert(
 assert(
   wishVisualizationArticle.updatedAt === "2026-07-27T12:00:00.000Z",
   "wish visualization updatedAt bumped for clarify-desires reverse",
+);
+assert(
+  wishVisualizationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/namerenie-chto-eto",
+  ),
+  "wish visualization reverse-links to intention article",
 );
 assert(
   wishVisualizationArticle.publishedAt === "2026-07-25T00:00:00.000Z",

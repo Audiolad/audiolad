@@ -209,6 +209,13 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
     },
     {
       before:
+        "Если желания уже заметнее и важно выбрать направление, которое будет влиять на решения, можно прочитать о том, ",
+      linkLabel: "что такое намерение и чем оно отличается от желания, цели и плана",
+      href: "/articles/namerenie-chto-eto",
+      after: ".",
+    },
+    {
+      before:
         "Если направление уже стало понятнее и хочется подробнее представить желаемое будущее, может быть полезен материал ",
       linkLabel: "«Визуализация желаний: что это такое и может ли она быть полезной»",
       href: "/articles/vizualizatsiya-zhelaniy",
@@ -236,6 +243,11 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
       description: "Когда прошлые планы мешают услышать новые желания",
     },
     {
+      href: "/articles/namerenie-chto-eto",
+      title: "Что такое намерение",
+      description: "Чем намерение отличается от желания, цели и плана",
+    },
+    {
       href: "/articles/vizualizatsiya-zhelaniy",
       title: "Визуализация желаний",
       description: "Когда направление уже понятнее и хочется представить будущее",
@@ -250,5 +262,5 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-27T00:00:00.000Z",
-  updatedAt: "2026-07-27T00:00:00.000Z",
+  updatedAt: "2026-08-03T10:00:00.000Z",
 } as const satisfies ArticleDefinition;

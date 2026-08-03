@@ -6,6 +6,7 @@ import { KAK_OTPUSTIT_OBIDU_ARTICLE } from "./content/kak-otpustit-obidu";
 import { KAK_OTPUSTIT_PROSHLOE_ARTICLE } from "./content/kak-otpustit-proshloe";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
+import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
 import { KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE } from "./content/kak-privlech-dengi-v-svoyu-zhizn";
 import { KAK_PROSTIT_CHELOVEKA_ARTICLE } from "./content/kak-prostit-cheloveka";
 import { KAK_PROSTIT_SEBYA_ARTICLE } from "./content/kak-prostit-sebya";
@@ -65,6 +66,7 @@ const ARTICLE_DEFINITIONS = [
   POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE,
   KAK_OTPUSTIT_PROSHLOE_ARTICLE,
   KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE,
+  NAMERENIE_CHTO_ETO_ARTICLE,
   KAK_PROSTIT_SEBYA_ARTICLE,
   KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE,
   KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE,
