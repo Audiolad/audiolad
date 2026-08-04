@@ -40,17 +40,18 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
           publishPreview={viewModel.publishPreview}
         />
 
-        <section className="mt-6 grid min-w-0 grid-cols-[minmax(240px,280px)_minmax(0,1fr)] items-start gap-x-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-x-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+        <section className="mt-6 grid min-w-0 grid-cols-[minmax(240px,280px)_minmax(0,1fr)] gap-x-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-x-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           <div className="w-full max-w-[280px] xl:max-w-[300px] 2xl:max-w-[360px]">
             <PracticeProductCover cover={viewModel.desktopCover} priority />
           </div>
 
           {/*
-            height:0 + min-height:100% keeps the text/CTA column tied to cover height,
-            so the primary action bottom edge aligns with the cover bottom.
+            Grid stretch makes this column at least cover-tall. mt-auto pins the
+            CTA to the cover bottom when meta fits; when title/subtitle/meta are
+            taller, the column grows and the author line is never clipped.
           */}
-          <div className="flex h-0 min-h-full min-w-0 max-w-full flex-col">
-            <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 max-w-full flex-col">
+            <div className="min-w-0">
               <PracticeMetaSection
                 viewModel={viewModel}
                 subtitleClamp
@@ -62,7 +63,7 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
             <PracticePrimaryActionSection
               viewModel={viewModel}
-              className="mt-3 shrink-0"
+              className="mt-auto shrink-0 pt-3"
             />
           </div>
         </section>
