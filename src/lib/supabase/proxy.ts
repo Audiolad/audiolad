@@ -46,10 +46,33 @@ function redirectWithSupabaseCookies(
   );
 }
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+type UpdateSessionOptions = {
+  /** Internal pathname rewrite (browser URL unchanged). */
+  rewritePathname?: string;
+};
+
+function createPassthroughResponse(
+  request: NextRequest,
+  rewritePathname?: string,
+): NextResponse {
+  if (rewritePathname) {
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = rewritePathname;
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
+  return NextResponse.next({
     request,
   });
+}
+
+export async function updateSession(
+  request: NextRequest,
+  options?: UpdateSessionOptions,
+) {
+  const rewritePathname = options?.rewritePathname;
+
+  let supabaseResponse = createPassthroughResponse(request, rewritePathname);
 
   let pendingCookies: SupabaseCookieToSet[] = [];
   let pendingHeaders: Record<string, string> = {};
@@ -71,9 +94,10 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value);
           });
 
-          supabaseResponse = NextResponse.next({
+          supabaseResponse = createPassthroughResponse(
             request,
-          });
+            rewritePathname,
+          );
 
           applySupabaseCookiesAndHeaders(
             supabaseResponse,
