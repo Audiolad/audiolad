@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -92,16 +92,60 @@ export default function MyPracticesLibrary({
     ? filterFromQuery
     : "all";
 
+  const [catalogItems, setCatalogItems] = useState(items);
+  const [itemsSource, setItemsSource] = useState(items);
+  const [leavingPracticeIds, setLeavingPracticeIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [toast, setToast] = useState<string | null>(null);
   const privateItems = initialPrivateItems;
+
+  if (items !== itemsSource) {
+    setItemsSource(items);
+    setCatalogItems(items);
+    setLeavingPracticeIds(new Set());
+  }
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  function handleRemovedFromLibrary(practiceId: string) {
+    setLeavingPracticeIds((prev) => {
+      const next = new Set(prev);
+      next.add(practiceId);
+      return next;
+    });
+    setToast("Удалено из Аудиотеки");
+
+    window.setTimeout(() => {
+      setCatalogItems((prev) =>
+        prev.filter((item) => item.practice?.id !== practiceId),
+      );
+      setLeavingPracticeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(practiceId);
+        return next;
+      });
+    }, 200);
+  }
 
   const normalizedPurchasedSlug = purchasedSlug?.trim().toLowerCase() ?? null;
   const purchasedItem = normalizedPurchasedSlug
-    ? items.find((item) => item.practice?.slug === normalizedPurchasedSlug)
+    ? catalogItems.find(
+        (item) => item.practice?.slug === normalizedPurchasedSlug,
+      )
     : null;
 
   const filteredItems = useMemo(
-    () => items.filter((item) => matchesLibraryFilter(item, activeFilter)),
-    [activeFilter, items],
+    () =>
+      catalogItems.filter((item) => matchesLibraryFilter(item, activeFilter)),
+    [activeFilter, catalogItems],
   );
 
   type AllLibraryEntry =
@@ -141,7 +185,7 @@ export default function MyPracticesLibrary({
 
   const allCount = filteredItems.length + privateItems.length;
   const libraryIsEmpty =
-    items.length === 0 && privateItems.length === 0 && !privateError;
+    catalogItems.length === 0 && privateItems.length === 0 && !privateError;
 
   function selectFilter(filter: LibraryFilterId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -321,6 +365,12 @@ export default function MyPracticesLibrary({
                     key={`catalog-${entry.item.id}`}
                     item={entry.item}
                     index={index}
+                    leaving={
+                      entry.item.practice?.id
+                        ? leavingPracticeIds.has(entry.item.practice.id)
+                        : false
+                    }
+                    onRemovedFromLibrary={handleRemovedFromLibrary}
                     highlighted={
                       normalizedPurchasedSlug !== null &&
                       entry.item.practice?.slug === normalizedPurchasedSlug
@@ -355,6 +405,12 @@ export default function MyPracticesLibrary({
                 key={item.id}
                 item={item}
                 index={index}
+                leaving={
+                  item.practice?.id
+                    ? leavingPracticeIds.has(item.practice.id)
+                    : false
+                }
+                onRemovedFromLibrary={handleRemovedFromLibrary}
                 highlighted={
                   normalizedPurchasedSlug !== null &&
                   item.practice?.slug === normalizedPurchasedSlug
@@ -364,6 +420,21 @@ export default function MyPracticesLibrary({
           </div>
         )}
       </section>
+
+      {toast ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+          style={{
+            bottom:
+              "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px) + 0.75rem)",
+          }}
+          role="status"
+        >
+          <p className="rounded-full bg-[#25135c] px-4 py-2 text-sm text-white shadow-lg">
+            {toast}
+          </p>
+        </div>
+      ) : null}
     </>
   );
 }

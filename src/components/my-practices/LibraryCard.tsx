@@ -42,6 +42,8 @@ type LibraryCardProps = {
   item: LibraryCardItem;
   index: number;
   highlighted?: boolean;
+  leaving?: boolean;
+  onRemovedFromLibrary?: (practiceId: string) => void;
 };
 
 function formatPracticeDuration(
@@ -81,6 +83,8 @@ export default function LibraryCard({
   item,
   index,
   highlighted = false,
+  leaving = false,
+  onRemovedFromLibrary,
 }: LibraryCardProps) {
   const practice = item.practice;
   const isUnavailable = practice === null;
@@ -104,11 +108,11 @@ export default function LibraryCard({
       : null;
   return (
     <article
-      className={`relative flex gap-4 rounded-[24px] border bg-white p-3 pb-14 shadow-[0_8px_22px_rgba(91,62,145,0.06)] ${
+      className={`relative flex gap-4 rounded-[24px] border bg-white p-3 pb-14 shadow-[0_8px_22px_rgba(91,62,145,0.06)] transition-opacity duration-200 ${
         highlighted
           ? "border-[#7042c5] ring-2 ring-[#7042c5]/30"
           : "border-[#eadff8]"
-      }`}
+      } ${leaving ? "pointer-events-none opacity-0" : "opacity-100"}`}
     >
       {productHref ? (
         <Link
@@ -187,10 +191,13 @@ export default function LibraryCard({
           </span>
         )}
 
-        {practice?.id ? (
+        {practice?.id && practice.slug ? (
           <LibraryPracticeMenu
             practiceId={practice.id}
+            practiceSlug={practice.slug}
             practiceTitle={title}
+            accessSource={item.accessSource}
+            onRemoved={onRemovedFromLibrary}
           />
         ) : null}
       </div>

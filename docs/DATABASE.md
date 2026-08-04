@@ -318,6 +318,21 @@ RLS: authenticated SELECT только своих строк. INSERT/UPDATE/DELE
 
 Storage: bucket `private-audio-items` (private, без browser policies).
 
+## remove_library_practice (Аудиотека, 2026-08-04)
+
+Миграция: `supabase/migrations/20260804130000_remove_library_practice.sql` — **применена к production**.
+
+RPC `public.remove_library_practice(p_practice_id uuid)`:
+
+- `SECURITY DEFINER`, `search_path = public, pg_temp`;
+- `user_id` только из `auth.uid()` (параметра `user_id` нет);
+- удаляет **только** строку `user_practices` с `access_source = 'free_claim'`;
+- `starter` / `purchase` / `gift` / `subscription` / `program` / `admin` → `not_removable`;
+- не трогает плейлисты, прогресс, историю;
+- `EXECUTE` только у `authenticated` (не у `anon`).
+
+API: `POST /api/library/remove` `{ practice_id }` → success / `not_in_library` / `not_removable` / `unauthorized` / `internal_error`.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

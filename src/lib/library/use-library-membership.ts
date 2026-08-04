@@ -13,6 +13,10 @@ import {
   type LibraryMembershipAction,
 } from "@/lib/library/membership-sync";
 import {
+  isRemoveLibrarySuccessBody,
+  mapLibraryRemoveButtonError,
+} from "@/lib/library/remove-api";
+import {
   buildPromoSignUpHref,
   buildPromoSignupContext,
   storePromoSignupContext,
@@ -33,6 +37,7 @@ export type UseLibraryMembershipInput = {
   practiceId?: string;
   promoSignup?: boolean;
   onClaimSuccess?: () => void;
+  onRemoveSuccess?: () => void;
 };
 
 export type UseLibraryMembershipResult = {
@@ -42,6 +47,7 @@ export type UseLibraryMembershipResult = {
   buttonLabel: string;
   inLibrary: boolean;
   handleClick: () => void;
+  removeFromLibrary: () => Promise<boolean>;
 };
 
 function getLibraryButtonLabel(
@@ -74,6 +80,7 @@ export function useLibraryMembership({
   practiceId,
   promoSignup = false,
   onClaimSuccess,
+  onRemoveSuccess,
 }: UseLibraryMembershipInput): UseLibraryMembershipResult {
   const router = useRouter();
   const { showFirstSaveRetention } = useFirstSaveRetention();
@@ -102,12 +109,9 @@ export function useLibraryMembership({
 
     return subscribeLibraryMembership(membershipKey, (nextAction) => {
       setAction(nextAction);
-
-      if (nextAction === "in_library") {
-        setErrorMessage(null);
-        setIsPending(false);
-        inFlightRef.current = false;
-      }
+      setErrorMessage(null);
+      setIsPending(false);
+      inFlightRef.current = false;
     });
   }, [membershipKey]);
 
@@ -181,6 +185,72 @@ export function useLibraryMembership({
     }
   }
 
+  async function removeFromLibrary(): Promise<boolean> {
+    if (inFlightRef.current || isPending) {
+      return false;
+    }
+
+    if (!practiceId) {
+      setErrorMessage("Не удалось удалить. Проверьте данные и попробуйте ещё раз.");
+      return false;
+    }
+
+    inFlightRef.current = true;
+    setIsPending(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/library/remove", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          practice_id: practiceId,
+        }),
+      });
+
+      if (response.status === 401) {
+        router.push(buildAuthRouteHref("/auth/sign-in", signInReturnPath));
+        return false;
+      }
+
+      const body: unknown = await response.json().catch(() => null);
+
+      if (response.status === 200 && isRemoveLibrarySuccessBody(body)) {
+        setAction("add");
+
+        if (membershipKey) {
+          publishLibraryMembership(membershipKey, "add");
+        }
+
+        onRemoveSuccess?.();
+        return true;
+      }
+
+      const errorCode =
+        typeof body === "object" &&
+        body !== null &&
+        "error" in body &&
+        typeof (body as ApiErrorBody).error === "string"
+          ? (body as ApiErrorBody).error
+          : undefined;
+
+      if (response.status >= 500) {
+        console.error("library_remove_client_error", response.status, errorCode);
+      }
+
+      setErrorMessage(mapLibraryRemoveButtonError(response.status, errorCode));
+      return false;
+    } catch {
+      setErrorMessage("Не удалось удалить. Попробуйте ещё раз.");
+      return false;
+    } finally {
+      inFlightRef.current = false;
+      setIsPending(false);
+    }
+  }
+
   function handleSignIn() {
     if (promoSignup && practiceId) {
       const context = buildPromoSignupContext({
@@ -207,6 +277,7 @@ export function useLibraryMembership({
     }
 
     if (action === "in_library") {
+      // Product/listen buttons stay non-destructive in v1.
       router.push("/my-practices");
       return;
     }
@@ -223,5 +294,6 @@ export function useLibraryMembership({
     buttonLabel: getLibraryButtonLabel(action, isPending, promoSignup),
     inLibrary: action === "in_library",
     handleClick,
+    removeFromLibrary,
   };
 }
