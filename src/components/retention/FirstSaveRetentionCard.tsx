@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
-import { usePwaInstall } from "@/components/pwa/PwaInstallProvider";
+import { PwaInstallContext } from "@/components/pwa/PwaInstallProvider";
 import {
   getCachedAnalyticsSessionId,
   trackPlatformEvent,
@@ -37,8 +37,12 @@ export default function FirstSaveRetentionCard({
   onDismiss,
 }: FirstSaveRetentionCardProps) {
   const pathname = usePathname() ?? "/";
-  const { isStandalone, uiVariant, openInstallFlow } = usePwaInstall();
-  const isMobile = uiVariant === "mobile";
+  // Card may render outside PwaInstallProvider (AppProviders nesting).
+  // Degrade install affordances instead of throwing.
+  const pwaInstall = useContext(PwaInstallContext);
+  const canUseInstallActions = pwaInstall !== null;
+  const isStandalone = pwaInstall?.isStandalone ?? false;
+  const isMobile = pwaInstall?.uiVariant === "mobile";
   const shownTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -98,6 +102,10 @@ export default function FirstSaveRetentionCard({
   }
 
   function handleInstallClick(): void {
+    if (!pwaInstall) {
+      return;
+    }
+
     const sessionId = getCachedAnalyticsSessionId();
 
     if (sessionId) {
@@ -109,7 +117,7 @@ export default function FirstSaveRetentionCard({
       });
     }
 
-    void openInstallFlow("retention");
+    void pwaInstall.openInstallFlow("retention");
   }
 
   const bottomOffset =
@@ -145,7 +153,7 @@ export default function FirstSaveRetentionCard({
           будет ждать вас.
         </p>
 
-        {!isStandalone && isMobile ? (
+        {canUseInstallActions && !isStandalone && isMobile ? (
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
             Добавьте АудиоЛад на главный экран телефона – так он всегда будет под
             рукой.
@@ -161,7 +169,7 @@ export default function FirstSaveRetentionCard({
             Открыть мою Аудиотеку
           </Link>
 
-          {!isStandalone ? (
+          {canUseInstallActions && !isStandalone ? (
             <button
               type="button"
               onClick={handleInstallClick}

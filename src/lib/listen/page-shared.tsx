@@ -34,6 +34,7 @@ import {
 } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { resolveListeningNotice } from "@/lib/products/listening-notice";
+import { resolveLibraryAction } from "@/lib/products/practice-access-ui";
 import { createClient } from "@/lib/supabase/server";
 
 type PracticeRow = PublicPracticeRow & {
@@ -491,6 +492,13 @@ export async function renderListenPage(
   const listeningNotice = resolveListeningNotice(practiceRow);
   const shellData = await getListenerShellData();
   const isAuthorPreview = access.mode === "author_preview";
+  const libraryAction = resolveLibraryAction({
+    access: productAccess,
+    practice: practiceRow,
+    isAuthenticated,
+    buyerPreviewMode: false,
+  });
+  const librarySignInReturnPath = `/listen/${resolvedAuthorSlug}/${practiceRow.slug}`;
   const sessionPayload = {
     practiceId: practiceRow.id,
     authorSlug: resolvedAuthorSlug,
@@ -529,6 +537,8 @@ export async function renderListenPage(
     productSlug: practiceRow.slug,
     listeningNotice,
     sessionPayload,
+    libraryAction,
+    librarySignInReturnPath,
   };
 
   return (

@@ -343,11 +343,22 @@ function testSourceFiles() {
   assert(button.includes('type="button"'), "real button element");
   assert(button.includes("aria-disabled"), "aria-disabled present");
   assert(button.includes('aria-live="polite"'), "aria-live for errors");
-  assert(button.includes("/api/library/claim"), "uses published claim api");
-  assert(button.includes("router.refresh()"), "refresh after success");
-  assert(button.includes("Войти, чтобы добавить"), "guest label");
-  assert(button.includes("Добавить в Аудиотеку"), "add label");
-  assert(button.includes("В Аудиотеке"), "in_library label");
+  assert(button.includes("useLibraryMembership"), "uses shared membership hook");
+  assert(!button.includes("router.refresh()"), "no router.refresh in claim button");
+  assert(!button.includes("/api/library/claim"), "claim call lives in shared hook");
+
+  const membershipHook = readFileSync(
+    "/var/www/audiolad/src/lib/library/use-library-membership.ts",
+    "utf8",
+  );
+  assert(membershipHook.includes("/api/library/claim"), "uses published claim api");
+  assert(!membershipHook.includes("router.refresh()"), "claim hook has no refresh");
+  assert(membershipHook.includes("inFlightRef"), "double-click guard");
+  assert(membershipHook.includes("publishLibraryMembership"), "syncs membership");
+  assert(membershipHook.includes("Войти, чтобы добавить"), "guest label");
+  assert(membershipHook.includes("Добавить в Аудиотеку"), "add label");
+  assert(membershipHook.includes("В Аудиотеке"), "in_library label");
+  assert(!membershipHook.includes("free_claim"), "no technical source in UI");
   assert(!button.includes("free_claim"), "no technical source in UI");
 
   assert(page.includes("PracticePageMobile"), "page uses mobile practice view");

@@ -400,11 +400,13 @@ export function PracticeLibraryActionSection({
         promoSignup={promoConversionMode}
         signInReturnPath={promoConversionMode ? promoListenPath : practicePagePath}
         action={presentation.libraryAction}
-        className={`w-full rounded-[22px] border px-5 py-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-80 ${
-          presentation.libraryAction === "in_library"
-            ? "border-[#c9b6ea] bg-[#faf6ff] text-[#7042c5]"
-            : "border-[#e2d7f2] bg-[#faf6ff] text-[#7d70a2]"
-        } ${disabledButtonClasses()}`}
+        className={({ inLibrary }) =>
+          `w-full rounded-[22px] border px-5 py-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-80 ${
+            inLibrary
+              ? "border-[#c9b6ea] bg-[#f3ebff] text-[#7042c5]"
+              : "border-[#7042c5] bg-white text-[#7042c5] hover:bg-[#faf6ff]"
+          } ${disabledButtonClasses()}`
+        }
       />
     </section>
   );

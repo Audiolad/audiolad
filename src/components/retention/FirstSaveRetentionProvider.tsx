@@ -8,12 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 
 import FirstSaveRetentionCard from "@/components/retention/FirstSaveRetentionCard";
 
 type FirstSaveRetentionContextValue = {
   showFirstSaveRetention: (input: { practiceId: string }) => void;
+  visiblePracticeId: string | null;
+  dismiss: () => void;
 };
 
 const FirstSaveRetentionContext =
@@ -38,15 +39,13 @@ type FirstSaveRetentionProviderProps = {
 export default function FirstSaveRetentionProvider({
   children,
 }: FirstSaveRetentionProviderProps) {
-  const router = useRouter();
   const [visiblePracticeId, setVisiblePracticeId] = useState<string | null>(
     null,
   );
 
   const dismiss = useCallback(() => {
     setVisiblePracticeId(null);
-    router.refresh();
-  }, [router]);
+  }, []);
 
   const showFirstSaveRetention = useCallback(
     ({ practiceId }: { practiceId: string }) => {
@@ -58,19 +57,31 @@ export default function FirstSaveRetentionProvider({
   const value = useMemo(
     () => ({
       showFirstSaveRetention,
+      visiblePracticeId,
+      dismiss,
     }),
-    [showFirstSaveRetention],
+    [showFirstSaveRetention, visiblePracticeId, dismiss],
   );
 
   return (
     <FirstSaveRetentionContext.Provider value={value}>
       {children}
-      {visiblePracticeId ? (
-        <FirstSaveRetentionCard
-          practiceId={visiblePracticeId}
-          onDismiss={dismiss}
-        />
-      ) : null}
     </FirstSaveRetentionContext.Provider>
+  );
+}
+
+/** Renders retention card inside a tree that may provide PWA install context. */
+export function FirstSaveRetentionHost() {
+  const context = useContext(FirstSaveRetentionContext);
+
+  if (!context?.visiblePracticeId) {
+    return null;
+  }
+
+  return (
+    <FirstSaveRetentionCard
+      practiceId={context.visiblePracticeId}
+      onDismiss={context.dismiss}
+    />
   );
 }

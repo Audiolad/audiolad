@@ -9,6 +9,7 @@ import {
   ControlCaption,
   ForwardFifteenIcon,
   formatListenTime,
+  ListenPlayerLibrarySlot,
   ListenPlayerPromoSlot,
   NextTrackIcon,
   NowPlayingIcon,
@@ -397,6 +398,8 @@ export default function ListenPlayerMobile() {
           ) : null}
         </section>
       ) : null}
+
+      <ListenPlayerLibrarySlot forDesktop={false} className="mt-5" />
 
       <ListenPlayerPromoSlot forDesktop={false} />
 

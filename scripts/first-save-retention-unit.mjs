@@ -71,22 +71,38 @@ function testUiWiring() {
   const providers = readRoot("src/components/AppProviders.tsx");
   const card = readRoot("src/components/retention/FirstSaveRetentionCard.tsx");
 
+  const membershipHook = readRoot("src/lib/library/use-library-membership.ts");
+  const retentionProvider = readRoot(
+    "src/components/retention/FirstSaveRetentionProvider.tsx",
+  );
+
   assert(
-    button.includes("showFirstSaveRetention"),
-    "library button triggers retention",
+    button.includes("useLibraryMembership"),
+    "library button uses shared membership hook",
   );
   assert(
-    button.includes("body.retention.show_first_save_prompt"),
+    membershipHook.includes("body.retention.show_first_save_prompt"),
     "reads retention flag",
   );
   assert(
-    button.includes("body.retention.show_first_save_prompt"),
-    "retention branch before refresh",
+    membershipHook.includes("showFirstSaveRetention"),
+    "library hook triggers retention",
   );
-  assert(button.includes("router.refresh()"), "refresh still available after dismiss path");
+  assert(
+    !membershipHook.includes("router.refresh()"),
+    "claim success path has no router.refresh",
+  );
+  assert(
+    !retentionProvider.includes("router.refresh()"),
+    "retention dismiss has no router.refresh",
+  );
   assert(
     providers.includes("FirstSaveRetentionProvider"),
     "provider mounted globally",
+  );
+  assert(
+    providers.includes("FirstSaveRetentionHost"),
+    "retention host mounted inside PWA tree",
   );
   assert(
     providers.indexOf("FirstSaveRetentionProvider") <
@@ -100,6 +116,15 @@ function testUiWiring() {
   assert(card.includes("Добавить на телефон"), "mobile install action");
   assert(card.includes("Установить АудиоЛад"), "desktop install action");
   assert(card.includes('openInstallFlow("retention")'), "retention install flow wired");
+  assert(
+    card.includes("useContext(PwaInstallContext)"),
+    "card uses optional PWA context",
+  );
+  assert(
+    card.includes("canUseInstallActions"),
+    "card degrades without PWA context",
+  );
+  assert(!card.includes("usePwaInstall("), "card does not throw via usePwaInstall");
   assert(!card.includes("Хорошо"), "legacy dismiss button removed");
   assert(card.includes('role="region"'), "not modal dialog");
   assert(!card.includes("aria-modal"), "no focus trap");

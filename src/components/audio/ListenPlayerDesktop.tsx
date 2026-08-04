@@ -7,6 +7,7 @@ import {
   CheckIcon,
   ForwardFifteenIcon,
   formatListenTime,
+  ListenPlayerLibrarySlot,
   ListenPlayerPromoSlot,
   NextTrackIcon,
   NowPlayingIcon,
@@ -403,6 +404,8 @@ export default function ListenPlayerDesktop() {
               Управление станет доступно после подготовки плеера.
             </p>
           )}
+
+          <ListenPlayerLibrarySlot forDesktop className="mt-3" />
 
           <ListenPlayerPromoSlot forDesktop />
 

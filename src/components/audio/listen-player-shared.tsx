@@ -12,12 +12,14 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import LibraryAddButton from "@/components/LibraryAddButton";
 import ListenAnalyticsTracker from "@/components/analytics/ListenAnalyticsTracker";
 import ListenPageViewTracker from "@/components/analytics/ListenPageViewTracker";
 import PromoPlaybackPrompts from "@/components/promo/PromoPlaybackPrompts";
 import type { CatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import type { ListenTrack } from "@/lib/listen/types";
+import type { PracticeLibraryAction } from "@/lib/products/practice-access-ui";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
 
 export type ListenPlayerProps = {
@@ -37,6 +39,8 @@ export type ListenPlayerProps = {
   authorSlug?: string;
   productSlug?: string;
   listeningNotice?: ResolvedListeningNotice | null;
+  libraryAction?: PracticeLibraryAction;
+  librarySignInReturnPath?: string;
 };
 
 const XL_MEDIA_QUERY = "(min-width: 1280px)";
@@ -242,6 +246,8 @@ type ListenPlayerContextValue = {
     authorSlug: string;
     productSlug: string;
     listeningNotice: ResolvedListeningNotice | null;
+    libraryAction: PracticeLibraryAction;
+    librarySignInReturnPath: string;
   };
   isEngineReady: boolean;
   isDismissedIdle: boolean;
@@ -310,6 +316,59 @@ export function useListenPlayer(): ListenPlayerContextValue {
     throw new Error("useListenPlayer must be used within ListenPlayerProvider");
   }
   return value;
+}
+
+export function ListenPlayerLibrarySlot({
+  forDesktop,
+  className,
+}: {
+  forDesktop: boolean;
+  className?: string;
+}) {
+  const isDesktopXl = useIsListenDesktopXl();
+  const {
+    props: {
+      practiceId,
+      productSlug,
+      promoConversionMode,
+      libraryAction,
+      librarySignInReturnPath,
+      isAuthorPreview,
+    },
+  } = useListenPlayer();
+
+  if (forDesktop !== isDesktopXl) {
+    return null;
+  }
+
+  if (
+    isAuthorPreview ||
+    libraryAction === "hidden" ||
+    !productSlug ||
+    !librarySignInReturnPath
+  ) {
+    return null;
+  }
+
+  return (
+    <div className={className}>
+      <LibraryAddButton
+        practiceSlug={productSlug}
+        practiceId={practiceId}
+        promoSignup={promoConversionMode}
+        signInReturnPath={librarySignInReturnPath}
+        action={libraryAction}
+        variant="onDark"
+        className={({ inLibrary, isPending }) =>
+          `w-full min-h-11 rounded-full border px-5 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60 ${
+            inLibrary
+              ? "border-white/35 bg-white/15 text-white"
+              : "border-white/45 bg-white text-[#4b2f86] hover:bg-white/95"
+          } ${isPending ? "opacity-80" : ""}`
+        }
+      />
+    </div>
+  );
 }
 
 export function ListenPlayerPromoSlot({ forDesktop }: { forDesktop: boolean }) {
@@ -384,6 +443,8 @@ export function ListenPlayerProvider({
   authorSlug = "",
   productSlug = "",
   listeningNotice = null,
+  libraryAction = "hidden",
+  librarySignInReturnPath = "",
 }: ListenPlayerProviderProps) {
   const {
     session,
@@ -492,6 +553,8 @@ export function ListenPlayerProvider({
       authorSlug,
       productSlug,
       listeningNotice,
+      libraryAction,
+      librarySignInReturnPath,
     },
     isEngineReady,
     isDismissedIdle,
