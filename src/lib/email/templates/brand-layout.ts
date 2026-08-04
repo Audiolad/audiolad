@@ -185,11 +185,28 @@ export function renderBrandEmailDivider(margin = "margin: 0 0 20px"): string {
                 </table>`;
 }
 
+function assertAbsoluteHttpUrl(href: string): string {
+  const trimmed = href.trim();
+  // GoTrue/template placeholders (e.g. {{ .ConfirmationURL }}) are resolved
+  // by the mailer before delivery; accept them alongside absolute http(s) URLs.
+  const isPlaceholder = /^\{\{[\s\S]+\}\}$/.test(trimmed);
+  const isAbsoluteHttp = /^https?:\/\//i.test(trimmed);
+
+  if (!isAbsoluteHttp && !isPlaceholder) {
+    throw new Error(
+      `brand_email_button_requires_absolute_http_url:${trimmed.slice(0, 80)}`,
+    );
+  }
+
+  return trimmed;
+}
+
 export function renderBrandEmailButton(
   href: string,
   label: string,
   options?: { msoWidth?: number },
 ): string {
+  const absoluteHref = assertAbsoluteHttpUrl(href);
   const msoWidth = options?.msoWidth ?? 320;
 
   return `<table
@@ -215,7 +232,7 @@ export function renderBrandEmailButton(
                         <v:roundrect
                           xmlns:v="urn:schemas-microsoft-com:vml"
                           xmlns:w="urn:schemas-microsoft-com:office:office"
-                          href="${escapeHtml(href)}"
+                          href="${escapeHtml(absoluteHref)}"
                           style="
                             height: 58px;
                             v-text-anchor: middle;
@@ -241,7 +258,7 @@ export function renderBrandEmailButton(
                       <!--[if !mso]><!-->
                       <a
                         class="email-button-link"
-                        href="${escapeHtml(href)}"
+                        href="${escapeHtml(absoluteHref)}"
                         target="_blank"
                         style="
                           display: inline-block;
@@ -259,12 +276,36 @@ export function renderBrandEmailButton(
                           background-color: #6633cc;
                           box-sizing: border-box;
                         "
-                        >${escapeHtml(label)}</a
-                      >
+                        >${escapeHtml(label)}</a>
                       <!--<![endif]-->
                     </td>
                   </tr>
                 </table>`;
+}
+
+/**
+ * Mail-client-safe CTA: absolute `<a href>` button plus a plain fallback link.
+ * Prefer this for administrative emails opened in webmail (e.g. Timeweb).
+ */
+export function renderBrandEmailCtaWithFallback(
+  href: string,
+  label: string,
+  options?: { msoWidth?: number },
+): string {
+  const absoluteHref = assertAbsoluteHttpUrl(href);
+
+  return [
+    renderBrandEmailButton(absoluteHref, label, options),
+    renderBrandEmailParagraph(
+      `Если кнопка не работает, откройте ссылку: <a href="${escapeHtml(
+        absoluteHref,
+      )}" target="_blank" style="color:#7042c5;text-decoration:underline;word-break:break-all;">${escapeHtml(
+        absoluteHref,
+      )}</a>`,
+      "email-body",
+      "0 0 8px",
+    ),
+  ].join("");
 }
 
 export function renderBrandEmailInfoBlock(contentHtml: string): string {

@@ -40,7 +40,7 @@ export function renderPayoutProfileRejectedEmailHtml(
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton("Открыть кабинет автора", payoutUrl),
+    renderBrandEmailButton(payoutUrl, "Открыть кабинет автора"),
     renderBrandEmailParagraph("С уважением,", "email-body", "24px 0 0"),
     renderBrandEmailParagraph(
       "<strong>Команда АудиоЛад</strong>",

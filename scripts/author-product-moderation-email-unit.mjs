@@ -196,8 +196,10 @@ assert.ok(getBrandEmailTemplateVersion("author_product_moderation_approved"));
 
 assert.ok(isAuthorProductModerationOutboxAction("changes_requested"));
 assert.ok(isAuthorProductModerationOutboxAction("approved_and_published"));
-assert.ok(!isAuthorProductModerationOutboxAction("submitted"));
+assert.ok(isAuthorProductModerationOutboxAction("submitted"));
+assert.ok(isAuthorProductModerationOutboxAction("resubmitted"));
 assert.ok(!isAuthorProductModerationOutboxAction("deleted"));
+assert.ok(!isAuthorProductModerationOutboxAction("draft"));
 
 assert.ok(
   isAuthorProductModerationEmailContext({
@@ -380,13 +382,21 @@ assert.match(migration, /FUNCTION public\.complete_practice_moderation_email_out
 assert.match(migration, /FOR UPDATE SKIP LOCKED/);
 assert.match(migration, /CREATE OR REPLACE FUNCTION public\.log_practice_moderation_event/);
 
-// Strict scope: only the two in-scope actions ever enqueue mail.
+// Strict author scope in the original migration: only the two author outcomes.
 assert.match(
   migration,
   /IF p_action IN \('changes_requested', 'approved_and_published'\) THEN/,
 );
-// No admin-facing alert email is introduced by this migration.
+// No admin-facing alert email is introduced by this migration (added later).
 assert.doesNotMatch(migration, /admin_alert/);
 assert.doesNotMatch(migration, /admin_email/);
+assert.doesNotMatch(migration, /platform_admin/);
+
+const adminMigration = read(
+  "supabase/migrations/20260804120000_practice_moderation_admin_email_outbox.sql",
+);
+assert.match(adminMigration, /platform_admin/);
+assert.match(adminMigration, /IF p_action IN \('submitted', 'resubmitted'\) THEN/);
+assert.match(adminMigration, /authors@audiolad\.ru/);
 
 console.log("author-product-moderation-email-unit: ok");

@@ -1,16 +1,17 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
 import {
-  renderBrandEmailButton,
+  renderBrandEmailCtaWithFallback,
   renderBrandEmailHeading,
   renderBrandEmailParagraph,
   renderBrandEmailShell,
 } from "./brand-layout";
+import { escapeHtml } from "./escape-html";
 
 export const PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_KEY =
   "payout_profile_admin_submitted";
 export const PAYOUT_PROFILE_ADMIN_SUBMITTED_EMAIL_TEMPLATE_VERSION =
-  "payout-profile-admin-submitted-v1-20260728";
+  "payout-profile-admin-submitted-v2-20260804";
 
 export type PayoutProfileAdminSubmittedEmailInput = {
   authorName: string;
@@ -46,7 +47,7 @@ export function renderPayoutProfileAdminSubmittedEmailHtml(
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton("Открыть анкету", detailUrl),
+    renderBrandEmailCtaWithFallback(detailUrl, "Открыть анкету"),
   ].join("");
 
   return renderBrandEmailShell({
@@ -74,14 +75,7 @@ export function renderPayoutProfileAdminSubmittedEmailText(
     `Автор ${authorName} отправил данные для выплат на проверку.`,
     "Откройте административную панель, чтобы проверить анкету.",
     "",
-    detailUrl,
+    `Открыть анкету: ${detailUrl}`,
+    `Если кнопка не работает, откройте ссылку: ${detailUrl}`,
   ].join("\n");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }

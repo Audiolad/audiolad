@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
  * Isolated SQL rehearsal for the author product moderation email outbox
- * migration (20260801140000_practice_moderation_email_outbox.sql).
+ * migrations:
+ *   - 20260801140000_practice_moderation_email_outbox.sql (author outcomes)
+ *   - 20260804120000_practice_moderation_admin_email_outbox.sql (admin alerts)
  *
  * Creates a scratch database on the isolated test-db container and never
  * touches the production `supabase-db` container. Follows the bootstrap
  * pattern from scripts/practice-sale-lock-sql-unit.mjs: build a minimal but
  * faithful schema (auth.users, authors, practices, practice_moderation_
- * events, author_members, profiles), apply only the target migration file,
- * then exercise it directly.
+ * events, author_members, profiles, audio_items), apply the migration files,
+ * then exercise them directly.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -21,6 +23,8 @@ const CONTAINER =
 const TEST_DB = "audiolad_product_moderation_email_test";
 const MIGRATION =
   "supabase/migrations/20260801140000_practice_moderation_email_outbox.sql";
+const ADMIN_MIGRATION =
+  "supabase/migrations/20260804120000_practice_moderation_admin_email_outbox.sql";
 
 const AUTHOR_ID = "22222222-2222-2222-2222-222222222222";
 const OWNER_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -210,8 +214,18 @@ CREATE TABLE public.practices (
   slug text NOT NULL,
   status text NOT NULL DEFAULT 'draft',
   moderation_status text NOT NULL DEFAULT 'not_submitted',
+  product_kind text NOT NULL DEFAULT 'practice',
+  is_free boolean NOT NULL DEFAULT true,
+  moderation_submitted_at timestamptz,
   deleted_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.audio_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  practice_id uuid NOT NULL REFERENCES public.practices(id) ON DELETE CASCADE,
+  title text NOT NULL DEFAULT 'Аудио',
+  position integer NOT NULL DEFAULT 0
 );
 
 CREATE TABLE public.practice_moderation_events (
@@ -250,6 +264,8 @@ CREATE TABLE public.profiles (
   psqlFile(TEST_DB, join(ROOT, MIGRATION));
   // Idempotency: re-apply migration.
   psqlFile(TEST_DB, join(ROOT, MIGRATION));
+  psqlFile(TEST_DB, join(ROOT, ADMIN_MIGRATION));
+  psqlFile(TEST_DB, join(ROOT, ADMIN_MIGRATION));
 
   psql(
     TEST_DB,
@@ -271,25 +287,33 @@ INSERT INTO public.author_members (author_id, user_id, role) VALUES
   ('${AUTHOR_ID}', '${EDITOR_USER_ID}', 'editor'),
   ('${AUTHOR_NO_EMAIL_ID}', '${NO_EMAIL_OWNER_USER_ID}', 'owner');
 
-INSERT INTO public.practices (id, author_id, title, slug, status, moderation_status) VALUES
-  ('${PRACTICE_A}', '${AUTHOR_ID}', 'Practice A', 'practice-a', 'draft', 'submitted'),
-  ('${PRACTICE_B}', '${AUTHOR_ID}', 'Practice B', 'practice-b', 'draft', 'submitted'),
-  ('${PRACTICE_NO_EMAIL}', '${AUTHOR_NO_EMAIL_ID}', 'No Email Practice', 'no-email-practice', 'draft', 'submitted'),
-  ('${PRACTICE_STALE_RESUBMIT}', '${AUTHOR_ID}', 'Stale Resubmit', 'stale-resubmit', 'draft', 'submitted'),
-  ('${PRACTICE_STALE_UNPUBLISH}', '${AUTHOR_ID}', 'Stale Unpublish', 'stale-unpublish', 'published', 'approved'),
-  ('${PRACTICE_STALE_DELETE}', '${AUTHOR_ID}', 'Stale Delete', 'stale-delete', 'draft', 'submitted'),
-  ('${PRACTICE_RETRY}', '${AUTHOR_ID}', 'Retry Practice', 'retry-practice', 'draft', 'submitted'),
-  ('${PRACTICE_RESTRICT}', '${AUTHOR_ID}', 'Restrict Practice', 'restrict-practice', 'draft', 'submitted'),
-  ('${PRACTICE_NOOP_ACTIONS}', '${AUTHOR_ID}', 'Noop Actions Practice', 'noop-actions-practice', 'draft', 'submitted');
+INSERT INTO public.practices (
+  id, author_id, title, slug, status, moderation_status,
+  product_kind, is_free, moderation_submitted_at
+) VALUES
+  ('${PRACTICE_A}', '${AUTHOR_ID}', 'Practice A', 'practice-a', 'draft', 'submitted', 'practice', true, '2026-08-04T09:00:00Z'),
+  ('${PRACTICE_B}', '${AUTHOR_ID}', 'Practice B', 'practice-b', 'draft', 'submitted', 'music', false, '2026-08-04T09:05:00Z'),
+  ('${PRACTICE_NO_EMAIL}', '${AUTHOR_NO_EMAIL_ID}', 'No Email Practice', 'no-email-practice', 'draft', 'submitted', 'practice', true, now()),
+  ('${PRACTICE_STALE_RESUBMIT}', '${AUTHOR_ID}', 'Stale Resubmit', 'stale-resubmit', 'draft', 'submitted', 'practice', true, now()),
+  ('${PRACTICE_STALE_UNPUBLISH}', '${AUTHOR_ID}', 'Stale Unpublish', 'stale-unpublish', 'published', 'approved', 'practice', true, now()),
+  ('${PRACTICE_STALE_DELETE}', '${AUTHOR_ID}', 'Stale Delete', 'stale-delete', 'draft', 'submitted', 'practice', true, now()),
+  ('${PRACTICE_RETRY}', '${AUTHOR_ID}', 'Retry Practice', 'retry-practice', 'draft', 'submitted', 'practice', true, now()),
+  ('${PRACTICE_RESTRICT}', '${AUTHOR_ID}', 'Restrict Practice', 'restrict-practice', 'draft', 'submitted', 'practice', true, now()),
+  ('${PRACTICE_NOOP_ACTIONS}', '${AUTHOR_ID}', 'Noop Actions Practice', 'noop-actions-practice', 'draft', 'submitted', 'practice', true, now());
+
+INSERT INTO public.audio_items (practice_id, title, position) VALUES
+  ('${PRACTICE_A}', 'Трек 1', 0),
+  ('${PRACTICE_B}', 'Трек 1', 0),
+  ('${PRACTICE_B}', 'Трек 2', 1);
 `,
   );
 }
 
 async function runAssertions() {
   // -------------------------------------------------------------------
-  // 1. Enqueue scope: only changes_requested / approved_and_published.
+  // 1. Enqueue scope: author outcomes + admin submit/resubmit alerts.
   // -------------------------------------------------------------------
-  logPracticeModerationEvent({
+  const submittedEventId = logPracticeModerationEvent({
     practiceId: PRACTICE_A,
     authorId: AUTHOR_ID,
     action: "submitted",
@@ -298,8 +322,33 @@ async function runAssertions() {
   });
   assertEqual(
     scalar(`SELECT count(*)::text FROM public.practice_moderation_email_outbox`),
-    "0",
-    "submitted must never enqueue an email",
+    "1",
+    "submitted must enqueue exactly one admin alert",
+  );
+  assertEqual(
+    scalar(
+      `SELECT recipient_email FROM public.practice_moderation_email_outbox WHERE event_id = '${submittedEventId}'`,
+    ),
+    "authors@audiolad.ru",
+    "admin submit alert must go to authors@audiolad.ru",
+  );
+  assertEqual(
+    scalar(
+      `SELECT recipient_role FROM public.practice_moderation_email_outbox WHERE event_id = '${submittedEventId}'`,
+    ),
+    "platform_admin",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'admin_review_path' FROM public.practice_moderation_email_outbox WHERE event_id = '${submittedEventId}'`,
+    ),
+    `/admin/product-moderation/${PRACTICE_A}`,
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'product_kind_label' FROM public.practice_moderation_email_outbox WHERE event_id = '${submittedEventId}'`,
+    ),
+    "аудиопрактика",
   );
 
   const changesEventId = logPracticeModerationEvent({
@@ -313,8 +362,8 @@ async function runAssertions() {
 
   assertEqual(
     scalar(`SELECT count(*)::text FROM public.practice_moderation_email_outbox`),
-    "1",
-    "changes_requested must enqueue exactly one row",
+    "2",
+    "changes_requested must enqueue one additional author row",
   );
   assertEqual(
     scalar(
@@ -384,8 +433,40 @@ async function runAssertions() {
     "approved_and_published must never carry a moderator comment",
   );
 
-  for (const action of [
+  const resubmittedEventId = logPracticeModerationEvent({
+    practiceId: PRACTICE_B,
+    authorId: AUTHOR_ID,
+    action: "resubmitted",
+    fromModerationStatus: "changes_requested",
+    toModerationStatus: "submitted",
+  });
+  assertEqual(
+    scalar(
+      `SELECT action FROM public.practice_moderation_email_outbox WHERE event_id = '${resubmittedEventId}'`,
+    ),
     "resubmitted",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'product_kind_label' FROM public.practice_moderation_email_outbox WHERE event_id = '${resubmittedEventId}'`,
+    ),
+    "альбом",
+    "music with 2+ tracks must be labeled as альбом",
+  );
+  assertEqual(
+    scalar(
+      `SELECT context->>'price_label' FROM public.practice_moderation_email_outbox WHERE event_id = '${resubmittedEventId}'`,
+    ),
+    "платный",
+  );
+  assertEqual(
+    scalar(
+      `SELECT (context->>'audio_track_count')::text FROM public.practice_moderation_email_outbox WHERE event_id = '${resubmittedEventId}'`,
+    ),
+    "2",
+  );
+
+  for (const action of [
     "submission_withdrawn",
     "unpublished",
     "republished",
@@ -686,9 +767,9 @@ async function runAssertions() {
     `INSERT INTO public.practice_moderation_email_outbox
        (event_id, practice_id, author_id, action, recipient_role)
      VALUES
-       ('${noopEventId}'::uuid, '${PRACTICE_NOOP_ACTIONS}'::uuid, '${AUTHOR_ID}'::uuid, 'submitted', 'author_owner')`,
+       ('${noopEventId}'::uuid, '${PRACTICE_NOOP_ACTIONS}'::uuid, '${AUTHOR_ID}'::uuid, 'draft', 'author_owner')`,
     "practice_moderation_email_outbox_action_check",
-    "action CHECK must reject actions outside the two-action scope",
+    "action CHECK must reject actions outside the author+admin scope",
   );
 }
 

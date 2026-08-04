@@ -95,11 +95,24 @@ async function testAdminAlertTemplate() {
   assert.match(html, /anna@example\.ru/);
   assert.match(html, /Медитации/);
   assert.match(html, /30 июл\. 2026 г\., 13:00/);
-  assert.match(
-    html,
-    /\/admin\/author-applications\/fc11e971-4d49-4253-8dac-bc7e15415d42/,
-  );
+  const detailUrl =
+    "https://audiolad.ru/admin/author-applications/fc11e971-4d49-4253-8dac-bc7e15415d42";
+  assert.match(html, new RegExp(`href="${detailUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
+  assert.match(html, />Открыть заявку</);
+  assert.match(html, /Если кнопка не работает, откройте ссылку:/);
+  assert.doesNotMatch(html, /href="Открыть заявку"/);
+  assert.doesNotMatch(html, /href="#"/);
+  assert.doesNotMatch(html, /href="\/admin\//);
+  assert.doesNotMatch(html, /mail\.timeweb\.com/);
+  for (const match of html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a\s*>/gi)) {
+    assert.doesNotMatch(match[1], /<a\b/i, "nested <a> tags are forbidden");
+  }
   assert.match(text, /Контакты: anna@example\.ru; @anna/);
+  assert.match(text, new RegExp(detailUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(
+    AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
+    "author-application-admin-alert-v2-20260804",
+  );
 
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,

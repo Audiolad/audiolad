@@ -1,7 +1,7 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
 import {
-  renderBrandEmailButton,
+  renderBrandEmailCtaWithFallback,
   renderBrandEmailHeading,
   renderBrandEmailParagraph,
   renderBrandEmailShell,
@@ -11,7 +11,7 @@ import { escapeHtml } from "./escape-html";
 export const AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY =
   "author_application_admin_alert";
 export const AUTHOR_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION =
-  "author-application-admin-alert-v1-20260730";
+  "author-application-admin-alert-v2-20260804";
 
 export type AuthorApplicationAdminAlertEmailInput = {
   applicationId: string;
@@ -63,7 +63,7 @@ export function renderAuthorApplicationAdminAlertEmailHtml(
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton("Открыть заявку", detailUrl),
+    renderBrandEmailCtaWithFallback(detailUrl, "Открыть заявку"),
   ].join("");
 
   return renderBrandEmailShell({
@@ -82,6 +82,10 @@ export function renderAuthorApplicationAdminAlertEmailText(
   input: AuthorApplicationAdminAlertEmailInput,
 ): string {
   const displayName = input.displayName.trim() || "Автор";
+  const detailUrl = getAuthorApplicationAdminDetailUrl(
+    input.applicationId,
+    input.siteOrigin,
+  );
 
   return [
     buildAuthorApplicationAdminAlertSubject(displayName),
@@ -91,6 +95,7 @@ export function renderAuthorApplicationAdminAlertEmailText(
     `Тематика: ${input.direction}`,
     `Дата подачи: ${input.submittedAtLabel}`,
     "",
-    `Открыть заявку: ${getAuthorApplicationAdminDetailUrl(input.applicationId, input.siteOrigin)}`,
+    `Открыть заявку: ${detailUrl}`,
+    `Если кнопка не работает, откройте ссылку: ${detailUrl}`,
   ].join("\n");
 }

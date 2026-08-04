@@ -125,7 +125,14 @@ function testAdminAlertEmail() {
     html,
     /\/admin\/commercial-applications\/fc11e971-4d49-4253-8dac-bc7e15415d42/,
   );
-  assert.match(html, /Открыть заявку/);
+  assert.match(html, /Рассмотреть заявку/);
+  assert.match(
+    html,
+    /href="https:\/\/audiolad\.ru\/admin\/commercial-applications\//,
+  );
+  assert.doesNotMatch(html, /href="Открыть заявку"/);
+  assert.doesNotMatch(html, /href="Рассмотреть заявку"/);
+  assert.doesNotMatch(html, /mail\.timeweb\.com/);
 
   const text = renderCommercialApplicationAdminAlertEmailText({
     authorName: "Герман Семенюк",
@@ -139,7 +146,7 @@ function testAdminAlertEmail() {
 async function testRendererRegistration() {
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: "commercial_application_admin_alert",
-    templateVersion: "commercial-application-admin-alert-v1-20260727",
+    templateVersion: "commercial-application-admin-alert-v2-20260804",
     payload: {
       authorName: "Герман Семенюк",
       applicationId: "fc11e971-4d49-4253-8dac-bc7e15415d42",

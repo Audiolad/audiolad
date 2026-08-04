@@ -13,6 +13,14 @@ import {
   renderAuthorApplicationSubmittedEmailText,
 } from "./author-application-submitted";
 import {
+  AUTHOR_PRODUCT_MODERATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY,
+  AUTHOR_PRODUCT_MODERATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION,
+  buildAuthorProductModerationAdminAlertSubject,
+  renderAuthorProductModerationAdminAlertEmailHtml,
+  renderAuthorProductModerationAdminAlertEmailText,
+  type AuthorProductModerationAdminAlertKind,
+} from "./author-product-moderation-admin-alert";
+import {
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY,
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_VERSION,
@@ -345,6 +353,71 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
     }
 
     if (
+      input.templateKey === AUTHOR_PRODUCT_MODERATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY
+    ) {
+      const productId = readString(input.payload, "productId");
+      const productTitle = readString(input.payload, "productTitle");
+      const authorName = readString(input.payload, "authorName");
+      const authorProjectName = readString(input.payload, "authorProjectName");
+      const productKindLabel = readString(input.payload, "productKindLabel");
+      const priceLabel = readString(input.payload, "priceLabel");
+      const submissionKindLabel = readString(input.payload, "submissionKindLabel");
+      const submittedAtLabel = readString(input.payload, "submittedAtLabel");
+      const kindValue = readString(input.payload, "kind");
+      const audioTrackCountRaw = input.payload.audioTrackCount;
+
+      if (
+        !productId ||
+        !productTitle ||
+        !authorName ||
+        !authorProjectName ||
+        !productKindLabel ||
+        !priceLabel ||
+        !submissionKindLabel ||
+        !submittedAtLabel ||
+        typeof audioTrackCountRaw !== "number" ||
+        !Number.isFinite(audioTrackCountRaw)
+      ) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const kind: AuthorProductModerationAdminAlertKind =
+        kindValue === "resubmitted" ? "resubmitted" : "submitted";
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+
+      return {
+        ok: true,
+        subject: buildAuthorProductModerationAdminAlertSubject(productTitle, kind),
+        html: renderAuthorProductModerationAdminAlertEmailHtml({
+          productId,
+          productTitle,
+          authorName,
+          authorProjectName,
+          productKindLabel,
+          priceLabel,
+          audioTrackCount: audioTrackCountRaw,
+          submissionKindLabel,
+          submittedAtLabel,
+          kind,
+          siteOrigin,
+        }),
+        text: renderAuthorProductModerationAdminAlertEmailText({
+          productId,
+          productTitle,
+          authorName,
+          authorProjectName,
+          productKindLabel,
+          priceLabel,
+          audioTrackCount: audioTrackCountRaw,
+          submissionKindLabel,
+          submittedAtLabel,
+          kind,
+          siteOrigin,
+        }),
+      };
+    }
+
+    if (
       input.templateKey === AUTHOR_PRODUCT_MODERATION_CHANGES_REQUESTED_EMAIL_TEMPLATE_KEY
     ) {
       const productTitle = readString(input.payload, "productTitle");
@@ -457,6 +530,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_KEY) {
     return PAYOUT_PROFILE_REJECTED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === AUTHOR_PRODUCT_MODERATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY) {
+    return AUTHOR_PRODUCT_MODERATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION;
   }
 
   if (

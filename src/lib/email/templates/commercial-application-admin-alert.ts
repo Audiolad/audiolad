@@ -1,16 +1,17 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
 import {
-  renderBrandEmailButton,
+  renderBrandEmailCtaWithFallback,
   renderBrandEmailHeading,
   renderBrandEmailParagraph,
   renderBrandEmailShell,
 } from "./brand-layout";
+import { escapeHtml } from "./escape-html";
 
 export const COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_KEY =
   "commercial_application_admin_alert";
 export const COMMERCIAL_APPLICATION_ADMIN_ALERT_EMAIL_TEMPLATE_VERSION =
-  "commercial-application-admin-alert-v1-20260727";
+  "commercial-application-admin-alert-v2-20260804";
 
 export type CommercialApplicationAdminAlertKind = "submitted" | "updated";
 
@@ -34,6 +35,14 @@ export function buildCommercialApplicationAdminAlertSubject(
   return `Новая заявка на коммерческий статус – ${name}`;
 }
 
+export function getCommercialApplicationAdminDetailUrl(
+  applicationId: string,
+  siteOrigin?: string,
+): string {
+  const origin = (siteOrigin ?? getAppOrigin()).replace(/\/$/, "");
+  return `${origin}/admin/commercial-applications/${applicationId}`;
+}
+
 export function renderCommercialApplicationAdminAlertEmailHtml(
   input: CommercialApplicationAdminAlertEmailInput,
 ): string {
@@ -41,7 +50,10 @@ export function renderCommercialApplicationAdminAlertEmailHtml(
   const logoUrl = `${siteOrigin}/brand/audiolad-logo-horizontal.png`;
   const authorName = input.authorName.trim() || "Автор";
   const kind = input.kind ?? "submitted";
-  const detailUrl = `${siteOrigin}/admin/commercial-applications/${input.applicationId}`;
+  const detailUrl = getCommercialApplicationAdminDetailUrl(
+    input.applicationId,
+    siteOrigin,
+  );
   const heading =
     kind === "updated"
       ? "Автор обновил коммерческую заявку"
@@ -59,7 +71,7 @@ export function renderCommercialApplicationAdminAlertEmailHtml(
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton("Открыть заявку", detailUrl),
+    renderBrandEmailCtaWithFallback(detailUrl, "Рассмотреть заявку"),
   ].join("");
 
   return renderBrandEmailShell({
@@ -77,10 +89,12 @@ export function renderCommercialApplicationAdminAlertEmailHtml(
 export function renderCommercialApplicationAdminAlertEmailText(
   input: CommercialApplicationAdminAlertEmailInput,
 ): string {
-  const siteOrigin = (input.siteOrigin ?? getAppOrigin()).replace(/\/$/, "");
   const authorName = input.authorName.trim() || "Автор";
   const kind = input.kind ?? "submitted";
-  const detailUrl = `${siteOrigin}/admin/commercial-applications/${input.applicationId}`;
+  const detailUrl = getCommercialApplicationAdminDetailUrl(
+    input.applicationId,
+    input.siteOrigin,
+  );
   const intro =
     kind === "updated"
       ? `Автор ${authorName} обновил заявку на коммерческий статус после запроса уточнений.`
@@ -92,14 +106,7 @@ export function renderCommercialApplicationAdminAlertEmailText(
     intro,
     "Откройте административную панель, чтобы рассмотреть её.",
     "",
-    detailUrl,
+    `Рассмотреть заявку: ${detailUrl}`,
+    `Если кнопка не работает, откройте ссылку: ${detailUrl}`,
   ].join("\n");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }

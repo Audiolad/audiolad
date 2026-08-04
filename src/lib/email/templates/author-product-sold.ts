@@ -90,7 +90,7 @@ export function renderAuthorProductSoldEmailHtml(
       "email-body",
       "0 0 24px",
     ),
-    renderBrandEmailButton("Открыть раздел «Финансы»", financeUrl),
+    renderBrandEmailButton(financeUrl, "Открыть раздел «Финансы»"),
     renderBrandEmailParagraph("С уважением,", "email-body", "24px 0 0"),
     renderBrandEmailParagraph(
       "<strong>Команда АудиоЛад</strong>",

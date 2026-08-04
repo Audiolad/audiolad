@@ -5,17 +5,22 @@ author moderation notifications.
 
 ## Scope
 
-Only two moderation outcomes ever enqueue an email (enqueue happens inside
-`log_practice_moderation_event`):
+Enqueue happens inside `log_practice_moderation_event` for:
+
+**Author-facing**
 
 - `changes_requested` — product is **not** published yet; author must edit
   and resubmit. Subject: `Требуются изменения в продукте – АудиоЛад`.
 - `approved_and_published` — product is now live. Subject:
   `Ваш продукт опубликован – АудиоЛад`.
 
-No other lifecycle action (`submitted`, `resubmitted`, `submission_withdrawn`,
-`unpublished`, `republished`, `edit_mode_started`, `deleted`) ever enqueues an
-email, and this worker never sends admin alerts — it is author-facing only.
+**Admin-facing** (to `authors@audiolad.ru`)
+
+- `submitted` — first send to moderation.
+- `resubmitted` — author resubmits after `changes_requested`.
+
+Other lifecycle actions (`submission_withdrawn`, `unpublished`, `republished`,
+`edit_mode_started`, `deleted`) never enqueue mail.
 
 ## Semantics
 

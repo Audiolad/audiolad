@@ -1,5 +1,5 @@
 import { resolveAuthorsEmailDeliveryFromEnv } from "@/lib/email/authors-email-transport";
-import type { AuthorProductModerationOutboxAction } from "@/lib/email/author-product-moderation-context";
+import type { AuthorProductModerationAuthorOutboxAction } from "@/lib/email/author-product-moderation-context";
 import { createSmtpEmailProvider } from "@/lib/email/providers/smtp";
 import {
   AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_SUBJECT,
@@ -16,7 +16,7 @@ import { getAppOrigin } from "@/lib/seo/app-origin";
 export type NotifyAuthorProductModerationInput = {
   /** practice_moderation_email_outbox.event_id — used only for Message-ID dedup. */
   eventId: string;
-  action: AuthorProductModerationOutboxAction;
+  action: AuthorProductModerationAuthorOutboxAction;
   toEmail: string;
   authorName?: string | null;
   productTitle: string;
