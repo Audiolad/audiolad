@@ -47,6 +47,7 @@
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
     "/articles/myshlenie-izobiliya",
     "/articles/namerenie-chto-eto",
+    "/articles/oshchushchenie-dostatka",
     "/articles/nastroy-na-dengi",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
@@ -278,6 +279,11 @@
       "articleId": "ART_plan34_намерение-что-это",
       "slug": "namerenie-chto-eto",
       "path": "/articles/namerenie-chto-eto"
+    },
+    {
+      "articleId": "ART_plan32_как-почувствовать-достаток",
+      "slug": "oshchushchenie-dostatka",
+      "path": "/articles/oshchushchenie-dostatka"
     },
     {
       "articleId": "ART_plan16_как-настроиться-на-деньги",

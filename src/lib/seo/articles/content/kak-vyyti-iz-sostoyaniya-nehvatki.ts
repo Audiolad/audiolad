@@ -1176,6 +1176,14 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     },
     {
       before:
+        "Если нужно отдельно разобрать, как развивать ощущение внутренней достаточности, не отрицая реальные ограничения, может быть полезна статья ",
+      linkLabel:
+        "«Как перестать жить в постоянной нехватке и развить ощущение достатка»",
+      href: "/articles/oshchushchenie-dostatka",
+      after: ".",
+    },
+    {
+      before:
         "Если нужно отдельно разобрать, как распознавать и проверять доступные варианты без спешки, может быть полезна статья ",
       linkLabel:
         "«Как замечать возможности и не проходить мимо важных перемен»",
@@ -1269,6 +1277,11 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
       description: "Распознавать, оценивать и проверять доступные варианты",
     },
     {
+      href: "/articles/oshchushchenie-dostatka",
+      title: "Ощущение достатка",
+      description: "Внутренняя опора без отрицания реальных ограничений",
+    },
+    {
       href: "/articles/kak-voyti-v-sostoyanie-izobiliya",
       title: "Как войти в состояние изобилия",
       description: "Шире о восприятии ресурсов и возможностей",
@@ -1336,5 +1349,5 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     ],
   },
   publishedAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-08-03T21:00:00.000Z",
+  updatedAt: "2026-08-04T07:30:00.000Z",
 } as const satisfies ArticleDefinition;

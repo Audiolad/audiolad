@@ -163,6 +163,14 @@ export const MYSHLENIE_IZOBILIYA_ARTICLE = {
     },
     {
       before:
+        "Если важно отдельно разобрать внутреннее переживание достаточности текущего момента – ",
+      linkLabel:
+        "«Как перестать жить в постоянной нехватке и развить ощущение достатка»",
+      href: "/articles/oshchushchenie-dostatka",
+      after: ".",
+    },
+    {
+      before:
         "Если важнее внутреннее ощущение достаточности и устойчивости – ",
       linkLabel:
         "«Как войти в состояние изобилия и перестать жить в ощущении постоянной нехватки»",
@@ -205,6 +213,11 @@ export const MYSHLENIE_IZOBILIYA_ARTICLE = {
       href: "/articles/kak-zamechat-vozmozhnosti",
       title: "Как замечать возможности",
       description: "Распознавать, оценивать и проверять доступные варианты",
+    },
+    {
+      href: "/articles/oshchushchenie-dostatka",
+      title: "Ощущение достатка",
+      description: "Внутренняя опора без отрицания реальных ограничений",
     },
     {
       href: "/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
@@ -252,5 +265,5 @@ export const MYSHLENIE_IZOBILIYA_ARTICLE = {
     ],
   },
   publishedAt: "2026-08-03T14:00:00.000Z",
-  updatedAt: "2026-08-03T21:00:00.000Z",
+  updatedAt: "2026-08-04T07:30:00.000Z",
 } as const satisfies ArticleDefinition;

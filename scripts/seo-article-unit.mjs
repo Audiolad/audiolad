@@ -3016,6 +3016,67 @@ assert(
   "money-fear slug unique",
 );
 
+const senseOfSufficiencyArticle = getArticleBySlug("oshchushchenie-dostatka");
+assert(senseOfSufficiencyArticle, "sense-of-sufficiency article registered");
+assert(
+  senseOfSufficiencyArticle.title ===
+    "Как перестать жить в постоянной нехватке и развить ощущение достатка",
+  "sense-of-sufficiency H1",
+);
+assert(
+  senseOfSufficiencyArticle.metaTitle ===
+    "Ощущение достатка: как перестать жить в постоянной нехватке – АудиоЛад",
+  "sense-of-sufficiency SEO title",
+);
+assert(
+  senseOfSufficiencyArticle.primaryPractice.practiceKey ===
+    "klyuch-k-izobiliyu",
+  "sense-of-sufficiency primary practice key",
+);
+assert(
+  senseOfSufficiencyArticle.topicSlug === "izobilie",
+  "sense-of-sufficiency uses abundance hub",
+);
+assert(
+  senseOfSufficiencyArticle.finalAudioLead === "",
+  "sense-of-sufficiency has one player only",
+);
+assert(
+  senseOfSufficiencyArticle.sections.some(
+    (section) => section.id === "audiopraktika",
+  ),
+  "sense-of-sufficiency practice section enables afterFinalAudio render",
+);
+assert(
+  senseOfSufficiencyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/myshlenie-izobiliya",
+  ),
+  "sense-of-sufficiency links to abundance-mindset article",
+);
+assert(
+  senseOfSufficiencyArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-zamechat-vozmozhnosti",
+  ),
+  "sense-of-sufficiency links to notice-opportunities article",
+);
+assert(
+  listArticleSlugs().filter((slug) => slug === "oshchushchenie-dostatka")
+    .length === 1,
+  "sense-of-sufficiency slug unique",
+);
+assert(
+  getArticleBySlug("myshlenie-izobiliya")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/oshchushchenie-dostatka",
+  ),
+  "abundance-mindset reverse-links to sense-of-sufficiency",
+);
+assert(
+  getArticleBySlug("kak-vyyti-iz-sostoyaniya-nehvatki")?.afterFinalAudio?.some(
+    (item) => item.href === "/articles/oshchushchenie-dostatka",
+  ),
+  "scarcity reverse-links to sense-of-sufficiency",
+);
+
 const noticeOpportunitiesArticle = getArticleBySlug(
   "kak-zamechat-vozmozhnosti",
 );
