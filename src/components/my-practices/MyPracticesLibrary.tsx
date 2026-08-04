@@ -28,6 +28,10 @@ const FILTERS: LibraryFilter[] = [
   { id: "downloaded", label: "Скачанные" },
 ];
 
+/** Survives Suspense/remount so remove confirmation is not lost mid-animation. */
+let pendingLibraryRemoveToast: string | null = null;
+let pendingLibraryRemoveToastUntil = 0;
+
 type MyPracticesLibraryProps = {
   items: LibraryCardItem[];
   error: boolean;
@@ -97,7 +101,16 @@ export default function MyPracticesLibrary({
   const [leavingPracticeIds, setLeavingPracticeIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(() => {
+    if (
+      pendingLibraryRemoveToast &&
+      pendingLibraryRemoveToastUntil > Date.now()
+    ) {
+      return pendingLibraryRemoveToast;
+    }
+
+    return null;
+  });
   const privateItems = initialPrivateItems;
 
   if (items !== itemsSource) {
@@ -111,7 +124,12 @@ export default function MyPracticesLibrary({
       return;
     }
 
-    const timer = window.setTimeout(() => setToast(null), 2800);
+    const remaining = Math.max(0, pendingLibraryRemoveToastUntil - Date.now());
+    const timer = window.setTimeout(() => {
+      pendingLibraryRemoveToast = null;
+      pendingLibraryRemoveToastUntil = 0;
+      setToast(null);
+    }, remaining || 2800);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -121,7 +139,9 @@ export default function MyPracticesLibrary({
       next.add(practiceId);
       return next;
     });
-    setToast("Удалено из Аудиотеки");
+    pendingLibraryRemoveToast = "Удалено из Аудиотеки";
+    pendingLibraryRemoveToastUntil = Date.now() + 2800;
+    setToast(pendingLibraryRemoveToast);
 
     window.setTimeout(() => {
       setCatalogItems((prev) =>
