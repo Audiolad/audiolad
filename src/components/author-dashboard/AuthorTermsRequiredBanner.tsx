@@ -3,20 +3,41 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import {
+  buildAuthorDashboardHref,
+  buildAuthorNewProductHref,
+  FREE_AUTHOR_FIRST_PRODUCT_BANNER,
+  shouldShowAuthorTermsRequiredBanner,
+  shouldShowFreeAuthorFirstProductBanner,
+} from "@/lib/author-dashboard/free-author-first-step";
+import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
 
 type Props = {
   authorId: string;
   authorSlug: string;
+  accessStatus: AuthorAccessStatus | string;
+  productCount: number;
 };
 
 export default function AuthorTermsRequiredBanner({
   authorId,
   authorSlug,
+  accessStatus,
+  productCount,
 }: Props) {
   const [status, setStatus] = useState<AuthorTermsStatusView | null>(null);
+  const showFirstProductBanner = shouldShowFreeAuthorFirstProductBanner(
+    accessStatus,
+    productCount,
+  );
+  const mayNeedTerms = shouldShowAuthorTermsRequiredBanner(accessStatus);
 
   useEffect(() => {
+    if (!mayNeedTerms) {
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
@@ -28,7 +49,9 @@ export default function AuthorTermsRequiredBanner({
           return;
         }
 
-        const data = (await response.json()) as { status?: AuthorTermsStatusView };
+        const data = (await response.json()) as {
+          status?: AuthorTermsStatusView;
+        };
         if (!cancelled && data.status) {
           setStatus(data.status);
         }
@@ -40,9 +63,39 @@ export default function AuthorTermsRequiredBanner({
     return () => {
       cancelled = true;
     };
-  }, [authorId]);
+  }, [authorId, mayNeedTerms]);
 
-  if (!status?.currentVersion || status.acceptedCurrent) {
+  if (showFirstProductBanner) {
+    const newProductHref = buildAuthorNewProductHref(authorSlug);
+    const dashboardHref = buildAuthorDashboardHref(authorSlug);
+
+    return (
+      <aside className="mb-5 rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] px-4 py-4">
+        <p className="text-[15px] font-semibold text-[#25135c]">
+          {FREE_AUTHOR_FIRST_PRODUCT_BANNER.title}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[#5f5484]">
+          {FREE_AUTHOR_FIRST_PRODUCT_BANNER.body}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Link
+            href={newProductHref}
+            className="inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+          >
+            {FREE_AUTHOR_FIRST_PRODUCT_BANNER.ctaLabel}
+          </Link>
+          <Link
+            href={dashboardHref}
+            className="inline-flex min-h-11 items-center rounded-full border border-[#7042c5] px-4 text-sm font-semibold text-[#7042c5]"
+          >
+            {FREE_AUTHOR_FIRST_PRODUCT_BANNER.secondaryCtaLabel}
+          </Link>
+        </div>
+      </aside>
+    );
+  }
+
+  if (!mayNeedTerms || !status?.currentVersion || status.acceptedCurrent) {
     return null;
   }
 

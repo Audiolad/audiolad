@@ -556,8 +556,8 @@ function testSourceGuards() {
   );
   assert.match(dashboard, /AuthorOnboardingChecklist/);
   assert.match(dashboard, /AuthorAccessStatusBanner/);
-  assert.match(dashboard, /Создайте свою первую практику/);
-  assert.match(dashboard, /Создать бесплатный продукт/);
+  assert.match(dashboard, /FREE_AUTHOR_PRODUCTS_EMPTY_STATE/);
+  assert.match(dashboard, /Создать бесплатный продукт|ctaLabel/);
 
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
   const initialFormMatch = form.match(

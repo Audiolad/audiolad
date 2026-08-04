@@ -202,9 +202,15 @@ const profile = {
   });
   assert.equal(gated.cta.disabled, true);
   assert.equal(gated.cta.href, null);
+  assert.match(
+    gated.cta.hint ?? "",
+    /Сначала опубликуйте один бесплатный продукт/,
+  );
+  assert.match(gated.cta.hint ?? "", /продавать платные материалы/);
+  // RPC/API gate message stays on the commercial-application path; status uses clearer UX copy.
   assert.equal(
-    gated.cta.hint,
     COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+    "Чтобы подать заявку на коммерческий статус, сначала опубликуйте хотя бы один бесплатный продукт",
   );
   assert.equal(gated.secondaryCtas[0]?.label, "Создать бесплатный продукт");
   assert.match(

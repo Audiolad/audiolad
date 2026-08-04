@@ -10,6 +10,10 @@ import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccess
 import AuthorOnboardingChecklist from "@/components/author-dashboard/AuthorOnboardingChecklist";
 import AuthorTermsRequiredBanner from "@/components/author-dashboard/AuthorTermsRequiredBanner";
 import { useAuthorProjectSelection } from "@/components/author-dashboard/useAuthorProjectSelection";
+import {
+  AUTHOR_PRODUCT_FREE_PRICE_LABEL,
+  FREE_AUTHOR_PRODUCTS_EMPTY_STATE,
+} from "@/lib/author-dashboard/free-author-first-step";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import {
@@ -98,7 +102,11 @@ function ProductCard({
 
           <div className="mt-3 flex flex-wrap gap-3 text-sm text-[#5f5484]">
             <span>{product.audio_count} аудио</span>
-            <span>{formatPriceLabel(product.price, product.is_free)}</span>
+            <span>
+              {product.is_free
+                ? AUTHOR_PRODUCT_FREE_PRICE_LABEL
+                : formatPriceLabel(product.price, product.is_free)}
+            </span>
             <span>Обновлён {formatUpdatedAt(product.updated_at)}</span>
             {product.moderation_submitted_at ? (
               <span>
@@ -226,6 +234,8 @@ export default function AuthorDashboardClient({
       <AuthorTermsRequiredBanner
         authorId={selectedAuthor.id}
         authorSlug={selectedAuthor.slug}
+        accessStatus={selectedAuthor.accessStatus}
+        productCount={loading ? -1 : products.length}
       />
 
       <section className="mt-4 rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] px-5 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]">
@@ -293,11 +303,10 @@ export default function AuthorDashboardClient({
         {!loading && !error && products.length === 0 ? (
           <div className="mt-4 rounded-[22px] border border-dashed border-[#d9c9ef] bg-[#fbf8ff] px-5 py-6">
             <h3 className="text-[17px] font-semibold text-[#2f2548]">
-              Создайте свою первую практику
+              {FREE_AUTHOR_PRODUCTS_EMPTY_STATE.title}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              Начните с бесплатного аудиопродукта – так слушатели смогут
-              познакомиться с вами и вашим подходом.
+              {FREE_AUTHOR_PRODUCTS_EMPTY_STATE.body}
             </p>
             <Link
               href={newProductHref}
@@ -308,7 +317,7 @@ export default function AuthorDashboardClient({
                   : "pointer-events-none bg-[#b7a5df] opacity-70"
               }`}
             >
-              Создать бесплатный продукт
+              {FREE_AUTHOR_PRODUCTS_EMPTY_STATE.ctaLabel}
             </Link>
           </div>
         ) : null}

@@ -63,6 +63,12 @@ import {
 import { buildPracticePublicPath } from "@/lib/author-products/utils";
 import AuthorAccessStatusBanner from "@/components/author-dashboard/AuthorAccessStatusBanner";
 import {
+  AUTHOR_PRODUCT_FREE_PRICE_LABEL,
+  buildAuthorStatusHref,
+  buildCommercialStatusHelpHref,
+  PAID_PRICING_COMMERCIAL_STATUS_MORE_LABEL,
+} from "@/lib/author-dashboard/free-author-first-step";
+import {
   authorAccessAllowsContentMutations,
   authorAccessAllowsPaidProducts,
   getPaidPricingDisabledReason,
@@ -2425,7 +2431,7 @@ export default function AuthorProductForm({
                   : "border border-[#c6afe6] text-[#7042c5]"
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
-              В подарок
+              {AUTHOR_PRODUCT_FREE_PRICE_LABEL}
             </button>
             <button
               type="button"
@@ -2444,9 +2450,21 @@ export default function AuthorProductForm({
           </div>
 
           {!canUsePaidPricing && paidPricingDisabledReason ? (
-            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-              {paidPricingDisabledReason}
-            </p>
+            <div className="mt-2 space-y-1 text-sm leading-5 text-[#7d70a2]">
+              <p>{paidPricingDisabledReason}</p>
+              <p>
+                <a
+                  href={
+                    selectedAuthor?.slug
+                      ? buildAuthorStatusHref(selectedAuthor.slug)
+                      : buildCommercialStatusHelpHref()
+                  }
+                  className="font-medium text-[#7042c5] underline-offset-2 hover:underline"
+                >
+                  {PAID_PRICING_COMMERCIAL_STATUS_MORE_LABEL}
+                </a>
+              </p>
+            </div>
           ) : null}
 
           {!form.isFree ? (

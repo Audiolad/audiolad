@@ -1,6 +1,3 @@
-import {
-  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
-} from "@/lib/author-commercial-applications/free-product-gate";
 import type { AuthorCommercialApplicationStatus } from "@/lib/author-commercial-applications/types";
 import {
   getCommercialShareDisplayLines,
@@ -8,6 +5,7 @@ import {
   resolveDisplayCommercialShare,
   type CommercialShareBps,
 } from "@/lib/author-commercial/economics";
+import { STARTER_FREE_PRODUCT_BEFORE_COMMERCIAL_HINT } from "@/lib/author-dashboard/free-author-first-step";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import {
   isAuthorCommercialActiveAccess,
@@ -432,7 +430,7 @@ export function resolveAuthorStatusView(
         disabled: false,
         hint: hasPublishedFreeProduct
           ? null
-          : COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+          : STARTER_FREE_PRODUCT_BEFORE_COMMERCIAL_HINT,
       },
       secondaryCtas: hasPublishedFreeProduct ? [] : [createFreeProductCta],
     };
@@ -450,7 +448,7 @@ export function resolveAuthorStatusView(
         label: "Подать заявку на коммерческий статус",
         href: null,
         disabled: true,
-        hint: COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+        hint: STARTER_FREE_PRODUCT_BEFORE_COMMERCIAL_HINT,
       },
       secondaryCtas: [createFreeProductCta],
     };

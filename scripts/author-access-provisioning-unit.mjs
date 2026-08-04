@@ -43,7 +43,7 @@ function testAccessHelpers() {
 
   assert.match(
     getAuthorAccessBannerMessage("free") ?? "",
-    /Бесплатный авторский аккаунт/,
+    /только для продажи платных/i,
   );
   assert.match(
     getAuthorAccessBannerMessage("commercial_onboarding") ?? "",
@@ -55,7 +55,7 @@ function testAccessHelpers() {
   );
   assert.match(
     getPaidPricingDisabledReason("free") ?? "",
-    /коммерческого подключения/,
+    /только для продажи/i,
   );
   assert.match(
     getPaidPricingDisabledReason("commercial_onboarding") ?? "",

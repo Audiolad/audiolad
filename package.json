@@ -40,6 +40,7 @@
     "test:integration:private-catalog-race": "node scripts/private-to-catalog-player-race-smoke.mjs",
     "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs",
     "test:author-status-page": "npx tsx scripts/author-status-page-unit.mjs",
+    "test:free-author-first-step": "npx tsx scripts/free-author-first-step-unit.mjs",
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
     "test:help-center-support": "npx tsx scripts/help-center-support-unit.mjs",
     "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs",

@@ -89,7 +89,8 @@ function baseInput(overrides = {}) {
   );
   assert.equal(view.cta.disabled, true);
   assert.equal(view.cta.href, null);
-  assert.match(view.cta.hint ?? "", /бесплатный продукт/i);
+  assert.match(view.cta.hint ?? "", /Сначала опубликуйте один бесплатный продукт/);
+  assert.match(view.cta.hint ?? "", /продавать платные материалы/);
   assert.equal(view.secondaryCtas[0]?.label, "Создать бесплатный продукт");
 }
 
