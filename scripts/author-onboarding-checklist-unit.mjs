@@ -159,6 +159,7 @@ function product(overrides = {}, readiness = emptyDraftReadiness()) {
     slug: "praktika",
     status: "draft",
     is_free: true,
+    price: 0,
     updated_at: "2026-07-01T10:00:00.000Z",
     readiness,
     ...overrides,
@@ -661,6 +662,8 @@ function testCommercialScenarios() {
       product(
         {
           status: "published",
+          is_free: true,
+          price: 0,
         },
         readyReadiness(),
       ),
@@ -678,6 +681,25 @@ function testCommercialScenarios() {
     ]),
     true,
   );
+
+  // 5b. Draft free + published paid must NOT unlock commercial
+  const draftFreePaidPublished = evaluate({
+    profile: completeProfile(),
+    products: [
+      product({ id: "free-draft", status: "draft", is_free: true, price: 0 }),
+      product(
+        {
+          id: "paid-pub",
+          status: "published",
+          is_free: false,
+          price: 990,
+        },
+        readyPaidReadiness(),
+      ),
+    ],
+  });
+  assert.equal(draftFreePaidPublished.readyForCommercial, false);
+  assert.equal(draftFreePaidPublished.steps[3].completed, false);
 
   // 6. Commercial application form available by default → Подать заявку
   const noApplication = evaluateCommercial({

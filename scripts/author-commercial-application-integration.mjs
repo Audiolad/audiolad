@@ -68,6 +68,15 @@ function cleanupAuthors(authorIds, userIds) {
   const authors = authorIds.map((id) => `'${id}'::uuid`).join(", ");
   const users = userIds.map((id) => `'${id}'::uuid`).join(", ");
   sqlFile(`
+BEGIN;
+SELECT set_config('audiolad.allow_practice_publish', 'on', true);
+SELECT set_config('audiolad.allow_practice_moderation_update', 'on', true);
+SELECT set_config('audiolad.allow_practice_soft_delete', 'on', true);
+SELECT set_config('audiolad.allow_moderated_content_update', 'on', true);
+DELETE FROM public.audio_items
+WHERE practice_id IN (SELECT id FROM public.practices WHERE author_id IN (${authors}));
+DELETE FROM public.practices
+WHERE author_id IN (${authors});
 DELETE FROM public.author_access_status_events
 WHERE author_id IN (${authors}) OR changed_by IN (${users});
 DELETE FROM public.author_commercial_application_status_events
@@ -78,6 +87,7 @@ DELETE FROM public.author_commercial_applications
 WHERE author_id IN (${authors});
 DELETE FROM public.author_members
 WHERE author_id IN (${authors});
+COMMIT;
 `);
 }
 
@@ -85,10 +95,68 @@ function applyMigration() {
   for (const relativePath of [
     "supabase/migrations/20260725230000_author_commercial_applications.sql",
     "supabase/migrations/20260727180000_commercial_onboarding_access_statuses.sql",
+    "supabase/migrations/20260804090000_commercial_application_free_product_gate.sql",
   ]) {
     const sql = readFileSync(path.join(ROOT, relativePath), "utf8");
     sqlFile(sql);
   }
+}
+
+function insertPractice(input) {
+  const {
+    id,
+    authorId,
+    title,
+    slug,
+    status = "draft",
+    isFree = true,
+    price = 0,
+    productKind = "practice",
+    format = "Медитация",
+    moderationStatus = "not_submitted",
+    deletedAt = null,
+    musicUsage = null,
+  } = input;
+
+  const deletedSql = deletedAt ? `'${deletedAt}'::timestamptz` : "NULL";
+  const musicSql =
+    musicUsage === null ? "NULL" : `'${musicUsage.replace(/'/g, "''")}'`;
+
+  sqlFile(`
+BEGIN;
+SELECT set_config('audiolad.allow_practice_moderation_update', 'on', true);
+SELECT set_config('audiolad.allow_practice_publish', 'on', true);
+INSERT INTO public.practices (
+  id, author_id, title, slug, description, format, price, is_free, status,
+  product_kind, music_usage_permission, moderation_status, deleted_at, published_at
+) VALUES (
+  '${id}'::uuid,
+  '${authorId}'::uuid,
+  '${title.replace(/'/g, "''")}',
+  '${slug}',
+  'Описание тестового продукта для commercial gate.',
+  '${format}',
+  ${price},
+  ${isFree ? "true" : "false"},
+  '${status}',
+  '${productKind}',
+  ${musicSql},
+  '${moderationStatus}',
+  ${deletedSql},
+  ${status === "published" ? "now()" : "NULL"}
+);
+COMMIT;
+`);
+}
+
+function replacePractice(input) {
+  sqlFile(`
+BEGIN;
+DELETE FROM public.audio_items WHERE practice_id = '${input.id}'::uuid;
+DELETE FROM public.practices WHERE id = '${input.id}'::uuid;
+COMMIT;
+`);
+  insertPractice(input);
 }
 
 function expectFailure(fn, label) {
@@ -127,6 +195,9 @@ async function main() {
     const staffId = randomUUID();
     const authorId = randomUUID();
     const otherAuthorId = randomUUID();
+    const freePracticeId = randomUUID();
+    const otherFreePracticeId = randomUUID();
+    const musicAlbumId = randomUUID();
     const password = "CommercialAppTest2026!";
 
     registry.register("auth_user", authorUserId);
@@ -166,7 +237,24 @@ VALUES
 COMMIT;
 `);
 
-      // 3. Draft
+      // Gate rejects: 0 products
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "submit without products",
+      );
+
+      // Draft allowed without published free product
       const draftResult = sqlScalarAsUser(
         authorUserId,
         `SELECT public.save_author_commercial_application_draft(
@@ -194,7 +282,212 @@ COMMIT;
         "draft keeps free",
       );
 
-      // 4. Submit
+      // Draft submit still gated
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              'комментарий'
+            )::text`,
+          ),
+        "draft submit without free product",
+      );
+
+      // Reject: draft free only
+      insertPractice({
+        id: freePracticeId,
+        authorId,
+        title: "Draft free",
+        slug: `draft-free-${suffix}`,
+        status: "draft",
+        isFree: true,
+        price: 0,
+      });
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "draft free rejects",
+      );
+
+      // Reject: free submitted / changes_requested
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Submitted free",
+        slug: `submitted-free-${suffix}`,
+        status: "draft",
+        isFree: true,
+        price: 0,
+        moderationStatus: "submitted",
+      });
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "submitted free rejects",
+      );
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Changes requested free",
+        slug: `changes-free-${suffix}`,
+        status: "draft",
+        isFree: true,
+        price: 0,
+        moderationStatus: "changes_requested",
+      });
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "changes_requested free rejects",
+      );
+
+      // Reject: published paid
+      sqlFile(`
+UPDATE public.authors
+SET access_status = 'commercial_active'
+WHERE id = '${authorId}'::uuid;
+`);
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Published paid",
+        slug: `paid-pub-${suffix}`,
+        status: "published",
+        isFree: false,
+        price: 990,
+        moderationStatus: "approved",
+      });
+      sqlFile(`
+UPDATE public.authors
+SET access_status = 'free'
+WHERE id = '${authorId}'::uuid;
+`);
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "published paid rejects",
+      );
+
+      // Reject: soft-deleted published free
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Deleted free",
+        slug: `deleted-free-${suffix}`,
+        status: "published",
+        isFree: true,
+        price: 0,
+        moderationStatus: "approved",
+        deletedAt: "2026-08-04T06:00:00Z",
+      });
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "soft-deleted free rejects",
+      );
+
+      // Reject: published free of another author
+      insertPractice({
+        id: otherFreePracticeId,
+        authorId: otherAuthorId,
+        title: "Other free",
+        slug: `other-free-${suffix}`,
+        status: "published",
+        isFree: true,
+        price: 0,
+        moderationStatus: "approved",
+      });
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "other author product rejects",
+      );
+
+      // Accept: published free practice
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Published free practice",
+        slug: `pub-free-${suffix}`,
+        status: "published",
+        isFree: true,
+        price: 0,
+        moderationStatus: "approved",
+      });
+      assert.equal(
+        sqlScalar(
+          `SELECT CASE WHEN public.author_has_published_free_product_for_commercial_gate('${authorId}'::uuid) THEN 't' ELSE 'f' END`,
+        ),
+        "t",
+        "gate helper true for published free practice",
+      );
+
       const submitResult = sqlScalarAsUser(
         authorUserId,
         `SELECT public.submit_author_commercial_application(
@@ -287,7 +580,25 @@ COMMIT;
         "Уточните тематику.",
       );
 
-      // 9. Resubmit after needs_changes
+      // 9. Resubmit after needs_changes — exempt from free-product gate
+      replacePractice({
+        id: freePracticeId,
+        authorId,
+        title: "Deleted after submit",
+        slug: `deleted-after-${suffix}`,
+        status: "published",
+        isFree: true,
+        price: 0,
+        moderationStatus: "approved",
+        deletedAt: "2026-08-04T06:10:00Z",
+      });
+      assert.equal(
+        sqlScalar(
+          `SELECT CASE WHEN public.author_has_published_free_product_for_commercial_gate('${authorId}'::uuid) THEN 't' ELSE 'f' END`,
+        ),
+        "f",
+        "no published free before needs_changes resubmit",
+      );
       const resubmit = sqlScalarAsUser(
         authorUserId,
         `SELECT public.submit_author_commercial_application(
@@ -347,7 +658,58 @@ COMMIT;
         "idempotent approve",
       );
 
-      // Reject path on a second author
+      // Existing commercial project is not affected / cannot re-submit
+      expectFailure(
+        () =>
+          sqlScalarAsUser(
+            authorUserId,
+            `SELECT public.submit_author_commercial_application(
+              '${authorId}'::uuid,
+              '${PLANNED}',
+              '${TOPICS}',
+              '${FORMAT}',
+              true,
+              NULL
+            )::text`,
+          ),
+        "commercial_onboarding blocks new submit",
+      );
+
+      // Music album (multi-track) counts for gate helper
+      insertPractice({
+        id: musicAlbumId,
+        authorId: otherAuthorId,
+        title: "Free music album",
+        slug: `music-album-${suffix}`,
+        status: "published",
+        isFree: true,
+        price: 0,
+        productKind: "music",
+        format: "Музыка",
+        moderationStatus: "approved",
+        musicUsage: "listen_only",
+      });
+      const trackA = randomUUID();
+      const trackB = randomUUID();
+      sqlFile(`
+BEGIN;
+SELECT set_config('audiolad.allow_practice_publish', 'on', true);
+INSERT INTO public.audio_items (id, practice_id, title, position, status, audio_path, duration_seconds)
+VALUES
+  ('${trackA}'::uuid, '${musicAlbumId}'::uuid, 'Track 1', 1, 'published', 'practices/${musicAlbumId}/1.mp3', 120),
+  ('${trackB}'::uuid, '${musicAlbumId}'::uuid, 'Track 2', 2, 'published', 'practices/${musicAlbumId}/2.mp3', 130);
+COMMIT;
+`);
+      // otherFreePracticeId already published; music album also valid
+      assert.equal(
+        sqlScalar(
+          `SELECT CASE WHEN public.author_has_published_free_product_for_commercial_gate('${otherAuthorId}'::uuid) THEN 't' ELSE 'f' END`,
+        ),
+        "t",
+        "music album counts as published free",
+      );
+
+      // Reject path on a second author (has published free)
       const draft2 = sqlScalarAsUser(
         otherUserId,
         `SELECT public.submit_author_commercial_application(

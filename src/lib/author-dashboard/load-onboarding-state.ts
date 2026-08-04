@@ -293,6 +293,7 @@ export async function loadAuthorOnboardingChecklistState(
           slug: product.slug,
           status: product.status,
           is_free: product.is_free,
+          price: product.price,
           updated_at: product.updated_at,
           readiness: emptyReadiness(),
         };
@@ -307,6 +308,7 @@ export async function loadAuthorOnboardingChecklistState(
           slug: product.slug,
           status: product.status,
           is_free: product.is_free,
+          price: product.price,
           updated_at: product.updated_at,
           readiness: emptyReadiness(),
         };
@@ -327,6 +329,7 @@ export async function loadAuthorOnboardingChecklistState(
         slug: product.slug,
         status: product.status,
         is_free: product.is_free,
+        price: product.price,
         updated_at: product.updated_at,
         readiness,
       };

@@ -208,6 +208,8 @@ async function testAuthorApplicationApprovedTemplate() {
   assert.doesNotMatch(html, /token=|email=/);
   assert.equal((html.match(/Оформите профиль автора/g) ?? []).length, 1);
   assert.equal((html.match(/Опубликуйте первый бесплатный аудиопродукт/g) ?? []).length, 1);
+  assert.match(html, /обязательный шаг перед заявкой на коммерческий статус/);
+  assert.match(text, /Сначала опубликуйте бесплатный аудиопродукт/);
   assert.equal((html.match(/Проверьте публичную страницу автора/g) ?? []).length, 1);
 
   assert.match(text, /Поздравляем! Ваша заявка одобрена/);

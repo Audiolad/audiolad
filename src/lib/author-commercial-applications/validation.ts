@@ -1,4 +1,8 @@
 import {
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE,
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+} from "./free-product-gate";
+import {
   FORMAT_PLAN_OPTIONS,
   type AuthorCommercialApplicationFieldErrors,
   type AuthorCommercialApplicationFormValues,
@@ -153,6 +157,10 @@ export function mapCommercialApplicationRpcError(message: string): string {
 
   if (message.includes("commercial_application_rights_required")) {
     return "Подтвердите, что у вас есть права на размещение материалов.";
+  }
+
+  if (message.includes(COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE)) {
+    return COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE;
   }
 
   if (message.includes("application_not_found")) {

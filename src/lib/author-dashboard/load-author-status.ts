@@ -1,5 +1,6 @@
 import "server-only";
 
+import { authorHasPublishedFreeProductForCommercialGate } from "@/lib/author-commercial-applications/free-product-gate";
 import { getAuthorCommercialApplication } from "@/lib/author-commercial-applications/queries";
 import { getCurrentApprovedAuthorCommercialShare } from "@/lib/author-commercial/current-terms";
 import {
@@ -44,12 +45,13 @@ export async function loadAuthorStatusView(input: {
 }): Promise<AuthorStatusViewModel> {
   const supabase = createServiceRoleClient();
 
-  const [application, payout, termsAcceptance, individualShare] =
+  const [application, payout, termsAcceptance, individualShare, hasPublishedFreeProduct] =
     await Promise.all([
       getAuthorCommercialApplication(supabase, input.authorId).catch(() => null),
       loadPayoutProfileSummary(input.authorId),
       hasAcceptedCurrentAuthorTerms(input.authorId),
       getCurrentApprovedAuthorCommercialShare(input.authorId),
+      authorHasPublishedFreeProductForCommercialGate(supabase, input.authorId),
     ]);
 
   return resolveAuthorStatusView({
@@ -69,5 +71,6 @@ export async function loadAuthorStatusView(input: {
       : null,
     role: input.role,
     authorSlug: input.authorSlug,
+    hasPublishedFreeProduct,
   });
 }

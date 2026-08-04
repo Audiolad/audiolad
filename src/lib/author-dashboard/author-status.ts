@@ -1,3 +1,6 @@
+import {
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+} from "@/lib/author-commercial-applications/free-product-gate";
 import type { AuthorCommercialApplicationStatus } from "@/lib/author-commercial-applications/types";
 import {
   getCommercialShareDisplayLines,
@@ -83,6 +86,11 @@ export type ResolveAuthorStatusViewInput = {
   } | null;
   role: "owner" | "editor";
   authorSlug: string;
+  /**
+   * Shared free-product gate from authorHasPublishedFreeProductForCommercialGate.
+   * When false/omitted, first commercial submit CTA stays blocked.
+   */
+  hasPublishedFreeProduct?: boolean;
 };
 
 const STARTER_CAPABILITIES = [
@@ -180,10 +188,21 @@ export function resolveAuthorStatusView(
     "/author-dashboard/products",
     input.authorSlug,
   );
+  const newProductHref = withAuthorQuery(
+    "/author-dashboard/products/new",
+    input.authorSlug,
+  );
   const financeHref = withAuthorQuery(
     "/author-dashboard/finance",
     input.authorSlug,
   );
+  const hasPublishedFreeProduct = input.hasPublishedFreeProduct === true;
+  const createFreeProductCta: AuthorStatusCta = {
+    label: "Создать бесплатный продукт",
+    href: newProductHref,
+    disabled: false,
+    hint: null,
+  };
 
   function buildOptionalPayoutSection(): AuthorStatusOptionalPayoutSection {
     const hasProfile = input.payoutProfileStatus != null;
@@ -411,8 +430,29 @@ export function resolveAuthorStatusView(
         label: "Продолжить заявку на коммерческий статус",
         href: applicationHref,
         disabled: false,
-        hint: null,
+        hint: hasPublishedFreeProduct
+          ? null
+          : COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
       },
+      secondaryCtas: hasPublishedFreeProduct ? [] : [createFreeProductCta],
+    };
+  }
+
+  if (!hasPublishedFreeProduct) {
+    return {
+      ...base,
+      kind: "starter",
+      currentTierLabel: "Стартовый",
+      currentTierDescription: STARTER_DESCRIPTION,
+      showStandardCommercialOffer: true,
+      paidProductsLocked: true,
+      cta: {
+        label: "Подать заявку на коммерческий статус",
+        href: null,
+        disabled: true,
+        hint: COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+      },
+      secondaryCtas: [createFreeProductCta],
     };
   }
 

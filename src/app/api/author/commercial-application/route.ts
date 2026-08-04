@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  authorHasPublishedFreeProductForCommercialGate,
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE,
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+  commercialApplicationSubmitRequiresPublishedFree,
+} from "@/lib/author-commercial-applications/free-product-gate";
+import {
   getAuthorCommercialApplication,
 } from "@/lib/author-commercial-applications/queries";
 import {
@@ -77,9 +83,24 @@ export async function GET(request: Request) {
     }
 
     const { supabase } = await requireAuthorMembership(authorId);
-    const application = await getAuthorCommercialApplication(supabase, authorId);
+    const [application, hasPublishedFreeProduct] = await Promise.all([
+      getAuthorCommercialApplication(supabase, authorId),
+      authorHasPublishedFreeProductForCommercialGate(supabase, authorId),
+    ]);
 
-    return NextResponse.json({ application });
+    const submitRequiresPublishedFreeProduct =
+      commercialApplicationSubmitRequiresPublishedFree(application?.status);
+    const canSubmit =
+      !submitRequiresPublishedFreeProduct || hasPublishedFreeProduct;
+
+    return NextResponse.json({
+      application,
+      hasPublishedFreeProduct,
+      submitRequiresPublishedFreeProduct,
+      canSubmit,
+      freeProductRequiredMessage:
+        COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+    });
   } catch (error) {
     return handleAuthorRouteError(error);
   }
@@ -154,6 +175,19 @@ export async function POST(request: Request) {
     const previous = await getAuthorCommercialApplication(supabase, authorId);
     const previousStatus = previous?.status ?? null;
 
+    if (
+      commercialApplicationSubmitRequiresPublishedFree(previousStatus) &&
+      !(await authorHasPublishedFreeProductForCommercialGate(supabase, authorId))
+    ) {
+      return NextResponse.json(
+        {
+          error: COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE,
+          message: COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+        },
+        { status: 400 },
+      );
+    }
+
     const rpc = await submitAuthorCommercialApplication(
       supabase,
       authorId,
@@ -161,7 +195,18 @@ export async function POST(request: Request) {
     );
 
     if (!rpc.ok) {
-      return NextResponse.json({ error: rpc.error }, { status: 400 });
+      const isFreeProductGate =
+        rpc.error === COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE;
+
+      return NextResponse.json(
+        {
+          error: isFreeProductGate
+            ? COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE
+            : "submit_failed",
+          message: rpc.error,
+        },
+        { status: 400 },
+      );
     }
 
     const application = await getAuthorCommercialApplication(supabase, authorId);

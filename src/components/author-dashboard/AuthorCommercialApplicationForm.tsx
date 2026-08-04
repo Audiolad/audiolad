@@ -1,20 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import {
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE,
+  COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+} from "@/lib/author-commercial-applications/free-product-gate";
 import {
   FORMAT_PLAN_OPTIONS,
   type AuthorCommercialApplicationFieldErrors,
   type AuthorCommercialApplicationFormValues,
   type AuthorCommercialApplicationRow,
 } from "@/lib/author-commercial-applications/types";
+import { rowToCommercialApplicationFormValues } from "@/lib/author-commercial-applications/validation";
 import {
   getCommercialApplicationStatusLabel,
 } from "@/lib/author-dashboard/commercial-onboarding";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
-import { rowToCommercialApplicationFormValues } from "@/lib/author-commercial-applications/validation";
 
 type AuthorCommercialApplicationFormProps = {
   authors: AuthorWorkspace[];
@@ -52,6 +57,7 @@ export default function AuthorCommercialApplicationForm({
     useState<AuthorCommercialApplicationFieldErrors>({});
   const [application, setApplication] =
     useState<AuthorCommercialApplicationRow | null>(null);
+  const [canSubmit, setCanSubmit] = useState(false);
   const [values, setValues] =
     useState<AuthorCommercialApplicationFormValues>(EMPTY_VALUES);
 
@@ -79,6 +85,7 @@ export default function AuthorCommercialApplicationForm({
 
         const payload = (await response.json()) as {
           application: AuthorCommercialApplicationRow | null;
+          canSubmit?: boolean;
         };
 
         if (cancelled) {
@@ -87,6 +94,7 @@ export default function AuthorCommercialApplicationForm({
 
         const row = payload.application ?? null;
         setApplication(row);
+        setCanSubmit(payload.canSubmit === true);
         setValues(row ? rowToCommercialApplicationFormValues(row) : EMPTY_VALUES);
       } catch {
         if (!cancelled) {
@@ -190,6 +198,7 @@ export default function AuthorCommercialApplicationForm({
 
       const payload = (await response.json()) as {
         error?: string;
+        message?: string;
         errors?: AuthorCommercialApplicationFieldErrors;
         application?: AuthorCommercialApplicationRow | null;
       };
@@ -198,7 +207,17 @@ export default function AuthorCommercialApplicationForm({
         if (payload.errors) {
           setFieldErrors(payload.errors);
         }
-        setError(payload.error ?? "Не удалось отправить заявку.");
+        if (payload.error === COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_CODE) {
+          setCanSubmit(false);
+          setError(
+            payload.message ??
+              COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE,
+          );
+          return;
+        }
+        setError(
+          payload.message ?? payload.error ?? "Не удалось отправить заявку.",
+        );
         return;
       }
 
@@ -225,6 +244,10 @@ export default function AuthorCommercialApplicationForm({
     (status === "needs_changes" || status === "rejected") &&
     Boolean(application?.review_comment?.trim());
   const busy = savingDraft || submitting;
+  const submitBlockedByFreeProduct = editable && !canSubmit;
+  const productsNewHref = selectedAuthor
+    ? `/author-dashboard/products/new?author=${encodeURIComponent(selectedAuthor.slug)}`
+    : "/author-dashboard/products/new";
 
   if (!selectedAuthor) {
     return (
@@ -295,6 +318,23 @@ export default function AuthorCommercialApplicationForm({
             {success ? (
               <div className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm text-[#3d8d65]">
                 {success}
+              </div>
+            ) : null}
+
+            {submitBlockedByFreeProduct ? (
+              <div className="rounded-[18px] border border-[#f0dfab] bg-[#fffaf0] px-4 py-3 text-sm leading-6 text-[#8a6a1f]">
+                <p>{COMMERCIAL_APPLICATION_FREE_PRODUCT_REQUIRED_MESSAGE}.</p>
+                <p className="mt-2">
+                  Черновик заявки можно заполнять заранее. Отправка откроется
+                  после публикации бесплатного продукта — подойдёт практика,
+                  музыка или альбом.
+                </p>
+                <Link
+                  href={productsNewHref}
+                  className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full border border-[#d4b56a] px-4 text-sm font-medium text-[#8a6a1f]"
+                >
+                  Создать бесплатный продукт
+                </Link>
               </div>
             ) : null}
 
@@ -420,7 +460,7 @@ export default function AuthorCommercialApplicationForm({
                 <button
                   type="button"
                   onClick={() => void submitApplication()}
-                  disabled={busy}
+                  disabled={busy || !canSubmit}
                   className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
                 >
                   {submitting ? "Отправка…" : "Отправить заявку"}

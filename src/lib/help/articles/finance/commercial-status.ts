@@ -6,7 +6,7 @@ export const commercialStatusArticle: HelpArticle = {
   slug: "commercial-status",
   title: "Как получить коммерческий статус",
   description:
-    "Подайте заявку на коммерческое подключение, примите условия автора и подготовьте данные для выплат.",
+    "Сначала опубликуйте бесплатный продукт, затем подайте заявку на коммерческое подключение, примите условия автора и при необходимости подготовьте данные для выплат.",
   category: "finance",
   audience: "author",
   order: 10,
@@ -17,24 +17,28 @@ export const commercialStatusArticle: HelpArticle = {
     "условия автора",
     "выплаты",
     "авторское вознаграждение",
+    "бесплатный продукт",
   ],
-  updatedAt: "2026-07-29",
-  version: 2,
+  updatedAt: "2026-08-04",
+  version: 3,
   relatedRoutes: [
     "/author-dashboard/status",
     "/author-dashboard/commercial-application",
     "/author-dashboard/commercial/terms",
     "/author-terms",
+    "/author-dashboard/products/new",
   ],
   relatedArticleIds: [
     "help.finance.earnings-and-payouts",
     "help.authors.create-first-product",
+    "help.authors.publish-product",
   ],
   sections: [
     {
       id: "intro",
       paragraphs: [
         "Коммерческий статус нужен, чтобы продавать аудиопродукты и получать авторское вознаграждение. На стартовом статусе доступны бесплатные публикации, промостраницы и личные материалы.",
+        "Подать заявку на коммерческий статус можно только после публикации хотя бы одного бесплатного продукта в текущем авторском проекте. Подходит бесплатная практика, бесплатная музыка или бесплатный альбом.",
       ],
     },
     {
@@ -42,15 +46,12 @@ export const commercialStatusArticle: HelpArticle = {
       title: "Как подключить коммерцию",
       steps: [
         helpRich(
-          "Откройте раздел статуса автора (",
-          helpPublicLink("/author-dashboard/status"),
+          "Создайте бесплатный продукт в кабинете автора (",
+          helpPublicLink("/author-dashboard/products/new"),
           ").",
         ),
-        helpRich(
-          "Подайте заявку на коммерческое подключение — кнопка ведёт на форму заявки (",
-          helpPublicLink("/author-dashboard/commercial-application"),
-          ").",
-        ),
+        "Отправьте продукт на модерацию и дождитесь одобрения.",
+        "После публикации бесплатного продукта откройте раздел статуса автора и подайте заявку на коммерческое подключение.",
         "Дождитесь рассмотрения заявки администрацией АудиоЛада.",
         helpRich(
           "Примите условия для авторов — документ доступен на ",
@@ -59,6 +60,7 @@ export const commercialStatusArticle: HelpArticle = {
           helpPublicLink("/author-dashboard/commercial/terms"),
           ").",
         ),
+        "После коммерческого одобрения и принятия условий можно публиковать платные продукты.",
         helpRich(
           "При необходимости заполните «Данные для выплат» (",
           helpPublicLink("/author-dashboard/commercial/payout-details"),
@@ -66,6 +68,7 @@ export const commercialStatusArticle: HelpArticle = {
         ),
       ],
       notes: [
+        "Черновик коммерческой заявки можно заполнять заранее, но отправить её получится только после публикации бесплатного продукта.",
         "Реквизиты можно заполнить позже — до первой выплаты.",
         "Пока заявка на рассмотрении или требуется доработка, статус и доступные действия отображаются на странице статуса автора.",
       ],

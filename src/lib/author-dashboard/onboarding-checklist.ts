@@ -1,3 +1,4 @@
+import { hasPublishedFreeProductForCommercialGate } from "@/lib/author-commercial-applications/free-product-gate";
 import { hasUserAuthorAvatar } from "@/lib/authors/has-user-avatar";
 import type { PublishReadinessResult } from "@/lib/author-products/publish";
 import { buildAuthorPublicPath, buildPracticePublicPath } from "@/lib/products/paths";
@@ -34,6 +35,7 @@ export type AuthorOnboardingProductInput = {
   slug: string;
   status: string;
   is_free: boolean;
+  price: number;
   updated_at: string;
   readiness: PublishReadinessResult;
 };
@@ -245,6 +247,10 @@ export function focusProductSuitabilityScore(
   return 0;
 }
 
+/**
+ * @deprecated Prefer hasPublishedFreeProductForCommercialGate(products).
+ * Kept for older unit imports; mirrors the historical 4-flag free-step gate.
+ */
 export function isFreeOnboardingReadyForCommercial(
   completionFlags: readonly boolean[],
 ): boolean {
@@ -334,16 +340,20 @@ export function evaluateAuthorOnboardingChecklist(input: {
   const freeProducts = nonArchived.filter((product) => product.is_free);
   const paidOnlyNonArchived =
     nonArchived.length > 0 && freeProducts.length === 0;
-  const publishedProducts = nonArchived.filter(isPublishedProduct);
+  const publishedFreeProducts = nonArchived.filter((product) =>
+    hasPublishedFreeProductForCommercialGate([product]),
+  );
   const focusProduct = selectFocusProduct(products);
-  const publishedProduct = publishedProducts[0] ?? null;
+  const publishedProduct = publishedFreeProducts[0] ?? null;
 
   const profileComplete = isAuthorProfileMinimumComplete(profile);
   const freeProductComplete = freeProducts.length > 0;
   const prepareComplete = nonArchived.some(
-    (product) => product.status === "published" || product.readiness.ok,
+    (product) =>
+      hasPublishedFreeProductForCommercialGate([product]) || product.readiness.ok,
   );
-  const publishComplete = publishedProducts.length > 0;
+  // Publish step and commercial unlock share the same published-free predicate.
+  const publishComplete = publishedFreeProducts.length > 0;
   const promotionComplete = campaigns.some(isActivePromotionForPublishedProduct);
 
   const completionFlags = [
@@ -356,7 +366,7 @@ export function evaluateAuthorOnboardingChecklist(input: {
   const completedCount = completionFlags.filter(Boolean).length;
   const firstIncompleteIndex = completionFlags.findIndex((flag) => !flag);
   const readyForCommercial =
-    isFreeOnboardingReadyForCommercial(completionFlags);
+    hasPublishedFreeProductForCommercialGate(nonArchived);
 
   const newProductHref = `/author-dashboard/products/new?author=${encodeURIComponent(authorSlug)}`;
   const profileHref = `/author-dashboard/profile?author=${encodeURIComponent(authorSlug)}`;

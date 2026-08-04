@@ -62,6 +62,7 @@ function baseInput(overrides = {}) {
     individualShare: null,
     role: "owner",
     authorSlug: "demo-author",
+    hasPublishedFreeProduct: true,
     ...overrides,
   };
 }
@@ -79,6 +80,17 @@ function baseInput(overrides = {}) {
   assert.ok(view.starterCapabilities.includes("Публичная страница автора"));
   assert.ok(AUTHOR_STATUS_COPY.premiumPricingNote.includes("позднее"));
   assert.ok(!AUTHOR_STATUS_COPY.premiumPricingNote.includes("900"));
+}
+
+// starter without published free product — CTA blocked
+{
+  const view = resolveAuthorStatusView(
+    baseInput({ hasPublishedFreeProduct: false }),
+  );
+  assert.equal(view.cta.disabled, true);
+  assert.equal(view.cta.href, null);
+  assert.match(view.cta.hint ?? "", /бесплатный продукт/i);
+  assert.equal(view.secondaryCtas[0]?.label, "Создать бесплатный продукт");
 }
 
 // draft application

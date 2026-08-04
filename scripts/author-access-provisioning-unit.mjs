@@ -109,7 +109,7 @@ function testEmailTemplate() {
 async function testRendererRegistration() {
   const rendered = await brandEmailTemplateRenderer.render({
     templateKey: "author_application_approved",
-    templateVersion: "author-application-approved-v2-20260722",
+    templateVersion: "author-application-approved-v3-20260804",
     payload: {},
   });
 
