@@ -58,6 +58,10 @@ function createPassthroughResponse(
   if (rewritePathname) {
     const rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname = rewritePathname;
+    // Nginx terminates TLS. The Next.js listener is plain HTTP on loopback.
+    // If we keep https from X-Forwarded-Proto, Next tries HTTPS to localhost
+    // and the school host rewrite fails with EPROTO / 500.
+    rewriteUrl.protocol = "http:";
     return NextResponse.rewrite(rewriteUrl);
   }
 
