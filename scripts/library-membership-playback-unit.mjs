@@ -168,12 +168,20 @@ function testSourceContracts() {
   assert(!card.includes("usePwaInstall("), "no throwing usePwaInstall");
 
   assert(
-    practiceParts.includes('border-[#7042c5] bg-white text-[#7042c5]'),
-    "practice page add button uses active styling",
+    practiceParts.includes('variant="practice"'),
+    "practice page uses practice variant (no function className from server)",
   );
   assert(
-    !practiceParts.includes('border-[#e2d7f2] bg-[#faf6ff] text-[#7d70a2]'),
-    "practice page add button no longer uses muted inactive style",
+    !practiceParts.includes("className={({"),
+    "practice page does not pass function className to client button",
+  );
+  assert(
+    button.includes('border-[#7042c5] bg-white text-[#7042c5]'),
+    "practice variant uses active styling",
+  );
+  assert(
+    !button.includes('border-[#e2d7f2] bg-[#faf6ff] text-[#7d70a2]'),
+    "practice variant no longer uses muted inactive style",
   );
 
   assert(listenPage.includes("resolveLibraryAction"), "listen page resolves library action");

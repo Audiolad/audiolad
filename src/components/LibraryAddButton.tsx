@@ -12,10 +12,22 @@ type LibraryButtonVisualState = Pick<
 >;
 
 export type LibraryAddButtonProps = UseLibraryMembershipInput & {
+  /**
+   * String className is safe from Server Components.
+   * Function form is only for Client Component callers.
+   */
   className?: string | ((state: LibraryButtonVisualState) => string);
-  /** Visual variant for dark full-player surfaces. */
-  variant?: "default" | "onDark";
+  /** Visual variant for product page / dark full-player / custom surfaces. */
+  variant?: "default" | "practice" | "onDark";
 };
+
+function resolvePracticeClassName(inLibrary: boolean): string {
+  return `w-full rounded-[22px] border px-5 py-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-80 ${
+    inLibrary
+      ? "border-[#c9b6ea] bg-[#f3ebff] text-[#7042c5]"
+      : "border-[#7042c5] bg-white text-[#7042c5] hover:bg-[#faf6ff]"
+  } disabled:cursor-not-allowed disabled:opacity-60`;
+}
 
 export default function LibraryAddButton({
   practiceSlug,
@@ -47,10 +59,15 @@ export default function LibraryAddButton({
     ? "Практика уже в Аудиотеке. Перейти в Аудиотеку"
     : buttonLabel;
 
-  const resolvedClassName =
-    typeof className === "function"
-      ? className({ action, isPending, inLibrary })
-      : className;
+  let resolvedClassName: string | undefined;
+
+  if (variant === "practice") {
+    resolvedClassName = resolvePracticeClassName(inLibrary);
+  } else if (typeof className === "function") {
+    resolvedClassName = className({ action, isPending, inLibrary });
+  } else {
+    resolvedClassName = className;
+  }
 
   const errorClassName =
     variant === "onDark"
