@@ -2277,6 +2277,229 @@
   }
 }
 
+/* —— Why now screen (after audience) —— */
+.school-why-now {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.15rem auto 2.2rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.1rem var(--school-gutter) 1.2rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      90% 55% at 100% 0%,
+      rgba(143, 78, 234, 0.1) 0%,
+      transparent 52%
+    ),
+    linear-gradient(168deg, #f8f2ea 0%, #f4ece6 44%, #efe7f6 100%);
+  border: 1px solid rgba(228, 216, 243, 0.78);
+}
+
+.school-why-now__layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.school-why-now__primary,
+.school-why-now__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.school-why-now__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.55rem, 6.2vw, 1.95rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--school-ink);
+}
+
+.school-why-now__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.school-why-now__text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.38;
+  color: var(--school-body-color);
+}
+
+.school-why-now__text--lead {
+  font-weight: 600;
+  color: var(--school-ink);
+}
+
+.school-why-now__text--highlight {
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 252, 249, 0.78);
+  border: 1px solid rgba(214, 196, 168, 0.38);
+  color: var(--school-ink);
+}
+
+.school-why-now__timeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.15rem 0 0.05rem;
+  list-style: none;
+  position: relative;
+}
+
+.school-why-now__timeline::before {
+  content: "";
+  position: absolute;
+  top: 1.05rem;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(168, 122, 58, 0.18) 0%,
+    rgba(112, 66, 197, 0.45) 50%,
+    rgba(112, 66, 197, 0.2) 100%
+  );
+}
+
+.school-why-now__timeline-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.school-why-now__timeline-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: rgba(255, 252, 249, 0.95);
+  border: 1px solid rgba(168, 122, 58, 0.35);
+  color: var(--school-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.school-why-now__timeline-item:last-child .school-why-now__timeline-dot {
+  border-color: rgba(112, 66, 197, 0.4);
+  color: var(--school-accent);
+}
+
+.school-why-now__timeline-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--school-ink);
+}
+
+.school-why-now__contrast {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.school-why-now__contrast-line {
+  margin: 0;
+  padding: 0.6rem 0.72rem;
+  border-radius: 0.95rem;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.34;
+}
+
+.school-why-now__contrast-line--think {
+  background: rgba(255, 252, 249, 0.55);
+  border: 1px solid rgba(214, 196, 168, 0.35);
+  color: var(--school-muted);
+}
+
+.school-why-now__contrast-line--create {
+  background: rgba(255, 252, 250, 0.88);
+  border: 1px solid rgba(196, 176, 230, 0.55);
+  color: var(--school-ink);
+  font-weight: 600;
+}
+
+.school-why-now__accent {
+  margin: 0.05rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 1.05rem;
+  background: rgba(255, 252, 250, 0.82);
+  border: 1px solid rgba(228, 216, 243, 0.78);
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.18rem, 4.5vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--school-ink);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .school-why-now {
+    margin-top: 0.5rem;
+    margin-bottom: 2.7rem;
+    padding: 1.8rem 1.75rem 1.9rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-why-now__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 1.4rem 1.85rem;
+    align-items: start;
+  }
+
+  .school-why-now__title {
+    font-size: 2.35rem;
+  }
+
+  .school-why-now__body {
+    gap: 0.55rem;
+  }
+
+  .school-why-now__timeline {
+    margin-top: 0.15rem;
+  }
+
+  .school-why-now__accent {
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-why-now {
+    padding: 2rem;
+  }
+
+  .school-why-now__title {
+    font-size: 2.55rem;
+  }
+
+  .school-why-now__accent {
+    font-size: 1.6rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .school-first-screen__cta {
     transition: none;
