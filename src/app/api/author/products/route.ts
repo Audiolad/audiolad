@@ -68,7 +68,8 @@ export async function POST(request: Request) {
 
     if (
       productKindRaw !== PRODUCT_KIND.PRACTICE &&
-      productKindRaw !== PRODUCT_KIND.MUSIC
+      productKindRaw !== PRODUCT_KIND.MUSIC &&
+      productKindRaw !== PRODUCT_KIND.AUDIO_POST
     ) {
       return NextResponse.json({ error: "invalid_product_kind" }, { status: 400 });
     }

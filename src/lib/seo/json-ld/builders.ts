@@ -642,8 +642,17 @@ export function buildPublicPlaylistJsonLd(
 export function shouldEmitPracticeJsonLd(input: {
   status: string | null | undefined;
   isFixtureMarked: boolean;
+  isCatalogListed?: boolean | null;
 }): boolean {
-  return input.status === "published" && !input.isFixtureMarked;
+  if (input.status !== "published" || input.isFixtureMarked) {
+    return false;
+  }
+
+  if (input.isCatalogListed === false) {
+    return false;
+  }
+
+  return true;
 }
 
 export function shouldEmitAuthorJsonLd(input: {

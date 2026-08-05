@@ -5,6 +5,7 @@ import {
   getVisibleAuthorProductStatus,
   getVisibleAuthorProductStatusLabel,
 } from "@/lib/author-products/moderation";
+import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 
 type ProductModerationListProps = {
@@ -37,7 +38,7 @@ function formatDuration(totalSeconds: number | null): string {
 }
 
 function productKindLabel(kind: string): string {
-  return kind === "music" ? "Музыка" : "Практика";
+  return getProductKindLabel(kind);
 }
 
 export default function ProductModerationList({
@@ -112,9 +113,11 @@ export default function ProductModerationList({
                     </td>
                     <td className="px-4 py-4 text-[#796ba0]">
                       <div>{productKindLabel(product.productKind)}</div>
-                      <div className="mt-1">
-                        {getProductPriceLabel(product.price, product.isFree)}
-                      </div>
+                      {product.productKind !== "audio_post" ? (
+                        <div className="mt-1">
+                          {getProductPriceLabel(product.price, product.isFree)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-[#796ba0]">
                       {product.audioCount} · {formatDuration(product.totalDurationSeconds)}
@@ -172,9 +175,11 @@ export default function ProductModerationList({
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#796ba0]">
                 <span>{productKindLabel(product.productKind)}</span>
-                <span>
-                  {getProductPriceLabel(product.price, product.isFree)}
-                </span>
+                {product.productKind !== "audio_post" ? (
+                  <span>
+                    {getProductPriceLabel(product.price, product.isFree)}
+                  </span>
+                ) : null}
                 <span>
                   {product.audioCount} аудио ·{" "}
                   {formatDuration(product.totalDurationSeconds)}

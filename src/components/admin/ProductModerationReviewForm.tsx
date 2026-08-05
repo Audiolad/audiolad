@@ -19,6 +19,7 @@ import {
   getVisibleAuthorProductStatus,
   getVisibleAuthorProductStatusLabel,
 } from "@/lib/author-products/moderation";
+import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 
@@ -249,15 +250,17 @@ export default function ProductModerationReviewForm({
           <div>
             <dt className="text-[#796ba0]">Вид продукта</dt>
             <dd className="mt-1 font-medium text-[#25135c]">
-              {product.productKind === "music" ? "Музыка" : "Практика"}
+              {getProductKindLabel(product.productKind)}
             </dd>
           </div>
-          <div>
-            <dt className="text-[#796ba0]">Цена</dt>
-            <dd className="mt-1 font-medium text-[#25135c]">
-              {getProductPriceLabel(product.price, product.isFree)}
-            </dd>
-          </div>
+          {product.productKind !== "audio_post" ? (
+            <div>
+              <dt className="text-[#796ba0]">Цена</dt>
+              <dd className="mt-1 font-medium text-[#25135c]">
+                {getProductPriceLabel(product.price, product.isFree)}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-[#796ba0]">Отправлен</dt>
             <dd className="mt-1 font-medium text-[#25135c]">
@@ -291,6 +294,52 @@ export default function ProductModerationReviewForm({
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#5f5484]">
               {product.description}
             </p>
+          </div>
+        ) : null}
+
+        {product.productKind === "audio_post" && product.promoEnabled ? (
+          <div className="mt-4 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] p-4">
+            <h4 className="text-sm font-semibold text-[#25135c]">
+              Рекомендация после прослушивания
+            </h4>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div>
+                <dt className="text-[#796ba0]">Заголовок</dt>
+                <dd className="mt-1 font-medium text-[#25135c]">
+                  {product.promoTitle || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[#796ba0]">Текст</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-[#5f5484]">
+                  {product.promoText || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[#796ba0]">Кнопка</dt>
+                <dd className="mt-1 text-[#5f5484]">
+                  {product.promoButtonText || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[#796ba0]">Ссылка</dt>
+                <dd className="mt-1">
+                  {product.promoUrl ? (
+                    <a
+                      href={product.promoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-[#7042c5] hover:underline"
+                    >
+                      Открыть рекомендацию
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                  {product.promoOpenInNewTab ? " · новая вкладка" : ""}
+                </dd>
+              </div>
+            </dl>
           </div>
         ) : null}
 

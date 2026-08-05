@@ -46,6 +46,11 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import {
+  PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH,
+  PROMO_RECOMMENDATION_TEXT_MAX_LENGTH,
+  PROMO_RECOMMENDATION_TITLE_MAX_LENGTH,
+} from "@/lib/products/promo-recommendation";
+import {
   PRODUCT_CONTENT_LIMITS,
   getAudioUploadErrorMessage,
   getProductFieldErrorMessage,
@@ -121,6 +126,13 @@ type FormState = {
   slug: string;
   isFree: boolean;
   price: number;
+  isCatalogListed: boolean;
+  promoEnabled: boolean;
+  promoTitle: string;
+  promoText: string;
+  promoButtonText: string;
+  promoUrl: string;
+  promoOpenInNewTab: boolean;
   coverUrl: string | null;
   coverVersion: string | null;
   coverImage?: unknown;
@@ -238,6 +250,13 @@ function buildInitialForm(
     slug: "",
     isFree: true,
     price: 99,
+    isCatalogListed: true,
+    promoEnabled: false,
+    promoTitle: "",
+    promoText: "",
+    promoButtonText: "",
+    promoUrl: "",
+    promoOpenInNewTab: false,
     coverUrl: null,
     coverVersion: null,
     coverImage: null,
@@ -321,9 +340,22 @@ function buildProductSavePayload(
     format:
       form.productKind === PRODUCT_KIND.MUSIC
         ? MUSIC_KIND_LABEL
-        : resolveFormatForStorage(form.formatPreset, form.customFormat),
-    is_free: form.isFree,
-    price: form.isFree ? 0 : form.price,
+        : form.productKind === PRODUCT_KIND.AUDIO_POST
+          ? "Аудиопост"
+          : resolveFormatForStorage(form.formatPreset, form.customFormat),
+    is_free:
+      form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree,
+    price:
+      form.productKind === PRODUCT_KIND.AUDIO_POST || form.isFree
+        ? 0
+        : form.price,
+    is_catalog_listed: form.isCatalogListed,
+    promo_enabled: form.promoEnabled,
+    promo_title: form.promoTitle,
+    promo_text: form.promoText,
+    promo_button_text: form.promoButtonText,
+    promo_url: form.promoUrl,
+    promo_open_in_new_tab: form.promoOpenInNewTab,
     use_shared_cover: form.useSharedCover,
     listening_notice_enabled:
       form.productKind === PRODUCT_KIND.MUSIC
@@ -2078,7 +2110,7 @@ export default function AuthorProductForm({
 
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">Тип продукта</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.productKind === PRODUCT_KIND.PRACTICE ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}>
               <input
                 type="radio"
@@ -2134,6 +2166,34 @@ export default function AuthorProductForm({
                 <span className="block text-sm font-medium text-[#3f3560]">Музыка</span>
                 <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
                   Отдельный трек или альбом из нескольких аудиофайлов.
+                </span>
+              </span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.productKind === PRODUCT_KIND.AUDIO_POST ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}>
+              <input
+                type="radio"
+                name="product_kind"
+                className="mt-1"
+                checked={form.productKind === PRODUCT_KIND.AUDIO_POST}
+                disabled={busy || !canChangeProductKind(form.publishedAt)}
+                onChange={() => {
+                  setForm((current) => ({
+                    ...current,
+                    productKind: PRODUCT_KIND.AUDIO_POST,
+                    musicUsagePermission: null,
+                    formatPreset: "",
+                    customFormat: "",
+                    isFree: true,
+                    price: 0,
+                    useSharedCover: true,
+                    listeningNoticeEnabled: false,
+                  }));
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">Аудиопост</span>
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  Бесплатный аудиоматериал с возможной рекомендацией после прослушивания.
                 </span>
               </span>
             </label>
@@ -2296,6 +2356,15 @@ export default function AuthorProductForm({
         </>
         ) : null}
 
+        {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
+          <div>
+            <span className="mb-2 block text-sm font-medium">Формат</span>
+            <p className="rounded-[18px] border border-[#e4d7f4] bg-[#fbf8ff] px-4 py-3 text-sm text-[#5f5484]">
+              Аудиопост
+            </p>
+          </div>
+        ) : null}
+
         {form.productKind === PRODUCT_KIND.MUSIC ? (
           <fieldset className="block space-y-3">
             <legend className="mb-1 block text-sm font-medium">
@@ -2395,6 +2464,7 @@ export default function AuthorProductForm({
           replaceLabel="Заменить обложку"
         />
 
+        {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
         <div className="mt-4 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
           <label className="flex cursor-pointer items-start gap-3">
             <input
@@ -2417,7 +2487,9 @@ export default function AuthorProductForm({
             </span>
           </label>
         </div>
+        ) : null}
 
+        {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
         <div>
           <span className="mb-2 block text-sm font-medium">Цена</span>
           <div className="flex flex-wrap gap-3">
@@ -2486,6 +2558,51 @@ export default function AuthorProductForm({
             </select>
           ) : null}
         </div>
+        ) : null}
+
+        {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
+          <fieldset className="block">
+            <legend className="mb-2 block text-sm font-medium">Видимость</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.isCatalogListed ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
+                <input
+                  type="radio"
+                  name="is_catalog_listed"
+                  className="mt-1"
+                  checked={form.isCatalogListed}
+                  disabled={busy}
+                  onChange={() =>
+                    setForm((current) => ({ ...current, isCatalogListed: true }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[#3f3560]">Публичный</span>
+                  <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                    Будет показан в каталоге и на странице автора.
+                  </span>
+                </span>
+              </label>
+              <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${!form.isCatalogListed ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
+                <input
+                  type="radio"
+                  name="is_catalog_listed"
+                  className="mt-1"
+                  checked={!form.isCatalogListed}
+                  disabled={busy}
+                  onChange={() =>
+                    setForm((current) => ({ ...current, isCatalogListed: false }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[#3f3560]">По ссылке</span>
+                  <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                    Доступен только по прямой ссылке.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+        ) : null}
       </section>
 
       {form.productKind === PRODUCT_KIND.PRACTICE ? (
@@ -2602,6 +2719,88 @@ export default function AuthorProductForm({
       </section>
       ) : null}
 
+      {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
+        <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
+          <h2 className="text-[20px] font-semibold">
+            Рекомендация после прослушивания
+          </h2>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={form.promoEnabled}
+              disabled={busy}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  promoEnabled: event.target.checked,
+                }))
+              }
+              className="mt-1 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
+            />
+            <span className="text-sm font-medium text-[#3f3560]">
+              Показывать рекомендацию
+            </span>
+          </label>
+          <div className={`space-y-4 ${form.promoEnabled ? "" : "pointer-events-none opacity-50"}`}>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Заголовок</span>
+              <input
+                value={form.promoTitle}
+                maxLength={PROMO_RECOMMENDATION_TITLE_MAX_LENGTH}
+                disabled={!form.promoEnabled || busy}
+                onChange={(event) => setForm((current) => ({ ...current, promoTitle: event.target.value }))}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              />
+              <CharCounter value={form.promoTitle} max={PROMO_RECOMMENDATION_TITLE_MAX_LENGTH} />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Текст</span>
+              <textarea
+                value={form.promoText}
+                maxLength={PROMO_RECOMMENDATION_TEXT_MAX_LENGTH}
+                disabled={!form.promoEnabled || busy}
+                onChange={(event) => setForm((current) => ({ ...current, promoText: event.target.value }))}
+                rows={4}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              />
+              <CharCounter value={form.promoText} max={PROMO_RECOMMENDATION_TEXT_MAX_LENGTH} />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Текст кнопки</span>
+              <input
+                value={form.promoButtonText}
+                maxLength={PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH}
+                disabled={!form.promoEnabled || busy}
+                onChange={(event) => setForm((current) => ({ ...current, promoButtonText: event.target.value }))}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+              />
+              <CharCounter value={form.promoButtonText} max={PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH} />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">Ссылка</span>
+              <input
+                type="url"
+                value={form.promoUrl}
+                disabled={!form.promoEnabled || busy}
+                onChange={(event) => setForm((current) => ({ ...current, promoUrl: event.target.value }))}
+                className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
+                placeholder="https://"
+              />
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-[#5f5484]">
+              <input
+                type="checkbox"
+                checked={form.promoOpenInNewTab}
+                disabled={!form.promoEnabled || busy}
+                onChange={(event) => setForm((current) => ({ ...current, promoOpenInNewTab: event.target.checked }))}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#c6afe6] text-[#7042c5] focus:ring-[#9a74d8]"
+              />
+              Открывать ссылку в новой вкладке
+            </label>
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
           {form.productKind === PRODUCT_KIND.MUSIC
@@ -2628,18 +2827,21 @@ export default function AuthorProductForm({
             >
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <AudioDragHandle
-                    disabled={reorderBusy}
-                    isDragging={draggingAudioId === audioItem.id}
-                    onPointerDown={(event) =>
-                      handleDragPointerDown(audioItem.id, event)
-                    }
-                    onPointerMove={handleDragPointerMove}
-                    onPointerUp={handleDragPointerUp}
-                    onPointerCancel={handleDragPointerCancel}
-                  />
+                  {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
+                    <AudioDragHandle
+                      disabled={reorderBusy}
+                      isDragging={draggingAudioId === audioItem.id}
+                      onPointerDown={(event) =>
+                        handleDragPointerDown(audioItem.id, event)
+                      }
+                      onPointerMove={handleDragPointerMove}
+                      onPointerUp={handleDragPointerUp}
+                      onPointerCancel={handleDragPointerCancel}
+                    />
+                  ) : null}
                   <h3 className="font-semibold">Аудио {index + 1}</h3>
                 </div>
+                {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -2660,6 +2862,7 @@ export default function AuthorProductForm({
                     ↓
                   </button>
                 </div>
+                ) : null}
               </div>
 
               <label className="mt-4 block">
@@ -2760,7 +2963,7 @@ export default function AuthorProductForm({
                 ) : null}
               </label>
 
-              {!form.useSharedCover ? (
+              {!form.useSharedCover && form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
                 <div className="mt-4">
                   <CoverUploadBlock
                     label="Обложка трека"
@@ -2924,6 +3127,7 @@ export default function AuthorProductForm({
             </article>
           ))}
 
+          {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
           <button
             type="button"
             disabled={busy || reorderBusy || !canEditPublicFields}
@@ -2932,6 +3136,7 @@ export default function AuthorProductForm({
           >
             Добавить аудио
           </button>
+          ) : null}
         </div>
       </section>
 

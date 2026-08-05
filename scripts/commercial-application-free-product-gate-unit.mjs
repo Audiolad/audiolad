@@ -77,6 +77,15 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  isPublishedFreeProductForCommercialGate({
+    status: "published",
+    is_free: true,
+    price: 0,
+    product_kind: "audio_post",
+  }),
+  false,
+);
 
 assert.equal(commercialApplicationSubmitRequiresPublishedFree(null), true);
 assert.equal(commercialApplicationSubmitRequiresPublishedFree("draft"), true);
@@ -177,6 +186,7 @@ const profile = {
         is_free: true,
         price: 0,
         readiness: readyReadiness(),
+        product_kind: "practice",
       }),
     ],
     campaigns: [],
@@ -238,6 +248,17 @@ const profile = {
 assert.equal(
   hasPublishedFreeProductForCommercialGate([
     { status: "submitted", is_free: true, price: 0 },
+  ]),
+  false,
+);
+assert.equal(
+  hasPublishedFreeProductForCommercialGate([
+    {
+      status: "published",
+      is_free: true,
+      price: 0,
+      product_kind: "audio_post",
+    },
   ]),
   false,
 );

@@ -23,24 +23,41 @@
 
 ### practices
 
-Единая сущность аудиопродукта (практика или музыка). Используется в `/catalog` и кабинете автора.
+Единая сущность аудиопродукта (практика, музыка или аудиопост). Используется в `/catalog` и кабинете автора.
 
-Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `music_usage_permission`.
+Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `music_usage_permission`, `is_catalog_listed`.
 
 Фильтр: `status=eq.published`, сортировка: `created_at.desc`.
 
 RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published'`.
 
-#### product_kind / music_usage_permission (2026-07-29)
+#### product_kind / music_usage_permission (2026-07-29, audio_post 2026-08-05)
 
-Миграция: `20260729200000_practice_product_kind_music.sql`.
+Миграции: `20260729200000_practice_product_kind_music.sql`, `20260805120000_practice_product_kind_audio_post.sql`.
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
-| `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером |
-| `music_usage_permission` | text NULL | для `practice` всегда NULL; для `music` при публикации обязательно `listen_only` \| `platform_reuse_allowed` |
+| `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music` \| `audio_post`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером |
+| `music_usage_permission` | text NULL | для `practice` и `audio_post` всегда NULL; для `music` при публикации обязательно `listen_only` \| `platform_reuse_allowed` |
 
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
+
+Для `audio_post`: всегда бесплатный (`is_free=true`, `price=0`), публичный формат «Аудиопост», ровно один `audio_item` на уровне publish readiness / UX (не CHECK на число треков).
+
+#### promo_* — универсальная внутренняя рекомендация (2026-08-05)
+
+Миграция: `20260805120000_practice_product_kind_audio_post.sql`.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `promo_enabled` | boolean NOT NULL DEFAULT false | показывать блок «следующий шаг» |
+| `promo_title` | text NULL | заголовок |
+| `promo_text` | text NULL | короткий текст |
+| `promo_button_text` | text NULL | текст кнопки |
+| `promo_url` | text NULL | internal `/...` или безопасный external URL |
+| `promo_open_in_new_tab` | boolean NOT NULL DEFAULT false | только для external |
+
+На MVP блок включается в UI только для `audio_post`. Поля универсальны для будущего использования на других типах.
 
 ### profiles
 

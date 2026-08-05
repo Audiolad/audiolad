@@ -15,17 +15,22 @@ export type CommercialGateProduct = {
   status: string;
   is_free: boolean;
   price: number;
+  product_kind?: string | null;
   deleted_at?: string | null;
 };
 
 /**
  * A product unlocks first commercial submit when it is a live published free
- * zero-price product of the current author project. Product kind is ignored.
+ * zero-price practice or music product of the current author project.
  */
 export function isPublishedFreeProductForCommercialGate(
   product: CommercialGateProduct,
 ): boolean {
   if (product.deleted_at) {
+    return false;
+  }
+
+  if (product.product_kind === "audio_post") {
     return false;
   }
 
@@ -83,7 +88,8 @@ export async function authorHasPublishedFreeProductForCommercialGate(
     .is("deleted_at", null)
     .eq("status", "published")
     .eq("is_free", true)
-    .eq("price", 0);
+    .eq("price", 0)
+    .in("product_kind", ["practice", "music"]);
 
   if (error) {
     throw new Error(

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   getMusicProductTypeLabel,
+  isAudioPostProductKind,
   isMusicProductKind,
   normalizeProductKind,
 } from "@/lib/author-products/product-kind";
@@ -152,9 +153,11 @@ function mapPracticeToHomeProduct(
     statsLabel: null,
     productTypeLabel: isMusicProductKind(productKind)
       ? getMusicProductTypeLabel()
-      : audioCount >= 2
-        ? "Программа аудиопрактик"
-        : "Аудиопрактика",
+      : isAudioPostProductKind(productKind)
+        ? "Аудиопост"
+        : audioCount >= 2
+          ? "Программа аудиопрактик"
+          : "Аудиопрактика",
     priceLabel: practice.is_free ? "Подарок" : `${practice.price ?? 0} ₽`,
     sortTimestamp: getSortTimestamp(practice.published_at, practice.created_at),
     audioCount,

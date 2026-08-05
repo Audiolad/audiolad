@@ -1,5 +1,6 @@
 import {
   getMusicReleaseLabel,
+  isAudioPostProductKind,
   isMusicProductKind,
 } from "@/lib/author-products/product-kind";
 import { isProgramFormat } from "@/lib/products/practice-access-ui";
@@ -34,6 +35,10 @@ export function buildProductCoverAlt(input: ProductCoverAltInput): string {
       typeof input.audioCount === "number" ? input.audioCount : 1,
     );
     return `Обложка: ${release.toLowerCase()} «${title}»${suffix}`;
+  }
+
+  if (isAudioPostProductKind(input.productKind)) {
+    return `Обложка аудиопоста «${title}»${suffix}`;
   }
 
   if (isProgramFormat(input.format ?? null)) {

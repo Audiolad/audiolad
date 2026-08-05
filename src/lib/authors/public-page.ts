@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
 import {
-  getMusicProductTypeLabel,
+  getProductKindLabel,
+  isAudioPostProductKind,
   isMusicProductKind,
   normalizeProductKind,
   type ProductKind,
@@ -124,6 +125,7 @@ export async function loadAuthorPublicPageData(
     )
     .eq("author_id", author.id)
     .eq("status", "published")
+    .eq("is_catalog_listed", true)
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
@@ -251,8 +253,12 @@ export function getAuthorProductTypeLabel(
   productKind?: string | null,
   audioCount = 1,
 ): string {
+  if (isAudioPostProductKind(productKind)) {
+    return getProductKindLabel(productKind);
+  }
+
   if (isMusicProductKind(productKind)) {
-    return getMusicProductTypeLabel();
+    return getProductKindLabel(productKind);
   }
 
   return getDisplayFormat(format) ?? "Аудиопрактика";

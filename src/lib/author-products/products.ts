@@ -5,6 +5,7 @@ import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
+  AUDIO_POST_KIND_LABEL,
   MUSIC_KIND_LABEL,
   MUSIC_USAGE_PERMISSION,
   PRODUCT_KIND,
@@ -33,6 +34,7 @@ const PRACTICE_DETAIL_SELECT = `
   duration_minutes,
   price,
   is_free,
+  is_catalog_listed,
   cover_url,
   cover_image,
   use_shared_cover,
@@ -50,6 +52,12 @@ const PRACTICE_DETAIL_SELECT = `
   listening_notice_enabled,
   listening_notice_title,
   listening_notice_text,
+  promo_enabled,
+  promo_title,
+  promo_text,
+  promo_button_text,
+  promo_url,
+  promo_open_in_new_tab,
   created_at,
   updated_at
 `;
@@ -281,7 +289,12 @@ export async function createDraftProduct(
         productKind === PRODUCT_KIND.MUSIC
           ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
           : null,
-      format: productKind === PRODUCT_KIND.MUSIC ? MUSIC_KIND_LABEL : null,
+      format:
+        productKind === PRODUCT_KIND.MUSIC
+          ? MUSIC_KIND_LABEL
+          : productKind === PRODUCT_KIND.AUDIO_POST
+            ? AUDIO_POST_KIND_LABEL
+            : null,
     })
     .select(PRACTICE_DETAIL_SELECT)
     .single();

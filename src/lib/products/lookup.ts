@@ -33,6 +33,12 @@ export type PublicPracticeRow = {
   listening_notice_enabled?: boolean | null;
   listening_notice_title?: string | null;
   listening_notice_text?: string | null;
+  promo_enabled?: boolean | null;
+  promo_title?: string | null;
+  promo_text?: string | null;
+  promo_button_text?: string | null;
+  promo_url?: string | null;
+  promo_open_in_new_tab?: boolean | null;
   authors: PublicPracticeAuthor | PublicPracticeAuthor[] | null;
 };
 
@@ -89,6 +95,12 @@ export async function getPracticeByAuthorAndSlug(
       listening_notice_enabled,
       listening_notice_title,
       listening_notice_text,
+      promo_enabled,
+      promo_title,
+      promo_text,
+      promo_button_text,
+      promo_url,
+      promo_open_in_new_tab,
       authors!practices_author_id_fkey (
         id,
         name,
