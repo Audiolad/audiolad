@@ -2349,92 +2349,85 @@
   color: var(--school-ink);
 }
 
-.school-why-now__timeline {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0.15rem 0 0.05rem;
-  list-style: none;
-  position: relative;
-}
-
-.school-why-now__timeline::before {
-  content: "";
-  position: absolute;
-  top: 1.05rem;
-  left: 12%;
-  right: 12%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    rgba(168, 122, 58, 0.18) 0%,
-    rgba(112, 66, 197, 0.45) 50%,
-    rgba(112, 66, 197, 0.2) 100%
-  );
-}
-
-.school-why-now__timeline-item {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  text-align: center;
-}
-
-.school-why-now__timeline-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 999px;
-  background: rgba(255, 252, 249, 0.95);
-  border: 1px solid rgba(168, 122, 58, 0.35);
-  color: var(--school-ink);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.school-why-now__timeline-item:last-child .school-why-now__timeline-dot {
-  border-color: rgba(112, 66, 197, 0.4);
-  color: var(--school-accent);
-}
-
-.school-why-now__timeline-label {
-  font-size: 0.92rem;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--school-ink);
-}
-
 .school-why-now__contrast {
   display: flex;
   flex-direction: column;
-  gap: 0.38rem;
+  gap: 0.55rem;
 }
 
-.school-why-now__contrast-line {
+.school-why-now__state {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1.15rem;
+  overflow: hidden;
+}
+
+.school-why-now__state--think {
+  background: linear-gradient(
+    165deg,
+    rgba(236, 230, 242, 0.72) 0%,
+    rgba(228, 222, 232, 0.78) 100%
+  );
+  border: 1px solid rgba(196, 186, 210, 0.45);
+}
+
+.school-why-now__state--create {
+  background:
+    radial-gradient(
+      70% 80% at 12% 18%,
+      rgba(255, 236, 196, 0.55) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      55% 60% at 88% 20%,
+      rgba(255, 248, 230, 0.7) 0%,
+      transparent 50%
+    ),
+    linear-gradient(165deg, #fff8ef 0%, #fff2df 48%, #f7ebe0 100%);
+  border: 1px solid rgba(214, 186, 140, 0.45);
+}
+
+.school-why-now__state--create::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 70%;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg at 30% 40%,
+    rgba(255, 214, 140, 0.14) 0deg 8deg,
+    transparent 8deg 18deg
+  );
+  opacity: 0.55;
+}
+
+.school-why-now__state-emoji {
+  position: relative;
+  z-index: 1;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.school-why-now__state-text {
+  position: relative;
+  z-index: 1;
   margin: 0;
-  padding: 0.6rem 0.72rem;
-  border-radius: 0.95rem;
   font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.34;
+  line-height: 1.36;
+  overflow-wrap: break-word;
 }
 
-.school-why-now__contrast-line--think {
-  background: rgba(255, 252, 249, 0.55);
-  border: 1px solid rgba(214, 196, 168, 0.35);
+.school-why-now__state--think .school-why-now__state-text {
   color: var(--school-muted);
 }
 
-.school-why-now__contrast-line--create {
-  background: rgba(255, 252, 250, 0.88);
-  border: 1px solid rgba(196, 176, 230, 0.55);
+.school-why-now__state--create .school-why-now__state-text {
   color: var(--school-ink);
   font-weight: 600;
 }
@@ -2477,8 +2470,15 @@
     gap: 0.55rem;
   }
 
-  .school-why-now__timeline {
-    margin-top: 0.15rem;
+  .school-why-now__contrast {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    align-items: stretch;
+  }
+
+  .school-why-now__state {
+    height: 100%;
   }
 
   .school-why-now__accent {

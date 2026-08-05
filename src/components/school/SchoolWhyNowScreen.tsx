@@ -24,11 +24,17 @@ const BODY = [
   },
 ] as const;
 
-const TIMELINE = ["Сегодня", "Первый шаг", "Через год"] as const;
-
 const CONTRAST = [
-  "Через год вы можете по-прежнему только думать о своей первой аудиопрактике.",
-  "А можете уже создавать собственные аудиопродукты, которые будут помогать людям.",
+  {
+    emoji: "🤔",
+    text: "Через год вы можете по-прежнему только думать о своей первой аудиопрактике.",
+    tone: "think",
+  },
+  {
+    emoji: "😊",
+    text: "А можете уже создавать собственные аудиопродукты, которые будут помогать людям.",
+    tone: "create",
+  },
 ] as const;
 
 const ACCENT = "Лучшее время начать – сегодня.";
@@ -59,27 +65,21 @@ export default function SchoolWhyNowScreen() {
         </div>
 
         <div className="school-why-now__secondary">
-          <ol className="school-why-now__timeline" aria-label="Путь вперёд">
-            {TIMELINE.map((step, index) => (
-              <li key={step} className="school-why-now__timeline-item">
+          <div className="school-why-now__contrast">
+            {CONTRAST.map((option) => (
+              <div
+                key={option.tone}
+                className={`school-why-now__state school-why-now__state--${option.tone}`}
+              >
                 <span
-                  className="school-why-now__timeline-dot"
+                  className="school-why-now__state-emoji"
                   aria-hidden="true"
                 >
-                  {index + 1}
+                  {option.emoji}
                 </span>
-                <span className="school-why-now__timeline-label">{step}</span>
-              </li>
+                <p className="school-why-now__state-text">{option.text}</p>
+              </div>
             ))}
-          </ol>
-
-          <div className="school-why-now__contrast">
-            <p className="school-why-now__contrast-line school-why-now__contrast-line--think">
-              {CONTRAST[0]}
-            </p>
-            <p className="school-why-now__contrast-line school-why-now__contrast-line--create">
-              {CONTRAST[1]}
-            </p>
           </div>
 
           <p className="school-why-now__accent">{ACCENT}</p>
