@@ -19,6 +19,7 @@ import SchoolLearningProcessScreen from "@/components/school/SchoolLearningProce
 import SchoolTariffsScreen from "@/components/school/SchoolTariffsScreen";
 import SchoolBonusesScreen from "@/components/school/SchoolBonusesScreen";
 import SchoolAfterGraduationScreen from "@/components/school/SchoolAfterGraduationScreen";
+import SchoolTestimonialsScreen from "@/components/school/SchoolTestimonialsScreen";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -54,6 +55,7 @@ export default async function SchoolSitePage() {
       <SchoolTariffsScreen />
       <SchoolBonusesScreen />
       <SchoolAfterGraduationScreen />
+      <SchoolTestimonialsScreen />
     </main>
   );
 }
