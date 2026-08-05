@@ -198,30 +198,47 @@
   scroll-margin-top: 1rem;
 }
 
-/* Deferred second-screen materials (not mounted on cover). */
+/* —— Second screen: value of audio format —— */
 .school-second-screen {
+  box-sizing: border-box;
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--school-max);
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
-  padding: 0 var(--school-gutter) 2rem;
+  gap: 1.35rem;
+  padding: 0.35rem var(--school-gutter) 2.25rem;
+  color: var(--school-ink);
 }
 
-.school-second-screen__accent {
+.school-second-screen__voice {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.95rem;
-  padding: 1.05rem 1.1rem;
+  padding: 1.2rem 1.15rem 1.25rem;
   border-radius: 1.45rem;
-  background: var(--school-lavender);
+  background:
+    radial-gradient(
+      120% 90% at 12% 0%,
+      rgba(143, 78, 234, 0.14) 0%,
+      transparent 55%
+    ),
+    var(--school-lavender);
   border: 1px solid var(--school-lavender-border);
 }
 
-.school-second-screen__accent-icon {
+.school-second-screen__voice-visual {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.school-second-screen__mic-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.85rem;
+  height: 2.85rem;
   flex-shrink: 0;
   border-radius: 999px;
   background: #fff;
@@ -230,57 +247,118 @@
 }
 
 .school-second-screen__mic-icon {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.3rem;
+  height: 1.3rem;
 }
 
-.school-second-screen__accent-text {
+.school-second-screen__waves {
+  width: min(11rem, 58%);
+  height: auto;
+  color: var(--school-accent);
+  opacity: 0.85;
+}
+
+.school-second-screen__voice-title {
   margin: 0;
-  text-align: left;
-  font-size: clamp(1rem, 3.8vw, 1.08rem);
-  line-height: 1.32;
-  font-weight: 600;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.45rem, 5.6vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
   color: var(--school-ink);
 }
 
-.school-second-screen__scenarios {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.4rem;
+.school-second-screen__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-second-screen__choice-title {
   margin: 0;
-  padding: 0;
+  font-size: clamp(1.12rem, 4.2vw, 1.28rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--school-ink);
+}
+
+.school-second-screen__choice-text {
+  margin: 0;
+  font-size: clamp(0.98rem, 3.6vw, 1.05rem);
+  font-weight: 500;
+  line-height: 1.45;
+  color: #2a2438;
+}
+
+.school-second-screen__scenarios {
+  display: flex;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.15rem 0.1rem 0.35rem;
   list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.school-second-screen__scenarios::-webkit-scrollbar {
+  display: none;
 }
 
 .school-second-screen__scenario {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.35rem;
+  flex: 0 0 min(9.75rem, 72vw);
   min-width: 0;
-  text-align: center;
+  padding: 0.85rem 0.8rem 0.9rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 253, 253, 0.92);
+  border: 1px solid var(--school-lavender-border);
+  scroll-snap-align: start;
+  color: var(--school-ink);
+}
+
+.school-second-screen__scenario-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.75rem;
+  background: var(--school-lavender);
   color: var(--school-ink);
 }
 
 .school-second-screen__scenario-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: var(--school-ink);
-  opacity: 0.9;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .school-second-screen__scenario-label {
-  font-size: clamp(0.68rem, 2.7vw, 0.78rem);
-  line-height: 1.15;
-  font-weight: 500;
-  color: var(--school-muted);
-  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--school-ink);
 }
 
-.school-second-screen__support {
+.school-second-screen__scenario-desc {
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--school-muted);
+}
+
+.school-second-screen__closing {
   margin: 0;
-  text-align: center;
-  font-size: clamp(0.95rem, 3.5vw, 1.02rem);
+  padding: 0.15rem 0.1rem 0;
+  text-align: left;
+  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-weight: 500;
   line-height: 1.45;
   color: var(--school-muted);
 }
@@ -305,6 +383,25 @@
   .school-site-root {
     --school-max: 520px;
     --school-gutter: 1.75rem;
+  }
+
+  .school-second-screen__scenarios {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    overflow: visible;
+    padding: 0;
+    scroll-snap-type: none;
+  }
+
+  .school-second-screen__scenario {
+    flex: none;
+    width: auto;
+  }
+
+  .school-second-screen__scenario:last-child {
+    grid-column: 1 / -1;
+    max-width: calc(50% - 0.35rem);
   }
 }
 
@@ -346,6 +443,43 @@
   .school-first-screen__start {
     font-size: 1.1rem;
   }
+
+  .school-second-screen {
+    gap: 1.55rem;
+    padding-top: 0.75rem;
+    padding-bottom: 2.75rem;
+  }
+
+  .school-second-screen__voice {
+    padding: 1.45rem 1.4rem 1.5rem;
+  }
+
+  .school-second-screen__voice-title {
+    font-size: 2.05rem;
+  }
+
+  .school-second-screen__scenarios {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .school-second-screen__scenario {
+    padding: 0.95rem 0.85rem 1rem;
+  }
+
+  .school-second-screen__scenario:last-child {
+    grid-column: auto;
+    max-width: none;
+  }
+
+  .school-second-screen__choice-title {
+    font-size: 1.35rem;
+  }
+
+  .school-second-screen__choice-text,
+  .school-second-screen__closing {
+    font-size: 1.08rem;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -360,6 +494,11 @@
 
   .school-first-screen__title {
     font-size: 3.8rem;
+  }
+
+  .school-second-screen__voice-title {
+    font-size: 2.2rem;
+    max-width: 18ch;
   }
 }
 

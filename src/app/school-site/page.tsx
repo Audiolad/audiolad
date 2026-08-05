@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import SchoolFirstScreen from "@/components/school/SchoolFirstScreen";
+import SchoolSecondScreen from "@/components/school/SchoolSecondScreen";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -22,6 +23,7 @@ export default async function SchoolSitePage() {
   return (
     <main>
       <SchoolFirstScreen />
+      <SchoolSecondScreen />
       <div id="tariffs" className="school-site-tariffs-anchor" />
     </main>
   );
