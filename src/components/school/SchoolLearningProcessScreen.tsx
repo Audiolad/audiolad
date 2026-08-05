@@ -41,7 +41,10 @@ export default function SchoolLearningProcessScreen() {
                   : "school-learning__step"
               }
             >
-              <span className="school-learning__step-num" aria-hidden="true">
+              <span
+                className="school-learning__step-num school-number"
+                aria-hidden="true"
+              >
                 {number}
               </span>
               <p className="school-learning__step-text">{step}</p>

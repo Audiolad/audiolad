@@ -1,11 +1,17 @@
 type SchoolTariffId = "standard" | "premium" | "vip";
 
+type SchoolTariffFeature = {
+  text: string;
+  note?: string;
+};
+
 type SchoolTariff = {
   id: SchoolTariffId;
   name: string;
+  oldPrice: string;
   price: string;
   description: string;
-  features: readonly string[];
+  features: readonly SchoolTariffFeature[];
   badge?: string;
   tone: "standard" | "premium" | "vip";
 };
@@ -18,56 +24,80 @@ const TARIFFS: readonly SchoolTariff[] = [
   {
     id: "standard",
     name: "Стандарт",
+    oldPrice: "5 000 ₽",
     price: "1 888 ₽",
     description:
       "Для тех, кто хочет познакомиться с профессией автора аудиопрактик и получить полное представление о том, как создавать собственные аудиопродукты.",
     features: [
-      "Два дня живого онлайн-интенсива;",
-      "Все 7 модулей программы;",
-      "Ответы на вопросы во время обучения;",
-      "Записи занятий;",
-      "Первое понимание профессии автора аудиопрактик.",
+      { text: "Два дня живого онлайн-интенсива;" },
+      { text: "Все 7 модулей программы;" },
+      { text: "Ответы на вопросы во время обучения;" },
+      { text: "Записи занятий;" },
+      { text: "Первое понимание профессии автора аудиопрактик." },
     ],
     tone: "standard",
   },
   {
     id: "premium",
     name: "Премиум",
+    oldPrice: "35 000 ₽",
     price: "18 888 ₽",
     badge: "Рекомендуем",
     description:
-      "Полная программа Школы Аудиопрактик с групповым сопровождением Сергея Петрова, обратной связью и помощью в создании собственных аудиопродуктов.",
+      "Полная практическая программа Школы Аудиопрактик с месячным сопровождением Сергея Петрова, восемью живыми встречами, персональной обратной связью и помощью в создании, доработке и публикации собственных аудиопродуктов.",
     features: [
-      "Всё, что входит в пакет «Стандарт»;",
-      "Бонусный модуль;",
-      "Один месяц сопровождения;",
-      "Общий чат участников;",
-      "Проверка домашних заданий;",
-      "Обратная связь во время обучения;",
-      "Помощь в создании первых аудиопродуктов;",
-      "Помощь с публикацией на АудиоЛаде;",
-      "Сертификат об окончании Школы Аудиопрактик.",
+      { text: "Всё, что входит в пакет «Стандарт»;" },
+      { text: "Бонусный модуль;" },
+      { text: "Один месяц практического сопровождения;" },
+      {
+        text: "8 живых встреч с обратной связью – два раза в неделю;",
+        note: "2 раза в неделю",
+      },
+      { text: "Общий чат участников;" },
+      {
+        text: "Персональная обратная связь от Сергея Петрова каждому участнику – голосом и в общем чате;",
+      },
+      { text: "Проверка домашних заданий;" },
+      {
+        text: "Разбор идей, сценариев, записей, упаковки и готовых аудиопродуктов;",
+      },
+      { text: "Помощь в создании и доработке первых аудиопродуктов;" },
+      {
+        text: "Помощь с публикацией первых аудиопродуктов на АудиоЛаде;",
+      },
+      { text: "Сертификат об окончании Школы Аудиопрактик." },
     ],
     tone: "premium",
   },
   {
     id: "vip",
     name: "VIP",
+    oldPrice: "125 000 ₽",
     price: "88 888 ₽",
     description:
       "Индивидуальная программа для тех, кто хочет максимально быстро создать и развить собственное авторское направление.",
     features: [
-      "Всё, что входит в пакет «Премиум»;",
-      "Четыре персональные встречи с Сергеем Петровым;",
-      "Индивидуальная помощь в выборе авторского направления;",
-      "Совместная разработка линейки аудиопродуктов;",
-      "Помощь в упаковке и позиционировании;",
-      "Помощь с запуском первых продаж;",
-      "Помощь с получением коммерческого статуса автора на АудиоЛаде;",
-      "Создание автоматической воронки в MAX или Telegram для регулярного привлечения новых подписчиков, слушателей и клиентов;",
-      "Рекомендация (публикация) ваших лучших аудиопродуктов в канале «Сергей и Зоя»;",
-      "Рекомендация (публикация) ваших лучших аудиопродуктов в рассылках проекта Сергея Петрова;",
-      "Индивидуальные рекомендации по развитию вашего проекта.",
+      { text: "Всё, что входит в пакет «Премиум»;" },
+      { text: "Четыре персональные встречи с Сергеем Петровым;" },
+      {
+        text: "Индивидуальная помощь в выборе авторского направления;",
+      },
+      { text: "Совместная разработка линейки аудиопродуктов;" },
+      { text: "Помощь в упаковке и позиционировании;" },
+      { text: "Помощь с запуском первых продаж;" },
+      {
+        text: "Помощь с получением коммерческого статуса автора на АудиоЛаде;",
+      },
+      {
+        text: "Создание автоматической воронки в MAX или Telegram для регулярного привлечения новых подписчиков, слушателей и клиентов;",
+      },
+      {
+        text: "Рекомендация (публикация) ваших лучших аудиопродуктов в канале «Сергей и Зоя»;",
+      },
+      {
+        text: "Рекомендация (публикация) ваших лучших аудиопродуктов в рассылках проекта Сергея Петрова;",
+      },
+      { text: "Индивидуальные рекомендации по развитию вашего проекта." },
     ],
     tone: "vip",
   },
@@ -115,21 +145,44 @@ export default function SchoolTariffsScreen() {
               {tariff.badge ? (
                 <p className="school-tariffs__badge">{tariff.badge}</p>
               ) : (
-                <span className="school-tariffs__badge-spacer" aria-hidden="true" />
+                <span
+                  className="school-tariffs__badge-spacer"
+                  aria-hidden="true"
+                />
               )}
 
               <h3 className="school-tariffs__name">{tariff.name}</h3>
-              <p className="school-tariffs__price">{tariff.price}</p>
+
+              <div className="school-tariffs__prices">
+                <p className="school-tariffs__price-old">
+                  <span className="sr-only">Прежняя цена: </span>
+                  <span className="school-number">{tariff.oldPrice}</span>
+                </p>
+                <p className="school-tariffs__price">
+                  <span className="sr-only">Текущая цена: </span>
+                  <span className="school-number">{tariff.price}</span>
+                </p>
+              </div>
+
               <p className="school-tariffs__description">{tariff.description}</p>
             </div>
 
             <ul className="school-tariffs__features">
               {tariff.features.map((feature) => (
-                <li key={feature} className="school-tariffs__feature">
+                <li key={feature.text} className="school-tariffs__feature">
                   <span className="school-tariffs__check" aria-hidden="true">
                     <CheckIcon className="school-tariffs__check-icon" />
                   </span>
-                  <span className="school-tariffs__feature-text">{feature}</span>
+                  <span className="school-tariffs__feature-body">
+                    <span className="school-tariffs__feature-text">
+                      {feature.text}
+                    </span>
+                    {feature.note ? (
+                      <span className="school-tariffs__feature-note">
+                        {feature.note}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>

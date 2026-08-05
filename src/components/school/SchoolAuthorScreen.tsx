@@ -12,8 +12,8 @@ const INTRO = [
 ] as const;
 
 const EXPERIENCE = [
-  { prefix: "В практиках – ", value: "20 лет" },
-  { prefix: "Консультирую и преподаю – ", value: "12 лет" },
+  { prefix: "В практиках – ", value: "20", unit: " лет" },
+  { prefix: "Консультирую и преподаю – ", value: "12", unit: " лет" },
 ] as const;
 
 const CONDUCTED = [
@@ -144,7 +144,10 @@ export default function SchoolAuthorScreen() {
           {EXPERIENCE.map((item) => (
             <p key={item.prefix} className="school-author__year">
               <span className="school-author__year-prefix">{item.prefix}</span>
-              <span className="school-author__year-value">{item.value}</span>
+              <span className="school-author__year-value">
+                <span className="school-number">{item.value}</span>
+                {item.unit}
+              </span>
               <span aria-hidden="true">;</span>
             </p>
           ))}
@@ -156,7 +159,9 @@ export default function SchoolAuthorScreen() {
             <ul className="school-author__stat-list">
               {CONDUCTED.map((item) => (
                 <li key={item.label} className="school-author__stat-item">
-                  <span className="school-author__stat-value">{item.value}</span>
+                  <span className="school-author__stat-value school-number">
+                    {item.value}
+                  </span>
                   <span className="school-author__stat-label">{item.label}</span>
                 </li>
               ))}
@@ -168,7 +173,9 @@ export default function SchoolAuthorScreen() {
             <ul className="school-author__stat-list">
               {CREATED.map((item) => (
                 <li key={item.label} className="school-author__stat-item">
-                  <span className="school-author__stat-value">{item.value}</span>
+                  <span className="school-author__stat-value school-number">
+                    {item.value}
+                  </span>
                   <span className="school-author__stat-label">{item.label}</span>
                 </li>
               ))}
@@ -200,9 +207,13 @@ export default function SchoolAuthorScreen() {
             </span>
             <p className="school-author__geo-text">
               Сегодня мои клиенты и ученики живут в{" "}
-              <strong className="school-author__geo-strong">29 странах</strong>{" "}
+              <strong className="school-author__geo-strong">
+                <span className="school-number">29</span> странах
+              </strong>{" "}
               на{" "}
-              <strong className="school-author__geo-strong">5 континентах</strong>
+              <strong className="school-author__geo-strong">
+                <span className="school-number">5</span> континентах
+              </strong>
               .
             </p>
           </div>

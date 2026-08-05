@@ -1,9 +1,6 @@
 import { SchoolTariffsAnchorLink } from "@/components/school/SchoolTariffsAnchorLink";
 import Image from "next/image";
 
-/** En dash (U+2013): «Старт – 20 августа». */
-const SCHOOL_START_DATE = "Старт – 20 августа";
-
 /**
  * Cover CTA: school-specific phrasing converts better on the first screen
  * than the generic tariff CTA «Принять участие».
@@ -40,7 +37,9 @@ export default function SchoolFirstScreen() {
           зарабатывать на любимом деле
         </p>
 
-        <p className="school-first-screen__start">{SCHOOL_START_DATE}</p>
+        <p className="school-first-screen__start">
+          Старт – <span className="school-number">20</span> августа
+        </p>
 
         <SchoolTariffsAnchorLink className="school-first-screen__cta">
           {SCHOOL_COVER_CTA}

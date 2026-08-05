@@ -72,7 +72,16 @@ export default function SchoolProgramAccordion({
               >
                 <span className="school-program__module-trigger-main">
                   <span className="school-program__module-label">
-                    {module.label}
+                    {module.kind === "module" ? (
+                      <>
+                        Модуль{" "}
+                        <span className="school-number">
+                          {module.label.replace(/^Модуль\s+/, "")}
+                        </span>
+                      </>
+                    ) : (
+                      module.label
+                    )}
                   </span>
                   <span className="school-program__module-title">
                     {module.title}

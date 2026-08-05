@@ -24,6 +24,13 @@
   --school-card-body-size: 1.125rem; /* 18px — example descriptions (reference) */
   --school-card-body-leading: 1.45;
   --school-body-color: #241e36;
+  /*
+   * Tabular lining numerals for prices/stats.
+   * Keep Playfair for headings; numbers use the landing sans stack.
+   */
+  --school-number-font:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -39,6 +46,13 @@
 
 .school-site-root :is(a, button) {
   -webkit-tap-highlight-color: transparent;
+}
+
+.school-number {
+  font-family: var(--school-number-font);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-synthesis: none;
 }
 
 /* —— First-screen cover (no platform header) —— */
@@ -3012,10 +3026,14 @@
 }
 
 .school-author__year-value {
-  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
   font-size: 1.35rem;
   font-weight: 700;
   color: var(--school-ink);
+}
+
+.school-author__year-value .school-number {
+  font-size: 1.35rem;
+  font-weight: 700;
 }
 
 .school-author__stats {
@@ -3056,7 +3074,6 @@
 }
 
 .school-author__stat-value {
-  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
   font-size: 1.2rem;
   font-weight: 700;
   line-height: 1.2;
@@ -3164,9 +3181,12 @@
 }
 
 .school-author__geo-strong {
-  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
   font-weight: 700;
   color: var(--school-ink);
+}
+
+.school-author__geo-strong .school-number {
+  font-weight: 700;
 }
 
 .school-author__wish-body {
@@ -3602,14 +3622,38 @@
   color: var(--school-ink);
 }
 
+.school-tariffs__prices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.school-tariffs__price-old {
+  margin: 0;
+  color: var(--school-muted);
+  font-size: clamp(0.98rem, 3.6vw, 1.08rem);
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(106, 92, 150, 0.55);
+}
+
 .school-tariffs__price {
   margin: 0;
-  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
   font-size: clamp(1.7rem, 6.5vw, 2rem);
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--school-ink);
+}
+
+.school-tariffs__price .school-number,
+.school-tariffs__price-old .school-number {
+  font-weight: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: inherit;
 }
 
 .school-tariffs__card--premium .school-tariffs__price {
@@ -3639,6 +3683,27 @@
   grid-template-columns: 1.25rem minmax(0, 1fr);
   gap: 0.55rem;
   align-items: start;
+}
+
+.school-tariffs__feature-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.school-tariffs__feature-note {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(112, 66, 197, 0.1);
+  border: 1px solid rgba(112, 66, 197, 0.18);
+  color: var(--school-accent);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .school-tariffs__check {
@@ -3753,7 +3818,7 @@
 
 @media (min-width: 1024px) {
   .school-tariffs {
-    max-width: min(1080px, 100%);
+    max-width: min(1140px, 100%);
     padding: 2.1rem 2rem 2.2rem;
   }
 
@@ -3777,7 +3842,7 @@
   }
 
   .school-tariffs__card-top {
-    min-height: 12.5rem;
+    min-height: 14.5rem;
   }
 
   .school-tariffs__name {
