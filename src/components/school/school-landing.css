@@ -677,9 +677,11 @@
   font-size: var(--school-card-title-size);
   font-weight: 500;
   line-height: 1.22;
+  letter-spacing: -0.01em;
   color: var(--school-ink);
-  overflow-wrap: break-word;
-  word-break: normal;
+  /* Break only on spaces — avoid orphan letters like «Аудиопрограмм / ы». */
+  overflow-wrap: normal;
+  word-break: keep-all;
   hyphens: none;
   -webkit-hyphens: none;
 }
