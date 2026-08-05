@@ -184,6 +184,7 @@ export async function loadListenSessionPayload(
       is_free,
       is_catalog_listed,
       guest_access_enabled,
+      product_kind,
       authors!practices_author_id_fkey (
         id,
         name,

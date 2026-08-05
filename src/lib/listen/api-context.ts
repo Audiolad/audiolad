@@ -21,6 +21,7 @@ type PracticeAccessRow = {
   status: string | null;
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
+  product_kind?: string | null;
 };
 
 export type ListenApiContext = {

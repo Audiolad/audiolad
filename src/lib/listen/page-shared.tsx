@@ -332,6 +332,7 @@ export async function renderListenPage(
       is_free,
       is_catalog_listed,
       guest_access_enabled,
+      product_kind,
       listening_notice_enabled,
       listening_notice_title,
       listening_notice_text,

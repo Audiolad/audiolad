@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { useProductContentsPlayback } from "@/components/products/useProductContentsPlayback";
 import { formatAudioDuration } from "@/lib/products/duration";
 import type { PublicAudioItem } from "@/lib/products/public-audio-items";
@@ -29,23 +27,12 @@ export default function AudioPostPlayer({
     clearErrorMessage,
     activeTrackId,
     isPlaying,
+    needsGesturePlay,
   } = useProductContentsPlayback({
     authorSlug,
     productSlug,
     enabled,
   });
-
-  useEffect(() => {
-    if (!errorMessage) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      clearErrorMessage();
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [clearErrorMessage, errorMessage]);
 
   if (!track) {
     return (
@@ -63,6 +50,7 @@ export default function AudioPostPlayer({
   const isLoading = loadingTrackId === track.id;
   const isCurrentTrack = activeTrackId === track.id;
   const showAsPlaying = isCurrentTrack && isPlaying;
+  const showGestureHint = needsGesturePlay && isCurrentTrack;
 
   return (
     <section className="rounded-[26px] border border-[#eadff8] bg-white px-5 py-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
@@ -79,6 +67,7 @@ export default function AudioPostPlayer({
           disabled={!enabled || isLoading}
           aria-label={showAsPlaying ? "Пауза" : "Воспроизвести"}
           onClick={() => {
+            clearErrorMessage();
             void playTrack(track.id);
           }}
           className="inline-flex min-h-12 min-w-[10.5rem] items-center justify-center gap-2 rounded-[16px] bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:cursor-not-allowed disabled:opacity-60"
@@ -91,7 +80,9 @@ export default function AudioPostPlayer({
                 ? "Загрузка…"
                 : showAsPlaying
                   ? "Пауза"
-                  : "Слушать"}
+                  : showGestureHint
+                    ? "Воспроизвести"
+                    : "Слушать"}
           </span>
         </button>
       </div>
@@ -99,6 +90,10 @@ export default function AudioPostPlayer({
       {errorMessage ? (
         <p className="mt-3 text-sm leading-6 text-[#8d4d57]" role="alert">
           {errorMessage}
+        </p>
+      ) : showGestureHint ? (
+        <p className="mt-3 text-sm leading-6 text-[#8d4d57]" role="status">
+          Нажмите ещё раз, чтобы начать прослушивание.
         </p>
       ) : (
         <p className="mt-3 text-sm leading-6 text-[#7d70a2]">

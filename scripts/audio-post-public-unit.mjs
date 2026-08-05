@@ -119,6 +119,37 @@ const unlistedPractice = await resolveProductAccess(
 );
 assert.equal(unlistedPractice.canListen, false);
 
+// Without product_kind the free-audio-post exception must not apply.
+const missingKind = await resolveProductAccess(
+  {
+    from() {
+      throw new Error("supabase_should_not_be_called_for_anonymous_blocked_path");
+    },
+  },
+  {
+    id: "p3",
+    author_id: "a1",
+    is_free: true,
+    status: "published",
+    is_catalog_listed: false,
+  },
+  null,
+);
+assert.equal(missingKind.canListen, false);
+
+const listenSessionLoader = read("src/lib/listen/load-session-payload.ts");
+assert.match(
+  listenSessionLoader,
+  /is_catalog_listed,[\s\S]*guest_access_enabled,[\s\S]*product_kind,/,
+  "listen session must load product_kind for unlisted audio_post guest access",
+);
+
+const listenPageShared = read("src/lib/listen/page-shared.tsx");
+assert.match(
+  listenPageShared,
+  /is_catalog_listed,[\s\S]*guest_access_enabled,[\s\S]*product_kind,/,
+);
+
 const pageSource = read("src/app/(listener)/practice/[...segments]/page.tsx");
 assert.match(pageSource, /AudioPostPage/);
 assert.match(pageSource, /isAudioPostProductKind/);

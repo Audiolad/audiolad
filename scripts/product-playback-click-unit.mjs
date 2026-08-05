@@ -59,15 +59,23 @@ const playbackHook = readFileSync(
 assert.match(playbackHook, /resolveProductPlaybackClickAction/);
 assert.match(playbackHook, /handlePlayPause/);
 assert.match(playbackHook, /isPlaying/);
+assert.match(playbackHook, /sessionCacheRef/);
+assert.match(playbackHook, /needsGesturePlay/);
+assert.match(playbackHook, /isProductAutoplayBlockedHint/);
+assert.match(playbackHook, /prefetch/);
 
 const audioPostPlayer = readFileSync(
   path.join(root, "src/components/products/audio-post/AudioPostPlayer.tsx"),
   "utf8",
 );
 assert.match(audioPostPlayer, /showAsPlaying/);
+assert.match(audioPostPlayer, /needsGesturePlay/);
 assert.match(audioPostPlayer, /"Пауза"/);
 assert.match(audioPostPlayer, /"Слушать"/);
+assert.match(audioPostPlayer, /"Воспроизвести"/);
 assert.doesNotMatch(audioPostPlayer, /Слушаю/);
 assert.match(audioPostPlayer, /isPlaying/);
+assert.match(audioPostPlayer, /role="alert"/);
+assert.doesNotMatch(audioPostPlayer, /setTimeout/);
 
 console.log("product-playback-click-unit: ok");

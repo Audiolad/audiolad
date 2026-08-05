@@ -11,6 +11,9 @@ type PracticeAccessRow = {
   author_id: string;
   is_free: boolean | null;
   status: string | null;
+  is_catalog_listed?: boolean | null;
+  guest_access_enabled?: boolean | null;
+  product_kind?: string | null;
 };
 
 export async function resolveListenAccess(
