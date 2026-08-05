@@ -290,9 +290,32 @@
   color: #2a2438;
 }
 
+/* Mobile: peek ~25% of the next card + soft right fade (no arrows/copy). */
+.school-second-screen__scenarios-shell {
+  --school-scenario-gap: 0.65rem;
+  position: relative;
+}
+
+.school-second-screen__scenarios-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0.35rem;
+  width: 2.35rem;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    to right,
+    rgba(246, 240, 232, 0) 0%,
+    rgba(246, 240, 232, 0.42) 48%,
+    rgba(250, 246, 255, 0.88) 100%
+  );
+}
+
 .school-second-screen__scenarios {
   display: flex;
-  gap: 0.65rem;
+  gap: var(--school-scenario-gap, 0.65rem);
   margin: 0;
   padding: 0.15rem 0.1rem 0.35rem;
   list-style: none;
@@ -313,9 +336,13 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0.35rem;
-  flex: 0 0 min(9.75rem, 72vw);
+  /*
+   * Track shows 2 full cards + ~25% of the third:
+   * width = (track - 2×gap) / 2.25
+   */
+  flex: 0 0 calc((100% - (2 * var(--school-scenario-gap, 0.65rem))) / 2.25);
   min-width: 0;
-  padding: 0.85rem 0.8rem 0.9rem;
+  padding: 0.85rem 0.75rem 0.9rem;
   border-radius: 1.15rem;
   background: rgba(255, 253, 253, 0.92);
   border: 1px solid var(--school-lavender-border);
@@ -383,6 +410,10 @@
   .school-site-root {
     --school-max: 520px;
     --school-gutter: 1.75rem;
+  }
+
+  .school-second-screen__scenarios-shell::after {
+    display: none;
   }
 
   .school-second-screen__scenarios {

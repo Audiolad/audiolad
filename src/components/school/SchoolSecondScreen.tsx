@@ -94,22 +94,24 @@ export default function SchoolSecondScreen() {
         <p className="school-second-screen__choice-text">{AUDIO_CHOICE_TEXT}</p>
       </div>
 
-      <ul
-        className="school-second-screen__scenarios"
-        aria-label="Когда слушают аудио"
-      >
-        {SCENARIOS.map(({ label, description, Icon }) => (
-          <li key={label} className="school-second-screen__scenario">
-            <span className="school-second-screen__scenario-icon-wrap">
-              <Icon className="school-second-screen__scenario-icon" />
-            </span>
-            <span className="school-second-screen__scenario-label">{label}</span>
-            <span className="school-second-screen__scenario-desc">
-              {description}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="school-second-screen__scenarios-shell">
+        <ul
+          className="school-second-screen__scenarios"
+          aria-label="Когда слушают аудио"
+        >
+          {SCENARIOS.map(({ label, description, Icon }) => (
+            <li key={label} className="school-second-screen__scenario">
+              <span className="school-second-screen__scenario-icon-wrap">
+                <Icon className="school-second-screen__scenario-icon" />
+              </span>
+              <span className="school-second-screen__scenario-label">{label}</span>
+              <span className="school-second-screen__scenario-desc">
+                {description}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <p className="school-second-screen__closing">{CLOSING_TEXT}</p>
     </section>
