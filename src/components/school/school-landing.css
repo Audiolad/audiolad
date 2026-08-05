@@ -4414,6 +4414,12 @@
   overflow-wrap: break-word;
 }
 
+.school-after__feature-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
 .school-after__feature-text {
   margin: 0;
   font-size: 0.92rem;
@@ -4587,9 +4593,9 @@
   }
 
   .school-after__feature:last-child {
-    grid-column: 1 / -1;
-    max-width: calc(50% - 0.45rem);
-    justify-self: center;
+    grid-column: auto;
+    max-width: none;
+    justify-self: stretch;
     padding-bottom: 0.85rem;
   }
 
@@ -4642,20 +4648,16 @@
   }
 
   .school-after__features {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.85rem;
   }
 
   .school-after__feature {
-    grid-column: span 4;
-  }
-
-  .school-after__feature:nth-child(n + 4) {
-    grid-column: span 3;
+    grid-column: auto;
   }
 
   .school-after__feature:last-child {
-    grid-column: span 3;
+    grid-column: auto;
     max-width: none;
     justify-self: stretch;
   }
