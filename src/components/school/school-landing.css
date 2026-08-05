@@ -1114,6 +1114,252 @@
   }
 }
 
+/* —— Fifth screen: emotional future vision —— */
+.school-fifth-screen {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.35rem auto 2.35rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.3rem var(--school-gutter) 1.45rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      120% 70% at 12% 0%,
+      rgba(143, 78, 234, 0.18) 0%,
+      transparent 52%
+    ),
+    radial-gradient(
+      90% 60% at 100% 100%,
+      rgba(95, 46, 201, 0.12) 0%,
+      transparent 55%
+    ),
+    linear-gradient(165deg, #efe7f8 0%, #f6f0e9 48%, #ebe3f5 100%);
+  border: 1px solid rgba(228, 216, 243, 0.85);
+}
+
+.school-fifth-screen__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    transparent 28%,
+    transparent 72%,
+    rgba(37, 19, 92, 0.04) 100%
+  );
+}
+
+.school-fifth-screen__orb {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.school-fifth-screen__orb--a {
+  top: -2.5rem;
+  right: -1.8rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  background: rgba(143, 78, 234, 0.14);
+}
+
+.school-fifth-screen__orb--b {
+  bottom: -3rem;
+  left: -2.4rem;
+  width: 9.5rem;
+  height: 9.5rem;
+  background: rgba(246, 240, 232, 0.55);
+}
+
+.school-fifth-screen__layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.78rem;
+}
+
+.school-fifth-screen__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 8.2vw, 2.55rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--school-ink);
+}
+
+.school-fifth-screen__intro,
+.school-fifth-screen__continuation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-fifth-screen__text {
+  margin: 0;
+  font-size: clamp(0.96rem, 3.5vw, 1.03rem);
+  font-weight: 500;
+  line-height: 1.4;
+  color: #2f2744;
+}
+
+.school-fifth-screen__waves {
+  width: min(12.5rem, 66%);
+  height: auto;
+  color: var(--school-accent);
+  opacity: 0.68;
+  margin: 0;
+}
+
+.school-fifth-screen__outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  list-style: none;
+  border-radius: 1.15rem;
+  background: rgba(255, 252, 250, 0.42);
+  border: 1px solid rgba(228, 216, 243, 0.55);
+}
+
+.school-fifth-screen__outcome {
+  display: grid;
+  grid-template-columns: 0.85rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.school-fifth-screen__outcome-mark {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.42rem;
+  border-radius: 999px;
+  background: rgba(112, 66, 197, 0.55);
+  box-shadow: 0 0 0 0.26rem rgba(143, 78, 234, 0.12);
+}
+
+.school-fifth-screen__outcome-text {
+  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-weight: 600;
+  line-height: 1.32;
+  color: var(--school-ink);
+}
+
+.school-fifth-screen__accent {
+  margin: 0.15rem 0 0;
+  padding: 0.9rem 1rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 252, 250, 0.7);
+  border: 1px solid rgba(228, 216, 243, 0.8);
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.2rem, 4.7vw, 1.38rem);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: var(--school-ink);
+}
+
+.school-fifth-screen__closing {
+  margin: 0;
+  font-size: clamp(0.95rem, 3.5vw, 1.03rem);
+  font-weight: 500;
+  line-height: 1.42;
+  color: var(--school-muted);
+}
+
+@media (min-width: 768px) {
+  .school-fifth-screen {
+    margin-top: 0.75rem;
+    padding: 2rem 1.75rem 2.15rem;
+    border-radius: 1.75rem;
+  }
+
+  /*
+   * Desktop: left = title / intro / accent;
+   * right = outcomes / continuation / closing.
+   */
+  .school-fifth-screen__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-areas:
+      "title outcomes"
+      "intro outcomes"
+      "waves continuation"
+      "accent continuation"
+      "accent closing";
+    column-gap: 2rem;
+    row-gap: 0.95rem;
+    align-items: start;
+  }
+
+  .school-fifth-screen__title {
+    grid-area: title;
+    font-size: 3.1rem;
+  }
+
+  .school-fifth-screen__intro {
+    grid-area: intro;
+  }
+
+  .school-fifth-screen__waves {
+    grid-area: waves;
+    width: min(16rem, 90%);
+    align-self: end;
+  }
+
+  .school-fifth-screen__outcomes {
+    grid-area: outcomes;
+    margin-top: 0.35rem;
+    padding: 1.05rem 1.05rem;
+    gap: 0.62rem;
+  }
+
+  .school-fifth-screen__continuation {
+    grid-area: continuation;
+  }
+
+  .school-fifth-screen__accent {
+    grid-area: accent;
+    font-size: 1.55rem;
+    padding: 1.1rem 1.2rem;
+    align-self: start;
+  }
+
+  .school-fifth-screen__closing {
+    grid-area: closing;
+  }
+
+  .school-fifth-screen__text,
+  .school-fifth-screen__closing {
+    font-size: 1.08rem;
+  }
+
+  .school-fifth-screen__outcome-text {
+    font-size: 1.1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-fifth-screen {
+    padding: 2.25rem 2rem 2.4rem;
+  }
+
+  .school-fifth-screen__title {
+    font-size: 3.35rem;
+  }
+
+  .school-fifth-screen__accent {
+    font-size: 1.65rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .school-first-screen__cta {
     transition: none;
