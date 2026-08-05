@@ -1531,6 +1531,289 @@
   }
 }
 
+/* —— Legacy: author heritage —— */
+.school-legacy-screen {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.2rem auto 2.35rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.25rem var(--school-gutter) 1.45rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      100% 70% at 0% 0%,
+      rgba(196, 154, 92, 0.14) 0%,
+      transparent 52%
+    ),
+    radial-gradient(
+      90% 65% at 100% 100%,
+      rgba(143, 78, 234, 0.12) 0%,
+      transparent 55%
+    ),
+    linear-gradient(165deg, #f7f0e6 0%, #f4eee8 42%, #efe6f4 100%);
+  border: 1px solid rgba(228, 216, 243, 0.85);
+}
+
+.school-legacy-screen__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    transparent 30%,
+    transparent 75%,
+    rgba(37, 19, 92, 0.03) 100%
+  );
+}
+
+.school-legacy-screen__orb {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(1.5px);
+}
+
+.school-legacy-screen__orb--a {
+  top: -2.2rem;
+  right: -1.6rem;
+  width: 7.5rem;
+  height: 7.5rem;
+  background: rgba(196, 154, 92, 0.16);
+}
+
+.school-legacy-screen__orb--b {
+  bottom: -2.8rem;
+  left: -2rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  background: rgba(143, 78, 234, 0.1);
+}
+
+.school-legacy-screen__layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.school-legacy-screen__primary,
+.school-legacy-screen__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.school-legacy-screen__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.55rem, 6.2vw, 1.95rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--school-ink);
+}
+
+.school-legacy-screen__mark {
+  width: min(11.5rem, 64%);
+  height: auto;
+  color: var(--school-accent);
+  opacity: 0.78;
+  margin: 0;
+}
+
+.school-legacy-screen__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-legacy-screen__text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
+}
+
+.school-legacy-screen__emotion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.05rem 0 0;
+  padding: 0.8rem 0.9rem;
+  list-style: none;
+  border-radius: 1.2rem;
+  background: rgba(255, 252, 248, 0.7);
+  border: 1px solid rgba(214, 196, 168, 0.45);
+}
+
+.school-legacy-screen__emotion-line {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--school-ink);
+}
+
+.school-legacy-screen__emotion-line:first-child,
+.school-legacy-screen__emotion-line:last-child {
+  font-weight: 600;
+}
+
+.school-legacy-screen__list-lead {
+  margin: 0;
+  font-size: var(--school-subhead-size);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--school-ink);
+}
+
+.school-legacy-screen__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.school-legacy-screen__list-item {
+  display: grid;
+  grid-template-columns: 0.85rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.school-legacy-screen__list-mark {
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-top: 0.42rem;
+  border-radius: 999px;
+  background: rgba(168, 122, 58, 0.55);
+  box-shadow: 0 0 0 0.24rem rgba(196, 154, 92, 0.14);
+}
+
+.school-legacy-screen__list-text {
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--school-body-color);
+}
+
+.school-legacy-screen__accent {
+  margin: 0.1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 252, 250, 0.72);
+  border: 1px solid rgba(228, 216, 243, 0.8);
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.18rem, 4.5vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  color: var(--school-ink);
+}
+
+.school-legacy-screen__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.15rem;
+  min-height: 3.25rem;
+  width: 100%;
+  padding: 0.9rem 1.15rem;
+  border-radius: 1.15rem;
+  background-color: var(--school-cta-mid);
+  background-image: linear-gradient(
+    180deg,
+    var(--school-cta-end) 0%,
+    var(--school-cta-mid) 48%,
+    var(--school-cta-start) 100%
+  );
+  color: #fff;
+  font-size: clamp(1.05rem, 3.9vw, 1.15rem);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 14px 30px rgba(95, 46, 201, 0.28);
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.school-legacy-screen__cta:hover {
+  filter: brightness(0.97);
+  box-shadow: 0 16px 34px rgba(95, 46, 201, 0.34);
+  transform: translateY(-1px);
+}
+
+.school-legacy-screen__cta:active {
+  transform: scale(0.985);
+  filter: brightness(0.9);
+  box-shadow: 0 10px 22px rgba(95, 46, 201, 0.26);
+}
+
+.school-legacy-screen__cta:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 3px;
+}
+
+@media (min-width: 768px) {
+  .school-legacy-screen {
+    margin-top: 0.55rem;
+    margin-bottom: 2.85rem;
+    padding: 1.9rem 1.75rem 2rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-legacy-screen__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1.5rem 1.85rem;
+    align-items: start;
+  }
+
+  .school-legacy-screen__title {
+    font-size: 2.35rem;
+    max-width: 14ch;
+  }
+
+  .school-legacy-screen__mark {
+    width: min(15rem, 90%);
+  }
+
+  .school-legacy-screen__accent {
+    font-size: 1.45rem;
+  }
+
+  .school-legacy-screen__cta {
+    width: 100%;
+    max-width: 22rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-legacy-screen {
+    padding: 2.15rem 2rem 2.25rem;
+  }
+
+  .school-legacy-screen__title {
+    font-size: 2.55rem;
+  }
+
+  .school-legacy-screen__accent {
+    font-size: 1.55rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .school-first-screen__cta {
     transition: none;
@@ -1547,5 +1830,14 @@
 
   .school-fourth-screen__dot {
     transition: none;
+  }
+
+  .school-legacy-screen__cta {
+    transition: none;
+  }
+
+  .school-legacy-screen__cta:hover,
+  .school-legacy-screen__cta:active {
+    transform: none;
   }
 }
