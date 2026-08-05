@@ -21,6 +21,8 @@ import SchoolBonusesScreen from "@/components/school/SchoolBonusesScreen";
 import SchoolAfterGraduationScreen from "@/components/school/SchoolAfterGraduationScreen";
 import SchoolTestimonialsScreen from "@/components/school/SchoolTestimonialsScreen";
 import SchoolFaqScreen from "@/components/school/SchoolFaqScreen";
+import SchoolFinalScreen from "@/components/school/SchoolFinalScreen";
+import SchoolFooter from "@/components/school/SchoolFooter";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -38,26 +40,30 @@ export default async function SchoolSitePage() {
   }
 
   return (
-    <main>
-      <SchoolFirstScreen />
-      <SchoolSecondScreen />
-      <SchoolThirdScreen />
-      <SchoolFourthScreen />
-      <SchoolFifthScreen />
-      <SchoolVoiceReachScreen />
-      <SchoolLegacyScreen />
-      <SchoolInnerProductScreen />
-      <SchoolAudienceScreen />
-      <SchoolWhyNowScreen />
-      <SchoolProgramScreen />
-      <SchoolResultsScreen />
-      <SchoolAuthorScreen />
-      <SchoolLearningProcessScreen />
-      <SchoolTariffsScreen />
-      <SchoolBonusesScreen />
-      <SchoolAfterGraduationScreen />
-      <SchoolTestimonialsScreen />
-      <SchoolFaqScreen />
-    </main>
+    <>
+      <main>
+        <SchoolFirstScreen />
+        <SchoolSecondScreen />
+        <SchoolThirdScreen />
+        <SchoolFourthScreen />
+        <SchoolFifthScreen />
+        <SchoolVoiceReachScreen />
+        <SchoolLegacyScreen />
+        <SchoolInnerProductScreen />
+        <SchoolAudienceScreen />
+        <SchoolWhyNowScreen />
+        <SchoolProgramScreen />
+        <SchoolResultsScreen />
+        <SchoolAuthorScreen />
+        <SchoolLearningProcessScreen />
+        <SchoolTariffsScreen />
+        <SchoolBonusesScreen />
+        <SchoolAfterGraduationScreen />
+        <SchoolTestimonialsScreen />
+        <SchoolFaqScreen />
+        <SchoolFinalScreen />
+      </main>
+      <SchoolFooter />
+    </>
   );
 }

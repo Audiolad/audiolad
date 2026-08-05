@@ -1,4 +1,8 @@
 import { SchoolTariffsAnchorLink } from "@/components/school/SchoolTariffsAnchorLink";
+import {
+  SCHOOL_START_DAY,
+  SCHOOL_START_MONTH,
+} from "@/lib/school/start";
 import Image from "next/image";
 
 /**
@@ -38,7 +42,8 @@ export default function SchoolFirstScreen() {
         </p>
 
         <p className="school-first-screen__start">
-          Старт – <span className="school-number">20</span> августа
+          Старт – <span className="school-number">{SCHOOL_START_DAY}</span>{" "}
+          {SCHOOL_START_MONTH}
         </p>
 
         <SchoolTariffsAnchorLink className="school-first-screen__cta">

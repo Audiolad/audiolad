@@ -1,4 +1,4 @@
-/** Shared school start date — keep FAQ and hero wording aligned. */
+/** Shared school start date — keep FAQ, hero and final screen aligned. */
 export const SCHOOL_START_DAY = "20";
 export const SCHOOL_START_MONTH = "августа";
 export const SCHOOL_START_YEAR = "2026";
