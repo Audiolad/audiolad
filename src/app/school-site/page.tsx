@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import SchoolFirstScreen from "@/components/school/SchoolFirstScreen";
 import SchoolSecondScreen from "@/components/school/SchoolSecondScreen";
+import SchoolThirdScreen from "@/components/school/SchoolThirdScreen";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -24,6 +25,7 @@ export default async function SchoolSitePage() {
     <main>
       <SchoolFirstScreen />
       <SchoolSecondScreen />
+      <SchoolThirdScreen />
       <div id="tariffs" className="school-site-tariffs-anchor" />
     </main>
   );
