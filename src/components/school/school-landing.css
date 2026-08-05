@@ -679,8 +679,9 @@
   font-weight: 600;
   line-height: 1.25;
   color: var(--school-ink);
-  overflow-wrap: anywhere;
-  hyphens: auto;
+  overflow-wrap: break-word;
+  hyphens: manual;
+  -webkit-hyphens: manual;
 }
 
 .school-third-screen__more {
