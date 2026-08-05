@@ -10,7 +10,7 @@
   --school-cta-end: #8f4eea;
   --school-gutter: 1.5rem;
   --school-max: 430px;
-  /* Natural hero asset ratio (~946×816): full scene via contain, not cover-crop. */
+  /* Source asset ratio; mobile hero uses a taller cover box. */
   --school-hero-ratio: 946 / 816;
 
   min-height: 100vh;
@@ -29,102 +29,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* —— Platform-aligned top header (above hero) —— */
-.school-site-header {
-  border-bottom: 1px solid #eadff8;
-  background: #fffdfd;
-  padding:
-    max(0.85rem, env(safe-area-inset-top, 0px))
-    var(--school-gutter)
-    0.75rem;
-}
-
-.school-site-header__row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin: 0 auto;
-  max-width: var(--school-max);
-}
-
-.school-site-header__row--guest {
-  justify-content: flex-start;
-  gap: 0.5rem;
-}
-
-.school-site-header__logo-link {
-  display: inline-flex;
-  min-width: 0;
-  max-width: min(12rem, calc(100% - 7rem));
-  border-radius: 0.25rem;
-}
-
-.school-site-header__logo-link:focus-visible {
-  outline: 2px solid var(--school-accent);
-  outline-offset: 3px;
-}
-
-.school-site-header__logo {
-  height: 2rem;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-  object-position: left center;
-}
-
-.school-site-header__auth {
-  margin-left: auto;
-  display: flex;
-  shrink: 0;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.school-site-header__profile {
-  display: inline-flex;
-  max-width: min(14rem, 52%);
-  min-width: 0;
-  align-items: center;
-  gap: 0.55rem;
-  border-radius: 999px;
-  border: 1px solid #eadff8;
-  background: #fffdfd;
-  padding: 0.25rem 0.7rem 0.25rem 0.25rem;
-  text-decoration: none;
-  color: var(--school-ink);
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease;
-}
-
-.school-site-header__profile:hover {
-  border-color: #dcc9f2;
-  background: #fdfbff;
-}
-
-.school-site-header__profile:focus-visible {
-  outline: 2px solid var(--school-accent);
-  outline-offset: 2px;
-}
-
-.school-site-header__profile-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-/* —— First-screen cover —— */
+/* —— First-screen cover (no platform header) —— */
 .school-first-screen {
   margin: 0 auto;
   width: 100%;
   max-width: var(--school-max);
-  padding: 0 0 1.85rem;
+  padding: 0 0 1.75rem;
   overflow: hidden;
   background: linear-gradient(
     180deg,
@@ -138,34 +48,40 @@
   position: relative;
   width: 100%;
   overflow: hidden;
+  /* Notch / status bar spacing without a chrome header. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .school-first-screen__hero {
   position: relative;
   width: 100%;
-  aspect-ratio: var(--school-hero-ratio);
-  /* Keep a solid vertical cover presence on mobile viewports. */
-  min-height: clamp(19.5rem, 48vw, 26rem);
+  /*
+   * Tall vertical cover above the old ~336px band, but short enough
+   * that cover only lightly trims sides (mug/notebook stay in frame).
+   */
+  height: clamp(21.5rem, 48dvh, 30rem);
+  min-height: 21.5rem;
   overflow: hidden;
-  background: #f6f0e8;
+  background: #efe6db;
 }
 
 .school-first-screen__hero-image {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center top;
+  object-fit: cover;
+  /* Bias right/lower so phone + heart mug stay after side trim. */
+  object-position: 64% 46%;
 }
 
 .school-first-screen__hero-fade {
   position: absolute;
   inset: auto 0 0;
-  height: 10%;
+  height: 18%;
   background: linear-gradient(
     180deg,
     rgba(246, 240, 232, 0) 0%,
-    rgba(246, 240, 232, 0.35) 55%,
+    rgba(246, 240, 232, 0.42) 48%,
     var(--school-cream) 100%
   );
   pointer-events: none;
@@ -175,7 +91,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  margin-top: -0.35rem;
+  margin-top: -1.35rem;
   padding: 0 var(--school-gutter);
   position: relative;
   z-index: 1;
@@ -193,23 +109,18 @@
 }
 
 .school-first-screen__offer {
-  margin: 1rem 0 0;
+  margin: 0.95rem 0 0;
   text-align: left;
-  font-size: clamp(1.1rem, 4.25vw, 1.25rem);
+  font-size: clamp(1.08rem, 4.1vw, 1.22rem);
   line-height: 1.42;
   font-weight: 500;
   color: #2a2438;
 }
 
-.school-first-screen__offer-em {
-  color: var(--school-ink);
-  font-weight: 700;
-}
-
 .school-first-screen__start {
   display: inline-flex;
   align-self: flex-start;
-  margin: 1.15rem 0 0;
+  margin: 1.05rem 0 0;
   padding: 0.55rem 0.95rem;
   border-radius: 999px;
   background: rgba(238, 230, 248, 0.92);
@@ -225,7 +136,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 1.2rem;
+  margin-top: 1.1rem;
   min-height: 3.5rem;
   width: 100%;
   padding: 0.95rem 1.2rem;
@@ -243,6 +154,7 @@
   line-height: 1.2;
   text-align: center;
   text-decoration: none;
+  white-space: nowrap;
   box-shadow: 0 16px 36px rgba(95, 46, 201, 0.32);
   transition:
     box-shadow 180ms ease,
@@ -366,12 +278,8 @@
     --school-gutter: 1.65rem;
   }
 
-  .school-site-header__logo {
-    height: 2.15rem;
-  }
-
   .school-first-screen__hero {
-    min-height: clamp(20.5rem, 52vw, 27rem);
+    height: clamp(22.5rem, 50dvh, 32rem);
   }
 }
 
@@ -386,47 +294,33 @@
     --school-max: 520px;
     --school-gutter: 1.75rem;
   }
-
-  .school-site-header__logo {
-    height: 2.25rem;
-  }
 }
 
 @media (min-width: 768px) {
   .school-site-root {
     --school-max: 720px;
     --school-gutter: 2rem;
-    padding: 0 1.25rem 2rem;
-  }
-
-  .school-site-header {
-    background: transparent;
-    border-bottom-color: transparent;
-    padding-top: 1.25rem;
-  }
-
-  .school-site-header__row,
-  .school-first-screen {
-    border-radius: 0;
+    padding: 0.85rem 1.25rem 2rem;
   }
 
   .school-first-screen {
-    border-radius: 0 0 1.5rem 1.5rem;
+    border-radius: 1.5rem;
     box-shadow: 0 18px 50px rgba(37, 19, 92, 0.08);
     overflow: hidden;
   }
 
-  .school-site-header__row {
-    background: #fffdfd;
-    border: 1px solid #eadff8;
-    border-bottom: 0;
-    border-radius: 1.5rem 1.5rem 0 0;
-    padding: 0.85rem 1.25rem;
-    max-width: var(--school-max);
+  .school-first-screen__content {
+    margin-top: -1.1rem;
   }
 
   .school-first-screen__hero {
-    min-height: 28rem;
+    /* Tall cover, but leave room for title + offer + date + CTA in 800px viewport. */
+    height: clamp(25rem, 44dvh, 32rem);
+  }
+
+  .school-first-screen__hero-image {
+    /* Keep face fully in frame on wide cards. */
+    object-position: 55% 30%;
   }
 
   .school-first-screen__title {
@@ -445,19 +339,11 @@
 @media (min-width: 1024px) {
   .school-site-root {
     --school-max: 860px;
-    padding: 0 1.5rem 2.5rem;
-  }
-
-  .school-site-header {
-    padding-top: 1.75rem;
+    padding: 0.85rem 1.5rem 2.5rem;
   }
 
   .school-first-screen__hero {
-    min-height: 30rem;
-  }
-
-  .school-site-header__logo {
-    height: 2.35rem;
+    height: clamp(26rem, 46dvh, 34rem);
   }
 
   .school-first-screen__title {
