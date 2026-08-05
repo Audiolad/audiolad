@@ -15,13 +15,13 @@
 
   /*
    * Local school typography (45+ readability). Mobile-first.
-   * Desktop overrides tokens below — not a proportional scale-up.
+   * Body aligned to fourth-screen example descriptions (~18px).
    */
-  --school-body-size: 1.3125rem; /* 21px */
-  --school-body-leading: 1.55;
-  --school-subhead-size: 1.25rem; /* 20px */
-  --school-card-title-size: 1.1875rem; /* 19px */
-  --school-card-body-size: 1.125rem; /* 18px */
+  --school-body-size: 1.125rem; /* 18px — matches example card descriptions */
+  --school-body-leading: 1.5;
+  --school-subhead-size: 1.125rem; /* 18px */
+  --school-card-title-size: 1rem; /* 16px — format/scenario labels */
+  --school-card-body-size: 1.125rem; /* 18px — example descriptions (reference) */
   --school-card-body-leading: 1.45;
   --school-body-color: #241e36;
 
@@ -380,7 +380,7 @@
 
 .school-second-screen__scenario-label {
   font-size: var(--school-card-title-size);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   color: var(--school-ink);
 }
@@ -454,9 +454,9 @@
     --school-gutter: 2rem;
     --school-body-size: 1.125rem; /* 18px */
     --school-body-leading: 1.5;
-    --school-subhead-size: 1.2rem;
-    --school-card-title-size: 1.0625rem; /* 17px */
-    --school-card-body-size: 1rem; /* 16px */
+    --school-subhead-size: 1.125rem; /* 18px */
+    --school-card-title-size: 1rem; /* 16px */
+    --school-card-body-size: 1.0625rem; /* 17px */
     --school-card-body-leading: 1.45;
     padding: 0.85rem 1.25rem 2rem;
   }
@@ -554,10 +554,9 @@
 .school-third-screen__title {
   margin: 0;
   font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
-  /* Keep hierarchy above enlarged 21px body without ballooning. */
-  font-size: clamp(1.65rem, 6.2vw, 2.05rem);
+  font-size: clamp(1.55rem, 5.9vw, 1.95rem);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.18;
   letter-spacing: -0.02em;
   color: var(--school-ink);
 }
@@ -565,7 +564,7 @@
 .school-third-screen__intro {
   display: flex;
   flex-direction: column;
-  gap: 0.95rem;
+  gap: 0.8rem;
 }
 
 .school-third-screen__intro-text {
@@ -579,8 +578,8 @@
 .school-third-screen__formats {
   display: flex;
   flex-direction: column;
-  gap: 0.95rem;
-  padding: 1.15rem 1rem 1.2rem;
+  gap: 0.85rem;
+  padding: 1.05rem 0.9rem 1.1rem;
   border-radius: 1.45rem;
   background:
     radial-gradient(
@@ -595,15 +594,15 @@
 .school-third-screen__formats-heading {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.6rem;
 }
 
 .school-third-screen__formats-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.1rem;
+  height: 2.1rem;
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--school-lavender);
@@ -611,37 +610,41 @@
 }
 
 .school-third-screen__formats-mark-icon {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .school-third-screen__formats-title {
   margin: 0;
+  min-width: 0;
   font-size: var(--school-subhead-size);
-  font-weight: 700;
-  line-height: 1.3;
+  font-weight: 600;
+  line-height: 1.25;
   color: var(--school-ink);
 }
 
 .school-third-screen__format-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.55rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  align-items: stretch;
 }
 
 .school-third-screen__format {
   box-sizing: border-box;
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  /* Equal-height band; taller after 45+ card title size. */
-  min-height: 4.65rem;
-  height: 4.65rem;
-  padding: 0.75rem 0.8rem;
-  border-radius: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  /* Room for icon + up to 2 label lines so cards stay visually even. */
+  min-height: 5.875rem;
+  height: 100%;
+  padding: 0.65rem 0.7rem 0.7rem;
+  border-radius: 0.95rem;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(228, 216, 243, 0.75);
   color: var(--school-ink);
@@ -655,33 +658,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.05rem;
-  height: 2.05rem;
+  width: 1.55rem;
+  height: 1.55rem;
   flex-shrink: 0;
-  border-radius: 0.7rem;
+  border-radius: 0.55rem;
   background: var(--school-lavender);
   color: var(--school-ink);
 }
 
 .school-third-screen__format-icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .school-third-screen__format-label {
   min-width: 0;
-  flex: 1 1 auto;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  width: 100%;
   font-size: var(--school-card-title-size);
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 500;
+  line-height: 1.22;
   color: var(--school-ink);
   overflow-wrap: break-word;
-  hyphens: manual;
-  -webkit-hyphens: manual;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .school-third-screen__more {
@@ -770,9 +770,16 @@
   }
 
   .school-third-screen__format {
-    min-height: 4.25rem;
-    height: 4.25rem;
-    padding: 0.75rem 0.85rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 3.6rem;
+    padding: 0.7rem 0.8rem;
+  }
+
+  .school-third-screen__format-label {
+    width: auto;
+    flex: 1 1 auto;
   }
 
   .school-third-screen__closing-lead {
