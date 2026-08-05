@@ -1346,6 +1346,191 @@
   }
 }
 
+/* —— Voice reach: one voice, many listens —— */
+.school-voice-reach {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.15rem auto 2.2rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.45rem var(--school-gutter) 1.55rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      90% 70% at 85% 20%,
+      rgba(143, 78, 234, 0.2) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      80% 60% at 10% 100%,
+      rgba(95, 46, 201, 0.12) 0%,
+      transparent 50%
+    ),
+    linear-gradient(160deg, #ebe3f6 0%, #f3ece4 46%, #e7dff3 100%);
+  border: 1px solid rgba(228, 216, 243, 0.9);
+}
+
+.school-voice-reach__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    transparent 35%,
+    transparent 70%,
+    rgba(37, 19, 92, 0.04) 100%
+  );
+}
+
+.school-voice-reach__layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.school-voice-reach__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.school-voice-reach__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.55rem, 6.4vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--school-ink);
+}
+
+.school-voice-reach__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.school-voice-reach__text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
+}
+
+.school-voice-reach__accent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.15rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 1.1rem;
+  background: rgba(255, 252, 250, 0.62);
+  border: 1px solid rgba(228, 216, 243, 0.75);
+}
+
+.school-voice-reach__accent-line {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.12rem, 4.2vw, 1.28rem);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  color: var(--school-ink);
+}
+
+.school-voice-reach__visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(15.5rem, 68%);
+  margin: 0 auto;
+  aspect-ratio: 1;
+  color: var(--school-accent);
+}
+
+.school-voice-reach__ripples {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.school-voice-reach__core {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--school-ink);
+  box-shadow: 0 10px 24px rgba(37, 19, 92, 0.1);
+}
+
+.school-voice-reach__mic {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .school-voice-reach {
+    margin-top: 0.55rem;
+    margin-bottom: 2.75rem;
+    padding: 1.85rem 1.75rem 1.9rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-voice-reach__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 1.5rem 1.75rem;
+    align-items: center;
+  }
+
+  .school-voice-reach__copy {
+    gap: 1rem;
+  }
+
+  .school-voice-reach__title {
+    font-size: 2.35rem;
+    max-width: 14ch;
+  }
+
+  .school-voice-reach__accent-line {
+    font-size: 1.35rem;
+  }
+
+  .school-voice-reach__visual {
+    width: min(18rem, 100%);
+    margin: 0;
+  }
+
+  .school-voice-reach__core {
+    width: 3.4rem;
+    height: 3.4rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-voice-reach {
+    padding: 2.1rem 2rem 2.15rem;
+  }
+
+  .school-voice-reach__title {
+    font-size: 2.55rem;
+  }
+
+  .school-voice-reach__visual {
+    width: min(19.5rem, 100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .school-first-screen__cta {
     transition: none;

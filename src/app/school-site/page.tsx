@@ -7,6 +7,7 @@ import SchoolSecondScreen from "@/components/school/SchoolSecondScreen";
 import SchoolThirdScreen from "@/components/school/SchoolThirdScreen";
 import SchoolFourthScreen from "@/components/school/SchoolFourthScreen";
 import SchoolFifthScreen from "@/components/school/SchoolFifthScreen";
+import SchoolVoiceReachScreen from "@/components/school/SchoolVoiceReachScreen";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -30,6 +31,7 @@ export default async function SchoolSitePage() {
       <SchoolThirdScreen />
       <SchoolFourthScreen />
       <SchoolFifthScreen />
+      <SchoolVoiceReachScreen />
       <div id="tariffs" className="school-site-tariffs-anchor" />
     </main>
   );
