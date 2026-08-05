@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useId, useState } from "react";
 
 import {
@@ -8,24 +9,6 @@ import {
   SCHOOL_TESTIMONIALS_MOBILE_VISIBLE,
   type SchoolTestimonial,
 } from "@/lib/school/testimonials";
-
-function WaveMark() {
-  return (
-    <svg
-      className="school-stories__wave"
-      viewBox="0 0 120 40"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M4 22c8-10 16-10 24 0s16 10 24 0 16-10 24 0 16 10 24 0 16-10 24 0"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function PlayIcon() {
   return (
@@ -113,13 +96,21 @@ function StoryCard({
             aria-label={`Воспроизвести видеоисторию ${story.nameGenitive}`}
             disabled={!embedSafe}
           >
-            <span className="school-stories__placeholder-decor" aria-hidden="true">
-              <WaveMark />
-            </span>
+            <Image
+              className="school-stories__poster"
+              src={story.posterSrc}
+              alt={story.posterAlt}
+              fill
+              sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 360px"
+              style={{
+                objectFit: "cover",
+                objectPosition: story.posterPosition ?? "center center",
+              }}
+            />
+            <span className="school-stories__shade" aria-hidden="true" />
             <span className="school-stories__play">
               <PlayIcon />
             </span>
-            <span className="school-stories__watch-label">Смотреть видеоисторию</span>
             <span className="school-stories__duration">
               <DurationIcon />
               <span className="school-number">{story.duration}</span>
@@ -163,11 +154,7 @@ export default function SchoolTestimonialsClient() {
   function handleToggle() {
     setExpanded((current) => {
       const next = !current;
-      if (
-        !next &&
-        activeVideoId &&
-        hiddenIds.has(activeVideoId)
-      ) {
+      if (!next && activeVideoId && hiddenIds.has(activeVideoId)) {
         setActiveVideoId(null);
       }
       return next;

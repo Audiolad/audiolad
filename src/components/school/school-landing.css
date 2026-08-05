@@ -4774,20 +4774,16 @@
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: linear-gradient(145deg, #efe6fb 0%, #f7efe6 55%, #ebe4f6 100%);
+  background: #ebe4f0;
   overflow: hidden;
 }
 
 .school-stories__placeholder {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
+  display: block;
   margin: 0;
-  padding: 1rem;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--school-ink);
@@ -4799,29 +4795,39 @@
   opacity: 0.7;
 }
 
-.school-stories__placeholder-decor {
+.school-stories__poster {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(112, 66, 197, 0.22);
-  pointer-events: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
 }
 
-.school-stories__wave {
-  width: min(72%, 14rem);
-  height: auto;
+.school-stories__shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(24, 12, 48, 0) 42%,
+    rgba(24, 12, 48, 0.18) 72%,
+    rgba(24, 12, 48, 0.38) 100%
+  );
 }
 
 .school-stories__play {
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  z-index: 2;
+  left: 1rem;
+  bottom: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3.6rem;
-  height: 3.6rem;
+  width: 3.4rem;
+  height: 3.4rem;
   border-radius: 999px;
   color: #fff;
   background-image: linear-gradient(
@@ -4830,7 +4836,9 @@
     var(--school-cta-mid) 48%,
     var(--school-cta-start) 100%
   );
-  box-shadow: 0 12px 26px rgba(95, 46, 201, 0.32);
+  box-shadow:
+    0 0 0 2px rgba(255, 252, 250, 0.42),
+    0 12px 26px rgba(95, 46, 201, 0.34);
   transition: transform 180ms ease, filter 180ms ease;
 }
 
@@ -4849,36 +4857,28 @@
 }
 
 .school-stories__play-icon {
-  width: 1.35rem;
-  height: 1.35rem;
-  margin-left: 0.15rem;
-}
-
-.school-stories__watch-label {
-  position: relative;
-  z-index: 1;
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--school-ink);
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-left: 0.12rem;
 }
 
 .school-stories__duration {
   position: absolute;
-  z-index: 1;
-  right: 0.7rem;
-  bottom: 0.7rem;
+  z-index: 2;
+  right: 0.9rem;
+  bottom: 0.95rem;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.28rem 0.55rem;
   border-radius: 999px;
-  background: rgba(255, 252, 250, 0.9);
+  background: rgba(255, 252, 250, 0.92);
   border: 1px solid rgba(196, 176, 230, 0.55);
   color: var(--school-ink);
   font-size: 0.86rem;
   font-weight: 700;
   line-height: 1;
+  box-shadow: 0 6px 16px rgba(37, 19, 92, 0.12);
 }
 
 .school-stories__duration-icon {
@@ -5090,6 +5090,23 @@
 
   .school-stories__name {
     font-size: 1.3rem;
+  }
+
+  .school-stories__play {
+    left: 1.15rem;
+    bottom: 1.15rem;
+    width: 3.75rem;
+    height: 3.75rem;
+  }
+
+  .school-stories__play-icon {
+    width: 1.4rem;
+    height: 1.4rem;
+  }
+
+  .school-stories__duration {
+    right: 1.05rem;
+    bottom: 1.1rem;
   }
 
   .school-stories__cta {
