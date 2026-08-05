@@ -13,6 +13,18 @@
   /* Source asset ratio; mobile hero uses a taller cover box. */
   --school-hero-ratio: 946 / 816;
 
+  /*
+   * Local school typography (45+ readability). Mobile-first.
+   * Desktop overrides tokens below — not a proportional scale-up.
+   */
+  --school-body-size: 1.3125rem; /* 21px */
+  --school-body-leading: 1.55;
+  --school-subhead-size: 1.25rem; /* 20px */
+  --school-card-title-size: 1.1875rem; /* 19px */
+  --school-card-body-size: 1.125rem; /* 18px */
+  --school-card-body-leading: 1.45;
+  --school-body-color: #241e36;
+
   min-height: 100vh;
   min-height: 100dvh;
   background:
@@ -123,10 +135,10 @@
 .school-first-screen__offer {
   margin: 0.95rem 0 0;
   text-align: left;
-  font-size: clamp(1.08rem, 4.1vw, 1.22rem);
-  line-height: 1.42;
+  font-size: var(--school-body-size);
+  line-height: var(--school-body-leading);
   font-weight: 500;
-  color: #2a2438;
+  color: var(--school-body-color);
 }
 
 .school-first-screen__start {
@@ -276,18 +288,18 @@
 
 .school-second-screen__choice-title {
   margin: 0;
-  font-size: clamp(1.12rem, 4.2vw, 1.28rem);
+  font-size: var(--school-subhead-size);
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
   color: var(--school-ink);
 }
 
 .school-second-screen__choice-text {
   margin: 0;
-  font-size: clamp(0.98rem, 3.6vw, 1.05rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.45;
-  color: #2a2438;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
 }
 
 /* Mobile: peek ~25% of the next card + soft right fade (no arrows/copy). */
@@ -367,16 +379,16 @@
 }
 
 .school-second-screen__scenario-label {
-  font-size: 0.95rem;
+  font-size: var(--school-card-title-size);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--school-ink);
 }
 
 .school-second-screen__scenario-desc {
-  font-size: 0.78rem;
+  font-size: var(--school-card-body-size);
   font-weight: 500;
-  line-height: 1.3;
+  line-height: var(--school-card-body-leading);
   color: var(--school-muted);
 }
 
@@ -384,9 +396,9 @@
   margin: 0;
   padding: 0.15rem 0.1rem 0;
   text-align: left;
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.45;
+  line-height: var(--school-body-leading);
   color: var(--school-muted);
 }
 
@@ -440,6 +452,12 @@
   .school-site-root {
     --school-max: 720px;
     --school-gutter: 2rem;
+    --school-body-size: 1.125rem; /* 18px */
+    --school-body-leading: 1.5;
+    --school-subhead-size: 1.2rem;
+    --school-card-title-size: 1.0625rem; /* 17px */
+    --school-card-body-size: 1rem; /* 16px */
+    --school-card-body-leading: 1.45;
     padding: 0.85rem 1.25rem 2rem;
   }
 
@@ -465,10 +483,6 @@
 
   .school-first-screen__title {
     font-size: 3.45rem;
-  }
-
-  .school-first-screen__offer {
-    font-size: 1.28rem;
   }
 
   .school-first-screen__start {
@@ -501,15 +515,6 @@
   .school-second-screen__scenario:last-child {
     grid-column: auto;
     max-width: none;
-  }
-
-  .school-second-screen__choice-title {
-    font-size: 1.35rem;
-  }
-
-  .school-second-screen__choice-text,
-  .school-second-screen__closing {
-    font-size: 1.08rem;
   }
 }
 
@@ -549,9 +554,10 @@
 .school-third-screen__title {
   margin: 0;
   font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
-  font-size: clamp(1.55rem, 6vw, 2rem);
+  /* Keep hierarchy above enlarged 21px body without ballooning. */
+  font-size: clamp(1.65rem, 6.2vw, 2.05rem);
   font-weight: 700;
-  line-height: 1.18;
+  line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--school-ink);
 }
@@ -559,15 +565,15 @@
 .school-third-screen__intro {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.95rem;
 }
 
 .school-third-screen__intro-text {
   margin: 0;
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.48;
-  color: #2a2438;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
 }
 
 .school-third-screen__formats {
@@ -611,9 +617,9 @@
 
 .school-third-screen__formats-title {
   margin: 0;
-  font-size: clamp(1.12rem, 4.2vw, 1.28rem);
+  font-size: var(--school-subhead-size);
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
   color: var(--school-ink);
 }
 
@@ -630,11 +636,11 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  /* Fixed band so 1–2 line labels stay equal height in the 2-col grid. */
-  min-height: 3.85rem;
-  height: 3.85rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.7rem;
+  /* Equal-height band; taller after 45+ card title size. */
+  min-height: 4.65rem;
+  height: 4.65rem;
+  padding: 0.75rem 0.8rem;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(228, 216, 243, 0.75);
@@ -669,9 +675,9 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 0.88rem;
+  font-size: var(--school-card-title-size);
   font-weight: 600;
-  line-height: 1.22;
+  line-height: 1.25;
   color: var(--school-ink);
   overflow-wrap: anywhere;
   hyphens: auto;
@@ -726,9 +732,9 @@
 
 .school-third-screen__closing-text {
   margin: 0;
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.45;
+  line-height: var(--school-body-leading);
   color: var(--school-muted);
 }
 
@@ -742,10 +748,6 @@
   .school-third-screen__title {
     font-size: 2.35rem;
     max-width: 16ch;
-  }
-
-  .school-third-screen__intro-text {
-    font-size: 1.08rem;
   }
 
   .school-third-screen__formats {
@@ -767,13 +769,9 @@
   }
 
   .school-third-screen__format {
-    min-height: 4rem;
-    height: 4rem;
+    min-height: 4.25rem;
+    height: 4.25rem;
     padding: 0.75rem 0.85rem;
-  }
-
-  .school-third-screen__format-label {
-    font-size: 0.92rem;
   }
 
   .school-third-screen__closing-lead {
@@ -781,7 +779,6 @@
   }
 
   .school-third-screen__closing-text {
-    font-size: 1.08rem;
     max-width: 42rem;
   }
 }
@@ -827,15 +824,15 @@
 
 .school-fourth-screen__intro-text {
   margin: 0;
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.48;
-  color: #2a2438;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
 }
 
 .school-fourth-screen__intro-lead {
   margin: 0;
-  font-size: clamp(1.02rem, 3.8vw, 1.12rem);
+  font-size: var(--school-subhead-size);
   font-weight: 700;
   line-height: 1.3;
   color: var(--school-ink);
@@ -894,7 +891,7 @@
    */
   flex: 0 0 calc((100% - var(--school-example-gap)) / 1.2);
   min-width: 0;
-  min-height: 14.5rem;
+  min-height: 16.25rem;
   padding: 1.25rem 1.15rem 1.3rem;
   border-radius: 1.4rem;
   border: 1px solid rgba(228, 216, 243, 0.7);
@@ -968,9 +965,9 @@
   z-index: 1;
   margin: 0;
   font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
-  font-size: clamp(1.22rem, 4.6vw, 1.4rem);
+  font-size: clamp(1.25rem, 4.8vw, 1.4rem);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.22;
   letter-spacing: -0.015em;
   color: var(--school-ink);
 }
@@ -979,10 +976,10 @@
   position: relative;
   z-index: 1;
   margin: 0;
-  font-size: clamp(0.94rem, 3.5vw, 1.02rem);
+  font-size: var(--school-card-body-size);
   font-weight: 500;
-  line-height: 1.42;
-  color: #3a314f;
+  line-height: var(--school-card-body-leading);
+  color: var(--school-body-color);
 }
 
 .school-fourth-screen__dots {
@@ -1028,9 +1025,9 @@
 
 .school-fourth-screen__closing-text {
   margin: 0;
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.45;
+  line-height: var(--school-body-leading);
   color: var(--school-muted);
 }
 
@@ -1044,15 +1041,6 @@
   .school-fourth-screen__title {
     font-size: 2.3rem;
     max-width: 18ch;
-  }
-
-  .school-fourth-screen__intro-text,
-  .school-fourth-screen__closing-text {
-    font-size: 1.08rem;
-  }
-
-  .school-fourth-screen__intro-lead {
-    font-size: 1.18rem;
   }
 
   .school-fourth-screen__carousel-shell::after {
@@ -1071,7 +1059,7 @@
   .school-fourth-screen__example {
     flex: none;
     width: auto;
-    min-height: 15.5rem;
+    min-height: 15.75rem;
     height: 100%;
     padding: 1.35rem 1.25rem 1.4rem;
   }
@@ -1088,11 +1076,7 @@
   }
 
   .school-fourth-screen__example-title {
-    font-size: 1.35rem;
-  }
-
-  .school-fourth-screen__example-text {
-    font-size: 1.02rem;
+    font-size: 1.3rem;
   }
 
   .school-fourth-screen__closing-lead {
@@ -1203,10 +1187,10 @@
 
 .school-fifth-screen__text {
   margin: 0;
-  font-size: clamp(0.96rem, 3.5vw, 1.03rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.4;
-  color: #2f2744;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
 }
 
 .school-fifth-screen__waves {
@@ -1246,9 +1230,9 @@
 }
 
 .school-fifth-screen__outcome-text {
-  font-size: clamp(0.98rem, 3.6vw, 1.06rem);
+  font-size: var(--school-subhead-size);
   font-weight: 600;
-  line-height: 1.32;
+  line-height: 1.35;
   color: var(--school-ink);
 }
 
@@ -1268,9 +1252,9 @@
 
 .school-fifth-screen__closing {
   margin: 0;
-  font-size: clamp(0.95rem, 3.5vw, 1.03rem);
+  font-size: var(--school-body-size);
   font-weight: 500;
-  line-height: 1.42;
+  line-height: var(--school-body-leading);
   color: var(--school-muted);
 }
 
@@ -1336,14 +1320,6 @@
     grid-area: closing;
   }
 
-  .school-fifth-screen__text,
-  .school-fifth-screen__closing {
-    font-size: 1.08rem;
-  }
-
-  .school-fifth-screen__outcome-text {
-    font-size: 1.1rem;
-  }
 }
 
 @media (min-width: 1024px) {
