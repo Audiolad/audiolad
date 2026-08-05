@@ -2884,6 +2884,389 @@
   }
 }
 
+/* —— Author screen —— */
+.school-author {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.15rem auto 2.35rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.2rem var(--school-gutter) 1.4rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      85% 50% at 0% 0%,
+      rgba(196, 154, 92, 0.1) 0%,
+      transparent 55%
+    ),
+    linear-gradient(168deg, #f8f2ea 0%, #f4ece6 48%, #efe8f5 100%);
+  border: 1px solid rgba(228, 216, 243, 0.78);
+}
+
+.school-author__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.school-author__section-title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.45rem, 5.8vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  color: var(--school-ink);
+}
+
+.school-author__section-title--desktop {
+  display: none;
+}
+
+.school-author__photo-wrap {
+  width: 100%;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  background: #e8dfd4;
+  border: 1px solid rgba(214, 196, 168, 0.35);
+}
+
+.school-author__photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  object-position: 50% 18%;
+}
+
+.school-author__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-author__name {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 5vw, 1.6rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--school-ink);
+}
+
+.school-author__role {
+  margin: 0;
+  font-size: var(--school-subhead-size);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--school-ink);
+}
+
+.school-author__story,
+.school-author__why-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.school-author__text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
+}
+
+.school-author__experience,
+.school-author__books,
+.school-author__geo,
+.school-author__why,
+.school-author__wish {
+  margin-top: 1.15rem;
+}
+
+.school-author__subtitle {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.2rem, 4.6vw, 1.4rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--school-ink);
+}
+
+.school-author__years {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+
+.school-author__year {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 1.05rem;
+  background: rgba(255, 252, 249, 0.82);
+  border: 1px solid rgba(228, 216, 243, 0.72);
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--school-body-color);
+}
+
+.school-author__year-value {
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--school-ink);
+}
+
+.school-author__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-author__stat-block {
+  padding: 0.85rem 0.9rem;
+  border-radius: 1.1rem;
+  background: rgba(255, 252, 249, 0.72);
+  border: 1px solid rgba(214, 196, 168, 0.35);
+}
+
+.school-author__stat-lead {
+  margin: 0 0 0.5rem;
+  font-size: var(--school-subhead-size);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--school-ink);
+}
+
+.school-author__stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.school-author__stat-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: baseline;
+}
+
+.school-author__stat-value {
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--school-ink);
+  white-space: nowrap;
+}
+
+.school-author__stat-label {
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--school-body-color);
+}
+
+.school-author__mid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.school-author__book-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.school-author__book-item {
+  display: grid;
+  grid-template-columns: 1.7rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.7rem 0.8rem;
+  border-radius: 1rem;
+  background: rgba(255, 252, 249, 0.72);
+  border: 1px solid rgba(228, 216, 243, 0.68);
+}
+
+.school-author__book-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-top: 0.05rem;
+  border-radius: 999px;
+  background: rgba(143, 78, 234, 0.08);
+  color: var(--school-accent);
+}
+
+.school-author__book-svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.school-author__book-text {
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--school-body-color);
+  overflow-wrap: break-word;
+}
+
+.school-author__geo-card {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.9rem 0.95rem;
+  border-radius: 1.15rem;
+  background:
+    radial-gradient(
+      70% 80% at 8% 20%,
+      rgba(143, 78, 234, 0.1) 0%,
+      transparent 55%
+    ),
+    rgba(255, 252, 249, 0.78);
+  border: 1px solid rgba(228, 216, 243, 0.72);
+}
+
+.school-author__geo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--school-accent);
+}
+
+.school-author__geo-svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.school-author__geo-text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
+}
+
+.school-author__geo-strong {
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  color: var(--school-ink);
+}
+
+.school-author__wish-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.2rem;
+  background: rgba(255, 252, 250, 0.82);
+  border: 1px solid rgba(196, 176, 230, 0.45);
+}
+
+.school-author__wish-text {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-ink);
+}
+
+@media (min-width: 768px) {
+  .school-author {
+    margin-top: 0.5rem;
+    margin-bottom: 2.7rem;
+    padding: 1.85rem 1.8rem 2rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-author__hero {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 1.4rem 1.7rem;
+    align-items: start;
+  }
+
+  .school-author__section-title--mobile {
+    display: none;
+  }
+
+  .school-author__section-title--desktop {
+    display: block;
+    font-size: 2.2rem;
+    max-width: 16ch;
+  }
+
+  .school-author__photo-wrap {
+    border-radius: 1.35rem;
+  }
+
+  .school-author__name {
+    font-size: 1.75rem;
+  }
+
+  .school-author__years {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+
+  .school-author__year-value {
+    font-size: 1.5rem;
+  }
+
+  .school-author__stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .school-author__mid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 1.2rem 1.5rem;
+    align-items: start;
+  }
+
+  .school-author__books,
+  .school-author__geo {
+    margin-top: 1.35rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-author {
+    padding: 2.1rem 2rem 2.2rem;
+  }
+
+  .school-author__section-title--desktop {
+    font-size: 2.4rem;
+  }
+
+  .school-author__photo-wrap {
+    max-width: 26rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .school-first-screen__cta {
     transition: none;
