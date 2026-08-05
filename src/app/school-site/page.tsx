@@ -12,6 +12,8 @@ import SchoolLegacyScreen from "@/components/school/SchoolLegacyScreen";
 import SchoolInnerProductScreen from "@/components/school/SchoolInnerProductScreen";
 import SchoolAudienceScreen from "@/components/school/SchoolAudienceScreen";
 import SchoolWhyNowScreen from "@/components/school/SchoolWhyNowScreen";
+import SchoolProgramScreen from "@/components/school/SchoolProgramScreen";
+import SchoolResultsScreen from "@/components/school/SchoolResultsScreen";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
@@ -40,6 +42,8 @@ export default async function SchoolSitePage() {
       <SchoolInnerProductScreen />
       <SchoolAudienceScreen />
       <SchoolWhyNowScreen />
+      <SchoolProgramScreen />
+      <SchoolResultsScreen />
       <div id="tariffs" className="school-site-tariffs-anchor" />
     </main>
   );
