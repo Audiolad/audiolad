@@ -669,6 +669,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
+    // audio_post: playback stays inline; never navigate to /listen fullscreen.
+    if (session.playbackNavigation === "inline_only") {
+      return;
+    }
+
     const path = buildSafeListenReplacePath(
       session.authorSlug,
       session.productSlug,

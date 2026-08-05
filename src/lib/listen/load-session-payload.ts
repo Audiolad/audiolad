@@ -4,6 +4,7 @@ import { getDisplayFormat } from "@/lib/author-products/format";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import { resolvePlaybackNavigationPolicy } from "@/lib/listen/playback-navigation";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import {
   mapLegacyPracticeToListenTrack,
@@ -244,6 +245,10 @@ export async function loadListenSessionPayload(
       }
     }
 
+    const playbackNavigation = resolvePlaybackNavigationPolicy(
+      practiceRow.product_kind,
+    );
+
     return {
       ok: true,
       session: {
@@ -270,6 +275,9 @@ export async function loadListenSessionPayload(
         coverUpdatedAt: practiceRow.updated_at ?? null,
         isAuthorPreview: access.mode === "author_preview",
         forceStartAtBeginning: options?.forceStartAtBeginning === true,
+        playbackNavigation,
+        // audio_post must never sync the browser URL to /listen.
+        suppressListenUrlSync: playbackNavigation === "inline_only",
       },
     };
   } catch {

@@ -8,6 +8,7 @@ import {
   usePlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
+import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 import { BOTTOM_NAV_MAIN_HEIGHT_PX } from "@/lib/navigation/bottom-nav";
 
 function MiniRewindIcon() {
@@ -117,9 +118,50 @@ export default function GlobalMiniPlayer() {
     ? activeSession.authorText || activeSession.authorName
     : activeSession.authorName;
 
+  const inlineOnly = isInlineOnlyPlaybackSession(activeSession);
+
   function handleOpenFullPlayer() {
+    if (inlineOnly) {
+      return;
+    }
     openFullPlayer();
   }
+
+  const trackMeta = (
+    <>
+      <div
+        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${activeSession.coverGradient} text-xl text-white shadow-inner`}
+      >
+        {activeCoverUrl ? (
+          <PlaybackCoverImage
+            coverUrl={activeCoverUrl}
+            coverImage={activeCoverImage}
+            updatedAt={activeCoverUpdatedAt}
+            displayWidth={44}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          activeSession.coverSymbol
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-white">{title}</p>
+        {subtitle ? (
+          isPrivateAudioSession(activeSession) ? (
+            <p className="truncate text-xs text-white/70">{subtitle}</p>
+          ) : (
+            <AuthorLink
+              authorSlug={activeSession.authorSlug}
+              authorName={subtitle}
+              stopPropagation
+              className="truncate text-xs text-white/70 hover:text-white"
+            />
+          )
+        ) : null}
+      </div>
+    </>
+  );
 
   return (
     <div
@@ -144,44 +186,20 @@ export default function GlobalMiniPlayer() {
         </button>
 
         <div className="flex min-h-0 flex-1 items-center gap-3 pr-8">
-          <button
-            type="button"
-            onClick={handleOpenFullPlayer}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            aria-label={`Открыть полный плеер: ${title}`}
-          >
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br ${activeSession.coverGradient} text-xl text-white shadow-inner`}
+          {inlineOnly ? (
+            <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              {trackMeta}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpenFullPlayer}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              aria-label={`Открыть полный плеер: ${title}`}
             >
-              {activeCoverUrl ? (
-                <PlaybackCoverImage
-                  coverUrl={activeCoverUrl}
-                  coverImage={activeCoverImage}
-                  updatedAt={activeCoverUpdatedAt}
-                  displayWidth={44}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                activeSession.coverSymbol
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{title}</p>
-              {subtitle ? (
-                isPrivateAudioSession(activeSession) ? (
-                  <p className="truncate text-xs text-white/70">{subtitle}</p>
-                ) : (
-                  <AuthorLink
-                    authorSlug={activeSession.authorSlug}
-                    authorName={subtitle}
-                    stopPropagation
-                    className="truncate text-xs text-white/70 hover:text-white"
-                  />
-                )
-              ) : null}
-            </div>
-          </button>
+              {trackMeta}
+            </button>
+          )}
 
           <div className="flex shrink-0 items-center gap-1">
             {queueMode ? (

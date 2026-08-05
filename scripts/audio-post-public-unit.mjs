@@ -155,6 +155,11 @@ assert.match(pageSource, /AudioPostPage/);
 assert.match(pageSource, /isAudioPostProductKind/);
 assert.match(pageSource, /shouldIndexPracticePage\(\s*practice\.status,\s*practice\.is_catalog_listed/);
 
+const audioPostPage = read("src/components/products/audio-post/AudioPostPage.tsx");
+assert.match(audioPostPage, /featured-card/);
+assert.match(audioPostPage, /NextStepRecommendation/);
+assert.doesNotMatch(audioPostPage, /\/listen\//);
+
 const authorPage = read("src/lib/authors/public-page.ts");
 assert.match(authorPage, /\.eq\("is_catalog_listed", true\)/);
 assert.match(authorPage, /isAudioPostProductKind/);

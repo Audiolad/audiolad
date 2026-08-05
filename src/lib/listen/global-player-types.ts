@@ -29,6 +29,11 @@ export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
   practiceId: string;
   authorSlug: string;
   productSlug: string;
+  /**
+   * Kind-specific navigation policy for the global player chrome.
+   * `inline_only` (audio_post): play/pause stays on-page; no /listen fullscreen.
+   */
+  playbackNavigation?: "inline_only" | "fullscreen";
   /** Guest promo funnel: persist progress in localStorage instead of server. */
   guestProgressMode?: boolean;
   guestProgressMeta?: {

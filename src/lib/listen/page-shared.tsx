@@ -13,8 +13,10 @@ import ListenPageClient from "@/components/audio/ListenPageClient";
 import BottomNav from "@/components/BottomNav";
 import { ListenerAppShell } from "@/components/listener/ListenerAppShell";
 import { getDisplayFormat } from "@/lib/author-products/format";
+import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import { resolveListenAccess } from "@/lib/listen/access";
+import { buildAudioPostListenRedirectPath } from "@/lib/listen/playback-navigation";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import { listPracticeProgress } from "@/lib/listen/progress";
 import {
@@ -303,7 +305,11 @@ async function loadListenTracks(
 export async function renderListenPage(
   authorSlug: string,
   productSlug: string,
-  options?: { accessDenied?: boolean; autoplay?: boolean },
+  options?: {
+    accessDenied?: boolean;
+    autoplay?: boolean;
+    searchParams?: Record<string, string | string[] | undefined>;
+  },
 ) {
   const practiceHref = buildPracticePublicPath(authorSlug, productSlug);
   const supabase = await createClient();
@@ -368,6 +374,17 @@ export async function renderListenPage(
 
   const practiceRow = practice as PracticeRow;
   const resolvedAuthorSlug = getPracticeAuthorSlug(practiceRow) ?? authorSlug;
+
+  // audio_post has no fullscreen /listen UI — send users to the public page.
+  if (isAudioPostProductKind(practiceRow.product_kind)) {
+    redirect(
+      buildAudioPostListenRedirectPath(
+        resolvedAuthorSlug,
+        practiceRow.slug,
+        options?.searchParams ?? null,
+      ),
+    );
+  }
 
   let productAccess;
 

@@ -77,5 +77,7 @@ assert.doesNotMatch(audioPostPlayer, /Слушаю/);
 assert.match(audioPostPlayer, /isPlaying/);
 assert.match(audioPostPlayer, /role="alert"/);
 assert.doesNotMatch(audioPostPlayer, /setTimeout/);
+assert.doesNotMatch(audioPostPlayer, /Воспроизведение откроется в плеере/);
+assert.match(audioPostPlayer, /variant/);
 
 console.log("product-playback-click-unit: ok");

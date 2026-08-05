@@ -9,6 +9,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
+import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 
 export const DESKTOP_PLAYER_BAR_HEIGHT_PX = 96;
 
@@ -176,6 +177,7 @@ function DesktopPlayerActiveState({
   const title =
     engine.currentTrack?.title?.trim() || session.practiceTitle;
   const isPrivate = isPrivateAudioSession(session);
+  const inlineOnly = isInlineOnlyPlaybackSession(session);
   const subtitle = isPrivate
     ? session.authorText || session.authorName
     : session.authorName;
@@ -338,16 +340,18 @@ function DesktopPlayerActiveState({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            aria-label="Открыть полный плеер"
-            onClick={() => {
-              openFullPlayer();
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            <ExpandIcon />
-          </button>
+          {inlineOnly ? null : (
+            <button
+              type="button"
+              aria-label="Открыть полный плеер"
+              onClick={() => {
+                openFullPlayer();
+              }}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#eadff8] text-[#7042c5] transition hover:border-[#dcc9f2] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              <ExpandIcon />
+            </button>
+          )}
 
           <button
             type="button"

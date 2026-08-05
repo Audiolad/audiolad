@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ access?: string; autoplay?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 async function resolveListenRoute(segments: string[]) {
@@ -39,15 +39,20 @@ async function resolveListenRoute(segments: string[]) {
 
 export default async function ListenPage({ params, searchParams }: PageProps) {
   const { segments } = await params;
-  const { access, autoplay } = await searchParams;
+  const query = await searchParams;
   const route = await resolveListenRoute(segments);
 
   if (!route) {
     notFound();
   }
 
+  const access = typeof query.access === "string" ? query.access : undefined;
+  const autoplay =
+    typeof query.autoplay === "string" ? query.autoplay : undefined;
+
   return renderListenPage(route.authorSlug, route.productSlug, {
     accessDenied: access === "denied",
     autoplay: parseListenAutoplayIntent(autoplay),
+    searchParams: query,
   });
 }
