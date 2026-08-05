@@ -11,11 +11,10 @@ const CLOSING_TITLE = "Остались вопросы?";
 const CLOSING_SUBTITLE =
   "Напишите Сергею – он поможет понять, какой формат участия подойдёт именно вам.";
 
-/** Confirmed MAX link from published Sergey & Zoya promo CTA. */
-const SERGEY_MAX_URL = "https://max.ru/id507305817690_bot";
-
-/** Not found in project/DB/public pages — button omitted until confirmed. */
-const SERGEY_TELEGRAM_URL: string | null = null;
+/** Confirmed personal messenger links for Sergey Petrov. */
+const SERGEY_MAX_URL =
+  "https://max.ru/u/f9LHodD0cOI9Z0TpTY6vON-AsaLO2UKjrEHxKZb8SoKf46sX5Bvih-n5QjQ";
+const SERGEY_TELEGRAM_URL = "https://t.me/petrovss";
 
 type MessengerContact = {
   id: "max" | "telegram";
@@ -29,15 +28,11 @@ const MESSENGER_CONTACTS: MessengerContact[] = [
     label: "Написать в MAX",
     href: SERGEY_MAX_URL,
   },
-  ...(SERGEY_TELEGRAM_URL
-    ? [
-        {
-          id: "telegram" as const,
-          label: "Написать в Telegram",
-          href: SERGEY_TELEGRAM_URL,
-        },
-      ]
-    : []),
+  {
+    id: "telegram",
+    label: "Написать в Telegram",
+    href: SERGEY_TELEGRAM_URL,
+  },
 ];
 
 function MaxIcon() {
