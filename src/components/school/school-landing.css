@@ -4243,6 +4243,16 @@
   .school-stories__placeholder:active .school-stories__play {
     transform: none;
   }
+
+  .school-faq__chevron,
+  .school-faq__cta {
+    transition: none;
+  }
+
+  .school-faq__cta:hover,
+  .school-faq__cta:active {
+    transform: none;
+  }
 }
 
 /* —— After graduation screen —— */
@@ -5153,5 +5163,273 @@
     margin-left: auto;
     margin-right: auto;
     font-size: 1.05rem;
+  }
+}
+
+/* —— FAQ screen —— */
+.school-faq {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.25rem auto 2.5rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.2rem var(--school-gutter) 1.35rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      70% 40% at 100% 0%,
+      rgba(143, 78, 234, 0.06) 0%,
+      transparent 55%
+    ),
+    linear-gradient(172deg, #f8f2ea 0%, #f4ebe4 50%, #f3ebf6 100%);
+  border: 1px solid rgba(228, 216, 243, 0.78);
+}
+
+.school-faq__inner {
+  width: 100%;
+  max-width: 100%;
+}
+
+.school-faq__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.school-faq__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.42rem, 5.7vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.025em;
+  color: var(--school-ink);
+}
+
+.school-faq__intro {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1.42;
+  color: var(--school-body-color);
+}
+
+.school-faq__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.school-faq__item {
+  overflow: hidden;
+  border-radius: 1.05rem;
+  background: rgba(255, 252, 250, 0.9);
+  border: 1px solid rgba(220, 206, 240, 0.7);
+}
+
+.school-faq__heading {
+  margin: 0;
+}
+
+.school-faq__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 4rem;
+  margin: 0;
+  padding: 0.95rem 0.95rem 0.95rem 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--school-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.school-faq__trigger:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: -3px;
+}
+
+.school-faq__question {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  overflow-wrap: break-word;
+}
+
+.school-faq__chevron {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--school-accent);
+  background: rgba(112, 66, 197, 0.08);
+  border: 1px solid rgba(112, 66, 197, 0.16);
+  transition: transform 160ms ease;
+}
+
+.school-faq__chevron--open {
+  transform: rotate(180deg);
+}
+
+.school-faq__chevron-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.school-faq__panel {
+  padding: 0 1rem 1rem;
+}
+
+.school-faq__answer {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1.42;
+  color: var(--school-body-color);
+  overflow-wrap: break-word;
+}
+
+.school-faq__answer + .school-faq__answer {
+  margin-top: 0.55rem;
+}
+
+.school-faq__closing {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  margin-top: 1.15rem;
+  padding: 1rem 0.95rem 1.05rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 252, 250, 0.78);
+  border: 1px solid rgba(214, 198, 238, 0.52);
+  text-align: center;
+}
+
+.school-faq__closing-text {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.08rem, 4.2vw, 1.22rem);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+  color: var(--school-ink);
+}
+
+.school-faq__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  width: 100%;
+  padding: 0.9rem 1.15rem;
+  border-radius: 1.15rem;
+  background-color: var(--school-cta-mid);
+  background-image: linear-gradient(
+    180deg,
+    var(--school-cta-end) 0%,
+    var(--school-cta-mid) 48%,
+    var(--school-cta-start) 100%
+  );
+  color: #fff;
+  font-size: clamp(1.05rem, 3.9vw, 1.15rem);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 14px 30px rgba(95, 46, 201, 0.28);
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.school-faq__cta:hover {
+  filter: brightness(0.97);
+  box-shadow: 0 16px 34px rgba(95, 46, 201, 0.34);
+  transform: translateY(-1px);
+}
+
+.school-faq__cta:active {
+  transform: scale(0.985);
+  filter: brightness(0.9);
+  box-shadow: 0 10px 22px rgba(95, 46, 201, 0.26);
+}
+
+.school-faq__cta:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 3px;
+}
+
+@media (min-width: 768px) {
+  .school-faq {
+    margin-top: 0.55rem;
+    margin-bottom: 2.85rem;
+    padding: 1.85rem 1.75rem 2rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-faq__inner {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .school-faq__title {
+    font-size: 2.25rem;
+  }
+
+  .school-faq__intro {
+    font-size: var(--school-body-size);
+    max-width: 40rem;
+  }
+
+  .school-faq__question {
+    font-size: 1.18rem;
+  }
+
+  .school-faq__answer {
+    font-size: var(--school-body-size);
+  }
+
+  .school-faq__closing-text {
+    font-size: 1.35rem;
+  }
+
+  .school-faq__cta {
+    width: 100%;
+    max-width: 22rem;
+    align-self: center;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-faq {
+    max-width: min(1160px, 100%);
+    padding: 2.1rem 2rem 2.25rem;
+  }
+
+  .school-faq__inner {
+    max-width: 880px;
+  }
+
+  .school-faq__title {
+    font-size: 2.45rem;
+  }
+
+  .school-faq__question {
+    font-size: 1.22rem;
   }
 }
