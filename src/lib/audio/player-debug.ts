@@ -15,6 +15,8 @@ type PlayerDebugEntry = {
   isRecovering: boolean;
   userWantsPlayback: boolean;
   sessionGeneration: number;
+  /** Safe key=value pairs only — never tokens, cookies, or full signed URLs. */
+  fields: string | null;
 };
 
 const ring: PlayerDebugEntry[] = [];
@@ -36,6 +38,26 @@ function isDebugEnabled(): boolean {
   }
 }
 
+function formatDebugFields(
+  fields: Record<string, string | number | boolean | null | undefined> | undefined,
+): string | null {
+  if (!fields) {
+    return null;
+  }
+
+  const parts: string[] = [];
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    parts.push(`${key}=${value === null ? "null" : String(value)}`);
+  }
+
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 export function isPlayerDebugEnabled(): boolean {
   return isDebugEnabled();
 }
@@ -49,6 +71,7 @@ export function logPlayerDebug(
     isRecovering?: boolean;
     userWantsPlayback?: boolean;
     sessionGeneration?: number;
+    fields?: Record<string, string | number | boolean | null | undefined>;
   },
 ): void {
   if (!isDebugEnabled()) {
@@ -71,12 +94,30 @@ export function logPlayerDebug(
     isRecovering: snapshot.isRecovering ?? false,
     userWantsPlayback: snapshot.userWantsPlayback ?? false,
     sessionGeneration: snapshot.sessionGeneration ?? 0,
+    fields: formatDebugFields(snapshot.fields),
   };
 
   ring.push(entry);
 
   if (ring.length > RING_SIZE) {
     ring.shift();
+  }
+
+  try {
+    const line = [
+      "[player-debug]",
+      source,
+      event,
+      `ready=${entry.readyState}`,
+      `net=${entry.networkState}`,
+      `hasSrc=${entry.hasSrc}`,
+      entry.fields ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    console.info(line);
+  } catch {
+    // ignore console failures
   }
 }
 
@@ -97,7 +138,10 @@ export function getPlayerDebugLogText(): string {
         `isRecovering=${entry.isRecovering}`,
         `wants=${entry.userWantsPlayback}`,
         `gen=${entry.sessionGeneration}`,
-      ].join(" | "),
+        entry.fields ?? "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
     )
     .join("\n");
 }
