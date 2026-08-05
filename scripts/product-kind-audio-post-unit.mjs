@@ -106,6 +106,80 @@ assert.equal(
   true,
 );
 
+const noDescription = evaluatePublishReadiness(
+  basePractice({ description: null }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(noDescription.ok, true, noDescription.firstFailure?.message);
+assert.equal(
+  noDescription.requirements.find((item) => item.key === "description")?.ok,
+  true,
+);
+
+const emptyDescription = evaluatePublishReadiness(
+  basePractice({ description: "   " }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(emptyDescription.ok, true, emptyDescription.firstFailure?.message);
+
+const missingTitle = evaluatePublishReadiness(
+  basePractice({ title: "" }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(missingTitle.firstFailure?.code, "missing_title");
+
+const missingAudio = evaluatePublishReadiness(basePractice(), [], {
+  activeTopicCount: 1,
+});
+assert.equal(
+  missingAudio.firstFailure?.code,
+  "audio_post_requires_single_audio",
+);
+
+const incompletePromo = evaluatePublishReadiness(
+  basePractice({
+    promo_enabled: true,
+    promo_title: "",
+    promo_text: "Текст",
+    promo_button_text: "Кнопка",
+    promo_url: "/catalog",
+  }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(incompletePromo.firstFailure?.code, "promo_title_required");
+
+const practiceNeedsDescription = evaluatePublishReadiness(
+  basePractice({
+    product_kind: PRODUCT_KIND.PRACTICE,
+    format: "Медитация",
+    description: null,
+    promo_enabled: false,
+  }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(
+  practiceNeedsDescription.firstFailure?.code,
+  "missing_description",
+);
+
+const musicNeedsDescription = evaluatePublishReadiness(
+  basePractice({
+    product_kind: PRODUCT_KIND.MUSIC,
+    format: "Музыка",
+    music_usage_permission: "listen_only",
+    description: "",
+    promo_enabled: false,
+  }),
+  [audioItem(1)],
+  { activeTopicCount: 1 },
+);
+assert.equal(musicNeedsDescription.firstFailure?.code, "missing_description");
+
 const paidAudioPost = evaluatePublishReadiness(
   basePractice({ is_free: false, price: 99 }),
   [audioItem(1)],
@@ -148,5 +222,18 @@ assert.match(migration, /audio_post_must_be_free/);
 assert.match(migration, /promo_title_required/);
 assert.match(migration, /v_product_kind = 'audio_post' THEN 'аудиопост'/);
 assert.match(migration, /product_kind IN \('practice', 'music'\)/);
+
+const descriptionMigration = readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260805193000_audio_post_optional_description.sql",
+  ),
+  "utf8",
+);
+assert.match(
+  descriptionMigration,
+  /product_kind <> 'audio_post'[\s\S]*missing_description/,
+);
+assert.match(descriptionMigration, /internal-moderation-readiness:v3/);
 
 console.log("product-kind-audio-post-unit: ok");

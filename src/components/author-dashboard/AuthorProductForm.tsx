@@ -2250,7 +2250,11 @@ export default function AuthorProductForm({
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-sm font-medium">Описание</span>
+          <span className="mb-2 block text-sm font-medium">
+            {form.productKind === PRODUCT_KIND.AUDIO_POST
+              ? "Описание (необязательно)"
+              : "Описание"}
+          </span>
           <textarea
             value={form.description}
             maxLength={PRODUCT_CONTENT_LIMITS.description}

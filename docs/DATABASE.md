@@ -42,7 +42,7 @@ RLS включён. Политика SELECT: `Public can read published practice
 
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 
-Для `audio_post`: всегда бесплатный (`is_free=true`, `price=0`), публичный формат «Аудиопост», ровно один `audio_item` на уровне publish readiness / UX (не CHECK на число треков).
+Для `audio_post`: всегда бесплатный (`is_free=true`, `price=0`), публичный формат «Аудиопост», ровно один `audio_item` на уровне publish readiness / UX (не CHECK на число треков). Поле `description` для `audio_post` необязательно (`assert_practice_moderation_ready` / TS publish readiness); для `practice` и `music` описание по-прежнему обязательно. Миграция: `20260805193000_audio_post_optional_description.sql`.
 
 #### promo_* — универсальная внутренняя рекомендация (2026-08-05)
 

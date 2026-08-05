@@ -153,6 +153,14 @@ assert(
   "same-product clicks reuse engine track switch",
 );
 assert(
+  playbackHook.includes("handlePlayPause"),
+  "active track click toggles pause/resume via global engine",
+);
+assert(
+  playbackHook.includes("resolveProductPlaybackClickAction"),
+  "playback click routing uses shared pure resolver",
+);
+assert(
   playbackHook.includes("requestLockRef"),
   "duplicate rapid clicks are guarded",
 );

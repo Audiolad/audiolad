@@ -27,4 +27,24 @@ assert.match(migration, /promo_url_required/);
 assert.match(migration, /product_kind IN \('practice', 'music'\)/);
 assert.match(migration, /WHEN v_product_kind = 'audio_post' THEN 'аудиопост'/);
 
+const optionalDescriptionMigration = readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260805193000_audio_post_optional_description.sql",
+  ),
+  "utf8",
+);
+assert.match(
+  optionalDescriptionMigration,
+  /CREATE OR REPLACE FUNCTION public\.assert_practice_moderation_ready/,
+);
+assert.match(
+  optionalDescriptionMigration,
+  /product_kind <> 'audio_post'[\s\S]*missing_description/,
+);
+assert.match(
+  optionalDescriptionMigration,
+  /internal-moderation-readiness:v3/,
+);
+
 console.log("audio-post-migration-sql-unit: ok");

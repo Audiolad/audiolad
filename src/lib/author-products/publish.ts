@@ -237,12 +237,14 @@ function buildCorePublishRequirements(
       }
     : null;
 
-  const descriptionFailure = !practice.description?.trim()
-    ? {
-        code: "missing_description",
-        message: "Добавьте описание аудиопродукта.",
-      }
-    : null;
+  // Audio posts may ship with cover + audio + short subtitle only.
+  const descriptionFailure =
+    !isAudioPost && !practice.description?.trim()
+      ? {
+          code: "missing_description",
+          message: "Добавьте описание аудиопродукта.",
+        }
+      : null;
 
   const format = resolveFormatForPublish(practice, audioItems);
   const formatFailure =

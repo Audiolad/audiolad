@@ -7,6 +7,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session";
+import { resolveProductPlaybackClickAction } from "@/lib/products/product-playback-click";
 
 type UseProductContentsPlaybackOptions = {
   authorSlug: string;
@@ -37,6 +38,17 @@ export function useProductContentsPlayback({
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const isActiveProduct =
+    !!session &&
+    session.sourceType !== "private_audio" &&
+    session.authorSlug === authorSlug &&
+    session.productSlug === productSlug;
+
+  const activeTrackId = isActiveProduct
+    ? (engine?.currentTrack?.id ?? null)
+    : null;
+  const isPlaying = Boolean(isActiveProduct && engine?.isPlaying);
+
   const playTrack = useCallback(
     async (trackId: string) => {
       if (!enabled || requestLockRef.current) {
@@ -54,16 +66,33 @@ export function useProductContentsPlayback({
           session.authorSlug === authorSlug &&
           session.productSlug === productSlug;
 
-        if (isSameProduct && engine && session) {
-          clearPlaylistQueue();
-          const trackIndex = session.tracks.findIndex(
-            (track) => track.id === trackId,
-          );
+        const trackIndex =
+          isSameProduct && session
+            ? session.tracks.findIndex((track) => track.id === trackId)
+            : -1;
 
-          if (trackIndex >= 0) {
-            await engine.handlePlayTrackAtIndex(trackIndex);
-            return;
-          }
+        const action = resolveProductPlaybackClickAction({
+          enabled,
+          isSameProduct: Boolean(isSameProduct && engine),
+          trackIndex,
+          currentTrackId: engine?.currentTrack?.id ?? null,
+          clickedTrackId: trackId,
+        });
+
+        if (action.type === "toggle_pause_resume" && engine) {
+          clearPlaylistQueue();
+          await engine.handlePlayPause();
+          return;
+        }
+
+        if (action.type === "play_at_index" && engine) {
+          clearPlaylistQueue();
+          await engine.handlePlayTrackAtIndex(action.index);
+          return;
+        }
+
+        if (action.type === "noop") {
+          return;
         }
 
         const loaded = await fetchListenSessionPayload(authorSlug, productSlug);
@@ -96,18 +125,13 @@ export function useProductContentsPlayback({
     ],
   );
 
-  const isActiveProduct =
-    !!session &&
-    session.sourceType !== "private_audio" &&
-    session.authorSlug === authorSlug &&
-    session.productSlug === productSlug;
-
   return {
     playTrack,
     loadingTrackId,
     errorMessage,
     clearErrorMessage: () => setErrorMessage(null),
-    activeTrackId: isActiveProduct ? (engine?.currentTrack?.id ?? null) : null,
+    activeTrackId,
+    isPlaying,
     enabled,
   };
 }
