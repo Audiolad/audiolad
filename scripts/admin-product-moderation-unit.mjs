@@ -97,6 +97,15 @@ assert.match(migration, /SET search_path = public, pg_temp/);
 assert.match(migration, /audiolad\.allow_practice_publish/);
 assert.doesNotMatch(migration, /practice_moderation_email_outbox/);
 
+const preserveListed = read(
+  "supabase/migrations/20260805194500_preserve_catalog_listed_on_publish.sql",
+);
+assert.match(
+  preserveListed,
+  /COALESCE\(v_practice\.is_catalog_listed, true\)/,
+);
+assert.match(preserveListed, /approve-and-publish-practice:v2/);
+
 const page = read("src/app/admin/product-moderation/page.tsx");
 assert.match(page, /requireAdminPermission\("author_products\.moderate"\)/);
 assert.match(page, /Сейчас нет продуктов, ожидающих модерации/);

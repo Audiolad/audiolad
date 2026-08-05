@@ -27,7 +27,9 @@
 
 Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `music_usage_permission`, `is_catalog_listed`.
 
-Фильтр: `status=eq.published`, сортировка: `created_at.desc`.
+Фильтр публичных витрин: `status=eq.published` и `is_catalog_listed=eq.true`. Режим «По ссылке» = `published` + `is_catalog_listed=false` (прямой URL, без каталога/главной/поиска/sitemap; `noindex`). `approve_and_publish_practice` / `publish_audio_product` сохраняют выбранное `is_catalog_listed` (миграция `20260805194500_preserve_catalog_listed_on_publish.sql`); starters остаются unlisted.
+
+Сортировка каталога: `created_at.desc`.
 
 RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published'`.
 

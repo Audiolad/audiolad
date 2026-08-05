@@ -62,6 +62,15 @@ assert.match(gates, /author_access_allows_paid_products/);
 assert.match(gates, /author_access_allows_content_mutations/);
 assert.match(gates, /assert_practice_moderation_ready/);
 
+const preserveListed = read(
+  "supabase/migrations/20260805194500_preserve_catalog_listed_on_publish.sql",
+);
+assert.match(preserveListed, /publish-audio-product:v9/);
+assert.match(
+  preserveListed,
+  /COALESCE\(v_practice\.is_catalog_listed, true\)/,
+);
+
 // Sale-lock and content-lock contracts remain available on main code.
 const saleLock = read("src/lib/author-products/sale-lock.ts");
 assert.match(saleLock, /PRODUCT_CONTENT_LOCKED_AFTER_SALE/);

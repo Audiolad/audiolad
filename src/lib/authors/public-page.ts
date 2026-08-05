@@ -171,11 +171,15 @@ export async function loadAuthorPublicPageData(
     ),
   );
 
-  const featuredIds = new Set(
-    (profile?.featuredProducts ?? []).map((product) => product.id),
+  // Featured picks may include unlisted drafts in the author cabinet; the
+  // public author page only surfaces catalog-listed published products.
+  const listedProductIds = new Set(allProducts.map((product) => product.id));
+  const featuredListed = (profile?.featuredProducts ?? []).filter((product) =>
+    listedProductIds.has(product.id),
   );
+  const featuredIds = new Set(featuredListed.map((product) => product.id));
 
-  const featuredProducts = (profile?.featuredProducts ?? []).map((product) =>
+  const featuredProducts = featuredListed.map((product) =>
     mapPracticeRow(
       {
         ...product,

@@ -76,6 +76,7 @@ export async function getAuthorPublishedPractices(
     )
     .eq("author_id", authorId)
     .eq("status", "published")
+    .eq("is_catalog_listed", true)
     .order("created_at", { ascending: false });
 
   if (error) {
