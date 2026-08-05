@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import PracticeViewTracker from "@/components/analytics/PracticeViewTracker";
+import AudioPostPage from "@/components/products/audio-post/AudioPostPage";
 import PracticePageDesktop from "@/components/products/practice-page/PracticePageDesktop";
 import PracticePageErrorState from "@/components/products/practice-page/PracticePageErrorState";
 import PracticePageMobile from "@/components/products/practice-page/PracticePageMobile";
@@ -18,10 +19,14 @@ import {
 } from "@/lib/products/cover-display";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import {
+  AUDIO_POST_KIND_LABEL,
   getMusicProductTypeLabel,
+  isAudioPostProductKind,
   isMusicProductKind,
   normalizeProductKind,
+  PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
+import { resolvePublicPromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
@@ -190,17 +195,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       ? practice.description.trim()
       : "";
   const canonical = buildPracticeCanonicalUrl(authorSlug, productSlug);
-  const indexable = shouldIndexPracticePage(practice.status);
+  const indexable = shouldIndexPracticePage(
+    practice.status,
+    practice.is_catalog_listed,
+  );
   const isMusic = isMusicProductKind(practice.product_kind);
+  const isAudioPost = isAudioPostProductKind(practice.product_kind);
   const descriptionFallback = isMusic
     ? "Музыкальный продукт на платформе АудиоЛад."
-    : METADATA_DESCRIPTION_FALLBACK;
+    : isAudioPost
+      ? "Аудиопост на платформе АудиоЛад."
+      : METADATA_DESCRIPTION_FALLBACK;
+  const subtitle =
+    typeof practice.subtitle === "string" ? practice.subtitle.trim() : "";
+  const metaDescription = trimmedDescription
+    ? truncateDescription(trimmedDescription)
+    : subtitle
+      ? truncateDescription(subtitle)
+      : descriptionFallback;
 
   return {
-    title: `${practice.title} – АудиоЛад`,
-    description: trimmedDescription
-      ? truncateDescription(trimmedDescription)
-      : descriptionFallback,
+    title: isAudioPost
+      ? `${practice.title} – ${AUDIO_POST_KIND_LABEL} – АудиоЛад`
+      : `${practice.title} – АудиоЛад`,
+    description: metaDescription,
     alternates: {
       canonical,
     },
@@ -321,15 +339,29 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
   const authorName = getAuthorName(practice);
   const productKind = normalizeProductKind(practice.product_kind);
+  const isAudioPost = isAudioPostProductKind(productKind);
   const musicTypeLabel = isMusicProductKind(productKind)
     ? getMusicProductTypeLabel()
     : null;
+  const typeLabel = isAudioPost
+    ? AUDIO_POST_KIND_LABEL
+    : (musicTypeLabel ?? practice.format);
   const meta = formatProductMeta({
-    format: musicTypeLabel ?? practice.format,
-    audioCount: publicAudioItems.length,
+    format: typeLabel,
+    audioCount: isAudioPost ? 1 : publicAudioItems.length,
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
   });
+  const recommendation = isAudioPost
+    ? resolvePublicPromoRecommendation({
+        promo_enabled: practice.promo_enabled === true,
+        promo_title: practice.promo_title,
+        promo_text: practice.promo_text,
+        promo_button_text: practice.promo_button_text,
+        promo_url: practice.promo_url,
+        promo_open_in_new_tab: practice.promo_open_in_new_tab === true,
+      })
+    : null;
   const description = practice.description?.trim() || null;
   const gradient = getProductCoverGradient(practice.slug);
   const symbol = getProductCoverSymbol(practice.slug);
@@ -464,6 +496,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const structuredData = shouldEmitPracticeJsonLd({
     status: practice.status,
     isFixtureMarked: isFixtureMarkedPractice(practice),
+    isCatalogListed: practice.is_catalog_listed,
   })
     ? buildPracticeJsonLd({
         title: practice.title,
@@ -521,8 +554,21 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
           }
         />
       ) : null}
-      <PracticePageMobile viewModel={viewModel} />
-      <PracticePageDesktop viewModel={viewModel} />
+      {isAudioPost ? (
+        <AudioPostPage
+          viewModel={{
+            ...viewModel,
+            productKind: PRODUCT_KIND.AUDIO_POST,
+            authorId: practice.author_id,
+            recommendation,
+          }}
+        />
+      ) : (
+        <>
+          <PracticePageMobile viewModel={viewModel} />
+          <PracticePageDesktop viewModel={viewModel} />
+        </>
+      )}
     </>
   );
 }

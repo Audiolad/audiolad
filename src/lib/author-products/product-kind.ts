@@ -1,6 +1,7 @@
 export const PRODUCT_KIND = {
   PRACTICE: "practice",
   MUSIC: "music",
+  AUDIO_POST: "audio_post",
 } as const;
 
 export type ProductKind = (typeof PRODUCT_KIND)[keyof typeof PRODUCT_KIND];
@@ -21,22 +22,32 @@ export const MUSIC_RELEASE_ALBUM_LABEL = "Музыкальный альбом";
 /** Public card/page label and system-stored practices.format for music. */
 export const MUSIC_KIND_LABEL = "Музыка";
 export const PRACTICE_KIND_LABEL = "Аудиопрактика";
+export const AUDIO_POST_KIND_LABEL = "Аудиопост";
 
 export const MUSIC_USAGE_PERMISSION_INTRO =
   "Выберите, смогут ли в будущем другие авторы АудиоЛада использовать эту музыку в своих аудиопродуктах.";
 
-export function normalizeProductKind(
-  value: string | null | undefined,
-): ProductKind {
-  return value === PRODUCT_KIND.MUSIC
-    ? PRODUCT_KIND.MUSIC
-    : PRODUCT_KIND.PRACTICE;
+export function normalizeProductKind(value: string | null | undefined): ProductKind {
+  switch (value) {
+    case PRODUCT_KIND.MUSIC:
+      return PRODUCT_KIND.MUSIC;
+    case PRODUCT_KIND.AUDIO_POST:
+      return PRODUCT_KIND.AUDIO_POST;
+    default:
+      return PRODUCT_KIND.PRACTICE;
+  }
 }
 
 export function isMusicProductKind(
   value: string | null | undefined,
 ): boolean {
   return normalizeProductKind(value) === PRODUCT_KIND.MUSIC;
+}
+
+export function isAudioPostProductKind(
+  value: string | null | undefined,
+): boolean {
+  return normalizeProductKind(value) === PRODUCT_KIND.AUDIO_POST;
 }
 
 export function canChangeProductKind(publishedAt: string | null | undefined): boolean {
@@ -71,7 +82,14 @@ export function getMusicProductTypeLabel(): string {
 }
 
 export function getProductKindLabel(kind: string | null | undefined): string {
-  return isMusicProductKind(kind) ? MUSIC_KIND_LABEL : PRACTICE_KIND_LABEL;
+  switch (normalizeProductKind(kind)) {
+    case PRODUCT_KIND.MUSIC:
+      return MUSIC_KIND_LABEL;
+    case PRODUCT_KIND.AUDIO_POST:
+      return AUDIO_POST_KIND_LABEL;
+    default:
+      return PRACTICE_KIND_LABEL;
+  }
 }
 
 export function getMusicUsagePermissionLabel(
@@ -108,7 +126,7 @@ export function assertMusicUsagePermissionForKind(
   | { ok: false; code: string; message: string } {
   const kind = normalizeProductKind(productKind);
 
-  if (kind === PRODUCT_KIND.PRACTICE) {
+  if (kind !== PRODUCT_KIND.MUSIC) {
     if (
       musicUsagePermission != null &&
       String(musicUsagePermission).trim() !== ""
@@ -117,7 +135,7 @@ export function assertMusicUsagePermissionForKind(
         ok: false,
         code: "music_usage_not_allowed_for_practice",
         message:
-          "Условия использования музыки недоступны для аудиопрактики.",
+          "Условия использования музыки доступны только для музыкальных продуктов.",
       };
     }
 

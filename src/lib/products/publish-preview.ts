@@ -88,8 +88,18 @@ export function canPublishFromPublishPreview(
 
 export function shouldIndexPracticePage(
   practiceStatus: string | null | undefined,
+  isCatalogListed?: boolean | null,
 ): boolean {
-  return isPracticePublished(practiceStatus);
+  if (!isPracticePublished(practiceStatus)) {
+    return false;
+  }
+
+  // Unlisted published products stay reachable by URL but must not be indexed.
+  if (isCatalogListed === false) {
+    return false;
+  }
+
+  return true;
 }
 
 export function shouldTrackPracticeListenerAnalytics(input: {

@@ -46,6 +46,7 @@ import {
   DEFAULT_LISTENING_NOTICE_TEXT,
   DEFAULT_LISTENING_NOTICE_TITLE,
 } from "@/lib/products/listening-notice";
+import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 import {
   loadAuthorSlug,
@@ -237,7 +238,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (
         typeof body.product_kind !== "string" ||
         (body.product_kind !== PRODUCT_KIND.PRACTICE &&
-          body.product_kind !== PRODUCT_KIND.MUSIC)
+          body.product_kind !== PRODUCT_KIND.MUSIC &&
+          body.product_kind !== PRODUCT_KIND.AUDIO_POST)
       ) {
         return NextResponse.json(
           { error: "invalid_product_kind" },
@@ -263,7 +265,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       updates.product_kind = nextProductKind;
 
-      if (nextProductKind === PRODUCT_KIND.PRACTICE) {
+      if (nextProductKind !== PRODUCT_KIND.MUSIC) {
         updates.music_usage_permission = null;
       } else if (
         !("music_usage_permission" in body) &&
@@ -281,7 +283,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             ? body.music_usage_permission.trim()
             : "";
 
-      if (nextProductKind === PRODUCT_KIND.PRACTICE) {
+      if (nextProductKind !== PRODUCT_KIND.MUSIC) {
         if (rawPermission) {
           return NextResponse.json(
             {
@@ -312,10 +314,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
         updates.music_usage_permission = permissionCheck.permission;
       }
-    } else if (
-      nextProductKind === PRODUCT_KIND.PRACTICE &&
-      "product_kind" in body
-    ) {
+    } else if (nextProductKind !== PRODUCT_KIND.MUSIC && "product_kind" in body) {
       updates.music_usage_permission = null;
     }
 
@@ -325,6 +324,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       body.is_free;
 
     if ("is_free" in body && typeof body.is_free === "boolean") {
+      if (
+        nextProductKind === PRODUCT_KIND.AUDIO_POST &&
+        body.is_free !== true
+      ) {
+        return NextResponse.json(
+          { error: "audio_post_must_be_free" },
+          { status: 400 },
+        );
+      }
+
       if (!body.is_free) {
         await assertAuthorCommercialWriteAllowed(
           practice.author_id,
@@ -345,6 +354,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body.price === "number" &&
       Number.isInteger(body.price)
     ) {
+      if (nextProductKind === PRODUCT_KIND.AUDIO_POST) {
+        return NextResponse.json(
+          { error: "audio_post_must_be_free" },
+          { status: 400 },
+        );
+      }
+
       await assertAuthorCommercialWriteAllowed(
         practice.author_id,
         accessStatus,
@@ -356,6 +372,78 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       updates.price = body.price;
       updates.is_free = false;
+    }
+
+    if (nextProductKind === PRODUCT_KIND.AUDIO_POST) {
+      updates.is_free = true;
+      updates.price = 0;
+    }
+
+    if (
+      "is_catalog_listed" in body &&
+      typeof body.is_catalog_listed === "boolean"
+    ) {
+      updates.is_catalog_listed = body.is_catalog_listed;
+    }
+
+    const hasPromoUpdate = [
+      "promo_enabled",
+      "promo_title",
+      "promo_text",
+      "promo_button_text",
+      "promo_url",
+      "promo_open_in_new_tab",
+    ].some((key) => key in body);
+
+    if (nextProductKind === PRODUCT_KIND.AUDIO_POST && hasPromoUpdate) {
+      const promo = validatePromoRecommendation({
+        promo_enabled:
+          "promo_enabled" in body
+            ? body.promo_enabled === true
+            : practice.promo_enabled === true,
+        promo_title:
+          "promo_title" in body && typeof body.promo_title === "string"
+            ? body.promo_title
+            : practice.promo_title,
+        promo_text:
+          "promo_text" in body && typeof body.promo_text === "string"
+            ? body.promo_text
+            : practice.promo_text,
+        promo_button_text:
+          "promo_button_text" in body &&
+          typeof body.promo_button_text === "string"
+            ? body.promo_button_text
+            : practice.promo_button_text,
+        promo_url:
+          "promo_url" in body && typeof body.promo_url === "string"
+            ? body.promo_url
+            : practice.promo_url,
+        promo_open_in_new_tab:
+          "promo_open_in_new_tab" in body
+            ? body.promo_open_in_new_tab === true
+            : practice.promo_open_in_new_tab === true,
+      });
+
+      if (!promo.ok) {
+        return NextResponse.json(
+          { error: promo.code, message: promo.message },
+          { status: 400 },
+        );
+      }
+
+      Object.assign(updates, promo.value);
+    } else if (
+      nextProductKind !== PRODUCT_KIND.AUDIO_POST &&
+      (hasPromoUpdate || "product_kind" in body)
+    ) {
+      Object.assign(updates, {
+        promo_enabled: false,
+        promo_title: null,
+        promo_text: null,
+        promo_button_text: null,
+        promo_url: null,
+        promo_open_in_new_tab: false,
+      });
     }
 
     if ("slug" in body && typeof body.slug === "string") {

@@ -43,9 +43,12 @@ type PracticeReadinessRow = Pick<
   | "subtitle"
   | "description"
   | "format"
+  | "product_kind"
+  | "music_usage_permission"
   | "duration_minutes"
   | "price"
   | "is_free"
+  | "is_catalog_listed"
   | "cover_url"
   | "use_shared_cover"
   | "audio_url"
@@ -55,6 +58,12 @@ type PracticeReadinessRow = Pick<
   | "listening_notice_enabled"
   | "listening_notice_title"
   | "listening_notice_text"
+  | "promo_enabled"
+  | "promo_title"
+  | "promo_text"
+  | "promo_button_text"
+  | "promo_url"
+  | "promo_open_in_new_tab"
   | "created_at"
   | "updated_at"
 >;
@@ -234,9 +243,12 @@ export async function loadAuthorOnboardingChecklistState(
           subtitle,
           description,
           format,
+          product_kind,
+          music_usage_permission,
           duration_minutes,
           price,
           is_free,
+          is_catalog_listed,
           cover_url,
           use_shared_cover,
           audio_url,
@@ -246,6 +258,12 @@ export async function loadAuthorOnboardingChecklistState(
           listening_notice_enabled,
           listening_notice_title,
           listening_notice_text,
+          promo_enabled,
+          promo_title,
+          promo_text,
+          promo_button_text,
+          promo_url,
+          promo_open_in_new_tab,
           created_at,
           updated_at
         `,
@@ -294,6 +312,7 @@ export async function loadAuthorOnboardingChecklistState(
           status: product.status,
           is_free: product.is_free,
           price: product.price,
+          product_kind: product.product_kind,
           updated_at: product.updated_at,
           readiness: emptyReadiness(),
         };
@@ -309,6 +328,7 @@ export async function loadAuthorOnboardingChecklistState(
           status: product.status,
           is_free: product.is_free,
           price: product.price,
+          product_kind: product.product_kind,
           updated_at: product.updated_at,
           readiness: emptyReadiness(),
         };
@@ -330,6 +350,7 @@ export async function loadAuthorOnboardingChecklistState(
         status: product.status,
         is_free: product.is_free,
         price: product.price,
+        product_kind: product.product_kind,
         updated_at: product.updated_at,
         readiness,
       };

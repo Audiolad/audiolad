@@ -28,6 +28,7 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "article_toc_click",
   "article_final_audio_click",
   "buy_clicked",
+  "product_promo_clicked",
   "author_page_view",
   "help_article_view",
   "help_search",

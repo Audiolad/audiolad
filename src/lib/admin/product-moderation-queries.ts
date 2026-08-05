@@ -61,6 +61,12 @@ export type AdminProductModerationDetail = {
   moderationReviewComment: string | null;
   isFree: boolean;
   price: number;
+  promoEnabled: boolean;
+  promoTitle: string | null;
+  promoText: string | null;
+  promoButtonText: string | null;
+  promoUrl: string | null;
+  promoOpenInNewTab: boolean;
   coverUrl: string | null;
   coverImage: unknown;
   createdAt: string;
@@ -241,6 +247,12 @@ export async function getAdminProductModerationDetail(
       moderation_review_comment,
       is_free,
       price,
+      promo_enabled,
+      promo_title,
+      promo_text,
+      promo_button_text,
+      promo_url,
+      promo_open_in_new_tab,
       cover_url,
       cover_image,
       created_at,
@@ -386,6 +398,12 @@ export async function getAdminProductModerationDetail(
       (practice.moderation_review_comment as string | null) ?? null,
     isFree: practice.is_free === true,
     price: typeof practice.price === "number" ? practice.price : 0,
+    promoEnabled: practice.promo_enabled === true,
+    promoTitle: (practice.promo_title as string | null) ?? null,
+    promoText: (practice.promo_text as string | null) ?? null,
+    promoButtonText: (practice.promo_button_text as string | null) ?? null,
+    promoUrl: (practice.promo_url as string | null) ?? null,
+    promoOpenInNewTab: practice.promo_open_in_new_tab === true,
     coverUrl: (practice.cover_url as string | null) ?? null,
     coverImage: practice.cover_image ?? null,
     createdAt: (practice.created_at as string) || "",

@@ -28,6 +28,13 @@ export type ProductFormSnapshot = {
   slug: string;
   isFree: boolean;
   price: number;
+  isCatalogListed: boolean;
+  promoEnabled: boolean;
+  promoTitle: string;
+  promoText: string;
+  promoButtonText: string;
+  promoUrl: string;
+  promoOpenInNewTab: boolean;
   coverUrl: string | null;
   coverVersion: string | null;
   coverImage?: unknown;
@@ -66,8 +73,20 @@ export function productDetailToFormSnapshot(
     formatPreset: preset,
     customFormat,
     slug: practice.slug,
-    isFree: practice.is_free === true,
-    price: practice.is_free === true ? 99 : practice.price,
+    isFree: productKind === "audio_post" || practice.is_free === true,
+    price:
+      productKind === "audio_post"
+        ? 0
+        : practice.is_free === true
+          ? 99
+          : practice.price,
+    isCatalogListed: practice.is_catalog_listed !== false,
+    promoEnabled: practice.promo_enabled === true,
+    promoTitle: practice.promo_title ?? "",
+    promoText: practice.promo_text ?? "",
+    promoButtonText: practice.promo_button_text ?? "",
+    promoUrl: practice.promo_url ?? "",
+    promoOpenInNewTab: practice.promo_open_in_new_tab === true,
     coverUrl: practice.cover_url,
     coverVersion: practice.cover_url ? practice.updated_at : null,
     coverImage: practice.cover_image ?? null,
@@ -106,8 +125,15 @@ export function mergeServerProductIntoForm(
         : null,
     formatPreset: current.formatPreset || server.formatPreset,
     customFormat: current.customFormat,
-    isFree: current.isFree,
-    price: current.price,
+    isFree: current.productKind === "audio_post" ? true : current.isFree,
+    price: current.productKind === "audio_post" ? 0 : current.price,
+    isCatalogListed: current.isCatalogListed,
+    promoEnabled: current.promoEnabled,
+    promoTitle: current.promoTitle,
+    promoText: current.promoText,
+    promoButtonText: current.promoButtonText,
+    promoUrl: current.promoUrl,
+    promoOpenInNewTab: current.promoOpenInNewTab,
     useSharedCover: current.useSharedCover,
     listeningNoticeEnabled: current.listeningNoticeEnabled,
     listeningNoticeTitle: current.listeningNoticeTitle,

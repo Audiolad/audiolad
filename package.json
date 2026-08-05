@@ -33,6 +33,7 @@
     "test:analytics-p323": "npx tsx scripts/analytics-p323-client-unit.mjs && node scripts/analytics-p323-sql-unit.mjs",
     "test:commercial-application": "npx tsx scripts/author-commercial-application-unit.mjs",
     "test:commercial-application-free-product-gate": "npx tsx scripts/commercial-application-free-product-gate-unit.mjs",
+    "test:audio-post": "npx tsx scripts/product-kind-audio-post-unit.mjs && node scripts/audio-post-migration-sql-unit.mjs && npx tsx scripts/audio-post-public-unit.mjs",
     "test:commercial-application:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/author-commercial-application-integration.mjs",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",

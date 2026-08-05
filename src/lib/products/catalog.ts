@@ -5,7 +5,8 @@ import {
 } from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import {
-  getMusicProductTypeLabel,
+  getProductKindLabel,
+  isAudioPostProductKind,
   isMusicProductKind,
   normalizeProductKind,
   type ProductKind,
@@ -145,8 +146,12 @@ function getProductTypeLabel(
   format: string | null,
   productKind?: string | null,
 ): string {
+  if (isAudioPostProductKind(productKind)) {
+    return getProductKindLabel(productKind);
+  }
+
   if (isMusicProductKind(productKind)) {
-    return getMusicProductTypeLabel();
+    return getProductKindLabel(productKind);
   }
 
   const trimmedFormat = typeof format === "string" ? format.trim() : "";
@@ -303,7 +308,9 @@ export async function mapPracticeRowsToCatalogProducts(
         href: buildPracticePublicPath(author.slug, practice.slug),
         meta: formatProductMeta({
           format: isMusicProductKind(practice.product_kind)
-            ? getMusicProductTypeLabel()
+            ? getProductKindLabel(practice.product_kind)
+            : isAudioPostProductKind(practice.product_kind)
+              ? getProductKindLabel(practice.product_kind)
             : practice.format,
           audioCount,
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
@@ -314,8 +321,10 @@ export async function mapPracticeRowsToCatalogProducts(
           totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
           durationMinutesFallback: practice.duration_minutes,
         }),
-        productTypeLabel: isMusicProductKind(practice.product_kind)
-          ? getMusicProductTypeLabel()
+        productTypeLabel:
+          isMusicProductKind(practice.product_kind) ||
+          isAudioPostProductKind(practice.product_kind)
+          ? getProductKindLabel(practice.product_kind)
           : (getDisplayFormat(practice.format) ??
             getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
         priceLabel: getProductPriceLabel(practice.price, practice.is_free),

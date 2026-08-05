@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
+
 export type ProductAccessReason =
   | "free"
   | "guest_promo"
@@ -18,6 +20,7 @@ export type ProductAccessInput = {
   status: string | null;
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
+  product_kind?: string | null;
 };
 
 export type ProductAccessResult = {
@@ -175,7 +178,19 @@ export async function resolveProductAccess(
     }
   }
 
-  if (practice.is_free === true && isPracticePublished(practice.status) && isPubliclyListed) {
+  // Free audio posts stay listenable by direct link even when unlisted.
+  // Catalog claim / acquire remains gated by is_catalog_listed separately.
+  const freeAudioPostListen =
+    isAudioPostProductKind(practice.product_kind) &&
+    practice.is_free === true &&
+    isPracticePublished(practice.status);
+
+  if (
+    (practice.is_free === true &&
+      isPracticePublished(practice.status) &&
+      isPubliclyListed) ||
+    freeAudioPostListen
+  ) {
     return {
       canListen: true,
       canAcquire: false,

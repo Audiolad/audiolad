@@ -36,6 +36,7 @@ export type AuthorOnboardingProductInput = {
   status: string;
   is_free: boolean;
   price: number;
+  product_kind?: string | null;
   updated_at: string;
   readiness: PublishReadinessResult;
 };

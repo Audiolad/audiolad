@@ -10,6 +10,8 @@ import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
 import {
   assertMusicUsagePermissionForKind,
+  AUDIO_POST_KIND_LABEL,
+  isAudioPostProductKind,
   isMusicProductKind,
   MUSIC_KIND_LABEL,
   normalizeProductKind,
@@ -17,6 +19,7 @@ import {
 } from "./product-kind";
 import { minutesFromSeconds } from "./utils";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
+import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
 
 export type PublishValidationResult =
   | { ok: true }
@@ -32,7 +35,8 @@ export type PublishReadinessRequirementKey =
   | "audio"
   | "price"
   | "topics"
-  | "music_usage";
+  | "music_usage"
+  | "promo";
 
 export type PublishReadinessRequirement = {
   key: PublishReadinessRequirementKey;
@@ -100,6 +104,14 @@ export function validateAudioItemsStructure(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
 ): PublishValidationResult {
+  if (isAudioPostProductKind(practice.product_kind) && audioItems.length !== 1) {
+    return {
+      ok: false,
+      code: "audio_post_requires_single_audio",
+      message: "Для аудиопоста требуется ровно одна аудиозапись.",
+    };
+  }
+
   if (audioItems.length === 0) {
     return {
       ok: false,
@@ -182,6 +194,10 @@ export function resolveFormatForPublish(
     return MUSIC_KIND_LABEL;
   }
 
+  if (isAudioPostProductKind(practice.product_kind)) {
+    return AUDIO_POST_KIND_LABEL;
+  }
+
   const format = practice.format?.trim() || null;
 
   if (format && format !== LEGACY_OTHER_FORMAT) {
@@ -196,7 +212,9 @@ function buildCorePublishRequirements(
   audioItems: AudioItemRow[],
   accessStatus?: AuthorAccessStatus,
 ): PublishReadinessRequirement[] {
-  const isMusic = normalizeProductKind(practice.product_kind) === PRODUCT_KIND.MUSIC;
+  const productKind = normalizeProductKind(practice.product_kind);
+  const isMusic = productKind === PRODUCT_KIND.MUSIC;
+  const isAudioPost = productKind === PRODUCT_KIND.AUDIO_POST;
 
   const authorFailure = !practice.author_id
     ? {
@@ -258,7 +276,12 @@ function buildCorePublishRequirements(
 
   let priceFailure: { code: string; message: string } | null = null;
 
-  if (accessStatus && !authorAccessAllowsPaidProducts(accessStatus)) {
+  if (isAudioPost && (!practice.is_free || practice.price !== 0)) {
+    priceFailure = {
+      code: "audio_post_must_be_free",
+      message: "Аудиопост может быть только бесплатным.",
+    };
+  } else if (accessStatus && !authorAccessAllowsPaidProducts(accessStatus)) {
     if (!practice.is_free || practice.price > 0) {
       priceFailure = {
         code: "paid_products_not_allowed",
@@ -293,6 +316,11 @@ function buildCorePublishRequirements(
       : !isMusic && !musicUsageCheck.ok
         ? { code: musicUsageCheck.code, message: musicUsageCheck.message }
         : null;
+  const promoCheck = validatePromoRecommendation(practice);
+  const promoFailure =
+    isAudioPost && !promoCheck.ok
+      ? { code: promoCheck.code, message: promoCheck.message }
+      : null;
 
   const requirements: PublishReadinessRequirement[] = [
     requirement("author", "Авторское пространство", authorFailure),
@@ -309,6 +337,10 @@ function buildCorePublishRequirements(
     requirements.push(
       requirement("music_usage", "Условия использования музыки", musicUsageFailure),
     );
+  }
+
+  if (isAudioPost) {
+    requirements.push(requirement("promo", "Рекомендация", promoFailure));
   }
 
   return requirements;

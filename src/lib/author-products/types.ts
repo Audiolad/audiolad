@@ -70,6 +70,7 @@ export type PracticeRow = {
   duration_minutes: number | null;
   price: number;
   is_free: boolean;
+  is_catalog_listed: boolean;
   cover_url: string | null;
   cover_image?: unknown;
   use_shared_cover: boolean;
@@ -87,6 +88,12 @@ export type PracticeRow = {
   listening_notice_enabled: boolean;
   listening_notice_title: string;
   listening_notice_text: string;
+  promo_enabled: boolean;
+  promo_title: string | null;
+  promo_text: string | null;
+  promo_button_text: string | null;
+  promo_url: string | null;
+  promo_open_in_new_tab: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +122,7 @@ export function coercePracticeRow(
     PracticeRow,
     | "product_kind"
     | "music_usage_permission"
+    | "is_catalog_listed"
     | "moderation_status"
     | "moderation_attempt"
     | "moderation_submitted_at"
@@ -122,6 +130,12 @@ export function coercePracticeRow(
     | "deleted_at"
     | "deleted_by"
     | "deletion_reason"
+    | "promo_enabled"
+    | "promo_title"
+    | "promo_text"
+    | "promo_button_text"
+    | "promo_url"
+    | "promo_open_in_new_tab"
   > & {
     product_kind?: string | null;
     music_usage_permission?: string | null;
@@ -132,6 +146,13 @@ export function coercePracticeRow(
     deleted_at?: string | null;
     deleted_by?: string | null;
     deletion_reason?: string | null;
+    is_catalog_listed?: boolean | null;
+    promo_enabled?: boolean | null;
+    promo_title?: string | null;
+    promo_text?: string | null;
+    promo_button_text?: string | null;
+    promo_url?: string | null;
+    promo_open_in_new_tab?: boolean | null;
   },
 ): PracticeRow {
   return {
@@ -149,6 +170,13 @@ export function coercePracticeRow(
     deleted_at: row.deleted_at ?? null,
     deleted_by: row.deleted_by ?? null,
     deletion_reason: row.deletion_reason ?? null,
+    is_catalog_listed: row.is_catalog_listed !== false,
+    promo_enabled: row.promo_enabled === true,
+    promo_title: row.promo_title ?? null,
+    promo_text: row.promo_text ?? null,
+    promo_button_text: row.promo_button_text ?? null,
+    promo_url: row.promo_url ?? null,
+    promo_open_in_new_tab: row.promo_open_in_new_tab === true,
   };
 }
 
