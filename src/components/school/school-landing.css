@@ -663,6 +663,8 @@
 }
 
 .school-third-screen__format-label {
+  min-width: 0;
+  flex: 1 1 auto;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -671,6 +673,8 @@
   font-weight: 600;
   line-height: 1.22;
   color: var(--school-ink);
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .school-third-screen__more {
