@@ -5354,18 +5354,15 @@
   margin-top: 0.2rem;
 }
 
+/* Mobile: stack pair so long labels stay readable without overflow. */
 .school-faq__actions--pair {
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   gap: 0.7rem;
 }
 
 .school-faq__actions--pair .school-faq__messenger {
-  flex: 1 1 0;
-  min-width: 0;
-  width: auto;
-  padding-inline: 0.65rem;
-  font-size: 0.92rem;
+  width: 100%;
 }
 
 .school-faq__messenger {
@@ -5431,17 +5428,6 @@
   outline-offset: 3px;
 }
 
-@media (max-width: 374.98px) {
-  .school-faq__actions--pair {
-    flex-direction: column;
-  }
-
-  .school-faq__actions--pair .school-faq__messenger {
-    width: 100%;
-    font-size: 1.02rem;
-    padding-inline: 1rem;
-  }
-}
 
 @media (min-width: 768px) {
   .school-faq {
@@ -5493,17 +5479,27 @@
     margin-inline: auto;
   }
 
+  .school-faq__actions--pair {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .school-faq__actions--pair .school-faq__messenger {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    font-size: 1rem;
+    padding-inline: 1rem;
+  }
+
   .school-faq__actions:not(.school-faq__actions--pair) .school-faq__messenger {
     width: auto;
     min-width: 16rem;
     max-width: 20rem;
     align-self: center;
     margin-inline: auto;
-  }
-
-  .school-faq__actions--pair .school-faq__messenger {
-    font-size: 1rem;
-    padding-inline: 1rem;
   }
 }
 
