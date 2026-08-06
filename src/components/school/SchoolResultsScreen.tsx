@@ -1,3 +1,4 @@
+import SchoolCertificatePreview from "@/components/school/SchoolCertificatePreview";
 import { SchoolTariffsAnchorLink } from "@/components/school/SchoolTariffsAnchorLink";
 
 const TITLE = "Что у вас будет после окончания Школы";
@@ -16,6 +17,13 @@ const RESULTS = [
 ] as const;
 
 const CTA_LABEL = "Посмотреть варианты участия";
+
+const CERT_TITLE = "Именной сертификат Школы Аудиопрактик";
+
+const CERT_PARAGRAPHS = [
+  "Участники вариантов «Премиум» и VIP после завершения программы получают именной сертификат, подтверждающий прохождение обучения и освоение программы создания авторских аудиопродуктов.",
+  "Сертификат можно сохранить в электронном виде, распечатать и добавить в своё профессиональное портфолио.",
+] as const;
 
 function CheckMark({ className }: { className?: string }) {
   return (
@@ -42,24 +50,40 @@ export default function SchoolResultsScreen() {
       className="school-results"
       aria-label="Что у вас будет после окончания Школы"
     >
-      <h2 className="school-results__title">{TITLE}</h2>
-      <p className="school-results__intro">{INTRO}</p>
+      <div className="school-results__layout">
+        <div className="school-results__certificate">
+          <SchoolCertificatePreview />
+          <div className="school-results__cert-copy">
+            <h3 className="school-results__cert-title">{CERT_TITLE}</h3>
+            {CERT_PARAGRAPHS.map((paragraph) => (
+              <p key={paragraph} className="school-results__cert-text">
+                {paragraph}
+              </p>
+            ))}
+          </div>
+        </div>
 
-      <ul className="school-results__list">
-        {RESULTS.map((item) => (
-          <li key={item} className="school-results__item">
-            <span className="school-results__check" aria-hidden="true">
-              <CheckMark className="school-results__check-icon" />
-            </span>
-            <span className="school-results__text">{item}</span>
-          </li>
-        ))}
-      </ul>
+        <div className="school-results__outcomes">
+          <h2 className="school-results__title">{TITLE}</h2>
+          <p className="school-results__intro">{INTRO}</p>
 
-      <div className="school-cta-center">
-        <SchoolTariffsAnchorLink className="school-results__cta">
-          {CTA_LABEL}
-        </SchoolTariffsAnchorLink>
+          <ul className="school-results__list">
+            {RESULTS.map((item) => (
+              <li key={item} className="school-results__item">
+                <span className="school-results__check" aria-hidden="true">
+                  <CheckMark className="school-results__check-icon" />
+                </span>
+                <span className="school-results__text">{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="school-cta-center">
+            <SchoolTariffsAnchorLink className="school-results__cta">
+              {CTA_LABEL}
+            </SchoolTariffsAnchorLink>
+          </div>
+        </div>
       </div>
     </section>
   );
