@@ -3607,13 +3607,13 @@
 
 .school-tariffs__schedule {
   display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
+  flex-direction: column;
+  gap: 0;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   margin: 0.15rem 0 0;
-  padding: 0.72rem 0.85rem;
+  padding: 0.8rem 0.9rem;
   border-radius: 0.95rem;
   border: 1px solid rgba(196, 176, 214, 0.42);
   background:
@@ -3624,6 +3624,19 @@
     );
   box-shadow: none;
   color: var(--school-ink);
+}
+
+.school-tariffs__schedule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.school-tariffs__schedule-divider {
+  height: 1px;
+  margin: 0.7rem 0 0.7rem 2.25rem;
+  background: rgba(168, 142, 196, 0.35);
 }
 
 .school-tariffs__schedule-icon {
@@ -3644,13 +3657,56 @@
   height: 1.05rem;
 }
 
-.school-tariffs__schedule-text {
+.school-tariffs__schedule-body {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: clamp(0.92rem, 3.5vw, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.school-tariffs__schedule-title {
+  margin: 0;
+  font-size: clamp(0.95rem, 3.5vw, 1.02rem);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--school-ink);
+}
+
+.school-tariffs__schedule-line {
+  margin: 0;
+  font-size: clamp(0.9rem, 3.4vw, 0.98rem);
   font-weight: 500;
   line-height: 1.4;
   color: var(--school-body-color);
+}
+
+.school-tariffs__schedule-note {
+  margin: 0.12rem 0 0;
+  font-size: clamp(0.82rem, 3.1vw, 0.9rem);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--school-muted);
+}
+
+@media (min-width: 1024px) {
+  .school-tariffs__schedule {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 0.95rem 1.05rem;
+  }
+
+  .school-tariffs__schedule-item {
+    flex: 1 1 0;
+  }
+
+  .school-tariffs__schedule-divider {
+    width: 1px;
+    height: auto;
+    align-self: stretch;
+    margin: 0.15rem 1rem;
+  }
 }
 
 .school-tariffs__grid {

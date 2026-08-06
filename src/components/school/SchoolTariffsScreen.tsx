@@ -5,8 +5,12 @@ import { useRef, useState } from "react";
 import SchoolGetCourseModal from "@/components/school/SchoolGetCourseModal";
 import type { SchoolGetCourseTariffId } from "@/lib/school/getcourse-widgets";
 import {
-  SCHOOL_INTENSIVE_SCHEDULE_BANNER,
+  SCHOOL_INTENSIVE_SCHEDULE_LINE,
   SCHOOL_INTENSIVE_STANDARD_FEATURE,
+  SCHOOL_INTENSIVE_TITLE,
+  SCHOOL_MENTORING_PERIOD,
+  SCHOOL_MENTORING_SCOPE_NOTE,
+  SCHOOL_MENTORING_TITLE,
 } from "@/lib/school/start";
 
 type SchoolTariffId = SchoolGetCourseTariffId;
@@ -169,6 +173,29 @@ function ScheduleIcon({ className }: { className?: string }) {
   );
 }
 
+/** Mentoring: path with step dots — accompaniment over time. */
+function MentoringIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 18.5c2.2-1.2 3.4-3.4 4.2-5.6.7-2 1.6-3.9 3.3-5.1 1.5-1.1 3.4-1.5 5.5-1.3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="5.2" cy="18.5" r="1.35" fill="currentColor" />
+      <circle cx="9.4" cy="12.4" r="1.2" fill="currentColor" />
+      <circle cx="13.6" cy="8.1" r="1.2" fill="currentColor" />
+      <circle cx="18.3" cy="6.5" r="1.35" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function SchoolTariffsScreen() {
   const [activeTariff, setActiveTariff] =
     useState<SchoolGetCourseTariffId | null>(null);
@@ -183,14 +210,40 @@ export default function SchoolTariffsScreen() {
       <div className="school-tariffs__header">
         <h2 className="school-tariffs__title">{TITLE}</h2>
         <p className="school-tariffs__subtitle">{SUBTITLE}</p>
-        <p className="school-tariffs__schedule">
-          <span className="school-tariffs__schedule-icon" aria-hidden="true">
-            <ScheduleIcon className="school-tariffs__schedule-icon-svg" />
-          </span>
-          <span className="school-tariffs__schedule-text">
-            {SCHOOL_INTENSIVE_SCHEDULE_BANNER}
-          </span>
-        </p>
+        <div className="school-tariffs__schedule" role="group" aria-label="Расписание этапов">
+          <div className="school-tariffs__schedule-item">
+            <span className="school-tariffs__schedule-icon" aria-hidden="true">
+              <ScheduleIcon className="school-tariffs__schedule-icon-svg" />
+            </span>
+            <div className="school-tariffs__schedule-body">
+              <p className="school-tariffs__schedule-title">
+                {SCHOOL_INTENSIVE_TITLE}
+              </p>
+              <p className="school-tariffs__schedule-line">
+                {SCHOOL_INTENSIVE_SCHEDULE_LINE}
+              </p>
+            </div>
+          </div>
+
+          <div className="school-tariffs__schedule-divider" aria-hidden="true" />
+
+          <div className="school-tariffs__schedule-item">
+            <span className="school-tariffs__schedule-icon" aria-hidden="true">
+              <MentoringIcon className="school-tariffs__schedule-icon-svg" />
+            </span>
+            <div className="school-tariffs__schedule-body">
+              <p className="school-tariffs__schedule-title">
+                {SCHOOL_MENTORING_TITLE}
+              </p>
+              <p className="school-tariffs__schedule-line">
+                {SCHOOL_MENTORING_PERIOD}
+              </p>
+              <p className="school-tariffs__schedule-note">
+                {SCHOOL_MENTORING_SCOPE_NOTE}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="school-tariffs__grid">
