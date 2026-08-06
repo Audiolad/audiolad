@@ -266,6 +266,7 @@ const FEATURES: readonly Feature[] = [
     title: "Продвижение на АудиоЛаде",
     text: [
       "Лучшие аудиопродукты смогут попадать в подборки, рекомендации, тематические разделы и другие точки знакомства с новой аудиторией.",
+      "Внутри платформы АудиоЛад уже создано множество удобных инструментов для привлечения аудитории, продвижения и монетизации авторских аудиопродуктов.",
     ],
     icon: <PromoteIcon />,
   },
@@ -352,9 +353,11 @@ export default function SchoolAfterGraduationScreen() {
 
       <p className="school-after__accent">{FINAL_ACCENT}</p>
 
-      <SchoolTariffsAnchorLink className="school-after__cta">
-        {CTA_LABEL}
-      </SchoolTariffsAnchorLink>
+      <div className="school-cta-center">
+        <SchoolTariffsAnchorLink className="school-after__cta">
+          {CTA_LABEL}
+        </SchoolTariffsAnchorLink>
+      </div>
     </section>
   );
 }

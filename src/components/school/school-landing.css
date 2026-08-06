@@ -543,13 +543,12 @@
     padding: 1rem 1.75rem 3rem;
   }
 
-  /* Desktop hero: two columns via grid-areas — content stays left in the
-     markup order (hero-stage, then content) while visually sitting right. */
+  /* Desktop hero: photo left → offer right (natural L→R reading path). */
   .school-first-screen {
     max-width: var(--school-hero-max);
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    grid-template-areas: "content hero";
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    grid-template-areas: "hero content";
     align-items: stretch;
     min-height: 40rem;
     padding: 0;
@@ -564,7 +563,7 @@
   .school-first-screen__hero {
     height: 100%;
     min-height: 40rem;
-    border-radius: 0 1.5rem 1.5rem 0;
+    border-radius: 1.5rem 0 0 1.5rem;
   }
 
   .school-first-screen__hero-image {
@@ -581,7 +580,7 @@
     grid-area: content;
     justify-content: center;
     margin-top: 0;
-    padding: 2.5rem 2rem 2.5rem 2.5rem;
+    padding: 2.5rem 2.5rem 2.5rem 2rem;
   }
 
   .school-first-screen__title {
@@ -635,6 +634,10 @@
 
   .school-first-screen__title {
     font-size: 4.5rem;
+  }
+
+  .school-stories__intro {
+    max-width: 54rem;
   }
 }
 
@@ -3107,6 +3110,11 @@
     max-width: var(--school-prose-max);
   }
 
+  /* Even 2×4 grid: Module 7 + Bonus side by side in the last row. */
+  .school-program__module--bonus {
+    grid-column: auto;
+  }
+
   .school-results {
     max-width: min(40rem, 100%);
     padding: 2.1rem 2.2rem 2.2rem;
@@ -5127,11 +5135,24 @@
 }
 
 .school-stories__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.school-stories__intro-text {
   margin: 0;
   font-size: 1.02rem;
   font-weight: 500;
   line-height: 1.42;
   color: var(--school-body-color);
+}
+
+/* Shared desktop CTA centering row — mobile stays block/full-width via CTA itself. */
+.school-cta-center {
+  display: block;
+  width: 100%;
 }
 
 .school-stories__grid {
@@ -5452,6 +5473,9 @@
 
   .school-stories__intro {
     max-width: 44rem;
+  }
+
+  .school-stories__intro-text {
     font-size: var(--school-body-size);
   }
 
@@ -5505,6 +5529,19 @@
 }
 
 @media (min-width: 1024px) {
+  .school-cta-center {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .school-results__cta,
+  .school-bonuses__cta,
+  .school-after__cta,
+  .school-stories__cta {
+    width: 100%;
+  }
+
   .school-stories {
     max-width: min(1160px, 100%);
     padding: 2.1rem 2rem 2.25rem;
@@ -5512,6 +5549,10 @@
 
   .school-stories__title {
     font-size: 2.45rem;
+  }
+
+  .school-stories__intro {
+    max-width: 48rem;
   }
 
   .school-stories__grid {

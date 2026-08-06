@@ -110,9 +110,11 @@ export default function SchoolBonusesScreen() {
         <p className="school-bonuses__total-accent">{TOTAL_ACCENT}</p>
       </div>
 
-      <SchoolTariffsAnchorLink className="school-bonuses__cta">
-        {CTA_LABEL}
-      </SchoolTariffsAnchorLink>
+      <div className="school-cta-center">
+        <SchoolTariffsAnchorLink className="school-bonuses__cta">
+          {CTA_LABEL}
+        </SchoolTariffsAnchorLink>
+      </div>
     </section>
   );
 }

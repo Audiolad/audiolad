@@ -56,9 +56,11 @@ export default function SchoolResultsScreen() {
         ))}
       </ul>
 
-      <SchoolTariffsAnchorLink className="school-results__cta">
-        {CTA_LABEL}
-      </SchoolTariffsAnchorLink>
+      <div className="school-cta-center">
+        <SchoolTariffsAnchorLink className="school-results__cta">
+          {CTA_LABEL}
+        </SchoolTariffsAnchorLink>
+      </div>
     </section>
   );
 }

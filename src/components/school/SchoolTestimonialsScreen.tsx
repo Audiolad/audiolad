@@ -3,8 +3,10 @@ import { SchoolTariffsAnchorLink } from "@/components/school/SchoolTariffsAnchor
 
 const TITLE = "Истории учеников и участников программ";
 
-const INTRO =
-  "Эти люди проходили обучение, сопровождение и авторские программы Сергея Петрова. Они рассказывают о своих результатах, изменениях и опыте совместной работы.";
+const INTRO = [
+  "Эти люди проходили обучение, сопровождение и авторские программы Сергея Петрова.",
+  "Они рассказывают о своих результатах, изменениях и опыте совместной работы.",
+] as const;
 
 const DISCLAIMER =
   "Результаты участников индивидуальны и зависят от опыта, действий, выбранного направления и других обстоятельств.";
@@ -19,16 +21,24 @@ export default function SchoolTestimonialsScreen() {
     >
       <div className="school-stories__header">
         <h2 className="school-stories__title">{TITLE}</h2>
-        <p className="school-stories__intro">{INTRO}</p>
+        <div className="school-stories__intro">
+          {INTRO.map((paragraph) => (
+            <p key={paragraph} className="school-stories__intro-text">
+              {paragraph}
+            </p>
+          ))}
+        </div>
       </div>
 
       <SchoolTestimonialsClient />
 
       <p className="school-stories__disclaimer">{DISCLAIMER}</p>
 
-      <SchoolTariffsAnchorLink className="school-stories__cta">
-        {CTA_LABEL}
-      </SchoolTariffsAnchorLink>
+      <div className="school-cta-center">
+        <SchoolTariffsAnchorLink className="school-stories__cta">
+          {CTA_LABEL}
+        </SchoolTariffsAnchorLink>
+      </div>
     </section>
   );
 }
