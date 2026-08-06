@@ -132,7 +132,11 @@ const MODULES: readonly SchoolProgramModule[] = [
 
 export default function SchoolProgramScreen() {
   return (
-    <section className="school-program" aria-label="Программа обучения">
+    <section
+      id="program"
+      className="school-program"
+      aria-label="Программа обучения"
+    >
       <div className="school-program__header">
         <h2 className="school-program__title">{TITLE}</h2>
         <p className="school-program__intro">{INTRO}</p>

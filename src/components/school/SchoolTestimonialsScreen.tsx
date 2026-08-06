@@ -16,6 +16,7 @@ const CTA_LABEL = "Выбрать вариант участия";
 export default function SchoolTestimonialsScreen() {
   return (
     <section
+      id="testimonials"
       className="school-stories"
       aria-label="Истории учеников и участников программ"
     >

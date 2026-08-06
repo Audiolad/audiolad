@@ -18,6 +18,11 @@
   --school-hero-max: 1280px;
   --school-section-y: 2.5rem;
   --school-col-gap: 1.5rem;
+  /* Sticky section nav height + safe area for anchor scroll offset. */
+  --school-nav-height: 3.5rem;
+  --school-nav-sticky-offset: calc(
+    var(--school-nav-height) + env(safe-area-inset-top, 0px) + 0.35rem
+  );
 
   /*
    * Local school typography (45+ readability). Mobile-first.
@@ -223,6 +228,152 @@
 .school-first-screen__cta:focus-visible {
   outline: 2px solid var(--school-accent);
   outline-offset: 3px;
+}
+
+/* —— Compact section navigation (sticky after hero) —— */
+.school-section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
+  /* Opaque fallback for browsers without backdrop-filter. */
+  background: #f7f1ea;
+  border-bottom: 1px solid rgba(228, 216, 243, 0.88);
+  box-shadow: 0 8px 22px rgba(95, 46, 201, 0.07);
+}
+
+@supports ((-webkit-backdrop-filter: blur(12px)) or (backdrop-filter: blur(12px))) {
+  .school-section-nav {
+    background: rgba(247, 241, 234, 0.86);
+    -webkit-backdrop-filter: blur(12px) saturate(1.08);
+    backdrop-filter: blur(12px) saturate(1.08);
+  }
+}
+
+.school-section-nav__inner {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--school-max);
+  margin: 0 auto;
+  padding: 0.45rem var(--school-gutter);
+}
+
+.school-section-nav__list {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.school-section-nav__list::-webkit-scrollbar {
+  display: none;
+}
+
+.school-section-nav__item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.school-section-nav__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: var(--school-ink);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  background: rgba(255, 252, 249, 0.55);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.school-section-nav__link:hover {
+  background: rgba(143, 78, 234, 0.08);
+  border-color: rgba(214, 198, 238, 0.75);
+}
+
+.school-section-nav__link:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 2px;
+}
+
+.school-section-nav__link--active {
+  background: rgba(143, 78, 234, 0.14);
+  border-color: rgba(168, 132, 224, 0.55);
+  color: #4f2a9e;
+}
+
+#program,
+#author,
+#tariffs,
+#bonuses,
+#testimonials {
+  scroll-margin-top: var(--school-nav-sticky-offset);
+}
+
+@media (min-width: 768px) {
+  .school-section-nav__inner {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .school-section-nav__list {
+    gap: 0.5rem;
+  }
+
+  .school-section-nav__link {
+    font-size: 1rem;
+    padding: 0.5rem 1.05rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-site-root {
+    --school-nav-height: 3.75rem;
+  }
+
+  .school-section-nav__inner {
+    max-width: min(var(--school-desktop-max), 100%);
+    padding: 0.55rem 1.5rem;
+  }
+
+  .school-section-nav__list {
+    justify-content: center;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .school-section-nav__link {
+    min-height: 2.6rem;
+    font-size: 1.02rem;
+    font-weight: 600;
+    padding: 0.45rem 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .school-section-nav__link {
+    transition: none;
+  }
 }
 
 /* Anchor target lives on .school-tariffs (id="tariffs"). */
@@ -3961,7 +4112,7 @@
   margin: 0.15rem auto 2.5rem;
   width: 100%;
   max-width: var(--school-max);
-  scroll-margin-top: 1rem;
+  scroll-margin-top: var(--school-nav-sticky-offset);
   overflow: hidden;
   border-radius: 1.55rem;
   padding: 1.25rem var(--school-gutter) 1.45rem;

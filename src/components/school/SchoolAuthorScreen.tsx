@@ -101,6 +101,7 @@ function GlobeIcon({ className }: { className?: string }) {
 export default function SchoolAuthorScreen() {
   return (
     <section
+      id="author"
       className="school-author"
       aria-label="Автор и преподаватель Школы Аудиопрактик"
     >

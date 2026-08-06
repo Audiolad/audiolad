@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import SchoolFirstScreen from "@/components/school/SchoolFirstScreen";
+import SchoolSectionNavigation from "@/components/school/SchoolSectionNavigation";
 import SchoolSecondScreen from "@/components/school/SchoolSecondScreen";
 import SchoolThirdScreen from "@/components/school/SchoolThirdScreen";
 import SchoolFourthScreen from "@/components/school/SchoolFourthScreen";
@@ -43,6 +44,7 @@ export default async function SchoolSitePage() {
     <>
       <main>
         <SchoolFirstScreen />
+        <SchoolSectionNavigation />
         <SchoolSecondScreen />
         <SchoolThirdScreen />
         <SchoolFourthScreen />

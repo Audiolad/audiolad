@@ -61,6 +61,7 @@ const CTA_LABEL = "Выбрать вариант участия";
 export default function SchoolBonusesScreen() {
   return (
     <section
+      id="bonuses"
       className="school-bonuses"
       aria-label="Бонусы для участников Премиум и VIP"
     >
