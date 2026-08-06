@@ -69,26 +69,32 @@ export default function SchoolSectionNavigation() {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (left, right) =>
-              left.boundingClientRect.top - right.boundingClientRect.top,
-          );
+    // IntersectionObserver rootMargin accepts only px or % (not rem/em).
+    // ~68px ≈ sticky nav height + breathing room; bottom -55% keeps lower half less dominant.
+    let observer: IntersectionObserver;
+    try {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort(
+              (left, right) =>
+                left.boundingClientRect.top - right.boundingClientRect.top,
+            );
 
-        const nextId = visible[0]?.target.id;
-        if (nextId && NAV_ITEMS.some((item) => item.id === nextId)) {
-          setActiveId(nextId as NavId);
-        }
-      },
-      {
-        // Sticky nav height (~3.5rem) + breathing room; keep lower half less dominant.
-        rootMargin: "-4.25rem 0px -55% 0px",
-        threshold: [0, 0.15, 0.35],
-      },
-    );
+          const nextId = visible[0]?.target.id;
+          if (nextId && NAV_ITEMS.some((item) => item.id === nextId)) {
+            setActiveId(nextId as NavId);
+          }
+        },
+        {
+          rootMargin: "-68px 0px -55% 0px",
+          threshold: [0, 0.15, 0.35],
+        },
+      );
+    } catch {
+      return;
+    }
 
     for (const section of sections) {
       observer.observe(section);
