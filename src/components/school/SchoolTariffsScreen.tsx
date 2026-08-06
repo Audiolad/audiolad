@@ -1,4 +1,11 @@
-type SchoolTariffId = "standard" | "premium" | "vip";
+"use client";
+
+import { useRef, useState } from "react";
+
+import SchoolGetCourseModal from "@/components/school/SchoolGetCourseModal";
+import type { SchoolGetCourseTariffId } from "@/lib/school/getcourse-widgets";
+
+type SchoolTariffId = SchoolGetCourseTariffId;
 
 type SchoolTariffFeature = {
   text: string;
@@ -126,6 +133,10 @@ function CheckIcon({ className }: { className?: string }) {
 }
 
 export default function SchoolTariffsScreen() {
+  const [activeTariff, setActiveTariff] =
+    useState<SchoolGetCourseTariffId | null>(null);
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   return (
     <section
       id="tariffs"
@@ -199,12 +210,23 @@ export default function SchoolTariffsScreen() {
               }
               data-tariff={tariff.id}
               aria-label={tariff.ctaLabel}
+              aria-haspopup="dialog"
+              onClick={(event) => {
+                lastTriggerRef.current = event.currentTarget;
+                setActiveTariff(tariff.id);
+              }}
             >
               {tariff.ctaLabel}
             </button>
           </article>
         ))}
       </div>
+
+      <SchoolGetCourseModal
+        tariffId={activeTariff}
+        onClose={() => setActiveTariff(null)}
+        returnFocusRef={lastTriggerRef}
+      />
     </section>
   );
 }
