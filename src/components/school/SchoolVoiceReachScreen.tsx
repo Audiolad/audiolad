@@ -12,7 +12,7 @@ const ACCENT = [
   "А она продолжает жить своей жизнью.",
 ] as const;
 
-function SchoolReachRipples({ className }: { className?: string }) {
+function SchoolReachWaves({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -20,60 +20,47 @@ function SchoolReachRipples({ className }: { className?: string }) {
       fill="none"
       aria-hidden="true"
     >
-      <circle
-        cx="120"
-        cy="120"
-        r="108"
+      {/* Soft expanding sound arcs — not closed circles, no radial spokes */}
+      <path
+        d="M78 150c18-34 48-52 82-52s64 18 82 52"
         stroke="currentColor"
-        strokeWidth="1"
-        opacity="0.12"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.42"
       />
-      <circle
-        cx="120"
-        cy="120"
-        r="84"
+      <path
+        d="M62 162c24-46 60-70 98-70s74 24 98 70"
         stroke="currentColor"
-        strokeWidth="1.15"
-        opacity="0.18"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        opacity="0.3"
       />
-      <circle
-        cx="120"
-        cy="120"
-        r="60"
+      <path
+        d="M48 174c28-56 70-86 112-86s84 30 112 86"
         stroke="currentColor"
-        strokeWidth="1.3"
-        opacity="0.28"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        opacity="0.2"
       />
-      <circle
-        cx="120"
-        cy="120"
-        r="38"
+      <path
+        d="M36 186c32-66 80-100 124-100s92 34 124 100"
         stroke="currentColor"
-        strokeWidth="1.45"
-        opacity="0.4"
+        strokeWidth="1.05"
+        strokeLinecap="round"
+        opacity="0.14"
       />
-      {/* Soft radial impulses */}
-      {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
-        const rad = (deg * Math.PI) / 180;
-        const x1 = 120 + Math.cos(rad) * 28;
-        const y1 = 120 + Math.sin(rad) * 28;
-        const x2 = 120 + Math.cos(rad) * 104;
-        const y2 = 120 + Math.sin(rad) * 104;
-        return (
-          <line
-            key={deg}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            stroke="currentColor"
-            strokeWidth="1.1"
-            strokeLinecap="round"
-            opacity={deg % 60 === 0 ? 0.28 : 0.14}
-          />
-        );
-      })}
-      <circle cx="120" cy="120" r="22" fill="currentColor" opacity="0.08" />
+
+      {/* Listener points along outer arcs */}
+      <circle cx="96" cy="104" r="3.2" fill="currentColor" opacity="0.34" />
+      <circle cx="144" cy="88" r="2.7" fill="currentColor" opacity="0.28" />
+      <circle cx="188" cy="104" r="3.4" fill="currentColor" opacity="0.36" />
+      <circle cx="68" cy="138" r="2.6" fill="currentColor" opacity="0.24" />
+      <circle cx="210" cy="140" r="2.8" fill="currentColor" opacity="0.26" />
+      <circle cx="118" cy="72" r="2.4" fill="currentColor" opacity="0.22" />
+      <circle cx="172" cy="74" r="2.5" fill="currentColor" opacity="0.24" />
+
+      {/* Soft glow behind mic */}
+      <circle cx="78" cy="168" r="28" fill="currentColor" opacity="0.07" />
     </svg>
   );
 }
@@ -107,9 +94,9 @@ export default function SchoolVoiceReachScreen() {
           </div>
         </div>
 
-        <div className="school-voice-reach__visual" aria-hidden="true">
-          <SchoolReachRipples className="school-voice-reach__ripples" />
-          <span className="school-voice-reach__core">
+        <div className="school-voice-reach__visual school-voice-reach__visual--spread" aria-hidden="true">
+          <SchoolReachWaves className="school-voice-reach__ripples" />
+          <span className="school-voice-reach__core school-voice-reach__core--source">
             <SchoolMicIcon className="school-voice-reach__mic" />
           </span>
         </div>

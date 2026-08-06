@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import SchoolFaqAccordion from "@/components/school/SchoolFaqAccordion";
 import { SCHOOL_FAQ_ITEMS } from "@/lib/school/faq";
 
@@ -20,6 +22,8 @@ type MessengerContact = {
   id: "max" | "telegram";
   label: string;
   href: string;
+  iconSrc: string;
+  iconAlt: string;
 };
 
 const MESSENGER_CONTACTS: MessengerContact[] = [
@@ -27,58 +31,17 @@ const MESSENGER_CONTACTS: MessengerContact[] = [
     id: "max",
     label: "Написать в MAX",
     href: SERGEY_MAX_URL,
+    iconSrc: "/school/messengers/max.png",
+    iconAlt: "",
   },
   {
     id: "telegram",
     label: "Написать в Telegram",
     href: SERGEY_TELEGRAM_URL,
+    iconSrc: "/school/messengers/telegram.png",
+    iconAlt: "",
   },
 ];
-
-function MaxIcon() {
-  return (
-    <svg
-      className="school-faq__messenger-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect
-        x="2.75"
-        y="2.75"
-        width="18.5"
-        height="18.5"
-        rx="5.25"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M7.15 16V8h1.7l2.2 4.55L13.25 8h1.7v8h-1.5v-5.15L11.3 15.3h-.95L8.65 10.85V16h-1.5Zm9.05 0V8H17.7v8h-1.5Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function TelegramIcon() {
-  return (
-    <svg
-      className="school-faq__messenger-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M21.2 4.4 3.7 11.1c-1.2.45-1.18 1.15-.22 1.45l4.5 1.4 1.75 5.35c.23.7.42.96.9.96.47 0 .68-.22 1.05-.58l2.5-2.42 5.2 3.83c.96.53 1.65.25 1.89-.89l3.42-16.1c.35-1.4-.53-2-1.5-1.56Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function MessengerIcon({ id }: { id: MessengerContact["id"] }) {
-  return id === "max" ? <MaxIcon /> : <TelegramIcon />;
-}
 
 export default function SchoolFaqScreen() {
   return (
@@ -114,7 +77,14 @@ export default function SchoolFaqScreen() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <MessengerIcon id={contact.id} />
+                  <Image
+                    className="school-faq__messenger-logo"
+                    src={contact.iconSrc}
+                    alt=""
+                    width={28}
+                    height={28}
+                    aria-hidden="true"
+                  />
                   <span>{contact.label}</span>
                 </a>
               ))}

@@ -15,14 +15,17 @@ const SITUATIONS = [
 const AUDIENCE_LEAD = "Особенно полезно для:";
 
 const AUDIENCES = [
-  "Психологов;",
-  "Коучей;",
-  "Наставников;",
-  "Преподавателей;",
-  "Энергопрактиков;",
-  "Специалистов помогающих профессий;",
-  "Авторов медитаций;",
-  "Всех, кто хочет делиться своими знаниями через аудиоформат.",
+  { label: "Психологов", size: "short" },
+  { label: "Коучей", size: "short" },
+  { label: "Наставников", size: "short" },
+  { label: "Энергопрактиков", size: "medium" },
+  { label: "Преподавателей", size: "medium" },
+  { label: "Специалистов помогающих профессий", size: "wide" },
+  { label: "Авторов медитаций", size: "wide" },
+  {
+    label: "Всех, кто хочет делиться своими знаниями через аудиоформат",
+    size: "full",
+  },
 ] as const;
 
 const CLOSING = [
@@ -59,8 +62,11 @@ export default function SchoolAudienceScreen() {
 
           <ul className="school-audience__audiences">
             {AUDIENCES.map((item) => (
-              <li key={item} className="school-audience__chip">
-                {item}
+              <li
+                key={item.label}
+                className={`school-audience__chip school-audience__chip--${item.size}`}
+              >
+                {item.label}
               </li>
             ))}
           </ul>

@@ -33,54 +33,91 @@ const ACCENT =
 
 const CTA_LABEL = "Выбрать вариант участия";
 
-function SchoolLegacyMark({ className }: { className?: string }) {
+function SchoolLegacyIcons({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 220 96"
-      fill="none"
-      aria-hidden="true"
-    >
-      {/* Soft year circles */}
-      <circle
-        cx="48"
-        cy="48"
-        r="34"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        opacity="0.16"
-      />
-      <circle
-        cx="48"
-        cy="48"
-        r="22"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        opacity="0.28"
-      />
-      {/* Wave becoming book lines */}
-      <path
-        d="M92 52c10-14 18-14 28 0s18 14 28 0 18-14 28 0 18 14 22 4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        opacity="0.55"
-      />
-      <path
-        d="M98 64h104M98 72h88M98 80h72"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-        opacity="0.35"
-      />
-      <path
-        d="M188 28c6 4 10 10 10 18 0 14-12 24-26 24h-8"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        opacity="0.3"
-      />
-    </svg>
+    <div className={className} aria-hidden="true">
+      <span className="school-legacy-screen__icon-badge">
+        <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <path
+            d="M8 16.5 20 10l12 6.5"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M11.5 18.2v6.3c0 2.8 3.7 4.5 8.5 4.5s8.5-1.7 8.5-4.5v-6.3"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M32 16.8v8.4"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+          <path
+            d="M14.5 22.5h11"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity="0.55"
+          />
+        </svg>
+      </span>
+
+      <span className="school-legacy-screen__icon-badge">
+        <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <circle cx="20" cy="13" r="3.4" stroke="currentColor" strokeWidth="1.6" />
+          <circle cx="11.5" cy="14.5" r="2.7" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="28.5" cy="14.5" r="2.7" stroke="currentColor" strokeWidth="1.5" />
+          <path
+            d="M13.2 28.5c1.2-4.2 3.7-6.2 6.8-6.2s5.6 2 6.8 6.2"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <path
+            d="M7.2 27.8c.9-3.1 2.6-4.6 4.8-4.6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M32.8 27.8c-.9-3.1-2.6-4.6-4.8-4.6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+
+      <span className="school-legacy-screen__icon-badge">
+        <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <path
+            d="M9 11.5h8.2c1.7 0 3 1.3 3 3V29H12c-1.7 0-3-1.3-3-3V11.5Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M20.2 11.5H28c1.7 0 3 1.3 3 3V26c0 1.7-1.3 3-3 3h-7.8"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12.2 16h5M12.2 20h5M23.2 16h5M23.2 20h5"
+            stroke="currentColor"
+            strokeWidth="1.45"
+            strokeLinecap="round"
+            opacity="0.65"
+          />
+        </svg>
+      </span>
+    </div>
   );
 }
 
@@ -104,7 +141,7 @@ export default function SchoolLegacyScreen() {
         <div className="school-legacy-screen__primary">
           <h2 className="school-legacy-screen__title">{TITLE}</h2>
 
-          <SchoolLegacyMark className="school-legacy-screen__mark" />
+          <SchoolLegacyIcons className="school-legacy-screen__icons" />
 
           <div className="school-legacy-screen__intro">
             {INTRO.map((paragraph) => (

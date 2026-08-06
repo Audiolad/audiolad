@@ -60,7 +60,6 @@ const TARIFFS: readonly SchoolTariff[] = [
       { text: "Один месяц практического сопровождения;" },
       {
         text: "8 живых встреч с обратной связью – два раза в неделю;",
-        note: "2 раза в неделю",
       },
       { text: "Общий чат участников;" },
       {
@@ -155,16 +154,11 @@ export default function SchoolTariffsScreen() {
             className={`school-tariffs__card school-tariffs__card--${tariff.tone}`}
             data-tariff={tariff.id}
           >
-            <div className="school-tariffs__card-top">
-              {tariff.badge ? (
-                <p className="school-tariffs__badge">{tariff.badge}</p>
-              ) : (
-                <span
-                  className="school-tariffs__badge-spacer"
-                  aria-hidden="true"
-                />
-              )}
+            {tariff.badge ? (
+              <p className="school-tariffs__badge">{tariff.badge}</p>
+            ) : null}
 
+            <div className="school-tariffs__card-top">
               <h3 className="school-tariffs__name">{tariff.name}</h3>
 
               <div className="school-tariffs__prices">
