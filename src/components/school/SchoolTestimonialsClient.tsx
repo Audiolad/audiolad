@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import {
   isAllowedVkEmbedUrl,
@@ -9,6 +9,10 @@ import {
   SCHOOL_TESTIMONIALS_MOBILE_VISIBLE,
   type SchoolTestimonial,
 } from "@/lib/school/testimonials";
+import {
+  requestStopSchoolAudio,
+  SCHOOL_STOP_VIDEO_EVENT,
+} from "@/lib/school/school-media-coordination";
 
 function PlayIcon() {
   return (
@@ -91,7 +95,11 @@ function StoryCard({
             type="button"
             className="school-stories__placeholder"
             onClick={() => {
-              if (embedSafe) onPlay(story.id);
+              if (!embedSafe) {
+                return;
+              }
+              requestStopSchoolAudio();
+              onPlay(story.id);
             }}
             aria-label={`Воспроизвести видеоисторию ${story.nameGenitive}`}
             disabled={!embedSafe}
@@ -144,6 +152,16 @@ export default function SchoolTestimonialsClient() {
   const listId = useId();
   const [expanded, setExpanded] = useState(false);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onStopVideo = () => {
+      setActiveVideoId(null);
+    };
+    window.addEventListener(SCHOOL_STOP_VIDEO_EVENT, onStopVideo);
+    return () => {
+      window.removeEventListener(SCHOOL_STOP_VIDEO_EVENT, onStopVideo);
+    };
+  }, []);
 
   const hiddenIds = new Set(
     SCHOOL_TESTIMONIALS.slice(SCHOOL_TESTIMONIALS_MOBILE_VISIBLE).map(

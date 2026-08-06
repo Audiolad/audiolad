@@ -3523,6 +3523,322 @@
   }
 }
 
+/* —— Audio invitation (inline audio post) —— */
+.school-invite {
+  box-sizing: border-box;
+  position: relative;
+  margin: 0.15rem auto 2.35rem;
+  width: 100%;
+  max-width: var(--school-max);
+  overflow: hidden;
+  border-radius: 1.55rem;
+  padding: 1.15rem var(--school-gutter) 1.3rem;
+  color: var(--school-ink);
+  background:
+    radial-gradient(
+      70% 50% at 0% 0%,
+      rgba(143, 78, 234, 0.08) 0%,
+      transparent 55%
+    ),
+    linear-gradient(168deg, #f8f2ea 0%, #f3ebe6 48%, #efe8f6 100%);
+  border: 1px solid rgba(228, 216, 243, 0.8);
+  box-shadow: 0 14px 34px rgba(37, 19, 92, 0.06);
+}
+
+.school-invite__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.school-invite__cover {
+  position: relative;
+  width: min(100%, 22rem);
+  max-width: 100%;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: rgba(238, 230, 248, 0.85);
+  border: 1px solid rgba(214, 196, 230, 0.55);
+}
+
+.school-invite__cover-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.school-invite__cover-fallback {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(
+      70% 70% at 40% 30%,
+      rgba(143, 78, 234, 0.18) 0%,
+      transparent 70%
+    ),
+    linear-gradient(160deg, #efe6f8 0%, #f4ebe3 100%);
+}
+
+.school-invite__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.school-invite__eyebrow {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--school-accent);
+}
+
+.school-invite__title {
+  margin: 0;
+  font-family: var(--font-school-serif), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.45rem, 5.6vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--school-ink);
+}
+
+.school-invite__subtitle {
+  margin: 0;
+  font-size: var(--school-body-size);
+  font-weight: 500;
+  line-height: var(--school-body-leading);
+  color: var(--school-body-color);
+}
+
+.school-invite__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin-top: 0.15rem;
+}
+
+.school-invite__author {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--school-ink);
+}
+
+.school-invite__extra,
+.school-invite__duration {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 500;
+  color: var(--school-muted);
+}
+
+.school-invite__player {
+  margin-top: 0.45rem;
+}
+
+.school-invite__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.school-invite__play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 3.35rem;
+  width: 100%;
+  padding: 0.85rem 1.15rem;
+  border: 0;
+  border-radius: 1.15rem;
+  background-image: linear-gradient(
+    180deg,
+    var(--school-cta-end) 0%,
+    var(--school-cta-mid) 48%,
+    var(--school-cta-start) 100%
+  );
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(95, 46, 201, 0.28);
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.school-invite__play:hover {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+
+.school-invite__play:active {
+  transform: scale(0.985);
+}
+
+.school-invite__play:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 3px;
+}
+
+.school-invite__play:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.school-invite__play-icon {
+  display: inline-flex;
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.school-invite__play-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.school-invite__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.school-invite__seek {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: rgba(143, 78, 234, 0.18);
+  outline: none;
+  cursor: pointer;
+}
+
+.school-invite__seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #7042c5;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(95, 46, 201, 0.35);
+}
+
+.school-invite__seek::-moz-range-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #7042c5;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(95, 46, 201, 0.35);
+}
+
+.school-invite__seek:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 3px;
+}
+
+.school-invite__times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--school-muted);
+}
+
+.school-invite__error {
+  margin: 0.45rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #8d4d57;
+}
+
+.school-invite__link {
+  margin-top: 0.35rem;
+  align-self: flex-start;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--school-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.school-invite__link:focus-visible {
+  outline: 2px solid var(--school-accent);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .school-invite {
+    margin-top: 0.45rem;
+    margin-bottom: 2.6rem;
+    padding: 1.6rem 1.75rem 1.7rem;
+    border-radius: 1.75rem;
+  }
+
+  .school-invite__title {
+    font-size: 2.15rem;
+  }
+
+  .school-invite__play {
+    width: auto;
+    min-width: 12rem;
+    align-self: flex-start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .school-invite {
+    max-width: min(var(--school-desktop-max), 100%);
+    padding: 1.85rem 2rem 1.95rem;
+  }
+
+  .school-invite__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+    gap: 1.75rem 2rem;
+    align-items: center;
+  }
+
+  .school-invite__cover {
+    width: 100%;
+    max-width: 24rem;
+    margin: 0;
+  }
+
+  .school-invite__title {
+    font-size: 2.35rem;
+    max-width: 18ch;
+  }
+
+  .school-invite__subtitle {
+    max-width: 36rem;
+  }
+
+  .school-invite__controls {
+    max-width: 28rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .school-invite__play,
+  .school-invite__play:hover,
+  .school-invite__play:active {
+    transition: none;
+    transform: none;
+  }
+}
+
 /* —— Learning process screen —— */
 .school-learning {
   box-sizing: border-box;
