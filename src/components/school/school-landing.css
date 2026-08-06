@@ -348,13 +348,17 @@
 }
 
 @media (min-width: 1024px) {
-  /* Chip row only — no full-width plate under the desktop nav. */
+  /*
+   * Full-width plate matching landing cream — opaque, no border/shadow,
+   * so sticky chips don't show text flicker while staying visually light.
+   */
   .school-site-root {
-    --school-nav-height: 2.75rem;
+    --school-nav-height: calc(2.6rem + 16px);
   }
 
   .school-section-nav {
-    background: transparent;
+    width: 100%;
+    background: var(--school-cream);
     border-bottom: none;
     box-shadow: none;
     -webkit-backdrop-filter: none;
@@ -363,8 +367,7 @@
 
   .school-section-nav__inner {
     max-width: min(var(--school-desktop-max), 100%);
-    /* Keep horizontal gutters for centering; drop vertical plate padding. */
-    padding: 0 1.5rem;
+    padding: 8px 1.5rem;
   }
 
   .school-section-nav__list {
