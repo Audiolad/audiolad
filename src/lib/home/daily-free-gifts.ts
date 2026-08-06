@@ -25,7 +25,7 @@ type DailyGiftSelection<T extends DailyFreeGiftCandidate> = {
   product: T;
 };
 
-function hashDailyGiftKey(value: string): number {
+export function hashDeterministicKey(value: string): number {
   let hash = 0x811c9dc5;
 
   for (let index = 0; index < value.length; index += 1) {
@@ -105,11 +105,11 @@ export function selectDailyFreeGiftProducts<T extends DailyFreeGiftCandidate>({
     const [product] = [...candidates].sort((left, right) =>
       compareDailyGiftKeys(
         {
-          key: hashDailyGiftKey(`${dateKey}|product|${authorId}|${left.id}`),
+          key: hashDeterministicKey(`${dateKey}|product|${authorId}|${left.id}`),
           id: left.id,
         },
         {
-          key: hashDailyGiftKey(`${dateKey}|product|${authorId}|${right.id}`),
+          key: hashDeterministicKey(`${dateKey}|product|${authorId}|${right.id}`),
           id: right.id,
         },
       ),
@@ -127,11 +127,11 @@ export function selectDailyFreeGiftProducts<T extends DailyFreeGiftCandidate>({
     .sort((left, right) =>
       compareDailyGiftKeys(
         {
-          key: hashDailyGiftKey(`${dateKey}|author|${left.authorId}`),
+          key: hashDeterministicKey(`${dateKey}|author|${left.authorId}`),
           id: left.authorId,
         },
         {
-          key: hashDailyGiftKey(`${dateKey}|author|${right.authorId}`),
+          key: hashDeterministicKey(`${dateKey}|author|${right.authorId}`),
           id: right.authorId,
         },
       ),
