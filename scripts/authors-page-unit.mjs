@@ -22,7 +22,7 @@ function read(path) {
 }
 
 function testAuthorsPageUsesLiveData() {
-  const page = read("src/app/authors/page.tsx");
+  const page = read("src/app/(platform)/authors/page.tsx");
 
   assert(!page.includes("12,4 тыс. слушателей"), "fake listeners removed");
   assert(!page.includes("Подписаться"), "subscribe button removed");

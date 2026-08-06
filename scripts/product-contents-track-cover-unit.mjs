@@ -36,7 +36,7 @@ const publicAudioItems = readFileSync(
   "utf8",
 );
 const practicePage = readFileSync(
-  "src/app/(listener)/practice/[...segments]/page.tsx",
+  "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   "utf8",
 );
 const practiceMobilePage = readFileSync(

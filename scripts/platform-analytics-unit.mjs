@@ -72,7 +72,7 @@ function testApiRoutes() {
 }
 
 function testAdminDashboard() {
-  const page = readSource("src/app/admin/page.tsx");
+  const page = readSource("src/app/(platform)/admin/page.tsx");
   const queries = readSource("src/lib/admin/analytics-queries.ts");
   const controls = readSource(
     "src/components/admin/AdminAnalyticsTestTrafficControls.tsx",
@@ -173,7 +173,7 @@ function testPercentRounding() {
 }
 
 function testIntegrations() {
-  const providers = readSource("src/components/AppProviders.tsx");
+  const providers = readSource("src/components/providers/BaseProviders.tsx");
   const listenPlayer = readSource(
     "src/components/audio/listen-player-shared.tsx",
   );

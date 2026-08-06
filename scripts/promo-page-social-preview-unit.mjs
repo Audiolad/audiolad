@@ -215,7 +215,7 @@ function testSkipsSignedThenFallsThrough() {
 
 function testMetadataWiringPreservesSeoAndSurfaces() {
   const page = read(
-    "src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
+    "src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
   );
   const helper = read("src/lib/promo-pages/social-preview.ts");
   const playback = read("src/components/promo-pages/usePromoPagePlayback.ts");

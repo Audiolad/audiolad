@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { AdminPayoutProfileActionState } from "@/app/admin/payout-profiles/action-state";
+import type { AdminPayoutProfileActionState } from "@/app/(platform)/admin/payout-profiles/action-state";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
 import { staffTransitionPayoutProfile } from "@/lib/author-payout-profiles/service";

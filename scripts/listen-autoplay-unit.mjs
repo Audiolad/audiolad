@@ -48,7 +48,7 @@ function testListenPageClientPassesAutoplay() {
 }
 
 function testListenRouteParser() {
-  const page = readSource("src/app/listen/[...segments]/page.tsx");
+  const page = readSource("src/app/(platform)/listen/[...segments]/page.tsx");
 
   assert(page.includes("parseListenAutoplayIntent"), "route uses shared parser");
 }

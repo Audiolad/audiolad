@@ -124,7 +124,7 @@ function testPlaybackWiring() {
 
 function testThreeGiftsContract() {
   const page = read(
-    "src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
+    "src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
   );
   const validation = read("src/lib/promo-pages/validation.ts");
 

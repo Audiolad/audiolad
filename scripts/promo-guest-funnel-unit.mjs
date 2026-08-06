@@ -99,7 +99,7 @@ function testCompleteSignupApi() {
 
 function testListenPageNoAutoplayDefault() {
   const listenPage = readFileSync(
-    "/var/www/audiolad/src/app/listen/[...segments]/page.tsx",
+    "/var/www/audiolad/src/app/(platform)/listen/[...segments]/page.tsx",
     "utf8",
   );
 

@@ -37,7 +37,7 @@ function testBottomNavVisibilityRules() {
 }
 
 function testCheckoutResultPageShell() {
-  const page = read("src/app/checkout/result/page.tsx");
+  const page = read("src/app/(platform)/checkout/result/page.tsx");
   const globals = read("src/app/globals.css");
 
   assert(page.includes('from "@/components/BottomNav"'), "page imports canonical BottomNav");

@@ -135,7 +135,7 @@ const desktopBar = read("src/components/listener/DesktopPlayerBar.tsx");
 assert.match(desktopBar, /isInlineOnlyPlaybackSession/);
 assert.match(desktopBar, /inlineOnly \? null/);
 
-const listenPage = read("src/app/listen/[...segments]/page.tsx");
+const listenPage = read("src/app/(platform)/listen/[...segments]/page.tsx");
 assert.match(listenPage, /searchParams:\s*query/);
 
 const pageShared = read("src/lib/listen/page-shared.tsx");

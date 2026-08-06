@@ -193,7 +193,7 @@ src/lib/topics/
 
 ```
 src/lib/seo/topic-hubs/     — registry, load, metadata, json-ld, paths
-src/app/(listener)/topics/[slug]/page.tsx
+src/app/(platform)/(listener)/topics/[slug]/page.tsx
 src/components/topics/TopicHubPageView.tsx
 ```
 

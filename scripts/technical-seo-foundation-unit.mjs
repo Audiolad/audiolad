@@ -381,7 +381,7 @@ function testRouteFiles() {
   const sitemapRoute = read("src/app/sitemap.ts");
   const robotsRoute = read("src/app/robots.ts");
   const promoPage = read(
-    "src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
+    "src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
   );
 
   assert(sitemapRoute.includes("revalidate = 3600"), "sitemap uses hourly revalidation");

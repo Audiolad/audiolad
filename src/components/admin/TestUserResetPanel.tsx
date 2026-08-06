@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   getTestUserResetPreflightAction,
   resetAllowlistedTestUserAction,
-} from "@/app/admin/users/test-reset-actions";
+} from "@/app/(platform)/admin/users/test-reset-actions";
 import {
   TEST_USER_RESET_CONFIRMATION_PHRASE,
   TEST_USER_RESET_EMAIL,

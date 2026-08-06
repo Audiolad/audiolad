@@ -140,7 +140,7 @@ function main() {
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
   assert.match(form, /Продукт будет опубликован от проекта/);
 
-  const createPage = read("src/app/author-dashboard/projects/new/page.tsx");
+  const createPage = read("src/app/(platform)/author-dashboard/projects/new/page.tsx");
   assert.match(createPage, /AuthorCreateProjectForm/);
 
   // Sale-lock still present

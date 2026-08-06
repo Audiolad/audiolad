@@ -151,7 +151,7 @@ assert.ok(
 );
 
 const page = readFileSync(
-  path.join(root, "src/app/author-terms/page.tsx"),
+  path.join(root, "src/app/(platform)/author-terms/page.tsx"),
   "utf8",
 );
 assert.ok(page.includes("Версия: {meta.version}"));
@@ -242,7 +242,7 @@ assert.ok(panel.includes('variant = "card"'));
 assert.ok(panel.includes("embedded"));
 
 const legalPage = readFileSync(
-  path.join(root, "src/app/author-dashboard/legal/page.tsx"),
+  path.join(root, "src/app/(platform)/author-dashboard/legal/page.tsx"),
   "utf8",
 );
 assert.ok(legalPage.includes("AuthorLegalTermsCard"));

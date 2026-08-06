@@ -14,7 +14,7 @@ import {
   getCachedAnalyticsSessionId,
   trackPlatformEvent,
 } from "@/lib/analytics/client";
-import { submitAuthorApplication } from "@/app/become-author/actions";
+import { submitAuthorApplication } from "@/app/(platform)/become-author/actions";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
   clearAuthorApplicationDraft,

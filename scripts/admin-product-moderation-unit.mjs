@@ -106,14 +106,14 @@ assert.match(
 );
 assert.match(preserveListed, /approve-and-publish-practice:v2/);
 
-const page = read("src/app/admin/product-moderation/page.tsx");
+const page = read("src/app/(platform)/admin/product-moderation/page.tsx");
 assert.match(page, /requireAdminPermission\("author_products\.moderate"\)/);
 assert.match(page, /Сейчас нет продуктов, ожидающих модерации/);
 
-const detail = read("src/app/admin/product-moderation/[id]/page.tsx");
+const detail = read("src/app/(platform)/admin/product-moderation/[id]/page.tsx");
 assert.match(detail, /requireAdminPermission\("author_products\.moderate"\)/);
 
-const actions = read("src/app/admin/product-moderation/actions.ts");
+const actions = read("src/app/(platform)/admin/product-moderation/actions.ts");
 assert.match(actions, /approveAndPublishPractice/);
 assert.match(actions, /requestPracticeChanges/);
 assert.match(actions, /comment\.length < 10/);

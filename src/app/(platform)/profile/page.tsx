@@ -10,7 +10,7 @@ import {
   ProfileSignOutSection,
   ProfileUserCard,
 } from "@/components/profile/ProfileSections";
-import { signOut } from "@/app/auth/sign-out/actions";
+import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 import { profilePageFullWidthClassName } from "@/lib/profile/layout";
 import { getProfilePageData } from "@/lib/profile/queries";

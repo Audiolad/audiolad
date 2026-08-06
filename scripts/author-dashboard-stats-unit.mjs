@@ -85,7 +85,7 @@ function testApiRoutes() {
 function testTrackerAndConstants() {
   const constants = read("src/lib/analytics/constants.ts");
   const tracker = read("src/components/analytics/AuthorPageViewTracker.tsx");
-  const page = read("src/app/(listener)/authors/[slug]/page.tsx");
+  const page = read("src/app/(platform)/(listener)/authors/[slug]/page.tsx");
   const sanitize = read("src/lib/analytics/sanitize.ts");
   const track = read("src/app/api/analytics/track/route.ts");
 

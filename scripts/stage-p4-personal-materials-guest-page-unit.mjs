@@ -11,9 +11,9 @@ function read(relativePath) {
 }
 
 function testRouteAndLayout() {
-  const page = read("src/app/d/[token]/page.tsx");
-  const layout = read("src/app/d/layout.tsx");
-  const notFound = read("src/app/d/[token]/not-found.tsx");
+  const page = read("src/app/(platform)/d/[token]/page.tsx");
+  const layout = read("src/app/(platform)/d/layout.tsx");
+  const notFound = read("src/app/(platform)/d/[token]/not-found.tsx");
   const nextConfig = read("next.config.ts");
   const robots = read("src/app/robots.ts");
   const robotsConfig = read("src/lib/seo/robots-config.ts");
@@ -149,9 +149,9 @@ function testOptionalTextBlocksWithoutHeadings() {
 function testClaimFlow() {
   const claimContext = read("src/app/api/d/[token]/claim-context/route.ts");
   const claim = read("src/app/api/d/[token]/claim/route.ts");
-  const claimPage = read("src/app/personal-materials/claim/page.tsx");
+  const claimPage = read("src/app/(platform)/personal-materials/claim/page.tsx");
   const myMaterial = read(
-    "src/app/(listener)/(library)/my-materials/[id]/page.tsx",
+    "src/app/(platform)/(listener)/(library)/my-materials/[id]/page.tsx",
   );
   const claimLib = read("src/lib/personal-materials/server/claim.ts");
 
@@ -166,7 +166,7 @@ function testClaimFlow() {
 }
 
 function testSecurityAndPrivacy() {
-  const page = read("src/app/d/[token]/page.tsx");
+  const page = read("src/app/(platform)/d/[token]/page.tsx");
   const player = read("src/components/personal-materials/guest/PersonalMaterialAudioPlayer.tsx");
   const metadata = read("src/lib/personal-materials/guest/privacy.ts");
 

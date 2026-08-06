@@ -5,13 +5,13 @@ import { useActionState, useState } from "react";
 import {
   ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
   type AdminPayoutProfileActionState,
-} from "@/app/admin/payout-profiles/action-state";
+} from "@/app/(platform)/admin/payout-profiles/action-state";
 import {
   rejectPayoutProfile,
   requestPayoutProfileChanges,
   takePayoutProfileInReview,
   verifyPayoutProfile,
-} from "@/app/admin/payout-profiles/actions";
+} from "@/app/(platform)/admin/payout-profiles/actions";
 import type { AuthorPayoutProfileAdminDetail } from "@/lib/author-payout-profiles/types";
 import {
   getAuthorPayoutProfileStatusLabel,

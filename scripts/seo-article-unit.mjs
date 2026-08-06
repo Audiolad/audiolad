@@ -5274,11 +5274,11 @@ assert(
   "migration adds article_final_audio_click",
 );
 
-const pageSource = read("src/app/(listener)/articles/[slug]/page.tsx");
+const pageSource = read("src/app/(platform)/(listener)/articles/[slug]/page.tsx");
 assert(pageSource.includes("ArticlePageView"), "page uses ArticlePageView");
 assert(pageSource.includes("force-dynamic"), "article page is dynamic");
 
-const layoutSource = read("src/app/(listener)/articles/layout.tsx");
+const layoutSource = read("src/app/(platform)/(listener)/articles/layout.tsx");
 assert(layoutSource.includes("HomeMobileHeader"), "reuses guest mobile header");
 assert(layoutSource.includes("ListenerAppShell") === false, "no parallel shell");
 

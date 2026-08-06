@@ -437,9 +437,9 @@ function testMenuInstallUsesSharedFlow() {
 
 function testPwaProviderErrorBoundary() {
   const boundary = readRoot("src/components/pwa/PwaInstallErrorBoundary.tsx");
-  const providers = readRoot("src/components/AppProviders.tsx");
+  const providers = readRoot("src/components/providers/PlatformProviders.tsx");
   const fallback = readRoot("src/lib/pwa/fallback-context.ts");
-  const settingsError = readRoot("src/app/settings/error.tsx");
+  const settingsError = readRoot("src/app/(platform)/settings/error.tsx");
 
   assert(boundary.includes("componentDidCatch"), "pwa boundary catches errors");
   assert(
@@ -520,7 +520,7 @@ function boundaryRendersProviderlessFallback() {
 }
 
 function testClientErrorReporterWiring() {
-  const providers = readRoot("src/components/AppProviders.tsx");
+  const providers = readRoot("src/components/providers/BaseProviders.tsx");
   const reporter = readRoot("src/lib/client-errors/reporter.ts");
   const route = readRoot("src/app/api/client-errors/route.ts");
 

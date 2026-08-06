@@ -649,7 +649,7 @@ function testEmailsAndSources() {
   assert.doesNotMatch(form, /Адрес регистрации/);
 
   const page = read(
-    "src/app/author-dashboard/commercial/payout-details/page.tsx",
+    "src/app/(platform)/author-dashboard/commercial/payout-details/page.tsx",
   );
   assert.match(
     page,

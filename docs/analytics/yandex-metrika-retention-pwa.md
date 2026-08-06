@@ -11,7 +11,7 @@
 ## Подключение в коде
 
 - Компонент счётчика: `src/components/analytics/YandexMetrika.tsx`
-- Монтирование: `src/components/AppProviders.tsx`
+- Монтирование: `src/components/providers/BaseProviders.tsx`
 - Инициализация выполняется один раз после согласия пользователя и загрузки `tag.js`
 
 Параметры `ym(..., "init", ...)` в production:

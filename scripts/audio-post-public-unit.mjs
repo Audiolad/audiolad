@@ -150,7 +150,7 @@ assert.match(
   /is_catalog_listed,[\s\S]*guest_access_enabled,[\s\S]*product_kind,/,
 );
 
-const pageSource = read("src/app/(listener)/practice/[...segments]/page.tsx");
+const pageSource = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(pageSource, /AudioPostPage/);
 assert.match(pageSource, /isAudioPostProductKind/);
 assert.match(pageSource, /shouldIndexPracticePage\(\s*practice\.status,\s*practice\.is_catalog_listed/);

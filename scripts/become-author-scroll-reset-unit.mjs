@@ -14,7 +14,7 @@ function read(path) {
 const shell = read("src/components/become-author/BecomeAuthorShell.tsx");
 const reset = read("src/components/become-author/BecomeAuthorScrollReset.tsx");
 const helper = read("src/lib/navigation/reset-app-scroll.ts");
-const loading = read("src/app/become-author/loading.tsx");
+const loading = read("src/app/(platform)/become-author/loading.tsx");
 const listenerShell = read("src/components/listener/ListenerAppShell.tsx");
 
 assert(

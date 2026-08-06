@@ -20,9 +20,9 @@ function read(relativePath) {
 
 function testRoutesAndNav() {
   const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
-  const listPage = read("src/app/author-dashboard/diagnostics/page.tsx");
-  const newPage = read("src/app/author-dashboard/diagnostics/new/page.tsx");
-  const editPage = read("src/app/author-dashboard/diagnostics/[id]/page.tsx");
+  const listPage = read("src/app/(platform)/author-dashboard/diagnostics/page.tsx");
+  const newPage = read("src/app/(platform)/author-dashboard/diagnostics/new/page.tsx");
+  const editPage = read("src/app/(platform)/author-dashboard/diagnostics/[id]/page.tsx");
 
   assert(nav.includes('label: "Личная работа"'), "nav personal work item");
   assert(nav.includes("/author-dashboard/diagnostics"), "nav diagnostics href");

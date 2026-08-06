@@ -276,7 +276,7 @@ function testPromotionUi() {
 }
 
 function testPublicPromoRouteExists() {
-  const route = read("src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
+  const route = read("src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
 
   assert(route.includes("force-dynamic"), "public promo route is dynamic");
   assert(route.includes("notFound"), "public promo route handles missing pages");

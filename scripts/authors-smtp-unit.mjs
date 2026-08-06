@@ -160,7 +160,7 @@ function testWelcomeSenderStaysOnPrimarySmtp() {
 
 function testApproveFlowDoesNotRollbackOnEmailFailure() {
   const actions = readFileSync(
-    new URL("../src/app/admin/author-applications/actions.ts", import.meta.url),
+    new URL("../src/app/(platform)/admin/author-applications/actions.ts", import.meta.url),
     "utf8",
   );
   const approveBlock = actions.match(
@@ -186,7 +186,7 @@ function testApprovedSenderPersistsConfigFailure() {
 
 function testLegacyAccessGrantedSenderUnreachable() {
   const actions = readFileSync(
-    new URL("../src/app/admin/author-applications/actions.ts", import.meta.url),
+    new URL("../src/app/(platform)/admin/author-applications/actions.ts", import.meta.url),
     "utf8",
   );
 

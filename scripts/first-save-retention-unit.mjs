@@ -68,7 +68,7 @@ function testRouteContract() {
 
 function testUiWiring() {
   const button = readRoot("src/components/LibraryAddButton.tsx");
-  const providers = readRoot("src/components/AppProviders.tsx");
+  const providers = readRoot("src/components/providers/PlatformProviders.tsx");
   const card = readRoot("src/components/retention/FirstSaveRetentionCard.tsx");
 
   const membershipHook = readRoot("src/lib/library/use-library-membership.ts");
@@ -105,8 +105,9 @@ function testUiWiring() {
     "retention host mounted inside PWA tree",
   );
   assert(
-    providers.indexOf("FirstSaveRetentionProvider") <
-      providers.indexOf("PwaInstallErrorBoundary"),
+    /<FirstSaveRetentionProvider>[\s\S]*<PwaInstallErrorBoundary/.test(
+      providers,
+    ),
     "retention provider survives PWA error-boundary fallback",
   );
   assert(card.includes("Практика сохранена ✓"), "title copy");

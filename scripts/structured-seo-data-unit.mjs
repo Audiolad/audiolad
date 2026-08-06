@@ -316,12 +316,12 @@ function testCanonicalMetadata() {
 }
 
 function testPageWiring() {
-  const homePage = read("src/app/(listener)/(home)/page.tsx");
-  const catalogPage = read("src/app/(listener)/(catalog)/catalog/page.tsx");
-  const authorPage = read("src/app/(listener)/authors/[slug]/page.tsx");
-  const practicePage = read("src/app/(listener)/practice/[...segments]/page.tsx");
-  const promoPage = read("src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
-  const playlistPage = read("src/app/p/[slug]/page.tsx");
+  const homePage = read("src/app/(platform)/(listener)/(home)/page.tsx");
+  const catalogPage = read("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx");
+  const authorPage = read("src/app/(platform)/(listener)/authors/[slug]/page.tsx");
+  const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
+  const promoPage = read("src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
+  const playlistPage = read("src/app/(platform)/p/[slug]/page.tsx");
   const jsonLdComponent = read("src/components/seo/JsonLd.tsx");
 
   assert(homePage.includes("buildHomeJsonLd"), "home page emits JSON-LD");

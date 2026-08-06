@@ -96,7 +96,7 @@ function testJsonLd() {
 }
 
 function testPageContent() {
-  const page = read("src/app/(listener)/for-authors/page.tsx");
+  const page = read("src/app/(platform)/(listener)/for-authors/page.tsx");
   assert.match(page, /buildForAuthorsPageJsonLd/);
   assert.match(page, /FOR_AUTHORS_PAGE_H1/);
   assert.match(page, /href="\/become-author"/);
@@ -168,7 +168,7 @@ function testNavigationAndSitemap() {
 }
 
 function testAboutCtaUpdates() {
-  const about = read("src/app/(listener)/about/page.tsx");
+  const about = read("src/app/(platform)/(listener)/about/page.tsx");
   assert.match(about, /href="\/for-authors"/);
   assert.match(about, /href="\/become-author"/);
   assert.match(about, /познакомьтесь с возможностями для авторов/);

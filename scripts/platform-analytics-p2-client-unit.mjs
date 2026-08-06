@@ -51,7 +51,7 @@ function main() {
   const periodSrc = read("src/lib/admin/analytics-period.ts");
   const queries = read("src/lib/admin/analytics-queries.ts");
   const funnel = read("src/components/admin/AdminAnalyticsFunnelPanel.tsx");
-  const page = read("src/app/admin/page.tsx");
+  const page = read("src/app/(platform)/admin/page.tsx");
 
   assert(periodSrc.includes("resolvePreviousAdminAnalyticsPeriodRange"), "prev period");
   assert(periodSrc.includes("formatAdminDelta"), "delta helper");

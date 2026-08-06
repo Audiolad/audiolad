@@ -44,7 +44,7 @@ function shouldWrapHomeTopicChip(title) {
 const src = readFileSync("src/components/home/HomeTopicNavigation.tsx", "utf8");
 const guestHome = readFileSync("src/components/home/GuestHome.tsx", "utf8");
 const personalHome = readFileSync("src/components/home/PersonalHome.tsx", "utf8");
-const homePage = readFileSync("src/app/(listener)/(home)/page.tsx", "utf8");
+const homePage = readFileSync("src/app/(platform)/(listener)/(home)/page.tsx", "utf8");
 const topicNavLib = readFileSync("src/lib/home/topic-navigation.ts", "utf8");
 const topicFilter = readFileSync("src/lib/catalog/topic-filter.ts", "utf8");
 const topicsQueries = readFileSync("src/lib/topics/queries.ts", "utf8");

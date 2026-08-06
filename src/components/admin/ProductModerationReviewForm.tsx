@@ -8,11 +8,11 @@ import { useFormStatus } from "react-dom";
 import {
   ADMIN_PRODUCT_MODERATION_ACTION_INITIAL_STATE,
   type AdminProductModerationActionState,
-} from "@/app/admin/product-moderation/action-state";
+} from "@/app/(platform)/admin/product-moderation/action-state";
 import {
   approveAndPublishProductAction,
   requestProductChangesAction,
-} from "@/app/admin/product-moderation/actions";
+} from "@/app/(platform)/admin/product-moderation/actions";
 import { ADMIN_PRODUCT_MODERATION_CHECKLIST } from "@/lib/admin/product-moderation-checklist";
 import type { AdminProductModerationDetail } from "@/lib/admin/product-moderation-queries";
 import {

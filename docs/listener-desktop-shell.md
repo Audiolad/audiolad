@@ -27,7 +27,7 @@
 | `profile` | `/profile`, `/profile/edit` | да | нет | да | да |
 | `author` | `/author-dashboard/**` | да | нет | да | нет |
 
-Подключение через route-level layouts (`src/app/profile/layout.tsx`, `src/app/author-dashboard/layout.tsx`), без переноса URL.
+Подключение через route-level layouts (`src/app/(platform)/profile/layout.tsx`, `src/app/(platform)/author-dashboard/layout.tsx`), без переноса URL.
 
 ## Отдельные пространства (вне listener-shell)
 
@@ -39,7 +39,7 @@
 
 ## Технические принципы
 
-1. **Глобальный `<audio>`** остаётся в root `GlobalAudioPlayerProvider`.
+1. **Глобальный `<audio>`** принадлежит `GlobalAudioPlayerProvider` внутри platform route group; полноэкранные studio routes его не монтируют.
 2. **Shell** не дублирует доменную логику страниц.
 3. **Мобильный интерфейс** — BottomNav через portal; author mode скрывает bottom nav.
 

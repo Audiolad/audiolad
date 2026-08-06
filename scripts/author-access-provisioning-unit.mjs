@@ -130,7 +130,7 @@ function testRpcErrorMapping() {
 
 function testAuthorApplicationActionsModuleExportsOnlyAsyncFunctions() {
   const actionsSource = readFileSync(
-    new URL("../src/app/admin/author-applications/actions.ts", import.meta.url),
+    new URL("../src/app/(platform)/admin/author-applications/actions.ts", import.meta.url),
     "utf8",
   );
   const formSource = readFileSync(
@@ -142,7 +142,7 @@ function testAuthorApplicationActionsModuleExportsOnlyAsyncFunctions() {
   );
   const actionStateSource = readFileSync(
     new URL(
-      "../src/app/admin/author-applications/action-state.ts",
+      "../src/app/(platform)/admin/author-applications/action-state.ts",
       import.meta.url,
     ),
     "utf8",

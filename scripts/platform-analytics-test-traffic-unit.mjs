@@ -152,7 +152,7 @@ function testSourceParity() {
 }
 
 function testAdminWiring() {
-  const page = readSource("src/app/admin/page.tsx");
+  const page = readSource("src/app/(platform)/admin/page.tsx");
   const workbench = readSource(
     "src/components/admin/AdminAnalyticsWorkbench.tsx",
   );

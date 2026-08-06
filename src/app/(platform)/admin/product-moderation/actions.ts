@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { AdminProductModerationActionState } from "@/app/admin/product-moderation/action-state";
+import type { AdminProductModerationActionState } from "@/app/(platform)/admin/product-moderation/action-state";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { getAdminProductModerationDetail } from "@/lib/admin/product-moderation-queries";
 import {

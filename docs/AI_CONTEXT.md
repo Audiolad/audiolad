@@ -35,8 +35,8 @@
 
 | Тема | Путь |
 |------|------|
-| Регистрация | `src/app/auth/sign-up/page.tsx` |
-| Вход | `src/app/auth/sign-in/page.tsx` |
+| Регистрация | `src/app/(platform)/auth/sign-up/page.tsx` |
+| Вход | `src/app/(platform)/auth/sign-in/page.tsx` |
 | Каталог (база) | `src/app/catalog/page.tsx` |
 | Нижняя навигация | `src/components/BottomNav.tsx` |
 | Сессия Supabase | `proxy.ts`, `src/lib/supabase/proxy.ts` |

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { AdminAuthorApplicationActionState } from "@/app/admin/author-applications/action-state";
+import type { AdminAuthorApplicationActionState } from "@/app/(platform)/admin/author-applications/action-state";
 import { callAuthorApplicationRpc } from "@/lib/admin/author-application-rpc";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { sendAuthorApplicationApprovedEmail } from "@/lib/email/send-author-application-approved-email";

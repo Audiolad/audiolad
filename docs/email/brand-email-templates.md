@@ -36,7 +36,7 @@ npx tsx scripts/build-gotrue-email-templates.ts
 
 ## Welcome email
 
-- Sent from `src/app/auth/sign-up/actions.ts` after successful registration only.
+- Sent from `src/app/(platform)/auth/sign-up/actions.ts` after successful registration only.
 - Renderer: `welcome` template key.
 - Subject: `Добро пожаловать в АудиоЛад 🎉`
 - SMTP env (server-only):

@@ -409,7 +409,7 @@ function testStructuredNotReady() {
 }
 
 function testSourceContracts() {
-  const page = read("src/app/(listener)/practice/[...segments]/page.tsx");
+  const page = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
   const banner = read(
     "src/components/products/practice-page/PublishPreviewBanner.tsx",

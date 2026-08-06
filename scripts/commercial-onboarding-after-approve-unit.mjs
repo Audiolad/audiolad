@@ -254,7 +254,7 @@ function testSourceGuards() {
     /set_author_access_status_for_commercial_application\(\s*v_row\.author_id,\s*'commercial'/,
   );
 
-  const actions = read("src/app/admin/commercial-applications/actions.ts");
+  const actions = read("src/app/(platform)/admin/commercial-applications/actions.ts");
   assert.match(actions, /sendCommercialApplicationApprovedEmail/);
   assert.match(actions, /!rpc\.result\.idempotent/);
   assert.match(actions, /commercial_application_approved_email_failed/);
@@ -271,10 +271,10 @@ function testSourceGuards() {
   );
 
   const payoutPage = read(
-    "src/app/author-dashboard/commercial/payout-details/page.tsx",
+    "src/app/(platform)/author-dashboard/commercial/payout-details/page.tsx",
   );
   const termsPage = read(
-    "src/app/author-dashboard/commercial/terms/page.tsx",
+    "src/app/(platform)/author-dashboard/commercial/terms/page.tsx",
   );
   assert.match(payoutPage, /requireCommercialOnboardingAuthor/);
   assert.match(payoutPage, /AuthorPayoutProfileForm/);
@@ -295,7 +295,7 @@ function testSourceGuards() {
     /sendCommercialApplicationAdminAlertEmail/,
   );
   assert.match(
-    read("src/app/admin/author-applications/actions.ts"),
+    read("src/app/(platform)/admin/author-applications/actions.ts"),
     /sendAuthorApplicationApprovedEmail/,
   );
   assert.match(

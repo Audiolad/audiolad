@@ -175,7 +175,7 @@ function primary(input) {
 // File wiring
 // ---------------------------------------------------------------------------
 {
-  const page = read("src/app/author-dashboard/opportunities/page.tsx");
+  const page = read("src/app/(platform)/author-dashboard/opportunities/page.tsx");
   const shell = read("src/components/author-dashboard/AuthorShell.tsx");
   assert.match(page, /loadAuthorOpportunitiesView/);
   assert.match(page, /listAuthorWorkspacesForUser/);

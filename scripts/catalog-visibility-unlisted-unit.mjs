@@ -81,7 +81,7 @@ assert.match(editorial, /\.eq\("is_catalog_listed", true\)/);
 const lookup = read("src/lib/products/lookup.ts");
 assert.doesNotMatch(lookup, /\.eq\("is_catalog_listed"/);
 
-const practicePage = read("src/app/(listener)/practice/[...segments]/page.tsx");
+const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(practicePage, /shouldIndexPracticePage/);
 assert.match(practicePage, /practice\.is_catalog_listed/);
 assert.match(practicePage, /index: false/);

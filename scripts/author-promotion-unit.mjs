@@ -144,7 +144,7 @@ function testMigrationContract() {
 
 function testPromotionRoutes() {
   const page = readFileSync(
-    join(ROOT, "src/app/author-dashboard/promotion/page.tsx"),
+    join(ROOT, "src/app/(platform)/author-dashboard/promotion/page.tsx"),
     "utf8",
   );
   const nav = readFileSync(

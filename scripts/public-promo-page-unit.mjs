@@ -34,7 +34,7 @@ function read(path) {
 
 function testPublicRoute() {
   const page = read(
-    "src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
+    "src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx",
   );
   const loader = read("src/lib/promo-pages/public-page.ts");
 
@@ -190,7 +190,7 @@ function testPresentationAndCta() {
 }
 
 function testSeoAndSitemap() {
-  const page = read("src/app/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
+  const page = read("src/app/(platform)/(listener)/promo/[authorSlug]/[promoSlug]/page.tsx");
   const sitemapData = read("src/lib/seo/sitemap-data.ts");
 
   assert(

@@ -5,7 +5,7 @@ import PwaSettingsSection from "@/components/pwa/PwaSettingsSection";
 import AnalyticsPrivacySection from "@/components/settings/AnalyticsPrivacySection";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
-import { signOut } from "@/app/auth/sign-out/actions";
+import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import {
   getDisplayName,

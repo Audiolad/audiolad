@@ -15,11 +15,11 @@ const shellConfig = read("src/lib/listener/shell-config.ts");
 const listenerShell = read("src/components/listener/ListenerAppShell.tsx");
 const listenerNav = read("src/lib/navigation/listener-nav.ts");
 const profileShell = read("src/components/profile/ProfilePageShell.tsx");
-const profileLayout = read("src/app/profile/layout.tsx");
-const authorLayout = read("src/app/author-dashboard/layout.tsx");
+const profileLayout = read("src/app/(platform)/profile/layout.tsx");
+const authorLayout = read("src/app/(platform)/author-dashboard/layout.tsx");
 const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
 const bottomNav = read("src/lib/navigation/bottom-nav.ts");
-const listenerLayout = read("src/app/(listener)/layout.tsx");
+const listenerLayout = read("src/app/(platform)/(listener)/layout.tsx");
 
 assert(
   shellConfig.includes('default:') &&

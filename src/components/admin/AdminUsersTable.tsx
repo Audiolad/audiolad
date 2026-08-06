@@ -19,7 +19,7 @@ import {
   getPlatformRoleLabel,
 } from "@/lib/auth/platform-admin";
 import type { AdminUsersPageData } from "@/lib/admin/queries";
-import { deleteAdminUsers } from "@/app/admin/users/actions";
+import { deleteAdminUsers } from "@/app/(platform)/admin/users/actions";
 
 type AdminUsersTableProps = {
   data: AdminUsersPageData;

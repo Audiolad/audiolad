@@ -43,7 +43,7 @@ function read(relPath) {
 }
 
 function testRouteExists() {
-  const page = read("src/app/(listener)/articles/page.tsx");
+  const page = read("src/app/(platform)/(listener)/articles/page.tsx");
   assert(page.includes("ArticleDirectoryPageView"), "directory page uses view");
   assert(page.includes("loadArticleDirectoryPageData"), "directory page loads selector data");
   assert(page.includes("buildArticlesDirectoryMetadata"), "directory page sets metadata");
@@ -85,7 +85,7 @@ function testMetadata() {
 function testRegistryIsSingleSource() {
   const registry = read("src/lib/seo/articles/registry.ts");
   const directory = read("src/lib/seo/articles/directory.ts");
-  const page = read("src/app/(listener)/articles/page.tsx");
+  const page = read("src/app/(platform)/(listener)/articles/page.tsx");
 
   assert(registry.includes("ARTICLE_DEFINITIONS"), "central registry exists");
   assert(directory.includes("listArticleDefinitions()"), "selector reads registry");
@@ -361,7 +361,7 @@ function testIndividualArticlesStillWork() {
     "latest known article still registered",
   );
 
-  const articlePage = read("src/app/(listener)/articles/[slug]/page.tsx");
+  const articlePage = read("src/app/(platform)/(listener)/articles/[slug]/page.tsx");
   assert(articlePage.includes("ArticlePageView"), "article detail route intact");
 }
 

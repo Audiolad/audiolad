@@ -85,6 +85,6 @@ Badge раздела «Заявки авторов» показывает сум
 ## Код
 
 - `src/lib/author-applications/**`
-- `src/app/become-author/**`
+- `src/app/(platform)/become-author/**`
 - `src/components/become-author/**`
 - `scripts/author-applications-unit.mjs`

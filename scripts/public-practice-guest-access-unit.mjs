@@ -19,16 +19,21 @@ function readRoot(relativePath) {
 }
 
 function testProviderSurvivesPwaFallback() {
-  const providers = readRoot("src/components/AppProviders.tsx");
+  const providers = readRoot("src/components/providers/PlatformProviders.tsx");
   const boundary = readRoot("src/components/pwa/PwaInstallErrorBoundary.tsx");
 
-  const retentionIndex = providers.indexOf("FirstSaveRetentionProvider");
-  const boundaryIndex = providers.indexOf("PwaInstallErrorBoundary");
-
-  assert(retentionIndex !== -1, "FirstSaveRetentionProvider mounted globally");
-  assert(boundaryIndex !== -1, "PwaInstallErrorBoundary still mounted");
   assert(
-    retentionIndex < boundaryIndex,
+    providers.includes("FirstSaveRetentionProvider"),
+    "FirstSaveRetentionProvider mounted globally",
+  );
+  assert(
+    providers.includes("PwaInstallErrorBoundary"),
+    "PwaInstallErrorBoundary still mounted",
+  );
+  assert(
+    /<FirstSaveRetentionProvider>[\s\S]*<PwaInstallErrorBoundary/.test(
+      providers,
+    ),
     "FirstSaveRetentionProvider wraps PwaInstallErrorBoundary so PWA fallback keeps retention context",
   );
   assert(
@@ -44,7 +49,7 @@ function testProviderSurvivesPwaFallback() {
 function testPracticeRouteIsPublic() {
   const authRoutes = readRoot("src/lib/auth/routes.ts");
   const practicePage = readRoot(
-    "src/app/(listener)/practice/[...segments]/page.tsx",
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
 
   assert(!authRoutes.includes('"/practice"'), "practice path is not private");
@@ -81,7 +86,7 @@ function testCatalogLinksToPracticePath() {
 
 function testGuestSeesPublicPaidPracticePage() {
   const practicePage = readRoot(
-    "src/app/(listener)/practice/[...segments]/page.tsx",
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
   const accessUi = readRoot("src/lib/products/practice-access-ui.ts");
 
@@ -124,7 +129,7 @@ function testDraftAndUnpublishedStayHidden() {
 
 function testRegisteredUserUsesSamePublicRoute() {
   const practicePage = readRoot(
-    "src/app/(listener)/practice/[...segments]/page.tsx",
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
   );
   const access = readRoot("src/lib/products/access.ts");
 

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import BottomNav from "@/components/BottomNav";
 import LegalFooter from "@/components/LegalFooter";
 import PrimaryNav from "@/components/PrimaryNav";
-import CheckoutResultClient from "@/app/checkout/result/CheckoutResultClient";
+import CheckoutResultClient from "@/app/(platform)/checkout/result/CheckoutResultClient";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 
 export const metadata: Metadata = {

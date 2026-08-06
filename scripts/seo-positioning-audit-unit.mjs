@@ -168,7 +168,7 @@ function testLayoutAndManifestSources() {
   const layout = readFileSync(join(ROOT, "src/app/layout.tsx"), "utf8");
   const manifest = readFileSync(join(ROOT, "public/manifest.webmanifest"), "utf8");
   const guestHome = readFileSync(join(ROOT, "src/components/home/GuestHome.tsx"), "utf8");
-  const requisites = readFileSync(join(ROOT, "src/app/requisites/page.tsx"), "utf8");
+  const requisites = readFileSync(join(ROOT, "src/app/(platform)/requisites/page.tsx"), "utf8");
 
   assert(layout.includes("HOME_SEO_TITLE"), "root layout uses canonical home title constant");
   assert(layout.includes("HOME_SEO_DESCRIPTION"), "root layout uses canonical description constant");

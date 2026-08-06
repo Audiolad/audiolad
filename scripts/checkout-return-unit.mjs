@@ -69,7 +69,7 @@ function testTochkaReturnUrlIncludesToken() {
 }
 
 function testCheckoutResultClientFlow() {
-  const client = read("src/app/checkout/result/CheckoutResultClient.tsx");
+  const client = read("src/app/(platform)/checkout/result/CheckoutResultClient.tsx");
 
   assert(client.includes("/api/checkout/status"), "client polls checkout status endpoint");
   assert(!client.includes("/api/orders/"), "client no longer polls auth-only orders endpoint");
@@ -84,7 +84,7 @@ function testCheckoutResultClientFlow() {
 }
 
 function testLibraryPurchasedToast() {
-  const page = read("src/app/(listener)/(library)/my-practices/page.tsx");
+  const page = read("src/app/(platform)/(listener)/(library)/my-practices/page.tsx");
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
 
   assert(page.includes("purchasedSlug"), "my-practices reads purchased query");

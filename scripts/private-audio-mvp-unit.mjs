@@ -157,7 +157,7 @@ function testSourceGuards() {
   assert(library.includes("Мои загрузки"), "uploads filter");
   assert(library.includes("Добавить своё аудио"), "add CTA");
 
-  const offer = read("src/app/offer/page.tsx");
+  const offer = read("src/app/(platform)/offer/page.tsx");
   assert(offer.includes("section-private-audio"), "legal section");
   assert(
     offer.includes("Личные аудиоматериалы пользователя"),

@@ -123,7 +123,7 @@ async function testAdminAlertTemplate() {
 }
 
 function testWiringAndFilters() {
-  const action = read("src/app/become-author/actions.ts");
+  const action = read("src/app/(platform)/become-author/actions.ts");
   assert.match(action, /sendAuthorApplicationAdminAlertEmail\(/);
   assert.match(action, /\.select\("id, submitted_at"\)/);
   assert.match(action, /\.eq\("status", existing\.status\)/);
@@ -144,11 +144,11 @@ function testWiringAndFilters() {
   assert.match(sender, /markOperationalEmailDeliverySent/);
   assert.match(sender, /markOperationalEmailDeliveryFailed/);
 
-  const listPage = read("src/app/admin/author-applications/page.tsx");
+  const listPage = read("src/app/(platform)/admin/author-applications/page.tsx");
   assert.match(listPage, /AUTHOR_APPLICATION_ATTENTION_FILTER_KEY/);
   assert.match(listPage, /resolveAdminAuthorApplicationFilterStatuses/);
 
-  const dashboard = read("src/app/admin/page.tsx");
+  const dashboard = read("src/app/(platform)/admin/page.tsx");
   assert.match(dashboard, /AuthorApplicationsAttentionCard/);
 
   const attentionCard = read(
@@ -157,7 +157,7 @@ function testWiringAndFilters() {
   assert.match(attentionCard, /status=attention/);
   assert.match(attentionCard, /status=new/);
 
-  const layout = read("src/app/admin/layout.tsx");
+  const layout = read("src/app/(platform)/admin/layout.tsx");
   assert.match(layout, /authorApplicationAttentionCount/);
   assert.match(layout, /author-applications/);
 }

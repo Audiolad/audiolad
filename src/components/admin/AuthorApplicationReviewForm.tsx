@@ -6,7 +6,7 @@ import { useActionState, useState } from "react";
 import {
   ADMIN_AUTHOR_APPLICATION_ACTION_INITIAL_STATE,
   type AdminAuthorApplicationActionState,
-} from "@/app/admin/author-applications/action-state";
+} from "@/app/(platform)/admin/author-applications/action-state";
 import {
   approveAuthorApplication,
   rejectAuthorApplication,
@@ -17,7 +17,7 @@ import {
   suspendLinkedAuthorAccess,
   takeAuthorApplicationInReview,
   updateAuthorApplicationAdminNote,
-} from "@/app/admin/author-applications/actions";
+} from "@/app/(platform)/admin/author-applications/actions";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
 import { getAuthorAccessStatusLabel } from "@/lib/authors/access";
 import type { AdminAuthorApplicationDetail } from "@/lib/author-applications/types";

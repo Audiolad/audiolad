@@ -20,8 +20,8 @@ function read(relativePath) {
 
 function testRoutePolicy() {
   const bottomNav = read("src/lib/navigation/bottom-nav.ts");
-  const authorLayout = read("src/app/author-dashboard/layout.tsx");
-  const adminLayout = read("src/app/admin/layout.tsx");
+  const authorLayout = read("src/app/(platform)/author-dashboard/layout.tsx");
+  const adminLayout = read("src/app/(platform)/admin/layout.tsx");
 
   assert(bottomNav.includes("WORKSPACE_DASHBOARD_PREFIXES"), "dashboard prefix list");
   assert(bottomNav.includes('"/author-dashboard"'), "author dashboard prefix");
@@ -69,8 +69,8 @@ function testShellPlayerChrome() {
 }
 
 function testPublicPlayerStillEnabled() {
-  const profileLayout = read("src/app/profile/layout.tsx");
-  const listenerLayout = read("src/app/(listener)/layout.tsx");
+  const profileLayout = read("src/app/(platform)/profile/layout.tsx");
+  const listenerLayout = read("src/app/(platform)/(listener)/layout.tsx");
   const shellConfig = read("src/lib/listener/shell-config.ts");
 
   assert(profileLayout.includes('mode="profile"'), "profile keeps listener shell");

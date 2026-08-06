@@ -6,14 +6,14 @@ import { useActionState, useState } from "react";
 import {
   ADMIN_COMMERCIAL_APPLICATION_ACTION_INITIAL_STATE,
   type AdminCommercialApplicationActionState,
-} from "@/app/admin/commercial-applications/action-state";
+} from "@/app/(platform)/admin/commercial-applications/action-state";
 import {
   approveCommercialApplication,
   rejectCommercialApplication,
   requestCommercialApplicationChanges,
   takeCommercialApplicationInReview,
   updateCommercialApplicationAdminNote,
-} from "@/app/admin/commercial-applications/actions";
+} from "@/app/(platform)/admin/commercial-applications/actions";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
 import { getAuthorAccessStatusLabel } from "@/lib/authors/access";
 import type { AdminAuthorCommercialApplicationDetail } from "@/lib/author-commercial-applications/types";

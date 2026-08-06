@@ -378,7 +378,7 @@ assert.match(analyticsMigration, /author_page_view/);
 
 assert.equal(resolveSupportNotificationEmail(), "1@audiolad.ru");
 
-const settings = read("src/app/settings/page.tsx");
+const settings = read("src/app/(platform)/settings/page.tsx");
 assert.match(settings, /title: "Помощь и поддержка"/);
 assert.match(settings, /href: "\/help"/);
 
@@ -481,7 +481,7 @@ const sidebarNav = read("src/components/listener/DesktopSidebarNav.tsx");
 assert.match(sidebarNav, /item\.icon === "help"/);
 assert.match(sidebarNav, /isListenerPrimaryNavItemActive/);
 
-const homeLayout = read("src/app/(listener)/(home)/layout.tsx");
+const homeLayout = read("src/app/(platform)/(listener)/(home)/layout.tsx");
 assert.match(homeLayout, /!shellData\.isAuthenticated/);
 assert.match(homeLayout, /<LegalFooter/);
 assert.doesNotMatch(
@@ -506,7 +506,7 @@ const opportunities = read(
 );
 assert.match(opportunities, /Справочный центр/);
 
-const privacy = read("src/app/privacy/page.tsx");
+const privacy = read("src/app/(platform)/privacy/page.tsx");
 assert.match(privacy, /текст обращения в поддержку/);
 
 console.log("help-center-support-unit: ok");

@@ -15,7 +15,7 @@ function read(path) {
 
 const personalHome = read("src/components/home/PersonalHome.tsx");
 const guestHome = read("src/components/home/GuestHome.tsx");
-const homeLayout = read("src/app/(listener)/(home)/layout.tsx");
+const homeLayout = read("src/app/(platform)/(listener)/(home)/layout.tsx");
 const legalFooter = read("src/components/LegalFooter.tsx");
 const publicFooterLinks = read("src/lib/navigation/public-footer-links.ts");
 const dataTs = read("src/lib/home/data.ts");

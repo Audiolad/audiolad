@@ -71,7 +71,7 @@ function main() {
   const url = read("src/lib/admin/analytics-url-state.ts");
   const csv = read("src/lib/admin/analytics-csv.ts");
   const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
-  const page = read("src/app/admin/page.tsx");
+  const page = read("src/app/(platform)/admin/page.tsx");
   const kpi = read("src/components/admin/AdminAnalyticsKpiStrip.tsx");
   const drawer = read("src/components/admin/AdminAnalyticsDrilldownDrawer.tsx");
   const breakdown = read("src/components/admin/AdminAnalyticsBreakdownPanel.tsx");

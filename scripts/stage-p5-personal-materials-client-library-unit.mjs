@@ -12,8 +12,8 @@ function read(relativePath) {
 }
 
 function testRoutes() {
-  const listPage = read("src/app/(listener)/(library)/my-materials/page.tsx");
-  const detailPage = read("src/app/(listener)/(library)/my-materials/[id]/page.tsx");
+  const listPage = read("src/app/(platform)/(listener)/(library)/my-materials/page.tsx");
+  const detailPage = read("src/app/(platform)/(listener)/(library)/my-materials/[id]/page.tsx");
   const listApi = read("src/app/api/my-materials/route.ts");
   const detailApi = read("src/app/api/my-materials/[id]/route.ts");
   const audioApi = read("src/app/api/my-materials/[id]/audio/route.ts");

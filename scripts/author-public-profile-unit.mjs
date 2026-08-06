@@ -36,7 +36,7 @@ function testAuthorLinkComponent() {
 }
 
 function testPublicPageSections() {
-  const page = read("src/app/(listener)/authors/[slug]/page.tsx");
+  const page = read("src/app/(platform)/(listener)/authors/[slug]/page.tsx");
 
   assert(page.includes("AuthorFeaturedSection"), "featured section wired");
   assert(page.includes("AuthorProductsSection"), "products section wired");

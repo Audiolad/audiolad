@@ -4,7 +4,7 @@
 
 ## Технический backlog
 
-- `fix(next): remove invalid headers export from src/app/d/layout.tsx` — устранить baseline-ошибку Next.js build: `headers` не является допустимым export поля layout.
+- `fix(next): remove invalid headers export from src/app/(platform)/d/layout.tsx` — устранить baseline-ошибку Next.js build: `headers` не является допустимым export поля layout.
 
 ## 0. SEO — после PR1 (приоритет: средний)
 
@@ -58,7 +58,7 @@ PR1–PR5 на production (`6a692a2`). Play All реализован в рабо
 
 `/profile` и `/profile/edit` читают и сохраняют данные авторизованного пользователя через серверный клиент. Имя, email и редактирование `full_name` проверены на production.
 
-**Файлы:** `src/app/profile/page.tsx`, `src/app/profile/edit/page.tsx`, `src/app/profile/edit/actions.ts`.
+**Файлы:** `src/app/(platform)/profile/page.tsx`, `src/app/(platform)/profile/edit/page.tsx`, `src/app/(platform)/profile/edit/actions.ts`.
 
 **Инфраструктура:** добавлен Nginx `location /rest/v1/` для Supabase REST API.
 
@@ -66,7 +66,7 @@ PR1–PR5 на production (`6a692a2`). Play All реализован в рабо
 
 После успешной регистрации выполняется переход на `/auth/sign-in?registered=1`. На странице входа при `registered=1` показывается сообщение об успешной регистрации. Проверено на production.
 
-**Файлы:** `src/app/auth/sign-up/page.tsx`, `src/app/auth/sign-in/page.tsx`.
+**Файлы:** `src/app/(platform)/auth/sign-up/page.tsx`, `src/app/(platform)/auth/sign-in/page.tsx`.
 
 ---
 

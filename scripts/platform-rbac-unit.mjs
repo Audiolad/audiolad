@@ -226,11 +226,11 @@ assert.doesNotMatch(
   "migration must not hardcode owner email",
 );
 
-const actions = read("src/app/admin/author-applications/actions.ts");
+const actions = read("src/app/(platform)/admin/author-applications/actions.ts");
 assert.match(actions, /requireAdminPermission\("authors\.manage"\)/);
 assert.doesNotMatch(actions, /requireAdminPanelAccess\(\)/);
 
-const usersActions = read("src/app/admin/users/actions.ts");
+const usersActions = read("src/app/(platform)/admin/users/actions.ts");
 assert.match(usersActions, /requireAdminPermission\("users\.manage"\)/);
 
 const commercialNav = ADMIN_NAV_ITEMS.find(
@@ -243,12 +243,12 @@ assert.equal(
   "commercial applications nav shares authors.view with author applications",
 );
 
-const commercialList = read("src/app/admin/commercial-applications/page.tsx");
+const commercialList = read("src/app/(platform)/admin/commercial-applications/page.tsx");
 const commercialDetail = read(
-  "src/app/admin/commercial-applications/[id]/page.tsx",
+  "src/app/(platform)/admin/commercial-applications/[id]/page.tsx",
 );
 const commercialActions = read(
-  "src/app/admin/commercial-applications/actions.ts",
+  "src/app/(platform)/admin/commercial-applications/actions.ts",
 );
 assert.match(
   commercialList,

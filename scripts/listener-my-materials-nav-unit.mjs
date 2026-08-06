@@ -19,7 +19,7 @@ const shellData = read("src/lib/listener/shell-data.ts");
 const sidebar = read("src/components/listener/DesktopSidebar.tsx");
 const sidebarNav = read("src/components/listener/DesktopSidebarNav.tsx");
 const profileSections = read("src/components/profile/ProfileSections.tsx");
-const profilePage = read("src/app/profile/page.tsx");
+const profilePage = read("src/app/(platform)/profile/page.tsx");
 const repository = read(
   "src/lib/personal-materials/client-library/repository.ts",
 );

@@ -93,7 +93,7 @@ assert(
   "archived not eligible",
 );
 
-const page = read("src/app/p/[slug]/page.tsx");
+const page = read("src/app/(platform)/p/[slug]/page.tsx");
 assert(page.includes("force-dynamic"), "dynamic");
 assert(page.includes("loadPublicPlaylistBySlug"), "loader");
 assert(page.includes("generateMetadata"), "metadata");

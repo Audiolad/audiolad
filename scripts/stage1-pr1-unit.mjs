@@ -306,7 +306,7 @@ function testSourceFiles() {
   assert(routes.includes("SIGN_UP_DEFAULT_REDIRECT"), "routes exports sign-up fallback");
 
   const signUp = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-up/page.tsx",
+    "/var/www/audiolad/src/app/(platform)/auth/sign-up/page.tsx",
     "utf8",
   );
   assert(signUp.includes("useSearchParams"), "sign-up reads next query param");
@@ -314,7 +314,7 @@ function testSourceFiles() {
   assert(signUp.includes("buildAuthRouteHref"), "sign-up preserves next on auth links");
 
   const signIn = readFileSync(
-    "/var/www/audiolad/src/app/auth/sign-in/page.tsx",
+    "/var/www/audiolad/src/app/(platform)/auth/sign-in/page.tsx",
     "utf8",
   );
   assert(signIn.includes("buildAuthRouteHref"), "sign-in preserves next on sign-up link");

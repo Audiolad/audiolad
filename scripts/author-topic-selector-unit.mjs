@@ -58,11 +58,11 @@ const topicFormData = readFileSync(
 );
 const syncLib = readFileSync("src/lib/topics/sync.ts", "utf8");
 const newPage = readFileSync(
-  "src/app/author-dashboard/products/new/page.tsx",
+  "src/app/(platform)/author-dashboard/products/new/page.tsx",
   "utf8",
 );
 const editPage = readFileSync(
-  "src/app/author-dashboard/products/[id]/page.tsx",
+  "src/app/(platform)/author-dashboard/products/[id]/page.tsx",
   "utf8",
 );
 const publishRoute = readFileSync(

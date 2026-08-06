@@ -187,7 +187,7 @@ assert(
   "topic_product_clicked allowlisted in TS",
 );
 
-const pageSource = read("src/app/(listener)/topics/[slug]/page.tsx");
+const pageSource = read("src/app/(platform)/(listener)/topics/[slug]/page.tsx");
 assert(pageSource.includes("loadTopicHubPageData"), "page loads hub data");
 assert(
   read("src/components/topics/TopicHubPageView.tsx").includes("Статьи по теме"),

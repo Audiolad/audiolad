@@ -579,7 +579,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     });
   }, []);
 
-  const stopAndClear = useCallback(() => {
+  const hardStop = useCallback(() => {
     sessionGenerationRef.current += 1;
     setSessionGeneration(sessionGenerationRef.current);
     const current = sessionRef.current;
@@ -588,14 +588,36 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         ? current.practiceId
         : null,
     );
-    stopEngineRef.current?.();
-    stopEngineRef.current = null;
+    try {
+      stopEngineRef.current?.();
+    } catch (error) {
+      console.error("global_player_hard_stop_engine_error", error);
+    } finally {
+      stopEngineRef.current = null;
+    }
+    const audio = persistentAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
     clearMediaSession();
     clearDesktopPlayerLastSession();
+    sessionRef.current = null;
     setSession(null);
     clearPlaylistQueue();
     setNoticeMessage(null);
   }, [clearPlaylistQueue]);
+
+  const stopAndClear = useCallback(() => {
+    hardStop();
+  }, [hardStop]);
+
+  useEffect(() => {
+    return () => {
+      hardStop();
+    };
+  }, [hardStop]);
 
   const mergeGuestProgressIntoSession = useCallback(
     (input: LoadSessionInput): LoadSessionInput => {

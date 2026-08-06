@@ -236,7 +236,7 @@ assert.ok(nav.includes('label: "Документы"'));
 assert.ok(nav.includes('label: "Продажи и финансы"'));
 
 const page = readFileSync(
-  path.join(root, "src/app/author-dashboard/status/page.tsx"),
+  path.join(root, "src/app/(platform)/author-dashboard/status/page.tsx"),
   "utf8",
 );
 assert.ok(page.includes("loadAuthorStatusView"));

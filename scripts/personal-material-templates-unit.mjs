@@ -100,10 +100,10 @@ function testUiWiring() {
     "src/components/author-dashboard/personal-materials/AuthorDiagnosticsTemplateEditorClient.tsx",
   );
   const newPage = read(
-    "src/app/author-dashboard/diagnostics/templates/new/page.tsx",
+    "src/app/(platform)/author-dashboard/diagnostics/templates/new/page.tsx",
   );
   const editPage = read(
-    "src/app/author-dashboard/diagnostics/templates/[id]/page.tsx",
+    "src/app/(platform)/author-dashboard/diagnostics/templates/[id]/page.tsx",
   );
 
   assert(list.includes("Шаблоны"), "templates tab");
