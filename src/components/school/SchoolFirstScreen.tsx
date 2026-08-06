@@ -18,7 +18,7 @@ export default function SchoolFirstScreen() {
             alt="Женщина записывает голос на телефон дома — для создания аудиопродукта достаточно телефона"
             fill
             className="school-first-screen__hero-image"
-            sizes="(max-width: 430px) 100vw, (max-width: 900px) 90vw, 860px"
+            sizes="(max-width: 430px) 100vw, (max-width: 900px) 90vw, (max-width: 1023px) 860px, 640px"
             priority
           />
           <div className="school-first-screen__hero-fade" aria-hidden="true" />

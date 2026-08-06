@@ -12,6 +12,12 @@
   --school-max: 430px;
   /* Source asset ratio; mobile hero uses a taller cover box. */
   --school-hero-ratio: 946 / 816;
+  /* Desktop layout tokens (used from 1024px up; no effect on mobile/tablet). */
+  --school-desktop-max: 1200px;
+  --school-prose-max: 46rem;
+  --school-hero-max: 1280px;
+  --school-section-y: 2.5rem;
+  --school-col-gap: 1.5rem;
 
   /*
    * Local school typography (45+ readability). Mobile-first.
@@ -531,21 +537,104 @@
 
 @media (min-width: 1024px) {
   .school-site-root {
-    --school-max: 860px;
-    padding: 0.85rem 1.5rem 2.5rem;
+    --school-max: var(--school-desktop-max);
+    --school-body-size: 1.125rem;
+    --school-gutter: 2rem;
+    padding: 1rem 1.75rem 3rem;
+  }
+
+  /* Desktop hero: two columns via grid-areas — content stays left in the
+     markup order (hero-stage, then content) while visually sitting right. */
+  .school-first-screen {
+    max-width: var(--school-hero-max);
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-areas: "content hero";
+    align-items: stretch;
+    min-height: 40rem;
+    padding: 0;
+  }
+
+  .school-first-screen__hero-stage {
+    grid-area: hero;
+    height: 100%;
+    padding-top: 0;
   }
 
   .school-first-screen__hero {
-    height: clamp(26rem, 46dvh, 34rem);
+    height: 100%;
+    min-height: 40rem;
+    border-radius: 0 1.5rem 1.5rem 0;
+  }
+
+  .school-first-screen__hero-image {
+    /* Recrop for the wide, tall desktop frame (source is a portrait shot). */
+    object-position: 62% 38%;
+  }
+
+  .school-first-screen__hero-fade {
+    /* Content no longer sits on top of the image, so drop the fade. */
+    display: none;
+  }
+
+  .school-first-screen__content {
+    grid-area: content;
+    justify-content: center;
+    margin-top: 0;
+    padding: 2.5rem 2rem 2.5rem 2.5rem;
   }
 
   .school-first-screen__title {
-    font-size: 3.8rem;
+    font-size: 4rem;
+  }
+
+  .school-first-screen__cta {
+    align-self: flex-start;
+    width: auto;
+    max-width: 20rem;
+  }
+
+  .school-second-screen {
+    gap: 1.4rem;
+    padding-top: 0.6rem;
+    padding-bottom: 2.5rem;
   }
 
   .school-second-screen__voice-title {
     font-size: 2.2rem;
     max-width: 18ch;
+  }
+
+  .school-second-screen__choice-text,
+  .school-second-screen__closing {
+    max-width: var(--school-prose-max);
+  }
+
+  .school-second-screen__scenarios {
+    align-items: stretch;
+  }
+
+  .school-second-screen__scenario {
+    height: 100%;
+  }
+}
+
+@media (min-width: 1440px) {
+  .school-site-root {
+    --school-desktop-max: 1240px;
+    --school-gutter: 2.25rem;
+  }
+
+  .school-first-screen {
+    min-height: 43.75rem;
+  }
+
+  .school-first-screen__hero {
+    min-height: 43.75rem;
+  }
+
+  .school-first-screen__title {
+    font-size: 4.5rem;
   }
 }
 
@@ -805,12 +894,48 @@
 }
 
 @media (min-width: 1024px) {
-  .school-third-screen__title {
-    font-size: 2.55rem;
+  .school-third-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    grid-template-areas:
+      "title formats"
+      "intro formats"
+      "closing formats";
+    column-gap: var(--school-col-gap);
+    row-gap: 0.85rem;
+    align-items: start;
   }
 
+  .school-third-screen__title {
+    grid-area: title;
+    font-size: 2.55rem;
+    max-width: 14ch;
+  }
+
+  .school-third-screen__intro {
+    grid-area: intro;
+    max-width: var(--school-prose-max);
+  }
+
+  .school-third-screen__formats {
+    grid-area: formats;
+    margin: 0;
+  }
+
+  .school-third-screen__closing {
+    grid-area: closing;
+    max-width: var(--school-prose-max);
+  }
+
+  /* 3 columns keeps 13 items denser than 4 + lonely last cell. */
   .school-third-screen__format-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .school-third-screen__format:last-child {
+    grid-column: 1 / -1;
+    max-width: calc((100% - 1.5rem) / 3);
+    justify-self: center;
   }
 }
 
@@ -1345,11 +1470,16 @@
 
 @media (min-width: 1024px) {
   .school-fifth-screen {
-    padding: 2.25rem 2rem 2.4rem;
+    padding: 2.1rem 2rem 2.2rem;
   }
 
   .school-fifth-screen__title {
     font-size: 3.35rem;
+  }
+
+  .school-fifth-screen__intro .school-fifth-screen__text,
+  .school-fifth-screen__continuation .school-fifth-screen__text {
+    max-width: var(--school-prose-max);
   }
 
   .school-fifth-screen__accent {
@@ -1537,15 +1667,20 @@
 
 @media (min-width: 1024px) {
   .school-voice-reach {
-    padding: 2.1rem 2rem 2.15rem;
+    padding: 2rem 2rem 2.05rem;
   }
 
   .school-voice-reach__title {
     font-size: 2.55rem;
   }
 
+  .school-voice-reach__text {
+    max-width: var(--school-prose-max);
+  }
+
   .school-voice-reach__visual {
     width: min(19.5rem, 100%);
+    min-height: 16rem;
   }
 }
 
@@ -1860,11 +1995,16 @@
 
 @media (min-width: 1024px) {
   .school-legacy-screen {
-    padding: 2.15rem 2rem 2.25rem;
+    padding: 2rem 2rem 2.1rem;
   }
 
   .school-legacy-screen__title {
     font-size: 2.55rem;
+  }
+
+  .school-legacy-screen__text,
+  .school-legacy-screen__list-text {
+    max-width: var(--school-prose-max);
   }
 
   .school-legacy-screen__accent {
@@ -2105,11 +2245,16 @@
 
 @media (min-width: 1024px) {
   .school-inner-product {
-    padding: 2rem;
+    padding: 1.9rem 2rem 2rem;
   }
 
   .school-inner-product__title {
     font-size: 2.4rem;
+  }
+
+  .school-inner-product__text,
+  .school-inner-product__item-text {
+    max-width: var(--school-prose-max);
   }
 
   .school-inner-product__mark--desktop {
@@ -2343,11 +2488,16 @@
 
 @media (min-width: 1024px) {
   .school-audience {
-    padding: 2rem;
+    padding: 1.9rem 2rem 2rem;
   }
 
   .school-audience__title {
     font-size: 2.45rem;
+  }
+
+  .school-audience__situation-text,
+  .school-audience__closing-text {
+    max-width: var(--school-prose-max);
   }
 }
 
@@ -2562,11 +2712,15 @@
 
 @media (min-width: 1024px) {
   .school-why-now {
-    padding: 2rem;
+    padding: 1.9rem 2rem 2rem;
   }
 
   .school-why-now__title {
     font-size: 2.55rem;
+  }
+
+  .school-why-now__text {
+    max-width: var(--school-prose-max);
   }
 
   .school-why-now__accent {
@@ -2942,15 +3096,20 @@
 
 @media (min-width: 1024px) {
   .school-program {
-    padding: 2rem;
+    padding: 1.9rem 2rem 2rem;
   }
 
   .school-program__title {
     font-size: 2.55rem;
   }
 
+  .school-program__intro {
+    max-width: var(--school-prose-max);
+  }
+
   .school-results {
-    padding: 2rem;
+    max-width: min(40rem, 100%);
+    padding: 2.1rem 2.2rem 2.2rem;
   }
 
   .school-results__title {
@@ -3335,11 +3494,20 @@
 
 @media (min-width: 1024px) {
   .school-author {
-    padding: 2.1rem 2rem 2.2rem;
+    padding: 2rem 2rem 2.1rem;
+  }
+
+  .school-author__hero {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 1.6rem 2rem;
   }
 
   .school-author__section-title--desktop {
     font-size: 2.4rem;
+  }
+
+  .school-author__text {
+    max-width: var(--school-prose-max);
   }
 
   .school-author__photo-wrap {
@@ -4007,7 +4175,7 @@
 
 @media (min-width: 1024px) {
   .school-tariffs {
-    max-width: min(1140px, 100%);
+    max-width: min(1180px, 100%);
     padding: 2.1rem 2rem 2.2rem;
   }
 
@@ -4028,6 +4196,18 @@
   .school-tariffs__card--premium {
     transform: translateY(-0.35rem) scale(1.02);
     z-index: 1;
+  }
+
+  .school-tariffs__card {
+    min-height: 100%;
+  }
+
+  .school-tariffs__features {
+    flex: 1 1 auto;
+  }
+
+  .school-tariffs__cta {
+    margin-top: auto;
   }
 
   .school-tariffs__card-top {
@@ -4887,6 +5067,7 @@
   }
 
   .school-after__platform {
+    max-width: 48rem;
     padding: 1.35rem 1.5rem 1.4rem;
   }
 
@@ -6049,7 +6230,56 @@
 
 @media (min-width: 1024px) {
   .school-final {
-    padding: 2.5rem 2.4rem 2.4rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    grid-template-areas: "content decor";
+    align-items: center;
+    column-gap: 1.5rem;
+    max-width: min(var(--school-desktop-max), 100%);
+    padding: 2.6rem 2.5rem 2.5rem;
+    text-align: left;
+  }
+
+  .school-final__content {
+    grid-area: content;
+    align-items: flex-start;
+    max-width: 38rem;
+  }
+
+  .school-final__decor {
+    grid-area: decor;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    min-height: 14rem;
+    padding: 1.25rem 1rem;
+    border-radius: 1.35rem;
+    background:
+      radial-gradient(
+        70% 70% at 55% 45%,
+        rgba(143, 78, 234, 0.12) 0%,
+        transparent 70%
+      ),
+      rgba(255, 252, 249, 0.55);
+    border: 1px solid rgba(196, 176, 230, 0.35);
+    color: rgba(112, 66, 197, 0.42);
+    justify-self: stretch;
+  }
+
+  .school-final__waves {
+    width: min(100%, 20rem);
+  }
+
+  .school-final__glow {
+    width: 22rem;
+    height: 22rem;
+    top: -10%;
+    right: -4%;
   }
 
   .school-final__title {
@@ -6062,6 +6292,19 @@
 
   .school-final__closing {
     font-size: 1.3rem;
+  }
+
+  .school-footer {
+    max-width: min(var(--school-desktop-max), 100%);
+  }
+
+  .school-faq__inner {
+    max-width: 880px;
+  }
+
+  .school-faq__closing {
+    max-width: 40rem;
+    margin-inline: auto;
   }
 }
 
@@ -6220,5 +6463,57 @@
 @media (prefers-reduced-motion: reduce) {
   .school-gc-modal__close:active {
     transform: none;
+  }
+}
+
+/* ======================================================================
+ * Consolidated desktop (≥1440px) polish.
+ * Wide-screen typography bump for section H2s that stay small at 1024,
+ * now that --school-desktop-max has room to breathe. No mobile/tablet
+ * or <1024 rule is touched here.
+ * ====================================================================== */
+@media (min-width: 1440px) {
+  .school-third-screen__title,
+  .school-voice-reach__title,
+  .school-legacy-screen__title,
+  .school-why-now__title,
+  .school-program__title,
+  .school-learning__title,
+  .school-tariffs__title {
+    font-size: 2.75rem;
+  }
+
+  .school-inner-product__title,
+  .school-audience__title,
+  .school-bonuses__title,
+  .school-after__title,
+  .school-stories__title,
+  .school-faq__title {
+    font-size: 2.7rem;
+  }
+
+  .school-results__title,
+  .school-author__section-title--desktop {
+    font-size: 2.65rem;
+  }
+
+  .school-fourth-screen__title {
+    font-size: 2.7rem;
+  }
+
+  .school-fifth-screen__title {
+    font-size: 3.5rem;
+  }
+
+  .school-final__title {
+    font-size: 3.2rem;
+  }
+
+  .school-final {
+    padding: 2.85rem 2.75rem 2.7rem;
+  }
+
+  .school-fourth-screen__intro {
+    max-width: var(--school-prose-max);
   }
 }
