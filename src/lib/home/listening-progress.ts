@@ -34,6 +34,7 @@ type PracticeAuthorRow = {
 
 type PracticeRow = {
   id: string;
+  author_id: string | null;
   title: string;
   slug: string;
   subtitle: string | null;
@@ -127,7 +128,7 @@ function mapPracticeToHomeProduct(
 
   const author = normalizeAuthor(practice.authors);
 
-  if (!author) {
+  if (!author || !practice.author_id) {
     return null;
   }
 
@@ -137,6 +138,7 @@ function mapPracticeToHomeProduct(
 
   return {
     id: practice.id,
+    authorId: practice.author_id,
     title: practice.title,
     slug: practice.slug,
     subtitle: practice.subtitle?.trim() || null,
@@ -326,6 +328,7 @@ export async function getContinueListening(
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       subtitle,
@@ -432,6 +435,7 @@ export async function getRecentlyListenedProducts(
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       subtitle,
@@ -519,6 +523,7 @@ export async function getActivePrograms(
     .select(
       `
       id,
+      author_id,
       title,
       slug,
       subtitle,
@@ -644,6 +649,7 @@ export async function loadAudioSummaryMap(
 export function enrichCatalogProducts(
   products: Array<{
     id: string;
+    authorId: string;
     title: string;
     slug: string;
     subtitle: string | null;

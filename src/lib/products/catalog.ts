@@ -44,6 +44,7 @@ type CatalogPracticeRow = {
 
 export type CatalogProduct = ProductCoverFields & {
   id: string;
+  authorId: string;
   title: string;
   slug: string;
   subtitle: string | null;
@@ -284,7 +285,7 @@ export async function mapPracticeRowsToCatalogProducts(
   const products = practiceRows.flatMap((practice) => {
     const author = normalizeAuthor(practice.authors);
 
-    if (!author) {
+    if (!author || !practice.author_id) {
       return [];
     }
 
@@ -294,6 +295,7 @@ export async function mapPracticeRowsToCatalogProducts(
     return [
       {
         id: practice.id,
+        authorId: practice.author_id,
         title: practice.title,
         slug: practice.slug,
         subtitle: practice.subtitle?.trim() || null,

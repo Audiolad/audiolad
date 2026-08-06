@@ -1,6 +1,7 @@
 import type { CatalogProduct } from "@/lib/products/catalog";
 
 export type HomeProduct = CatalogProduct & {
+  authorId: string;
   audioCount: number;
   listenHref: string | null;
 };

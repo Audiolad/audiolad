@@ -8,6 +8,10 @@ import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 
+import {
+  getMoscowDateKey,
+  selectDailyFreeGiftProducts,
+} from "./daily-free-gifts";
 import { getGreetingFirstName } from "./profile-name";
 import {
   enrichCatalogProducts,
@@ -70,6 +74,12 @@ export async function getGuestHomeData(
   const products = enrichCatalogProducts(catalogProducts, audioSummaryMap);
   const freeProducts = products.filter((product) => product.isFree);
   const featuredFreeProduct = freeProducts[0] ?? null;
+  const dailyFreeGiftProducts = selectDailyFreeGiftProducts({
+    products: freeProducts,
+    featuredProductId: featuredFreeProduct?.id ?? null,
+    dateKey: getMoscowDateKey(),
+    limit: 8,
+  });
   const programProducts = products.filter(isProgramProduct).slice(0, 8);
 
   const authors = await safeHomeSection(
@@ -80,7 +90,7 @@ export async function getGuestHomeData(
 
   return {
     featuredFreeProduct,
-    freeProducts: freeProducts.slice(0, 12),
+    freeProducts: dailyFreeGiftProducts,
     newProducts: products.slice(0, 8),
     programProducts,
     authors,
