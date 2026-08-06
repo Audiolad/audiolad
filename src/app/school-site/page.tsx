@@ -15,7 +15,6 @@ import SchoolWhyNowScreen from "@/components/school/SchoolWhyNowScreen";
 import SchoolProgramScreen from "@/components/school/SchoolProgramScreen";
 import SchoolResultsScreen from "@/components/school/SchoolResultsScreen";
 import SchoolAuthorScreen from "@/components/school/SchoolAuthorScreen";
-import SchoolAudioInvitationScreen from "@/components/school/SchoolAudioInvitationScreen";
 import SchoolLearningProcessScreen from "@/components/school/SchoolLearningProcessScreen";
 import SchoolTariffsScreen from "@/components/school/SchoolTariffsScreen";
 import SchoolBonusesScreen from "@/components/school/SchoolBonusesScreen";
@@ -56,7 +55,6 @@ export default async function SchoolSitePage() {
         <SchoolProgramScreen />
         <SchoolResultsScreen />
         <SchoolAuthorScreen />
-        <SchoolAudioInvitationScreen />
         <SchoolLearningProcessScreen />
         <SchoolTariffsScreen />
         <SchoolBonusesScreen />
