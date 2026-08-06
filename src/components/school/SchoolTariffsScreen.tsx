@@ -8,6 +8,7 @@ type SchoolTariffFeature = {
 type SchoolTariff = {
   id: SchoolTariffId;
   name: string;
+  ctaLabel: string;
   oldPrice: string;
   price: string;
   description: string;
@@ -16,14 +17,14 @@ type SchoolTariff = {
   tone: "standard" | "premium" | "vip";
 };
 
-const TITLE = "Пакеты участия";
+const TITLE = "Варианты участия";
 const SUBTITLE = "Выберите формат обучения, который подходит именно вам.";
-const CTA_LABEL = "Принять участие";
 
 const TARIFFS: readonly SchoolTariff[] = [
   {
     id: "standard",
     name: "Стандарт",
+    ctaLabel: "Выбрать Стандарт",
     oldPrice: "5 000 ₽",
     price: "1 888 ₽",
     description:
@@ -40,13 +41,14 @@ const TARIFFS: readonly SchoolTariff[] = [
   {
     id: "premium",
     name: "Премиум",
+    ctaLabel: "Выбрать Премиум",
     oldPrice: "35 000 ₽",
     price: "18 888 ₽",
     badge: "Рекомендуем",
     description:
       "Полная практическая программа Школы Аудиопрактик с месячным сопровождением Сергея Петрова, восемью живыми встречами, персональной обратной связью и помощью в создании, доработке и публикации собственных аудиопродуктов.",
     features: [
-      { text: "Всё, что входит в пакет «Стандарт»;" },
+      { text: "Всё, что входит в вариант «Стандарт»;" },
       { text: "Бонусный модуль;" },
       { text: "Один месяц практического сопровождения;" },
       {
@@ -72,12 +74,13 @@ const TARIFFS: readonly SchoolTariff[] = [
   {
     id: "vip",
     name: "VIP",
+    ctaLabel: "Выбрать VIP",
     oldPrice: "125 000 ₽",
     price: "88 888 ₽",
     description:
       "Индивидуальная программа для тех, кто хочет максимально быстро создать и развить собственное авторское направление.",
     features: [
-      { text: "Всё, что входит в пакет «Премиум»;" },
+      { text: "Всё, что входит в вариант «Премиум»;" },
       { text: "Четыре персональные встречи с Сергеем Петровым;" },
       {
         text: "Индивидуальная помощь в выборе авторского направления;",
@@ -127,7 +130,7 @@ export default function SchoolTariffsScreen() {
     <section
       id="tariffs"
       className="school-tariffs"
-      aria-label="Пакеты участия"
+      aria-label="Варианты участия"
     >
       <div className="school-tariffs__header">
         <h2 className="school-tariffs__title">{TITLE}</h2>
@@ -195,9 +198,9 @@ export default function SchoolTariffsScreen() {
                   : "school-tariffs__cta"
               }
               data-tariff={tariff.id}
-              aria-label={`${CTA_LABEL}: пакет ${tariff.name}`}
+              aria-label={tariff.ctaLabel}
             >
-              {CTA_LABEL}
+              {tariff.ctaLabel}
             </button>
           </article>
         ))}

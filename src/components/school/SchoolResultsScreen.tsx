@@ -15,7 +15,7 @@ const RESULTS = [
   "Возможность привлекать первых слушателей и получать доход от своих знаний.",
 ] as const;
 
-const CTA_LABEL = "Посмотреть пакеты участия";
+const CTA_LABEL = "Посмотреть варианты участия";
 
 function CheckMark({ className }: { className?: string }) {
   return (

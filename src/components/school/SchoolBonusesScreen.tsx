@@ -11,7 +11,7 @@ type SchoolBonus = {
   description: readonly string[];
 };
 
-const TITLE = "Бонусы для участников пакетов «Премиум» и «VIP»";
+const TITLE = "Бонусы для участников «Премиум» и VIP";
 
 const INTRO =
   "Дополнительные материалы помогут быстрее выбрать своё направление, увереннее создавать и публиковать аудиопродукты и спокойнее развивать своё авторское дело.";
@@ -54,15 +54,15 @@ const BONUSES: readonly SchoolBonus[] = [
 
 const TOTAL_TITLE = "Общая стоимость бонусов";
 const TOTAL_PRICE = "22 331 ₽";
-const TOTAL_NOTE = "Все три бонуса уже входят в пакеты «Премиум» и «VIP».";
-const TOTAL_ACCENT = "Стоимость бонусов выше стоимости пакета «Премиум».";
-const CTA_LABEL = "Выбрать пакет участия";
+const TOTAL_NOTE = "Все три бонуса уже входят в варианты «Премиум» и VIP.";
+const TOTAL_ACCENT = "Стоимость бонусов выше стоимости варианта «Премиум».";
+const CTA_LABEL = "Выбрать вариант участия";
 
 export default function SchoolBonusesScreen() {
   return (
     <section
       className="school-bonuses"
-      aria-label="Бонусы для участников пакетов Премиум и VIP"
+      aria-label="Бонусы для участников Премиум и VIP"
     >
       <div className="school-bonuses__header">
         <h2 className="school-bonuses__title">{TITLE}</h2>

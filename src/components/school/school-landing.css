@@ -3754,10 +3754,11 @@
     var(--school-cta-start) 100%
   );
   color: #fff;
-  font-size: clamp(1.05rem, 3.9vw, 1.15rem);
+  font-size: clamp(1rem, 3.6vw, 1.12rem);
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: 0 14px 30px rgba(95, 46, 201, 0.26);
   transition:
@@ -3767,7 +3768,6 @@
 }
 
 .school-tariffs__cta--premium {
-  min-height: 3.4rem;
   box-shadow: 0 16px 34px rgba(95, 46, 201, 0.32);
 }
 

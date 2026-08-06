@@ -7,7 +7,7 @@ import Image from "next/image";
 
 /**
  * Cover CTA: school-specific phrasing converts better on the first screen
- * than the generic tariff CTA «Принять участие».
+ * than the generic tariff CTAs «Выбрать Стандарт / Премиум / VIP».
  */
 const SCHOOL_COVER_CTA = "Присоединиться к Школе";
 

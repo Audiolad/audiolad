@@ -31,7 +31,7 @@ const LEGACY_ITEMS = [
 const ACCENT =
   "То, что вы создадите сегодня, может помогать людям ещё долгие годы";
 
-const CTA_LABEL = "Принять участие";
+const CTA_LABEL = "Выбрать вариант участия";
 
 function SchoolLegacyMark({ className }: { className?: string }) {
   return (

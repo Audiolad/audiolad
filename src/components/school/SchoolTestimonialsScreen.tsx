@@ -9,7 +9,7 @@ const INTRO =
 const DISCLAIMER =
   "Результаты участников индивидуальны и зависят от опыта, действий, выбранного направления и других обстоятельств.";
 
-const CTA_LABEL = "Выбрать пакет участия";
+const CTA_LABEL = "Выбрать вариант участия";
 
 export default function SchoolTestimonialsScreen() {
   return (
