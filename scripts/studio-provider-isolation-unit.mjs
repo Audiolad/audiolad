@@ -49,6 +49,10 @@ function testStudioIsolation() {
 
   assert(studioLayout.includes("min-h-dvh"), "studio layout is fullscreen");
   assert(
+    studioLayout.includes("StudioAudioProvider"),
+    "studio mounts its local audio provider",
+  );
+  assert(
     !studioLayout.includes("ListenerAppShell") &&
       !studioPage.includes("ListenerAppShell"),
     "studio excludes listener shell",

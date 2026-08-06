@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { StudioAudioProvider } from "@/components/studio/StudioAudioProvider";
+
 export default function StudioRouteLayout({
   children,
 }: {
@@ -7,7 +9,7 @@ export default function StudioRouteLayout({
 }) {
   return (
     <main className="min-h-dvh bg-platform-surface text-[#25135c]">
-      {children}
+      <StudioAudioProvider>{children}</StudioAudioProvider>
     </main>
   );
 }

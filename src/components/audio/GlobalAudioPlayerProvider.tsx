@@ -22,6 +22,11 @@ import {
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
 import { requestStopLocalAudioPlayers } from "@/lib/audio/local-audio-coordination";
+import {
+  isStudioAudioStopMessage,
+  STUDIO_AUDIO_CONTROL_CHANNEL,
+  STUDIO_AUDIO_STOP_STORAGE_KEY,
+} from "@/lib/audio/studio-audio-coordination";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import {
   getGlobalPlayerSessionKey,
@@ -616,6 +621,39 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   useEffect(() => {
     return () => {
       hardStop();
+    };
+  }, [hardStop]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const stopFromStudio = () => {
+      hardStop();
+    };
+    const channel =
+      "BroadcastChannel" in window
+        ? new BroadcastChannel(STUDIO_AUDIO_CONTROL_CHANNEL)
+        : null;
+    const handleChannelMessage = (event: MessageEvent<unknown>) => {
+      if (isStudioAudioStopMessage(event.data)) {
+        stopFromStudio();
+      }
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === STUDIO_AUDIO_STOP_STORAGE_KEY && event.newValue) {
+        stopFromStudio();
+      }
+    };
+
+    channel?.addEventListener("message", handleChannelMessage);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      channel?.removeEventListener("message", handleChannelMessage);
+      channel?.close();
+      window.removeEventListener("storage", handleStorage);
     };
   }, [hardStop]);
 
