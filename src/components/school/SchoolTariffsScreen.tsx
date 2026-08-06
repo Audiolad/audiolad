@@ -4,6 +4,10 @@ import { useRef, useState } from "react";
 
 import SchoolGetCourseModal from "@/components/school/SchoolGetCourseModal";
 import type { SchoolGetCourseTariffId } from "@/lib/school/getcourse-widgets";
+import {
+  SCHOOL_INTENSIVE_SCHEDULE_BANNER,
+  SCHOOL_INTENSIVE_STANDARD_FEATURE,
+} from "@/lib/school/start";
 
 type SchoolTariffId = SchoolGetCourseTariffId;
 
@@ -37,7 +41,7 @@ const TARIFFS: readonly SchoolTariff[] = [
     description:
       "Для тех, кто хочет познакомиться с профессией автора аудиопрактик и получить полное представление о том, как создавать собственные аудиопродукты.",
     features: [
-      { text: "Два дня живого онлайн-интенсива;" },
+      { text: `${SCHOOL_INTENSIVE_STANDARD_FEATURE};` },
       { text: "Все 7 модулей программы;" },
       { text: "Ответы на вопросы во время обучения;" },
       { text: "Записи занятий;" },
@@ -131,6 +135,40 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+function ScheduleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="3.5"
+        y="5"
+        width="17"
+        height="15"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M8 3.5v3M16 3.5v3M3.5 9.5h17"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 12.2v3.2l2.1 1.2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function SchoolTariffsScreen() {
   const [activeTariff, setActiveTariff] =
     useState<SchoolGetCourseTariffId | null>(null);
@@ -145,6 +183,14 @@ export default function SchoolTariffsScreen() {
       <div className="school-tariffs__header">
         <h2 className="school-tariffs__title">{TITLE}</h2>
         <p className="school-tariffs__subtitle">{SUBTITLE}</p>
+        <p className="school-tariffs__schedule">
+          <span className="school-tariffs__schedule-icon" aria-hidden="true">
+            <ScheduleIcon className="school-tariffs__schedule-icon-svg" />
+          </span>
+          <span className="school-tariffs__schedule-text">
+            {SCHOOL_INTENSIVE_SCHEDULE_BANNER}
+          </span>
+        </p>
       </div>
 
       <div className="school-tariffs__grid">

@@ -3605,6 +3605,54 @@
   color: var(--school-body-color);
 }
 
+.school-tariffs__schedule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.72rem 0.85rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(196, 176, 214, 0.42);
+  background:
+    linear-gradient(
+      165deg,
+      rgba(252, 246, 238, 0.96) 0%,
+      rgba(244, 236, 248, 0.92) 100%
+    );
+  box-shadow: none;
+  color: var(--school-ink);
+}
+
+.school-tariffs__schedule-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-top: 0.05rem;
+  border-radius: 0.55rem;
+  background: rgba(143, 78, 234, 0.1);
+  color: #7042c5;
+}
+
+.school-tariffs__schedule-icon-svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.school-tariffs__schedule-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(0.92rem, 3.5vw, 1rem);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--school-body-color);
+}
+
 .school-tariffs__grid {
   display: flex;
   flex-direction: column;
