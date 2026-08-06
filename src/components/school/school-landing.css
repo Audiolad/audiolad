@@ -349,15 +349,22 @@
 
 @media (min-width: 1024px) {
   /*
-   * Full-width plate matching landing cream — opaque, no border/shadow,
-   * so sticky chips don't show text flicker while staying visually light.
+   * Full-bleed cream plate (cancels .school-site-root inline padding),
+   * chips stay centered in --school-desktop-max via __inner.
+   * Root desktop padding-inline is 1.75rem (see .school-site-root @1024).
    */
   .school-site-root {
     --school-nav-height: calc(2.6rem + 16px);
+    --school-nav-bleed: 1.75rem;
   }
 
   .school-section-nav {
-    width: 100%;
+    box-sizing: border-box;
+    width: calc(100% + 2 * var(--school-nav-bleed));
+    max-width: none;
+    margin-top: 12px;
+    margin-right: calc(-1 * var(--school-nav-bleed));
+    margin-left: calc(-1 * var(--school-nav-bleed));
     background: var(--school-cream);
     border-bottom: none;
     box-shadow: none;
