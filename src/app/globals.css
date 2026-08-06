@@ -501,6 +501,29 @@ body {
   }
 }
 
+@media (min-width: 1024px) {
+  .listener-home-content .featured-card--guest {
+    border-radius: 28px;
+  }
+
+  .listener-home-content .featured-card--guest .featured-card__cover {
+    width: min(56%, 360px);
+    aspect-ratio: 1 / 1;
+    border-radius: 28px 0 0 28px;
+    background-color: #ffffff;
+  }
+
+  .listener-home-content .featured-card--guest .featured-card__cover img {
+    object-fit: contain;
+  }
+
+  .listener-home-content .featured-card--guest .featured-card__content {
+    width: 44%;
+    max-width: 44%;
+    flex: 0 1 44%;
+  }
+}
+
 .primary-cta,
 .home-primary-cta {
   display: inline-flex;

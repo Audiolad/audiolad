@@ -14,7 +14,7 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
   const listenHref = product.listenHref;
 
   return (
-    <article className="featured-card mt-8 overflow-hidden rounded-[28px]">
+    <article className="featured-card featured-card--guest mt-8 overflow-hidden rounded-[28px]">
       <Link
         href={product.href}
         className="featured-card__cover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
