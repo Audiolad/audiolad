@@ -19,11 +19,13 @@ import {
   getStudioReplacementProjectSize,
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
+import {
+  MAX_LOCAL_FILE_SIZE_BYTES,
+  validateStudioLocalFile,
+} from "@/lib/studio/local-file-validation";
 
-const MAX_LOCAL_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
-const SUPPORTED_FILE_EXTENSIONS = /\.(mp3|wav|m4a|aac)$/i;
 
 export type StudioAudioStatus =
   | "idle"
@@ -60,6 +62,7 @@ type StudioAudioContextValue = {
   removeTrack: (trackId: string) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   toggleTrackMuted: (trackId: string) => void;
+  getTrackBuffer: (trackId: string) => AudioBuffer | null;
   reset: () => void;
 };
 
@@ -72,26 +75,7 @@ type TrackRuntime = {
   source: AudioBufferSourceNode | null;
 };
 
-export function validateStudioLocalFile(
-  file: Pick<File, "name" | "size" | "type">,
-): string | null {
-  const hasAudioMimeType = file.type.startsWith("audio/");
-  const hasSupportedExtension = SUPPORTED_FILE_EXTENSIONS.test(file.name);
-
-  if (!hasAudioMimeType && !hasSupportedExtension) {
-    return "Выберите аудиофайл MP3, WAV, M4A или AAC.";
-  }
-
-  if (file.size === 0) {
-    return "Выбранный файл пуст.";
-  }
-
-  if (file.size > MAX_LOCAL_FILE_SIZE_BYTES) {
-    return "Размер одной дорожки превышает лимит Studio — 200 МБ.";
-  }
-
-  return null;
-}
+export { validateStudioLocalFile };
 
 function formatDecodeError(error: unknown): string {
   void error;
@@ -650,6 +634,10 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [updateTrack],
   );
 
+  const getTrackBuffer = useCallback((trackId: string): AudioBuffer | null => {
+    return trackRuntimesRef.current.get(trackId)?.buffer ?? null;
+  }, []);
+
   const removeTrack = useCallback(
     (trackId: string) => {
       if (!tracksRef.current.some((track) => track.id === trackId)) {
@@ -712,11 +700,13 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       seekRelative,
       setTrackVolume,
       toggleTrackMuted,
+      getTrackBuffer,
       removeTrack,
       reset,
     }),
     [
       currentTime,
+      getTrackBuffer,
       loadLocalFiles,
       pause,
       play,

@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
   type StudioLocalTrack,
   useStudioAudio,
 } from "@/components/studio/StudioAudioProvider";
 import { StudioBrand } from "@/components/studio/StudioBrand";
+import { StudioTimeline } from "@/components/studio/StudioTimeline";
+import {
+  clampPixelsPerSecond,
+  DEFAULT_PIXELS_PER_SECOND,
+  getFitPixelsPerSecond,
+} from "@/lib/studio/timeline-math";
 
 type StudioTrackSlot = {
   id: string;
@@ -23,6 +29,7 @@ const TRACK_ACCENTS = [
   "border-amber-400/70 bg-amber-400/15 text-amber-100",
   "border-emerald-400/70 bg-emerald-400/15 text-emerald-200",
 ];
+const TIMELINE_ACCENTS = ["#a78bfa", "#38bdf8", "#2dd4bf", "#fbbf24", "#34d399"];
 
 function formatTime(value: number): string {
   if (!Number.isFinite(value) || value < 0) {
@@ -102,12 +109,17 @@ export default function StudioEditorShell() {
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [slotNameDraft, setSlotNameDraft] = useState("");
+  const [pixelsPerSecond, setPixelsPerSecond] = useState(
+    DEFAULT_PIXELS_PER_SECOND,
+  );
+  const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
   ]);
   const {
     currentTime,
+    getTrackBuffer,
     loadLocalFiles,
     pause,
     play,
@@ -130,6 +142,22 @@ export default function StudioEditorShell() {
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
+  const timelineTracks = slots.map((slot) => {
+    const track = slot.audioTrackId
+      ? tracksById.get(slot.audioTrackId)
+      : undefined;
+    return {
+      id: track?.id ?? slot.id,
+      name: slot.name,
+      fileName: track?.fileName,
+      buffer: track ? getTrackBuffer(track.id) : null,
+      duration: track?.duration ?? 0,
+      accent: TIMELINE_ACCENTS[slots.indexOf(slot) % TIMELINE_ACCENTS.length],
+    };
+  });
+  const handleTimelineViewportWidthChange = useCallback((width: number) => {
+    setTimelineViewportWidth(width);
+  }, []);
 
   const openAddAudioDialog = (slotId: string) => {
     if (addAudioInputRef.current) {
@@ -176,6 +204,160 @@ export default function StudioEditorShell() {
         },
       ];
     });
+  };
+
+  const renderTimelineControls = (_timelineTrack: unknown, index: number) => {
+    const slot = slots[index];
+    const track = slot?.audioTrackId
+      ? tracksById.get(slot.audioTrackId)
+      : undefined;
+    if (!slot) {
+      return null;
+    }
+    const accent = TRACK_ACCENTS[index % TRACK_ACCENTS.length];
+
+    return (
+      <div className="flex min-h-40 gap-3">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${accent}`}>
+          {index + 1}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 items-center gap-1">
+            {editingSlotId === slot.id ? (
+              <input
+                autoFocus
+                value={slotNameDraft}
+                onChange={(event) => setSlotNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") saveSlotRename(slot.id);
+                  if (event.key === "Escape") cancelSlotRename();
+                }}
+                aria-label={`Название дорожки ${index + 1}`}
+                className="min-w-0 flex-1 rounded bg-[#1c2433] px-2 py-1 text-sm font-semibold text-white outline-none ring-1 ring-violet-300/60"
+              />
+            ) : (
+              <>
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                  {slot.name}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => startSlotRename(slot)}
+                  aria-label={`Изменить название ${slot.name}`}
+                  title="Переименовать дорожку"
+                  className="shrink-0 text-[#bda8e8]"
+                >
+                  ✎
+                </button>
+              </>
+            )}
+          </div>
+          <div className="mt-3 flex min-h-28 items-end gap-3">
+            <TrackMuteButton
+              track={track}
+              onToggle={() => track && toggleTrackMuted(track.id)}
+            />
+            <div className="studio-volume-fader flex h-28 w-5 shrink-0 flex-col items-center">
+              <input
+                aria-label={`Громкость ${slot.name}`}
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round((track?.volume ?? 1) * 100)}
+                disabled={!track}
+                onChange={(event) =>
+                  track && setTrackVolume(track.id, Number(event.target.value) / 100)
+                }
+                title={
+                  track
+                    ? `Громкость: ${Math.round(track.volume * 100)}%`
+                    : "Добавьте аудио, чтобы регулировать громкость"
+                }
+                className="studio-volume-fader__range accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
+              />
+              <span className="text-[10px] text-[#9ba7bb]">
+                {Math.round((track?.volume ?? 1) * 100)}%
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-col items-start gap-2 text-xs">
+            {track ? (
+              <>
+                <button
+                  type="button"
+                  disabled={track.isReplacing}
+                  onClick={() => {
+                    pause();
+                    if (replaceAudioInputRef.current) {
+                      replaceAudioInputRef.current.dataset.trackId = track.id;
+                      replaceAudioInputRef.current.click();
+                    }
+                  }}
+                  className="text-[#d8c8fb] disabled:opacity-40"
+                >
+                  Заменить аудио
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeTrack(track.id);
+                    setSlots((currentSlots) =>
+                      currentSlots.map((item) =>
+                        item.id === slot.id ? { ...item, audioTrackId: null } : item,
+                      ),
+                    );
+                  }}
+                  className="text-[#a9b4c7]"
+                >
+                  Очистить дорожку
+                </button>
+              </>
+            ) : null}
+            {index >= 2 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (track) removeTrack(track.id);
+                  setSlots((currentSlots) =>
+                    currentSlots.filter((item) => item.id !== slot.id),
+                  );
+                }}
+                className="text-[#a9b4c7] underline underline-offset-4"
+              >
+                Удалить дорожку
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTimelineEmptyState = (_timelineTrack: unknown, index: number) => {
+    const slot = slots[index];
+    if (!slot) {
+      return null;
+    }
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+        <p className="text-sm font-medium text-[#e2e8f5]">Добавьте аудио</p>
+        <p className="mt-1 text-xs text-[#97a4b8]">
+          Загрузите аудиофайл с устройства
+        </p>
+        <button
+          type="button"
+          disabled={isLoading}
+          onPointerUp={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            openAddAudioDialog(slot.id);
+          }}
+          className="mt-4 h-10 rounded-lg bg-[#7650bd] px-4 text-sm font-semibold text-white disabled:opacity-40"
+        >
+          Добавить аудио
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -309,20 +491,49 @@ export default function StudioEditorShell() {
               <span className="mr-1 text-xs uppercase tracking-wide text-[#99a4b8]">
                 Масштаб
               </span>
-              <button type="button" disabled title="Будет доступно после добавления формы волны" className="h-9 w-9 rounded border border-white/10 opacity-45">
+              <button
+                type="button"
+                onClick={() =>
+                  setPixelsPerSecond((current) =>
+                    clampPixelsPerSecond(current / 1.25),
+                  )
+                }
+                className="h-9 w-9 rounded border border-white/10"
+                aria-label="Уменьшить масштаб временной шкалы"
+              >
                 −
               </button>
               <input
                 aria-label="Масштаб временной шкалы"
                 type="range"
-                disabled
-                title="Будет доступно после добавления формы волны"
-                className="w-16 accent-[#9f7aea] opacity-45"
+                min="0.001"
+                max="400"
+                step="0.001"
+                value={pixelsPerSecond}
+                onChange={(event) => setPixelsPerSecond(Number(event.target.value))}
+                className="w-16 accent-[#9f7aea]"
               />
-              <button type="button" disabled title="Будет доступно после добавления формы волны" className="h-9 w-9 rounded border border-white/10 opacity-45">
+              <button
+                type="button"
+                onClick={() =>
+                  setPixelsPerSecond((current) =>
+                    clampPixelsPerSecond(current * 1.25),
+                  )
+                }
+                className="h-9 w-9 rounded border border-white/10"
+                aria-label="Увеличить масштаб временной шкалы"
+              >
                 +
               </button>
-              <button type="button" disabled title="Будет доступно после добавления формы волны" className="h-9 rounded border border-white/10 px-2 text-xs opacity-45">
+              <button
+                type="button"
+                onClick={() =>
+                  setPixelsPerSecond(
+                    getFitPixelsPerSecond(projectDuration, timelineViewportWidth),
+                  )
+                }
+                className="h-9 rounded border border-white/10 px-2 text-xs"
+              >
                 По ширине
               </button>
             </div>
@@ -345,7 +556,19 @@ export default function StudioEditorShell() {
             </p>
           ) : null}
 
-          <div className="space-y-3">
+          <StudioTimeline
+            duration={projectDuration}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            tracks={timelineTracks}
+            pixelsPerSecond={pixelsPerSecond}
+            onViewportWidthChange={handleTimelineViewportWidthChange}
+            onSeek={seek}
+            renderControls={renderTimelineControls}
+            renderEmpty={renderTimelineEmptyState}
+          />
+
+          {false ? <div className="space-y-3">
             {slots.map((slot, index) => {
               const track = slot.audioTrackId
                 ? tracksById.get(slot.audioTrackId)
@@ -508,18 +731,6 @@ export default function StudioEditorShell() {
                               {track.replacementError}
                             </p>
                           ) : null}
-                          <div className="mt-5 h-16 overflow-hidden rounded-lg border border-white/10 bg-[#0d131d]">
-                            <div
-                              aria-hidden="true"
-                              className={`h-full ${accent.split(" ").at(-2) ?? "bg-violet-400/15"}`}
-                              style={{
-                                width: `${Math.min(
-                                  (currentTime / Math.max(track.duration, 1)) * 100,
-                                  100,
-                                )}%`,
-                              }}
-                            />
-                          </div>
                         </div>
                       ) : (
                         <div className="flex min-h-32 flex-col items-center justify-center rounded-lg border border-dashed border-white/20 bg-[#0d131d] px-4 text-center">
@@ -544,7 +755,7 @@ export default function StudioEditorShell() {
                 </section>
               );
             })}
-          </div>
+          </div> : null}
 
           {slots.length < MAX_TRACK_SLOTS ? (
             <button

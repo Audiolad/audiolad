@@ -13,7 +13,7 @@ import {
   getStudioReplacementProjectSize,
   getStudioTrackGain,
 } from "../src/lib/studio/audio-engine-math.ts";
-import { validateStudioLocalFile } from "../src/components/studio/StudioAudioProvider.tsx";
+import { validateStudioLocalFile } from "../src/lib/studio/local-file-validation.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -68,19 +68,11 @@ function testLocalFileValidation() {
     null,
   );
   assert.match(
-    validateStudioLocalFile({
-      name: "notes.txt",
-      type: "text/plain",
-      size: 100,
-    }),
+    validateStudioLocalFile({ name: "notes.txt", type: "text/plain", size: 100 }),
     /аудиофайл/i,
   );
   assert.match(
-    validateStudioLocalFile({
-      name: "empty.wav",
-      type: "audio/wav",
-      size: 0,
-    }),
+    validateStudioLocalFile({ name: "empty.wav", type: "audio/wav", size: 0 }),
     /пуст/i,
   );
   assert.match(
@@ -95,6 +87,7 @@ function testLocalFileValidation() {
 
 function testProviderEngineLifecycle() {
   const provider = readSource("src/components/studio/StudioAudioProvider.tsx");
+  const fileValidation = readSource("src/lib/studio/local-file-validation.ts");
 
   for (const state of [
     '"idle"',
@@ -118,10 +111,17 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /getStudioProjectDuration/);
   assert.match(provider, /getStudioTrackGain/);
   assert.match(provider, /startSourcesAtPosition\(nextPosition\)/);
-  assert.match(provider, /MAX_LOCAL_FILE_SIZE_BYTES = 200 \* 1024 \* 1024/);
-  assert.match(provider, /SUPPORTED_FILE_EXTENSIONS/);
+  assert.match(fileValidation, /MAX_LOCAL_FILE_SIZE_BYTES = 200 \* 1024 \* 1024/);
+  assert.match(fileValidation, /SUPPORTED_FILE_EXTENSIONS/);
+  assert.match(provider, /local-file-validation/);
+  assert.match(provider, /export \{ validateStudioLocalFile \}/);
   assert.match(provider, /gain\.gain\.value = 1/);
   assert.match(provider, /toggleTrackMuted/);
+  assert.match(provider, /getTrackBuffer/);
+  assert.match(
+    provider,
+    /trackRuntimesRef\.current\.get\(trackId\)\?\.buffer \?\? null/,
+  );
   assert.match(provider, /replaceTrackAudio/);
   assert.match(provider, /getStudioReplacementProjectSize/);
   assert.doesNotMatch(provider, /\bsolo\b/i);
@@ -208,13 +208,40 @@ function testStudioBoundariesAndCrossTabStop() {
     globalStyles,
     /::-webkit-slider-runnable-track,[\s\S]*::-webkit-slider-thumb \{[\s\S]*box-sizing: border-box;/,
   );
-  assert.match(studioWorkspace, /currentTime \/ Math\.max\(track\.duration, 1\)/);
+  assert.match(studioWorkspace, /import \{ StudioTimeline \}/);
+  assert.match(studioWorkspace, /<StudioTimeline/);
+  assert.match(studioWorkspace, /getTrackBuffer\(track\.id\)/);
+  assert.match(studioWorkspace, /renderControls=\{renderTimelineControls\}/);
+  assert.match(studioWorkspace, /renderEmpty=\{renderTimelineEmptyState\}/);
+  assert.match(studioWorkspace, /onPointerUp=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
   assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);
   assert.match(studioWorkspace, /Сохранение проектов будет добавлено/);
   assert.match(studioWorkspace, /Экспорт будет доступен после подключения серверного сведения/);
   assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);
-  assert.doesNotMatch(studioWorkspace, /waveform/i);
+  const timeline = readSource("src/components/studio/StudioTimeline.tsx");
+  const waveformCanvas = readSource(
+    "src/components/studio/StudioWaveformCanvas.tsx",
+  );
+  assert.match(timeline, /pixelsPerSecond/);
+  assert.match(timeline, /overflow-x-auto/);
+  assert.match(timeline, /WAVEFORM_OVERSCAN_PIXELS/);
+  assert.match(timeline, /renderStartX/);
+  assert.match(timeline, /onScroll/);
+  assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
+  assert.match(timeline, /renderControls\(track, index\)/);
+  assert.match(timeline, /clipWidth/);
+  assert.match(timeline, /onPointerUp=\{seekFromPointer\}/);
+  assert.match(timeline, /lastManualScrollAtRef/);
+  assert.match(timeline, /getAnchoredTimelineScrollLeft/);
+  assert.match(timeline, /onSeek=\{seekAtOffset\}/);
+  assert.doesNotMatch(timeline, /onToggleMuted|onVolumeChange/);
+  assert.doesNotMatch(timeline, /wavesurfer|<audio(?:\s|>)/i);
+  assert.match(waveformCanvas, /getCachedWaveformPeaks/);
+  assert.match(waveformCanvas, /viewportWidth/);
+  assert.match(waveformCanvas, /renderStartX/);
+  assert.doesNotMatch(waveformCanvas, /width=\{timelineWidth\}/);
+  assert.doesNotMatch(waveformCanvas, /wavesurfer|<audio(?:\s|>)/i);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);
   assert.match(globalProvider, /isStudioAudioStopMessage/);
