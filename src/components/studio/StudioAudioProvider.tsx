@@ -15,9 +15,13 @@ import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
+  getStudioProjectDuration,
+  getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 
 const MAX_LOCAL_FILE_SIZE_BYTES = 200 * 1024 * 1024;
+const MAX_LOCAL_TRACKS = 5;
+const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
 const SUPPORTED_FILE_EXTENSIONS = /\.(mp3|wav|m4a|aac)$/i;
 
 export type StudioAudioStatus =
@@ -34,25 +38,37 @@ export type StudioLocalTrack = {
   fileSize: number;
   duration: number;
   volume: number;
+  muted: boolean;
+  solo: boolean;
+  status: "loading" | "ready" | "error";
 };
 
 type StudioAudioContextValue = {
-  track: StudioLocalTrack | null;
+  tracks: StudioLocalTrack[];
+  projectDuration: number;
   status: StudioAudioStatus;
   currentTime: number;
-  duration: number;
-  error: string | null;
-  loadLocalFile: (file: File) => Promise<void>;
+  projectError: string | null;
+  loadLocalFiles: (files: Iterable<File>) => Promise<void>;
   play: () => Promise<void>;
   pause: () => void;
   seek: (position: number) => void;
   seekRelative: (offset: number) => void;
-  setTrackVolume: (volume: number) => void;
-  removeTrack: () => void;
+  removeTrack: (trackId: string) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  toggleTrackMuted: (trackId: string) => void;
+  toggleTrackSolo: (trackId: string) => void;
   reset: () => void;
 };
 
 const StudioAudioContext = createContext<StudioAudioContextValue | null>(null);
+
+type TrackRuntime = {
+  file: File;
+  buffer: AudioBuffer;
+  gain: GainNode;
+  source: AudioBufferSourceNode | null;
+};
 
 export function validateStudioLocalFile(
   file: Pick<File, "name" | "size" | "type">,
@@ -69,7 +85,7 @@ export function validateStudioLocalFile(
   }
 
   if (file.size > MAX_LOCAL_FILE_SIZE_BYTES) {
-    return "Размер файла превышает временный лимит Studio — 200 МБ.";
+    return "Размер одной дорожки превышает лимит Studio — 200 МБ.";
   }
 
   return null;
@@ -83,24 +99,27 @@ function formatDecodeError(error: unknown): string {
   return "Не удалось декодировать аудио в этом браузере.";
 }
 
+function getTrackId(file: File, index: number): string {
+  return `${file.name}:${file.size}:${file.lastModified}:${index}:${crypto.randomUUID()}`;
+}
+
 export function StudioAudioProvider({ children }: { children: ReactNode }) {
-  const [track, setTrack] = useState<StudioLocalTrack | null>(null);
+  const [tracks, setTracks] = useState<StudioLocalTrack[]>([]);
   const [status, setStatus] = useState<StudioAudioStatus>("idle");
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [projectDuration, setProjectDuration] = useState(0);
+  const [projectError, setProjectError] = useState<string | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
-  const audioBufferRef = useRef<AudioBuffer | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
+  const trackRuntimesRef = useRef(new Map<string, TrackRuntime>());
+  const tracksRef = useRef<StudioLocalTrack[]>([]);
   const positionRef = useRef(0);
   const startedAtContextTimeRef = useRef(0);
   const startedAtPositionRef = useRef(0);
-  const durationRef = useRef(0);
+  const projectDurationRef = useRef(0);
+  const statusRef = useRef<StudioAudioStatus>("idle");
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
-  const cleanupRef = useRef<() => void>(() => {});
 
   const cancelProgressLoop = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -109,26 +128,54 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const detachSource = useCallback(() => {
-    const source = sourceRef.current;
-    sourceRef.current = null;
+  const setStatusValue = useCallback((nextStatus: StudioAudioStatus) => {
+    statusRef.current = nextStatus;
+    setStatus(nextStatus);
+  }, []);
 
-    if (!source) {
-      return;
-    }
+  const replaceTracks = useCallback((nextTracks: StudioLocalTrack[]) => {
+    tracksRef.current = nextTracks;
+    projectDurationRef.current = getStudioProjectDuration(nextTracks);
+    setTracks(nextTracks);
+    setProjectDuration(projectDurationRef.current);
+  }, []);
 
-    source.onended = null;
-    try {
-      source.stop();
-    } catch {
-      // Stopping an already-ended source is harmless.
+  const applyTrackGains = useCallback(() => {
+    const hasSolo = tracksRef.current.some((track) => track.solo);
+    for (const track of tracksRef.current) {
+      const runtime = trackRuntimesRef.current.get(track.id);
+      if (runtime) {
+        runtime.gain.gain.value = getStudioTrackGain({
+          volume: track.volume,
+          muted: track.muted,
+          solo: track.solo,
+          hasSolo,
+        });
+      }
     }
-    source.disconnect();
+  }, []);
+
+  const stopSources = useCallback(() => {
+    for (const runtime of trackRuntimesRef.current.values()) {
+      const source = runtime.source;
+      runtime.source = null;
+      if (!source) {
+        continue;
+      }
+
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        // A source may already have reached its end.
+      }
+      source.disconnect();
+    }
   }, []);
 
   const getPlaybackPosition = useCallback(() => {
     const context = audioContextRef.current;
-    if (!context || !sourceRef.current) {
+    if (!context || statusRef.current !== "playing") {
       return positionRef.current;
     }
 
@@ -136,7 +183,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       startedAtContextTime: startedAtContextTimeRef.current,
       startedAtPosition: startedAtPositionRef.current,
       contextTime: context.currentTime,
-      duration: durationRef.current,
+      duration: projectDurationRef.current,
     });
   }, []);
 
@@ -147,176 +194,222 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     return nextPosition;
   }, [getPlaybackPosition]);
 
+  const finishPlayback = useCallback(() => {
+    cancelProgressLoop();
+    stopSources();
+    positionRef.current = projectDurationRef.current;
+    setCurrentTime(projectDurationRef.current);
+    setStatusValue("ready");
+  }, [cancelProgressLoop, setStatusValue, stopSources]);
+
   const startProgressLoop = useCallback(() => {
     cancelProgressLoop();
 
     const tick = () => {
-      if (!sourceRef.current) {
+      if (statusRef.current !== "playing") {
         animationFrameRef.current = null;
         return;
       }
 
-      updateVisiblePosition();
+      const position = updateVisiblePosition();
+      if (position >= projectDurationRef.current) {
+        finishPlayback();
+        return;
+      }
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
     animationFrameRef.current = window.requestAnimationFrame(tick);
-  }, [cancelProgressLoop, updateVisiblePosition]);
+  }, [cancelProgressLoop, finishPlayback, updateVisiblePosition]);
 
-  const clearTrackResources = useCallback(
-    (closeContext: boolean) => {
-      cancelProgressLoop();
-      detachSource();
-
-      gainRef.current?.disconnect();
-      gainRef.current = null;
-      audioBufferRef.current = null;
-      positionRef.current = 0;
-      startedAtContextTimeRef.current = 0;
-      startedAtPositionRef.current = 0;
-      durationRef.current = 0;
-
-      const context = audioContextRef.current;
-      audioContextRef.current = null;
-      if (closeContext && context && context.state !== "closed") {
-        void context.close().catch(() => {
-          // Closing can be rejected by a browser during page teardown.
-        });
-      }
-    },
-    [cancelProgressLoop, detachSource],
-  );
-
-  const reset = useCallback(() => {
-    loadGenerationRef.current += 1;
-    clearTrackResources(true);
-    setTrack(null);
-    setCurrentTime(0);
-    setDuration(0);
-    setError(null);
-    setStatus("idle");
-  }, [clearTrackResources]);
-
-  useEffect(() => {
-    cleanupRef.current = reset;
-  }, [reset]);
-
-  const createSourceAtPosition = useCallback(
+  const startSourcesAtPosition = useCallback(
     (requestedPosition: number) => {
       const context = audioContextRef.current;
-      const buffer = audioBufferRef.current;
-      const gain = gainRef.current;
-
-      if (!context || !buffer || !gain) {
-        throw new Error("Локальная дорожка не готова к воспроизведению.");
+      if (!context || tracksRef.current.length === 0) {
+        return;
       }
 
       const position = clampStudioAudioPosition(
         requestedPosition,
-        buffer.duration,
+        projectDurationRef.current,
       );
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(gain);
-      sourceRef.current = source;
-      startedAtContextTimeRef.current = context.currentTime;
+      const startAt = context.currentTime;
+      for (const track of tracksRef.current) {
+        const runtime = trackRuntimesRef.current.get(track.id);
+        if (!runtime || position >= runtime.buffer.duration) {
+          continue;
+        }
+
+        const source = context.createBufferSource();
+        source.buffer = runtime.buffer;
+        source.connect(runtime.gain);
+        runtime.source = source;
+        source.onended = () => {
+          if (runtime.source === source) {
+            runtime.source = null;
+          }
+          source.disconnect();
+        };
+        source.start(startAt, position);
+      }
+
+      startedAtContextTimeRef.current = startAt;
       startedAtPositionRef.current = position;
       positionRef.current = position;
       setCurrentTime(position);
-
-      source.onended = () => {
-        if (sourceRef.current !== source) {
-          return;
-        }
-
-        sourceRef.current = null;
-        cancelProgressLoop();
-        positionRef.current = buffer.duration;
-        setCurrentTime(buffer.duration);
-        setStatus("ready");
-        source.disconnect();
-      };
-
-      source.start(0, position);
+      setStatusValue("playing");
       startProgressLoop();
     },
-    [cancelProgressLoop, startProgressLoop],
+    [setStatusValue, startProgressLoop],
   );
 
-  const loadLocalFile = useCallback(
-    async (file: File) => {
-      const validationError = validateStudioLocalFile(file);
+  const disposeResources = useCallback(() => {
+    cancelProgressLoop();
+    stopSources();
+    for (const runtime of trackRuntimesRef.current.values()) {
+      runtime.gain.disconnect();
+    }
+    trackRuntimesRef.current.clear();
+    const context = audioContextRef.current;
+    audioContextRef.current = null;
+    if (context && context.state !== "closed") {
+      void context.close().catch(() => {
+        // Browsers can reject close during page teardown.
+      });
+    }
+  }, [cancelProgressLoop, stopSources]);
+
+  const reset = useCallback(() => {
+    loadGenerationRef.current += 1;
+    disposeResources();
+    replaceTracks([]);
+    positionRef.current = 0;
+    startedAtContextTimeRef.current = 0;
+    startedAtPositionRef.current = 0;
+    setCurrentTime(0);
+    setProjectError(null);
+    setStatusValue("idle");
+  }, [disposeResources, replaceTracks, setStatusValue]);
+
+  const loadLocalFiles = useCallback(
+    async (fileInput: Iterable<File>) => {
+      const files = Array.from(fileInput);
+      const validationError = files.map(validateStudioLocalFile).find(Boolean);
       if (validationError) {
-        reset();
-        setError(validationError);
-        setStatus("error");
+        setProjectError(validationError);
+        if (tracksRef.current.length === 0) {
+          setStatusValue("error");
+        }
+        return;
+      }
+
+      if (files.length === 0) {
+        return;
+      }
+
+      if (tracksRef.current.length + files.length > MAX_LOCAL_TRACKS) {
+        setProjectError(`В проект можно добавить не больше ${MAX_LOCAL_TRACKS} дорожек.`);
+        return;
+      }
+
+      const totalSize =
+        tracksRef.current.reduce((sum, track) => sum + track.fileSize, 0) +
+        files.reduce((sum, file) => sum + file.size, 0);
+      if (totalSize > MAX_LOCAL_PROJECT_SIZE_BYTES) {
+        setProjectError("Общий размер дорожек не может превышать 750 МБ.");
         return;
       }
 
       const generation = loadGenerationRef.current + 1;
       loadGenerationRef.current = generation;
-      clearTrackResources(true);
-      setTrack(null);
-      setCurrentTime(0);
-      setDuration(0);
-      setError(null);
-      setStatus("loading");
+      const statusBeforeLoad = statusRef.current;
+      if (statusBeforeLoad !== "playing") {
+        setStatusValue("loading");
+      }
+      setProjectError(null);
 
-      let context: AudioContext | null = null;
+      const context =
+        audioContextRef.current ??
+        (() => {
+          const nextContext = new AudioContext();
+          audioContextRef.current = nextContext;
+          return nextContext;
+        })();
+      const decodedTracks: Array<{ file: File; buffer: AudioBuffer }> = [];
+
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        context = new AudioContext();
-        const decoded = await context.decodeAudioData(arrayBuffer);
+        for (const file of files) {
+          const decoded = await context.decodeAudioData(await file.arrayBuffer());
+          if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
+            throw new Error(`Некорректная длительность файла «${file.name}».`);
+          }
+          decodedTracks.push({ file, buffer: decoded });
+        }
 
         if (generation !== loadGenerationRef.current) {
-          void context.close();
           return;
         }
 
-        if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
-          void context.close();
-          throw new Error("Длительность аудио некорректна.");
+        const nextTracks = [...tracksRef.current];
+        for (const [index, { file, buffer }] of decodedTracks.entries()) {
+          const id = getTrackId(file, index);
+          const gain = context.createGain();
+          gain.gain.value = 1;
+          gain.connect(context.destination);
+          trackRuntimesRef.current.set(id, {
+            file,
+            buffer,
+            gain,
+            source: null,
+          });
+          nextTracks.push({
+            id,
+            fileName: file.name,
+            fileSize: file.size,
+            duration: buffer.duration,
+            volume: 1,
+            muted: false,
+            solo: false,
+            status: "ready",
+          });
         }
-
-        const gain = context.createGain();
-        gain.gain.value = 1;
-        gain.connect(context.destination);
-
-        audioContextRef.current = context;
-        audioBufferRef.current = decoded;
-        gainRef.current = gain;
-        durationRef.current = decoded.duration;
-        setTrack({
-          id: `${file.name}:${file.size}:${file.lastModified}`,
-          fileName: file.name,
-          fileSize: file.size,
-          duration: decoded.duration,
-          volume: 1,
-        });
-        setDuration(decoded.duration);
-        setStatus("ready");
+        replaceTracks(nextTracks);
+        applyTrackGains();
+        if (statusBeforeLoad === "playing") {
+          const playbackPosition = getPlaybackPosition();
+          cancelProgressLoop();
+          stopSources();
+          startSourcesAtPosition(playbackPosition);
+        } else {
+          setStatusValue(statusBeforeLoad === "paused" ? "paused" : "ready");
+        }
       } catch (decodeError) {
         if (generation !== loadGenerationRef.current) {
           return;
         }
 
-        if (context && context.state !== "closed") {
-          void context.close().catch(() => {
-            // Decode failures can happen before the context becomes active.
-          });
+        setProjectError(formatDecodeError(decodeError));
+        if (tracksRef.current.length === 0) {
+          setStatusValue("error");
+        } else if (statusBeforeLoad !== "playing") {
+          setStatusValue(statusBeforeLoad);
         }
-        clearTrackResources(true);
-        setError(formatDecodeError(decodeError));
-        setStatus("error");
       }
     },
-    [clearTrackResources, reset],
+    [
+      applyTrackGains,
+      cancelProgressLoop,
+      getPlaybackPosition,
+      replaceTracks,
+      setStatusValue,
+      startSourcesAtPosition,
+      stopSources,
+    ],
   );
 
   const play = useCallback(async () => {
     const context = audioContextRef.current;
-    const buffer = audioBufferRef.current;
-    if (!context || !buffer) {
+    if (!context || tracksRef.current.length === 0) {
       return;
     }
 
@@ -325,61 +418,63 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         await context.resume();
       }
 
-      detachSource();
-      const restartPosition =
-        positionRef.current >= buffer.duration ? 0 : positionRef.current;
-      createSourceAtPosition(restartPosition);
-      setStatus("playing");
-    } catch (playError) {
-      detachSource();
       cancelProgressLoop();
-      setError(formatDecodeError(playError));
-      setStatus("error");
+      stopSources();
+      const restartPosition =
+        positionRef.current >= projectDurationRef.current ? 0 : positionRef.current;
+      startSourcesAtPosition(restartPosition);
+    } catch (playError) {
+      stopSources();
+      cancelProgressLoop();
+      setProjectError(formatDecodeError(playError));
+      setStatusValue("error");
     }
-  }, [cancelProgressLoop, createSourceAtPosition, detachSource]);
+  }, [cancelProgressLoop, setStatusValue, startSourcesAtPosition, stopSources]);
 
   const pause = useCallback(() => {
-    if (!sourceRef.current) {
+    if (statusRef.current !== "playing") {
       return;
     }
 
     updateVisiblePosition();
-    detachSource();
+    stopSources();
     cancelProgressLoop();
-    setStatus("paused");
-  }, [cancelProgressLoop, detachSource, updateVisiblePosition]);
+    setStatusValue(
+      positionRef.current >= projectDurationRef.current ? "ready" : "paused",
+    );
+  }, [cancelProgressLoop, setStatusValue, stopSources, updateVisiblePosition]);
 
   const seek = useCallback(
     (requestedPosition: number) => {
-      if (!audioBufferRef.current) {
+      if (tracksRef.current.length === 0) {
         return;
       }
 
       const nextPosition = clampStudioAudioPosition(
         requestedPosition,
-        durationRef.current,
+        projectDurationRef.current,
       );
-      const wasPlaying = Boolean(sourceRef.current);
+      const wasPlaying = statusRef.current === "playing";
 
       if (wasPlaying) {
-        detachSource();
+        stopSources();
         cancelProgressLoop();
-        if (nextPosition >= durationRef.current) {
-          positionRef.current = durationRef.current;
-          setCurrentTime(durationRef.current);
-          setStatus("ready");
+        if (nextPosition >= projectDurationRef.current) {
+          positionRef.current = projectDurationRef.current;
+          setCurrentTime(projectDurationRef.current);
+          setStatusValue("ready");
         } else {
-          createSourceAtPosition(nextPosition);
+          startSourcesAtPosition(nextPosition);
         }
       } else {
         positionRef.current = nextPosition;
         setCurrentTime(nextPosition);
-        if (nextPosition >= durationRef.current) {
-          setStatus("ready");
+        if (nextPosition >= projectDurationRef.current) {
+          setStatusValue("ready");
         }
       }
     },
-    [cancelProgressLoop, createSourceAtPosition, detachSource],
+    [cancelProgressLoop, setStatusValue, startSourcesAtPosition, stopSources],
   );
 
   const seekRelative = useCallback(
@@ -388,58 +483,130 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         getStudioAudioRelativeSeekPosition(
           getPlaybackPosition(),
           offset,
-          durationRef.current,
+          projectDurationRef.current,
         ),
       );
     },
     [getPlaybackPosition, seek],
   );
 
-  const setTrackVolume = useCallback((requestedVolume: number) => {
-    const volume = Math.min(Math.max(requestedVolume, 0), 1);
-    if (gainRef.current) {
-      gainRef.current.gain.value = volume;
-    }
-    setTrack((currentTrack) =>
-      currentTrack ? { ...currentTrack, volume } : null,
-    );
-  }, []);
+  const updateTrack = useCallback(
+    (trackId: string, update: (track: StudioLocalTrack) => StudioLocalTrack) => {
+      const nextTracks = tracksRef.current.map((track) =>
+        track.id === trackId ? update(track) : track,
+      );
+      if (nextTracks === tracksRef.current) {
+        return;
+      }
+      replaceTracks(nextTracks);
+      applyTrackGains();
+    },
+    [applyTrackGains, replaceTracks],
+  );
+
+  const setTrackVolume = useCallback(
+    (trackId: string, requestedVolume: number) => {
+      const volume = Math.min(Math.max(requestedVolume, 0), 1);
+      updateTrack(trackId, (track) => ({ ...track, volume }));
+    },
+    [updateTrack],
+  );
+
+  const toggleTrackMuted = useCallback(
+    (trackId: string) => {
+      updateTrack(trackId, (track) => ({ ...track, muted: !track.muted }));
+    },
+    [updateTrack],
+  );
+
+  const toggleTrackSolo = useCallback(
+    (trackId: string) => {
+      updateTrack(trackId, (track) => ({ ...track, solo: !track.solo }));
+    },
+    [updateTrack],
+  );
+
+  const removeTrack = useCallback(
+    (trackId: string) => {
+      if (!tracksRef.current.some((track) => track.id === trackId)) {
+        return;
+      }
+
+      const wasPlaying = statusRef.current === "playing";
+      const position = getPlaybackPosition();
+      cancelProgressLoop();
+      stopSources();
+      const runtime = trackRuntimesRef.current.get(trackId);
+      runtime?.gain.disconnect();
+      trackRuntimesRef.current.delete(trackId);
+      replaceTracks(tracksRef.current.filter((track) => track.id !== trackId));
+      const nextPosition = clampStudioAudioPosition(
+        position,
+        projectDurationRef.current,
+      );
+      positionRef.current = nextPosition;
+      setCurrentTime(nextPosition);
+
+      if (tracksRef.current.length === 0) {
+        setStatusValue("idle");
+      } else if (wasPlaying && nextPosition < projectDurationRef.current) {
+        startSourcesAtPosition(nextPosition);
+      } else {
+        setStatusValue(
+          nextPosition >= projectDurationRef.current ? "ready" : "paused",
+        );
+      }
+    },
+    [
+      cancelProgressLoop,
+      getPlaybackPosition,
+      replaceTracks,
+      setStatusValue,
+      startSourcesAtPosition,
+      stopSources,
+    ],
+  );
 
   useEffect(() => {
     return () => {
-      cleanupRef.current();
+      disposeResources();
     };
-  }, []);
+  }, [disposeResources]);
 
   const value = useMemo<StudioAudioContextValue>(
     () => ({
-      track,
+      tracks,
+      projectDuration,
       status,
       currentTime,
-      duration,
-      error,
-      loadLocalFile,
+      projectError,
+      loadLocalFiles,
       play,
       pause,
       seek,
       seekRelative,
       setTrackVolume,
-      removeTrack: reset,
+      toggleTrackMuted,
+      toggleTrackSolo,
+      removeTrack,
       reset,
     }),
     [
       currentTime,
-      duration,
-      error,
-      loadLocalFile,
+      loadLocalFiles,
       pause,
       play,
+      projectDuration,
+      projectError,
+      removeTrack,
       reset,
       seek,
       seekRelative,
       setTrackVolume,
       status,
-      track,
+      toggleTrackMuted,
+      toggleTrackSolo,
+      tracks,
     ],
   );
 
@@ -461,4 +628,6 @@ export function useStudioAudio(): StudioAudioContextValue {
 
 export const studioAudioLimits = {
   maxLocalFileSizeBytes: MAX_LOCAL_FILE_SIZE_BYTES,
+  maxLocalTracks: MAX_LOCAL_TRACKS,
+  maxLocalProjectSizeBytes: MAX_LOCAL_PROJECT_SIZE_BYTES,
 };

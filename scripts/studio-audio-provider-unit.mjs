@@ -9,6 +9,8 @@ import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
+  getStudioProjectDuration,
+  getStudioTrackGain,
 } from "../src/lib/studio/audio-engine-math.ts";
 import { validateStudioLocalFile } from "../src/components/studio/StudioAudioProvider.tsx";
 
@@ -43,6 +45,22 @@ function testPositionMath() {
   assert.equal(getStudioAudioRelativeSeekPosition(8, -15, 30), 0);
   assert.equal(getStudioAudioRelativeSeekPosition(24, 15, 30), 30);
   assert.equal(getStudioAudioRelativeSeekPosition(10, 15, 30), 25);
+  assert.equal(
+    getStudioProjectDuration([{ duration: 10 }, { duration: 42 }, { duration: 24 }]),
+    42,
+  );
+  assert.equal(
+    getStudioTrackGain({ volume: 0.8, muted: false, solo: false, hasSolo: false }),
+    0.8,
+  );
+  assert.equal(
+    getStudioTrackGain({ volume: 0.8, muted: true, solo: true, hasSolo: true }),
+    0,
+  );
+  assert.equal(
+    getStudioTrackGain({ volume: 0.8, muted: false, solo: false, hasSolo: true }),
+    0,
+  );
 }
 
 function testLocalFileValidation() {
@@ -95,21 +113,25 @@ function testProviderEngineLifecycle() {
   }
 
   assert.match(provider, /new AudioContext\(\)/);
-  assert.match(provider, /decodeAudioData\(arrayBuffer\)/);
+  assert.match(provider, /decodeAudioData\(await file\.arrayBuffer\(\)\)/);
   assert.match(provider, /context\.createBufferSource\(\)/);
+  assert.match(provider, /MAX_LOCAL_TRACKS = 5/);
+  assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = 750 \* 1024 \* 1024/);
   assert.match(provider, /context\.createGain\(\)/);
-  assert.match(provider, /source\.start\(0, position\)/);
-  assert.match(provider, /detachSource\(\)/);
-  assert.match(provider, /setStatus\("paused"\)/);
-  assert.match(provider, /createSourceAtPosition\(nextPosition\)/);
-  assert.match(provider, /setStatus\("ready"\)/);
+  assert.match(provider, /source\.start\(startAt, position\)/);
+  assert.match(provider, /trackRuntimesRef/);
+  assert.match(provider, /getStudioProjectDuration/);
+  assert.match(provider, /getStudioTrackGain/);
+  assert.match(provider, /startSourcesAtPosition\(nextPosition\)/);
   assert.match(provider, /MAX_LOCAL_FILE_SIZE_BYTES = 200 \* 1024 \* 1024/);
   assert.match(provider, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /gain\.gain\.value = 1/);
-  assert.match(provider, /gainRef\.current\.gain\.value = volume/);
+  assert.match(provider, /toggleTrackMuted/);
+  assert.match(provider, /toggleTrackSolo/);
+  assert.match(provider, /removeTrack/);
   assert.match(provider, /cancelProgressLoop\(\)/);
   assert.match(provider, /context\.close\(\)/);
-  assert.match(provider, /cleanupRef\.current\(\)/);
+  assert.match(provider, /disposeResources\(\)/);
 }
 
 function testStudioBoundariesAndCrossTabStop() {
@@ -135,13 +157,19 @@ function testStudioBoundariesAndCrossTabStop() {
     studioProvider,
     /getStudioAudioRelativeSeekPosition\(\s*getPlaybackPosition\(\),/,
   );
-  assert.match(studioProvider, /if \(nextPosition >= durationRef\.current\)/);
+  assert.match(studioProvider, /if \(nextPosition >= projectDurationRef\.current\)/);
   assert.doesNotMatch(studioWorkspace, />\s*Play\s*</);
   assert.match(studioWorkspace, /aria-label="Воспроизвести"/);
   assert.match(studioWorkspace, /aria-label="Пауза"/);
   assert.match(studioWorkspace, /seekRelative\(-15\)/);
   assert.match(studioWorkspace, /seekRelative\(15\)/);
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
+  assert.match(studioWorkspace, /multiple/);
+  assert.match(studioWorkspace, /tracks\.length >= 5/);
+  assert.match(studioWorkspace, /В проект можно добавить не более пяти дорожек/);
+  assert.match(studioWorkspace, /toggleTrackMuted/);
+  assert.match(studioWorkspace, /toggleTrackSolo/);
+  assert.match(studioWorkspace, /currentTime \/ track\.duration/);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);
   assert.match(globalProvider, /isStudioAudioStopMessage/);
