@@ -22,6 +22,7 @@ function formatFileSize(bytes: number): string {
 
 export default function StudioWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const replacementInputRef = useRef<HTMLInputElement | null>(null);
   const {
     currentTime,
     loadLocalFiles,
@@ -29,13 +30,13 @@ export default function StudioWorkspace() {
     play,
     projectDuration,
     projectError,
+    replaceTrackAudio,
     removeTrack,
     seek,
     seekRelative,
     setTrackVolume,
     status,
     toggleTrackMuted,
-    toggleTrackSolo,
     tracks,
   } = useStudioAudio();
 
@@ -106,6 +107,21 @@ export default function StudioWorkspace() {
                 }
               }}
             />
+            <input
+              ref={replacementInputRef}
+              type="file"
+              accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac"
+              className="sr-only"
+              onChange={(event) => {
+                const trackId = event.currentTarget.dataset.trackId;
+                const file = event.target.files?.[0];
+                event.currentTarget.value = "";
+                delete event.currentTarget.dataset.trackId;
+                if (trackId && file) {
+                  void replaceTrackAudio(trackId, file);
+                }
+              }}
+            />
           </div>
 
           {projectError ? (
@@ -148,7 +164,10 @@ export default function StudioWorkspace() {
                     </p>
                     <p className="mt-1 text-sm text-[#70618e]">
                       {formatTime(track.duration)} · {formatFileSize(track.fileSize)}
-                      {track.status === "loading" ? " · Загрузка…" : ""}
+                      {track.isReplacing ? " · Замена аудио…" : ""}
+                      {track.status === "loading" && !track.isReplacing
+                        ? " · Загрузка…"
+                        : ""}
                       {track.status === "error" ? " · Ошибка загрузки" : ""}
                     </p>
                   </div>
@@ -156,18 +175,59 @@ export default function StudioWorkspace() {
                     <button
                       type="button"
                       onClick={() => toggleTrackMuted(track.id)}
-                      aria-label="Отключить звук дорожки"
-                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfc0e6] px-3 text-sm font-semibold text-[#523786]"
+                      aria-label={
+                        track.muted
+                          ? "Включить звук дорожки"
+                          : "Отключить звук дорожки"
+                      }
+                      aria-pressed={track.muted}
+                      title={track.muted ? "Включить звук" : "Отключить звук"}
+                      className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border px-3 ${
+                        track.muted
+                          ? "border-[#cbd2df] bg-[#eef1f6] text-[#637089]"
+                          : "border-[#cfc0e6] bg-white text-[#523786]"
+                      }`}
                     >
-                      М
+                      {track.muted ? (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                          <path d="m16 9 5 5m0-5-5 5" />
+                        </svg>
+                      ) : (
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                          <path d="M18 6a8.5 8.5 0 0 1 0 12" />
+                        </svg>
+                      )}
                     </button>
                     <button
                       type="button"
-                      onClick={() => toggleTrackSolo(track.id)}
-                      aria-label="Слушать только эту дорожку"
-                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfc0e6] px-3 text-sm font-semibold text-[#523786]"
+                      disabled={track.isReplacing}
+                      onClick={() => {
+                        pause();
+                        if (replacementInputRef.current) {
+                          replacementInputRef.current.dataset.trackId = track.id;
+                          replacementInputRef.current.click();
+                        }
+                      }}
+                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfc0e6] px-4 text-sm font-semibold text-[#523786] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      С
+                      Заменить аудио
                     </button>
                     <button
                       type="button"
@@ -178,6 +238,11 @@ export default function StudioWorkspace() {
                     </button>
                   </div>
                 </div>
+                {track.replacementError ? (
+                  <p role="alert" className="mt-3 text-sm text-[#a12a42]">
+                    {track.replacementError}
+                  </p>
+                ) : null}
 
                 <div
                   aria-label="Визуальный блок дорожки"

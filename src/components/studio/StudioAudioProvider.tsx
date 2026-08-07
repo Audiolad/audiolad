@@ -16,6 +16,7 @@ import {
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
   getStudioProjectDuration,
+  getStudioReplacementProjectSize,
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 
@@ -39,8 +40,9 @@ export type StudioLocalTrack = {
   duration: number;
   volume: number;
   muted: boolean;
-  solo: boolean;
   status: "loading" | "ready" | "error";
+  isReplacing: boolean;
+  replacementError: string | null;
 };
 
 type StudioAudioContextValue = {
@@ -50,6 +52,7 @@ type StudioAudioContextValue = {
   currentTime: number;
   projectError: string | null;
   loadLocalFiles: (files: Iterable<File>) => Promise<void>;
+  replaceTrackAudio: (trackId: string, file: File) => Promise<void>;
   play: () => Promise<void>;
   pause: () => void;
   seek: (position: number) => void;
@@ -57,7 +60,6 @@ type StudioAudioContextValue = {
   removeTrack: (trackId: string) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   toggleTrackMuted: (trackId: string) => void;
-  toggleTrackSolo: (trackId: string) => void;
   reset: () => void;
 };
 
@@ -92,11 +94,8 @@ export function validateStudioLocalFile(
 }
 
 function formatDecodeError(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return `Не удалось декодировать аудио: ${error.message}`;
-  }
-
-  return "Не удалось декодировать аудио в этом браузере.";
+  void error;
+  return "Браузеру не удалось открыть выбранное аудио.";
 }
 
 function getTrackId(file: File, index: number): string {
@@ -120,6 +119,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   const statusRef = useRef<StudioAudioStatus>("idle");
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
+  const replacementGenerationRef = useRef(new Map<string, number>());
 
   const cancelProgressLoop = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -141,15 +141,12 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyTrackGains = useCallback(() => {
-    const hasSolo = tracksRef.current.some((track) => track.solo);
     for (const track of tracksRef.current) {
       const runtime = trackRuntimesRef.current.get(track.id);
       if (runtime) {
         runtime.gain.gain.value = getStudioTrackGain({
           volume: track.volume,
           muted: track.muted,
-          solo: track.solo,
-          hasSolo,
         });
       }
     }
@@ -291,6 +288,17 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     setStatusValue("idle");
   }, [disposeResources, replaceTracks, setStatusValue]);
 
+  const updateTrack = useCallback(
+    (trackId: string, update: (track: StudioLocalTrack) => StudioLocalTrack) => {
+      const nextTracks = tracksRef.current.map((track) =>
+        track.id === trackId ? update(track) : track,
+      );
+      replaceTracks(nextTracks);
+      applyTrackGains();
+    },
+    [applyTrackGains, replaceTracks],
+  );
+
   const loadLocalFiles = useCallback(
     async (fileInput: Iterable<File>) => {
       const files = Array.from(fileInput);
@@ -369,8 +377,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
             duration: buffer.duration,
             volume: 1,
             muted: false,
-            solo: false,
             status: "ready",
+            isReplacing: false,
+            replacementError: null,
           });
         }
         replaceTracks(nextTracks);
@@ -404,6 +413,137 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setStatusValue,
       startSourcesAtPosition,
       stopSources,
+    ],
+  );
+
+  const replaceTrackAudio = useCallback(
+    async (trackId: string, file: File) => {
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      const runtime = trackRuntimesRef.current.get(trackId);
+      if (!track || !runtime || track.isReplacing) {
+        return;
+      }
+
+      const validationError = validateStudioLocalFile(file);
+      if (validationError) {
+        updateTrack(trackId, (item) => ({
+          ...item,
+          replacementError: `Не удалось заменить аудио. ${validationError}`,
+        }));
+        return;
+      }
+
+      const projectSize = tracksRef.current.reduce(
+        (total, item) => total + item.fileSize,
+        0,
+      );
+      if (
+        getStudioReplacementProjectSize(projectSize, track.fileSize, file.size) >
+        MAX_LOCAL_PROJECT_SIZE_BYTES
+      ) {
+        updateTrack(trackId, (item) => ({
+          ...item,
+          replacementError:
+            "Не удалось заменить аудио. Общий размер дорожек не может превышать 750 МБ.",
+        }));
+        return;
+      }
+
+      const position = getPlaybackPosition();
+      if (statusRef.current === "playing") {
+        stopSources();
+        cancelProgressLoop();
+        positionRef.current = position;
+        setCurrentTime(position);
+        setStatusValue("paused");
+      }
+
+      const generation = (replacementGenerationRef.current.get(trackId) ?? 0) + 1;
+      replacementGenerationRef.current.set(trackId, generation);
+      updateTrack(trackId, (item) => ({
+        ...item,
+        isReplacing: true,
+        replacementError: null,
+      }));
+
+      const context =
+        audioContextRef.current ??
+        (() => {
+          const nextContext = new AudioContext();
+          audioContextRef.current = nextContext;
+          return nextContext;
+        })();
+
+      try {
+        const buffer = await context.decodeAudioData(await file.arrayBuffer());
+        if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+          throw new Error("invalid audio duration");
+        }
+
+        if (replacementGenerationRef.current.get(trackId) !== generation) {
+          return;
+        }
+
+        const currentTrack = tracksRef.current.find((item) => item.id === trackId);
+        const oldRuntime = trackRuntimesRef.current.get(trackId);
+        if (!currentTrack || !oldRuntime) {
+          return;
+        }
+
+        oldRuntime.source?.stop();
+        oldRuntime.source?.disconnect();
+        oldRuntime.gain.disconnect();
+        const gain = context.createGain();
+        gain.connect(context.destination);
+        trackRuntimesRef.current.set(trackId, {
+          file,
+          buffer,
+          gain,
+          source: null,
+        });
+        const nextTracks = tracksRef.current.map((item) =>
+          item.id === trackId
+            ? {
+                ...item,
+                fileName: file.name,
+                fileSize: file.size,
+                duration: buffer.duration,
+                isReplacing: false,
+                replacementError: null,
+              }
+            : item,
+        );
+        replaceTracks(nextTracks);
+        applyTrackGains();
+        const nextPosition = clampStudioAudioPosition(
+          positionRef.current,
+          projectDurationRef.current,
+        );
+        positionRef.current = nextPosition;
+        setCurrentTime(nextPosition);
+        setStatusValue(
+          nextPosition >= projectDurationRef.current ? "ready" : "paused",
+        );
+      } catch (error) {
+        if (replacementGenerationRef.current.get(trackId) !== generation) {
+          return;
+        }
+
+        updateTrack(trackId, (item) => ({
+          ...item,
+          isReplacing: false,
+          replacementError: `Не удалось заменить аудио. ${formatDecodeError(error)}`,
+        }));
+      }
+    },
+    [
+      applyTrackGains,
+      cancelProgressLoop,
+      getPlaybackPosition,
+      replaceTracks,
+      setStatusValue,
+      stopSources,
+      updateTrack,
     ],
   );
 
@@ -490,20 +630,6 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [getPlaybackPosition, seek],
   );
 
-  const updateTrack = useCallback(
-    (trackId: string, update: (track: StudioLocalTrack) => StudioLocalTrack) => {
-      const nextTracks = tracksRef.current.map((track) =>
-        track.id === trackId ? update(track) : track,
-      );
-      if (nextTracks === tracksRef.current) {
-        return;
-      }
-      replaceTracks(nextTracks);
-      applyTrackGains();
-    },
-    [applyTrackGains, replaceTracks],
-  );
-
   const setTrackVolume = useCallback(
     (trackId: string, requestedVolume: number) => {
       const volume = Math.min(Math.max(requestedVolume, 0), 1);
@@ -515,13 +641,6 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   const toggleTrackMuted = useCallback(
     (trackId: string) => {
       updateTrack(trackId, (track) => ({ ...track, muted: !track.muted }));
-    },
-    [updateTrack],
-  );
-
-  const toggleTrackSolo = useCallback(
-    (trackId: string) => {
-      updateTrack(trackId, (track) => ({ ...track, solo: !track.solo }));
     },
     [updateTrack],
   );
@@ -581,13 +700,13 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       currentTime,
       projectError,
       loadLocalFiles,
+      replaceTrackAudio,
       play,
       pause,
       seek,
       seekRelative,
       setTrackVolume,
       toggleTrackMuted,
-      toggleTrackSolo,
       removeTrack,
       reset,
     }),
@@ -598,6 +717,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       play,
       projectDuration,
       projectError,
+      replaceTrackAudio,
       removeTrack,
       reset,
       seek,
@@ -605,7 +725,6 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setTrackVolume,
       status,
       toggleTrackMuted,
-      toggleTrackSolo,
       tracks,
     ],
   );

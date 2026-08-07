@@ -53,17 +53,21 @@ export function getStudioProjectDuration(
 export function getStudioTrackGain({
   volume,
   muted,
-  solo,
-  hasSolo,
 }: {
   volume: number;
   muted: boolean;
-  solo: boolean;
-  hasSolo: boolean;
 }): number {
-  if (muted || (hasSolo && !solo)) {
+  if (muted) {
     return 0;
   }
 
   return Math.min(Math.max(volume, 0), 1);
+}
+
+export function getStudioReplacementProjectSize(
+  projectSize: number,
+  replacedFileSize: number,
+  replacementFileSize: number,
+): number {
+  return Math.max(projectSize - replacedFileSize, 0) + replacementFileSize;
 }

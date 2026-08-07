@@ -10,6 +10,7 @@ import {
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
   getStudioProjectDuration,
+  getStudioReplacementProjectSize,
   getStudioTrackGain,
 } from "../src/lib/studio/audio-engine-math.ts";
 import { validateStudioLocalFile } from "../src/components/studio/StudioAudioProvider.tsx";
@@ -50,17 +51,11 @@ function testPositionMath() {
     42,
   );
   assert.equal(
-    getStudioTrackGain({ volume: 0.8, muted: false, solo: false, hasSolo: false }),
+    getStudioTrackGain({ volume: 0.8, muted: false }),
     0.8,
   );
-  assert.equal(
-    getStudioTrackGain({ volume: 0.8, muted: true, solo: true, hasSolo: true }),
-    0,
-  );
-  assert.equal(
-    getStudioTrackGain({ volume: 0.8, muted: false, solo: false, hasSolo: true }),
-    0,
-  );
+  assert.equal(getStudioTrackGain({ volume: 0.8, muted: true }), 0);
+  assert.equal(getStudioReplacementProjectSize(600, 150, 200), 650);
 }
 
 function testLocalFileValidation() {
@@ -127,7 +122,9 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /gain\.gain\.value = 1/);
   assert.match(provider, /toggleTrackMuted/);
-  assert.match(provider, /toggleTrackSolo/);
+  assert.match(provider, /replaceTrackAudio/);
+  assert.match(provider, /getStudioReplacementProjectSize/);
+  assert.doesNotMatch(provider, /\bsolo\b/i);
   assert.match(provider, /removeTrack/);
   assert.match(provider, /cancelProgressLoop\(\)/);
   assert.match(provider, /context\.close\(\)/);
@@ -168,7 +165,11 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /tracks\.length >= 5/);
   assert.match(studioWorkspace, /В проект можно добавить не более пяти дорожек/);
   assert.match(studioWorkspace, /toggleTrackMuted/);
-  assert.match(studioWorkspace, /toggleTrackSolo/);
+  assert.match(studioWorkspace, /Заменить аудио/);
+  assert.match(studioWorkspace, /"Отключить звук дорожки"/);
+  assert.match(studioWorkspace, /"Включить звук дорожки"/);
+  assert.doesNotMatch(studioWorkspace, />\s*[MS]\s*</);
+  assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /currentTime \/ track\.duration/);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);
