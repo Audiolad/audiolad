@@ -254,6 +254,22 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /import \{ StudioTimeline \}/);
   assert.match(studioWorkspace, /<StudioTimeline/);
   assert.match(studioWorkspace, /getTrackBuffer\(track\.id\)/);
+  assert.match(
+    studioWorkspace,
+    /hasAudio: Boolean\(slot\.audioTrackId && track\)/,
+  );
+  assert.match(
+    studioWorkspace,
+    /\{ id: "slot-1", name: "Дорожка 1", audioTrackId: null \},[\s\S]*\{ id: "slot-2", name: "Дорожка 2", audioTrackId: null \}/,
+  );
+  assert.match(
+    studioWorkspace,
+    /name: `Дорожка \$\{nextNumber\}`,[\s\S]*audioTrackId: null/,
+  );
+  assert.match(
+    studioWorkspace,
+    /item\.id === slot\.id \? \{ \.\.\.item, audioTrackId: null \} : item/,
+  );
   assert.match(studioWorkspace, /renderControls=\{renderTimelineControls\}/);
   assert.match(studioWorkspace, /renderEmpty=\{renderTimelineEmptyState\}/);
   assert.match(studioWorkspace, /onPointerUp=\{\(event\) => event\.stopPropagation\(\)\}/);
@@ -273,6 +289,9 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /onScroll/);
   assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
   assert.match(timeline, /renderControls\(track, index\)/);
+  assert.match(timeline, /hasAudio: boolean/);
+  assert.match(timeline, /!track\.hasAudio \? renderEmpty\(track, index\) : null/);
+  assert.doesNotMatch(timeline, /!track\.buffer \? renderEmpty/);
   assert.match(timeline, /clipWidth/);
   assert.match(timeline, /clipLeft/);
   assert.match(timeline, /trim-start/);

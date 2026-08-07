@@ -191,6 +191,7 @@ export default function StudioEditorShell() {
       id: track?.id ?? slot.id,
       name: slot.name,
       fileName: track?.fileName,
+      hasAudio: Boolean(slot.audioTrackId && track),
       buffer: track ? getTrackBuffer(track.id) : null,
       startTime: track?.startTime ?? 0,
       offset: track?.offset ?? 0,

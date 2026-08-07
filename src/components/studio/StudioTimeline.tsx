@@ -24,6 +24,7 @@ export type StudioTimelineTrack = {
   id: string;
   name: string;
   fileName?: string;
+  hasAudio: boolean;
   buffer: AudioBuffer | null;
   startTime: number;
   offset: number;
@@ -339,7 +340,7 @@ export function StudioTimeline({
                   onPointerUp={seekFromPointer}
                 >
                   <div className="relative h-[88px] bg-[#0d131d]">
-                    {track.buffer && clipRenderWidth > 0 ? (
+                    {track.hasAudio && track.buffer && clipRenderWidth > 0 ? (
                       <div
                         className="absolute top-0 overflow-hidden"
                         style={{
@@ -364,7 +365,7 @@ export function StudioTimeline({
                         />
                       </div>
                     ) : null}
-                    {track.buffer && clipWidth > 0 ? (
+                    {track.hasAudio && track.buffer && clipWidth > 0 ? (
                       <div
                         className="absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border border-white/30 bg-white/5"
                         style={{ left: clipLeft, width: clipWidth }}
@@ -403,7 +404,7 @@ export function StudioTimeline({
                       </div>
                     ) : null}
                   </div>
-                  {!track.buffer ? renderEmpty(track, index) : null}
+                  {!track.hasAudio ? renderEmpty(track, index) : null}
                 </div>
               );
             })}
