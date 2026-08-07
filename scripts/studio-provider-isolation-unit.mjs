@@ -46,28 +46,61 @@ function testProviderComposition() {
 function testStudioIsolation() {
   const studioLayout = readSource("src/app/(studio)/studio/layout.tsx");
   const studioPage = readSource("src/app/(studio)/studio/page.tsx");
+  const editorLayout = readSource(
+    "src/app/(studio)/studio/project/new/layout.tsx",
+  );
+  const editorPage = readSource("src/app/(studio)/studio/project/new/page.tsx");
+  const livePage = readSource("src/app/(studio)/studio/live/page.tsx");
+  const studioAccess = readSource("src/lib/studio/access.ts");
 
-  assert(studioLayout.includes("min-h-dvh"), "studio layout is fullscreen");
   assert(
-    studioLayout.includes("StudioAudioProvider"),
-    "studio mounts its local audio provider",
+    !studioLayout.includes("StudioAudioProvider"),
+    "studio entry layout does not mount the audio provider",
+  );
+  assert(
+    editorLayout.includes("StudioAudioProvider"),
+    "new project route mounts its local audio provider",
+  );
+  assert(
+    studioPage.includes("Создать аудиопрактику") &&
+      studioPage.includes("Прямой аудиоэфир") &&
+      studioPage.includes('href="/studio/project/new"'),
+    "studio entry renders both mode cards",
+  );
+  assert(
+    livePage.includes("Функция находится в разработке"),
+    "live route renders its development status",
+  );
+  assert(
+    !studioPage.includes("AudioContext") &&
+      !livePage.includes("AudioContext") &&
+      !studioPage.includes("StudioAudioProvider") &&
+      !livePage.includes("StudioAudioProvider"),
+    "entry and live routes do not create local audio resources",
   );
   assert(
     !studioLayout.includes("ListenerAppShell") &&
-      !studioPage.includes("ListenerAppShell"),
+      !studioPage.includes("ListenerAppShell") &&
+      !livePage.includes("ListenerAppShell"),
     "studio excludes listener shell",
   );
   assert(
     !studioLayout.includes("GlobalAudioPlayerProvider") &&
-      !studioPage.includes("GlobalAudioPlayerProvider"),
+      !studioPage.includes("GlobalAudioPlayerProvider") &&
+      !livePage.includes("GlobalAudioPlayerProvider"),
     "studio excludes global player provider",
   );
   assert(
-    studioPage.includes('redirect("/auth/sign-in?next=/studio")'),
-    "studio redirects anonymous users to sign-in",
+    studioPage.includes('requireStudioAuthorAccess("/studio")') &&
+      editorPage.includes(
+        'requireStudioAuthorAccess("/studio/project/new")',
+      ) &&
+      livePage.includes('requireStudioAuthorAccess("/studio/live")') &&
+      studioAccess.includes("next=${nextPath}"),
+    "studio routes preserve their redirect destination",
   );
   assert(
-    studioPage.includes("listAuthorWorkspacesForUser"),
+    studioAccess.includes("listAuthorWorkspacesForUser"),
     "studio checks author workspace access",
   );
 }

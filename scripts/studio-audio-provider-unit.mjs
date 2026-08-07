@@ -132,7 +132,9 @@ function testProviderEngineLifecycle() {
 }
 
 function testStudioBoundariesAndCrossTabStop() {
-  const studioLayout = readSource("src/app/(studio)/studio/layout.tsx");
+  const editorLayout = readSource(
+    "src/app/(studio)/studio/project/new/layout.tsx",
+  );
   const studioProvider = readSource("src/components/studio/StudioAudioProvider.tsx");
   const studioWorkspace = readSource(
     "src/components/studio/StudioWorkspace.tsx",
@@ -142,8 +144,8 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   const coordination = readSource("src/lib/audio/studio-audio-coordination.ts");
 
-  assert.match(studioLayout, /<StudioAudioProvider>/);
-  assert.doesNotMatch(studioLayout, /GlobalAudioPlayerProvider/);
+  assert.match(editorLayout, /<StudioAudioProvider>/);
+  assert.doesNotMatch(editorLayout, /GlobalAudioPlayerProvider/);
   assert.doesNotMatch(
     studioProvider,
     /requestPlatformAudioStopFromStudio/,
@@ -170,6 +172,8 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /"Включить звук дорожки"/);
   assert.doesNotMatch(studioWorkspace, />\s*[MS]\s*</);
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
+  assert.match(studioWorkspace, /href="\/studio"/);
+  assert.match(studioWorkspace, /Назад в Studio/);
   assert.match(studioWorkspace, /currentTime \/ track\.duration/);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);

@@ -60,6 +60,12 @@ export default function StudioWorkspace() {
         </div>
         <nav className="flex flex-wrap gap-2">
           <Link
+            href="/studio"
+            className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfc0e6] px-4 text-sm font-semibold text-[#523786]"
+          >
+            Назад в Studio
+          </Link>
+          <Link
             href="/author-dashboard"
             className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
           >
