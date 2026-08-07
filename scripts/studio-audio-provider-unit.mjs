@@ -168,9 +168,23 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /Дорожка 2/);
   assert.match(studioWorkspace, /slots\.length < MAX_TRACK_SLOTS/);
   assert.match(studioWorkspace, /\+ Добавить дорожку/);
+  assert.match(studioWorkspace, /disabled=\{!track\}/);
+  assert.match(
+    studioWorkspace,
+    /Добавьте аудио, чтобы регулировать громкость/,
+  );
+  assert.match(
+    studioWorkspace,
+    /Добавьте аудио, чтобы управлять звуком/,
+  );
   assert.match(studioWorkspace, /В проект можно добавить не более пяти дорожек/);
   assert.match(studioWorkspace, /toggleTrackMuted/);
   assert.match(studioWorkspace, /Заменить аудио/);
+  assert.match(studioWorkspace, /Очистить дорожку/);
+  assert.match(studioWorkspace, /index >= 2/);
+  assert.match(studioWorkspace, /saveSlotRename/);
+  assert.match(studioWorkspace, /event\.key === "Escape"/);
+  assert.doesNotMatch(studioWorkspace, /Пустая универсальная дорожка/);
   assert.match(studioWorkspace, /Включить звук дорожки/);
   assert.match(studioWorkspace, /Отключить звук дорожки/);
   assert.doesNotMatch(studioWorkspace, />\s*[MS]\s*</);
@@ -179,7 +193,8 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /Назад в Studio/);
   assert.match(studioWorkspace, /writingMode: "vertical-lr"/);
   assert.match(studioWorkspace, /currentTime \/ Math\.max\(track\.duration, 1\)/);
-  assert.match(studioWorkspace, /Проект: \{projectName\}/);
+  assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
+  assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);
   assert.match(studioWorkspace, /Сохранение проектов будет добавлено/);
   assert.match(studioWorkspace, /Экспорт будет доступен после подключения серверного сведения/);
   assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);

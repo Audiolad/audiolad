@@ -41,23 +41,31 @@ function TrackMuteButton({
   track,
   onToggle,
 }: {
-  track: StudioLocalTrack;
+  track?: StudioLocalTrack;
   onToggle: () => void;
 }) {
-  const label = track.muted
+  const label = track?.muted
     ? "Включить звук дорожки"
     : "Отключить звук дорожки";
+  const isDisabled = !track;
 
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-label={label}
-      aria-pressed={track.muted}
-      title={track.muted ? "Включить звук" : "Отключить звук"}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-[#1c2433] text-[#c9d8ff]"
+      aria-pressed={track?.muted ?? false}
+      disabled={isDisabled}
+      title={
+        isDisabled
+          ? "Добавьте аудио, чтобы управлять звуком"
+          : track.muted
+            ? "Включить звук"
+            : "Отключить звук"
+      }
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-[#1c2433] text-[#c9d8ff] disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {track.muted ? (
+      {track?.muted ? (
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -92,6 +100,8 @@ export default function StudioEditorShell() {
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
   const [projectName, setProjectName] = useState("Новый проект");
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+  const [slotNameDraft, setSlotNameDraft] = useState("");
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
@@ -126,6 +136,28 @@ export default function StudioEditorShell() {
       addAudioInputRef.current.dataset.slotId = slotId;
       addAudioInputRef.current.click();
     }
+  };
+
+  const startSlotRename = (slot: StudioTrackSlot) => {
+    setEditingSlotId(slot.id);
+    setSlotNameDraft(slot.name);
+  };
+
+  const saveSlotRename = (slotId: string) => {
+    const name = slotNameDraft.trim();
+    if (name) {
+      setSlots((currentSlots) =>
+        currentSlots.map((slot) =>
+          slot.id === slotId ? { ...slot, name } : slot,
+        ),
+      );
+    }
+    setEditingSlotId(null);
+  };
+
+  const cancelSlotRename = () => {
+    setEditingSlotId(null);
+    setSlotNameDraft("");
   };
 
   const addSlot = () => {
@@ -194,7 +226,7 @@ export default function StudioEditorShell() {
               ) : (
                 <div className="mt-1 flex items-center gap-2">
                   <p className="truncate text-sm font-semibold text-white">
-                    Проект: {projectName}
+                    {projectName}
                   </p>
                   <button
                     type="button"
@@ -323,90 +355,90 @@ export default function StudioEditorShell() {
               return (
                 <section key={slot.id} className="overflow-hidden rounded-xl border border-white/10 bg-[#121b28]">
                   <div className="grid lg:grid-cols-[250px_minmax(0,1fr)]">
-                    <aside className="flex gap-3 border-b border-white/10 bg-[#101722] p-4 lg:border-b-0 lg:border-r">
+                    <aside className="flex min-h-40 gap-3 border-b border-white/10 bg-[#101722] p-4 lg:border-b-0 lg:border-r">
                       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${accent}`}>
                         {index + 1}
                       </span>
-                      <div className="flex min-w-0 flex-1 gap-3">
-                        <div className="min-w-0 flex-1">
-                          <input
-                            value={slot.name}
-                            onChange={(event) =>
-                              setSlots((currentSlots) =>
-                                currentSlots.map((item) =>
-                                  item.id === slot.id
-                                    ? { ...item, name: event.target.value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            aria-label={`Название дорожки ${index + 1}`}
-                            className="w-full bg-transparent text-sm font-semibold text-white outline-none"
-                          />
-                          <p className="mt-1 text-xs text-[#8d99ac]">
-                            {track ? "Аудиосодержимое загружено" : "Пустая универсальная дорожка"}
-                          </p>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="flex min-w-0 items-center gap-1">
+                          {editingSlotId === slot.id ? (
+                            <input
+                              autoFocus
+                              value={slotNameDraft}
+                              onChange={(event) =>
+                                setSlotNameDraft(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  saveSlotRename(slot.id);
+                                }
+                                if (event.key === "Escape") {
+                                  cancelSlotRename();
+                                }
+                              }}
+                              aria-label={`Название дорожки ${index + 1}`}
+                              className="min-w-0 flex-1 rounded bg-[#1c2433] px-2 py-1 text-sm font-semibold text-white outline-none ring-1 ring-violet-300/60"
+                            />
+                          ) : (
+                            <>
+                              <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                                {slot.name}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => startSlotRename(slot)}
+                                aria-label={`Изменить название ${slot.name}`}
+                                title="Переименовать дорожку"
+                                className="shrink-0 text-[#bda8e8]"
+                              >
+                                ✎
+                              </button>
+                            </>
+                          )}
                         </div>
-                        {track ? (
+
+                        <div className="mt-3 flex min-h-28 items-end gap-3">
+                          <TrackMuteButton
+                            track={track}
+                            onToggle={() => {
+                              if (track) {
+                                toggleTrackMuted(track.id);
+                              }
+                            }}
+                          />
                           <div className="flex h-28 flex-col items-center">
                             <input
                               aria-label={`Громкость ${slot.name}`}
                               type="range"
                               min="0"
                               max="100"
-                              value={Math.round(track.volume * 100)}
-                              onChange={(event) =>
-                                setTrackVolume(
-                                  track.id,
-                                  Number(event.target.value) / 100,
-                                )
+                              value={Math.round((track?.volume ?? 1) * 100)}
+                              disabled={!track}
+                              onChange={(event) => {
+                                if (track) {
+                                  setTrackVolume(
+                                    track.id,
+                                    Number(event.target.value) / 100,
+                                  );
+                                }
+                              }}
+                              title={
+                                track
+                                  ? `Громкость: ${Math.round(track.volume * 100)}%`
+                                  : "Добавьте аудио, чтобы регулировать громкость"
                               }
-                              title={`Громкость: ${Math.round(track.volume * 100)}%`}
-                              className="h-24 w-5 accent-[#9f7aea]"
+                              className="h-24 w-5 accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
                               style={{ writingMode: "vertical-lr", direction: "rtl" }}
                             />
                             <span className="text-[10px] text-[#9ba7bb]">
-                              {Math.round(track.volume * 100)}%
+                              {Math.round((track?.volume ?? 1) * 100)}%
                             </span>
                           </div>
-                        ) : null}
-                      </div>
-                      {slots.length > 2 ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (track) {
-                              removeTrack(track.id);
-                            }
-                            setSlots((currentSlots) =>
-                              currentSlots.filter((item) => item.id !== slot.id),
-                            );
-                          }}
-                          className="self-end text-xs text-[#a9b4c7] underline underline-offset-4"
-                        >
-                          Удалить дорожку
-                        </button>
-                      ) : null}
-                    </aside>
+                        </div>
 
-                    <div className="min-w-0 p-4">
-                      {track ? (
-                        <div>
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-[#e8edf8]">
-                                {track.fileName}
-                              </p>
-                              <p className="mt-1 text-xs text-[#9ba7bb]">
-                                {formatTime(track.duration)} · {formatFileSize(track.fileSize)}
-                                {track.isReplacing ? " · Замена аудио…" : ""}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <TrackMuteButton
-                                track={track}
-                                onToggle={() => toggleTrackMuted(track.id)}
-                              />
+                        <div className="mt-3 flex flex-col items-start gap-2 text-xs">
+                          {track ? (
+                            <>
                               <button
                                 type="button"
                                 disabled={track.isReplacing}
@@ -418,7 +450,7 @@ export default function StudioEditorShell() {
                                     replaceAudioInputRef.current.click();
                                   }
                                 }}
-                                className="h-10 rounded-lg border border-white/15 px-3 text-sm text-[#dce3f2] disabled:opacity-40"
+                                className="text-[#d8c8fb] disabled:opacity-40"
                               >
                                 Заменить аудио
                               </button>
@@ -434,11 +466,43 @@ export default function StudioEditorShell() {
                                     ),
                                   );
                                 }}
-                                className="h-10 rounded-lg border border-white/15 px-3 text-sm text-[#dce3f2]"
+                                className="text-[#a9b4c7]"
                               >
-                                Убрать аудио
+                                Очистить дорожку
                               </button>
-                            </div>
+                            </>
+                          ) : null}
+                          {index >= 2 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (track) {
+                                  removeTrack(track.id);
+                                }
+                                setSlots((currentSlots) =>
+                                  currentSlots.filter((item) => item.id !== slot.id),
+                                );
+                              }}
+                              className="text-[#a9b4c7] underline underline-offset-4"
+                            >
+                              Удалить дорожку
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </aside>
+
+                    <div className="min-w-0 p-4">
+                      {track ? (
+                        <div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[#e8edf8]">
+                              {track.fileName}
+                            </p>
+                            <p className="mt-1 text-xs text-[#9ba7bb]">
+                              {formatTime(track.duration)} · {formatFileSize(track.fileSize)}
+                              {track.isReplacing ? " · Замена аудио…" : ""}
+                            </p>
                           </div>
                           {track.replacementError ? (
                             <p role="alert" className="mt-3 text-sm text-rose-200">
