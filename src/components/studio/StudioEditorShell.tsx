@@ -141,6 +141,7 @@ export default function StudioEditorShell() {
     replaceTrackAudio,
     seek,
     seekRelative,
+    setClipLayout,
     setTrackVolume,
     status,
     toggleTrackMuted,
@@ -191,6 +192,8 @@ export default function StudioEditorShell() {
       name: slot.name,
       fileName: track?.fileName,
       buffer: track ? getTrackBuffer(track.id) : null,
+      startTime: track?.startTime ?? 0,
+      offset: track?.offset ?? 0,
       duration: track?.duration ?? 0,
       accent: TIMELINE_ACCENTS[slots.indexOf(slot) % TIMELINE_ACCENTS.length],
     };
@@ -606,6 +609,8 @@ export default function StudioEditorShell() {
             pixelsPerSecond={pixelsPerSecond}
             onViewportWidthChange={handleTimelineViewportWidthChange}
             onSeek={seek}
+            onClipGestureStart={pause}
+            onClipLayoutChange={setClipLayout}
             renderControls={renderTimelineControls}
             renderEmpty={renderTimelineEmptyState}
           />

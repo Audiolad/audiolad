@@ -6,6 +6,8 @@ import { getCachedWaveformPeaks } from "@/lib/studio/waveform-peaks";
 
 type StudioWaveformCanvasProps = {
   buffer: AudioBuffer | null;
+  sourceOffset: number;
+  sourceDuration: number;
   timelineWidth: number;
   viewportWidth: number;
   renderStartX: number;
@@ -16,6 +18,8 @@ type StudioWaveformCanvasProps = {
 
 export function StudioWaveformCanvas({
   buffer,
+  sourceOffset,
+  sourceDuration,
   timelineWidth,
   viewportWidth,
   renderStartX,
@@ -56,18 +60,32 @@ export function StudioWaveformCanvas({
     }
 
     const peaks = getCachedWaveformPeaks(buffer, 8192);
+    const safeBufferDuration = Math.max(buffer.duration, 0.000_001);
+    const startRatio = Math.min(
+      Math.max(sourceOffset / safeBufferDuration, 0),
+      1,
+    );
+    const endRatio = Math.min(
+      Math.max((sourceOffset + sourceDuration) / safeBufferDuration, startRatio),
+      1,
+    );
     context.strokeStyle = accent;
     context.lineWidth = 1;
     context.beginPath();
     const midpoint = height / 2;
     for (let column = 0; column < renderWidth; column += 1) {
       const startPeak = Math.floor(
-        ((renderStartX + column) / Math.max(timelineWidth, 1)) * peaks.minimums.length,
+        (startRatio +
+          ((renderStartX + column) / Math.max(timelineWidth, 1)) *
+            (endRatio - startRatio)) *
+          peaks.minimums.length,
       );
       const endPeak = Math.min(
         peaks.minimums.length,
         Math.ceil(
-          ((renderStartX + column + 1) / Math.max(timelineWidth, 1)) *
+          (startRatio +
+            ((renderStartX + column + 1) / Math.max(timelineWidth, 1)) *
+              (endRatio - startRatio)) *
             peaks.minimums.length,
         ),
       );
@@ -81,7 +99,16 @@ export function StudioWaveformCanvas({
       context.lineTo(column + 0.5, midpoint + maximum * midpoint);
     }
     context.stroke();
-  }, [accent, buffer, height, renderStartX, renderWidth, timelineWidth]);
+  }, [
+    accent,
+    buffer,
+    height,
+    renderStartX,
+    renderWidth,
+    sourceDuration,
+    sourceOffset,
+    timelineWidth,
+  ]);
 
   const getOffsetX = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();

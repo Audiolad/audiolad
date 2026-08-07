@@ -47,6 +47,14 @@ function testPositionMath() {
   assert.equal(getStudioAudioRelativeSeekPosition(24, 15, 30), 30);
   assert.equal(getStudioAudioRelativeSeekPosition(10, 15, 30), 25);
   assert.equal(
+    getStudioProjectDuration([
+      { startTime: 0, duration: 10 },
+      { startTime: 30, duration: 42 },
+      { startTime: 8, duration: 24 },
+    ]),
+    72,
+  );
+  assert.equal(
     getStudioProjectDuration([{ duration: 10 }, { duration: 42 }, { duration: 24 }]),
     42,
   );
@@ -106,9 +114,13 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /MAX_LOCAL_TRACKS = 5/);
   assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = 750 \* 1024 \* 1024/);
   assert.match(provider, /context\.createGain\(\)/);
-  assert.match(provider, /source\.start\(startAt, position\)/);
+  assert.match(provider, /track\.startTime \+ track\.duration/);
+  assert.match(provider, /track\.offset \+ elapsedClipTime/);
+  assert.match(provider, /source\.start\(/);
   assert.match(provider, /trackRuntimesRef/);
   assert.match(provider, /getStudioProjectDuration/);
+  assert.match(provider, /setClipLayout/);
+  assert.match(provider, /getStudioClipLayout/);
   assert.match(provider, /getStudioTrackGain/);
   assert.match(provider, /startSourcesAtPosition\(nextPosition\)/);
   assert.match(fileValidation, /MAX_LOCAL_FILE_SIZE_BYTES = 200 \* 1024 \* 1024/);
@@ -262,13 +274,20 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
   assert.match(timeline, /renderControls\(track, index\)/);
   assert.match(timeline, /clipWidth/);
+  assert.match(timeline, /clipLeft/);
+  assert.match(timeline, /trim-start/);
+  assert.match(timeline, /trim-end/);
+  assert.match(timeline, /getStudioClipMoveLayout/);
+  assert.match(timeline, /onClipLayoutChange/);
   assert.match(timeline, /onPointerUp=\{seekFromPointer\}/);
   assert.match(timeline, /lastManualScrollAtRef/);
   assert.match(timeline, /getAnchoredTimelineScrollLeft/);
-  assert.match(timeline, /onSeek=\{seekAtOffset\}/);
+  assert.match(timeline, /onSeek=\{\(clipX\)/);
   assert.doesNotMatch(timeline, /onToggleMuted|onVolumeChange/);
   assert.doesNotMatch(timeline, /wavesurfer|<audio(?:\s|>)/i);
   assert.match(waveformCanvas, /getCachedWaveformPeaks/);
+  assert.match(waveformCanvas, /sourceOffset/);
+  assert.match(waveformCanvas, /sourceDuration/);
   assert.match(waveformCanvas, /viewportWidth/);
   assert.match(waveformCanvas, /renderStartX/);
   assert.doesNotMatch(waveformCanvas, /width=\{timelineWidth\}/);

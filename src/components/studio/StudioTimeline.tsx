@@ -11,12 +11,22 @@ import {
   timeToTimelineX,
   timelineXToTime,
 } from "@/lib/studio/timeline-math";
+import {
+  getStudioClipEnd,
+  getStudioClipLayout,
+  getStudioClipMoveLayout,
+  getStudioClipTrimEndLayout,
+  getStudioClipTrimStartLayout,
+  type StudioClipLayout,
+} from "@/lib/studio/clip-math";
 
 export type StudioTimelineTrack = {
   id: string;
   name: string;
   fileName?: string;
   buffer: AudioBuffer | null;
+  startTime: number;
+  offset: number;
   duration: number;
   accent: string;
 };
@@ -29,6 +39,8 @@ type StudioTimelineProps = {
   pixelsPerSecond: number;
   onViewportWidthChange: (width: number) => void;
   onSeek: (time: number) => void;
+  onClipLayoutChange: (trackId: string, layout: StudioClipLayout) => void;
+  onClipGestureStart: () => void;
   renderControls: (track: StudioTimelineTrack, index: number) => ReactNode;
   renderEmpty: (track: StudioTimelineTrack, index: number) => ReactNode;
 };
@@ -43,6 +55,8 @@ export function StudioTimeline({
   pixelsPerSecond,
   onViewportWidthChange,
   onSeek,
+  onClipLayoutChange,
+  onClipGestureStart,
   renderControls,
   renderEmpty,
 }: StudioTimelineProps) {
@@ -52,7 +66,30 @@ export function StudioTimeline({
   const previousPixelsPerSecondRef = useRef(pixelsPerSecond);
   const lastManualScrollAtRef = useRef(0);
   const isAutoScrollingRef = useRef(false);
-  const timelineWidth = getTimelineWidth(duration, pixelsPerSecond, viewportWidth);
+  const gestureRef = useRef<{
+    track: StudioTimelineTrack;
+    kind: "move" | "trim-start" | "trim-end";
+    pointerId: number;
+    pointerStartX: number;
+    layout: StudioClipLayout;
+  } | null>(null);
+  const [previewLayouts, setPreviewLayouts] = useState<
+    Record<string, StudioClipLayout>
+  >({});
+  const displayDuration = Math.max(
+    duration,
+    ...tracks.map((track) =>
+      getStudioClipEnd(
+        previewLayouts[track.id] ??
+          getStudioClipLayout(track, track.buffer?.duration ?? 0),
+      ),
+    ),
+  );
+  const timelineWidth = getTimelineWidth(
+    displayDuration,
+    pixelsPerSecond,
+    viewportWidth,
+  );
   const playheadX = timeToTimelineX(currentTime, pixelsPerSecond);
   const renderStartX = Math.max(scrollLeft - WAVEFORM_OVERSCAN_PIXELS, 0);
   const renderWidth = Math.min(
@@ -128,9 +165,109 @@ export function StudioTimeline({
     seekAtOffset(event.clientX - rect.left);
   };
 
+  const getSnapTargets = (trackId: string) => [
+    0,
+    duration,
+    ...tracks.flatMap((track) =>
+      track.id === trackId
+        ? []
+        : [track.startTime, track.startTime + track.duration],
+    ),
+  ];
+  const getGestureLayout = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ): StudioClipLayout | null => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) {
+      return null;
+    }
+    const deltaSeconds = (event.clientX - gesture.pointerStartX) / pixelsPerSecond;
+    const common = {
+      layout: gesture.layout,
+      bufferDuration: gesture.track.buffer?.duration ?? 0,
+      snapTargets: getSnapTargets(gesture.track.id),
+      pixelsPerSecond,
+      bypassSnap: event.altKey,
+    };
+    if (gesture.kind === "move") {
+      return getStudioClipMoveLayout({
+        ...common,
+        requestedStartTime: gesture.layout.startTime + deltaSeconds,
+      });
+    }
+    if (gesture.kind === "trim-start") {
+      return getStudioClipTrimStartLayout({
+        ...common,
+        requestedStartTime: gesture.layout.startTime + deltaSeconds,
+      });
+    }
+    return getStudioClipTrimEndLayout({
+      ...common,
+      requestedEndTime: getStudioClipEnd(gesture.layout) + deltaSeconds,
+    });
+  };
+  const beginClipGesture = (
+    event: React.PointerEvent<HTMLDivElement>,
+    track: StudioTimelineTrack,
+    kind: "move" | "trim-start" | "trim-end",
+  ) => {
+    if (!track.buffer) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    gestureRef.current = {
+      track,
+      kind,
+      pointerId: event.pointerId,
+      pointerStartX: event.clientX,
+      layout: getStudioClipLayout(track, track.buffer.duration),
+    };
+    onClipGestureStart();
+  };
+  const previewClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const layout = getGestureLayout(event);
+    const track = gestureRef.current?.track;
+    if (layout && track) {
+      setPreviewLayouts((current) => ({ ...current, [track.id]: layout }));
+    }
+  };
+  const finishClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const gesture = gestureRef.current;
+    const layout = getGestureLayout(event);
+    if (!gesture || !layout) {
+      return;
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    gestureRef.current = null;
+    setPreviewLayouts((current) => {
+      const next = { ...current };
+      delete next[gesture.track.id];
+      return next;
+    });
+    onClipLayoutChange(gesture.track.id, layout);
+  };
+  const cancelClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) {
+      return;
+    }
+    gestureRef.current = null;
+    setPreviewLayouts((current) => {
+      const next = { ...current };
+      delete next[gesture.track.id];
+      return next;
+    });
+  };
+
   const rulerStep = getRulerStepSeconds(pixelsPerSecond);
   const rulerMarks: number[] = [];
-  for (let time = 0; time <= duration; time += rulerStep) {
+  for (let time = 0; time <= displayDuration; time += rulerStep) {
     rulerMarks.push(time);
   }
 
@@ -178,14 +315,21 @@ export function StudioTimeline({
             </div>
 
             {tracks.map((track, index) => {
+              const layout = previewLayouts[track.id] ??
+                getStudioClipLayout(track, track.buffer?.duration ?? 0);
+              const clipLeft = timeToTimelineX(layout.startTime, pixelsPerSecond);
               const clipWidth = Math.min(
-                timeToTimelineX(track.duration, pixelsPerSecond),
-                timelineWidth,
+                timeToTimelineX(layout.duration, pixelsPerSecond),
+                Math.max(timelineWidth - clipLeft, 0),
               );
-              const clipRenderStartX = Math.max(renderStartX, 0);
+              const clipRenderStartX = Math.max(renderStartX - clipLeft, 0);
               const clipRenderWidth = Math.min(
                 renderWidth,
-                Math.max(clipWidth - clipRenderStartX, 0),
+                Math.max(
+                  Math.min(renderStartX + renderWidth, clipLeft + clipWidth) -
+                    (clipLeft + clipRenderStartX),
+                  0,
+                ),
               );
               return (
                 <div
@@ -194,19 +338,67 @@ export function StudioTimeline({
                   style={{ width: timelineWidth }}
                   onPointerUp={seekFromPointer}
                 >
-                  <div className="h-[88px] bg-[#0d131d]">
+                  <div className="relative h-[88px] bg-[#0d131d]">
                     {track.buffer && clipRenderWidth > 0 ? (
                       <div
-                        className="absolute top-0"
-                        style={{ left: clipRenderStartX }}
+                        className="absolute top-0 overflow-hidden"
+                        style={{
+                          left: clipLeft + clipRenderStartX,
+                          width: clipRenderWidth,
+                        }}
                       >
                         <StudioWaveformCanvas
                           buffer={track.buffer}
+                          sourceOffset={layout.offset}
+                          sourceDuration={layout.duration}
                           timelineWidth={clipWidth}
                           viewportWidth={clipRenderWidth}
                           renderStartX={clipRenderStartX}
                           accent={track.accent}
-                          onSeek={seekAtOffset}
+                          onSeek={(clipX) =>
+                            onSeek(
+                              layout.startTime +
+                                timelineXToTime(clipX, pixelsPerSecond),
+                            )
+                          }
+                        />
+                      </div>
+                    ) : null}
+                    {track.buffer && clipWidth > 0 ? (
+                      <div
+                        className="absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border border-white/30 bg-white/5"
+                        style={{ left: clipLeft, width: clipWidth }}
+                        data-studio-clip={track.id}
+                      >
+                        <div
+                          aria-label={`Обрезать начало ${track.name}`}
+                          className="w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
+                          onPointerDown={(event) =>
+                            beginClipGesture(event, track, "trim-start")
+                          }
+                          onPointerMove={previewClipGesture}
+                          onPointerUp={finishClipGesture}
+                          onPointerCancel={cancelClipGesture}
+                        />
+                        <div
+                          aria-label={`Переместить ${track.name}`}
+                          className="min-w-0 flex-1 cursor-grab active:cursor-grabbing"
+                          onPointerDown={(event) =>
+                            beginClipGesture(event, track, "move")
+                          }
+                          onPointerMove={previewClipGesture}
+                          onPointerUp={finishClipGesture}
+                          onPointerCancel={cancelClipGesture}
+                        />
+                        <div
+                          aria-label={`Обрезать конец ${track.name}`}
+                          className="w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
+                          onPointerDown={(event) =>
+                            beginClipGesture(event, track, "trim-end")
+                          }
+                          onPointerMove={previewClipGesture}
+                          onPointerUp={finishClipGesture}
+                          onPointerCancel={cancelClipGesture}
                         />
                       </div>
                     ) : null}

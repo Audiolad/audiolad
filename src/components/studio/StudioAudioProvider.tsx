@@ -20,6 +20,10 @@ import {
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 import {
+  getStudioClipLayout,
+  type StudioClipLayout,
+} from "@/lib/studio/clip-math";
+import {
   MAX_LOCAL_FILE_SIZE_BYTES,
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
@@ -39,6 +43,8 @@ export type StudioLocalTrack = {
   id: string;
   fileName: string;
   fileSize: number;
+  startTime: number;
+  offset: number;
   duration: number;
   volume: number;
   muted: boolean;
@@ -62,6 +68,10 @@ type StudioAudioContextValue = {
   removeTrack: (trackId: string) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   toggleTrackMuted: (trackId: string) => void;
+  setClipLayout: (
+    trackId: string,
+    layout: Partial<StudioClipLayout>,
+  ) => void;
   getTrackBuffer: (trackId: string) => AudioBuffer | null;
   reset: () => void;
 };
@@ -217,10 +227,15 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       const startAt = context.currentTime;
       for (const track of tracksRef.current) {
         const runtime = trackRuntimesRef.current.get(track.id);
-        if (!runtime || position >= runtime.buffer.duration) {
+        if (!runtime || position >= track.startTime + track.duration) {
           continue;
         }
 
+        const elapsedClipTime = Math.max(position - track.startTime, 0);
+        const remaining = track.duration - elapsedClipTime;
+        if (remaining <= 0) {
+          continue;
+        }
         const source = context.createBufferSource();
         source.buffer = runtime.buffer;
         source.connect(runtime.gain);
@@ -231,7 +246,11 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           }
           source.disconnect();
         };
-        source.start(startAt, position);
+        source.start(
+          startAt + Math.max(track.startTime - position, 0),
+          track.offset + elapsedClipTime,
+          remaining,
+        );
       }
 
       startedAtContextTimeRef.current = startAt;
@@ -359,6 +378,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
             id,
             fileName: file.name,
             fileSize: file.size,
+            startTime: 0,
+            offset: 0,
             duration: buffer.duration,
             volume: 1,
             muted: false,
@@ -492,14 +513,17 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         });
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
-            ? {
-                ...item,
-                fileName: file.name,
-                fileSize: file.size,
-                duration: buffer.duration,
-                isReplacing: false,
-                replacementError: null,
-              }
+            ? (() => {
+                const layout = getStudioClipLayout(item, buffer.duration);
+                return {
+                  ...item,
+                  ...layout,
+                  fileName: file.name,
+                  fileSize: file.size,
+                  isReplacing: false,
+                  replacementError: null,
+                };
+              })()
             : item,
         );
         replaceTracks(nextTracks);
@@ -634,6 +658,36 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [updateTrack],
   );
 
+  const setClipLayout = useCallback(
+    (trackId: string, layout: Partial<StudioClipLayout>) => {
+      const runtime = trackRuntimesRef.current.get(trackId);
+      if (!runtime) {
+        return;
+      }
+      if (statusRef.current === "playing") {
+        pause();
+      }
+      updateTrack(trackId, (track) => ({
+        ...track,
+        ...getStudioClipLayout(
+          {
+            startTime: layout.startTime ?? track.startTime,
+            offset: layout.offset ?? track.offset,
+            duration: layout.duration ?? track.duration,
+          },
+          runtime.buffer.duration,
+        ),
+      }));
+      const nextPosition = clampStudioAudioPosition(
+        positionRef.current,
+        projectDurationRef.current,
+      );
+      positionRef.current = nextPosition;
+      setCurrentTime(nextPosition);
+    },
+    [pause, updateTrack],
+  );
+
   const getTrackBuffer = useCallback((trackId: string): AudioBuffer | null => {
     return trackRuntimesRef.current.get(trackId)?.buffer ?? null;
   }, []);
@@ -700,6 +754,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       seekRelative,
       setTrackVolume,
       toggleTrackMuted,
+      setClipLayout,
       getTrackBuffer,
       removeTrack,
       reset,
@@ -719,6 +774,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       seekRelative,
       setTrackVolume,
       status,
+      setClipLayout,
       toggleTrackMuted,
       tracks,
     ],

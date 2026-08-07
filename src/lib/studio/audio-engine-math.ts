@@ -39,12 +39,19 @@ export function getStudioAudioRelativeSeekPosition(
 }
 
 export function getStudioProjectDuration(
-  tracks: Iterable<{ duration: number }>,
+  tracks: Iterable<{ startTime?: number; duration: number }>,
 ): number {
   let longest = 0;
   for (const track of tracks) {
-    if (Number.isFinite(track.duration) && track.duration > longest) {
-      longest = track.duration;
+    const startTime =
+      Number.isFinite(track.startTime) && (track.startTime ?? 0) > 0
+        ? track.startTime ?? 0
+        : 0;
+    const duration = Number.isFinite(track.duration) && track.duration > 0
+      ? track.duration
+      : 0;
+    if (startTime + duration > longest) {
+      longest = startTime + duration;
     }
   }
   return longest;
