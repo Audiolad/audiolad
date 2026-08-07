@@ -25,3 +25,11 @@ export function getStudioAudioPlaybackPosition({
     duration,
   );
 }
+
+export function getStudioAudioRelativeSeekPosition(
+  position: number,
+  offset: number,
+  duration: number,
+): number {
+  return clampStudioAudioPosition(position + offset, duration);
+}

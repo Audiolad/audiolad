@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
+  getStudioAudioRelativeSeekPosition,
 } from "../src/lib/studio/audio-engine-math.ts";
 import { validateStudioLocalFile } from "../src/components/studio/StudioAudioProvider.tsx";
 
@@ -39,6 +40,9 @@ function testPositionMath() {
     }),
     20,
   );
+  assert.equal(getStudioAudioRelativeSeekPosition(8, -15, 30), 0);
+  assert.equal(getStudioAudioRelativeSeekPosition(24, 15, 30), 30);
+  assert.equal(getStudioAudioRelativeSeekPosition(10, 15, 30), 25);
 }
 
 function testLocalFileValidation() {
@@ -111,6 +115,9 @@ function testProviderEngineLifecycle() {
 function testStudioBoundariesAndCrossTabStop() {
   const studioLayout = readSource("src/app/(studio)/studio/layout.tsx");
   const studioProvider = readSource("src/components/studio/StudioAudioProvider.tsx");
+  const studioWorkspace = readSource(
+    "src/components/studio/StudioWorkspace.tsx",
+  );
   const globalProvider = readSource(
     "src/components/audio/GlobalAudioPlayerProvider.tsx",
   );
@@ -118,7 +125,23 @@ function testStudioBoundariesAndCrossTabStop() {
 
   assert.match(studioLayout, /<StudioAudioProvider>/);
   assert.doesNotMatch(studioLayout, /GlobalAudioPlayerProvider/);
-  assert.match(studioProvider, /requestPlatformAudioStopFromStudio\(\)/);
+  assert.doesNotMatch(
+    studioProvider,
+    /requestPlatformAudioStopFromStudio/,
+    "opening Studio does not automatically stop audio in other tabs",
+  );
+  assert.match(studioProvider, /seekRelative/);
+  assert.match(
+    studioProvider,
+    /getStudioAudioRelativeSeekPosition\(\s*getPlaybackPosition\(\),/,
+  );
+  assert.match(studioProvider, /if \(nextPosition >= durationRef\.current\)/);
+  assert.doesNotMatch(studioWorkspace, />\s*Play\s*</);
+  assert.match(studioWorkspace, /aria-label="Воспроизвести"/);
+  assert.match(studioWorkspace, /aria-label="Пауза"/);
+  assert.match(studioWorkspace, /seekRelative\(-15\)/);
+  assert.match(studioWorkspace, /seekRelative\(15\)/);
+  assert.doesNotMatch(studioWorkspace, /Статус движка/);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);
   assert.match(globalProvider, /isStudioAudioStopMessage/);

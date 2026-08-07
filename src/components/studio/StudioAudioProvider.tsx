@@ -14,8 +14,8 @@ import {
 import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
+  getStudioAudioRelativeSeekPosition,
 } from "@/lib/studio/audio-engine-math";
-import { requestPlatformAudioStopFromStudio } from "@/lib/audio/studio-audio-coordination";
 
 const MAX_LOCAL_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 const SUPPORTED_FILE_EXTENSIONS = /\.(mp3|wav|m4a|aac)$/i;
@@ -46,6 +46,7 @@ type StudioAudioContextValue = {
   play: () => Promise<void>;
   pause: () => void;
   seek: (position: number) => void;
+  seekRelative: (offset: number) => void;
   setTrackVolume: (volume: number) => void;
   removeTrack: () => void;
   reset: () => void;
@@ -363,13 +364,35 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       if (wasPlaying) {
         detachSource();
         cancelProgressLoop();
-        createSourceAtPosition(nextPosition);
+        if (nextPosition >= durationRef.current) {
+          positionRef.current = durationRef.current;
+          setCurrentTime(durationRef.current);
+          setStatus("ready");
+        } else {
+          createSourceAtPosition(nextPosition);
+        }
       } else {
         positionRef.current = nextPosition;
         setCurrentTime(nextPosition);
+        if (nextPosition >= durationRef.current) {
+          setStatus("ready");
+        }
       }
     },
     [cancelProgressLoop, createSourceAtPosition, detachSource],
+  );
+
+  const seekRelative = useCallback(
+    (offset: number) => {
+      seek(
+        getStudioAudioRelativeSeekPosition(
+          getPlaybackPosition(),
+          offset,
+          durationRef.current,
+        ),
+      );
+    },
+    [getPlaybackPosition, seek],
   );
 
   const setTrackVolume = useCallback((requestedVolume: number) => {
@@ -380,10 +403,6 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     setTrack((currentTrack) =>
       currentTrack ? { ...currentTrack, volume } : null,
     );
-  }, []);
-
-  useEffect(() => {
-    requestPlatformAudioStopFromStudio();
   }, []);
 
   useEffect(() => {
@@ -403,6 +422,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       play,
       pause,
       seek,
+      seekRelative,
       setTrackVolume,
       removeTrack: reset,
       reset,
@@ -416,6 +436,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       play,
       reset,
       seek,
+      seekRelative,
       setTrackVolume,
       status,
       track,

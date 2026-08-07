@@ -31,6 +31,7 @@ export default function StudioWorkspace() {
     play,
     removeTrack,
     seek,
+    seekRelative,
     setTrackVolume,
     status,
     track,
@@ -181,24 +182,44 @@ export default function StudioWorkspace() {
             >
               В начало
             </button>
+            <button
+              type="button"
+              disabled={!canControlTransport}
+              onClick={() => seekRelative(-15)}
+              aria-label="Перемотать назад на 15 секунд"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#cfc0e6] px-4 text-sm font-semibold text-[#523786] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              −15
+            </button>
             {isPlaying ? (
               <button
                 type="button"
                 onClick={pause}
+                aria-label="Пауза"
                 className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#523786] px-5 text-sm font-semibold text-white"
               >
-                Pause
+                ‖
               </button>
             ) : (
               <button
                 type="button"
                 disabled={!canControlTransport}
                 onClick={() => void play()}
+                aria-label="Воспроизвести"
                 className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Play
+                ▶
               </button>
             )}
+            <button
+              type="button"
+              disabled={!canControlTransport}
+              onClick={() => seekRelative(15)}
+              aria-label="Перемотать вперёд на 15 секунд"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#cfc0e6] px-4 text-sm font-semibold text-[#523786] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              +15
+            </button>
             <p className="text-sm font-medium tabular-nums text-[#4e3978]">
               {formatTime(currentTime)} / {formatTime(duration)}
             </p>
@@ -215,10 +236,9 @@ export default function StudioWorkspace() {
             onChange={(event) => seek(Number(event.target.value))}
             className="mt-5 block w-full accent-[#7042c5] disabled:cursor-not-allowed"
           />
-          <p className="mt-3 text-sm text-[#70618e]">
-            Статус движка:{" "}
-            <span className="font-medium text-[#4e3978]">{status}</span>
-          </p>
+          {isLoading ? (
+            <p className="mt-3 text-sm text-[#70618e]">Загрузка аудио…</p>
+          ) : null}
         </section>
       </main>
     </section>
