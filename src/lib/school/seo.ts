@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, MetadataRoute } from "next";
 
 import { SCHOOL_ORIGIN } from "@/lib/school/host";
 
-export const SCHOOL_SEO_TITLE = "Школа Аудиопрактик – АудиоЛад";
+export const SCHOOL_SEO_TITLE =
+  "Школа Аудиопрактик — обучение созданию авторских медитаций и аудиопродуктов";
 
 export const SCHOOL_SEO_DESCRIPTION =
-  "Превратите свои знания, голос и внутреннее состояние в авторские аудиопродукты, чтобы раскрыть своё предназначение, помогать людям и зарабатывать на любимом деле.";
+  "Научитесь создавать авторские медитации, аудиопрактики, аудиокурсы и программы своим голосом. Онлайн-интенсив и практическое сопровождение Сергея Петрова.";
 
 export function buildSchoolLandingMetadata(): Metadata {
   return {
@@ -31,8 +32,18 @@ export function buildSchoolLandingMetadata(): Metadata {
       ],
     },
     robots: {
-      index: false,
+      index: true,
       follow: true,
     },
+  };
+}
+
+export function buildSchoolRobotsRoute(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: "*",
+      allow: "/",
+    },
+    sitemap: `${SCHOOL_ORIGIN}/sitemap.xml`,
   };
 }

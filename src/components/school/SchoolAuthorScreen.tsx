@@ -106,9 +106,9 @@ export default function SchoolAuthorScreen() {
       aria-label="Автор и преподаватель Школы Аудиопрактик"
     >
       <div className="school-author__hero">
-        <h2 className="school-author__section-title school-author__section-title--mobile">
+        <div className="school-author__section-title school-author__section-title--mobile">
           {SECTION_TITLE}
-        </h2>
+        </div>
 
         <div className="school-author__photo-wrap">
           <Image

@@ -24,6 +24,10 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
+  if (isSchoolHostname(hostname) && pathname === SCHOOL_SITE_PATH) {
+    return NextResponse.redirect(new URL("/", request.url), 308);
+  }
+
   if (isSchoolHostname(hostname) && pathname === "/") {
     return updateSession(request, { rewritePathname: SCHOOL_SITE_PATH });
   }

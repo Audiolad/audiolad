@@ -24,13 +24,16 @@ import SchoolTestimonialsScreen from "@/components/school/SchoolTestimonialsScre
 import SchoolFaqScreen from "@/components/school/SchoolFaqScreen";
 import SchoolFinalScreen from "@/components/school/SchoolFinalScreen";
 import SchoolFooter from "@/components/school/SchoolFooter";
+import JsonLd from "@/components/seo/JsonLd";
 import {
   getHostnameFromHeaders,
   isMainSiteHostname,
 } from "@/lib/school/host";
+import { buildSchoolLandingJsonLd } from "@/lib/school/json-ld";
 import { buildSchoolLandingMetadata } from "@/lib/school/seo";
 
 export const metadata: Metadata = buildSchoolLandingMetadata();
+const schoolLandingJsonLd = buildSchoolLandingJsonLd();
 
 export default async function SchoolSitePage() {
   const hostname = getHostnameFromHeaders(await headers());
@@ -42,6 +45,7 @@ export default async function SchoolSitePage() {
 
   return (
     <>
+      <JsonLd data={schoolLandingJsonLd} />
       <main>
         <SchoolFirstScreen />
         <SchoolSectionNavigation />
