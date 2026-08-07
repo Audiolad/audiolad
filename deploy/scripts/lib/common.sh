@@ -190,7 +190,18 @@ wait_for_release_readiness() {
 
 port_has_listener() {
   local port="$1"
-  ss -lntp 2>/dev/null | grep -q ":${port} "
+  local sockets=""
+
+  sockets="$(ss -lntp 2>/dev/null)" || return $?
+
+  printf '%s\n' "$sockets" | awk -v port=":${port} " '
+    $0 ~ port {
+      found = 1
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  '
 }
 
 wait_for_port_free() {
@@ -211,11 +222,20 @@ wait_for_port_free() {
 cleanup_orphan_next_servers() {
   local keep_port="${1:-$PRODUCTION_PORT}"
   local keep_pid=""
+  local listener_status=0
 
   if port_has_listener "$keep_port"; then
     keep_pid="$(ss -lntp 2>/dev/null | awk -v port=":${keep_port}" '
-      $0 ~ port && match($0, /pid=([0-9]+)/, m) { print m[1]; exit }
+      $0 ~ port && !found && match($0, /pid=([0-9]+)/, m) {
+        print m[1]
+        found = 1
+      }
     ')"
+  else
+    listener_status=$?
+    if (( listener_status != 1 )); then
+      return "$listener_status"
+    fi
   fi
 
   while read -r pid; do
