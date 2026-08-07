@@ -406,7 +406,7 @@ export default function StudioEditorShell() {
                               }
                             }}
                           />
-                          <div className="flex h-28 flex-col items-center">
+                          <div className="studio-volume-fader flex h-28 w-5 shrink-0 flex-col items-center">
                             <input
                               aria-label={`Громкость ${slot.name}`}
                               type="range"
@@ -427,8 +427,7 @@ export default function StudioEditorShell() {
                                   ? `Громкость: ${Math.round(track.volume * 100)}%`
                                   : "Добавьте аудио, чтобы регулировать громкость"
                               }
-                              className="h-24 w-5 accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
-                              style={{ writingMode: "vertical-lr", direction: "rtl" }}
+                              className="studio-volume-fader__range accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
                             />
                             <span className="text-[10px] text-[#9ba7bb]">
                               {Math.round((track?.volume ?? 1) * 100)}%

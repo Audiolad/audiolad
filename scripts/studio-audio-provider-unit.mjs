@@ -139,6 +139,7 @@ function testStudioBoundariesAndCrossTabStop() {
   const studioWorkspace = readSource(
     "src/components/studio/StudioEditorShell.tsx",
   );
+  const globalStyles = readSource("src/app/globals.css");
   const globalProvider = readSource(
     "src/components/audio/GlobalAudioPlayerProvider.tsx",
   );
@@ -191,7 +192,22 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
   assert.match(studioWorkspace, /Назад в Studio/);
-  assert.match(studioWorkspace, /writingMode: "vertical-lr"/);
+  assert.match(studioWorkspace, /studio-volume-fader flex h-28 w-5 shrink-0/);
+  assert.match(studioWorkspace, /studio-volume-fader__range/);
+  assert.doesNotMatch(studioWorkspace, /transform:\s*["'`]?rotate/);
+  assert.doesNotMatch(studioWorkspace, /style=\{\{[^}]*volume/);
+  assert.match(
+    globalStyles,
+    /\.studio-volume-fader \{[\s\S]*flex: 0 0 1\.25rem;[\s\S]*min-width: 1\.25rem;[\s\S]*max-width: 1\.25rem;/,
+  );
+  assert.match(
+    globalStyles,
+    /\.studio-volume-fader__range \{[\s\S]*box-sizing: border-box;[\s\S]*-webkit-appearance: slider-vertical;[\s\S]*writing-mode: vertical-lr;/,
+  );
+  assert.match(
+    globalStyles,
+    /::-webkit-slider-runnable-track,[\s\S]*::-webkit-slider-thumb \{[\s\S]*box-sizing: border-box;/,
+  );
   assert.match(studioWorkspace, /currentTime \/ Math\.max\(track\.duration, 1\)/);
   assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
   assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);

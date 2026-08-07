@@ -67,6 +67,38 @@
   top: 0;
 }
 
+/*
+ * Native vertical ranges use implementation-specific intrinsic sizing in
+ * Chromium/WebKit. Keep both the flex item and the control's physical box
+ * fixed so moving the thumb cannot move the fader's center line.
+ */
+.studio-volume-fader {
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  min-width: 1.25rem;
+  max-width: 1.25rem;
+}
+
+.studio-volume-fader__range {
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  width: 1.25rem;
+  min-width: 1.25rem;
+  max-width: 1.25rem;
+  height: 6rem;
+  margin: 0;
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.studio-volume-fader__range::-webkit-slider-runnable-track,
+.studio-volume-fader__range::-webkit-slider-thumb {
+  box-sizing: border-box;
+}
+
 @media (min-width: 1280px) {
   .listener-app-shell__body.platform-mobile-shell,
   .legal-page-shell.platform-mobile-shell,
