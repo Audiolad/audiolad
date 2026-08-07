@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type StudioLocalTrack,
@@ -42,6 +42,18 @@ function formatTime(value: number): string {
 
 function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} МБ`;
+}
+
+function isNativeInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, [contenteditable="true"], a[href], [role="button"], [role="checkbox"], [role="link"], [role="menuitem"], [role="slider"], [role="textbox"]',
+    ),
+  );
 }
 
 function TrackMuteButton({
@@ -142,6 +154,34 @@ export default function StudioEditorShell() {
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
+
+  useEffect(() => {
+    const handleSpaceShortcut = (event: KeyboardEvent) => {
+      if (
+        event.key !== " " ||
+        event.repeat ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.isComposing ||
+        !canControlTransport ||
+        isNativeInteractiveTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      if (isPlaying) {
+        pause();
+      } else {
+        void play();
+      }
+    };
+
+    document.addEventListener("keydown", handleSpaceShortcut);
+    return () => document.removeEventListener("keydown", handleSpaceShortcut);
+  }, [canControlTransport, isPlaying, pause, play]);
+
   const timelineTracks = slots.map((slot) => {
     const track = slot.audioTrackId
       ? tracksById.get(slot.audioTrackId)
@@ -447,6 +487,7 @@ export default function StudioEditorShell() {
                   type="button"
                   onClick={pause}
                   aria-label="Пауза"
+                  title="Пробел — воспроизведение / пауза"
                   className="h-10 rounded-lg bg-[#4fb887] px-4 text-[#06110d]"
                 >
                   ‖
@@ -457,6 +498,7 @@ export default function StudioEditorShell() {
                   disabled={!canControlTransport}
                   onClick={() => void play()}
                   aria-label="Воспроизвести"
+                  title="Пробел — воспроизведение / пауза"
                   className="h-10 rounded-lg bg-[#4fb887] px-4 text-[#06110d] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   ▶

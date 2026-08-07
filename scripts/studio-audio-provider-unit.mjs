@@ -161,6 +161,25 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, />\s*Play\s*</);
   assert.match(studioWorkspace, /aria-label="Воспроизвести"/);
   assert.match(studioWorkspace, /aria-label="Пауза"/);
+  assert.match(studioWorkspace, /handleSpaceShortcut/);
+  assert.match(studioWorkspace, /event\.key !== " "/);
+  assert.match(studioWorkspace, /event\.repeat/);
+  assert.match(studioWorkspace, /event\.ctrlKey/);
+  assert.match(studioWorkspace, /event\.metaKey/);
+  assert.match(studioWorkspace, /event\.altKey/);
+  assert.match(studioWorkspace, /event\.isComposing/);
+  assert.match(studioWorkspace, /!canControlTransport/);
+  assert.match(studioWorkspace, /isNativeInteractiveTarget\(event\.target\)/);
+  assert.match(
+    studioWorkspace,
+    /input, textarea, select, button, \[contenteditable="true"\]/,
+  );
+  assert.match(studioWorkspace, /event\.preventDefault\(\);/);
+  assert.match(studioWorkspace, /if \(isPlaying\) \{\s*pause\(\);\s*\} else \{\s*void play\(\);/);
+  assert.match(
+    studioWorkspace,
+    /title="Пробел — воспроизведение \/ пауза"/,
+  );
   assert.match(studioWorkspace, /seekRelative\(-15\)/);
   assert.match(studioWorkspace, /seekRelative\(15\)/);
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
