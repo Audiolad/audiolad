@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { StudioBrand } from "@/components/studio/StudioBrand";
 import { requireStudioAuthorAccess } from "@/lib/studio/access";
 
 export const dynamic = "force-dynamic";
@@ -9,10 +10,11 @@ export default async function StudioLivePage() {
 
   return (
     <main className="min-h-dvh bg-[#160d2d] px-5 py-6 text-white sm:px-8 sm:py-8">
-      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col justify-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#bda8e8]">
-          АудиоЛад · Студия
-        </p>
+      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col">
+        <header className="border-b border-white/15 pb-6">
+          <StudioBrand />
+        </header>
+        <div className="flex flex-1 flex-col justify-center">
         <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Прямой аудиоэфир</h1>
         <span className="mt-5 w-fit rounded-full bg-[#4c3a6f] px-3 py-1 text-sm font-semibold text-[#d9c9f7]">
           Функция находится в разработке
@@ -36,6 +38,7 @@ export default async function StudioLivePage() {
             Вернуться в кабинет автора
           </Link>
         </nav>
+        </div>
       </div>
     </main>
   );

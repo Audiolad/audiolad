@@ -8,7 +8,7 @@ export default function NewStudioProjectLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-dvh bg-platform-surface text-[#25135c]">
+    <main className="min-h-dvh bg-[#0b1019] text-[#edf0f7]">
       <StudioAudioProvider>{children}</StudioAudioProvider>
     </main>
   );

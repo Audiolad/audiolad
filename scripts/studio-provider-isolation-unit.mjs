@@ -52,6 +52,7 @@ function testStudioIsolation() {
   const editorPage = readSource("src/app/(studio)/studio/project/new/page.tsx");
   const livePage = readSource("src/app/(studio)/studio/live/page.tsx");
   const studioAccess = readSource("src/lib/studio/access.ts");
+  const studioBrand = readSource("src/components/studio/StudioBrand.tsx");
 
   assert(
     !studioLayout.includes("StudioAudioProvider"),
@@ -66,6 +67,12 @@ function testStudioIsolation() {
       studioPage.includes("Прямой аудиоэфир") &&
       studioPage.includes('href="/studio/project/new"'),
     "studio entry renders both mode cards",
+  );
+  assert(
+    studioBrand.includes('src="/brand/audiolad-logo-light.webp"') &&
+      studioBrand.includes("Студия") &&
+      !studioPage.includes("uppercase tracking"),
+    "studio uses the official compact brand asset",
   );
   assert(
     livePage.includes("Функция находится в разработке"),

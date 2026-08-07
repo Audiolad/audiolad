@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { StudioBrand } from "@/components/studio/StudioBrand";
 import { requireStudioAuthorAccess } from "@/lib/studio/access";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,7 @@ export default async function StudioPage() {
     <main className="min-h-dvh bg-[#160d2d] px-5 py-6 text-white sm:px-8 sm:py-8">
       <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-5xl flex-col">
         <header className="flex flex-col gap-4 border-b border-white/15 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#bda8e8]">
-              АудиоЛад
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold">Студия</h1>
-          </div>
+          <StudioBrand />
           <nav className="flex flex-wrap gap-2">
             <Link
               href="/author-dashboard"

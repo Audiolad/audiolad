@@ -137,7 +137,7 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   const studioProvider = readSource("src/components/studio/StudioAudioProvider.tsx");
   const studioWorkspace = readSource(
-    "src/components/studio/StudioWorkspace.tsx",
+    "src/components/studio/StudioEditorShell.tsx",
   );
   const globalProvider = readSource(
     "src/components/audio/GlobalAudioPlayerProvider.tsx",
@@ -163,18 +163,27 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /seekRelative\(-15\)/);
   assert.match(studioWorkspace, /seekRelative\(15\)/);
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
-  assert.match(studioWorkspace, /multiple/);
-  assert.match(studioWorkspace, /tracks\.length >= 5/);
+  assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
+  assert.match(studioWorkspace, /Дорожка 1/);
+  assert.match(studioWorkspace, /Дорожка 2/);
+  assert.match(studioWorkspace, /slots\.length < MAX_TRACK_SLOTS/);
+  assert.match(studioWorkspace, /\+ Добавить дорожку/);
   assert.match(studioWorkspace, /В проект можно добавить не более пяти дорожек/);
   assert.match(studioWorkspace, /toggleTrackMuted/);
   assert.match(studioWorkspace, /Заменить аудио/);
-  assert.match(studioWorkspace, /"Отключить звук дорожки"/);
-  assert.match(studioWorkspace, /"Включить звук дорожки"/);
+  assert.match(studioWorkspace, /Включить звук дорожки/);
+  assert.match(studioWorkspace, /Отключить звук дорожки/);
   assert.doesNotMatch(studioWorkspace, />\s*[MS]\s*</);
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
   assert.match(studioWorkspace, /Назад в Studio/);
-  assert.match(studioWorkspace, /currentTime \/ track\.duration/);
+  assert.match(studioWorkspace, /writingMode: "vertical-lr"/);
+  assert.match(studioWorkspace, /currentTime \/ Math\.max\(track\.duration, 1\)/);
+  assert.match(studioWorkspace, /Проект: \{projectName\}/);
+  assert.match(studioWorkspace, /Сохранение проектов будет добавлено/);
+  assert.match(studioWorkspace, /Экспорт будет доступен после подключения серверного сведения/);
+  assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);
+  assert.doesNotMatch(studioWorkspace, /waveform/i);
   assert.match(coordination, /BroadcastChannel/);
   assert.match(coordination, /STUDIO_AUDIO_STOP_STORAGE_KEY/);
   assert.match(globalProvider, /isStudioAudioStopMessage/);

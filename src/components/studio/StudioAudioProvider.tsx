@@ -51,7 +51,7 @@ type StudioAudioContextValue = {
   status: StudioAudioStatus;
   currentTime: number;
   projectError: string | null;
-  loadLocalFiles: (files: Iterable<File>) => Promise<void>;
+  loadLocalFiles: (files: Iterable<File>) => Promise<StudioLocalTrack[]>;
   replaceTrackAudio: (trackId: string, file: File) => Promise<void>;
   play: () => Promise<void>;
   pause: () => void;
@@ -308,16 +308,16 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         if (tracksRef.current.length === 0) {
           setStatusValue("error");
         }
-        return;
+        return [];
       }
 
       if (files.length === 0) {
-        return;
+        return [];
       }
 
       if (tracksRef.current.length + files.length > MAX_LOCAL_TRACKS) {
         setProjectError(`В проект можно добавить не больше ${MAX_LOCAL_TRACKS} дорожек.`);
-        return;
+        return [];
       }
 
       const totalSize =
@@ -325,7 +325,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         files.reduce((sum, file) => sum + file.size, 0);
       if (totalSize > MAX_LOCAL_PROJECT_SIZE_BYTES) {
         setProjectError("Общий размер дорожек не может превышать 750 МБ.");
-        return;
+        return [];
       }
 
       const generation = loadGenerationRef.current + 1;
@@ -355,10 +355,11 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         }
 
         if (generation !== loadGenerationRef.current) {
-          return;
+          return [];
         }
 
         const nextTracks = [...tracksRef.current];
+        const createdTracks: StudioLocalTrack[] = [];
         for (const [index, { file, buffer }] of decodedTracks.entries()) {
           const id = getTrackId(file, index);
           const gain = context.createGain();
@@ -370,7 +371,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
             gain,
             source: null,
           });
-          nextTracks.push({
+          const createdTrack: StudioLocalTrack = {
             id,
             fileName: file.name,
             fileSize: file.size,
@@ -380,7 +381,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
             status: "ready",
             isReplacing: false,
             replacementError: null,
-          });
+          };
+          nextTracks.push(createdTrack);
+          createdTracks.push(createdTrack);
         }
         replaceTracks(nextTracks);
         applyTrackGains();
@@ -392,9 +395,10 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         } else {
           setStatusValue(statusBeforeLoad === "paused" ? "paused" : "ready");
         }
+        return createdTracks;
       } catch (decodeError) {
         if (generation !== loadGenerationRef.current) {
-          return;
+          return [];
         }
 
         setProjectError(formatDecodeError(decodeError));
@@ -403,6 +407,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         } else if (statusBeforeLoad !== "playing") {
           setStatusValue(statusBeforeLoad);
         }
+        return [];
       }
     },
     [
