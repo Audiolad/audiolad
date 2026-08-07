@@ -161,6 +161,18 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, />\s*Play\s*</);
   assert.match(studioWorkspace, /aria-label="Воспроизвести"/);
   assert.match(studioWorkspace, /aria-label="Пауза"/);
+  const fixedPlayPauseGeometry =
+    /inline-flex h-10 w-10 items-center justify-center rounded-lg bg-\[#4fb887\] p-0 leading-none text-\[#06110d\]/g;
+  assert.equal(
+    [...studioWorkspace.matchAll(fixedPlayPauseGeometry)].length,
+    2,
+    "Play and Pause use the same fixed square control geometry",
+  );
+  assert.doesNotMatch(
+    studioWorkspace,
+    /aria-label="(?:Пауза|Воспроизвести)"[\s\S]{0,240}(?:scale|transform)/,
+    "Play/Pause controls do not use geometry-changing visual effects",
+  );
   assert.match(studioWorkspace, /handleSpaceShortcut/);
   assert.match(studioWorkspace, /event\.key !== " "/);
   assert.match(studioWorkspace, /event\.repeat/);

@@ -488,7 +488,7 @@ export default function StudioEditorShell() {
                   onClick={pause}
                   aria-label="Пауза"
                   title="Пробел — воспроизведение / пауза"
-                  className="h-10 rounded-lg bg-[#4fb887] px-4 text-[#06110d]"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#4fb887] p-0 leading-none text-[#06110d]"
                 >
                   ‖
                 </button>
@@ -499,7 +499,7 @@ export default function StudioEditorShell() {
                   onClick={() => void play()}
                   aria-label="Воспроизвести"
                   title="Пробел — воспроизведение / пауза"
-                  className="h-10 rounded-lg bg-[#4fb887] px-4 text-[#06110d] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#4fb887] p-0 leading-none text-[#06110d] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   ▶
                 </button>
