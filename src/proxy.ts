@@ -15,20 +15,44 @@ function getRequestHostname(request: NextRequest): string {
   return normalizeHostname(forwarded ?? host);
 }
 
-export async function proxy(request: NextRequest) {
-  const hostname = getRequestHostname(request);
-  const { pathname } = request.nextUrl;
+/**
+ * School host routing policy (pure, unit-tested).
+ *
+ * - Main site `/school-site` → 404 (no indexable duplicate).
+ * - School host `/` → internal rewrite to `/school-site` (public URL stays `/`).
+ * - School host `/school-site` must NOT 308→`/`: Next re-enters proxy after rewrite
+ *   and that redirect creates an infinite loop.
+ */
+export type SchoolProxyAction =
+  | { action: "not_found" }
+  | { action: "rewrite_school_landing" }
+  | { action: "pass_through" };
 
-  // Avoid an indexable duplicate of the school landing on the main site.
+export function resolveSchoolProxyAction(
+  hostname: string,
+  pathname: string,
+): SchoolProxyAction {
   if (isMainSiteHostname(hostname) && isSchoolSitePath(pathname)) {
-    return new NextResponse(null, { status: 404 });
-  }
-
-  if (isSchoolHostname(hostname) && pathname === SCHOOL_SITE_PATH) {
-    return NextResponse.redirect(new URL("/", request.url), 308);
+    return { action: "not_found" };
   }
 
   if (isSchoolHostname(hostname) && pathname === "/") {
+    return { action: "rewrite_school_landing" };
+  }
+
+  return { action: "pass_through" };
+}
+
+export async function proxy(request: NextRequest) {
+  const hostname = getRequestHostname(request);
+  const { pathname } = request.nextUrl;
+  const schoolAction = resolveSchoolProxyAction(hostname, pathname);
+
+  if (schoolAction.action === "not_found") {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  if (schoolAction.action === "rewrite_school_landing") {
     return updateSession(request, { rewritePathname: SCHOOL_SITE_PATH });
   }
 
