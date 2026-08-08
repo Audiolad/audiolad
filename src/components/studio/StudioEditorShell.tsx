@@ -14,6 +14,7 @@ import {
   DEFAULT_PIXELS_PER_SECOND,
   getFitPixelsPerSecond,
 } from "@/lib/studio/timeline-math";
+import { getStudioDefaultFadeDuration } from "@/lib/studio/fade-math";
 
 type StudioTrackSlot = {
   id: string;
@@ -114,6 +115,46 @@ function TrackMuteButton({
   );
 }
 
+function TrackFadeButton({
+  track,
+  kind,
+  onToggle,
+}: {
+  track?: StudioLocalTrack;
+  kind: "in" | "out";
+  onToggle: () => void;
+}) {
+  const isFadeIn = kind === "in";
+  const active = isFadeIn
+    ? (track?.fadeInDuration ?? 0) > 0
+    : (track?.fadeOutDuration ?? 0) > 0;
+  const label = isFadeIn ? "Плавное появление" : "Плавное затухание";
+
+  return (
+    <button
+      type="button"
+      disabled={!track}
+      onClick={onToggle}
+      aria-label={label}
+      aria-pressed={active}
+      title={
+        track
+          ? active
+            ? `${label}: выключить`
+            : `${label}: включить`
+          : "Добавьте аудио, чтобы настроить затухание"
+      }
+      className={`h-8 rounded border px-2 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+        active
+          ? "border-violet-300/70 bg-violet-400/20 text-violet-100"
+          : "border-white/15 bg-[#1c2433] text-[#c9d8ff]"
+      }`}
+    >
+      {isFadeIn ? "Появление" : "Затухание"}
+    </button>
+  );
+}
+
 export default function StudioEditorShell() {
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
@@ -141,6 +182,7 @@ export default function StudioEditorShell() {
     replaceTrackAudio,
     seek,
     seekRelative,
+    setClipFades,
     setClipLayout,
     setTrackVolume,
     status,
@@ -196,6 +238,8 @@ export default function StudioEditorShell() {
       startTime: track?.startTime ?? 0,
       offset: track?.offset ?? 0,
       duration: track?.duration ?? 0,
+      fadeInDuration: track?.fadeInDuration ?? 0,
+      fadeOutDuration: track?.fadeOutDuration ?? 0,
       accent: TIMELINE_ACCENTS[slots.indexOf(slot) % TIMELINE_ACCENTS.length],
     };
   });
@@ -323,6 +367,34 @@ export default function StudioEditorShell() {
                 {Math.round((track?.volume ?? 1) * 100)}%
               </span>
             </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <TrackFadeButton
+              track={track}
+              kind="in"
+              onToggle={() => {
+                if (!track) return;
+                setClipFades(track.id, {
+                  fadeInDuration:
+                    track.fadeInDuration > 0
+                      ? 0
+                      : getStudioDefaultFadeDuration(track.duration),
+                });
+              }}
+            />
+            <TrackFadeButton
+              track={track}
+              kind="out"
+              onToggle={() => {
+                if (!track) return;
+                setClipFades(track.id, {
+                  fadeOutDuration:
+                    track.fadeOutDuration > 0
+                      ? 0
+                      : getStudioDefaultFadeDuration(track.duration),
+                });
+              }}
+            />
           </div>
           <div className="mt-3 flex flex-col items-start gap-2 text-xs">
             {track ? (
@@ -612,6 +684,7 @@ export default function StudioEditorShell() {
             onSeek={seek}
             onClipGestureStart={pause}
             onClipLayoutChange={setClipLayout}
+            onClipFadesChange={setClipFades}
             renderControls={renderTimelineControls}
             renderEmpty={renderTimelineEmptyState}
           />

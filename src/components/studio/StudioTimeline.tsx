@@ -19,6 +19,10 @@ import {
   getStudioClipTrimStartLayout,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
+import {
+  clampStudioClipFades,
+  type StudioClipFades,
+} from "@/lib/studio/fade-math";
 
 export type StudioTimelineTrack = {
   id: string;
@@ -29,6 +33,8 @@ export type StudioTimelineTrack = {
   startTime: number;
   offset: number;
   duration: number;
+  fadeInDuration: number;
+  fadeOutDuration: number;
   accent: string;
 };
 
@@ -41,6 +47,7 @@ type StudioTimelineProps = {
   onViewportWidthChange: (width: number) => void;
   onSeek: (time: number) => void;
   onClipLayoutChange: (trackId: string, layout: StudioClipLayout) => void;
+  onClipFadesChange: (trackId: string, fades: StudioClipFades) => void;
   onClipGestureStart: () => void;
   renderControls: (track: StudioTimelineTrack, index: number) => ReactNode;
   renderEmpty: (track: StudioTimelineTrack, index: number) => ReactNode;
@@ -57,6 +64,7 @@ export function StudioTimeline({
   onViewportWidthChange,
   onSeek,
   onClipLayoutChange,
+  onClipFadesChange,
   onClipGestureStart,
   renderControls,
   renderEmpty,
@@ -69,13 +77,17 @@ export function StudioTimeline({
   const isAutoScrollingRef = useRef(false);
   const gestureRef = useRef<{
     track: StudioTimelineTrack;
-    kind: "move" | "trim-start" | "trim-end";
+    kind: "move" | "trim-start" | "trim-end" | "fade-in" | "fade-out";
     pointerId: number;
     pointerStartX: number;
     layout: StudioClipLayout;
+    fades: StudioClipFades;
   } | null>(null);
   const [previewLayouts, setPreviewLayouts] = useState<
     Record<string, StudioClipLayout>
+  >({});
+  const [previewFades, setPreviewFades] = useState<
+    Record<string, StudioClipFades>
   >({});
   const displayDuration = Math.max(
     duration,
@@ -202,15 +214,44 @@ export function StudioTimeline({
         requestedStartTime: gesture.layout.startTime + deltaSeconds,
       });
     }
+    if (gesture.kind === "fade-in" || gesture.kind === "fade-out") {
+      return null;
+    }
     return getStudioClipTrimEndLayout({
       ...common,
       requestedEndTime: getStudioClipEnd(gesture.layout) + deltaSeconds,
     });
   };
+  const getGestureFades = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ): StudioClipFades | null => {
+    const gesture = gestureRef.current;
+    if (
+      !gesture ||
+      gesture.pointerId !== event.pointerId ||
+      (gesture.kind !== "fade-in" && gesture.kind !== "fade-out")
+    ) {
+      return null;
+    }
+    const deltaSeconds = (event.clientX - gesture.pointerStartX) / pixelsPerSecond;
+    return clampStudioClipFades(
+      {
+        fadeInDuration:
+          gesture.kind === "fade-in"
+            ? gesture.fades.fadeInDuration + deltaSeconds
+            : gesture.fades.fadeInDuration,
+        fadeOutDuration:
+          gesture.kind === "fade-out"
+            ? gesture.fades.fadeOutDuration - deltaSeconds
+            : gesture.fades.fadeOutDuration,
+      },
+      gesture.layout.duration,
+    );
+  };
   const beginClipGesture = (
     event: React.PointerEvent<HTMLDivElement>,
     track: StudioTimelineTrack,
-    kind: "move" | "trim-start" | "trim-end",
+    kind: "move" | "trim-start" | "trim-end" | "fade-in" | "fade-out",
   ) => {
     if (!track.buffer) {
       return;
@@ -224,21 +265,27 @@ export function StudioTimeline({
       pointerId: event.pointerId,
       pointerStartX: event.clientX,
       layout: getStudioClipLayout(track, track.buffer.duration),
+      fades: clampStudioClipFades(track, track.duration),
     };
     onClipGestureStart();
   };
   const previewClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     const layout = getGestureLayout(event);
+    const fades = getGestureFades(event);
     const track = gestureRef.current?.track;
     if (layout && track) {
       setPreviewLayouts((current) => ({ ...current, [track.id]: layout }));
+    }
+    if (fades && track) {
+      setPreviewFades((current) => ({ ...current, [track.id]: fades }));
     }
   };
   const finishClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
     const gesture = gestureRef.current;
     const layout = getGestureLayout(event);
-    if (!gesture || !layout) {
+    const fades = getGestureFades(event);
+    if (!gesture || (!layout && !fades)) {
       return;
     }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -250,7 +297,17 @@ export function StudioTimeline({
       delete next[gesture.track.id];
       return next;
     });
-    onClipLayoutChange(gesture.track.id, layout);
+    setPreviewFades((current) => {
+      const next = { ...current };
+      delete next[gesture.track.id];
+      return next;
+    });
+    if (layout) {
+      onClipLayoutChange(gesture.track.id, layout);
+    }
+    if (fades) {
+      onClipFadesChange(gesture.track.id, fades);
+    }
   };
   const cancelClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
@@ -260,6 +317,11 @@ export function StudioTimeline({
     }
     gestureRef.current = null;
     setPreviewLayouts((current) => {
+      const next = { ...current };
+      delete next[gesture.track.id];
+      return next;
+    });
+    setPreviewFades((current) => {
       const next = { ...current };
       delete next[gesture.track.id];
       return next;
@@ -318,6 +380,8 @@ export function StudioTimeline({
             {tracks.map((track, index) => {
               const layout = previewLayouts[track.id] ??
                 getStudioClipLayout(track, track.buffer?.duration ?? 0);
+              const fades = previewFades[track.id] ??
+                clampStudioClipFades(track, layout.duration);
               const clipLeft = timeToTimelineX(layout.startTime, pixelsPerSecond);
               const clipWidth = Math.min(
                 timeToTimelineX(layout.duration, pixelsPerSecond),
@@ -404,6 +468,75 @@ export function StudioTimeline({
                       </div>
                     ) : null}
                   </div>
+                  {track.hasAudio && track.buffer && clipWidth > 0 ? (
+                    <div
+                      aria-label={`Автоматизация затуханий ${track.name}`}
+                      className="relative h-9 border-t border-white/10 bg-[#111a27]"
+                    >
+                      <div
+                        className="absolute inset-y-1 overflow-hidden rounded-sm border border-violet-300/35 bg-violet-400/10"
+                        style={{ left: clipLeft, width: clipWidth }}
+                        data-studio-fade-lane={track.id}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="absolute bottom-0 left-0 top-0 bg-violet-300/25"
+                          style={{
+                            width: timeToTimelineX(
+                              fades.fadeInDuration,
+                              pixelsPerSecond,
+                            ),
+                            clipPath: "polygon(0 100%, 100% 0, 100% 100%)",
+                          }}
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="absolute bottom-0 right-0 top-0 bg-violet-300/25"
+                          style={{
+                            width: timeToTimelineX(
+                              fades.fadeOutDuration,
+                              pixelsPerSecond,
+                            ),
+                            clipPath: "polygon(0 0, 100% 100%, 0 100%)",
+                          }}
+                        />
+                        <div
+                          aria-label={`Настроить появление ${track.name}`}
+                          className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
+                          style={{
+                            left: Math.max(
+                              timeToTimelineX(fades.fadeInDuration, pixelsPerSecond) - 4,
+                              0,
+                            ),
+                          }}
+                          onPointerDown={(event) =>
+                            beginClipGesture(event, track, "fade-in")
+                          }
+                          onPointerMove={previewClipGesture}
+                          onPointerUp={finishClipGesture}
+                          onPointerCancel={cancelClipGesture}
+                        />
+                        <div
+                          aria-label={`Настроить затухание ${track.name}`}
+                          className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
+                          style={{
+                            left: Math.max(
+                              clipWidth -
+                                timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond) -
+                                4,
+                              0,
+                            ),
+                          }}
+                          onPointerDown={(event) =>
+                            beginClipGesture(event, track, "fade-out")
+                          }
+                          onPointerMove={previewClipGesture}
+                          onPointerUp={finishClipGesture}
+                          onPointerCancel={cancelClipGesture}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                   {!track.hasAudio ? renderEmpty(track, index) : null}
                 </div>
               );
