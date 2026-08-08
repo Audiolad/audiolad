@@ -8,7 +8,10 @@ import {
   useStudioAudio,
 } from "@/components/studio/StudioAudioProvider";
 import { StudioBrand } from "@/components/studio/StudioBrand";
-import { StudioTimeline } from "@/components/studio/StudioTimeline";
+import {
+  StudioTimeline,
+  type StudioTimelineHandle,
+} from "@/components/studio/StudioTimeline";
 import {
   clampPixelsPerSecond,
   DEFAULT_PIXELS_PER_SECOND,
@@ -158,6 +161,7 @@ function TrackFadeButton({
 export default function StudioEditorShell() {
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
+  const timelineRef = useRef<StudioTimelineHandle | null>(null);
   const [projectName, setProjectName] = useState("Новый проект");
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
@@ -543,7 +547,10 @@ export default function StudioEditorShell() {
               <button
                 type="button"
                 disabled={!canControlTransport}
-                onClick={() => seek(0)}
+                onClick={() => {
+                  seek(0);
+                  timelineRef.current?.scrollToStart();
+                }}
                 title="Перейти в начало"
                 className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -592,7 +599,10 @@ export default function StudioEditorShell() {
               <button
                 type="button"
                 disabled={!canControlTransport}
-                onClick={() => seek(projectDuration)}
+                onClick={() => {
+                  seek(projectDuration);
+                  timelineRef.current?.scrollToEnd();
+                }}
                 aria-label="Перейти в конец"
                 title="Перейти в конец проекта"
                 className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
@@ -685,6 +695,7 @@ export default function StudioEditorShell() {
           ) : null}
 
           <StudioTimeline
+            ref={timelineRef}
             duration={projectDuration}
             currentTime={currentTime}
             isPlaying={isPlaying}

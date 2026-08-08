@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { StudioWaveformCanvas } from "@/components/studio/StudioWaveformCanvas";
 import {
@@ -38,6 +46,11 @@ export type StudioTimelineTrack = {
   accent: string;
 };
 
+export type StudioTimelineHandle = {
+  scrollToStart: () => void;
+  scrollToEnd: () => void;
+};
+
 type StudioTimelineProps = {
   duration: number;
   currentTime: number;
@@ -55,7 +68,8 @@ type StudioTimelineProps = {
 
 const WAVEFORM_OVERSCAN_PIXELS = 240;
 
-export function StudioTimeline({
+export const StudioTimeline = forwardRef<StudioTimelineHandle, StudioTimelineProps>(
+function StudioTimeline({
   duration,
   currentTime,
   isPlaying,
@@ -68,7 +82,7 @@ export function StudioTimeline({
   onClipGestureStart,
   renderControls,
   renderEmpty,
-}: StudioTimelineProps) {
+}: StudioTimelineProps, ref) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -108,6 +122,35 @@ export function StudioTimeline({
   const renderWidth = Math.min(
     viewportWidth + WAVEFORM_OVERSCAN_PIXELS * 2,
     Math.max(timelineWidth - renderStartX, 1),
+  );
+  const scrollTo = useCallback((nextScrollLeft: number) => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    isAutoScrollingRef.current = true;
+    lastManualScrollAtRef.current = Date.now();
+    viewport.scrollLeft = Math.max(nextScrollLeft, 0);
+    setScrollLeft(viewport.scrollLeft);
+    window.setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, 0);
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToStart: () => scrollTo(0),
+      scrollToEnd: () => {
+        const viewport = viewportRef.current;
+        if (!viewport) {
+          return;
+        }
+        scrollTo(Math.max(viewport.scrollWidth - viewport.clientWidth, 0));
+      },
+    }),
+    [scrollTo],
   );
 
   useEffect(() => {
@@ -552,4 +595,4 @@ export function StudioTimeline({
       </div>
     </section>
   );
-}
+});

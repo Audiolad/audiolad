@@ -208,17 +208,25 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /seekRelative\(15\)/);
   assert.match(
     studioWorkspace,
-    /seekRelative\(15\)[\s\S]*onClick=\{\(\) => seek\(projectDuration\)\}/,
+    /timelineRef\.current\?\.scrollToStart\(\)/,
   );
+  assert.match(studioWorkspace, /timelineRef\.current\?\.scrollToEnd\(\)/);
+  assert.match(studioWorkspace, /seek\(0\);[\s\S]*scrollToStart\(\)/);
+  assert.match(
+    studioWorkspace,
+    /seek\(projectDuration\);[\s\S]*scrollToEnd\(\)/,
+  );
+  assert.match(studioWorkspace, /useRef<StudioTimelineHandle \| null>\(null\)/);
+  assert.match(studioWorkspace, /ref=\{timelineRef\}/);
   assert.match(studioWorkspace, /aria-label="Перейти в конец"/);
   assert.match(studioWorkspace, /title="Перейти в конец проекта"/);
   assert.match(
     studioWorkspace,
-    /disabled=\{!canControlTransport\}[\s\S]*onClick=\{\(\) => seek\(projectDuration\)\}/,
+    /disabled=\{!canControlTransport\}[\s\S]*scrollToEnd\(\)/,
   );
   assert.match(
     studioWorkspace,
-    /onClick=\{\(\) => seek\(projectDuration\)\}[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
+    /scrollToEnd\(\);[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
   );
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
   assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
@@ -265,7 +273,7 @@ function testStudioBoundariesAndCrossTabStop() {
     globalStyles,
     /::-webkit-slider-runnable-track,[\s\S]*::-webkit-slider-thumb \{[\s\S]*box-sizing: border-box;/,
   );
-  assert.match(studioWorkspace, /import \{ StudioTimeline \}/);
+  assert.match(studioWorkspace, /StudioTimeline,/);
   assert.match(studioWorkspace, /<StudioTimeline/);
   assert.match(studioWorkspace, /getTrackBuffer\(track\.id\)/);
   assert.match(
@@ -297,6 +305,12 @@ function testStudioBoundariesAndCrossTabStop() {
     "src/components/studio/StudioWaveformCanvas.tsx",
   );
   assert.match(timeline, /pixelsPerSecond/);
+  assert.match(timeline, /forwardRef<StudioTimelineHandle, StudioTimelineProps>/);
+  assert.match(timeline, /useImperativeHandle/);
+  assert.match(timeline, /scrollToStart: \(\) => scrollTo\(0\)/);
+  assert.match(timeline, /scrollWidth - viewport\.clientWidth/);
+  assert.match(timeline, /lastManualScrollAtRef\.current = Date\.now\(\)/);
+  assert.doesNotMatch(timeline, /querySelector/);
   assert.match(timeline, /overflow-x-auto/);
   assert.match(timeline, /WAVEFORM_OVERSCAN_PIXELS/);
   assert.match(timeline, /renderStartX/);
