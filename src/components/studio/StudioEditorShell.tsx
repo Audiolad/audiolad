@@ -8,6 +8,7 @@ import {
   useStudioAudio,
 } from "@/components/studio/StudioAudioProvider";
 import { StudioBrand } from "@/components/studio/StudioBrand";
+import { useStudioRecorder } from "@/components/studio/useStudioRecorder";
 import {
   StudioTimeline,
   type StudioTimelineHandle,
@@ -177,6 +178,7 @@ export default function StudioEditorShell() {
   const {
     currentTime,
     getTrackBuffer,
+    ingestRecordedFile,
     loadLocalFiles,
     pause,
     play,
@@ -201,6 +203,26 @@ export default function StudioEditorShell() {
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
+  const {
+    isProcessingRecording,
+    isRecording,
+    recordingElapsed,
+    recordingError,
+    recordingSlotId,
+    startRecording,
+    stopRecording,
+  } = useStudioRecorder({
+    onRecordedFile: async (file, startTime, slotId) => {
+      const track = await ingestRecordedFile(file, { startTime });
+      if (track) {
+        setSlots((currentSlots) =>
+          currentSlots.map((slot) =>
+            slot.id === slotId ? { ...slot, audioTrackId: track.id } : slot,
+          ),
+        );
+      }
+    },
+  });
 
   useEffect(() => {
     const handleSpaceShortcut = (event: KeyboardEvent) => {
@@ -256,6 +278,14 @@ export default function StudioEditorShell() {
       addAudioInputRef.current.dataset.slotId = slotId;
       addAudioInputRef.current.click();
     }
+  };
+
+  const startSlotRecording = (slotId: string) => {
+    void startRecording({
+      slotId,
+      startTime: tracks.length === 0 ? 0 : currentTime,
+      onStartTransport: () => (isPlaying ? undefined : play()),
+    });
   };
 
   const startSlotRename = (slot: StudioTrackSlot) => {
@@ -433,16 +463,47 @@ export default function StudioEditorShell() {
                 </button>
               </>
             ) : null}
+            {!track ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={isLoading || isRecording || isProcessingRecording}
+                  onClick={() => openAddAudioDialog(slot.id)}
+                  className="text-[#d8c8fb] disabled:opacity-40"
+                >
+                  Добавить аудио
+                </button>
+                {recordingSlotId === slot.id ? (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="text-rose-200"
+                  >
+                    Стоп · {formatTime(recordingElapsed)}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isLoading || isRecording || isProcessingRecording}
+                    onClick={() => startSlotRecording(slot.id)}
+                    className="text-[#d8c8fb] disabled:opacity-40"
+                  >
+                    Записать
+                  </button>
+                )}
+              </div>
+            ) : null}
             {index >= 2 ? (
               <button
                 type="button"
+                disabled={recordingSlotId === slot.id}
                 onClick={() => {
                   if (track) removeTrack(track.id);
                   setSlots((currentSlots) =>
                     currentSlots.filter((item) => item.id !== slot.id),
                   );
                 }}
-                className="text-[#a9b4c7] underline underline-offset-4"
+                className="text-[#a9b4c7] underline underline-offset-4 disabled:opacity-40"
               >
                 Удалить дорожку
               </button>
@@ -458,24 +519,53 @@ export default function StudioEditorShell() {
     if (!slot) {
       return null;
     }
+    const isThisSlotRecording = recordingSlotId === slot.id;
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
         <p className="text-sm font-medium text-[#e2e8f5]">Добавьте аудио</p>
         <p className="mt-1 text-xs text-[#97a4b8]">
           Загрузите аудиофайл с устройства
         </p>
-        <button
-          type="button"
-          disabled={isLoading}
-          onPointerUp={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            openAddAudioDialog(slot.id);
-          }}
-          className="mt-4 h-10 rounded-lg bg-[#7650bd] px-4 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          Добавить аудио
-        </button>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            disabled={isLoading || isRecording || isProcessingRecording}
+            onPointerUp={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              openAddAudioDialog(slot.id);
+            }}
+            className="h-10 rounded-lg bg-[#7650bd] px-4 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            Добавить аудио
+          </button>
+          {isThisSlotRecording ? (
+            <button
+              type="button"
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                stopRecording();
+              }}
+              className="h-10 rounded-lg border border-rose-300/60 bg-rose-400/15 px-4 text-sm font-semibold text-rose-100"
+            >
+              Стоп · {formatTime(recordingElapsed)}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isLoading || isRecording || isProcessingRecording}
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                startSlotRecording(slot.id);
+              }}
+              className="h-10 rounded-lg border border-violet-300/60 px-4 text-sm font-semibold text-violet-100 disabled:opacity-40"
+            >
+              Записать с микрофона
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -691,6 +781,11 @@ export default function StudioEditorShell() {
           {projectError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {projectError}
+            </p>
+          ) : null}
+          {recordingError ? (
+            <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              {recordingError}
             </p>
           ) : null}
 

@@ -135,6 +135,12 @@ function testProviderEngineLifecycle() {
     /trackRuntimesRef\.current\.get\(trackId\)\?\.buffer \?\? null/,
   );
   assert.match(provider, /replaceTrackAudio/);
+  assert.match(provider, /ingestRecordedFile/);
+  assert.match(provider, /validateStudioRecordedFile/);
+  assert.match(provider, /startTime: Number\.isFinite\(startTime\)/);
+  assert.match(provider, /offset: 0/);
+  assert.match(provider, /fadeInDuration: 0/);
+  assert.match(provider, /fadeOutDuration: 0/);
   assert.match(provider, /getStudioReplacementProjectSize/);
   assert.doesNotMatch(provider, /\bsolo\b/i);
   assert.match(provider, /removeTrack/);
@@ -294,6 +300,11 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(studioWorkspace, /renderControls=\{renderTimelineControls\}/);
   assert.match(studioWorkspace, /renderEmpty=\{renderTimelineEmptyState\}/);
+  assert.match(studioWorkspace, /useStudioRecorder/);
+  assert.match(studioWorkspace, /recordingSlotId === slot\.id/);
+  assert.match(studioWorkspace, /Записать с микрофона/);
+  assert.match(studioWorkspace, /Записать/);
+  assert.match(studioWorkspace, /Стоп · \{formatTime\(recordingElapsed\)\}/);
   assert.match(studioWorkspace, /onPointerUp=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
   assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);

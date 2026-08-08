@@ -12,6 +12,7 @@
     "test:studio-audio-provider": "npx tsx scripts/studio-audio-provider-unit.mjs",
     "test:studio-clip-math": "npx tsx scripts/studio-clip-math-unit.mjs",
     "test:studio-fade-math": "npx tsx scripts/studio-fade-math-unit.mjs",
+    "test:studio-recorder": "npx tsx scripts/studio-recorder-unit.mjs",
     "test:studio-timeline-math": "npx tsx scripts/studio-timeline-math-unit.mjs",
     "test:studio-waveform-peaks": "npx tsx scripts/studio-waveform-peaks-unit.mjs",
     "test:test-user-reset:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 npx tsx scripts/test-user-reset-integration.mjs",

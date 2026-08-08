@@ -32,6 +32,7 @@ import {
   MAX_LOCAL_FILE_SIZE_BYTES,
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
+import { validateStudioRecordedFile } from "@/lib/studio/recorder";
 
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
@@ -67,6 +68,10 @@ type StudioAudioContextValue = {
   currentTime: number;
   projectError: string | null;
   loadLocalFiles: (files: Iterable<File>) => Promise<StudioLocalTrack[]>;
+  ingestRecordedFile: (
+    file: File,
+    options: { startTime: number },
+  ) => Promise<StudioLocalTrack | null>;
   replaceTrackAudio: (trackId: string, file: File) => Promise<void>;
   play: () => Promise<void>;
   pause: () => void;
@@ -472,6 +477,92 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  const ingestRecordedFile = useCallback(
+    async (file: File, { startTime }: { startTime: number }) => {
+      const validationError = validateStudioRecordedFile(file);
+      if (validationError) {
+        setProjectError(validationError);
+        return null;
+      }
+      if (tracksRef.current.length >= MAX_LOCAL_TRACKS) {
+        setProjectError(`В проект можно добавить не больше ${MAX_LOCAL_TRACKS} дорожек.`);
+        return null;
+      }
+      const projectSize =
+        tracksRef.current.reduce((sum, track) => sum + track.fileSize, 0) +
+        file.size;
+      if (projectSize > MAX_LOCAL_PROJECT_SIZE_BYTES) {
+        setProjectError("Общий размер дорожек не может превышать 750 МБ.");
+        return null;
+      }
+
+      const statusBeforeIngest = statusRef.current;
+      if (statusBeforeIngest !== "playing") {
+        setStatusValue("loading");
+      }
+      setProjectError(null);
+      const context =
+        audioContextRef.current ??
+        (() => {
+          const nextContext = new AudioContext();
+          audioContextRef.current = nextContext;
+          return nextContext;
+        })();
+
+      try {
+        const buffer = await context.decodeAudioData(await file.arrayBuffer());
+        if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+          throw new Error("invalid recorded audio duration");
+        }
+        const gain = context.createGain();
+        gain.gain.value = 1;
+        const outputGain = context.createGain();
+        outputGain.gain.value = 1;
+        gain.connect(outputGain);
+        outputGain.connect(context.destination);
+        const track: StudioLocalTrack = {
+          id: getTrackId(file, tracksRef.current.length),
+          fileName: file.name,
+          fileSize: file.size,
+          startTime: Number.isFinite(startTime) && startTime >= 0 ? startTime : 0,
+          offset: 0,
+          duration: buffer.duration,
+          fadeInDuration: 0,
+          fadeOutDuration: 0,
+          volume: 1,
+          muted: false,
+          status: "ready",
+          isReplacing: false,
+          replacementError: null,
+        };
+        trackRuntimesRef.current.set(track.id, {
+          file,
+          buffer,
+          gain,
+          outputGain,
+          source: null,
+        });
+        replaceTracks([...tracksRef.current, track]);
+        applyTrackGains();
+        if (statusBeforeIngest !== "playing") {
+          setStatusValue(statusBeforeIngest === "paused" ? "paused" : "ready");
+        }
+        return track;
+      } catch (decodeError) {
+        setProjectError(
+          `Не удалось обработать запись. ${formatDecodeError(decodeError)}`,
+        );
+        if (tracksRef.current.length === 0) {
+          setStatusValue("error");
+        } else if (statusBeforeIngest !== "playing") {
+          setStatusValue(statusBeforeIngest);
+        }
+        return null;
+      }
+    },
+    [applyTrackGains, replaceTracks, setStatusValue],
+  );
+
   const replaceTrackAudio = useCallback(
     async (trackId: string, file: File) => {
       const track = tracksRef.current.find((item) => item.id === trackId);
@@ -824,6 +915,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       currentTime,
       projectError,
       loadLocalFiles,
+      ingestRecordedFile,
       replaceTrackAudio,
       play,
       pause,
@@ -840,6 +932,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [
       currentTime,
       getTrackBuffer,
+      ingestRecordedFile,
       loadLocalFiles,
       pause,
       play,
