@@ -307,6 +307,7 @@ function StudioTimeline({
     if (!track.buffer) {
       return;
     }
+    onSelectClip(clip.id);
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
