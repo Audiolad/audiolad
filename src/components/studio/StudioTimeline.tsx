@@ -63,7 +63,9 @@ type StudioTimelineProps = {
   onSelectClip: (clipId: string | null) => void;
   onClipLayoutChange: (trackId: string, clipId: string, layout: StudioClipLayout) => void;
   onClipFadesChange: (trackId: string, clipId: string, fades: StudioClipFades) => void;
-  onClipGestureStart: () => void;
+  onClipGestureBegin: () => void;
+  onClipGestureCommit: () => void;
+  onClipGestureCancel: () => void;
   liveRecording: {
     slotId: string;
     startTime: number;
@@ -88,7 +90,9 @@ function StudioTimeline({
   onSelectClip,
   onClipLayoutChange,
   onClipFadesChange,
-  onClipGestureStart,
+  onClipGestureBegin,
+  onClipGestureCommit,
+  onClipGestureCancel,
   liveRecording,
   renderControls,
   renderEmpty,
@@ -320,7 +324,7 @@ function StudioTimeline({
       layout: getStudioClipLayout(clip, track.buffer.duration),
       fades: clampStudioClipFades(clip, clip.duration),
     };
-    onClipGestureStart();
+    onClipGestureBegin();
   };
   const previewClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     const layout = getGestureLayout(event);
@@ -362,6 +366,7 @@ function StudioTimeline({
     if (fades) {
       onClipFadesChange(gesture.track.id, gesture.clip.id, fades);
     }
+    onClipGestureCommit();
   };
   const cancelClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
@@ -380,6 +385,7 @@ function StudioTimeline({
       delete next[gesture.clip.id];
       return next;
     });
+    onClipGestureCancel();
   };
 
   const rulerStep = getRulerStepSeconds(pixelsPerSecond);

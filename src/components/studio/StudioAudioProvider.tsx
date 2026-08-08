@@ -35,6 +35,13 @@ import {
   validateStudioLocalFile,
 } from "@/lib/studio/local-file-validation";
 import { validateStudioRecordedFile } from "@/lib/studio/recorder";
+import {
+  createStudioEditingSnapshot,
+  getStudioPasteClips,
+  type StudioClipClipboard,
+  type StudioEditingSnapshot,
+  type StudioTrackSnapshot,
+} from "@/lib/studio/history";
 
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
@@ -93,7 +100,22 @@ type StudioAudioContextValue = {
   ) => void;
   splitClip: (trackId: string, clipId: string, atTime: number) => string | null;
   removeClip: (trackId: string, clipId: string) => void;
+  pasteClips: (
+    trackId: string,
+    clipboard: StudioClipClipboard,
+    startTime: number,
+  ) => string[];
   getTrackBuffer: (trackId: string) => AudioBuffer | null;
+  exportEditingState: () => StudioEditingSnapshot;
+  restoreEditingState: (
+    snapshot: StudioEditingSnapshot,
+  ) => { missingTrackIds: string[] };
+  restoreTracks: (
+    tracks: StudioTrackSnapshot[],
+    position?: number,
+  ) => { missingTrackIds: string[] };
+  pruneRetainedAssets: (referencedTrackIds: Iterable<string>) => void;
+  updateRetainedAssets: (referencedTrackIds: Iterable<string>) => void;
   reset: () => void;
 };
 
@@ -105,6 +127,8 @@ type TrackRuntime = {
   outputGain: GainNode;
   sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
 };
+
+type TrackAsset = Pick<TrackRuntime, "file" | "buffer">;
 
 export { validateStudioLocalFile };
 
@@ -126,6 +150,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackRuntimesRef = useRef(new Map<string, TrackRuntime>());
+  const assetVaultRef = useRef(new Map<string, TrackAsset>());
   const tracksRef = useRef<StudioLocalTrack[]>([]);
   const positionRef = useRef(0);
   const startedAtContextTimeRef = useRef(0);
@@ -152,6 +177,16 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     audioContextRef.current = nextContext;
     return nextContext;
   }, []);
+
+  const createTrackRuntime = useCallback(
+    (asset: TrackAsset): TrackRuntime => {
+      const context = getAudioContext();
+      const outputGain = context.createGain();
+      outputGain.connect(context.destination);
+      return { ...asset, outputGain, sources: new Map() };
+    },
+    [getAudioContext],
+  );
 
   const createMicrophoneAnalyser = useCallback(
     (stream: MediaStream) => {
@@ -350,6 +385,12 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => {
     loadGenerationRef.current += 1;
+    for (const [trackId, runtime] of trackRuntimesRef.current) {
+      assetVaultRef.current.set(trackId, {
+        file: runtime.file,
+        buffer: runtime.buffer,
+      });
+    }
     disposeResources();
     replaceTracks([]);
     positionRef.current = 0;
@@ -437,6 +478,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
             outputGain,
             sources: new Map(),
           });
+          assetVaultRef.current.set(id, { file, buffer });
           const createdTrack: StudioLocalTrack = {
             id,
             fileName: file.name,
@@ -553,6 +595,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           outputGain,
           sources: new Map(),
         });
+        assetVaultRef.current.set(track.id, { file, buffer });
         replaceTracks([...tracksRef.current, track]);
         applyTrackGains();
         if (statusBeforeIngest !== "playing") {
@@ -656,6 +699,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           outputGain,
           sources: new Map(),
         });
+        assetVaultRef.current.set(trackId, { file, buffer });
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
             ? (() => {
@@ -909,6 +953,40 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [pause, updateTrack],
   );
 
+  const pasteClips = useCallback(
+    (
+      trackId: string,
+      clipboard: StudioClipClipboard,
+      startTime: number,
+    ): string[] => {
+      const runtime = trackRuntimesRef.current.get(trackId);
+      if (
+        !runtime ||
+        clipboard.sourceTrackId !== trackId ||
+        clipboard.clips.length === 0
+      ) {
+        return [];
+      }
+      const clips = getStudioPasteClips({
+        clipboard,
+        targetStartTime: startTime,
+        targetBufferDuration: runtime.buffer.duration,
+        createClipId: () => crypto.randomUUID(),
+      });
+      if (clips.length === 0) {
+        return [];
+      }
+
+      pause();
+      updateTrack(trackId, (track) => ({
+        ...track,
+        clips: [...track.clips, ...clips],
+      }));
+      return clips.map((clip) => clip.id);
+    },
+    [pause, updateTrack],
+  );
+
   const getTrackBuffer = useCallback((trackId: string): AudioBuffer | null => {
     return trackRuntimesRef.current.get(trackId)?.buffer ?? null;
   }, []);
@@ -924,6 +1002,12 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       cancelProgressLoop();
       stopSources();
       const runtime = trackRuntimesRef.current.get(trackId);
+      if (runtime) {
+        assetVaultRef.current.set(trackId, {
+          file: runtime.file,
+          buffer: runtime.buffer,
+        });
+      }
       runtime?.outputGain.disconnect();
       trackRuntimesRef.current.delete(trackId);
       replaceTracks(tracksRef.current.filter((track) => track.id !== trackId));
@@ -954,6 +1038,115 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  const exportEditingState = useCallback((): StudioEditingSnapshot => {
+    const snapshotTracks: StudioTrackSnapshot[] = tracksRef.current.map(
+      (track) => ({
+        id: track.id,
+        fileName: track.fileName,
+        fileSize: track.fileSize,
+        clips: track.clips,
+        volume: track.volume,
+        muted: track.muted,
+      }),
+    );
+    return createStudioEditingSnapshot({
+      tracks: snapshotTracks,
+      slots: [],
+      selectedClipId: null,
+      position: getPlaybackPosition(),
+    });
+  }, [getPlaybackPosition]);
+
+  const restoreEditingState = useCallback(
+    (
+      snapshot: StudioEditingSnapshot,
+    ): { missingTrackIds: string[] } => {
+      cancelProgressLoop();
+      stopSources();
+      for (const runtime of trackRuntimesRef.current.values()) {
+        runtime.outputGain.disconnect();
+      }
+      trackRuntimesRef.current.clear();
+
+      const missingTrackIds: string[] = [];
+      const restoredTracks: StudioLocalTrack[] = [];
+      for (const track of snapshot.tracks) {
+        const asset = assetVaultRef.current.get(track.id);
+        if (!asset) {
+          missingTrackIds.push(track.id);
+          continue;
+        }
+        const runtime = createTrackRuntime(asset);
+        trackRuntimesRef.current.set(track.id, runtime);
+        restoredTracks.push({
+          ...track,
+          clips: track.clips.map((clip) => ({ ...clip })),
+          status: "ready",
+          isReplacing: false,
+          replacementError: null,
+        });
+      }
+
+      replaceTracks(restoredTracks);
+      applyTrackGains();
+      const position = clampStudioAudioPosition(
+        snapshot.position,
+        projectDurationRef.current,
+      );
+      positionRef.current = position;
+      startedAtContextTimeRef.current = 0;
+      startedAtPositionRef.current = position;
+      setCurrentTime(position);
+      setStatusValue(
+        restoredTracks.length === 0
+          ? "idle"
+          : position >= projectDurationRef.current
+            ? "ready"
+            : "paused",
+      );
+      return { missingTrackIds };
+    },
+    [
+      applyTrackGains,
+      cancelProgressLoop,
+      createTrackRuntime,
+      replaceTracks,
+      setStatusValue,
+      stopSources,
+    ],
+  );
+
+  const pruneRetainedAssets = useCallback(
+    (referencedTrackIds: Iterable<string>) => {
+      const retained = new Set(referencedTrackIds);
+      for (const track of tracksRef.current) {
+        retained.add(track.id);
+      }
+      for (const trackId of assetVaultRef.current.keys()) {
+        if (!retained.has(trackId)) {
+          assetVaultRef.current.delete(trackId);
+        }
+      }
+    },
+    [],
+  );
+
+  const restoreTracks = useCallback(
+    (
+      tracksToRestore: StudioTrackSnapshot[],
+      position = positionRef.current,
+    ) =>
+      restoreEditingState({
+        tracks: tracksToRestore,
+        slots: [],
+        selectedClipId: null,
+        position,
+      }),
+    [restoreEditingState],
+  );
+
+  const updateRetainedAssets = pruneRetainedAssets;
+
   useEffect(() => {
     return () => {
       disposeResources();
@@ -981,14 +1174,21 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setClipFades,
       splitClip,
       removeClip,
+      pasteClips,
       getTrackBuffer,
       removeTrack,
+      exportEditingState,
+      restoreEditingState,
+      restoreTracks,
+      pruneRetainedAssets,
+      updateRetainedAssets,
       reset,
     }),
     [
       currentTime,
       createMicrophoneAnalyser,
       getTrackBuffer,
+      exportEditingState,
       ingestRecordedFile,
       loadLocalFiles,
       pause,
@@ -1006,8 +1206,13 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setClipFades,
       splitClip,
       removeClip,
+      pasteClips,
+      pruneRetainedAssets,
+      restoreEditingState,
+      restoreTracks,
       toggleTrackMuted,
       tracks,
+      updateRetainedAssets,
     ],
   );
 

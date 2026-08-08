@@ -150,6 +150,21 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /removeClip/);
   assert.doesNotMatch(provider, /\bsolo\b/i);
   assert.match(provider, /removeTrack/);
+  assert.match(provider, /assetVaultRef/);
+  assert.match(provider, /exportEditingState/);
+  assert.match(provider, /restoreEditingState/);
+  assert.match(provider, /restoreTracks/);
+  assert.match(provider, /pruneRetainedAssets/);
+  assert.match(provider, /updateRetainedAssets/);
+  assert.match(provider, /pasteClips/);
+  assert.match(provider, /createTrackRuntime/);
+  assert.match(provider, /stopSources\(\);[\s\S]*trackRuntimesRef\.current\.clear\(\)/);
+  assert.match(provider, /position: getPlaybackPosition\(\)/);
+  assert.doesNotMatch(
+    readSource("src/lib/studio/history.ts"),
+    /\b(?:AudioBuffer|AudioBufferSourceNode|GainNode|File|Blob)\b/,
+    "history snapshots cannot retain browser audio assets or nodes",
+  );
   assert.match(provider, /cancelProgressLoop\(\)/);
   assert.match(provider, /context\.close\(\)/);
   assert.match(provider, /disposeResources\(\)/);
@@ -197,14 +212,14 @@ function testStudioBoundariesAndCrossTabStop() {
     /aria-label="(?:Пауза|Воспроизвести)"[\s\S]{0,240}(?:scale|transform)/,
     "Play/Pause controls do not use geometry-changing visual effects",
   );
-  assert.match(studioWorkspace, /handleSpaceShortcut/);
-  assert.match(studioWorkspace, /event\.key !== " "/);
+  assert.match(studioWorkspace, /handleStudioShortcut/);
+  assert.match(studioWorkspace, /event\.key === " "/);
   assert.match(studioWorkspace, /event\.repeat/);
   assert.match(studioWorkspace, /event\.ctrlKey/);
   assert.match(studioWorkspace, /event\.metaKey/);
   assert.match(studioWorkspace, /event\.altKey/);
   assert.match(studioWorkspace, /event\.isComposing/);
-  assert.match(studioWorkspace, /!canControlTransport/);
+  assert.match(studioWorkspace, /canControlTransport/);
   assert.match(studioWorkspace, /isNativeInteractiveTarget\(event\.target\)/);
   assert.match(
     studioWorkspace,
@@ -302,7 +317,7 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(
     studioWorkspace,
-    /item\.id === slot\.id \? \{ \.\.\.item, audioTrackId: null \} : item/,
+    /item\.id === slot\.id[\s\S]*audioTrackId: null/,
   );
   assert.match(studioWorkspace, /renderControls=\{renderTimelineControls\}/);
   assert.match(studioWorkspace, /renderEmpty=\{renderTimelineEmptyState\}/);

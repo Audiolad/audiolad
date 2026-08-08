@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:studio-provider-isolation": "node scripts/studio-provider-isolation-unit.mjs",
     "test:studio-audio-provider": "npx tsx scripts/studio-audio-provider-unit.mjs",
+    "test:studio-history": "npx tsx scripts/studio-history-unit.mjs",
+    "test:studio-shortcuts": "node scripts/studio-shortcuts-unit.mjs",
     "test:studio-clip-math": "npx tsx scripts/studio-clip-math-unit.mjs",
     "test:studio-fade-math": "npx tsx scripts/studio-fade-math-unit.mjs",
     "test:studio-recorder": "npx tsx scripts/studio-recorder-unit.mjs",

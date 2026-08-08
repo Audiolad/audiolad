@@ -23,6 +23,17 @@ import {
   MIN_STUDIO_CLIP_DURATION,
   type StudioClip,
 } from "@/lib/studio/clip-math";
+import {
+  createStudioClipClipboard,
+  createStudioHistory,
+  getStudioPasteClips,
+  recordStudioHistory,
+  redoStudioHistory,
+  undoStudioHistory,
+  type StudioClipClipboard,
+  type StudioEditingSnapshot,
+  type StudioHistory,
+} from "@/lib/studio/history";
 
 type StudioTrackSlot = {
   id: string;
@@ -39,6 +50,8 @@ const TRACK_ACCENTS = [
   "border-emerald-400/70 bg-emerald-400/15 text-emerald-200",
 ];
 const TIMELINE_ACCENTS = ["#a78bfa", "#38bdf8", "#2dd4bf", "#fbbf24", "#34d399"];
+const STUDIO_CLIP_OVERLAP_ERROR =
+  "Здесь недостаточно свободного места для вставки фрагмента.";
 
 function formatTime(value: number): string {
   if (!Number.isFinite(value) || value < 0) {
@@ -176,6 +189,11 @@ export default function StudioEditorShell() {
   );
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [history, setHistory] = useState<StudioHistory | null>(null);
+  const [clipboard, setClipboard] = useState<StudioClipClipboard | null>(null);
+  const [editingError, setEditingError] = useState<string | null>(null);
+  const historyRef = useRef<StudioHistory | null>(null);
+  const gestureSnapshotRef = useRef<StudioEditingSnapshot | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
@@ -183,15 +201,18 @@ export default function StudioEditorShell() {
   const {
     createMicrophoneAnalyser,
     currentTime,
+    exportEditingState,
     getTrackBuffer,
     ingestRecordedFile,
     loadLocalFiles,
     pause,
+    pasteClips,
     play,
     projectDuration,
     projectError,
     removeTrack,
     replaceTrackAudio,
+    restoreEditingState,
     seek,
     seekRelative,
     setClipFades,
@@ -202,12 +223,161 @@ export default function StudioEditorShell() {
     status,
     toggleTrackMuted,
     tracks,
+    updateRetainedAssets,
   } = useStudioAudio();
 
   const tracksById = useMemo(
     () => new Map(tracks.map((track) => [track.id, track])),
     [tracks],
   );
+  const captureEditingSnapshot = useCallback(
+    (): StudioEditingSnapshot => ({
+      ...exportEditingState(),
+      slots: slots.map((slot) => ({ ...slot })),
+      selectedClipId,
+    }),
+    [exportEditingState, selectedClipId, slots],
+  );
+  const updateHistory = useCallback((nextHistory: StudioHistory) => {
+    historyRef.current = nextHistory;
+    setHistory(nextHistory);
+    updateRetainedAssets([
+      ...nextHistory.past.flatMap((snapshot) =>
+        snapshot.tracks.map((track) => track.id),
+      ),
+      ...nextHistory.future.flatMap((snapshot) =>
+        snapshot.tracks.map((track) => track.id),
+      ),
+      ...(clipboard ? [clipboard.sourceTrackId] : []),
+    ]);
+  }, [clipboard, updateRetainedAssets]);
+  const recordEditingHistory = useCallback(
+    (before: StudioEditingSnapshot) => {
+      const next = recordStudioHistory(
+        historyRef.current ?? createStudioHistory(before),
+        captureEditingSnapshot(),
+      );
+      updateHistory(next);
+    },
+    [captureEditingSnapshot, updateHistory],
+  );
+  const runEditingAction = useCallback(
+    <Result,>(action: () => Result): Result => {
+      const before = captureEditingSnapshot();
+      const result = action();
+      recordEditingHistory(before);
+      return result;
+    },
+    [captureEditingSnapshot, recordEditingHistory],
+  );
+  const restoreHistorySnapshot = useCallback(
+    (snapshot: StudioEditingSnapshot) => {
+      restoreEditingState(snapshot);
+      const validClipIds = new Set(
+        snapshot.tracks.flatMap((track) => track.clips.map((clip) => clip.id)),
+      );
+      const trackIds = new Set(snapshot.tracks.map((track) => track.id));
+      setSlots(
+        snapshot.slots.map((slot) => ({
+          ...slot,
+          audioTrackId:
+            slot.audioTrackId && trackIds.has(slot.audioTrackId)
+              ? slot.audioTrackId
+              : null,
+        })),
+      );
+      setSelectedClipId(
+        snapshot.selectedClipId && validClipIds.has(snapshot.selectedClipId)
+          ? snapshot.selectedClipId
+          : null,
+      );
+      setEditingError(null);
+    },
+    [restoreEditingState],
+  );
+  const undo = useCallback(() => {
+    const next = undoStudioHistory(historyRef.current ?? createStudioHistory(
+      captureEditingSnapshot(),
+    ));
+    if (!next.snapshot) return;
+    updateHistory(next.history);
+    restoreHistorySnapshot(next.snapshot);
+  }, [captureEditingSnapshot, restoreHistorySnapshot, updateHistory]);
+  const redo = useCallback(() => {
+    const next = redoStudioHistory(historyRef.current ?? createStudioHistory(
+      captureEditingSnapshot(),
+    ));
+    if (!next.snapshot) return;
+    updateHistory(next.history);
+    restoreHistorySnapshot(next.snapshot);
+  }, [captureEditingSnapshot, restoreHistorySnapshot, updateHistory]);
+  const selectedTrackAndClip = (() => {
+    for (const track of tracks) {
+      const clip = track.clips.find((item) => item.id === selectedClipId);
+      if (clip) return { track, clip };
+    }
+    return null;
+  })();
+  const deleteSelectedClip = useCallback(() => {
+    if (!selectedTrackAndClip) return;
+    runEditingAction(() => {
+      if (selectedTrackAndClip.track.clips.length === 1) {
+        removeTrack(selectedTrackAndClip.track.id);
+      } else {
+        removeClip(selectedTrackAndClip.track.id, selectedTrackAndClip.clip.id);
+      }
+    });
+    setSelectedClipId(null);
+  }, [removeClip, removeTrack, runEditingAction, selectedTrackAndClip]);
+  const copySelectedClip = useCallback(() => {
+    if (!selectedTrackAndClip) return;
+    setClipboard(
+      createStudioClipClipboard(
+        selectedTrackAndClip.track.id,
+        [selectedTrackAndClip.clip],
+      ),
+    );
+    setEditingError(null);
+  }, [selectedTrackAndClip]);
+  const pasteClipboard = useCallback(() => {
+    if (!clipboard || !selectedTrackAndClip) return;
+    if (clipboard.sourceTrackId !== selectedTrackAndClip.track.id) {
+      return;
+    }
+    const buffer = getTrackBuffer(selectedTrackAndClip.track.id);
+    if (!buffer) return;
+    const pastedPreview = getStudioPasteClips({
+      clipboard,
+      targetStartTime: currentTime,
+      targetBufferDuration: buffer.duration,
+      createClipId: () => crypto.randomUUID(),
+    });
+    const overlaps = pastedPreview.some((candidate) =>
+      selectedTrackAndClip.track.clips.some(
+        (clip) =>
+          candidate.startTime < clip.startTime + clip.duration &&
+          candidate.startTime + candidate.duration > clip.startTime,
+      ),
+    );
+    if (overlaps) {
+      setEditingError(STUDIO_CLIP_OVERLAP_ERROR);
+      return;
+    }
+    const pastedIds = runEditingAction(() =>
+      pasteClips(selectedTrackAndClip.track.id, clipboard, currentTime),
+    );
+    if (pastedIds[0]) {
+      setSelectedClipId(pastedIds[0]);
+    }
+    setEditingError(null);
+  }, [
+    clipboard,
+    currentTime,
+    getTrackBuffer,
+    pasteClips,
+    runEditingAction,
+    selectedTrackAndClip,
+  ]);
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
@@ -236,31 +406,80 @@ export default function StudioEditorShell() {
   });
 
   useEffect(() => {
-    const handleSpaceShortcut = (event: KeyboardEvent) => {
-      if (
-        event.key !== " " ||
-        event.repeat ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.altKey ||
-        event.isComposing ||
-        !canControlTransport ||
-        isNativeInteractiveTarget(event.target)
-      ) {
+    const handleStudioShortcut = (event: KeyboardEvent) => {
+      if (event.isComposing || isNativeInteractiveTarget(event.target)) {
         return;
       }
+      const modifier = event.ctrlKey || event.metaKey;
 
-      event.preventDefault();
-      if (isPlaying) {
-        pause();
-      } else {
-        void play();
+      if (
+        event.key === " " &&
+        !event.repeat &&
+        !modifier &&
+        !event.altKey &&
+        canControlTransport
+      ) {
+        event.preventDefault();
+        if (isPlaying) {
+          pause();
+        } else {
+          void play();
+        }
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+      if (event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "c") {
+        if (!selectedTrackAndClip) return;
+        event.preventDefault();
+        copySelectedClip();
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "v") {
+        if (!clipboard || !selectedTrackAndClip) return;
+        event.preventDefault();
+        pasteClipboard();
+        return;
+      }
+      if (
+        !modifier &&
+        !event.altKey &&
+        !event.repeat &&
+        (event.key === "Delete" || event.key === "Backspace") &&
+        selectedTrackAndClip
+      ) {
+        event.preventDefault();
+        deleteSelectedClip();
       }
     };
 
-    document.addEventListener("keydown", handleSpaceShortcut);
-    return () => document.removeEventListener("keydown", handleSpaceShortcut);
-  }, [canControlTransport, isPlaying, pause, play]);
+    document.addEventListener("keydown", handleStudioShortcut);
+    return () => document.removeEventListener("keydown", handleStudioShortcut);
+  }, [
+    canControlTransport,
+    clipboard,
+    copySelectedClip,
+    deleteSelectedClip,
+    isPlaying,
+    pasteClipboard,
+    pause,
+    play,
+    redo,
+    selectedTrackAndClip,
+    undo,
+  ]);
 
   const timelineTracks = slots.map((slot) => {
     const track = slot.audioTrackId
@@ -433,12 +652,14 @@ export default function StudioEditorShell() {
               kind="in"
               onToggle={() => {
                 if (!track || !selectedClip) return;
-                setClipFades(track.id, selectedClip.id, {
-                  fadeInDuration:
-                    selectedClip.fadeInDuration > 0
-                      ? 0
-                      : getStudioDefaultFadeDuration(selectedClip.duration),
-                });
+                runEditingAction(() =>
+                  setClipFades(track.id, selectedClip.id, {
+                    fadeInDuration:
+                      selectedClip.fadeInDuration > 0
+                        ? 0
+                        : getStudioDefaultFadeDuration(selectedClip.duration),
+                  }),
+                );
               }}
             />
             <TrackFadeButton
@@ -446,12 +667,14 @@ export default function StudioEditorShell() {
               kind="out"
               onToggle={() => {
                 if (!track || !selectedClip) return;
-                setClipFades(track.id, selectedClip.id, {
-                  fadeOutDuration:
-                    selectedClip.fadeOutDuration > 0
-                      ? 0
-                      : getStudioDefaultFadeDuration(selectedClip.duration),
-                });
+                runEditingAction(() =>
+                  setClipFades(track.id, selectedClip.id, {
+                    fadeOutDuration:
+                      selectedClip.fadeOutDuration > 0
+                        ? 0
+                        : getStudioDefaultFadeDuration(selectedClip.duration),
+                  }),
+                );
               }}
             />
           </div>
@@ -479,38 +702,21 @@ export default function StudioEditorShell() {
                 </button>
                 <button type="button" disabled={!canSplitSelectedClip} onClick={() => {
                   if (!selectedClip) return;
-                  const nextId = splitClip(track.id, selectedClip.id, currentTime);
+                  const nextId = runEditingAction(() =>
+                    splitClip(track.id, selectedClip.id, currentTime),
+                  );
                   if (nextId) setSelectedClipId(nextId);
                 }} className="text-[#d8c8fb] disabled:opacity-40">
                   Разрезать
                 </button>
-                <button type="button" disabled={!selectedClip} onClick={() => {
-                  if (!selectedClip) return;
-                  if (track.clips.length === 1) {
-                    removeTrack(track.id);
-                    setSlots((currentSlots) =>
-                      currentSlots.map((item) =>
-                        item.id === slot.id
-                          ? { ...item, audioTrackId: null }
-                          : item,
-                      ),
-                    );
-                  } else {
-                    removeClip(track.id, selectedClip.id);
-                  }
-                  setSelectedClipId(null);
-                }} className="text-[#a9b4c7] disabled:opacity-40">
+                <button type="button" disabled={!selectedClip} onClick={deleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">
                   Удалить фрагмент
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    removeTrack(track.id);
-                    setSlots((currentSlots) =>
-                      currentSlots.map((item) =>
-                        item.id === slot.id ? { ...item, audioTrackId: null } : item,
-                      ),
-                    );
+                    runEditingAction(() => removeTrack(track.id));
+                    setSelectedClipId(null);
                   }}
                   className="text-[#a9b4c7]"
                 >
@@ -833,6 +1039,24 @@ export default function StudioEditorShell() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={!history || history.past.length < 2}
+                onClick={undo}
+                title="Отменить последнее действие (Ctrl/Cmd+Z)"
+                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Отменить
+              </button>
+              <button
+                type="button"
+                disabled={!history || history.future.length === 0}
+                onClick={redo}
+                title="Повторить отменённое действие (Ctrl/Cmd+Shift+Z или Ctrl+Y)"
+                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Повторить
+              </button>
               <button type="button" disabled title="Сохранение проектов будет добавлено на следующем этапе" className="h-10 rounded-lg border border-white/15 px-3 text-sm opacity-45">
                 Сохранить
               </button>
@@ -847,6 +1071,11 @@ export default function StudioEditorShell() {
           {projectError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {projectError}
+            </p>
+          ) : null}
+          {editingError ? (
+            <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              {editingError}
             </p>
           ) : null}
           {recordingError ? (
@@ -878,7 +1107,18 @@ export default function StudioEditorShell() {
             onSeek={seek}
             selectedClipId={selectedClipId}
             onSelectClip={setSelectedClipId}
-            onClipGestureStart={pause}
+            onClipGestureBegin={() => {
+              gestureSnapshotRef.current = exportEditingState();
+              pause();
+            }}
+            onClipGestureCommit={() => {
+              const snapshot = gestureSnapshotRef.current;
+              gestureSnapshotRef.current = null;
+              if (snapshot) recordEditingHistory(snapshot);
+            }}
+            onClipGestureCancel={() => {
+              gestureSnapshotRef.current = null;
+            }}
             onClipLayoutChange={setClipLayout}
             onClipFadesChange={setClipFades}
             renderControls={renderTimelineControls}
