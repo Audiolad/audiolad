@@ -589,6 +589,16 @@ export default function StudioEditorShell() {
               >
                 +15
               </button>
+              <button
+                type="button"
+                disabled={!canControlTransport}
+                onClick={() => seek(projectDuration)}
+                aria-label="Перейти в конец"
+                title="Перейти в конец проекта"
+                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ▶|
+              </button>
               <p className="min-w-[116px] text-center text-sm tabular-nums text-[#dfe5f2]">
                 {formatTime(currentTime)} / {formatTime(projectDuration)}
               </p>

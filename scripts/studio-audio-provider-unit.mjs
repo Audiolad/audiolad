@@ -206,6 +206,20 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(studioWorkspace, /seekRelative\(-15\)/);
   assert.match(studioWorkspace, /seekRelative\(15\)/);
+  assert.match(
+    studioWorkspace,
+    /seekRelative\(15\)[\s\S]*onClick=\{\(\) => seek\(projectDuration\)\}/,
+  );
+  assert.match(studioWorkspace, /aria-label="Перейти в конец"/);
+  assert.match(studioWorkspace, /title="Перейти в конец проекта"/);
+  assert.match(
+    studioWorkspace,
+    /disabled=\{!canControlTransport\}[\s\S]*onClick=\{\(\) => seek\(projectDuration\)\}/,
+  );
+  assert.match(
+    studioWorkspace,
+    /onClick=\{\(\) => seek\(projectDuration\)\}[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
+  );
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
   assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
   assert.match(studioWorkspace, /Дорожка 1/);
