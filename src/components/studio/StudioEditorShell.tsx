@@ -176,6 +176,7 @@ export default function StudioEditorShell() {
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
   ]);
   const {
+    createMicrophoneAnalyser,
     currentTime,
     getTrackBuffer,
     ingestRecordedFile,
@@ -208,10 +209,13 @@ export default function StudioEditorShell() {
     isRecording,
     recordingElapsed,
     recordingError,
+    recordingAnalyser,
+    recordingStartTime,
     recordingSlotId,
     startRecording,
     stopRecording,
   } = useStudioRecorder({
+    createMicrophoneAnalyser,
     onRecordedFile: async (file, startTime, slotId) => {
       const track = await ingestRecordedFile(file, { startTime });
       if (track) {
@@ -374,6 +378,15 @@ export default function StudioEditorShell() {
               </>
             )}
           </div>
+          {recordingSlotId === slot.id && isRecording ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-2 inline-flex w-fit items-center rounded-full border border-rose-400/50 bg-rose-500/15 px-2 py-1 text-xs font-semibold tabular-nums text-rose-100"
+            >
+              ● Идёт запись {formatTime(recordingElapsed)}
+            </p>
+          ) : null}
           <div className="mt-3 flex min-h-28 items-end gap-3">
             <TrackMuteButton
               track={track}
@@ -525,6 +538,9 @@ export default function StudioEditorShell() {
         <p className="text-sm font-medium text-[#e2e8f5]">Добавьте аудио</p>
         <p className="mt-1 text-xs text-[#97a4b8]">
           Загрузите аудиофайл с устройства
+        </p>
+        <p className="mt-2 text-xs text-[#718096]">
+          При записи под музыку лучше использовать наушники.
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button
@@ -714,6 +730,14 @@ export default function StudioEditorShell() {
                 className="min-w-[120px] flex-1 accent-[#9f7aea] disabled:cursor-not-allowed"
               />
             </section>
+            {isRecording ? (
+              <p
+                role="status"
+                className="rounded border border-rose-400/50 bg-rose-500/10 px-2 py-1 text-xs font-semibold tabular-nums text-rose-200"
+              >
+                ● Идёт запись {formatTime(recordingElapsed)}
+              </p>
+            ) : null}
 
             <div className="flex items-center gap-1">
               <span className="mr-1 text-xs uppercase tracking-wide text-[#99a4b8]">
@@ -795,6 +819,18 @@ export default function StudioEditorShell() {
             currentTime={currentTime}
             isPlaying={isPlaying}
             tracks={timelineTracks}
+            liveRecording={
+              isRecording &&
+              recordingSlotId &&
+              recordingAnalyser &&
+              recordingStartTime !== null
+                ? {
+                    slotId: recordingSlotId,
+                    startTime: recordingStartTime,
+                    analyser: recordingAnalyser,
+                  }
+                : null
+            }
             pixelsPerSecond={pixelsPerSecond}
             onViewportWidthChange={handleTimelineViewportWidthChange}
             onSeek={seek}

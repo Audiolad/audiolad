@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getStudioRecorderMimeType,
   getStudioRecordingExtension,
+  STUDIO_MICROPHONE_CONSTRAINTS,
+  shouldFallbackToBasicMicrophoneRequest,
   validateStudioRecordedFile,
 } from "@/lib/studio/recorder";
 
@@ -19,6 +21,9 @@ type StartStudioRecordingOptions = {
 };
 
 type UseStudioRecorderOptions = {
+  createMicrophoneAnalyser: (
+    stream: MediaStream,
+  ) => { analyser: AnalyserNode; disconnect: () => void };
   onRecordedFile: (
     file: File,
     startTime: number,
@@ -27,6 +32,7 @@ type UseStudioRecorderOptions = {
 };
 
 export function useStudioRecorder({
+  createMicrophoneAnalyser,
   onRecordedFile,
 }: UseStudioRecorderOptions) {
   const [recordingStatus, setRecordingStatus] = useState<
@@ -35,18 +41,32 @@ export function useStudioRecorder({
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [recordingSlotId, setRecordingSlotId] = useState<string | null>(null);
+  const [recordingAnalyser, setRecordingAnalyser] = useState<AnalyserNode | null>(
+    null,
+  );
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(
+    null,
+  );
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startTimeRef = useRef(0);
-  const elapsedFrameRef = useRef<number | null>(null);
+  const elapsedTimerRef = useRef<number | null>(null);
+  const analyserDisconnectRef = useRef<(() => void) | null>(null);
   const discardResultRef = useRef(false);
   const isDisposedRef = useRef(false);
 
   const stopElapsedTimer = useCallback(() => {
-    if (elapsedFrameRef.current !== null) {
-      window.cancelAnimationFrame(elapsedFrameRef.current);
-      elapsedFrameRef.current = null;
+    if (elapsedTimerRef.current !== null) {
+      window.clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
     }
+  }, []);
+
+  const releaseAnalyser = useCallback(() => {
+    analyserDisconnectRef.current?.();
+    analyserDisconnectRef.current = null;
+    setRecordingAnalyser(null);
+    setRecordingStartTime(null);
   }, []);
 
   const releaseStream = useCallback(() => {
@@ -82,7 +102,17 @@ export function useStudioRecorder({
       discardResultRef.current = false;
       isStartingRecorder = true;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: STUDIO_MICROPHONE_CONSTRAINTS,
+          });
+        } catch (error) {
+          if (!shouldFallbackToBasicMicrophoneRequest(error)) {
+            throw error;
+          }
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
         if (isDisposedRef.current) {
           stream.getTracks().forEach((track) => track.stop());
           isStartingRecorder = false;
@@ -107,11 +137,18 @@ export function useStudioRecorder({
         };
         recorder.onerror = () => {
           setRecordingError("Не удалось записать звук с микрофона.");
+          discardResultRef.current = true;
+          stopElapsedTimer();
+          releaseAnalyser();
+          if (recorder.state !== "inactive") {
+            recorder.stop();
+          }
         };
         recorder.onstop = () => {
           activeRecorder = activeRecorder === recorder ? null : activeRecorder;
           recorderRef.current = null;
           stopElapsedTimer();
+          releaseAnalyser();
           releaseStream();
           if (discardResultRef.current) {
             setRecordingStatus("idle");
@@ -146,13 +183,18 @@ export function useStudioRecorder({
         const startedAt = performance.now();
         const updateElapsed = () => {
           setRecordingElapsed((performance.now() - startedAt) / 1000);
-          elapsedFrameRef.current = window.requestAnimationFrame(updateElapsed);
         };
         setRecordingElapsed(0);
-        elapsedFrameRef.current = window.requestAnimationFrame(updateElapsed);
+        const microphoneAnalysis = createMicrophoneAnalyser(stream);
+        analyserDisconnectRef.current = microphoneAnalysis.disconnect;
+        setRecordingAnalyser(microphoneAnalysis.analyser);
+        setRecordingStartTime(startTime);
         recorder.start();
+        elapsedTimerRef.current = window.setInterval(updateElapsed, 250);
         setRecordingStatus("recording");
       } catch (error) {
+        stopElapsedTimer();
+        releaseAnalyser();
         releaseStream();
         recorderRef.current = null;
         activeRecorder = null;
@@ -168,7 +210,14 @@ export function useStudioRecorder({
         );
       }
     },
-    [onRecordedFile, recordingStatus, releaseStream, stopElapsedTimer],
+    [
+      createMicrophoneAnalyser,
+      onRecordedFile,
+      recordingStatus,
+      releaseAnalyser,
+      releaseStream,
+      stopElapsedTimer,
+    ],
   );
 
   useEffect(() => {
@@ -176,6 +225,7 @@ export function useStudioRecorder({
       isDisposedRef.current = true;
       discardResultRef.current = true;
       stopElapsedTimer();
+      releaseAnalyser();
       const recorder = recorderRef.current;
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
@@ -186,7 +236,7 @@ export function useStudioRecorder({
       }
       isStartingRecorder = false;
     };
-  }, [releaseStream, stopElapsedTimer]);
+  }, [releaseAnalyser, releaseStream, stopElapsedTimer]);
 
   return {
     isRecording: recordingStatus === "recording",
@@ -194,6 +244,8 @@ export function useStudioRecorder({
     recordingElapsed,
     recordingError,
     recordingSlotId,
+    recordingAnalyser,
+    recordingStartTime,
     startRecording,
     stopRecording,
   };

@@ -5,6 +5,12 @@ export const STUDIO_RECORDER_MIME_TYPES = [
   "audio/ogg;codecs=opus",
 ] as const;
 
+export const STUDIO_MICROPHONE_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+};
+
 const RECORDING_EXTENSION_BY_MIME: Record<string, string> = {
   "audio/webm": "webm",
   "audio/mp4": "mp4",
@@ -13,6 +19,14 @@ const RECORDING_EXTENSION_BY_MIME: Record<string, string> = {
 
 function getBaseMimeType(mimeType: string): string {
   return mimeType.split(";", 1)[0].trim().toLowerCase();
+}
+
+export function shouldFallbackToBasicMicrophoneRequest(error: unknown): boolean {
+  const name =
+    error instanceof DOMException || error instanceof Error ? error.name : "";
+  return ["OverconstrainedError", "NotSupportedError", "TypeError"].includes(
+    name,
+  );
 }
 
 export function getStudioRecorderMimeType(): string | null {

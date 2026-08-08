@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { StudioLiveWaveformCanvas } from "@/components/studio/StudioLiveWaveformCanvas";
 import { StudioWaveformCanvas } from "@/components/studio/StudioWaveformCanvas";
 import {
   formatTimelineTime,
@@ -62,6 +63,11 @@ type StudioTimelineProps = {
   onClipLayoutChange: (trackId: string, layout: StudioClipLayout) => void;
   onClipFadesChange: (trackId: string, fades: StudioClipFades) => void;
   onClipGestureStart: () => void;
+  liveRecording: {
+    slotId: string;
+    startTime: number;
+    analyser: AnalyserNode;
+  } | null;
   renderControls: (track: StudioTimelineTrack, index: number) => ReactNode;
   renderEmpty: (track: StudioTimelineTrack, index: number) => ReactNode;
 };
@@ -80,6 +86,7 @@ function StudioTimeline({
   onClipLayoutChange,
   onClipFadesChange,
   onClipGestureStart,
+  liveRecording,
   renderControls,
   renderEmpty,
 }: StudioTimelineProps, ref) {
@@ -509,6 +516,14 @@ function StudioTimeline({
                           onPointerCancel={cancelClipGesture}
                         />
                       </div>
+                    ) : null}
+                    {!track.hasAudio && liveRecording?.slotId === track.id ? (
+                      <StudioLiveWaveformCanvas
+                        analyser={liveRecording.analyser}
+                        startTime={liveRecording.startTime}
+                        pixelsPerSecond={pixelsPerSecond}
+                        accent={track.accent}
+                      />
                     ) : null}
                   </div>
                   {track.hasAudio && track.buffer && clipWidth > 0 ? (

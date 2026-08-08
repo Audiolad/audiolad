@@ -67,6 +67,9 @@ type StudioAudioContextValue = {
   status: StudioAudioStatus;
   currentTime: number;
   projectError: string | null;
+  createMicrophoneAnalyser: (
+    stream: MediaStream,
+  ) => { analyser: AnalyserNode; disconnect: () => void };
   loadLocalFiles: (files: Iterable<File>) => Promise<StudioLocalTrack[]>;
   ingestRecordedFile: (
     file: File,
@@ -135,6 +138,36 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       animationFrameRef.current = null;
     }
   }, []);
+
+  const getAudioContext = useCallback(() => {
+    if (audioContextRef.current) {
+      return audioContextRef.current;
+    }
+
+    const nextContext = new AudioContext();
+    audioContextRef.current = nextContext;
+    return nextContext;
+  }, []);
+
+  const createMicrophoneAnalyser = useCallback(
+    (stream: MediaStream) => {
+      const context = getAudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+
+      return {
+        analyser,
+        disconnect: () => {
+          source.disconnect();
+          analyser.disconnect();
+        },
+      };
+    },
+    [getAudioContext],
+  );
 
   const setStatusValue = useCallback((nextStatus: StudioAudioStatus) => {
     statusRef.current = nextStatus;
@@ -384,13 +417,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       }
       setProjectError(null);
 
-      const context =
-        audioContextRef.current ??
-        (() => {
-          const nextContext = new AudioContext();
-          audioContextRef.current = nextContext;
-          return nextContext;
-        })();
+      const context = getAudioContext();
       const decodedTracks: Array<{ file: File; buffer: AudioBuffer }> = [];
 
       try {
@@ -469,6 +496,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [
       applyTrackGains,
       cancelProgressLoop,
+      getAudioContext,
       getPlaybackPosition,
       replaceTracks,
       setStatusValue,
@@ -501,13 +529,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         setStatusValue("loading");
       }
       setProjectError(null);
-      const context =
-        audioContextRef.current ??
-        (() => {
-          const nextContext = new AudioContext();
-          audioContextRef.current = nextContext;
-          return nextContext;
-        })();
+      const context = getAudioContext();
 
       try {
         const buffer = await context.decodeAudioData(await file.arrayBuffer());
@@ -560,7 +582,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [applyTrackGains, replaceTracks, setStatusValue],
+    [applyTrackGains, getAudioContext, replaceTracks, setStatusValue],
   );
 
   const replaceTrackAudio = useCallback(
@@ -613,13 +635,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         replacementError: null,
       }));
 
-      const context =
-        audioContextRef.current ??
-        (() => {
-          const nextContext = new AudioContext();
-          audioContextRef.current = nextContext;
-          return nextContext;
-        })();
+      const context = getAudioContext();
 
       try {
         const buffer = await context.decodeAudioData(await file.arrayBuffer());
@@ -694,6 +710,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [
       applyTrackGains,
       cancelProgressLoop,
+      getAudioContext,
       getPlaybackPosition,
       replaceTracks,
       setStatusValue,
@@ -914,6 +931,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       status,
       currentTime,
       projectError,
+      createMicrophoneAnalyser,
       loadLocalFiles,
       ingestRecordedFile,
       replaceTrackAudio,
@@ -931,6 +949,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     }),
     [
       currentTime,
+      createMicrophoneAnalyser,
       getTrackBuffer,
       ingestRecordedFile,
       loadLocalFiles,
