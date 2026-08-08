@@ -799,11 +799,15 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const nextPosition = clampStudioAudioPosition(
-        requestedPosition,
-        projectDurationRef.current,
-      );
       const wasPlaying = statusRef.current === "playing";
+      const nextPosition = wasPlaying
+        ? clampStudioAudioPosition(
+            requestedPosition,
+            projectDurationRef.current,
+          )
+        : Number.isFinite(requestedPosition)
+          ? Math.max(requestedPosition, 0)
+          : 0;
 
       if (wasPlaying) {
         stopSources();
@@ -1089,10 +1093,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
       replaceTracks(restoredTracks);
       applyTrackGains();
-      const position = clampStudioAudioPosition(
-        snapshot.position,
-        projectDurationRef.current,
-      );
+      const position = Number.isFinite(snapshot.position)
+        ? Math.max(snapshot.position, 0)
+        : 0;
       positionRef.current = position;
       startedAtContextTimeRef.current = 0;
       startedAtPositionRef.current = position;

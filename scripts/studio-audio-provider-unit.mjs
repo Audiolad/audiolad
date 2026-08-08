@@ -340,7 +340,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /forwardRef<StudioTimelineHandle, StudioTimelineProps>/);
   assert.match(timeline, /useImperativeHandle/);
   assert.match(timeline, /scrollToStart: \(\) => scrollTo\(0\)/);
-  assert.match(timeline, /scrollWidth - viewport\.clientWidth/);
+  assert.match(timeline, /timeToTimelineX\(projectExtent, pixelsPerSecond\)/);
   assert.match(timeline, /lastManualScrollAtRef\.current = Date\.now\(\)/);
   assert.doesNotMatch(timeline, /querySelector/);
   assert.match(timeline, /overflow-x-auto/);
@@ -361,6 +361,11 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /selectedClipId/);
   assert.match(timeline, /track\.clips\.map/);
   assert.match(timeline, /onPointerUp=\{seekFromPointer\}/);
+  assert.match(timeline, /getTimelineEditExtent/);
+  assert.match(timeline, /const editHorizon = getTimelineEditExtent/);
+  assert.match(timeline, /timelineXToTime\(offsetX, pixelsPerSecond\), editHorizon/);
+  assert.match(timeline, /timeToTimelineX\(projectExtent, pixelsPerSecond\)/);
+  assert.match(timeline, /onSelectClip\(null\)/);
   const beginGesture = timeline.slice(
     timeline.indexOf("const beginClipGesture"),
     timeline.indexOf("const previewClipGesture"),
@@ -374,10 +379,13 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /clip=\{selectedClip\}/);
   assert.match(studioWorkspace, /disabled=\{!selectedClip\}/);
   assert.match(studioWorkspace, /disabled=\{!canSplitSelectedClip\}/);
-  assert.match(studioWorkspace, /currentTime > selectedClip\.startTime \+ MIN_STUDIO_CLIP_DURATION/);
   assert.match(
     studioWorkspace,
-    /currentTime <\s*selectedClip\.startTime \+\s*selectedClip\.duration -\s*MIN_STUDIO_CLIP_DURATION/,
+    /currentTime >\s*selectedTrackAndClip\.clip\.startTime \+\s*MIN_STUDIO_CLIP_DURATION/,
+  );
+  assert.match(
+    studioWorkspace,
+    /currentTime <\s*selectedTrackAndClip\.clip\.startTime \+\s*selectedTrackAndClip\.clip\.duration -\s*MIN_STUDIO_CLIP_DURATION/,
   );
   assert.match(
     timeline,

@@ -8,6 +8,7 @@ import {
   getAnchoredTimelineScrollLeft,
   getFitPixelsPerSecond,
   getRulerStepSeconds,
+  getTimelineEditExtent,
   getTimelineWidth,
   timeToTimelineX,
   timelineXToTime,
@@ -16,6 +17,8 @@ import {
 assert.equal(clampPixelsPerSecond(5), 20);
 assert.equal(clampPixelsPerSecond(900), 400);
 assert.equal(getTimelineWidth(12, 50), 600);
+assert.equal(getTimelineEditExtent(60, 80, 800), 62.5);
+assert.equal(getTimelineEditExtent(60, 80, 0), 62);
 assert.equal(timeToTimelineX(2.5, 80), 200);
 assert.equal(timelineXToTime(200, 80), 2.5);
 assert.equal(getFitPixelsPerSecond(20, 800), 40);

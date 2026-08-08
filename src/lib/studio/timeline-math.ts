@@ -29,6 +29,22 @@ export function getTimelineWidth(
   return Math.max(duration * normalizePixelsPerSecond(pixelsPerSecond), minimumWidth);
 }
 
+export function getTimelineEditExtent(
+  projectDuration: number,
+  pixelsPerSecond: number,
+  viewportWidth: number,
+): number {
+  const safeDuration =
+    Number.isFinite(projectDuration) && projectDuration > 0 ? projectDuration : 0;
+  const pixels = normalizePixelsPerSecond(pixelsPerSecond);
+  const trailingPixels = Math.max(
+    Number.isFinite(viewportWidth) ? viewportWidth * 0.25 : 0,
+    pixels * 2,
+  );
+
+  return safeDuration + trailingPixels / pixels;
+}
+
 export function timeToTimelineX(time: number, pixelsPerSecond: number): number {
   if (!Number.isFinite(time) || time <= 0) {
     return 0;

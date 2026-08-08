@@ -318,6 +318,39 @@ export default function StudioEditorShell() {
     }
     return null;
   })();
+  const canSplitSelectedClip = Boolean(
+    selectedTrackAndClip &&
+      currentTime >
+        selectedTrackAndClip.clip.startTime + MIN_STUDIO_CLIP_DURATION &&
+      currentTime <
+        selectedTrackAndClip.clip.startTime +
+          selectedTrackAndClip.clip.duration -
+          MIN_STUDIO_CLIP_DURATION,
+  );
+  const splitSelectedClip = useCallback(() => {
+    if (!selectedTrackAndClip || !canSplitSelectedClip) {
+      return false;
+    }
+
+    const nextId = runEditingAction(() =>
+      splitClip(
+        selectedTrackAndClip.track.id,
+        selectedTrackAndClip.clip.id,
+        currentTime,
+      ),
+    );
+    if (nextId) {
+      setSelectedClipId(nextId);
+      return true;
+    }
+    return false;
+  }, [
+    canSplitSelectedClip,
+    currentTime,
+    runEditingAction,
+    selectedTrackAndClip,
+    splitClip,
+  ]);
   const deleteSelectedClip = useCallback(() => {
     if (!selectedTrackAndClip) return;
     runEditingAction(() => {
@@ -454,6 +487,18 @@ export default function StudioEditorShell() {
         return;
       }
       if (
+        modifier &&
+        !event.altKey &&
+        !event.repeat &&
+        event.key.toLowerCase() === "b" &&
+        canSplitSelectedClip
+      ) {
+        if (splitSelectedClip()) {
+          event.preventDefault();
+        }
+        return;
+      }
+      if (
         !modifier &&
         !event.altKey &&
         !event.repeat &&
@@ -469,6 +514,7 @@ export default function StudioEditorShell() {
     return () => document.removeEventListener("keydown", handleStudioShortcut);
   }, [
     canControlTransport,
+    canSplitSelectedClip,
     clipboard,
     copySelectedClip,
     deleteSelectedClip,
@@ -478,6 +524,7 @@ export default function StudioEditorShell() {
     play,
     redo,
     selectedTrackAndClip,
+    splitSelectedClip,
     undo,
   ]);
 
@@ -560,14 +607,6 @@ export default function StudioEditorShell() {
       ? tracksById.get(slot.audioTrackId)
       : undefined;
     const selectedClip = track?.clips.find((clip) => clip.id === selectedClipId);
-    const canSplitSelectedClip = Boolean(
-      selectedClip &&
-        currentTime > selectedClip.startTime + MIN_STUDIO_CLIP_DURATION &&
-        currentTime <
-          selectedClip.startTime +
-            selectedClip.duration -
-            MIN_STUDIO_CLIP_DURATION,
-    );
     if (!slot) {
       return null;
     }
@@ -700,13 +739,7 @@ export default function StudioEditorShell() {
                 >
                   Заменить аудио
                 </button>
-                <button type="button" disabled={!canSplitSelectedClip} onClick={() => {
-                  if (!selectedClip) return;
-                  const nextId = runEditingAction(() =>
-                    splitClip(track.id, selectedClip.id, currentTime),
-                  );
-                  if (nextId) setSelectedClipId(nextId);
-                }} className="text-[#d8c8fb] disabled:opacity-40">
+                <button type="button" disabled={!canSplitSelectedClip} onClick={splitSelectedClip} className="text-[#d8c8fb] disabled:opacity-40">
                   Разрезать
                 </button>
                 <button type="button" disabled={!selectedClip} onClick={deleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">

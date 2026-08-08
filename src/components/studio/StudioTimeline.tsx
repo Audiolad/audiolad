@@ -16,6 +16,7 @@ import {
   formatTimelineTime,
   getAnchoredTimelineScrollLeft,
   getRulerStepSeconds,
+  getTimelineEditExtent,
   getTimelineWidth,
   timeToTimelineX,
   timelineXToTime,
@@ -118,14 +119,19 @@ function StudioTimeline({
   const [previewFades, setPreviewFades] = useState<
     Record<string, StudioClipFades>
   >({});
-  const displayDuration = Math.max(
+  const projectExtent = Math.max(
     duration,
     ...tracks.flatMap((track) => track.clips.map((clip) =>
       getStudioClipEnd(previewLayouts[clip.id] ?? getStudioClipLayout(clip, track.buffer?.duration ?? 0)),
     )),
   );
+  const editHorizon = getTimelineEditExtent(
+    projectExtent,
+    pixelsPerSecond,
+    viewportWidth,
+  );
   const timelineWidth = getTimelineWidth(
-    displayDuration,
+    editHorizon,
     pixelsPerSecond,
     viewportWidth,
   );
@@ -159,10 +165,16 @@ function StudioTimeline({
         if (!viewport) {
           return;
         }
-        scrollTo(Math.max(viewport.scrollWidth - viewport.clientWidth, 0));
+        scrollTo(
+          Math.max(
+            timeToTimelineX(projectExtent, pixelsPerSecond) -
+              viewport.clientWidth,
+            0,
+          ),
+        );
       },
     }),
-    [scrollTo],
+    [pixelsPerSecond, projectExtent, scrollTo],
   );
 
   useEffect(() => {
@@ -226,9 +238,15 @@ function StudioTimeline({
   }, [duration, isPlaying, playheadX]);
 
   const seekAtOffset = (offsetX: number) => {
-    onSeek(Math.min(timelineXToTime(offsetX, pixelsPerSecond), duration));
+    onSeek(Math.min(timelineXToTime(offsetX, pixelsPerSecond), editHorizon));
   };
   const seekFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (
+      !(event.target instanceof Element) ||
+      !event.target.closest("[data-studio-clip], [data-studio-fade-lane]")
+    ) {
+      onSelectClip(null);
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     seekAtOffset(event.clientX - rect.left);
   };
@@ -390,7 +408,7 @@ function StudioTimeline({
 
   const rulerStep = getRulerStepSeconds(pixelsPerSecond);
   const rulerMarks: number[] = [];
-  for (let time = 0; time <= displayDuration; time += rulerStep) {
+  for (let time = 0; time <= editHorizon; time += rulerStep) {
     rulerMarks.push(time);
   }
 
