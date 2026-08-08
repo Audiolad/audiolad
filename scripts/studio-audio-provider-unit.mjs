@@ -364,6 +364,21 @@ function testStudioBoundariesAndCrossTabStop() {
     studioWorkspace,
     /currentTime <\s*selectedClip\.startTime \+\s*selectedClip\.duration -\s*MIN_STUDIO_CLIP_DURATION/,
   );
+  assert.match(
+    timeline,
+    /aria-label=\{`Автоматизация затуханий \$\{track\.name\}`\}[\s\S]*className="relative h-9 border-t/,
+  );
+  assert.doesNotMatch(timeline, /absolute top-\[88px\]/);
+  assert.match(timeline, /selectedClipId === clip\.id/);
+  assert.match(
+    timeline,
+    /clip\.fadeInDuration > 0 \|\| clip\.fadeOutDuration > 0/,
+  );
+  assert.match(
+    timeline,
+    /clip\.fadeInDuration <= 0 && clip\.fadeOutDuration <= 0/,
+  );
+  assert.doesNotMatch(timeline, /track\.fade(?:In|Out)Duration/);
   assert.match(timeline, /lastManualScrollAtRef/);
   assert.match(timeline, /getAnchoredTimelineScrollLeft/);
   assert.match(timeline, /onSeek=\{\(clipX\)/);

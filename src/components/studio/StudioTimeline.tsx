@@ -442,7 +442,6 @@ function StudioTimeline({
                   <div className="relative h-[88px] bg-[#0d131d]">
                     {track.hasAudio && track.buffer ? track.clips.map((clip) => {
                       const layout = previewLayouts[clip.id] ?? getStudioClipLayout(clip, track.buffer!.duration);
-                      const fades = previewFades[clip.id] ?? clampStudioClipFades(clip, layout.duration);
                       const clipLeft = timeToTimelineX(layout.startTime, pixelsPerSecond);
                       const clipWidth = Math.min(timeToTimelineX(layout.duration, pixelsPerSecond), Math.max(timelineWidth - clipLeft, 0));
                       const clipRenderStartX = Math.max(renderStartX - clipLeft, 0);
@@ -490,14 +489,6 @@ function StudioTimeline({
                           onPointerCancel={cancelClipGesture}
                         />
                       </div>
-                      <div aria-label={`Автоматизация затуханий ${track.name}`} className="absolute top-[88px] h-9 border-t border-white/10 bg-[#111a27]" style={{ left: clipLeft, width: clipWidth }}>
-                        <div className={`absolute inset-y-1 overflow-hidden rounded-sm border bg-violet-400/10 ${selectedClipId === clip.id ? "border-violet-200" : "border-violet-300/35"}`} data-studio-fade-lane={clip.id} onPointerDown={() => onSelectClip(clip.id)}>
-                          <span aria-hidden="true" className="absolute bottom-0 left-0 top-0 bg-violet-300/25" style={{ width: timeToTimelineX(fades.fadeInDuration, pixelsPerSecond), clipPath: "polygon(0 100%, 100% 0, 100% 100%)" }} />
-                          <span aria-hidden="true" className="absolute bottom-0 right-0 top-0 bg-violet-300/25" style={{ width: timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond), clipPath: "polygon(0 0, 100% 100%, 0 100%)" }} />
-                          <div aria-label={`Настроить появление ${track.name}`} className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white" style={{ left: Math.max(timeToTimelineX(fades.fadeInDuration, pixelsPerSecond) - 4, 0) }} onPointerDown={(event) => beginClipGesture(event, track, clip, "fade-in")} onPointerMove={previewClipGesture} onPointerUp={finishClipGesture} onPointerCancel={cancelClipGesture} />
-                          <div aria-label={`Настроить затухание ${track.name}`} className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white" style={{ left: Math.max(clipWidth - timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond) - 4, 0) }} onPointerDown={(event) => beginClipGesture(event, track, clip, "fade-out")} onPointerMove={previewClipGesture} onPointerUp={finishClipGesture} onPointerCancel={cancelClipGesture} />
-                        </div>
-                      </div>
                         </div>
                       );
                     }) : null}
@@ -510,6 +501,117 @@ function StudioTimeline({
                       />
                     ) : null}
                   </div>
+                  {track.hasAudio && track.buffer && track.clips.some(
+                    (clip) =>
+                      selectedClipId === clip.id &&
+                      (clip.fadeInDuration > 0 || clip.fadeOutDuration > 0),
+                  ) ? (
+                    <div
+                      aria-label={`Автоматизация затуханий ${track.name}`}
+                      className="relative h-9 border-t border-white/10 bg-[#111a27]"
+                    >
+                      {track.clips.map((clip) => {
+                        if (
+                          selectedClipId !== clip.id ||
+                          (clip.fadeInDuration <= 0 && clip.fadeOutDuration <= 0)
+                        ) {
+                          return null;
+                        }
+
+                        const layout =
+                          previewLayouts[clip.id] ??
+                          getStudioClipLayout(clip, track.buffer!.duration);
+                        const fades =
+                          previewFades[clip.id] ??
+                          clampStudioClipFades(clip, layout.duration);
+                        const clipLeft = timeToTimelineX(
+                          layout.startTime,
+                          pixelsPerSecond,
+                        );
+                        const clipWidth = Math.min(
+                          timeToTimelineX(layout.duration, pixelsPerSecond),
+                          Math.max(timelineWidth - clipLeft, 0),
+                        );
+
+                        if (clipWidth <= 0) {
+                          return null;
+                        }
+
+                        return (
+                          <div
+                            key={clip.id}
+                            className="absolute inset-y-1 overflow-hidden rounded-sm border border-violet-200 bg-violet-400/10"
+                            style={{ left: clipLeft, width: clipWidth }}
+                            data-studio-fade-lane={clip.id}
+                            onPointerDown={() => onSelectClip(clip.id)}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-0 left-0 top-0 bg-violet-300/25"
+                              style={{
+                                width: timeToTimelineX(
+                                  fades.fadeInDuration,
+                                  pixelsPerSecond,
+                                ),
+                                clipPath: "polygon(0 100%, 100% 0, 100% 100%)",
+                              }}
+                            />
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-0 right-0 top-0 bg-violet-300/25"
+                              style={{
+                                width: timeToTimelineX(
+                                  fades.fadeOutDuration,
+                                  pixelsPerSecond,
+                                ),
+                                clipPath: "polygon(0 0, 100% 100%, 0 100%)",
+                              }}
+                            />
+                            <div
+                              aria-label={`Настроить появление ${track.name}`}
+                              className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
+                              style={{
+                                left: Math.max(
+                                  timeToTimelineX(
+                                    fades.fadeInDuration,
+                                    pixelsPerSecond,
+                                  ) - 4,
+                                  0,
+                                ),
+                              }}
+                              onPointerDown={(event) =>
+                                beginClipGesture(event, track, clip, "fade-in")
+                              }
+                              onPointerMove={previewClipGesture}
+                              onPointerUp={finishClipGesture}
+                              onPointerCancel={cancelClipGesture}
+                            />
+                            <div
+                              aria-label={`Настроить затухание ${track.name}`}
+                              className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
+                              style={{
+                                left: Math.max(
+                                  clipWidth -
+                                    timeToTimelineX(
+                                      fades.fadeOutDuration,
+                                      pixelsPerSecond,
+                                    ) -
+                                    4,
+                                  0,
+                                ),
+                              }}
+                              onPointerDown={(event) =>
+                                beginClipGesture(event, track, clip, "fade-out")
+                              }
+                              onPointerMove={previewClipGesture}
+                              onPointerUp={finishClipGesture}
+                              onPointerCancel={cancelClipGesture}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   {track.clips.length === 0 ? renderEmpty(track, index) : null}
                 </div>
               );
