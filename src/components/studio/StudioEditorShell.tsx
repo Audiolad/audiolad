@@ -19,6 +19,10 @@ import {
   getFitPixelsPerSecond,
 } from "@/lib/studio/timeline-math";
 import { getStudioDefaultFadeDuration } from "@/lib/studio/fade-math";
+import {
+  MIN_STUDIO_CLIP_DURATION,
+  type StudioClip,
+} from "@/lib/studio/clip-math";
 
 type StudioTrackSlot = {
   id: string;
@@ -120,29 +124,29 @@ function TrackMuteButton({
 }
 
 function TrackFadeButton({
-  track,
+  clip,
   kind,
   onToggle,
 }: {
-  track?: StudioLocalTrack;
+  clip?: StudioClip;
   kind: "in" | "out";
   onToggle: () => void;
 }) {
   const isFadeIn = kind === "in";
   const active = isFadeIn
-    ? (track?.fadeInDuration ?? 0) > 0
-    : (track?.fadeOutDuration ?? 0) > 0;
+    ? (clip?.fadeInDuration ?? 0) > 0
+    : (clip?.fadeOutDuration ?? 0) > 0;
   const label = isFadeIn ? "Плавное появление" : "Плавное затухание";
 
   return (
     <button
       type="button"
-      disabled={!track}
+      disabled={!clip}
       onClick={onToggle}
       aria-label={label}
       aria-pressed={active}
       title={
-        track
+        clip
           ? active
             ? `${label}: выключить`
             : `${label}: включить`
@@ -171,6 +175,7 @@ export default function StudioEditorShell() {
     DEFAULT_PIXELS_PER_SECOND,
   );
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
@@ -191,6 +196,8 @@ export default function StudioEditorShell() {
     seekRelative,
     setClipFades,
     setClipLayout,
+    splitClip,
+    removeClip,
     setTrackVolume,
     status,
     toggleTrackMuted,
@@ -263,13 +270,9 @@ export default function StudioEditorShell() {
       id: track?.id ?? slot.id,
       name: slot.name,
       fileName: track?.fileName,
-      hasAudio: Boolean(slot.audioTrackId && track),
+      hasAudio: Boolean(slot.audioTrackId && track?.clips.length),
       buffer: track ? getTrackBuffer(track.id) : null,
-      startTime: track?.startTime ?? 0,
-      offset: track?.offset ?? 0,
-      duration: track?.duration ?? 0,
-      fadeInDuration: track?.fadeInDuration ?? 0,
-      fadeOutDuration: track?.fadeOutDuration ?? 0,
+      clips: track?.clips ?? [],
       accent: TIMELINE_ACCENTS[slots.indexOf(slot) % TIMELINE_ACCENTS.length],
     };
   });
@@ -337,6 +340,15 @@ export default function StudioEditorShell() {
     const track = slot?.audioTrackId
       ? tracksById.get(slot.audioTrackId)
       : undefined;
+    const selectedClip = track?.clips.find((clip) => clip.id === selectedClipId);
+    const canSplitSelectedClip = Boolean(
+      selectedClip &&
+        currentTime > selectedClip.startTime + MIN_STUDIO_CLIP_DURATION &&
+        currentTime <
+          selectedClip.startTime +
+            selectedClip.duration -
+            MIN_STUDIO_CLIP_DURATION,
+    );
     if (!slot) {
       return null;
     }
@@ -417,28 +429,28 @@ export default function StudioEditorShell() {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <TrackFadeButton
-              track={track}
+              clip={selectedClip}
               kind="in"
               onToggle={() => {
-                if (!track) return;
-                setClipFades(track.id, {
+                if (!track || !selectedClip) return;
+                setClipFades(track.id, selectedClip.id, {
                   fadeInDuration:
-                    track.fadeInDuration > 0
+                    selectedClip.fadeInDuration > 0
                       ? 0
-                      : getStudioDefaultFadeDuration(track.duration),
+                      : getStudioDefaultFadeDuration(selectedClip.duration),
                 });
               }}
             />
             <TrackFadeButton
-              track={track}
+              clip={selectedClip}
               kind="out"
               onToggle={() => {
-                if (!track) return;
-                setClipFades(track.id, {
+                if (!track || !selectedClip) return;
+                setClipFades(track.id, selectedClip.id, {
                   fadeOutDuration:
-                    track.fadeOutDuration > 0
+                    selectedClip.fadeOutDuration > 0
                       ? 0
-                      : getStudioDefaultFadeDuration(track.duration),
+                      : getStudioDefaultFadeDuration(selectedClip.duration),
                 });
               }}
             />
@@ -448,7 +460,7 @@ export default function StudioEditorShell() {
               <>
                 <button
                   type="button"
-                  disabled={track.isReplacing}
+                  disabled={track.isReplacing || track.clips.length > 1}
                   onClick={() => {
                     pause();
                     if (replaceAudioInputRef.current) {
@@ -456,9 +468,39 @@ export default function StudioEditorShell() {
                       replaceAudioInputRef.current.click();
                     }
                   }}
+                  title={
+                    track.clips.length > 1
+                      ? "Объедините или очистите фрагменты перед заменой аудио"
+                      : undefined
+                  }
                   className="text-[#d8c8fb] disabled:opacity-40"
                 >
                   Заменить аудио
+                </button>
+                <button type="button" disabled={!canSplitSelectedClip} onClick={() => {
+                  if (!selectedClip) return;
+                  const nextId = splitClip(track.id, selectedClip.id, currentTime);
+                  if (nextId) setSelectedClipId(nextId);
+                }} className="text-[#d8c8fb] disabled:opacity-40">
+                  Разрезать
+                </button>
+                <button type="button" disabled={!selectedClip} onClick={() => {
+                  if (!selectedClip) return;
+                  if (track.clips.length === 1) {
+                    removeTrack(track.id);
+                    setSlots((currentSlots) =>
+                      currentSlots.map((item) =>
+                        item.id === slot.id
+                          ? { ...item, audioTrackId: null }
+                          : item,
+                      ),
+                    );
+                  } else {
+                    removeClip(track.id, selectedClip.id);
+                  }
+                  setSelectedClipId(null);
+                }} className="text-[#a9b4c7] disabled:opacity-40">
+                  Удалить фрагмент
                 </button>
                 <button
                   type="button"
@@ -834,6 +876,8 @@ export default function StudioEditorShell() {
             pixelsPerSecond={pixelsPerSecond}
             onViewportWidthChange={handleTimelineViewportWidthChange}
             onSeek={seek}
+            selectedClipId={selectedClipId}
+            onSelectClip={setSelectedClipId}
             onClipGestureStart={pause}
             onClipLayoutChange={setClipLayout}
             onClipFadesChange={setClipFades}
@@ -995,7 +1039,7 @@ export default function StudioEditorShell() {
                               {track.fileName}
                             </p>
                             <p className="mt-1 text-xs text-[#9ba7bb]">
-                              {formatTime(track.duration)} · {formatFileSize(track.fileSize)}
+                              {formatTime(Math.max(...track.clips.map((clip) => clip.duration), 0))} · {formatFileSize(track.fileSize)}
                               {track.isReplacing ? " · Замена аудио…" : ""}
                             </p>
                           </div>

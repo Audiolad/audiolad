@@ -15,12 +15,14 @@ import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
-  getStudioProjectDuration,
   getStudioReplacementProjectSize,
   getStudioTrackGain,
 } from "@/lib/studio/audio-engine-math";
 import {
   getStudioClipLayout,
+  getStudioProjectDurationFromClips,
+  splitStudioClip,
+  type StudioClip,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
 import {
@@ -49,11 +51,7 @@ export type StudioLocalTrack = {
   id: string;
   fileName: string;
   fileSize: number;
-  startTime: number;
-  offset: number;
-  duration: number;
-  fadeInDuration: number;
-  fadeOutDuration: number;
+  clips: StudioClip[];
   volume: number;
   muted: boolean;
   status: "loading" | "ready" | "error";
@@ -85,9 +83,16 @@ type StudioAudioContextValue = {
   toggleTrackMuted: (trackId: string) => void;
   setClipLayout: (
     trackId: string,
+    clipId: string,
     layout: Partial<StudioClipLayout>,
   ) => void;
-  setClipFades: (trackId: string, fades: Partial<StudioClipFades>) => void;
+  setClipFades: (
+    trackId: string,
+    clipId: string,
+    fades: Partial<StudioClipFades>,
+  ) => void;
+  splitClip: (trackId: string, clipId: string, atTime: number) => string | null;
+  removeClip: (trackId: string, clipId: string) => void;
   getTrackBuffer: (trackId: string) => AudioBuffer | null;
   reset: () => void;
 };
@@ -97,9 +102,8 @@ const StudioAudioContext = createContext<StudioAudioContextValue | null>(null);
 type TrackRuntime = {
   file: File;
   buffer: AudioBuffer;
-  gain: GainNode;
   outputGain: GainNode;
-  source: AudioBufferSourceNode | null;
+  sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
 };
 
 export { validateStudioLocalFile };
@@ -176,7 +180,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
   const replaceTracks = useCallback((nextTracks: StudioLocalTrack[]) => {
     tracksRef.current = nextTracks;
-    projectDurationRef.current = getStudioProjectDuration(nextTracks);
+    projectDurationRef.current = getStudioProjectDurationFromClips(nextTracks);
     setTracks(nextTracks);
     setProjectDuration(projectDurationRef.current);
   }, []);
@@ -195,19 +199,17 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
   const stopSources = useCallback(() => {
     for (const runtime of trackRuntimesRef.current.values()) {
-      const source = runtime.source;
-      runtime.source = null;
-      if (!source) {
-        continue;
+      for (const { source, envelopeGain } of runtime.sources.values()) {
+        source.onended = null;
+        try {
+          source.stop();
+        } catch {
+          // A source may already have reached its end.
+        }
+        source.disconnect();
+        envelopeGain.disconnect();
       }
-
-      source.onended = null;
-      try {
-        source.stop();
-      } catch {
-        // A source may already have reached its end.
-      }
-      source.disconnect();
+      runtime.sources.clear();
     }
   }, []);
 
@@ -274,60 +276,50 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       const startAt = context.currentTime;
       for (const track of tracksRef.current) {
         const runtime = trackRuntimesRef.current.get(track.id);
-        if (!runtime || position >= track.startTime + track.duration) {
+        if (!runtime) {
           continue;
         }
-
-        const elapsedClipTime = Math.max(position - track.startTime, 0);
-        const remaining = track.duration - elapsedClipTime;
-        if (remaining <= 0) {
-          continue;
-        }
-        const source = context.createBufferSource();
-        source.buffer = runtime.buffer;
-        source.connect(runtime.gain);
-        const sourceStartAt = startAt + Math.max(track.startTime - position, 0);
-        const fades = clampStudioClipFades(track, track.duration);
-        const fadeGain = runtime.gain.gain;
-        fadeGain.cancelScheduledValues(sourceStartAt);
-        fadeGain.setValueAtTime(
-          getStudioFadeEnvelope(elapsedClipTime, track.duration, fades),
-          sourceStartAt,
-        );
-        if (
-          fades.fadeInDuration > elapsedClipTime &&
-          fades.fadeInDuration < track.duration
-        ) {
-          fadeGain.linearRampToValueAtTime(
-            1,
-            sourceStartAt + (fades.fadeInDuration - elapsedClipTime),
-          );
-        }
-        const fadeOutStart = track.duration - fades.fadeOutDuration;
-        if (fadeOutStart > elapsedClipTime) {
+        for (const clip of track.clips) {
+          if (position >= clip.startTime + clip.duration) continue;
+          const elapsedClipTime = Math.max(position - clip.startTime, 0);
+          const remaining = clip.duration - elapsedClipTime;
+          if (remaining <= 0) continue;
+          const source = context.createBufferSource();
+          const envelopeGain = context.createGain();
+          source.buffer = runtime.buffer;
+          source.connect(envelopeGain);
+          envelopeGain.connect(runtime.outputGain);
+          const sourceStartAt = startAt + Math.max(clip.startTime - position, 0);
+          const fades = clampStudioClipFades(clip, clip.duration);
+          const fadeGain = envelopeGain.gain;
           fadeGain.setValueAtTime(
-            1,
-            sourceStartAt + (fadeOutStart - elapsedClipTime),
+            getStudioFadeEnvelope(elapsedClipTime, clip.duration, fades),
+            sourceStartAt,
           );
-        }
-        if (fades.fadeOutDuration > 0) {
-          fadeGain.linearRampToValueAtTime(
-            0,
-            sourceStartAt + (track.duration - elapsedClipTime),
-          );
-        }
-        runtime.source = source;
-        source.onended = () => {
-          if (runtime.source === source) {
-            runtime.source = null;
+          if (fades.fadeInDuration > elapsedClipTime) {
+            fadeGain.linearRampToValueAtTime(1, sourceStartAt + (fades.fadeInDuration - elapsedClipTime));
           }
-          source.disconnect();
-        };
-        source.start(
-          startAt + Math.max(track.startTime - position, 0),
-          track.offset + elapsedClipTime,
-          remaining,
-        );
+          const fadeOutStart = clip.duration - fades.fadeOutDuration;
+          if (fadeOutStart > elapsedClipTime) {
+            fadeGain.setValueAtTime(1, sourceStartAt + (fadeOutStart - elapsedClipTime));
+          }
+          if (fades.fadeOutDuration > 0) {
+            fadeGain.linearRampToValueAtTime(0, sourceStartAt + (clip.duration - elapsedClipTime));
+          }
+          runtime.sources.set(clip.id, { source, envelopeGain });
+          source.onended = () => {
+            if (runtime.sources.get(clip.id)?.source === source) {
+              runtime.sources.delete(clip.id);
+            }
+            source.disconnect();
+            envelopeGain.disconnect();
+          };
+          source.start(
+            sourceStartAt,
+            clip.offset + elapsedClipTime,
+            remaining,
+          );
+        }
       }
 
       startedAtContextTimeRef.current = startAt;
@@ -344,7 +336,6 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     cancelProgressLoop();
     stopSources();
     for (const runtime of trackRuntimesRef.current.values()) {
-      runtime.gain.disconnect();
       runtime.outputGain.disconnect();
     }
     trackRuntimesRef.current.clear();
@@ -437,28 +428,27 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         const createdTracks: StudioLocalTrack[] = [];
         for (const [index, { file, buffer }] of decodedTracks.entries()) {
           const id = getTrackId(file, index);
-          const gain = context.createGain();
-          gain.gain.value = 1;
           const outputGain = context.createGain();
           outputGain.gain.value = 1;
-          gain.connect(outputGain);
           outputGain.connect(context.destination);
           trackRuntimesRef.current.set(id, {
             file,
             buffer,
-            gain,
             outputGain,
-            source: null,
+            sources: new Map(),
           });
           const createdTrack: StudioLocalTrack = {
             id,
             fileName: file.name,
             fileSize: file.size,
-            startTime: 0,
-            offset: 0,
-            duration: buffer.duration,
-            fadeInDuration: 0,
-            fadeOutDuration: 0,
+            clips: [{
+              id: crypto.randomUUID(),
+              startTime: 0,
+              offset: 0,
+              duration: buffer.duration,
+              fadeInDuration: 0,
+              fadeOutDuration: 0,
+            }],
             volume: 1,
             muted: false,
             status: "ready",
@@ -536,21 +526,21 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
           throw new Error("invalid recorded audio duration");
         }
-        const gain = context.createGain();
-        gain.gain.value = 1;
         const outputGain = context.createGain();
         outputGain.gain.value = 1;
-        gain.connect(outputGain);
         outputGain.connect(context.destination);
         const track: StudioLocalTrack = {
           id: getTrackId(file, tracksRef.current.length),
           fileName: file.name,
           fileSize: file.size,
-          startTime: Number.isFinite(startTime) && startTime >= 0 ? startTime : 0,
-          offset: 0,
-          duration: buffer.duration,
-          fadeInDuration: 0,
-          fadeOutDuration: 0,
+          clips: [{
+            id: crypto.randomUUID(),
+            startTime: Number.isFinite(startTime) && startTime >= 0 ? startTime : 0,
+            offset: 0,
+            duration: buffer.duration,
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+          }],
           volume: 1,
           muted: false,
           status: "ready",
@@ -560,9 +550,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         trackRuntimesRef.current.set(track.id, {
           file,
           buffer,
-          gain,
           outputGain,
-          source: null,
+          sources: new Map(),
         });
         replaceTracks([...tracksRef.current, track]);
         applyTrackGains();
@@ -653,29 +642,33 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        oldRuntime.source?.stop();
-        oldRuntime.source?.disconnect();
-        oldRuntime.gain.disconnect();
+        for (const { source, envelopeGain } of oldRuntime.sources.values()) {
+          source.stop();
+          source.disconnect();
+          envelopeGain.disconnect();
+        }
         oldRuntime.outputGain.disconnect();
-        const gain = context.createGain();
         const outputGain = context.createGain();
-        gain.connect(outputGain);
         outputGain.connect(context.destination);
         trackRuntimesRef.current.set(trackId, {
           file,
           buffer,
-          gain,
           outputGain,
-          source: null,
+          sources: new Map(),
         });
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
             ? (() => {
-                const layout = getStudioClipLayout(item, buffer.duration);
                 return {
                   ...item,
-                  ...layout,
-                  ...clampStudioClipFades(item, layout.duration),
+                  clips: item.clips.map((clip) => {
+                    const layout = getStudioClipLayout(clip, buffer.duration);
+                    return {
+                      ...clip,
+                      ...layout,
+                      ...clampStudioClipFades(clip, layout.duration),
+                    };
+                  }),
                   fileName: file.name,
                   fileSize: file.size,
                   isReplacing: false,
@@ -818,7 +811,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   );
 
   const setClipLayout = useCallback(
-    (trackId: string, layout: Partial<StudioClipLayout>) => {
+    (trackId: string, clipId: string, layout: Partial<StudioClipLayout>) => {
       const runtime = trackRuntimesRef.current.get(trackId);
       if (!runtime) {
         return;
@@ -827,18 +820,24 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         pause();
       }
       updateTrack(trackId, (track) => {
-        const nextLayout = getStudioClipLayout(
-          {
-            startTime: layout.startTime ?? track.startTime,
-            offset: layout.offset ?? track.offset,
-            duration: layout.duration ?? track.duration,
-          },
-          runtime.buffer.duration,
-        );
         return {
           ...track,
-          ...nextLayout,
-          ...clampStudioClipFades(track, nextLayout.duration),
+          clips: track.clips.map((clip) => {
+            if (clip.id !== clipId) return clip;
+            const nextLayout = getStudioClipLayout(
+              {
+                startTime: layout.startTime ?? clip.startTime,
+                offset: layout.offset ?? clip.offset,
+                duration: layout.duration ?? clip.duration,
+              },
+              runtime.buffer.duration,
+            );
+            return {
+              ...clip,
+              ...nextLayout,
+              ...clampStudioClipFades(clip, nextLayout.duration),
+            };
+          }),
         };
       });
       const nextPosition = clampStudioAudioPosition(
@@ -852,7 +851,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   );
 
   const setClipFades = useCallback(
-    (trackId: string, fades: Partial<StudioClipFades>) => {
+    (trackId: string, clipId: string, fades: Partial<StudioClipFades>) => {
       if (!trackRuntimesRef.current.has(trackId)) {
         return;
       }
@@ -861,13 +860,50 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       }
       updateTrack(trackId, (track) => ({
         ...track,
-        ...clampStudioClipFades(
-          {
-            fadeInDuration: fades.fadeInDuration ?? track.fadeInDuration,
-            fadeOutDuration: fades.fadeOutDuration ?? track.fadeOutDuration,
-          },
-          track.duration,
+        clips: track.clips.map((clip) =>
+          clip.id !== clipId
+            ? clip
+            : {
+                ...clip,
+                ...clampStudioClipFades(
+                  {
+                    fadeInDuration: fades.fadeInDuration ?? clip.fadeInDuration,
+                    fadeOutDuration: fades.fadeOutDuration ?? clip.fadeOutDuration,
+                  },
+                  clip.duration,
+                ),
+              },
         ),
+      }));
+    },
+    [pause, updateTrack],
+  );
+
+  const splitClip = useCallback(
+    (trackId: string, clipId: string, atTime: number) => {
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      const clip = track?.clips.find((item) => item.id === clipId);
+      if (!track || !clip) return null;
+      const split = splitStudioClip(clip, atTime, crypto.randomUUID());
+      if (!split) return null;
+      pause();
+      updateTrack(trackId, (item) => ({
+        ...item,
+        clips: item.clips.flatMap((candidate) =>
+          candidate.id === clipId ? [split.left, split.right] : [candidate],
+        ),
+      }));
+      return split.right.id;
+    },
+    [pause, updateTrack],
+  );
+
+  const removeClip = useCallback(
+    (trackId: string, clipId: string) => {
+      pause();
+      updateTrack(trackId, (track) => ({
+        ...track,
+        clips: track.clips.filter((clip) => clip.id !== clipId),
       }));
     },
     [pause, updateTrack],
@@ -888,7 +924,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       cancelProgressLoop();
       stopSources();
       const runtime = trackRuntimesRef.current.get(trackId);
-      runtime?.gain.disconnect();
+      runtime?.outputGain.disconnect();
       trackRuntimesRef.current.delete(trackId);
       replaceTracks(tracksRef.current.filter((track) => track.id !== trackId));
       const nextPosition = clampStudioAudioPosition(
@@ -943,6 +979,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       toggleTrackMuted,
       setClipLayout,
       setClipFades,
+      splitClip,
+      removeClip,
       getTrackBuffer,
       removeTrack,
       reset,
@@ -966,6 +1004,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       status,
       setClipLayout,
       setClipFades,
+      splitClip,
+      removeClip,
       toggleTrackMuted,
       tracks,
     ],

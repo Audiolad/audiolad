@@ -24,8 +24,11 @@ import {
   getStudioClipEnd,
   getStudioClipLayout,
   getStudioClipMoveLayout,
+  getStudioClipSnapCandidates,
+  getStudioSameTrackBounds,
   getStudioClipTrimEndLayout,
   getStudioClipTrimStartLayout,
+  type StudioClip,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
 import {
@@ -39,11 +42,7 @@ export type StudioTimelineTrack = {
   fileName?: string;
   hasAudio: boolean;
   buffer: AudioBuffer | null;
-  startTime: number;
-  offset: number;
-  duration: number;
-  fadeInDuration: number;
-  fadeOutDuration: number;
+  clips: StudioClip[];
   accent: string;
 };
 
@@ -60,8 +59,10 @@ type StudioTimelineProps = {
   pixelsPerSecond: number;
   onViewportWidthChange: (width: number) => void;
   onSeek: (time: number) => void;
-  onClipLayoutChange: (trackId: string, layout: StudioClipLayout) => void;
-  onClipFadesChange: (trackId: string, fades: StudioClipFades) => void;
+  selectedClipId: string | null;
+  onSelectClip: (clipId: string | null) => void;
+  onClipLayoutChange: (trackId: string, clipId: string, layout: StudioClipLayout) => void;
+  onClipFadesChange: (trackId: string, clipId: string, fades: StudioClipFades) => void;
   onClipGestureStart: () => void;
   liveRecording: {
     slotId: string;
@@ -83,6 +84,8 @@ function StudioTimeline({
   pixelsPerSecond,
   onViewportWidthChange,
   onSeek,
+  selectedClipId,
+  onSelectClip,
   onClipLayoutChange,
   onClipFadesChange,
   onClipGestureStart,
@@ -98,6 +101,7 @@ function StudioTimeline({
   const isAutoScrollingRef = useRef(false);
   const gestureRef = useRef<{
     track: StudioTimelineTrack;
+    clip: StudioClip;
     kind: "move" | "trim-start" | "trim-end" | "fade-in" | "fade-out";
     pointerId: number;
     pointerStartX: number;
@@ -112,12 +116,9 @@ function StudioTimeline({
   >({});
   const displayDuration = Math.max(
     duration,
-    ...tracks.map((track) =>
-      getStudioClipEnd(
-        previewLayouts[track.id] ??
-          getStudioClipLayout(track, track.buffer?.duration ?? 0),
-      ),
-    ),
+    ...tracks.flatMap((track) => track.clips.map((clip) =>
+      getStudioClipEnd(previewLayouts[clip.id] ?? getStudioClipLayout(clip, track.buffer?.duration ?? 0)),
+    )),
   );
   const timelineWidth = getTimelineWidth(
     displayDuration,
@@ -228,14 +229,12 @@ function StudioTimeline({
     seekAtOffset(event.clientX - rect.left);
   };
 
-  const getSnapTargets = (trackId: string) => [
-    0,
-    duration,
-    ...tracks.flatMap((track) =>
-      track.id === trackId
-        ? []
-        : [track.startTime, track.startTime + track.duration],
+  const getSnapTargets = (clipId: string) => [
+    ...getStudioClipSnapCandidates(
+      tracks.flatMap((track) => track.clips),
+      clipId,
     ),
+    duration,
   ];
   const getGestureLayout = (
     event: React.PointerEvent<HTMLDivElement>,
@@ -248,9 +247,10 @@ function StudioTimeline({
     const common = {
       layout: gesture.layout,
       bufferDuration: gesture.track.buffer?.duration ?? 0,
-      snapTargets: getSnapTargets(gesture.track.id),
+      snapTargets: getSnapTargets(gesture.clip.id),
       pixelsPerSecond,
       bypassSnap: event.altKey,
+      collisionBounds: getStudioSameTrackBounds(gesture.clip, gesture.track.clips),
     };
     if (gesture.kind === "move") {
       return getStudioClipMoveLayout({
@@ -301,6 +301,7 @@ function StudioTimeline({
   const beginClipGesture = (
     event: React.PointerEvent<HTMLDivElement>,
     track: StudioTimelineTrack,
+    clip: StudioClip,
     kind: "move" | "trim-start" | "trim-end" | "fade-in" | "fade-out",
   ) => {
     if (!track.buffer) {
@@ -311,11 +312,12 @@ function StudioTimeline({
     event.currentTarget.setPointerCapture(event.pointerId);
     gestureRef.current = {
       track,
+      clip,
       kind,
       pointerId: event.pointerId,
       pointerStartX: event.clientX,
-      layout: getStudioClipLayout(track, track.buffer.duration),
-      fades: clampStudioClipFades(track, track.duration),
+      layout: getStudioClipLayout(clip, track.buffer.duration),
+      fades: clampStudioClipFades(clip, clip.duration),
     };
     onClipGestureStart();
   };
@@ -323,11 +325,12 @@ function StudioTimeline({
     const layout = getGestureLayout(event);
     const fades = getGestureFades(event);
     const track = gestureRef.current?.track;
+    const clip = gestureRef.current?.clip;
     if (layout && track) {
-      setPreviewLayouts((current) => ({ ...current, [track.id]: layout }));
+      setPreviewLayouts((current) => ({ ...current, [clip!.id]: layout }));
     }
     if (fades && track) {
-      setPreviewFades((current) => ({ ...current, [track.id]: fades }));
+      setPreviewFades((current) => ({ ...current, [clip!.id]: fades }));
     }
   };
   const finishClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -344,19 +347,19 @@ function StudioTimeline({
     gestureRef.current = null;
     setPreviewLayouts((current) => {
       const next = { ...current };
-      delete next[gesture.track.id];
+      delete next[gesture.clip.id];
       return next;
     });
     setPreviewFades((current) => {
       const next = { ...current };
-      delete next[gesture.track.id];
+      delete next[gesture.clip.id];
       return next;
     });
     if (layout) {
-      onClipLayoutChange(gesture.track.id, layout);
+      onClipLayoutChange(gesture.track.id, gesture.clip.id, layout);
     }
     if (fades) {
-      onClipFadesChange(gesture.track.id, fades);
+      onClipFadesChange(gesture.track.id, gesture.clip.id, fades);
     }
   };
   const cancelClipGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -368,12 +371,12 @@ function StudioTimeline({
     gestureRef.current = null;
     setPreviewLayouts((current) => {
       const next = { ...current };
-      delete next[gesture.track.id];
+      delete next[gesture.clip.id];
       return next;
     });
     setPreviewFades((current) => {
       const next = { ...current };
-      delete next[gesture.track.id];
+      delete next[gesture.clip.id];
       return next;
     });
   };
@@ -428,24 +431,6 @@ function StudioTimeline({
             </div>
 
             {tracks.map((track, index) => {
-              const layout = previewLayouts[track.id] ??
-                getStudioClipLayout(track, track.buffer?.duration ?? 0);
-              const fades = previewFades[track.id] ??
-                clampStudioClipFades(track, layout.duration);
-              const clipLeft = timeToTimelineX(layout.startTime, pixelsPerSecond);
-              const clipWidth = Math.min(
-                timeToTimelineX(layout.duration, pixelsPerSecond),
-                Math.max(timelineWidth - clipLeft, 0),
-              );
-              const clipRenderStartX = Math.max(renderStartX - clipLeft, 0);
-              const clipRenderWidth = Math.min(
-                renderWidth,
-                Math.max(
-                  Math.min(renderStartX + renderWidth, clipLeft + clipWidth) -
-                    (clipLeft + clipRenderStartX),
-                  0,
-                ),
-              );
               return (
                 <div
                   key={track.id}
@@ -454,42 +439,30 @@ function StudioTimeline({
                   onPointerUp={seekFromPointer}
                 >
                   <div className="relative h-[88px] bg-[#0d131d]">
-                    {track.hasAudio && track.buffer && clipRenderWidth > 0 ? (
-                      <div
-                        className="absolute top-0 overflow-hidden"
-                        style={{
-                          left: clipLeft + clipRenderStartX,
-                          width: clipRenderWidth,
-                        }}
-                      >
-                        <StudioWaveformCanvas
-                          buffer={track.buffer}
-                          sourceOffset={layout.offset}
-                          sourceDuration={layout.duration}
-                          timelineWidth={clipWidth}
-                          viewportWidth={clipRenderWidth}
-                          renderStartX={clipRenderStartX}
-                          accent={track.accent}
-                          onSeek={(clipX) =>
-                            onSeek(
-                              layout.startTime +
-                                timelineXToTime(clipX, pixelsPerSecond),
-                            )
-                          }
-                        />
-                      </div>
-                    ) : null}
-                    {track.hasAudio && track.buffer && clipWidth > 0 ? (
+                    {track.hasAudio && track.buffer ? track.clips.map((clip) => {
+                      const layout = previewLayouts[clip.id] ?? getStudioClipLayout(clip, track.buffer!.duration);
+                      const fades = previewFades[clip.id] ?? clampStudioClipFades(clip, layout.duration);
+                      const clipLeft = timeToTimelineX(layout.startTime, pixelsPerSecond);
+                      const clipWidth = Math.min(timeToTimelineX(layout.duration, pixelsPerSecond), Math.max(timelineWidth - clipLeft, 0));
+                      const clipRenderStartX = Math.max(renderStartX - clipLeft, 0);
+                      const clipRenderWidth = Math.min(renderWidth, Math.max(Math.min(renderStartX + renderWidth, clipLeft + clipWidth) - (clipLeft + clipRenderStartX), 0));
+                      if (clipWidth <= 0) return null;
+                      return (
+                        <div key={clip.id}>
+                    {clipRenderWidth > 0 ? <div className="absolute top-0 overflow-hidden" style={{ left: clipLeft + clipRenderStartX, width: clipRenderWidth }}>
+                      <StudioWaveformCanvas buffer={track.buffer!} sourceOffset={layout.offset} sourceDuration={layout.duration} timelineWidth={clipWidth} viewportWidth={clipRenderWidth} renderStartX={clipRenderStartX} accent={track.accent} onSeek={(clipX) => { onSelectClip(clip.id); onSeek(layout.startTime + timelineXToTime(clipX, pixelsPerSecond)); }} />
+                    </div> : null}
                       <div
                         className="absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border border-white/30 bg-white/5"
                         style={{ left: clipLeft, width: clipWidth }}
-                        data-studio-clip={track.id}
+                        data-studio-clip={clip.id}
+                        onPointerDown={() => onSelectClip(clip.id)}
                       >
                         <div
                           aria-label={`Обрезать начало ${track.name}`}
                           className="w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
                           onPointerDown={(event) =>
-                            beginClipGesture(event, track, "trim-start")
+                            beginClipGesture(event, track, clip, "trim-start")
                           }
                           onPointerMove={previewClipGesture}
                           onPointerUp={finishClipGesture}
@@ -499,7 +472,7 @@ function StudioTimeline({
                           aria-label={`Переместить ${track.name}`}
                           className="min-w-0 flex-1 cursor-grab active:cursor-grabbing"
                           onPointerDown={(event) =>
-                            beginClipGesture(event, track, "move")
+                            beginClipGesture(event, track, clip, "move")
                           }
                           onPointerMove={previewClipGesture}
                           onPointerUp={finishClipGesture}
@@ -509,14 +482,24 @@ function StudioTimeline({
                           aria-label={`Обрезать конец ${track.name}`}
                           className="w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
                           onPointerDown={(event) =>
-                            beginClipGesture(event, track, "trim-end")
+                            beginClipGesture(event, track, clip, "trim-end")
                           }
                           onPointerMove={previewClipGesture}
                           onPointerUp={finishClipGesture}
                           onPointerCancel={cancelClipGesture}
                         />
                       </div>
-                    ) : null}
+                      <div aria-label={`Автоматизация затуханий ${track.name}`} className="absolute top-[88px] h-9 border-t border-white/10 bg-[#111a27]" style={{ left: clipLeft, width: clipWidth }}>
+                        <div className={`absolute inset-y-1 overflow-hidden rounded-sm border bg-violet-400/10 ${selectedClipId === clip.id ? "border-violet-200" : "border-violet-300/35"}`} data-studio-fade-lane={clip.id} onPointerDown={() => onSelectClip(clip.id)}>
+                          <span aria-hidden="true" className="absolute bottom-0 left-0 top-0 bg-violet-300/25" style={{ width: timeToTimelineX(fades.fadeInDuration, pixelsPerSecond), clipPath: "polygon(0 100%, 100% 0, 100% 100%)" }} />
+                          <span aria-hidden="true" className="absolute bottom-0 right-0 top-0 bg-violet-300/25" style={{ width: timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond), clipPath: "polygon(0 0, 100% 100%, 0 100%)" }} />
+                          <div aria-label={`Настроить появление ${track.name}`} className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white" style={{ left: Math.max(timeToTimelineX(fades.fadeInDuration, pixelsPerSecond) - 4, 0) }} onPointerDown={(event) => beginClipGesture(event, track, clip, "fade-in")} onPointerMove={previewClipGesture} onPointerUp={finishClipGesture} onPointerCancel={cancelClipGesture} />
+                          <div aria-label={`Настроить затухание ${track.name}`} className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white" style={{ left: Math.max(clipWidth - timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond) - 4, 0) }} onPointerDown={(event) => beginClipGesture(event, track, clip, "fade-out")} onPointerMove={previewClipGesture} onPointerUp={finishClipGesture} onPointerCancel={cancelClipGesture} />
+                        </div>
+                      </div>
+                        </div>
+                      );
+                    }) : null}
                     {!track.hasAudio && liveRecording?.slotId === track.id ? (
                       <StudioLiveWaveformCanvas
                         analyser={liveRecording.analyser}
@@ -526,76 +509,7 @@ function StudioTimeline({
                       />
                     ) : null}
                   </div>
-                  {track.hasAudio && track.buffer && clipWidth > 0 ? (
-                    <div
-                      aria-label={`Автоматизация затуханий ${track.name}`}
-                      className="relative h-9 border-t border-white/10 bg-[#111a27]"
-                    >
-                      <div
-                        className="absolute inset-y-1 overflow-hidden rounded-sm border border-violet-300/35 bg-violet-400/10"
-                        style={{ left: clipLeft, width: clipWidth }}
-                        data-studio-fade-lane={track.id}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="absolute bottom-0 left-0 top-0 bg-violet-300/25"
-                          style={{
-                            width: timeToTimelineX(
-                              fades.fadeInDuration,
-                              pixelsPerSecond,
-                            ),
-                            clipPath: "polygon(0 100%, 100% 0, 100% 100%)",
-                          }}
-                        />
-                        <span
-                          aria-hidden="true"
-                          className="absolute bottom-0 right-0 top-0 bg-violet-300/25"
-                          style={{
-                            width: timeToTimelineX(
-                              fades.fadeOutDuration,
-                              pixelsPerSecond,
-                            ),
-                            clipPath: "polygon(0 0, 100% 100%, 0 100%)",
-                          }}
-                        />
-                        <div
-                          aria-label={`Настроить появление ${track.name}`}
-                          className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
-                          style={{
-                            left: Math.max(
-                              timeToTimelineX(fades.fadeInDuration, pixelsPerSecond) - 4,
-                              0,
-                            ),
-                          }}
-                          onPointerDown={(event) =>
-                            beginClipGesture(event, track, "fade-in")
-                          }
-                          onPointerMove={previewClipGesture}
-                          onPointerUp={finishClipGesture}
-                          onPointerCancel={cancelClipGesture}
-                        />
-                        <div
-                          aria-label={`Настроить затухание ${track.name}`}
-                          className="absolute bottom-0 top-0 z-10 w-2 cursor-ew-resize bg-violet-200/70 hover:bg-white"
-                          style={{
-                            left: Math.max(
-                              clipWidth -
-                                timeToTimelineX(fades.fadeOutDuration, pixelsPerSecond) -
-                                4,
-                              0,
-                            ),
-                          }}
-                          onPointerDown={(event) =>
-                            beginClipGesture(event, track, "fade-out")
-                          }
-                          onPointerMove={previewClipGesture}
-                          onPointerUp={finishClipGesture}
-                          onPointerCancel={cancelClipGesture}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                  {!track.hasAudio ? renderEmpty(track, index) : null}
+                  {track.clips.length === 0 ? renderEmpty(track, index) : null}
                 </div>
               );
             })}

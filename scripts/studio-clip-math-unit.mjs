@@ -3,12 +3,17 @@
 import assert from "node:assert/strict";
 
 import {
+  MIN_STUDIO_CLIP_DURATION,
   getStudioClipEnd,
   getStudioClipLayout,
   getStudioClipMoveLayout,
+  getStudioClipSnapCandidates,
   getStudioClipSnapTime,
+  getStudioProjectDurationFromClips,
+  getStudioSameTrackBounds,
   getStudioClipTrimEndLayout,
   getStudioClipTrimStartLayout,
+  splitStudioClip,
 } from "../src/lib/studio/clip-math.ts";
 
 assert.deepEqual(getStudioClipLayout({}, 12), {
@@ -92,6 +97,68 @@ assert.deepEqual(
     pixelsPerSecond: 100,
   }),
   { startTime: 2, offset: 1, duration: 11 },
+);
+
+const firstClip = {
+  id: "first",
+  startTime: 2,
+  offset: 1,
+  duration: 6,
+  fadeInDuration: 2,
+  fadeOutDuration: 3,
+};
+const split = splitStudioClip(firstClip, 5, "right");
+assert.ok(split);
+assert.deepEqual(split.left, {
+  ...firstClip,
+  duration: 3,
+  fadeOutDuration: 0,
+});
+assert.deepEqual(
+  { ...split.right, id: "generated" },
+  {
+    ...firstClip,
+    id: "generated",
+    startTime: 5,
+    offset: 4,
+    duration: 3,
+    fadeInDuration: 0,
+  },
+);
+assert.equal(splitStudioClip(firstClip, 2 + MIN_STUDIO_CLIP_DURATION, "right"), null);
+assert.equal(splitStudioClip(firstClip, 8 - MIN_STUDIO_CLIP_DURATION, "right"), null);
+assert.deepEqual(
+  getStudioSameTrackBounds(
+    { ...firstClip, id: "middle", startTime: 5, duration: 2 },
+    [
+      { ...firstClip, id: "before", startTime: 0, duration: 4 },
+      { ...firstClip, id: "middle", startTime: 5, duration: 2 },
+      { ...firstClip, id: "after", startTime: 8, duration: 3 },
+    ],
+  ),
+  { previousEnd: 4, nextStart: 8 },
+);
+assert.deepEqual(
+  getStudioClipMoveLayout({
+    layout: { startTime: 5, offset: 0, duration: 2 },
+    bufferDuration: 20,
+    requestedStartTime: 7.95,
+    snapTargets: [8],
+    pixelsPerSecond: 100,
+    collisionBounds: { previousEnd: 4, nextStart: 8 },
+  }),
+  { startTime: 6, offset: 0, duration: 2 },
+);
+assert.deepEqual(getStudioClipSnapCandidates([
+  { id: "one", startTime: 2, offset: 0, duration: 3 },
+  { id: "two", startTime: 8, offset: 0, duration: 4 },
+], "one"), [0, 8, 12]);
+assert.equal(
+  getStudioProjectDurationFromClips([
+    { clips: [{ id: "one", startTime: 2, offset: 0, duration: 3 }] },
+    { clips: [{ id: "two", startTime: 8, offset: 0, duration: 4 }] },
+  ]),
+  12,
 );
 
 console.log("studio-clip-math-unit: ok");

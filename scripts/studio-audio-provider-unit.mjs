@@ -114,11 +114,12 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /MAX_LOCAL_TRACKS = 5/);
   assert.match(provider, /MAX_LOCAL_PROJECT_SIZE_BYTES = 750 \* 1024 \* 1024/);
   assert.match(provider, /context\.createGain\(\)/);
-  assert.match(provider, /track\.startTime \+ track\.duration/);
-  assert.match(provider, /track\.offset \+ elapsedClipTime/);
+  assert.match(provider, /for \(const clip of track\.clips\)/);
+  assert.match(provider, /clip\.startTime \+ clip\.duration/);
+  assert.match(provider, /clip\.offset \+ elapsedClipTime/);
   assert.match(provider, /source\.start\(/);
   assert.match(provider, /trackRuntimesRef/);
-  assert.match(provider, /getStudioProjectDuration/);
+  assert.match(provider, /getStudioProjectDurationFromClips/);
   assert.match(provider, /setClipLayout/);
   assert.match(provider, /getStudioClipLayout/);
   assert.match(provider, /getStudioTrackGain/);
@@ -127,7 +128,7 @@ function testProviderEngineLifecycle() {
   assert.match(fileValidation, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /local-file-validation/);
   assert.match(provider, /export \{ validateStudioLocalFile \}/);
-  assert.match(provider, /gain\.gain\.value = 1/);
+  assert.match(provider, /outputGain\.gain\.value = 1/);
   assert.match(provider, /toggleTrackMuted/);
   assert.match(provider, /getTrackBuffer/);
   assert.match(
@@ -137,11 +138,16 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /replaceTrackAudio/);
   assert.match(provider, /ingestRecordedFile/);
   assert.match(provider, /validateStudioRecordedFile/);
+  assert.match(provider, /clips: \[\{/);
   assert.match(provider, /startTime: Number\.isFinite\(startTime\)/);
   assert.match(provider, /offset: 0/);
   assert.match(provider, /fadeInDuration: 0/);
   assert.match(provider, /fadeOutDuration: 0/);
   assert.match(provider, /getStudioReplacementProjectSize/);
+  assert.match(provider, /sources: Map<string/);
+  assert.match(provider, /envelopeGain/);
+  assert.match(provider, /splitClip/);
+  assert.match(provider, /removeClip/);
   assert.doesNotMatch(provider, /\bsolo\b/i);
   assert.match(provider, /removeTrack/);
   assert.match(provider, /cancelProgressLoop\(\)/);
@@ -284,7 +290,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /getTrackBuffer\(track\.id\)/);
   assert.match(
     studioWorkspace,
-    /hasAudio: Boolean\(slot\.audioTrackId && track\)/,
+    /hasAudio: Boolean\(slot\.audioTrackId && track\?\.clips\.length\)/,
   );
   assert.match(
     studioWorkspace,
@@ -329,7 +335,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
   assert.match(timeline, /renderControls\(track, index\)/);
   assert.match(timeline, /hasAudio: boolean/);
-  assert.match(timeline, /!track\.hasAudio \? renderEmpty\(track, index\) : null/);
+  assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);
   assert.doesNotMatch(timeline, /!track\.buffer \? renderEmpty/);
   assert.match(timeline, /clipWidth/);
   assert.match(timeline, /clipLeft/);
@@ -337,6 +343,8 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /trim-end/);
   assert.match(timeline, /getStudioClipMoveLayout/);
   assert.match(timeline, /onClipLayoutChange/);
+  assert.match(timeline, /selectedClipId/);
+  assert.match(timeline, /track\.clips\.map/);
   assert.match(timeline, /onPointerUp=\{seekFromPointer\}/);
   assert.match(timeline, /lastManualScrollAtRef/);
   assert.match(timeline, /getAnchoredTimelineScrollLeft/);

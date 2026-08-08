@@ -169,7 +169,7 @@ export default function StudioWorkspace() {
                       {index + 1}. {track.fileName}
                     </p>
                     <p className="mt-1 text-sm text-[#70618e]">
-                      {formatTime(track.duration)} · {formatFileSize(track.fileSize)}
+                      {formatTime(Math.max(...track.clips.map((clip) => clip.duration), 0))} · {formatFileSize(track.fileSize)}
                       {track.isReplacing ? " · Замена аудио…" : ""}
                       {track.status === "loading" && !track.isReplacing
                         ? " · Загрузка…"
@@ -259,7 +259,7 @@ export default function StudioWorkspace() {
                     className="absolute inset-y-0 left-0 bg-[#7042c5]/25"
                     style={{
                       width: `${Math.min(
-                        (currentTime / track.duration) * 100,
+                        (currentTime / Math.max(...track.clips.map((clip) => clip.startTime + clip.duration), 1)) * 100,
                         100,
                       )}%`,
                     }}
