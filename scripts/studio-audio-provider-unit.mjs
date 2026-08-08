@@ -341,6 +341,11 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /useImperativeHandle/);
   assert.match(timeline, /scrollToStart: \(\) => scrollTo\(0\)/);
   assert.match(timeline, /timeToTimelineX\(projectExtent, pixelsPerSecond\)/);
+  assert.match(timeline, /clampTimelineScrollLeft/);
+  assert.match(
+    timeline,
+    /timeToTimelineX\(projectExtent, pixelsPerSecond\) -\s*viewport\.clientWidth \* 0\.75/,
+  );
   assert.match(timeline, /lastManualScrollAtRef\.current = Date\.now\(\)/);
   assert.doesNotMatch(timeline, /querySelector/);
   assert.match(timeline, /overflow-x-auto/);
@@ -366,6 +371,14 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /timelineXToTime\(offsetX, pixelsPerSecond\), editHorizon/);
   assert.match(timeline, /timeToTimelineX\(projectExtent, pixelsPerSecond\)/);
   assert.match(timeline, /onSelectClip\(null\)/);
+  assert.match(
+    studioWorkspace,
+    /track\.id === clipboard\.sourceTrackId/,
+  );
+  assert.match(
+    studioWorkspace,
+    /pasteClips\(targetTrack\.id, clipboard, currentTime\)/,
+  );
   const beginGesture = timeline.slice(
     timeline.indexOf("const beginClipGesture"),
     timeline.indexOf("const previewClipGesture"),

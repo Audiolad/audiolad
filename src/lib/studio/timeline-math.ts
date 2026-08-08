@@ -39,7 +39,7 @@ export function getTimelineEditExtent(
   const pixels = normalizePixelsPerSecond(pixelsPerSecond);
   const trailingPixels = Math.max(
     Number.isFinite(viewportWidth) ? viewportWidth * 0.25 : 0,
-    pixels * 2,
+    pixels * 5,
   );
 
   return safeDuration + trailingPixels / pixels;

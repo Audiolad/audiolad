@@ -38,8 +38,12 @@ assert.match(shell, /currentTime >\s*selectedTrackAndClip\.clip\.startTime/);
 assert.match(shell, /currentTime <\s*selectedTrackAndClip\.clip\.startTime/);
 assert.match(shell, /runEditingAction\(\(\) => removeTrack\(track\.id\)\)/);
 assert.match(shell, /createStudioClipClipboard/);
-assert.match(shell, /clipboard\.sourceTrackId !== selectedTrackAndClip\.track\.id/);
-assert.match(shell, /pasteClips\(selectedTrackAndClip\.track\.id, clipboard, currentTime\)/);
+assert.match(shell, /track\.id === clipboard\.sourceTrackId/);
+assert.match(shell, /pasteClips\(targetTrack\.id, clipboard, currentTime\)/);
+assert.doesNotMatch(
+  shell,
+  /if \(!clipboard \|\| !selectedTrackAndClip\) return/,
+);
 assert.match(shell, /STUDIO_CLIP_OVERLAP_ERROR/);
 assert.match(shell, /Отменить последнее действие/);
 assert.match(shell, /Повторить отменённое действие/);

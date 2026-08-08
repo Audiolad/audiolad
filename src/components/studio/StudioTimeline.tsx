@@ -13,6 +13,7 @@ import {
 import { StudioLiveWaveformCanvas } from "@/components/studio/StudioLiveWaveformCanvas";
 import { StudioWaveformCanvas } from "@/components/studio/StudioWaveformCanvas";
 import {
+  clampTimelineScrollLeft,
   formatTimelineTime,
   getAnchoredTimelineScrollLeft,
   getRulerStepSeconds,
@@ -166,15 +167,16 @@ function StudioTimeline({
           return;
         }
         scrollTo(
-          Math.max(
+          clampTimelineScrollLeft(
             timeToTimelineX(projectExtent, pixelsPerSecond) -
-              viewport.clientWidth,
-            0,
+              viewport.clientWidth * 0.75,
+            timelineWidth,
+            viewport.clientWidth,
           ),
         );
       },
     }),
-    [pixelsPerSecond, projectExtent, scrollTo],
+    [pixelsPerSecond, projectExtent, scrollTo, timelineWidth],
   );
 
   useEffect(() => {

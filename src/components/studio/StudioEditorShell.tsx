@@ -373,11 +373,14 @@ export default function StudioEditorShell() {
     setEditingError(null);
   }, [selectedTrackAndClip]);
   const pasteClipboard = useCallback(() => {
-    if (!clipboard || !selectedTrackAndClip) return;
-    if (clipboard.sourceTrackId !== selectedTrackAndClip.track.id) {
+    if (!clipboard) return;
+    const targetTrack = tracks.find(
+      (track) => track.id === clipboard.sourceTrackId,
+    );
+    if (!targetTrack) {
       return;
     }
-    const buffer = getTrackBuffer(selectedTrackAndClip.track.id);
+    const buffer = getTrackBuffer(targetTrack.id);
     if (!buffer) return;
     const pastedPreview = getStudioPasteClips({
       clipboard,
@@ -386,7 +389,7 @@ export default function StudioEditorShell() {
       createClipId: () => crypto.randomUUID(),
     });
     const overlaps = pastedPreview.some((candidate) =>
-      selectedTrackAndClip.track.clips.some(
+      targetTrack.clips.some(
         (clip) =>
           candidate.startTime < clip.startTime + clip.duration &&
           candidate.startTime + candidate.duration > clip.startTime,
@@ -397,7 +400,7 @@ export default function StudioEditorShell() {
       return;
     }
     const pastedIds = runEditingAction(() =>
-      pasteClips(selectedTrackAndClip.track.id, clipboard, currentTime),
+      pasteClips(targetTrack.id, clipboard, currentTime),
     );
     if (pastedIds[0]) {
       setSelectedClipId(pastedIds[0]);
@@ -409,7 +412,7 @@ export default function StudioEditorShell() {
     getTrackBuffer,
     pasteClips,
     runEditingAction,
-    selectedTrackAndClip,
+    tracks,
   ]);
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
@@ -481,7 +484,7 @@ export default function StudioEditorShell() {
         return;
       }
       if (modifier && event.key.toLowerCase() === "v") {
-        if (!clipboard || !selectedTrackAndClip) return;
+        if (!clipboard) return;
         event.preventDefault();
         pasteClipboard();
         return;
