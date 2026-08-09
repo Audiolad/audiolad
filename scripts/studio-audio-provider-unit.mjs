@@ -148,6 +148,16 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /envelopeGain/);
   assert.match(provider, /splitClip/);
   assert.match(provider, /removeClip/);
+  assert.match(provider, /rippleDeleteClip/);
+  assert.match(provider, /getStudioRippleDeleteResult/);
+  assert.match(
+    provider,
+    /position >= removedEnd[\s\S]*position - result\.removedClip\.duration/,
+  );
+  assert.match(
+    provider,
+    /position > result\.removedClip\.startTime[\s\S]*result\.removedClip\.startTime/,
+  );
   assert.doesNotMatch(provider, /\bsolo\b/i);
   assert.match(provider, /removeTrack/);
   assert.match(provider, /assetVaultRef/);
@@ -371,6 +381,14 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /timelineXToTime\(offsetX, pixelsPerSecond\), editHorizon/);
   assert.match(timeline, /timeToTimelineX\(projectExtent, pixelsPerSecond\)/);
   assert.match(timeline, /onSelectClip\(null\)/);
+  assert.match(timeline, /const isSelected = selectedClipId === clip\.id/);
+  assert.match(timeline, /border-violet-200 bg-violet-300\/15/);
+  assert.match(timeline, /border-white\/30 bg-white\/5/);
+  assert.match(timeline, /aria-selected=\{isSelected\}/);
+  assert.match(
+    timeline,
+    /closest\("\[data-studio-clip\], \[data-studio-fade-lane\]"\)/,
+  );
   assert.match(
     studioWorkspace,
     /track\.id === clipboard\.sourceTrackId/,

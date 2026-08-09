@@ -211,6 +211,7 @@ export default function StudioEditorShell() {
     projectDuration,
     projectError,
     removeTrack,
+    rippleDeleteClip,
     replaceTrackAudio,
     restoreEditingState,
     seek,
@@ -362,6 +363,16 @@ export default function StudioEditorShell() {
     });
     setSelectedClipId(null);
   }, [removeClip, removeTrack, runEditingAction, selectedTrackAndClip]);
+  const rippleDeleteSelectedClip = useCallback(() => {
+    if (!selectedTrackAndClip) return;
+    runEditingAction(() =>
+      rippleDeleteClip(
+        selectedTrackAndClip.track.id,
+        selectedTrackAndClip.clip.id,
+      ),
+    );
+    setSelectedClipId(null);
+  }, [rippleDeleteClip, runEditingAction, selectedTrackAndClip]);
   const copySelectedClip = useCallback(() => {
     if (!selectedTrackAndClip) return;
     setClipboard(
@@ -505,6 +516,19 @@ export default function StudioEditorShell() {
         !modifier &&
         !event.altKey &&
         !event.repeat &&
+        event.shiftKey &&
+        (event.key === "Delete" || event.key === "Backspace") &&
+        selectedTrackAndClip
+      ) {
+        event.preventDefault();
+        rippleDeleteSelectedClip();
+        return;
+      }
+      if (
+        !modifier &&
+        !event.altKey &&
+        !event.repeat &&
+        !event.shiftKey &&
         (event.key === "Delete" || event.key === "Backspace") &&
         selectedTrackAndClip
       ) {
@@ -526,6 +550,7 @@ export default function StudioEditorShell() {
     pause,
     play,
     redo,
+    rippleDeleteSelectedClip,
     selectedTrackAndClip,
     splitSelectedClip,
     undo,
@@ -747,6 +772,9 @@ export default function StudioEditorShell() {
                 </button>
                 <button type="button" disabled={!selectedClip} onClick={deleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">
                   Удалить фрагмент
+                </button>
+                <button type="button" disabled={!selectedClip} onClick={rippleDeleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">
+                  Удалить + сдвиг
                 </button>
                 <button
                   type="button"

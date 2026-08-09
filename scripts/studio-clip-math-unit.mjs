@@ -7,6 +7,7 @@ import {
   getStudioClipEnd,
   getStudioClipLayout,
   getStudioClipMoveLayout,
+  getStudioRippleDeleteResult,
   getStudioClipSnapCandidates,
   getStudioClipSnapTime,
   getStudioProjectDurationFromClips,
@@ -127,6 +128,22 @@ assert.deepEqual(
 );
 assert.equal(splitStudioClip(firstClip, 2 + MIN_STUDIO_CLIP_DURATION, "right"), null);
 assert.equal(splitStudioClip(firstClip, 8 - MIN_STUDIO_CLIP_DURATION, "right"), null);
+const rippleClips = [
+  { ...firstClip, id: "removed", startTime: 0, duration: 4 },
+  { ...firstClip, id: "next", startTime: 6, duration: 3 },
+  { ...firstClip, id: "last", startTime: 12, duration: 2 },
+];
+const ripple = getStudioRippleDeleteResult(rippleClips, "removed");
+assert.ok(ripple);
+assert.equal(ripple.removedClip.id, "removed");
+assert.deepEqual(
+  ripple.clips.map((clip) => [clip.id, clip.startTime]),
+  [
+    ["next", 2],
+    ["last", 8],
+  ],
+);
+assert.equal(getStudioRippleDeleteResult(rippleClips, "missing"), null);
 assert.deepEqual(
   getStudioSameTrackBounds(
     { ...firstClip, id: "middle", startTime: 5, duration: 2 },

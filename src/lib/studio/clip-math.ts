@@ -117,6 +117,31 @@ export function splitStudioClip(
   };
 }
 
+export function getStudioRippleDeleteResult(
+  clips: readonly StudioClip[],
+  clipId: string,
+): { clips: StudioClip[]; removedClip: StudioClip } | null {
+  const removedClip = clips.find((clip) => clip.id === clipId);
+  if (!removedClip) {
+    return null;
+  }
+
+  const removedEnd = getStudioClipEnd(removedClip);
+  return {
+    removedClip,
+    clips: clips.flatMap((clip) => {
+      if (clip.id === clipId) {
+        return [];
+      }
+      return [
+        clip.startTime >= removedEnd
+          ? { ...clip, startTime: clip.startTime - removedClip.duration }
+          : clip,
+      ];
+    }),
+  };
+}
+
 export function getStudioClipSnapTime({
   requestedTime,
   pixelsPerSecond,

@@ -21,6 +21,7 @@ import {
 import {
   getStudioClipLayout,
   getStudioProjectDurationFromClips,
+  getStudioRippleDeleteResult,
   splitStudioClip,
   type StudioClip,
   type StudioClipLayout,
@@ -100,6 +101,7 @@ type StudioAudioContextValue = {
   ) => void;
   splitClip: (trackId: string, clipId: string, atTime: number) => string | null;
   removeClip: (trackId: string, clipId: string) => void;
+  rippleDeleteClip: (trackId: string, clipId: string) => void;
   pasteClips: (
     trackId: string,
     clipboard: StudioClipClipboard,
@@ -957,6 +959,36 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [pause, updateTrack],
   );
 
+  const rippleDeleteClip = useCallback(
+    (trackId: string, clipId: string) => {
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      const result = track
+        ? getStudioRippleDeleteResult(track.clips, clipId)
+        : null;
+      if (!result) {
+        return;
+      }
+
+      const position = getPlaybackPosition();
+      pause();
+      updateTrack(trackId, (item) => ({
+        ...item,
+        clips: result.clips,
+      }));
+
+      const removedEnd = result.removedClip.startTime + result.removedClip.duration;
+      const nextPosition =
+        position >= removedEnd
+          ? position - result.removedClip.duration
+          : position > result.removedClip.startTime
+            ? result.removedClip.startTime
+            : position;
+      positionRef.current = nextPosition;
+      setCurrentTime(nextPosition);
+    },
+    [getPlaybackPosition, pause, updateTrack],
+  );
+
   const pasteClips = useCallback(
     (
       trackId: string,
@@ -1177,6 +1209,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setClipFades,
       splitClip,
       removeClip,
+      rippleDeleteClip,
       pasteClips,
       getTrackBuffer,
       removeTrack,
@@ -1209,6 +1242,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       setClipFades,
       splitClip,
       removeClip,
+      rippleDeleteClip,
       pasteClips,
       pruneRetainedAssets,
       restoreEditingState,
