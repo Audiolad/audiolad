@@ -44,12 +44,30 @@ assert.equal(isSchoolSitePath(SCHOOL_SITE_PATH), true);
 assertAction(SCHOOL_HOSTNAME, "/", "rewrite_school_landing");
 // Internal path on school host must pass through (served via rewrite), never redirect.
 assertAction(SCHOOL_HOSTNAME, SCHOOL_SITE_PATH, "pass_through");
-assertAction(SCHOOL_HOSTNAME, "/catalog", "pass_through");
+assertAction(SCHOOL_HOSTNAME, "/robots.txt", "pass_through");
+assertAction(SCHOOL_HOSTNAME, "/sitemap.xml", "pass_through");
+for (const pathname of [
+  "/listen/sergey-petrov/dengi-menya-obozhayut",
+  "/catalog",
+  "/authors",
+  "/become-author",
+  "/auth/sign-up",
+  "/auth/sign-in",
+  "/profile",
+]) {
+  assertAction(SCHOOL_HOSTNAME, pathname, "not_found");
+}
 
 // audiolad.ru/school-site → intentional 404 (SEO / no public duplicate).
 assertAction("audiolad.ru", SCHOOL_SITE_PATH, "not_found");
 assertAction("www.audiolad.ru", SCHOOL_SITE_PATH, "not_found");
 assertAction("audiolad.ru", "/", "pass_through");
+assertAction("audiolad.ru", "/catalog", "pass_through");
+assertAction(
+  "audiolad.ru",
+  "/listen/sergey-petrov/dengi-menya-obozhayut",
+  "pass_through",
+);
 
 // Source guard: no school-host 308 /school-site → / (the loop bug).
 assert.equal(

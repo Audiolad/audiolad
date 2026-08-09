@@ -22,6 +22,7 @@ function getRequestHostname(request: NextRequest): string {
  * - School host `/` → internal rewrite to `/school-site` (public URL stays `/`).
  * - School host `/school-site` must NOT 308→`/`: Next re-enters proxy after rewrite
  *   and that redirect creates an infinite loop.
+ * - School host exposes no platform application routes.
  */
 export type SchoolProxyAction =
   | { action: "not_found" }
@@ -38,6 +39,17 @@ export function resolveSchoolProxyAction(
 
   if (isSchoolHostname(hostname) && pathname === "/") {
     return { action: "rewrite_school_landing" };
+  }
+
+  if (
+    isSchoolHostname(hostname) &&
+    ![
+      SCHOOL_SITE_PATH,
+      "/robots.txt",
+      "/sitemap.xml",
+    ].includes(pathname)
+  ) {
+    return { action: "not_found" };
   }
 
   return { action: "pass_through" };
