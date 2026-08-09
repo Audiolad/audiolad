@@ -445,6 +445,7 @@ function StudioTimeline({
             <div
               className="h-8 border-b border-white/10 text-[10px] text-[#9ba7bb]"
               style={{ width: timelineWidth }}
+              onPointerUp={() => onSelectClip(null)}
             >
               {rulerMarks.map((time) => (
                 <span
@@ -472,16 +473,22 @@ function StudioTimeline({
                       const clipWidth = Math.min(timeToTimelineX(layout.duration, pixelsPerSecond), Math.max(timelineWidth - clipLeft, 0));
                       const clipRenderStartX = Math.max(renderStartX - clipLeft, 0);
                       const clipRenderWidth = Math.min(renderWidth, Math.max(Math.min(renderStartX + renderWidth, clipLeft + clipWidth) - (clipLeft + clipRenderStartX), 0));
+                      const isSelected = selectedClipId === clip.id;
                       if (clipWidth <= 0) return null;
                       return (
                         <div key={clip.id}>
-                    {clipRenderWidth > 0 ? <div className="absolute top-0 overflow-hidden" style={{ left: clipLeft + clipRenderStartX, width: clipRenderWidth }}>
+                    {clipRenderWidth > 0 ? <div className="absolute top-0 overflow-hidden" data-studio-clip={clip.id} style={{ left: clipLeft + clipRenderStartX, width: clipRenderWidth }}>
                       <StudioWaveformCanvas buffer={track.buffer!} sourceOffset={layout.offset} sourceDuration={layout.duration} timelineWidth={clipWidth} viewportWidth={clipRenderWidth} renderStartX={clipRenderStartX} accent={track.accent} onSeek={(clipX) => { onSelectClip(clip.id); onSeek(layout.startTime + timelineXToTime(clipX, pixelsPerSecond)); }} />
                     </div> : null}
                       <div
-                        className="absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border border-white/30 bg-white/5"
+                        className={`absolute top-0 z-10 flex h-[88px] overflow-hidden rounded border ${
+                          isSelected
+                            ? "border-violet-200 bg-violet-300/15 shadow-[0_0_14px_rgba(167,139,250,0.32)]"
+                            : "border-white/30 bg-white/5"
+                        }`}
                         style={{ left: clipLeft, width: clipWidth }}
                         data-studio-clip={clip.id}
+                        aria-selected={isSelected}
                         onPointerDown={() => onSelectClip(clip.id)}
                       >
                         <div
