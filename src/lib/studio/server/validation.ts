@@ -6,6 +6,7 @@ import {
   STUDIO_TECHNICAL_VERSION,
   type StudioProjectDataV2,
 } from "./model";
+import { normalizeStudioMimeType } from "../recording-mime";
 
 export class StudioApiError extends Error {
   constructor(
@@ -25,6 +26,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "audio/x-wav",
   "audio/mp4",
   "audio/aac",
+  "audio/webm",
 ]);
 
 export function parseUuid(value: unknown, code = "invalid_request"): string {
@@ -251,7 +253,7 @@ export function validateStudioUpload(file: File): {
   byteSize: number;
 } {
   const filename = sanitizeStudioFilename(file.name);
-  const mimeType = file.type.toLowerCase();
+  const mimeType = normalizeStudioMimeType(file.type);
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new StudioApiError("unsupported_mime_type", 422);
   }

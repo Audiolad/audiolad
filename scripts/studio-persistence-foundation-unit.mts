@@ -155,10 +155,46 @@ assert.throws(
   (error: unknown) =>
     error instanceof StudioApiError && error.code === "invalid_source_type",
 );
+for (const [name, mimeType] of [
+  ["voice.mp3", "audio/mpeg"],
+  ["voice.wav", "audio/wav"],
+  ["voice.wav", "audio/x-wav"],
+  ["voice.m4a", "audio/mp4"],
+  ["voice.aac", "audio/aac"],
+] as const) {
+  assert.equal(
+    validateStudioUpload({ name, type: mimeType, size: 1 } as File).mimeType,
+    mimeType,
+  );
+}
 assert.throws(
   () => validateStudioUpload({ name: "voice.ogg", type: "audio/ogg", size: 1 } as File),
   (error: unknown) =>
     error instanceof StudioApiError && error.code === "unsupported_mime_type",
+);
+assert.deepEqual(
+  validateStudioUpload({
+    name: "recording.webm",
+    type: "audio/webm;codecs=opus",
+    size: 4,
+  } as File),
+  {
+    filename: "recording.webm",
+    mimeType: "audio/webm",
+    byteSize: 4,
+  },
+);
+assert.deepEqual(
+  validateStudioUpload({
+    name: "recording.m4a",
+    type: "audio/mp4;codecs=mp4a.40.2",
+    size: 4,
+  } as File),
+  {
+    filename: "recording.m4a",
+    mimeType: "audio/mp4",
+    byteSize: 4,
+  },
 );
 assert.throws(
   () => validateStudioUpload({
@@ -191,6 +227,16 @@ assert.match(migration, /FOR UPDATE/);
 assert.match(migration, /TO service_role/);
 assert.doesNotMatch(migration, /CREATE POLICY[^\n]*\n\s+ON storage\.objects/);
 assert.doesNotMatch(migration, /studio_assets|studio_set_asset_upload_status|title|document/);
+
+const recordingMimeMigration = await readFile(
+  new URL(
+    "../supabase/migrations/20260810160000_studio_recording_webm_assets.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+assert.match(recordingMimeMigration, /array_append\(allowed_mime_types, 'audio\/webm'\)/);
+assert.match(recordingMimeMigration, /audio\/webm/);
 
 const repository = await readFile(
   new URL("../src/lib/studio/server/repository.ts", import.meta.url),

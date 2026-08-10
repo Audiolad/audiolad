@@ -35,8 +35,8 @@ const project = {
   },
 };
 const metadata = {
-  id: assetId, projectId, originalName: "voice.mp3", mimeType: "audio/mpeg",
-  sizeBytes: 5, durationSeconds: 8, sourceType: "upload" as const, createdAt: "2026-08-09T00:00:00.000Z",
+  id: assetId, projectId, originalName: "recording.webm", mimeType: "audio/webm",
+  sizeBytes: 5, durationSeconds: 8, sourceType: "recording" as const, createdAt: "2026-08-09T00:00:00.000Z",
 };
 let downloads = 0;
 let decodes = 0;
@@ -45,7 +45,7 @@ const result = await hydrateStudioProject({
   assets: [metadata],
   download: async () => {
     downloads += 1;
-    return new Blob(["audio"], { type: "audio/mpeg" });
+    return new Blob(["audio"], { type: "audio/webm" });
   },
   decode: async () => {
     decodes += 1;
@@ -54,9 +54,20 @@ const result = await hydrateStudioProject({
 });
 assert.equal(downloads, 1);
 assert.equal(decodes, 1);
+assert.equal(result.assets.get(assetId)?.file.type, "audio/webm");
+assert.equal(result.assets.get(assetId)?.metadata.sourceType, "recording");
 assert.equal(result.state.currentTime, 42);
 assert.deepEqual(result.state.tracks[0].clips.map((clip) => clip.startTime), [3, 9]);
 assert.equal(result.assets.get(assetId)?.buffer, result.assets.get(assetId)?.buffer);
+
+const mp4Hydration = await hydrateStudioProject({
+  project,
+  assets: [{ ...metadata, originalName: "recording.m4a", mimeType: "audio/mp4" }],
+  download: async () => new Blob(["audio"], { type: "audio/mp4" }),
+  decode: async () => ({ duration: 8 } as AudioBuffer),
+});
+assert.equal(mp4Hydration.assets.get(assetId)?.file.type, "audio/mp4");
+assert.equal(mp4Hydration.assets.get(assetId)?.metadata.sourceType, "recording");
 
 const provider = await readFile(
   new URL("../src/components/studio/StudioAudioProvider.tsx", import.meta.url), "utf8",

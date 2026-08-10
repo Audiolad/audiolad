@@ -1,9 +1,11 @@
-export const STUDIO_RECORDER_MIME_TYPES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/mp4",
-  "audio/ogg;codecs=opus",
-] as const;
+import {
+  STUDIO_RECORDER_MIME_CANDIDATES,
+  isStudioPersistableRecordingMimeType,
+  normalizeStudioMimeType,
+  selectStudioRecorderMimeType,
+} from "./recording-mime";
+
+export { STUDIO_RECORDER_MIME_CANDIDATES as STUDIO_RECORDER_MIME_TYPES };
 
 export const STUDIO_MICROPHONE_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: false,
@@ -14,12 +16,7 @@ export const STUDIO_MICROPHONE_CONSTRAINTS: MediaTrackConstraints = {
 const RECORDING_EXTENSION_BY_MIME: Record<string, string> = {
   "audio/webm": "webm",
   "audio/mp4": "mp4",
-  "audio/ogg": "ogg",
 };
-
-function getBaseMimeType(mimeType: string): string {
-  return mimeType.split(";", 1)[0].trim().toLowerCase();
-}
 
 export function shouldFallbackToBasicMicrophoneRequest(error: unknown): boolean {
   const name =
@@ -34,18 +31,17 @@ export function getStudioRecorderMimeType(): string | null {
     return null;
   }
 
-  return (
-    STUDIO_RECORDER_MIME_TYPES.find((mimeType) =>
-      MediaRecorder.isTypeSupported(mimeType),
-    ) ?? null
-  );
+  return selectStudioRecorderMimeType(MediaRecorder.isTypeSupported);
 }
 
 export function validateStudioRecordedFile(
   file: Pick<File, "name" | "size" | "type">,
 ): string | null {
-  const mimeType = getBaseMimeType(file.type);
-  if (!RECORDING_EXTENSION_BY_MIME[mimeType]) {
+  const mimeType = normalizeStudioMimeType(file.type);
+  if (
+    !isStudioPersistableRecordingMimeType(file.type) ||
+    !RECORDING_EXTENSION_BY_MIME[mimeType]
+  ) {
     return "Запись создана в неподдерживаемом аудиоформате.";
   }
   if (file.size === 0) {
@@ -55,5 +51,5 @@ export function validateStudioRecordedFile(
 }
 
 export function getStudioRecordingExtension(mimeType: string): string {
-  return RECORDING_EXTENSION_BY_MIME[getBaseMimeType(mimeType)] ?? "webm";
+  return RECORDING_EXTENSION_BY_MIME[normalizeStudioMimeType(mimeType)] ?? "webm";
 }

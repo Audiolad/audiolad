@@ -12,6 +12,11 @@ import {
   shouldFallbackToBasicMicrophoneRequest,
   validateStudioRecordedFile,
 } from "../src/lib/studio/recorder.ts";
+import {
+  isStudioPersistableRecordingMimeType,
+  normalizeStudioMimeType,
+  selectStudioRecorderMimeType,
+} from "../src/lib/studio/recording-mime.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readSource = (relativePath) => readFileSync(join(ROOT, relativePath), "utf8");
@@ -19,8 +24,8 @@ const readSource = (relativePath) => readFileSync(join(ROOT, relativePath), "utf
 assert.deepEqual(STUDIO_RECORDER_MIME_TYPES, [
   "audio/webm;codecs=opus",
   "audio/webm",
+  "audio/mp4;codecs=mp4a.40.2",
   "audio/mp4",
-  "audio/ogg;codecs=opus",
 ]);
 assert.deepEqual(STUDIO_MICROPHONE_CONSTRAINTS, {
   echoCancellation: false,
@@ -29,7 +34,29 @@ assert.deepEqual(STUDIO_MICROPHONE_CONSTRAINTS, {
 });
 assert.equal(getStudioRecordingExtension("audio/webm;codecs=opus"), "webm");
 assert.equal(getStudioRecordingExtension("audio/mp4"), "mp4");
-assert.equal(getStudioRecordingExtension("audio/ogg;codecs=opus"), "ogg");
+assert.equal(
+  selectStudioRecorderMimeType((mimeType) =>
+    mimeType === "audio/webm;codecs=opus",
+  ),
+  "audio/webm;codecs=opus",
+);
+assert.equal(
+  selectStudioRecorderMimeType((mimeType) =>
+    mimeType === "audio/mp4;codecs=mp4a.40.2",
+  ),
+  "audio/mp4;codecs=mp4a.40.2",
+);
+assert.equal(
+  selectStudioRecorderMimeType((mimeType) => mimeType === "audio/ogg;codecs=opus"),
+  null,
+);
+assert.equal(selectStudioRecorderMimeType(() => false), null);
+assert.equal(normalizeStudioMimeType(" audio/webm;codecs=opus "), "audio/webm");
+assert.equal(normalizeStudioMimeType("audio/mp4;codecs=mp4a.40.2"), "audio/mp4");
+assert.equal(normalizeStudioMimeType("audio/ogg;codecs=opus"), "audio/ogg");
+assert.equal(isStudioPersistableRecordingMimeType("audio/webm;codecs=opus"), true);
+assert.equal(isStudioPersistableRecordingMimeType("audio/mp4;codecs=mp4a.40.2"), true);
+assert.equal(isStudioPersistableRecordingMimeType("audio/ogg;codecs=opus"), false);
 assert.equal(
   validateStudioRecordedFile({
     name: "Запись 1.webm",
@@ -40,6 +67,14 @@ assert.equal(
 );
 assert.match(
   validateStudioRecordedFile({ name: "Запись 1.wav", type: "audio/wav", size: 1 }),
+  /неподдерживаемом/i,
+);
+assert.match(
+  validateStudioRecordedFile({
+    name: "Запись 1.ogg",
+    type: "audio/ogg;codecs=opus",
+    size: 1,
+  }),
   /неподдерживаемом/i,
 );
 
@@ -77,6 +112,9 @@ assert.equal(
 assert.match(hook, /let activeRecorder: MediaRecorder \| null = null/);
 assert.match(hook, /"idle" \| "arming" \| "recording" \| "processing"/);
 assert.match(hook, /setRecorderStatus\("arming"\)/);
+assert.match(hook, /const requestedMimeType = getStudioRecorderMimeType\(\)/);
+assert.match(hook, /new MediaRecorder\(stream, \{ mimeType: requestedMimeType \}\)/);
+assert.match(hook, /isStudioPersistableRecordingMimeType\(recorder\.mimeType\)/);
 assert.match(hook, /recorder\.stop\(\)/);
 assert.match(
   hook,

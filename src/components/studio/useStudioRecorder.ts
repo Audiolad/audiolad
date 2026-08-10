@@ -9,6 +9,7 @@ import {
   shouldFallbackToBasicMicrophoneRequest,
   validateStudioRecordedFile,
 } from "@/lib/studio/recorder";
+import { isStudioPersistableRecordingMimeType } from "@/lib/studio/recording-mime";
 
 let activeRecorder: MediaRecorder | null = null;
 let isStartingRecorder = false;
@@ -224,6 +225,11 @@ export function useStudioRecorder({
         setRecordingError("Запись с микрофона не поддерживается этим браузером.");
         return;
       }
+      const requestedMimeType = getStudioRecorderMimeType();
+      if (!requestedMimeType) {
+        setRecordingError("Запись с микрофона не поддерживается этим браузером.");
+        return;
+      }
 
       setRecordingError(null);
       discardResultRef.current = false;
@@ -248,10 +254,13 @@ export function useStudioRecorder({
           return;
         }
         streamRef.current = stream;
-        const mimeType = getStudioRecorderMimeType();
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
+        const recorder = new MediaRecorder(stream, { mimeType: requestedMimeType });
+        if (!isStudioPersistableRecordingMimeType(recorder.mimeType)) {
+          throw new DOMException(
+            "Unsupported MediaRecorder MIME type",
+            "NotSupportedError",
+          );
+        }
         const chunks: BlobPart[] = [];
         recorderRef.current = recorder;
         activeRecorder = recorder;
@@ -301,7 +310,7 @@ export function useStudioRecorder({
             return;
           }
 
-          const fileType = recorder.mimeType || mimeType || "audio/webm";
+          const fileType = recorder.mimeType;
           const file = new File(
             chunks,
             `Запись ${++recordingNumber}.${getStudioRecordingExtension(fileType)}`,

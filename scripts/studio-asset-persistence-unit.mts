@@ -10,8 +10,18 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const assetId = "22222222-2222-4222-8222-222222222222";
 const originalFetch = globalThis.fetch;
 const file = new Blob(["audio"], { type: "audio/mpeg" }) as File;
+const recordingFile = new File(["opus"], "Запись 1.webm", {
+  type: "audio/webm;codecs=opus",
+});
 
-function assetResponse(id = assetId) {
+function assetResponse(
+  id = assetId,
+  overrides: Partial<{
+    originalName: string;
+    mimeType: string;
+    sourceType: "upload" | "recording";
+  }> = {},
+) {
   return {
     asset: {
       id,
@@ -22,6 +32,7 @@ function assetResponse(id = assetId) {
       durationSeconds: null,
       sourceType: "upload",
       createdAt: "2026-08-09T00:00:00.000Z",
+      ...overrides,
     },
   };
 }
@@ -56,10 +67,23 @@ await withFetch(async (url, init) => {
 
 await withFetch(async (_url, init) => {
   assert(init?.body instanceof FormData);
+  const uploadedRecording = init.body.get("file");
+  assert(uploadedRecording instanceof File);
+  assert.equal(uploadedRecording.type, "audio/webm;codecs=opus");
   assert.equal(init.body.get("sourceType"), "recording");
-  return Response.json(assetResponse(), { status: 201 });
+  return Response.json(assetResponse(assetId, {
+    originalName: "recording.webm",
+    mimeType: "audio/webm",
+    sourceType: "recording",
+  }), { status: 201 });
 }, async () => {
-  await uploadStudioProjectAsset({ projectId, file, sourceType: "recording" });
+  const asset = await uploadStudioProjectAsset({
+    projectId,
+    file: recordingFile,
+    sourceType: "recording",
+  });
+  assert.equal(asset.mimeType, "audio/webm");
+  assert.equal(asset.sourceType, "recording");
 });
 
 let independentUploads = 0;
