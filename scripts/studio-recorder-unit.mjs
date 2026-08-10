@@ -127,6 +127,15 @@ assert.match(hook, /lastStopAction: "recorder-stop-called"[\s\S]*recorder\.stop\
 assert.match(hook, /recorder\.onstop[\s\S]*lastStopAction: "onstop-fired"/);
 assert.match(hook, /recorder\.onerror[\s\S]*lastStopAction: "onerror-fired"/);
 assert.match(hook, /activeStreamTrackCount/);
+assert.match(hook, /requestedMimeType/);
+assert.match(hook, /recorderMimeType/);
+assert.match(hook, /blobType/);
+assert.match(hook, /normalizedPersistenceMime/);
+assert.match(hook, /microphoneRequestCount/);
+assert.match(hook, /lastGetUserMediaSuccessAt/);
+assert.match(hook, /lastGetUserMediaErrorName/);
+assert.match(hook, /stopRecordingInvocationCount/);
+assert.match(hook, /recordStopControlEvent/);
 assert.match(hook, /track\.readyState === "live"/);
 assert.ok(
   hook.indexOf("recorder.start()") < hook.indexOf("setRecordingSlotId(slotId)"),
@@ -156,8 +165,27 @@ assert.match(editor, /recordingSlotId === slot\.id/);
 assert.match(editor, /recordingSlotId === slot\.id && isRecording/);
 assert.match(editor, /Включаем микрофон…/);
 assert.match(editor, /Записать с микрофона/);
-assert.match(editor, /Стоп · \{formatTime\(recordingElapsed\)\}/);
-assert.match(editor, /● Идёт запись \{formatTime\(recordingElapsed\)\}/);
+assert.equal(
+  (editor.match(/Стоп · \{formatTime\(recordingElapsed\)\}/g) ?? []).length,
+  3,
+  "top panel, sidebar, and timeline expose Stop while recording",
+);
+assert.match(
+  editor,
+  /\{isRecording \? \(\s*<button[\s\S]*recordStopControlEvent\("top"[\s\S]*stopRecording\(\);/,
+  "top recording indicator invokes the shared stop handler",
+);
+assert.match(
+  editor,
+  /recordingSlotId === slot\.id && isRecording[\s\S]*recordStopControlEvent\("sidebar"[\s\S]*stopRecording\(\);/,
+  "sidebar recording indicator invokes the shared stop handler once",
+);
+assert.match(
+  editor,
+  /isThisSlotRecording[\s\S]*recordStopControlEvent\("timeline"[\s\S]*stopRecording\(\);/,
+  "timeline recording indicator invokes the shared stop handler",
+);
+assert.match(editor, /min-h-10 rounded-md px-3 text-rose-200/);
 assert.match(editor, /При записи под музыку лучше использовать наушники/);
 assert.match(editor, /recorderDebug = false/);
 assert.match(editor, /\{recorderDebug \?/);
@@ -167,13 +195,19 @@ assert.match(editor, /\{recordingSlotId \?\? "—"\}/);
 assert.match(editor, /debugEnabled: recorderDebug/);
 assert.match(
   editor,
-  /recordSidebarStopClick\(\);\s*stopRecording\(\);/,
+  /recordStopControlEvent\("sidebar"[\s\S]*stopRecording\(\);/,
   "sidebar Stop records click evidence before invoking stopRecording",
 );
 assert.match(editor, /recorderDebugState\.stopClickCount/);
 assert.match(editor, /recorderDebugState\.lastStopAction/);
 assert.match(editor, /recorderDebugState\.lastStopGuardStatus/);
 assert.match(editor, /recorderDebugState\.lastStopMediaRecorderState/);
+assert.match(editor, /recorderDebugState\.requestedMimeType/);
+assert.match(editor, /recorderDebugState\.microphoneRequestCount/);
+assert.match(editor, /recorderDebugState\.topStopPointerDownCount/);
+assert.match(editor, /audioDebug = false/);
+assert.match(editor, /\{audioDebug \?/);
+assert.match(provider, /contextState: context\?\.state/);
 assert.match(timeline, /StudioLiveWaveformCanvas/);
 assert.match(timeline, /liveRecording\?\.slotId === track\.slotId/);
 assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);

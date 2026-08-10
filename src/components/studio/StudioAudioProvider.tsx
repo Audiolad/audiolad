@@ -60,6 +60,21 @@ export type StudioAudioStatus =
   | "paused"
   | "error";
 
+export type StudioAudioDebugState = {
+  contextState: string;
+  sampleRate: number | null;
+  contextCurrentTime: number | null;
+  activeSourceCount: number;
+  outputGain: number | null;
+  mutedTrackCount: number;
+  lastPlayClickAt: string | null;
+  lastResumeAttemptAt: string | null;
+  lastResumeResult: string;
+  lastResumeError: string | null;
+  stateBeforePlay: string | null;
+  stateAfterResume: string | null;
+};
+
 export type StudioLocalTrack = {
   id: string;
   fileName: string;
@@ -83,6 +98,7 @@ type StudioAudioContextValue = {
   status: StudioAudioStatus;
   currentTime: number;
   projectError: string | null;
+  audioDebugState: StudioAudioDebugState;
   createMicrophoneAnalyser: (
     stream: MediaStream,
   ) => { analyser: AnalyserNode; disconnect: () => void };
@@ -162,16 +178,32 @@ function getTrackId(file: File, index: number): string {
 export function StudioAudioProvider({
   children,
   persistenceProjectId,
+  debugEnabled = false,
 }: {
   children: ReactNode;
   /** Opt in only from a future persisted project route. */
   persistenceProjectId?: string;
+  debugEnabled?: boolean;
 }) {
   const [tracks, setTracks] = useState<StudioLocalTrack[]>([]);
   const [status, setStatus] = useState<StudioAudioStatus>("idle");
   const [currentTime, setCurrentTime] = useState(0);
   const [projectDuration, setProjectDuration] = useState(0);
   const [projectError, setProjectError] = useState<string | null>(null);
+  const [audioDebugState, setAudioDebugState] = useState<StudioAudioDebugState>({
+    contextState: "missing",
+    sampleRate: null,
+    contextCurrentTime: null,
+    activeSourceCount: 0,
+    outputGain: null,
+    mutedTrackCount: 0,
+    lastPlayClickAt: null,
+    lastResumeAttemptAt: null,
+    lastResumeResult: "none",
+    lastResumeError: null,
+    stateBeforePlay: null,
+    stateAfterResume: null,
+  });
   const [persistenceContext, setPersistenceContext] = useState<{
     name: string | null;
     revision: number | null;
@@ -191,6 +223,30 @@ export function StudioAudioProvider({
   const replacementGenerationRef = useRef(new Map<string, number>());
   const assetUploadGenerationRef = useRef(new Map<string, number>());
   const assetUploadControllersRef = useRef(new Map<string, AbortController>());
+  const debugEnabledRef = useRef(debugEnabled);
+
+  useEffect(() => {
+    debugEnabledRef.current = debugEnabled;
+  }, [debugEnabled]);
+
+  const updateAudioDebug = useCallback((
+    update: (current: StudioAudioDebugState) => StudioAudioDebugState,
+  ) => {
+    if (debugEnabledRef.current) setAudioDebugState(update);
+  }, []);
+
+  const getAudioDebugSnapshot = useCallback(() => {
+    const context = audioContextRef.current;
+    const runtimes = [...trackRuntimesRef.current.values()];
+    return {
+      contextState: context?.state ?? "missing",
+      sampleRate: context?.sampleRate ?? null,
+      contextCurrentTime: context?.currentTime ?? null,
+      activeSourceCount: runtimes.reduce((count, runtime) => count + runtime.sources.size, 0),
+      outputGain: runtimes[0]?.outputGain.gain.value ?? null,
+      mutedTrackCount: tracksRef.current.filter((track) => track.muted).length,
+    };
+  }, []);
 
   const cancelProgressLoop = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -989,8 +1045,38 @@ export function StudioAudioProvider({
     }
 
     try {
+      const beforePlay = context.state;
+      updateAudioDebug((current) => ({
+        ...current,
+        ...getAudioDebugSnapshot(),
+        lastPlayClickAt: new Date().toISOString(),
+        stateBeforePlay: beforePlay,
+      }));
       if (context.state === "suspended") {
-        await context.resume();
+        updateAudioDebug((current) => ({
+          ...current,
+          lastResumeAttemptAt: new Date().toISOString(),
+          lastResumeResult: "pending",
+          lastResumeError: null,
+        }));
+        try {
+          await context.resume();
+          updateAudioDebug((current) => ({
+            ...current,
+            ...getAudioDebugSnapshot(),
+            lastResumeResult: "resolved",
+            stateAfterResume: context.state,
+          }));
+        } catch (error) {
+          updateAudioDebug((current) => ({
+            ...current,
+            ...getAudioDebugSnapshot(),
+            lastResumeResult: "rejected",
+            lastResumeError: error instanceof Error ? error.name : "unknown",
+            stateAfterResume: context.state,
+          }));
+          throw error;
+        }
       }
 
       cancelProgressLoop();
@@ -998,13 +1084,21 @@ export function StudioAudioProvider({
       const restartPosition =
         positionRef.current >= projectDurationRef.current ? 0 : positionRef.current;
       startSourcesAtPosition(restartPosition);
+      updateAudioDebug((current) => ({ ...current, ...getAudioDebugSnapshot() }));
     } catch (playError) {
       stopSources();
       cancelProgressLoop();
       setProjectError(formatDecodeError(playError));
       setStatusValue("error");
     }
-  }, [cancelProgressLoop, setStatusValue, startSourcesAtPosition, stopSources]);
+  }, [
+    cancelProgressLoop,
+    getAudioDebugSnapshot,
+    setStatusValue,
+    startSourcesAtPosition,
+    stopSources,
+    updateAudioDebug,
+  ]);
 
   const pause = useCallback(() => {
     if (statusRef.current !== "playing") {
@@ -1431,6 +1525,7 @@ export function StudioAudioProvider({
       status,
       currentTime,
       projectError,
+      audioDebugState,
       createMicrophoneAnalyser,
       loadLocalFiles,
       ingestRecordedFile,
@@ -1473,6 +1568,7 @@ export function StudioAudioProvider({
       persistenceContext,
       projectDuration,
       projectError,
+      audioDebugState,
       replaceTrackAudio,
       retryTrackAssetUpload,
       hydratePersistedProject,

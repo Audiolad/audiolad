@@ -187,9 +187,11 @@ function TrackFadeButton({
 export default function StudioEditorShell({
   persistedHydration,
   recorderDebug = false,
+  audioDebug = false,
 }: {
   persistedHydration?: StudioProjectHydration | null;
   recorderDebug?: boolean;
+  audioDebug?: boolean;
 }) {
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
@@ -233,6 +235,7 @@ export default function StudioEditorShell({
     play,
     projectDuration,
     projectError,
+    audioDebugState,
     removeTrack,
     rippleDeleteClip,
     replaceTrackAudio,
@@ -605,7 +608,7 @@ export default function StudioEditorShell({
     recordingSlotId,
     recordingStatus,
     recorderDebugState,
-    recordSidebarStopClick,
+    recordStopControlEvent,
     startRecording,
     stopRecording,
   } = useStudioRecorder({
@@ -1015,11 +1018,18 @@ export default function StudioEditorShell({
                 {recordingSlotId === slot.id && isRecording ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      recordSidebarStopClick();
+                    onPointerDown={(event) => recordStopControlEvent("sidebar", "pointerdown", event.target)}
+                    onTouchStart={(event) => recordStopControlEvent("sidebar", "touchstart", event.target)}
+                    onClick={(event) => {
+                      recordStopControlEvent(
+                        "sidebar",
+                        "click",
+                        event.target,
+                        event.currentTarget.getBoundingClientRect(),
+                      );
                       stopRecording();
                     }}
-                    className="text-rose-200"
+                    className="min-h-10 rounded-md px-3 text-rose-200"
                   >
                     Стоп · {formatTime(recordingElapsed)}
                   </button>
@@ -1089,8 +1099,13 @@ export default function StudioEditorShell({
             <button
               type="button"
               onPointerUp={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                recordStopControlEvent("timeline", "pointerdown", event.target);
+              }}
               onClick={(event) => {
                 event.stopPropagation();
+                recordStopControlEvent("timeline", "click", event.target);
                 stopRecording();
               }}
               className="h-10 rounded-lg border border-rose-300/60 bg-rose-400/15 px-4 text-sm font-semibold text-rose-100"
@@ -1304,12 +1319,17 @@ export default function StudioEditorShell({
               />
             </section>
             {isRecording ? (
-              <p
-                role="status"
-                className="rounded border border-rose-400/50 bg-rose-500/10 px-2 py-1 text-xs font-semibold tabular-nums text-rose-200"
+              <button
+                type="button"
+                onPointerDown={(event) => recordStopControlEvent("top", "pointerdown", event.target)}
+                onClick={(event) => {
+                  recordStopControlEvent("top", "click", event.target);
+                  stopRecording();
+                }}
+                className="min-h-10 rounded border border-rose-400/50 bg-rose-500/10 px-3 py-1 text-xs font-semibold tabular-nums text-rose-200"
               >
-                ● Идёт запись {formatTime(recordingElapsed)}
-              </p>
+                Стоп · {formatTime(recordingElapsed)}
+              </button>
             ) : null}
 
             <div className="flex items-center gap-1">
@@ -1494,6 +1514,37 @@ export default function StudioEditorShell({
                     {recorderDebugState.lastStopMediaRecorderState}
                   </dd>
                 </div>
+                <div><dt className="inline text-amber-100/70">Requested / recorder MIME: </dt><dd className="inline">{recorderDebugState.requestedMimeType ?? "—"} / {recorderDebugState.recorderMimeType ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">Blob / File / persist MIME: </dt><dd className="inline">{recorderDebugState.blobType ?? "—"} / {recorderDebugState.fileType ?? "—"} / {recorderDebugState.normalizedPersistenceMime ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">Mic requests: </dt><dd className="inline">{recorderDebugState.microphoneRequestCount} · {recorderDebugState.lastMicrophoneRequestStartedAt ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">getUserMedia: </dt><dd className="inline">{recorderDebugState.lastGetUserMediaSuccessAt ?? "—"} / {recorderDebugState.lastGetUserMediaErrorName ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">Recording error: </dt><dd className="inline">{recorderDebugState.lastRecordingErrorReason ?? "—"} / {recorderDebugState.currentRecordingError ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">Stop top P/C: </dt><dd className="inline">{recorderDebugState.topStopPointerDownCount}/{recorderDebugState.topStopClickCount}</dd></div>
+                <div><dt className="inline text-amber-100/70">Stop sidebar P/T/C: </dt><dd className="inline">{recorderDebugState.sidebarStopPointerDownCount}/{recorderDebugState.sidebarStopTouchStartCount}/{recorderDebugState.sidebarStopClickCount}</dd></div>
+                <div><dt className="inline text-amber-100/70">Stop timeline P/C: </dt><dd className="inline">{recorderDebugState.timelineStopPointerDownCount}/{recorderDebugState.timelineStopClickCount}</dd></div>
+                <div><dt className="inline text-amber-100/70">Stop invoke/source: </dt><dd className="inline">{recorderDebugState.stopRecordingInvocationCount} / {recorderDebugState.lastStopSource ?? "—"}</dd></div>
+                <div><dt className="inline text-amber-100/70">Sidebar rect / target: </dt><dd className="inline">{recorderDebugState.sidebarButtonRect ?? "—"} / {recorderDebugState.lastHitTarget ?? "—"}</dd></div>
+              </dl>
+            </section>
+          ) : null}
+          {audioDebug ? (
+            <section
+              aria-label="Отладка аудио"
+              className="mb-4 rounded-lg border border-sky-300/30 bg-sky-400/10 px-4 py-3 text-xs text-sky-50"
+            >
+              <p className="font-semibold">Отладка аудио</p>
+              <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                <div><dt className="inline text-sky-100/70">Context: </dt><dd className="inline">{audioDebugState.contextState}</dd></div>
+                <div><dt className="inline text-sky-100/70">Sample rate: </dt><dd className="inline">{audioDebugState.sampleRate ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Context time: </dt><dd className="inline">{audioDebugState.contextCurrentTime ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Active sources: </dt><dd className="inline">{audioDebugState.activeSourceCount}</dd></div>
+                <div><dt className="inline text-sky-100/70">Output gain: </dt><dd className="inline">{audioDebugState.outputGain ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Muted tracks: </dt><dd className="inline">{audioDebugState.mutedTrackCount}</dd></div>
+                <div><dt className="inline text-sky-100/70">Play click: </dt><dd className="inline">{audioDebugState.lastPlayClickAt ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Before / after resume: </dt><dd className="inline">{audioDebugState.stateBeforePlay ?? "—"} / {audioDebugState.stateAfterResume ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Resume: </dt><dd className="inline">{audioDebugState.lastResumeResult}</dd></div>
+                <div><dt className="inline text-sky-100/70">Resume error: </dt><dd className="inline">{audioDebugState.lastResumeError ?? "—"}</dd></div>
+                <div><dt className="inline text-sky-100/70">Recorder / live tracks: </dt><dd className="inline">{recorderDebugState.mediaRecorderState} / {recorderDebugState.activeStreamTrackCount}</dd></div>
               </dl>
             </section>
           ) : null}

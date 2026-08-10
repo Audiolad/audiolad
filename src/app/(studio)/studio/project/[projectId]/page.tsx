@@ -8,15 +8,19 @@ export default async function PersistedStudioProjectPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ studioRecorderDebug?: string }>;
+  searchParams: Promise<{
+    studioRecorderDebug?: string;
+    studioAudioDebug?: string;
+  }>;
 }) {
   const { projectId } = await params;
-  const { studioRecorderDebug } = await searchParams;
+  const { studioRecorderDebug, studioAudioDebug } = await searchParams;
   await requireStudioAuthorAccess(`/studio/project/${projectId}`);
   return (
     <PersistedStudioProjectShell
       projectId={projectId}
       recorderDebug={studioRecorderDebug === "1"}
+      audioDebug={studioAudioDebug === "1"}
     />
   );
 }

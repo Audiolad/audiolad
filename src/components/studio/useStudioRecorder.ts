@@ -44,6 +44,8 @@ type StudioRecorderDebugAction =
   | "onstop-fired"
   | "onerror-fired";
 type StudioMediaRecorderState = MediaRecorder["state"] | "missing";
+export type StudioStopSource = "top" | "sidebar" | "timeline";
+type StudioStopEvent = "pointerdown" | "touchstart" | "click";
 
 export type StudioRecorderDebugState = {
   mediaRecorderState: StudioMediaRecorderState;
@@ -54,6 +56,29 @@ export type StudioRecorderDebugState = {
   lastStopRecorderPresent: boolean;
   lastStopMediaRecorderState: StudioMediaRecorderState;
   lastStopAction: StudioRecorderDebugAction;
+  requestedMimeType: string | null;
+  recorderMimeType: string | null;
+  blobType: string | null;
+  fileType: string | null;
+  normalizedPersistenceMime: string | null;
+  microphoneRequestCount: number;
+  lastMicrophoneRequestStartedAt: string | null;
+  lastGetUserMediaSuccessAt: string | null;
+  lastGetUserMediaErrorName: string | null;
+  lastGetUserMediaErrorAt: string | null;
+  lastRecordingErrorReason: string | null;
+  currentRecordingError: string | null;
+  topStopPointerDownCount: number;
+  topStopClickCount: number;
+  sidebarStopPointerDownCount: number;
+  sidebarStopTouchStartCount: number;
+  sidebarStopClickCount: number;
+  timelineStopPointerDownCount: number;
+  timelineStopClickCount: number;
+  stopRecordingInvocationCount: number;
+  lastStopSource: StudioStopSource | null;
+  sidebarButtonRect: string | null;
+  lastHitTarget: string | null;
 };
 
 const initialRecorderDebugState: StudioRecorderDebugState = {
@@ -65,6 +90,29 @@ const initialRecorderDebugState: StudioRecorderDebugState = {
   lastStopRecorderPresent: false,
   lastStopMediaRecorderState: "missing",
   lastStopAction: "none",
+  requestedMimeType: null,
+  recorderMimeType: null,
+  blobType: null,
+  fileType: null,
+  normalizedPersistenceMime: null,
+  microphoneRequestCount: 0,
+  lastMicrophoneRequestStartedAt: null,
+  lastGetUserMediaSuccessAt: null,
+  lastGetUserMediaErrorName: null,
+  lastGetUserMediaErrorAt: null,
+  lastRecordingErrorReason: null,
+  currentRecordingError: null,
+  topStopPointerDownCount: 0,
+  topStopClickCount: 0,
+  sidebarStopPointerDownCount: 0,
+  sidebarStopTouchStartCount: 0,
+  sidebarStopClickCount: 0,
+  timelineStopPointerDownCount: 0,
+  timelineStopClickCount: 0,
+  stopRecordingInvocationCount: 0,
+  lastStopSource: null,
+  sidebarButtonRect: null,
+  lastHitTarget: null,
 };
 
 export function useStudioRecorder({
@@ -120,11 +168,30 @@ export function useStudioRecorder({
     [],
   );
 
-  const recordSidebarStopClick = useCallback(() => {
+  const recordStopControlEvent = useCallback((
+    source: StudioStopSource,
+    event: StudioStopEvent,
+    target?: EventTarget | null,
+    sidebarRect?: DOMRect,
+  ) => {
     updateRecorderDebug((current) => ({
       ...current,
-      stopClickCount: current.stopClickCount + 1,
-      lastStopClickAt: new Date().toISOString(),
+      topStopPointerDownCount: current.topStopPointerDownCount + (source === "top" && event === "pointerdown" ? 1 : 0),
+      topStopClickCount: current.topStopClickCount + (source === "top" && event === "click" ? 1 : 0),
+      sidebarStopPointerDownCount: current.sidebarStopPointerDownCount + (source === "sidebar" && event === "pointerdown" ? 1 : 0),
+      sidebarStopTouchStartCount: current.sidebarStopTouchStartCount + (source === "sidebar" && event === "touchstart" ? 1 : 0),
+      sidebarStopClickCount: current.sidebarStopClickCount + (source === "sidebar" && event === "click" ? 1 : 0),
+      timelineStopPointerDownCount: current.timelineStopPointerDownCount + (source === "timeline" && event === "pointerdown" ? 1 : 0),
+      timelineStopClickCount: current.timelineStopClickCount + (source === "timeline" && event === "click" ? 1 : 0),
+      stopClickCount: current.stopClickCount + (event === "click" ? 1 : 0),
+      lastStopClickAt: event === "click" ? new Date().toISOString() : current.lastStopClickAt,
+      lastStopSource: source,
+      sidebarButtonRect: sidebarRect
+        ? `${Math.round(sidebarRect.width)}×${Math.round(sidebarRect.height)}`
+        : current.sidebarButtonRect,
+      lastHitTarget: target instanceof Element
+        ? `${target.tagName.toLowerCase()}${target.className ? `.${String(target.className).split(" ").slice(0, 2).join(".")}` : ""}`
+        : current.lastHitTarget,
     }));
   }, [updateRecorderDebug]);
 
@@ -167,6 +234,7 @@ export function useStudioRecorder({
     updateRecorderDebug((current) => ({
       ...current,
       ...debugSnapshot,
+      stopRecordingInvocationCount: current.stopRecordingInvocationCount + 1,
       lastStopAction: "handler-entered",
     }));
     if (guardStatus !== "recording") {
@@ -232,21 +300,46 @@ export function useStudioRecorder({
       }
 
       setRecordingError(null);
+      updateRecorderDebug((current) => ({
+        ...current,
+        requestedMimeType,
+        currentRecordingError: null,
+        lastRecordingErrorReason: "cleared-on-record-click",
+      }));
       discardResultRef.current = false;
       isStartingRecorder = true;
       setRecorderStatus("arming");
       try {
         let stream: MediaStream;
         try {
+          updateRecorderDebug((current) => ({
+            ...current,
+            microphoneRequestCount: current.microphoneRequestCount + 1,
+            lastMicrophoneRequestStartedAt: new Date().toISOString(),
+          }));
           stream = await navigator.mediaDevices.getUserMedia({
             audio: STUDIO_MICROPHONE_CONSTRAINTS,
           });
         } catch (error) {
+          updateRecorderDebug((current) => ({
+            ...current,
+            lastGetUserMediaErrorName: error instanceof DOMException ? error.name : "unknown",
+            lastGetUserMediaErrorAt: new Date().toISOString(),
+          }));
           if (!shouldFallbackToBasicMicrophoneRequest(error)) {
             throw error;
           }
+          updateRecorderDebug((current) => ({
+            ...current,
+            microphoneRequestCount: current.microphoneRequestCount + 1,
+            lastMicrophoneRequestStartedAt: new Date().toISOString(),
+          }));
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
+        updateRecorderDebug((current) => ({
+          ...current,
+          lastGetUserMediaSuccessAt: new Date().toISOString(),
+        }));
         if (isDisposedRef.current) {
           stream.getTracks().forEach((track) => track.stop());
           isStartingRecorder = false;
@@ -255,6 +348,11 @@ export function useStudioRecorder({
         }
         streamRef.current = stream;
         const recorder = new MediaRecorder(stream, { mimeType: requestedMimeType });
+        updateRecorderDebug((current) => ({
+          ...current,
+          recorderMimeType: recorder.mimeType,
+          normalizedPersistenceMime: recorder.mimeType.split(";", 1)[0].trim().toLowerCase(),
+        }));
         if (!isStudioPersistableRecordingMimeType(recorder.mimeType)) {
           throw new DOMException(
             "Unsupported MediaRecorder MIME type",
@@ -311,14 +409,26 @@ export function useStudioRecorder({
           }
 
           const fileType = recorder.mimeType;
+          const blob = new Blob(chunks, { type: fileType });
           const file = new File(
-            chunks,
+            [blob],
             `Запись ${++recordingNumber}.${getStudioRecordingExtension(fileType)}`,
             { type: fileType },
           );
+          updateRecorderDebug((current) => ({
+            ...current,
+            blobType: blob.type,
+            fileType: file.type,
+            normalizedPersistenceMime: file.type.split(";", 1)[0].trim().toLowerCase(),
+          }));
           const validationError = validateStudioRecordedFile(file);
           if (validationError) {
             setRecordingError(validationError);
+            updateRecorderDebug((current) => ({
+              ...current,
+              currentRecordingError: validationError,
+              lastRecordingErrorReason: "recorded-file-validation",
+            }));
             setRecorderStatus("idle");
             setRecordingSlotId(null);
             return;
@@ -326,6 +436,11 @@ export function useStudioRecorder({
           void onRecordedFile(file, startTimeRef.current, slotId)
             .catch(() => {
               setRecordingError("Не удалось добавить запись в проект.");
+              updateRecorderDebug((current) => ({
+                ...current,
+                currentRecordingError: "Не удалось добавить запись в проект.",
+                lastRecordingErrorReason: "recorded-file-ingest",
+              }));
             })
             .finally(() => {
               setRecorderStatus("idle");
@@ -362,13 +477,17 @@ export function useStudioRecorder({
         setRecordingSlotId(null);
         setRecorderStatus("idle");
         const name = error instanceof DOMException ? error.name : "";
-        setRecordingError(
-          name === "NotAllowedError" || name === "SecurityError"
+        const message = name === "NotAllowedError" || name === "SecurityError"
             ? "Нет доступа к микрофону. Разрешите его использование в браузере."
             : name === "NotFoundError"
               ? "Микрофон не найден или недоступен."
-              : "Не удалось включить микрофон для записи.",
-        );
+              : "Не удалось включить микрофон для записи.";
+        setRecordingError(message);
+        updateRecorderDebug((current) => ({
+          ...current,
+          currentRecordingError: message,
+          lastRecordingErrorReason: `start-catch:${name || "unknown"}`,
+        }));
       }
     },
     [
@@ -414,7 +533,7 @@ export function useStudioRecorder({
     recordingAnalyser,
     recordingStartTime,
     recorderDebugState,
-    recordSidebarStopClick,
+    recordStopControlEvent,
     startRecording,
     stopRecording,
   };
