@@ -63,6 +63,11 @@ function testPositionMath() {
     0.8,
   );
   assert.equal(getStudioTrackGain({ volume: 0.8, muted: true }), 0);
+  assert.equal(getStudioTrackGain({ volume: 0, muted: false }), 0);
+  assert.equal(getStudioTrackGain({ volume: 1, muted: false }), 1);
+  assert.equal(getStudioTrackGain({ volume: 2, muted: false }), 2);
+  assert.equal(getStudioTrackGain({ volume: 4, muted: false }), 4);
+  assert.equal(getStudioTrackGain({ volume: 5, muted: false }), 4);
   assert.equal(getStudioReplacementProjectSize(600, 150, 200), 650);
 }
 
@@ -130,6 +135,15 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /export \{ validateStudioLocalFile \}/);
   assert.match(provider, /fxInput\.connect\(outputGain\)/);
   assert.match(provider, /setTrackVoicePreset/);
+  assert.match(provider, /STUDIO_VOICE_PRESET_CONFIG/);
+  assert.match(provider, /lowShelf: \{ frequency: 200, gain: 3 \}/);
+  assert.match(provider, /lowShelf: \{ frequency: 135, gain: 4 \}/);
+  assert.match(provider, /lowMid: \{ frequency: 300, gain: 2 \}/);
+  assert.match(provider, /delaySeconds: 0\.14/);
+  assert.match(provider, /wetGain: 0\.22/);
+  assert.match(provider, /feedbackGain: 0\.14/);
+  assert.match(provider, /wetHighShelf/);
+  assert.match(provider, /track\.trackKind !== "voice"/);
   assert.match(provider, /toggleTrackMuted/);
   assert.match(provider, /getTrackBuffer/);
   assert.match(
@@ -195,6 +209,8 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   const coordination = readSource("src/lib/audio/studio-audio-coordination.ts");
 
+  assert.match(studioWorkspace, /max=\{trackKind === "voice" \? "400" : "200"\}/);
+  assert.match(studioWorkspace, /Высокое усиление может вызвать искажения/);
   assert.match(editorLayout, /<StudioAudioProvider>/);
   assert.doesNotMatch(editorLayout, /GlobalAudioPlayerProvider/);
   assert.doesNotMatch(
@@ -299,7 +315,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
   assert.match(studioWorkspace, /Назад в Studio/);
-  assert.match(studioWorkspace, /max="200"/);
+  assert.match(studioWorkspace, /max=\{trackKind === "voice" \? "400" : "200"\}/);
   assert.match(studioWorkspace, /setTrackVolume\(track\.id, Number\(event\.target\.value\) \/ 100\)/);
   assert.doesNotMatch(studioWorkspace, /transform:\s*["'`]?rotate/);
   assert.doesNotMatch(studioWorkspace, /style=\{\{[^}]*volume/);

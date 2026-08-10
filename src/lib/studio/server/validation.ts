@@ -161,7 +161,7 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
       typeof track.volume !== "number" ||
       !Number.isFinite(track.volume) ||
       track.volume < 0 ||
-      track.volume > 2 ||
+      track.volume > 4 ||
       typeof track.muted !== "boolean" ||
       (track.trackKind !== undefined && track.trackKind !== "voice" && track.trackKind !== "music") ||
       (track.voicePreset !== undefined && !["clean", "warm", "deep", "space"].includes(track.voicePreset as string)) ||

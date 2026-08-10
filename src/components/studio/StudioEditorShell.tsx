@@ -946,7 +946,7 @@ export default function StudioEditorShell({
                 aria-label={`Громкость ${slot.name}`}
                 type="range"
                 min="0"
-                max="200"
+                max={trackKind === "voice" ? "400" : "200"}
                 value={Math.round((track?.volume ?? 1) * 100)}
                 disabled={!track}
                 onChange={(event) =>
@@ -964,6 +964,11 @@ export default function StudioEditorShell({
               </span>
             </div>
           </div>
+          {trackKind === "voice" && (track?.volume ?? 1) > 2 ? (
+            <p className="mt-1 text-[10px] text-[#9ba7bb]">
+              Высокое усиление может вызвать искажения
+            </p>
+          ) : null}
           {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-2">
             <TrackFadeButton
               clip={selectedClip}

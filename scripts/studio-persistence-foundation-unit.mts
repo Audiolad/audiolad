@@ -64,6 +64,20 @@ const validProjectData = {
 };
 
 assert.deepEqual(parseStudioProjectData(validProjectData), validProjectData);
+assert.deepEqual(
+  parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{ ...validProjectData.tracks[0], volume: 4 }],
+  }).tracks[0]?.volume,
+  4,
+);
+assert.throws(
+  () => parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{ ...validProjectData.tracks[0], volume: 4.01 }],
+  }),
+  (error: unknown) => error instanceof StudioApiError && error.code === "invalid_track",
+);
 assert.deepEqual(parseStudioProjectData(EMPTY_STUDIO_PROJECT_DATA), {
   schemaVersion: 2,
   studioVersion: 1,

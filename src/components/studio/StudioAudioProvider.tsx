@@ -56,6 +56,24 @@ import type { StudioProjectHydration } from "@/lib/studio/hydration";
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
 
+export const STUDIO_VOICE_PRESET_CONFIG = {
+  warm: {
+    lowShelf: { frequency: 200, gain: 3 },
+    highShelf: { frequency: 5500, gain: -1.75 },
+  },
+  deep: {
+    lowShelf: { frequency: 135, gain: 4 },
+    lowMid: { frequency: 300, gain: 2 },
+    highShelf: { frequency: 5500, gain: -1 },
+  },
+  space: {
+    delaySeconds: 0.14,
+    wetGain: 0.22,
+    feedbackGain: 0.14,
+    wetHighShelf: { frequency: 5000, gain: -3 },
+  },
+} as const;
+
 export type StudioAudioStatus =
   | "idle"
   | "loading"
@@ -371,28 +389,55 @@ export function StudioAudioProvider({
       nodes.push(filter);
     };
     if (preset === "warm") {
-      connectFilter("lowshelf", 180, 1.5);
-      connectFilter("highshelf", 5000, -1);
+      connectFilter(
+        "lowshelf",
+        STUDIO_VOICE_PRESET_CONFIG.warm.lowShelf.frequency,
+        STUDIO_VOICE_PRESET_CONFIG.warm.lowShelf.gain,
+      );
+      connectFilter(
+        "highshelf",
+        STUDIO_VOICE_PRESET_CONFIG.warm.highShelf.frequency,
+        STUDIO_VOICE_PRESET_CONFIG.warm.highShelf.gain,
+      );
     } else if (preset === "deep") {
-      connectFilter("lowshelf", 130, 2);
-      connectFilter("peaking", 300, 1);
+      connectFilter(
+        "lowshelf",
+        STUDIO_VOICE_PRESET_CONFIG.deep.lowShelf.frequency,
+        STUDIO_VOICE_PRESET_CONFIG.deep.lowShelf.gain,
+      );
+      connectFilter(
+        "peaking",
+        STUDIO_VOICE_PRESET_CONFIG.deep.lowMid.frequency,
+        STUDIO_VOICE_PRESET_CONFIG.deep.lowMid.gain,
+      );
+      connectFilter(
+        "highshelf",
+        STUDIO_VOICE_PRESET_CONFIG.deep.highShelf.frequency,
+        STUDIO_VOICE_PRESET_CONFIG.deep.highShelf.gain,
+      );
     } else {
       const dry = context.createGain();
-      const delay = context.createDelay(0.2);
+      const delay = context.createDelay(0.25);
+      const wetHighShelf = context.createBiquadFilter();
       const wet = context.createGain();
       const feedback = context.createGain();
       dry.gain.value = 1;
-      delay.delayTime.value = 0.095;
-      wet.gain.value = 0.1;
-      feedback.gain.value = 0.08;
+      delay.delayTime.value = STUDIO_VOICE_PRESET_CONFIG.space.delaySeconds;
+      wetHighShelf.type = "highshelf";
+      wetHighShelf.frequency.value =
+        STUDIO_VOICE_PRESET_CONFIG.space.wetHighShelf.frequency;
+      wetHighShelf.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.wetHighShelf.gain;
+      wet.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.wetGain;
+      feedback.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.feedbackGain;
       runtime.fxInput.connect(dry);
       runtime.fxInput.connect(delay);
-      delay.connect(wet);
+      delay.connect(wetHighShelf);
+      wetHighShelf.connect(wet);
       delay.connect(feedback);
       feedback.connect(delay);
       dry.connect(runtime.outputGain);
       wet.connect(runtime.outputGain);
-      runtime.fxNodes = [dry, delay, wet, feedback];
+      runtime.fxNodes = [dry, delay, wetHighShelf, wet, feedback];
       return;
     }
     output.connect(runtime.outputGain);
@@ -1251,7 +1296,7 @@ export function StudioAudioProvider({
 
   const setTrackVolume = useCallback(
     (trackId: string, requestedVolume: number) => {
-      const volume = Math.min(Math.max(requestedVolume, 0), 2);
+      const volume = Math.min(Math.max(requestedVolume, 0), 4);
       updateTrack(trackId, (track) => ({ ...track, volume }));
     },
     [updateTrack],
