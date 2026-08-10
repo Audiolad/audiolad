@@ -727,6 +727,7 @@ export default function StudioEditorShell({
       : undefined;
     return {
       id: track?.id ?? slot.id,
+      slotId: slot.id,
       name: slot.name,
       fileName: track?.fileName,
       hasAudio: Boolean(slot.audioTrackId && track?.clips.length),
@@ -1122,11 +1123,24 @@ export default function StudioEditorShell({
         ? "Сохранение аудио…"
         : autosaveState?.status === "error"
           ? "Ошибка сохранения"
-          : autosaveState?.status === "saving"
+          : autosaveState?.isInFlight
             ? "Сохранение…"
-            : autosaveState?.status === "saved" && persistedHydration
+            : autosaveState?.dirty
+              ? "Есть несохранённые изменения"
+              : autosaveState?.status === "saved" && persistedHydration
               ? "Сохранено"
               : null;
+  const saveIsInFlight = autosaveState?.isInFlight ?? false;
+  const saveHasDirtyChanges = autosaveState?.dirty ?? false;
+  const saveIsUnavailable = !persistedHydration ||
+    autosaveState?.status === "partial-disabled" ||
+    autosaveState?.status === "conflict";
+  const saveButtonDisabled = saveIsUnavailable || saveIsInFlight || !saveHasDirtyChanges;
+  const saveButtonLabel = saveIsInFlight
+    ? "Сохранение…"
+    : saveHasDirtyChanges
+      ? "Сохранить"
+      : "Сохранено";
 
   return (
     <section className="min-h-dvh bg-[#0b1019] text-[#edf0f7]">
@@ -1360,11 +1374,11 @@ export default function StudioEditorShell({
               </button>
               <button
                 type="button"
-                disabled={!persistedHydration || autosaveState?.status === "partial-disabled" || autosaveState?.status === "conflict"}
+                disabled={saveButtonDisabled}
                 onClick={() => controllerRef.current?.retry()}
                 className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Сохранить
+                {saveButtonLabel}
               </button>
               <button type="button" disabled title="Экспорт будет доступен после подключения серверного сведения" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm opacity-45">
                 Экспорт

@@ -40,6 +40,7 @@ import {
 
 export type StudioTimelineTrack = {
   id: string;
+  slotId: string;
   name: string;
   fileName?: string;
   hasAudio: boolean;
@@ -525,7 +526,7 @@ function StudioTimeline({
                         </div>
                       );
                     }) : null}
-                    {!track.hasAudio && liveRecording?.slotId === track.id ? (
+                    {!track.hasAudio && liveRecording?.slotId === track.slotId ? (
                       <StudioLiveWaveformCanvas
                         analyser={liveRecording.analyser}
                         startTime={liveRecording.startTime}
@@ -645,7 +646,9 @@ function StudioTimeline({
                       })}
                     </div>
                   ) : null}
-                  {track.clips.length === 0 ? renderEmpty(track, index) : null}
+                  {track.clips.length === 0 && liveRecording?.slotId !== track.slotId
+                    ? renderEmpty(track, index)
+                    : null}
                 </div>
               );
             })}

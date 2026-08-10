@@ -102,7 +102,8 @@ assert.match(editor, /Стоп · \{formatTime\(recordingElapsed\)\}/);
 assert.match(editor, /● Идёт запись \{formatTime\(recordingElapsed\)\}/);
 assert.match(editor, /При записи под музыку лучше использовать наушники/);
 assert.match(timeline, /StudioLiveWaveformCanvas/);
-assert.match(timeline, /liveRecording\?\.slotId === track\.id/);
+assert.match(timeline, /liveRecording\?\.slotId === track\.slotId/);
+assert.match(timeline, /track\.clips\.length === 0 && liveRecording\?\.slotId !== track\.slotId/);
 assert.match(liveWaveform, /requestAnimationFrame\(draw\)/);
 assert.match(liveWaveform, /cancelAnimationFrame/);
 

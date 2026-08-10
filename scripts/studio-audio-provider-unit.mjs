@@ -365,7 +365,10 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
   assert.match(timeline, /renderControls\(track, index\)/);
   assert.match(timeline, /hasAudio: boolean/);
-  assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);
+  assert.match(
+    timeline,
+    /track\.clips\.length === 0 && liveRecording\?\.slotId !== track\.slotId/,
+  );
   assert.doesNotMatch(timeline, /!track\.buffer \? renderEmpty/);
   assert.match(timeline, /clipWidth/);
   assert.match(timeline, /clipLeft/);

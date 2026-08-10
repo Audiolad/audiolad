@@ -149,6 +149,10 @@ assert.match(shell, /Проект открыт не полностью\. Сох�
 assert.match(shell, /currentTime: exportEditingState\(\)\.position/);
 assert.match(shell, /onClipGestureCommit/);
 assert.match(shell, /Сохранить/);
+assert.match(shell, /Есть несохранённые изменения/);
+assert.match(shell, /autosaveState\?\.isInFlight/);
+assert.match(shell, /saveButtonDisabled/);
+assert.match(shell, /Сохранено/);
 assert.match(shell, /assetPersistenceStatus !== "saved"/);
 assert.match(client, /export async function updateStudioProject/);
 assert.match(client, /revision_conflict/);
