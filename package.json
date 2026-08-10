@@ -21,6 +21,7 @@
     "test:studio-persistence-serialization": "npx tsx scripts/studio-persistence-serialization-unit.mts",
     "test:studio-asset-persistence": "npx tsx scripts/studio-asset-persistence-unit.mts",
     "test:studio-project-hydration": "npx tsx scripts/studio-project-hydration-unit.mts",
+    "test:studio-project-creation": "npx tsx scripts/studio-project-creation-unit.mts",
     "test:studio-autosave": "npx tsx scripts/studio-autosave-unit.mts",
     "test:studio-persistence-integration": "npx tsx scripts/studio-persistence-integration-unit.mts",
     "test:studio-persistence:isolated": "AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_STUDIO_PERSISTENCE_ISOLATED=1 npx tsx scripts/studio-persistence-isolated-integration.mts",

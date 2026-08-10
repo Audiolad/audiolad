@@ -186,8 +186,10 @@ function TrackFadeButton({
 
 export default function StudioEditorShell({
   persistedHydration,
+  recorderDebug = false,
 }: {
   persistedHydration?: StudioProjectHydration | null;
+  recorderDebug?: boolean;
 }) {
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
@@ -1430,6 +1432,32 @@ export default function StudioEditorShell({
             <p role="status" className="mb-4 rounded-lg border border-violet-300/30 bg-violet-400/10 px-4 py-3 text-sm text-violet-100">
               Включаем микрофон…
             </p>
+          ) : null}
+          {recorderDebug ? (
+            <section
+              aria-label="Отладка записи"
+              className="mb-4 rounded-lg border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-xs text-amber-50"
+            >
+              <p className="font-semibold">Отладка записи</p>
+              <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                <div>
+                  <dt className="inline text-amber-100/70">Статус: </dt>
+                  <dd className="inline">{recordingStatus}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Дорожка: </dt>
+                  <dd className="inline">{recordingSlotId ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Длительность: </dt>
+                  <dd className="inline">{formatTime(recordingElapsed)}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Активна: </dt>
+                  <dd className="inline">{isRecording ? "да" : "нет"}</dd>
+                </div>
+              </dl>
+            </section>
           ) : null}
 
           <StudioTimeline

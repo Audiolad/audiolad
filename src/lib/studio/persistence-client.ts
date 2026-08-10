@@ -83,6 +83,40 @@ function isProject(value: unknown): value is StudioPersistedProject {
   );
 }
 
+export async function createStudioProject({
+  authorId,
+  name,
+  signal,
+}: {
+  authorId: string;
+  name: string;
+  signal?: AbortSignal;
+}): Promise<StudioPersistedProject> {
+  const response = await studioFetch("/api/studio/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ authorId, name }),
+    signal,
+  });
+  if (!response.ok) throw await toStudioFetchError(response);
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("project" in body) ||
+    !isProject(body.project)
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return body.project;
+}
+
 async function studioFetch(
   input: RequestInfo | URL,
   init?: RequestInit,

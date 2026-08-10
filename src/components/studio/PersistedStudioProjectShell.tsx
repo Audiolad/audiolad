@@ -28,7 +28,13 @@ function LoadingShell({ message }: { message: string }) {
   );
 }
 
-function Hydrator({ projectId }: { projectId: string }) {
+function Hydrator({
+  projectId,
+  recorderDebug,
+}: {
+  projectId: string;
+  recorderDebug: boolean;
+}) {
   const { decodePersistedAsset, hydratePersistedProject } = useStudioAudio();
   const [hydration, setHydration] = useState<StudioProjectHydration | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -109,13 +115,24 @@ function Hydrator({ projectId }: { projectId: string }) {
       />
     );
   }
-  return <StudioEditorShell persistedHydration={hydration} />;
+  return (
+    <StudioEditorShell
+      persistedHydration={hydration}
+      recorderDebug={recorderDebug}
+    />
+  );
 }
 
-export function PersistedStudioProjectShell({ projectId }: { projectId: string }) {
+export function PersistedStudioProjectShell({
+  projectId,
+  recorderDebug,
+}: {
+  projectId: string;
+  recorderDebug: boolean;
+}) {
   return (
     <StudioAudioProvider persistenceProjectId={projectId}>
-      <Hydrator projectId={projectId} />
+      <Hydrator projectId={projectId} recorderDebug={recorderDebug} />
     </StudioAudioProvider>
   );
 }
