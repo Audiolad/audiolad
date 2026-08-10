@@ -855,13 +855,27 @@ export default function StudioEditorShell({
             )}
           </div>
           {recordingSlotId === slot.id && isRecording ? (
-            <p
-              role="status"
-              aria-live="polite"
-              className="mt-2 inline-flex w-fit items-center rounded-full border border-rose-400/50 bg-rose-500/15 px-2 py-1 text-xs font-semibold tabular-nums text-rose-100"
+            <button
+              type="button"
+              onPointerDown={(event) =>
+                recordStopControlEvent("sidebar", "pointerdown", event.target)
+              }
+              onTouchStart={(event) =>
+                recordStopControlEvent("sidebar", "touchstart", event.target)
+              }
+              onClick={(event) => {
+                recordStopControlEvent(
+                  "sidebar",
+                  "click",
+                  event.target,
+                  event.currentTarget.getBoundingClientRect(),
+                );
+                stopRecording();
+              }}
+              className="mt-2 inline-flex min-h-10 w-fit items-center rounded-lg border border-rose-400/50 bg-rose-500/15 px-3 py-1 text-xs font-semibold tabular-nums text-rose-100"
             >
-              ● Идёт запись {formatTime(recordingElapsed)}
-            </p>
+              Стоп · {formatTime(recordingElapsed)}
+            </button>
           ) : null}
           {hasPersistenceProject && track ? (
             <div className="mt-2 flex items-center gap-2 text-xs" aria-live="polite">
@@ -1015,25 +1029,7 @@ export default function StudioEditorShell({
                 >
                   Добавить аудио
                 </button>
-                {recordingSlotId === slot.id && isRecording ? (
-                  <button
-                    type="button"
-                    onPointerDown={(event) => recordStopControlEvent("sidebar", "pointerdown", event.target)}
-                    onTouchStart={(event) => recordStopControlEvent("sidebar", "touchstart", event.target)}
-                    onClick={(event) => {
-                      recordStopControlEvent(
-                        "sidebar",
-                        "click",
-                        event.target,
-                        event.currentTarget.getBoundingClientRect(),
-                      );
-                      stopRecording();
-                    }}
-                    className="min-h-10 rounded-md px-3 text-rose-200"
-                  >
-                    Стоп · {formatTime(recordingElapsed)}
-                  </button>
-                ) : (
+                {recordingSlotId === slot.id && isRecording ? null : (
                   <button
                     type="button"
                     disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}

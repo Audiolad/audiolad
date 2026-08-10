@@ -177,7 +177,7 @@ assert.match(
 );
 assert.match(
   editor,
-  /recordingSlotId === slot\.id && isRecording[\s\S]*recordStopControlEvent\("sidebar"[\s\S]*stopRecording\(\);/,
+  /recordingSlotId === slot\.id && isRecording[\s\S]*<button[\s\S]*recordStopControlEvent\("sidebar"[\s\S]*stopRecording\(\);/,
   "sidebar recording indicator invokes the shared stop handler once",
 );
 assert.match(
@@ -185,7 +185,8 @@ assert.match(
   /isThisSlotRecording[\s\S]*recordStopControlEvent\("timeline"[\s\S]*stopRecording\(\);/,
   "timeline recording indicator invokes the shared stop handler",
 );
-assert.match(editor, /min-h-10 rounded-md px-3 text-rose-200/);
+assert.match(editor, /min-h-10 w-fit items-center rounded-lg/);
+assert.doesNotMatch(editor, /● Идёт запись/);
 assert.match(editor, /При записи под музыку лучше использовать наушники/);
 assert.match(editor, /recorderDebug = false/);
 assert.match(editor, /\{recorderDebug \?/);
