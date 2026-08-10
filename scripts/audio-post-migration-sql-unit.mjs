@@ -47,4 +47,25 @@ assert.match(
   /internal-moderation-readiness:v3/,
 );
 
+const promoAnalyticsMigration = readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20260810100000_platform_analytics_product_promo_clicked.sql",
+  ),
+  "utf8",
+);
+assert.match(
+  promoAnalyticsMigration,
+  /CREATE OR REPLACE FUNCTION public\.is_platform_analytics_event/,
+);
+assert.match(promoAnalyticsMigration, /'product_promo_clicked'/);
+assert.match(
+  promoAnalyticsMigration,
+  /is_platform_analytics_event\('product_promo_clicked'\) IS NOT TRUE/,
+);
+assert.match(
+  promoAnalyticsMigration,
+  /is_platform_analytics_event\('unknown_test_event'\) IS NOT FALSE/,
+);
+
 console.log("audio-post-migration-sql-unit: ok");

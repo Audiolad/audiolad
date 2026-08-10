@@ -2,6 +2,7 @@ import LegalFooter from "@/components/LegalFooter";
 import AuthorLink from "@/components/authors/AuthorLink";
 import NextStepRecommendation from "@/components/products/NextStepRecommendation";
 import AudioPostBackLink from "@/components/products/audio-post/AudioPostBackLink";
+import AudioPostListenAnalytics from "@/components/products/audio-post/AudioPostListenAnalytics";
 import AudioPostPlayer from "@/components/products/audio-post/AudioPostPlayer";
 import {
   PracticeAccessBanners,
@@ -84,6 +85,13 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-6 sm:px-6">
+      <AudioPostListenAnalytics
+        practiceId={practice.id}
+        authorSlug={resolvedAuthorSlug}
+        productSlug={practice.slug}
+        path={viewModel.practicePagePath}
+      />
+
       {/* Mobile: featured-card layout (home large-card language) */}
       <div className="xl:hidden">
         <AudioPostBackLink />
