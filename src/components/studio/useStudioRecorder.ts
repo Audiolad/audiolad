@@ -31,13 +31,14 @@ type UseStudioRecorderOptions = {
   ) => Promise<void>;
 };
 
+type StudioRecordingStatus = "idle" | "arming" | "recording" | "processing";
+
 export function useStudioRecorder({
   createMicrophoneAnalyser,
   onRecordedFile,
 }: UseStudioRecorderOptions) {
-  const [recordingStatus, setRecordingStatus] = useState<
-    "idle" | "recording" | "processing"
-  >("idle");
+  const [recordingStatus, setRecordingStatus] =
+    useState<StudioRecordingStatus>("idle");
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [recordingSlotId, setRecordingSlotId] = useState<string | null>(null);
@@ -54,6 +55,12 @@ export function useStudioRecorder({
   const analyserDisconnectRef = useRef<(() => void) | null>(null);
   const discardResultRef = useRef(false);
   const isDisposedRef = useRef(false);
+  const recordingStatusRef = useRef<StudioRecordingStatus>("idle");
+
+  const setRecorderStatus = useCallback((nextStatus: StudioRecordingStatus) => {
+    recordingStatusRef.current = nextStatus;
+    setRecordingStatus(nextStatus);
+  }, []);
 
   const stopElapsedTimer = useCallback(() => {
     if (elapsedTimerRef.current !== null) {
@@ -76,16 +83,24 @@ export function useStudioRecorder({
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
-    if (!recorder || recorder.state === "inactive") {
+    if (
+      recordingStatusRef.current !== "recording" ||
+      !recorder ||
+      recorder.state === "inactive"
+    ) {
       return;
     }
-    setRecordingStatus("processing");
+    setRecorderStatus("processing");
     recorder.stop();
-  }, []);
+  }, [setRecorderStatus]);
 
   const startRecording = useCallback(
     async ({ slotId, startTime, onStartTransport }: StartStudioRecordingOptions) => {
-      if (activeRecorder || isStartingRecorder || recordingStatus !== "idle") {
+      if (
+        activeRecorder ||
+        isStartingRecorder ||
+        recordingStatusRef.current !== "idle"
+      ) {
         setRecordingError("Запись уже выполняется в другой дорожке.");
         return;
       }
@@ -101,6 +116,7 @@ export function useStudioRecorder({
       setRecordingError(null);
       discardResultRef.current = false;
       isStartingRecorder = true;
+      setRecorderStatus("arming");
       try {
         let stream: MediaStream;
         try {
@@ -116,6 +132,7 @@ export function useStudioRecorder({
         if (isDisposedRef.current) {
           stream.getTracks().forEach((track) => track.stop());
           isStartingRecorder = false;
+          setRecorderStatus("idle");
           return;
         }
         streamRef.current = stream;
@@ -128,7 +145,6 @@ export function useStudioRecorder({
         activeRecorder = recorder;
         isStartingRecorder = false;
         startTimeRef.current = startTime;
-        setRecordingSlotId(slotId);
 
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -151,7 +167,7 @@ export function useStudioRecorder({
           releaseAnalyser();
           releaseStream();
           if (discardResultRef.current) {
-            setRecordingStatus("idle");
+            setRecorderStatus("idle");
             setRecordingSlotId(null);
             return;
           }
@@ -165,7 +181,7 @@ export function useStudioRecorder({
           const validationError = validateStudioRecordedFile(file);
           if (validationError) {
             setRecordingError(validationError);
-            setRecordingStatus("idle");
+            setRecorderStatus("idle");
             setRecordingSlotId(null);
             return;
           }
@@ -174,7 +190,7 @@ export function useStudioRecorder({
               setRecordingError("Не удалось добавить запись в проект.");
             })
             .finally(() => {
-              setRecordingStatus("idle");
+              setRecorderStatus("idle");
               setRecordingSlotId(null);
             });
         };
@@ -187,11 +203,12 @@ export function useStudioRecorder({
         setRecordingElapsed(0);
         const microphoneAnalysis = createMicrophoneAnalyser(stream);
         analyserDisconnectRef.current = microphoneAnalysis.disconnect;
+        recorder.start();
+        setRecordingSlotId(slotId);
         setRecordingAnalyser(microphoneAnalysis.analyser);
         setRecordingStartTime(startTime);
-        recorder.start();
         elapsedTimerRef.current = window.setInterval(updateElapsed, 250);
-        setRecordingStatus("recording");
+        setRecorderStatus("recording");
       } catch (error) {
         stopElapsedTimer();
         releaseAnalyser();
@@ -200,6 +217,7 @@ export function useStudioRecorder({
         activeRecorder = null;
         isStartingRecorder = false;
         setRecordingSlotId(null);
+        setRecorderStatus("idle");
         const name = error instanceof DOMException ? error.name : "";
         setRecordingError(
           name === "NotAllowedError" || name === "SecurityError"
@@ -213,9 +231,9 @@ export function useStudioRecorder({
     [
       createMicrophoneAnalyser,
       onRecordedFile,
-      recordingStatus,
       releaseAnalyser,
       releaseStream,
+      setRecorderStatus,
       stopElapsedTimer,
     ],
   );
@@ -235,10 +253,13 @@ export function useStudioRecorder({
         activeRecorder = null;
       }
       isStartingRecorder = false;
+      recordingStatusRef.current = "idle";
     };
   }, [releaseAnalyser, releaseStream, stopElapsedTimer]);
 
   return {
+    recordingStatus,
+    isArmingRecording: recordingStatus === "arming",
     isRecording: recordingStatus === "recording",
     isProcessingRecording: recordingStatus === "processing",
     recordingElapsed,

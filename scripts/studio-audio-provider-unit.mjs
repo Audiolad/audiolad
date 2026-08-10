@@ -363,12 +363,15 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /renderStartX/);
   assert.match(timeline, /onScroll/);
   assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
-  assert.match(timeline, /renderControls\(track, index\)/);
-  assert.match(timeline, /hasAudio: boolean/);
   assert.match(
     timeline,
-    /track\.clips\.length === 0 && liveRecording\?\.slotId !== track\.slotId/,
+    /gridTemplateColumns: `250px \$\{timelineWidth\}px`/,
   );
+  assert.match(timeline, /className="contents"/);
+  assert.match(timeline, /sticky left-0 z-20 min-h-\[190px\]/);
+  assert.match(timeline, /renderControls\(track, index\)/);
+  assert.match(timeline, /hasAudio: boolean/);
+  assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);
   assert.doesNotMatch(timeline, /!track\.buffer \? renderEmpty/);
   assert.match(timeline, /clipWidth/);
   assert.match(timeline, /clipLeft/);

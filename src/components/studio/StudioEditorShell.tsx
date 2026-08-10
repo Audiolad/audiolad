@@ -593,6 +593,7 @@ export default function StudioEditorShell({
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
   const {
+    isArmingRecording,
     isProcessingRecording,
     isRecording,
     recordingElapsed,
@@ -600,6 +601,7 @@ export default function StudioEditorShell({
     recordingAnalyser,
     recordingStartTime,
     recordingSlotId,
+    recordingStatus,
     startRecording,
     stopRecording,
   } = useStudioRecorder({
@@ -999,13 +1001,13 @@ export default function StudioEditorShell({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={isLoading || isRecording || isProcessingRecording}
+                  disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
                   onClick={() => openAddAudioDialog(slot.id)}
                   className="text-[#d8c8fb] disabled:opacity-40"
                 >
                   Добавить аудио
                 </button>
-                {recordingSlotId === slot.id ? (
+                {recordingSlotId === slot.id && isRecording ? (
                   <button
                     type="button"
                     onClick={stopRecording}
@@ -1016,7 +1018,7 @@ export default function StudioEditorShell({
                 ) : (
                   <button
                     type="button"
-                    disabled={isLoading || isRecording || isProcessingRecording}
+                    disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
                     onClick={() => startSlotRecording(slot.id)}
                     className="text-[#d8c8fb] disabled:opacity-40"
                   >
@@ -1028,7 +1030,7 @@ export default function StudioEditorShell({
             {index >= 2 ? (
               <button
                 type="button"
-                disabled={recordingSlotId === slot.id}
+                disabled={recordingSlotId === slot.id || isArmingRecording || isProcessingRecording}
                 onClick={() => {
                   if (track) removeTrack(track.id);
                   setSlots((currentSlots) =>
@@ -1052,7 +1054,7 @@ export default function StudioEditorShell({
     if (!slot) {
       return null;
     }
-    const isThisSlotRecording = recordingSlotId === slot.id;
+    const isThisSlotRecording = recordingSlotId === slot.id && isRecording;
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
         <p className="text-sm font-medium text-[#e2e8f5]">Добавьте аудио</p>
@@ -1065,7 +1067,7 @@ export default function StudioEditorShell({
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button
             type="button"
-            disabled={isLoading || isRecording || isProcessingRecording}
+            disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
             onPointerUp={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
@@ -1090,7 +1092,7 @@ export default function StudioEditorShell({
           ) : (
             <button
               type="button"
-              disabled={isLoading || isRecording || isProcessingRecording}
+              disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
               onPointerUp={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
@@ -1422,6 +1424,11 @@ export default function StudioEditorShell({
           {recordingError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {recordingError}
+            </p>
+          ) : null}
+          {recordingStatus === "arming" ? (
+            <p role="status" className="mb-4 rounded-lg border border-violet-300/30 bg-violet-400/10 px-4 py-3 text-sm text-violet-100">
+              Включаем микрофон…
             </p>
           ) : null}
 

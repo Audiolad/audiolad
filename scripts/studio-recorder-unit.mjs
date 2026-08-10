@@ -75,7 +75,17 @@ assert.equal(
   true,
 );
 assert.match(hook, /let activeRecorder: MediaRecorder \| null = null/);
+assert.match(hook, /"idle" \| "arming" \| "recording" \| "processing"/);
+assert.match(hook, /setRecorderStatus\("arming"\)/);
 assert.match(hook, /recorder\.stop\(\)/);
+assert.match(
+  hook,
+  /recordingStatusRef\.current !== "recording"[\s\S]*recorder\.stop\(\)/,
+);
+assert.ok(
+  hook.indexOf("recorder.start()") < hook.indexOf("setRecordingSlotId(slotId)"),
+  "the active slot is exposed only after MediaRecorder.start()",
+);
 assert.match(hook, /getTracks\(\)\.forEach\(\(track\) => track\.stop\(\)\)/);
 assert.match(hook, /releaseAnalyser\(\)/);
 assert.match(hook, /window\.setInterval\(updateElapsed, 250\)/);
@@ -97,13 +107,16 @@ assert.doesNotMatch(
 assert.equal((provider.match(/new AudioContext\(\)/g) ?? []).length, 1);
 assert.match(editor, /useStudioRecorder/);
 assert.match(editor, /recordingSlotId === slot\.id/);
+assert.match(editor, /recordingSlotId === slot\.id && isRecording/);
+assert.match(editor, /Включаем микрофон…/);
 assert.match(editor, /Записать с микрофона/);
 assert.match(editor, /Стоп · \{formatTime\(recordingElapsed\)\}/);
 assert.match(editor, /● Идёт запись \{formatTime\(recordingElapsed\)\}/);
 assert.match(editor, /При записи под музыку лучше использовать наушники/);
 assert.match(timeline, /StudioLiveWaveformCanvas/);
 assert.match(timeline, /liveRecording\?\.slotId === track\.slotId/);
-assert.match(timeline, /track\.clips\.length === 0 && liveRecording\?\.slotId !== track\.slotId/);
+assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);
+assert.match(timeline, /className="contents"/);
 assert.match(liveWaveform, /requestAnimationFrame\(draw\)/);
 assert.match(liveWaveform, /cancelAnimationFrame/);
 

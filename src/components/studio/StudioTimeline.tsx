@@ -420,34 +420,26 @@ function StudioTimeline({
       aria-label="Временная шкала Studio"
       className="overflow-hidden rounded-xl border border-white/10 bg-[#101722]"
     >
-      <div className="grid grid-cols-[250px_minmax(0,1fr)]">
-        <div className="border-r border-white/10 bg-[#101722]">
-          <div className="h-8 border-b border-white/10" />
-          {tracks.map((track, index) => (
-            <aside
-              key={track.id}
-              className="min-h-[190px] border-b border-white/10 p-4 last:border-b-0"
-            >
-              {renderControls(track, index)}
-            </aside>
-          ))}
-        </div>
+      <div
+        ref={viewportRef}
+        className="overflow-x-auto"
+        onScroll={(event) => {
+          setScrollLeft(event.currentTarget.scrollLeft);
+          if (!isAutoScrollingRef.current) {
+            lastManualScrollAtRef.current = Date.now();
+          }
+        }}
+      >
         <div
-          ref={viewportRef}
-          className="overflow-x-auto"
-          onScroll={(event) => {
-            setScrollLeft(event.currentTarget.scrollLeft);
-            if (!isAutoScrollingRef.current) {
-              lastManualScrollAtRef.current = Date.now();
-            }
-          }}
+          className="relative grid min-w-max grid-cols-[250px_minmax(0,1fr)]"
+          style={{ gridTemplateColumns: `250px ${timelineWidth}px` }}
         >
-          <div className="relative min-w-full" style={{ width: timelineWidth }}>
-            <div
-              className="h-8 border-b border-white/10 text-[10px] text-[#9ba7bb]"
-              style={{ width: timelineWidth }}
-              onPointerUp={() => onSelectClip(null)}
-            >
+          <div className="sticky left-0 z-20 h-8 border-b border-r border-white/10 bg-[#101722]" />
+          <div
+            className="h-8 border-b border-white/10 text-[10px] text-[#9ba7bb]"
+            style={{ width: timelineWidth }}
+            onPointerUp={() => onSelectClip(null)}
+          >
               {rulerMarks.map((time) => (
                 <span
                   key={time}
@@ -457,12 +449,15 @@ function StudioTimeline({
                   {formatTimelineTime(time)}
                 </span>
               ))}
-            </div>
+          </div>
 
-            {tracks.map((track, index) => {
-              return (
+          {tracks.map((track, index) => {
+            return (
+              <div key={track.id} className="contents">
+                <aside className="sticky left-0 z-20 min-h-[190px] border-b border-r border-white/10 bg-[#101722] p-4">
+                  {renderControls(track, index)}
+                </aside>
                 <div
-                  key={track.id}
                   className="relative min-h-[190px] border-b border-white/10 last:border-b-0"
                   style={{ width: timelineWidth }}
                   onPointerUp={seekFromPointer}
@@ -646,19 +641,17 @@ function StudioTimeline({
                       })}
                     </div>
                   ) : null}
-                  {track.clips.length === 0 && liveRecording?.slotId !== track.slotId
-                    ? renderEmpty(track, index)
-                    : null}
+                  {track.clips.length === 0 ? renderEmpty(track, index) : null}
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
 
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]"
-              style={{ left: playheadX }}
-            />
-          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 top-0 z-10 ml-[250px] w-px bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]"
+            style={{ left: playheadX }}
+          />
         </div>
       </div>
     </section>
