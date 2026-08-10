@@ -29,13 +29,47 @@ type UseStudioRecorderOptions = {
     startTime: number,
     slotId: string,
   ) => Promise<void>;
+  debugEnabled?: boolean;
 };
 
 type StudioRecordingStatus = "idle" | "arming" | "recording" | "processing";
+type StudioRecorderDebugAction =
+  | "none"
+  | "handler-entered"
+  | "guard-return-status"
+  | "guard-return-missing-recorder"
+  | "guard-return-inactive-recorder"
+  | "recorder-stop-called"
+  | "onstop-fired"
+  | "onerror-fired";
+type StudioMediaRecorderState = MediaRecorder["state"] | "missing";
+
+export type StudioRecorderDebugState = {
+  mediaRecorderState: StudioMediaRecorderState;
+  activeStreamTrackCount: number;
+  stopClickCount: number;
+  lastStopClickAt: string | null;
+  lastStopGuardStatus: StudioRecordingStatus | null;
+  lastStopRecorderPresent: boolean;
+  lastStopMediaRecorderState: StudioMediaRecorderState;
+  lastStopAction: StudioRecorderDebugAction;
+};
+
+const initialRecorderDebugState: StudioRecorderDebugState = {
+  mediaRecorderState: "missing",
+  activeStreamTrackCount: 0,
+  stopClickCount: 0,
+  lastStopClickAt: null,
+  lastStopGuardStatus: null,
+  lastStopRecorderPresent: false,
+  lastStopMediaRecorderState: "missing",
+  lastStopAction: "none",
+};
 
 export function useStudioRecorder({
   createMicrophoneAnalyser,
   onRecordedFile,
+  debugEnabled = false,
 }: UseStudioRecorderOptions) {
   const [recordingStatus, setRecordingStatus] =
     useState<StudioRecordingStatus>("idle");
@@ -48,6 +82,8 @@ export function useStudioRecorder({
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(
     null,
   );
+  const [recorderDebugState, setRecorderDebugState] =
+    useState<StudioRecorderDebugState>(initialRecorderDebugState);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startTimeRef = useRef(0);
@@ -56,6 +92,40 @@ export function useStudioRecorder({
   const discardResultRef = useRef(false);
   const isDisposedRef = useRef(false);
   const recordingStatusRef = useRef<StudioRecordingStatus>("idle");
+  const debugEnabledRef = useRef(debugEnabled);
+
+  useEffect(() => {
+    debugEnabledRef.current = debugEnabled;
+  }, [debugEnabled]);
+
+  const getMediaRecorderState = useCallback(
+    (recorder: MediaRecorder | null): StudioMediaRecorderState =>
+      recorder?.state ?? "missing",
+    [],
+  );
+
+  const getActiveStreamTrackCount = useCallback(
+    () =>
+      streamRef.current?.getTracks().filter((track) => track.readyState === "live")
+        .length ?? 0,
+    [],
+  );
+
+  const updateRecorderDebug = useCallback(
+    (update: (current: StudioRecorderDebugState) => StudioRecorderDebugState) => {
+      if (!debugEnabledRef.current) return;
+      setRecorderDebugState(update);
+    },
+    [],
+  );
+
+  const recordSidebarStopClick = useCallback(() => {
+    updateRecorderDebug((current) => ({
+      ...current,
+      stopClickCount: current.stopClickCount + 1,
+      lastStopClickAt: new Date().toISOString(),
+    }));
+  }, [updateRecorderDebug]);
 
   const setRecorderStatus = useCallback((nextStatus: StudioRecordingStatus) => {
     recordingStatusRef.current = nextStatus;
@@ -83,16 +153,58 @@ export function useStudioRecorder({
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
-    if (
-      recordingStatusRef.current !== "recording" ||
-      !recorder ||
-      recorder.state === "inactive"
-    ) {
+    const guardStatus = recordingStatusRef.current;
+    const recorderPresent = Boolean(recorder);
+    const mediaRecorderState = getMediaRecorderState(recorder);
+    const debugSnapshot = {
+      lastStopGuardStatus: guardStatus,
+      lastStopRecorderPresent: recorderPresent,
+      lastStopMediaRecorderState: mediaRecorderState,
+      mediaRecorderState,
+      activeStreamTrackCount: getActiveStreamTrackCount(),
+    };
+    updateRecorderDebug((current) => ({
+      ...current,
+      ...debugSnapshot,
+      lastStopAction: "handler-entered",
+    }));
+    if (guardStatus !== "recording") {
+      updateRecorderDebug((current) => ({
+        ...current,
+        ...debugSnapshot,
+        lastStopAction: "guard-return-status",
+      }));
       return;
     }
+    if (!recorder) {
+      updateRecorderDebug((current) => ({
+        ...current,
+        ...debugSnapshot,
+        lastStopAction: "guard-return-missing-recorder",
+      }));
+      return;
+    }
+    if (recorder.state === "inactive") {
+      updateRecorderDebug((current) => ({
+        ...current,
+        ...debugSnapshot,
+        lastStopAction: "guard-return-inactive-recorder",
+      }));
+      return;
+    }
+    updateRecorderDebug((current) => ({
+      ...current,
+      ...debugSnapshot,
+      lastStopAction: "recorder-stop-called",
+    }));
     setRecorderStatus("processing");
     recorder.stop();
-  }, [setRecorderStatus]);
+  }, [
+    getActiveStreamTrackCount,
+    getMediaRecorderState,
+    setRecorderStatus,
+    updateRecorderDebug,
+  ]);
 
   const startRecording = useCallback(
     async ({ slotId, startTime, onStartTransport }: StartStudioRecordingOptions) => {
@@ -152,6 +264,12 @@ export function useStudioRecorder({
           }
         };
         recorder.onerror = () => {
+          updateRecorderDebug((current) => ({
+            ...current,
+            mediaRecorderState: getMediaRecorderState(recorder),
+            activeStreamTrackCount: getActiveStreamTrackCount(),
+            lastStopAction: "onerror-fired",
+          }));
           setRecordingError("Не удалось записать звук с микрофона.");
           discardResultRef.current = true;
           stopElapsedTimer();
@@ -161,11 +279,22 @@ export function useStudioRecorder({
           }
         };
         recorder.onstop = () => {
+          updateRecorderDebug((current) => ({
+            ...current,
+            mediaRecorderState: getMediaRecorderState(recorder),
+            activeStreamTrackCount: getActiveStreamTrackCount(),
+            lastStopAction: "onstop-fired",
+          }));
           activeRecorder = activeRecorder === recorder ? null : activeRecorder;
           recorderRef.current = null;
           stopElapsedTimer();
           releaseAnalyser();
           releaseStream();
+          updateRecorderDebug((current) => ({
+            ...current,
+            mediaRecorderState: getMediaRecorderState(recorder),
+            activeStreamTrackCount: getActiveStreamTrackCount(),
+          }));
           if (discardResultRef.current) {
             setRecorderStatus("idle");
             setRecordingSlotId(null);
@@ -209,6 +338,11 @@ export function useStudioRecorder({
         setRecordingStartTime(startTime);
         elapsedTimerRef.current = window.setInterval(updateElapsed, 250);
         setRecorderStatus("recording");
+        updateRecorderDebug((current) => ({
+          ...current,
+          mediaRecorderState: getMediaRecorderState(recorder),
+          activeStreamTrackCount: getActiveStreamTrackCount(),
+        }));
       } catch (error) {
         stopElapsedTimer();
         releaseAnalyser();
@@ -235,6 +369,9 @@ export function useStudioRecorder({
       releaseStream,
       setRecorderStatus,
       stopElapsedTimer,
+      getActiveStreamTrackCount,
+      getMediaRecorderState,
+      updateRecorderDebug,
     ],
   );
 
@@ -267,6 +404,8 @@ export function useStudioRecorder({
     recordingSlotId,
     recordingAnalyser,
     recordingStartTime,
+    recorderDebugState,
+    recordSidebarStopClick,
     startRecording,
     stopRecording,
   };

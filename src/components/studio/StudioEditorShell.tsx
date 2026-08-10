@@ -604,10 +604,13 @@ export default function StudioEditorShell({
     recordingStartTime,
     recordingSlotId,
     recordingStatus,
+    recorderDebugState,
+    recordSidebarStopClick,
     startRecording,
     stopRecording,
   } = useStudioRecorder({
     createMicrophoneAnalyser,
+    debugEnabled: recorderDebug,
     onRecordedFile: async (file, startTime, slotId) => {
       const track = await ingestRecordedFile(file, { startTime });
       if (track) {
@@ -1012,7 +1015,10 @@ export default function StudioEditorShell({
                 {recordingSlotId === slot.id && isRecording ? (
                   <button
                     type="button"
-                    onClick={stopRecording}
+                    onClick={() => {
+                      recordSidebarStopClick();
+                      stopRecording();
+                    }}
                     className="text-rose-200"
                   >
                     Стоп · {formatTime(recordingElapsed)}
@@ -1445,7 +1451,11 @@ export default function StudioEditorShell({
                   <dd className="inline">{recordingStatus}</dd>
                 </div>
                 <div>
-                  <dt className="inline text-amber-100/70">Дорожка: </dt>
+                  <dt className="inline text-amber-100/70">Recording slot: </dt>
+                  <dd className="inline">{recordingSlotId ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Row slot: </dt>
                   <dd className="inline">{recordingSlotId ?? "—"}</dd>
                 </div>
                 <div>
@@ -1455,6 +1465,34 @@ export default function StudioEditorShell({
                 <div>
                   <dt className="inline text-amber-100/70">Активна: </dt>
                   <dd className="inline">{isRecording ? "да" : "нет"}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">MediaRecorder: </dt>
+                  <dd className="inline">{recorderDebugState.mediaRecorderState}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Live tracks: </dt>
+                  <dd className="inline">{recorderDebugState.activeStreamTrackCount}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Stop clicks: </dt>
+                  <dd className="inline">{recorderDebugState.stopClickCount}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Last Stop click: </dt>
+                  <dd className="inline">{recorderDebugState.lastStopClickAt ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Last Stop action: </dt>
+                  <dd className="inline">{recorderDebugState.lastStopAction}</dd>
+                </div>
+                <div>
+                  <dt className="inline text-amber-100/70">Last guard: </dt>
+                  <dd className="inline">
+                    {recorderDebugState.lastStopGuardStatus ?? "—"} /{" "}
+                    {recorderDebugState.lastStopRecorderPresent ? "present" : "missing"} /{" "}
+                    {recorderDebugState.lastStopMediaRecorderState}
+                  </dd>
                 </div>
               </dl>
             </section>

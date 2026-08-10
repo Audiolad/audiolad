@@ -80,8 +80,16 @@ assert.match(hook, /setRecorderStatus\("arming"\)/);
 assert.match(hook, /recorder\.stop\(\)/);
 assert.match(
   hook,
-  /recordingStatusRef\.current !== "recording"[\s\S]*recorder\.stop\(\)/,
+  /guardStatus !== "recording"[\s\S]*guard-return-status/,
 );
+assert.match(hook, /!recorder[\s\S]*guard-return-missing-recorder/);
+assert.match(hook, /recorder\.state === "inactive"[\s\S]*guard-return-inactive-recorder/);
+assert.match(hook, /lastStopAction: "handler-entered"/);
+assert.match(hook, /lastStopAction: "recorder-stop-called"[\s\S]*recorder\.stop\(\)/);
+assert.match(hook, /recorder\.onstop[\s\S]*lastStopAction: "onstop-fired"/);
+assert.match(hook, /recorder\.onerror[\s\S]*lastStopAction: "onerror-fired"/);
+assert.match(hook, /activeStreamTrackCount/);
+assert.match(hook, /track\.readyState === "live"/);
 assert.ok(
   hook.indexOf("recorder.start()") < hook.indexOf("setRecordingSlotId(slotId)"),
   "the active slot is exposed only after MediaRecorder.start()",
@@ -118,6 +126,16 @@ assert.match(editor, /\{recorderDebug \?/);
 assert.match(editor, /Отладка записи/);
 assert.match(editor, /\{recordingStatus\}/);
 assert.match(editor, /\{recordingSlotId \?\? "—"\}/);
+assert.match(editor, /debugEnabled: recorderDebug/);
+assert.match(
+  editor,
+  /recordSidebarStopClick\(\);\s*stopRecording\(\);/,
+  "sidebar Stop records click evidence before invoking stopRecording",
+);
+assert.match(editor, /recorderDebugState\.stopClickCount/);
+assert.match(editor, /recorderDebugState\.lastStopAction/);
+assert.match(editor, /recorderDebugState\.lastStopGuardStatus/);
+assert.match(editor, /recorderDebugState\.lastStopMediaRecorderState/);
 assert.match(timeline, /StudioLiveWaveformCanvas/);
 assert.match(timeline, /liveRecording\?\.slotId === track\.slotId/);
 assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);
