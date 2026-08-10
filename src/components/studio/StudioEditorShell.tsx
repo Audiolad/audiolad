@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import {
   type StudioLocalTrack,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/studio/clip-math";
 import {
   createStudioClipClipboard,
+  createStudioEditingSnapshot,
   createStudioHistory,
   getStudioPasteClips,
   recordStudioHistory,
@@ -34,6 +35,13 @@ import {
   type StudioEditingSnapshot,
   type StudioHistory,
 } from "@/lib/studio/history";
+import type { StudioProjectHydration } from "@/lib/studio/hydration";
+import {
+  StudioAutosaveController,
+  type StudioAutosaveState,
+} from "@/lib/studio/autosave";
+import { serializeStudioProjectState, validateStudioProjectDocument } from "@/lib/studio/persistence";
+import { updateStudioProject } from "@/lib/studio/persistence-client";
 
 type StudioTrackSlot = {
   id: string;
@@ -176,7 +184,11 @@ function TrackFadeButton({
   );
 }
 
-export default function StudioEditorShell() {
+export default function StudioEditorShell({
+  persistedHydration,
+}: {
+  persistedHydration?: StudioProjectHydration | null;
+}) {
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
   const timelineRef = useRef<StudioTimelineHandle | null>(null);
@@ -193,7 +205,15 @@ export default function StudioEditorShell() {
   const [clipboard, setClipboard] = useState<StudioClipClipboard | null>(null);
   const [editingError, setEditingError] = useState<string | null>(null);
   const historyRef = useRef<StudioHistory | null>(null);
+  const hydratedProjectIdRef = useRef<string | null>(null);
   const gestureSnapshotRef = useRef<StudioEditingSnapshot | null>(null);
+  const controllerRef = useRef<StudioAutosaveController | null>(null);
+  const projectIdRef = useRef<string | null>(null);
+  const projectNameRef = useRef(projectName);
+  const slotsRef = useRef<StudioTrackSlot[]>([]);
+  const tracksRef = useRef<StudioLocalTrack[]>([]);
+  const assetSignatureRef = useRef<string | null>(null);
+  const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
     { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
@@ -203,6 +223,7 @@ export default function StudioEditorShell() {
     currentTime,
     exportEditingState,
     getTrackBuffer,
+    hasPersistenceProject,
     ingestRecordedFile,
     loadLocalFiles,
     pause,
@@ -213,6 +234,7 @@ export default function StudioEditorShell() {
     removeTrack,
     rippleDeleteClip,
     replaceTrackAudio,
+    retryTrackAssetUpload,
     restoreEditingState,
     seek,
     seekRelative,
@@ -226,6 +248,137 @@ export default function StudioEditorShell() {
     tracks,
     updateRetainedAssets,
   } = useStudioAudio();
+
+  useEffect(() => {
+    projectNameRef.current = projectName;
+    slotsRef.current = slots;
+    tracksRef.current = tracks;
+  }, [projectName, slots, tracks]);
+
+  useEffect(() => {
+    if (controllerRef.current) return;
+    controllerRef.current = new StudioAutosaveController({
+      getSnapshot: () => {
+        const assetState = tracksRef.current.some(
+          (track) => !track.assetId || track.assetPersistenceStatus !== "saved",
+        );
+        const hasAssetError = tracksRef.current.some(
+          (track) => track.assetPersistenceStatus === "error",
+        );
+        const projectId = projectIdRef.current;
+        if (!projectId) {
+          throw new Error("Persisted project is not ready");
+        }
+        const serialized = serializeStudioProjectState({
+          currentTime: exportEditingState().position,
+          slots: slotsRef.current,
+          tracks: tracksRef.current.map((track) => ({
+            id: track.id,
+            assetId: track.assetId,
+            assetPersistenceStatus: track.assetPersistenceStatus,
+            name: track.fileName,
+            volume: track.volume,
+            muted: track.muted,
+            clips: track.clips,
+          })),
+        });
+        return {
+          name: projectNameRef.current.trim() || "Новый проект",
+          document: serialized.document,
+          blocked: hasAssetError ? "asset-error" : assetState || serialized.pendingTrackIds.length
+            ? "assets"
+            : undefined,
+        };
+      },
+      update: async ({ expectedRevision, name, projectData }) => {
+        const projectId = projectIdRef.current;
+        if (!projectId) throw new Error("Persisted project is not ready");
+        const project = await updateStudioProject({
+          projectId,
+          expectedRevision,
+          name,
+          projectData,
+        });
+        return { revision: project.revision };
+      },
+      onChange: setAutosaveState,
+    });
+  }, [exportEditingState]);
+
+  const markSavedChange = useCallback(() => {
+    controllerRef.current?.markDirty();
+  }, []);
+
+  useEffect(() => {
+    if (
+      !persistedHydration ||
+      hydratedProjectIdRef.current === persistedHydration.project.id
+    ) return;
+    hydratedProjectIdRef.current = persistedHydration.project.id;
+    projectIdRef.current = persistedHydration.project.id;
+    setProjectName(persistedHydration.project.name);
+    setSlots(persistedHydration.state.slots.map((slot) => ({ ...slot })));
+    setSelectedClipId(null);
+    setClipboard(null);
+    setEditingError(null);
+    const initial = createStudioEditingSnapshot({
+      tracks: tracks.map((track) => ({
+        id: track.id,
+        fileName: track.fileName,
+        fileSize: track.fileSize,
+        assetId: track.assetId,
+        assetPersistenceStatus: track.assetPersistenceStatus,
+        clips: track.clips,
+        volume: track.volume,
+        muted: track.muted,
+      })),
+      slots: persistedHydration.state.slots,
+      selectedClipId: null,
+      position: persistedHydration.state.currentTime,
+    });
+    const nextHistory = createStudioHistory(initial);
+    historyRef.current = nextHistory;
+    setHistory(nextHistory);
+    assetSignatureRef.current = tracks
+      .map((track) => `${track.id}:${track.assetId ?? ""}:${track.assetPersistenceStatus}`)
+      .join("|");
+    controllerRef.current?.hydrate({
+      revision: persistedHydration.project.revision,
+      name: persistedHydration.project.name,
+      document: validateStudioProjectDocument(persistedHydration.project.projectData),
+      complete: persistedHydration.failures.size === 0,
+    });
+  }, [persistedHydration, tracks]);
+
+  useEffect(() => {
+    if (!persistedHydration) return;
+    const signature = tracks
+      .map((track) => `${track.id}:${track.assetId ?? ""}:${track.assetPersistenceStatus}`)
+      .join("|");
+    if (assetSignatureRef.current === null) {
+      assetSignatureRef.current = signature;
+      return;
+    }
+    if (signature !== assetSignatureRef.current) {
+      assetSignatureRef.current = signature;
+      controllerRef.current?.notifyAssetBound();
+    }
+  }, [persistedHydration, tracks]);
+
+  useEffect(() => {
+    const controller = controllerRef.current;
+    return () => controller?.dispose();
+  }, []);
+
+  useEffect(() => {
+    if (!autosaveState?.canWarnBeforeUnload) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [autosaveState?.canWarnBeforeUnload]);
 
   const tracksById = useMemo(
     () => new Map(tracks.map((track) => [track.id, track])),
@@ -259,8 +412,9 @@ export default function StudioEditorShell() {
         captureEditingSnapshot(),
       );
       updateHistory(next);
+      markSavedChange();
     },
-    [captureEditingSnapshot, updateHistory],
+    [captureEditingSnapshot, markSavedChange, updateHistory],
   );
   const runEditingAction = useCallback(
     <Result,>(action: () => Result): Result => {
@@ -294,7 +448,7 @@ export default function StudioEditorShell() {
       );
       setEditingError(null);
     },
-    [restoreEditingState],
+    [restoreEditingState, setSlots],
   );
   const undo = useCallback(() => {
     const next = undoStudioHistory(historyRef.current ?? createStudioHistory(
@@ -303,7 +457,8 @@ export default function StudioEditorShell() {
     if (!next.snapshot) return;
     updateHistory(next.history);
     restoreHistorySnapshot(next.snapshot);
-  }, [captureEditingSnapshot, restoreHistorySnapshot, updateHistory]);
+    markSavedChange();
+  }, [captureEditingSnapshot, markSavedChange, restoreHistorySnapshot, updateHistory]);
   const redo = useCallback(() => {
     const next = redoStudioHistory(historyRef.current ?? createStudioHistory(
       captureEditingSnapshot(),
@@ -311,7 +466,8 @@ export default function StudioEditorShell() {
     if (!next.snapshot) return;
     updateHistory(next.history);
     restoreHistorySnapshot(next.snapshot);
-  }, [captureEditingSnapshot, restoreHistorySnapshot, updateHistory]);
+    markSavedChange();
+  }, [captureEditingSnapshot, markSavedChange, restoreHistorySnapshot, updateHistory]);
   const selectedTrackAndClip = (() => {
     for (const track of tracks) {
       const clip = track.clips.find((item) => item.id === selectedClipId);
@@ -352,17 +508,25 @@ export default function StudioEditorShell() {
     selectedTrackAndClip,
     splitClip,
   ]);
+  const detachTrackFromSlots = useCallback((trackId: string) => {
+    setSlots((currentSlots) =>
+      currentSlots.map((slot) =>
+        slot.audioTrackId === trackId ? { ...slot, audioTrackId: null } : slot,
+      ),
+    );
+  }, [setSlots]);
   const deleteSelectedClip = useCallback(() => {
     if (!selectedTrackAndClip) return;
     runEditingAction(() => {
       if (selectedTrackAndClip.track.clips.length === 1) {
         removeTrack(selectedTrackAndClip.track.id);
+        detachTrackFromSlots(selectedTrackAndClip.track.id);
       } else {
         removeClip(selectedTrackAndClip.track.id, selectedTrackAndClip.clip.id);
       }
     });
     setSelectedClipId(null);
-  }, [removeClip, removeTrack, runEditingAction, selectedTrackAndClip]);
+  }, [detachTrackFromSlots, removeClip, removeTrack, runEditingAction, selectedTrackAndClip]);
   const rippleDeleteSelectedClip = useCallback(() => {
     if (!selectedTrackAndClip) return;
     runEditingAction(() =>
@@ -448,6 +612,7 @@ export default function StudioEditorShell() {
             slot.id === slotId ? { ...slot, audioTrackId: track.id } : slot,
           ),
         );
+        markSavedChange();
       }
     },
   });
@@ -602,6 +767,7 @@ export default function StudioEditorShell() {
           slot.id === slotId ? { ...slot, name } : slot,
         ),
       );
+      markSavedChange();
     }
     setEditingSlotId(null);
   };
@@ -627,6 +793,7 @@ export default function StudioEditorShell() {
         },
       ];
     });
+    markSavedChange();
   };
 
   const renderTimelineControls = (_timelineTrack: unknown, index: number) => {
@@ -685,10 +852,46 @@ export default function StudioEditorShell() {
               ● Идёт запись {formatTime(recordingElapsed)}
             </p>
           ) : null}
+          {hasPersistenceProject && track ? (
+            <div className="mt-2 flex items-center gap-2 text-xs" aria-live="polite">
+              {track.status === "error" ? (
+                <span className="text-rose-200">
+                  {track.replacementError ?? "Не удалось загрузить аудио дорожки"}
+                </span>
+              ) : null}
+              <span className={
+                track.assetPersistenceStatus === "error"
+                  ? "text-rose-200"
+                  : "text-[#9ba7bb]"
+              }>
+                {track.assetPersistenceStatus === "pending"
+                  ? "Ожидает сохранения"
+                  : track.assetPersistenceStatus === "uploading"
+                    ? "Сохранение аудио…"
+                    : track.assetPersistenceStatus === "saved"
+                      ? "Аудио сохранено"
+                      : "Не удалось сохранить аудио"}
+              </span>
+              {track.assetPersistenceStatus === "error" ? (
+                <button
+                  type="button"
+                  onClick={() => retryTrackAssetUpload(track.id)}
+                  className="text-[#d8c8fb] underline underline-offset-4"
+                >
+                  Повторить
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="mt-3 flex min-h-28 items-end gap-3">
             <TrackMuteButton
               track={track}
-              onToggle={() => track && toggleTrackMuted(track.id)}
+              onToggle={() => {
+                if (track) {
+                  toggleTrackMuted(track.id);
+                  markSavedChange();
+                }
+              }}
             />
             <div className="studio-volume-fader flex h-28 w-5 shrink-0 flex-col items-center">
               <input
@@ -699,7 +902,7 @@ export default function StudioEditorShell() {
                 value={Math.round((track?.volume ?? 1) * 100)}
                 disabled={!track}
                 onChange={(event) =>
-                  track && setTrackVolume(track.id, Number(event.target.value) / 100)
+                  track && (setTrackVolume(track.id, Number(event.target.value) / 100), markSavedChange())
                 }
                 title={
                   track
@@ -779,7 +982,10 @@ export default function StudioEditorShell() {
                 <button
                   type="button"
                   onClick={() => {
-                    runEditingAction(() => removeTrack(track.id));
+                    runEditingAction(() => {
+                      removeTrack(track.id);
+                      detachTrackFromSlots(track.id);
+                    });
                     setSelectedClipId(null);
                   }}
                   className="text-[#a9b4c7]"
@@ -827,6 +1033,7 @@ export default function StudioEditorShell() {
                   setSlots((currentSlots) =>
                     currentSlots.filter((item) => item.id !== slot.id),
                   );
+                  markSavedChange();
                 }}
                 className="text-[#a9b4c7] underline underline-offset-4 disabled:opacity-40"
               >
@@ -898,6 +1105,29 @@ export default function StudioEditorShell() {
     );
   };
 
+  const guardNavigation = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      autosaveState?.canWarnBeforeUnload &&
+      !window.confirm("Есть несохранённые изменения. Если выйти сейчас, они могут быть потеряны.")
+    ) {
+      event.preventDefault();
+    }
+  }, [autosaveState?.canWarnBeforeUnload]);
+
+  const autosaveMessage = autosaveState?.status === "partial-disabled"
+    ? "Проект открыт не полностью. Сохранение отключено."
+    : autosaveState?.status === "conflict"
+      ? "Проект изменён в другой вкладке. Обновите страницу, чтобы продолжить."
+      : autosaveState?.status === "asset-uploading"
+        ? "Сохранение аудио…"
+        : autosaveState?.status === "error"
+          ? "Ошибка сохранения"
+          : autosaveState?.status === "saving"
+            ? "Сохранение…"
+            : autosaveState?.status === "saved" && persistedHydration
+              ? "Сохранено"
+              : null;
+
   return (
     <section className="min-h-dvh bg-[#0b1019] text-[#edf0f7]">
       <div className="mx-auto flex min-h-dvh max-w-[1920px] flex-col">
@@ -906,18 +1136,21 @@ export default function StudioEditorShell() {
           <nav className="flex flex-wrap items-center gap-2">
             <Link
               href="/studio"
+              onClick={guardNavigation}
               className="inline-flex min-h-9 items-center rounded-lg px-3 text-sm text-[#bfc9da] hover:bg-white/5"
             >
               ← Назад в Studio
             </Link>
             <Link
               href="/author-dashboard"
+              onClick={guardNavigation}
               className="inline-flex min-h-9 items-center rounded-lg border border-white/15 px-3 text-sm font-medium text-white"
             >
               В кабинет автора
             </Link>
             <Link
               href="/profile"
+              onClick={guardNavigation}
               className="inline-flex min-h-9 items-center rounded-lg border border-violet-300/50 px-3 text-sm font-medium text-[#eadfff]"
             >
               В АудиоЛад
@@ -934,10 +1167,14 @@ export default function StudioEditorShell() {
                   autoFocus
                   value={projectName}
                   onChange={(event) => setProjectName(event.target.value)}
-                  onBlur={() => setIsEditingProjectName(false)}
+                  onBlur={() => {
+                    setIsEditingProjectName(false);
+                    markSavedChange();
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       setIsEditingProjectName(false);
+                      markSavedChange();
                     }
                   }}
                   aria-label="Название проекта"
@@ -1121,7 +1358,12 @@ export default function StudioEditorShell() {
               >
                 Повторить
               </button>
-              <button type="button" disabled title="Сохранение проектов будет добавлено на следующем этапе" className="h-10 rounded-lg border border-white/15 px-3 text-sm opacity-45">
+              <button
+                type="button"
+                disabled={!persistedHydration || autosaveState?.status === "partial-disabled" || autosaveState?.status === "conflict"}
+                onClick={() => controllerRef.current?.retry()}
+                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-45"
+              >
                 Сохранить
               </button>
               <button type="button" disabled title="Экспорт будет доступен после подключения серверного сведения" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm opacity-45">
@@ -1135,6 +1377,27 @@ export default function StudioEditorShell() {
           {projectError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {projectError}
+            </p>
+          ) : null}
+          {autosaveMessage ? (
+            <p
+              role={autosaveState?.status === "error" || autosaveState?.status === "conflict" ? "alert" : "status"}
+              className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                autosaveState?.status === "error" || autosaveState?.status === "conflict"
+                  ? "border-rose-400/40 bg-rose-500/10 text-rose-100"
+                  : "border-white/10 bg-[#131b28] text-[#c9d8ff]"
+              }`}
+            >
+              {autosaveMessage}
+              {autosaveState?.status === "conflict" ? (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="ml-3 underline underline-offset-4"
+                >
+                  Обновить страницу
+                </button>
+              ) : null}
             </p>
           ) : null}
           {editingError ? (
@@ -1300,7 +1563,7 @@ export default function StudioEditorShell() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  removeTrack(track.id);
+                                  runEditingAction(() => removeTrack(track.id));
                                   setSlots((currentSlots) =>
                                     currentSlots.map((item) =>
                                       item.id === slot.id
@@ -1320,7 +1583,7 @@ export default function StudioEditorShell() {
                               type="button"
                               onClick={() => {
                                 if (track) {
-                                  removeTrack(track.id);
+                                  runEditingAction(() => removeTrack(track.id));
                                 }
                                 setSlots((currentSlots) =>
                                   currentSlots.filter((item) => item.id !== slot.id),
@@ -1414,6 +1677,7 @@ export default function StudioEditorShell() {
                         : slot,
                     ),
                   );
+                  markSavedChange();
                 }
               });
             }}

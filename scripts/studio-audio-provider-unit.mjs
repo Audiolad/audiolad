@@ -339,7 +339,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /onPointerUp=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
   assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);
-  assert.match(studioWorkspace, /Сохранение проектов будет добавлено/);
+  assert.match(studioWorkspace, /Сохранить/);
   assert.match(studioWorkspace, /Экспорт будет доступен после подключения серверного сведения/);
   assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);
   const timeline = readSource("src/components/studio/StudioTimeline.tsx");

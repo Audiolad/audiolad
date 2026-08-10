@@ -14,6 +14,8 @@ export type StudioTrackSnapshot = {
   id: string;
   fileName: string;
   fileSize: number;
+  assetId: string | null;
+  assetPersistenceStatus: "pending" | "uploading" | "saved" | "error";
   clips: StudioClip[];
   volume: number;
   muted: boolean;

@@ -43,6 +43,11 @@ import {
   type StudioEditingSnapshot,
   type StudioTrackSnapshot,
 } from "@/lib/studio/history";
+import {
+  uploadStudioProjectAsset,
+  type StudioAssetSourceType,
+} from "@/lib/studio/persistence-client";
+import type { StudioProjectHydration } from "@/lib/studio/hydration";
 
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
@@ -59,6 +64,8 @@ export type StudioLocalTrack = {
   id: string;
   fileName: string;
   fileSize: number;
+  assetId: string | null;
+  assetPersistenceStatus: "pending" | "uploading" | "saved" | "error";
   clips: StudioClip[];
   volume: number;
   muted: boolean;
@@ -69,6 +76,9 @@ export type StudioLocalTrack = {
 
 type StudioAudioContextValue = {
   tracks: StudioLocalTrack[];
+  hasPersistenceProject: boolean;
+  persistenceProjectName: string | null;
+  persistenceProjectRevision: number | null;
   projectDuration: number;
   status: StudioAudioStatus;
   currentTime: number;
@@ -82,6 +92,11 @@ type StudioAudioContextValue = {
     options: { startTime: number },
   ) => Promise<StudioLocalTrack | null>;
   replaceTrackAudio: (trackId: string, file: File) => Promise<void>;
+  retryTrackAssetUpload: (trackId: string) => void;
+  decodePersistedAsset: (blob: Blob) => Promise<AudioBuffer>;
+  hydratePersistedProject: (
+    hydration: StudioProjectHydration,
+  ) => { failedAssetIds: string[] };
   play: () => Promise<void>;
   pause: () => void;
   seek: (position: number) => void;
@@ -126,11 +141,12 @@ const StudioAudioContext = createContext<StudioAudioContextValue | null>(null);
 type TrackRuntime = {
   file: File;
   buffer: AudioBuffer;
+  sourceType: StudioAssetSourceType;
   outputGain: GainNode;
   sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
 };
 
-type TrackAsset = Pick<TrackRuntime, "file" | "buffer">;
+type TrackAsset = Pick<TrackRuntime, "file" | "buffer" | "sourceType">;
 
 export { validateStudioLocalFile };
 
@@ -143,12 +159,23 @@ function getTrackId(file: File, index: number): string {
   return `${file.name}:${file.size}:${file.lastModified}:${index}:${crypto.randomUUID()}`;
 }
 
-export function StudioAudioProvider({ children }: { children: ReactNode }) {
+export function StudioAudioProvider({
+  children,
+  persistenceProjectId,
+}: {
+  children: ReactNode;
+  /** Opt in only from a future persisted project route. */
+  persistenceProjectId?: string;
+}) {
   const [tracks, setTracks] = useState<StudioLocalTrack[]>([]);
   const [status, setStatus] = useState<StudioAudioStatus>("idle");
   const [currentTime, setCurrentTime] = useState(0);
   const [projectDuration, setProjectDuration] = useState(0);
   const [projectError, setProjectError] = useState<string | null>(null);
+  const [persistenceContext, setPersistenceContext] = useState<{
+    name: string | null;
+    revision: number | null;
+  }>({ name: null, revision: null });
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackRuntimesRef = useRef(new Map<string, TrackRuntime>());
@@ -162,6 +189,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   const animationFrameRef = useRef<number | null>(null);
   const loadGenerationRef = useRef(0);
   const replacementGenerationRef = useRef(new Map<string, number>());
+  const assetUploadGenerationRef = useRef(new Map<string, number>());
+  const assetUploadControllersRef = useRef(new Map<string, AbortController>());
 
   const cancelProgressLoop = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -385,12 +414,25 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     }
   }, [cancelProgressLoop, stopSources]);
 
+  const cancelTrackAssetUpload = useCallback((trackId: string) => {
+    assetUploadGenerationRef.current.set(
+      trackId,
+      (assetUploadGenerationRef.current.get(trackId) ?? 0) + 1,
+    );
+    assetUploadControllersRef.current.get(trackId)?.abort();
+    assetUploadControllersRef.current.delete(trackId);
+  }, []);
+
   const reset = useCallback(() => {
     loadGenerationRef.current += 1;
+    for (const trackId of assetUploadControllersRef.current.keys()) {
+      cancelTrackAssetUpload(trackId);
+    }
     for (const [trackId, runtime] of trackRuntimesRef.current) {
       assetVaultRef.current.set(trackId, {
         file: runtime.file,
         buffer: runtime.buffer,
+        sourceType: runtime.sourceType,
       });
     }
     disposeResources();
@@ -401,7 +443,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     setCurrentTime(0);
     setProjectError(null);
     setStatusValue("idle");
-  }, [disposeResources, replaceTracks, setStatusValue]);
+  }, [cancelTrackAssetUpload, disposeResources, replaceTracks, setStatusValue]);
 
   const updateTrack = useCallback(
     (trackId: string, update: (track: StudioLocalTrack) => StudioLocalTrack) => {
@@ -412,6 +454,155 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       applyTrackGains();
     },
     [applyTrackGains, replaceTracks],
+  );
+
+  const startTrackAssetUpload = useCallback((trackId: string) => {
+    if (!persistenceProjectId) return;
+    const asset = assetVaultRef.current.get(trackId);
+    const track = tracksRef.current.find((item) => item.id === trackId);
+    if (!asset || !track) return;
+
+    cancelTrackAssetUpload(trackId);
+    const generation = assetUploadGenerationRef.current.get(trackId) ?? 0;
+    const controller = new AbortController();
+    assetUploadControllersRef.current.set(trackId, controller);
+    updateTrack(trackId, (item) => ({
+      ...item,
+      assetPersistenceStatus: "uploading",
+    }));
+
+    void uploadStudioProjectAsset({
+      projectId: persistenceProjectId,
+      file: asset.file,
+      sourceType: asset.sourceType,
+      signal: controller.signal,
+    }).then(
+      (uploadedAsset) => {
+        if (
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        assetUploadControllersRef.current.delete(trackId);
+        updateTrack(trackId, (item) => ({
+          ...item,
+          assetId: uploadedAsset.id,
+          assetPersistenceStatus: "saved",
+        }));
+      },
+      () => {
+        if (
+          controller.signal.aborted ||
+          assetUploadGenerationRef.current.get(trackId) !== generation ||
+          assetUploadControllersRef.current.get(trackId) !== controller
+        ) {
+          return;
+        }
+        assetUploadControllersRef.current.delete(trackId);
+        updateTrack(trackId, (item) => ({
+          ...item,
+          assetPersistenceStatus: "error",
+        }));
+      },
+    );
+  }, [cancelTrackAssetUpload, persistenceProjectId, updateTrack]);
+
+  const retryTrackAssetUpload = useCallback((trackId: string) => {
+    const track = tracksRef.current.find((item) => item.id === trackId);
+    if (track?.assetPersistenceStatus === "error") {
+      startTrackAssetUpload(trackId);
+    }
+  }, [startTrackAssetUpload]);
+
+  const decodePersistedAsset = useCallback(
+    async (blob: Blob) => {
+      const buffer = await getAudioContext().decodeAudioData(await blob.arrayBuffer());
+      if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+        throw new Error("invalid persisted audio duration");
+      }
+      return buffer;
+    },
+    [getAudioContext],
+  );
+
+  const hydratePersistedProject = useCallback(
+    (hydration: StudioProjectHydration) => {
+      loadGenerationRef.current += 1;
+      cancelProgressLoop();
+      stopSources();
+      for (const runtime of trackRuntimesRef.current.values()) {
+        runtime.outputGain.disconnect();
+      }
+      trackRuntimesRef.current.clear();
+      assetVaultRef.current.clear();
+
+      const hydratedTracks: StudioLocalTrack[] = hydration.state.tracks.map((track) => {
+        const asset = hydration.assets.get(track.assetId);
+        const failure = hydration.failures.get(track.assetId);
+        if (asset) {
+          const runtime = createTrackRuntime({
+            file: asset.file,
+            buffer: asset.buffer,
+            sourceType: asset.metadata.sourceType,
+          });
+          trackRuntimesRef.current.set(track.id, runtime);
+          assetVaultRef.current.set(track.id, {
+            file: asset.file,
+            buffer: asset.buffer,
+            sourceType: asset.metadata.sourceType,
+          });
+        }
+        const metadata = asset?.metadata;
+        return {
+          id: track.id,
+          fileName: metadata?.originalName ?? track.name,
+          fileSize: metadata?.sizeBytes ?? 0,
+          assetId: track.assetId,
+          assetPersistenceStatus: "saved",
+          clips: track.clips.map((clip) => ({ ...clip })),
+          volume: track.volume,
+          muted: track.muted,
+          status: asset ? "ready" : "error",
+          isReplacing: false,
+          replacementError: failure?.message ?? (asset ? null : "Не удалось загрузить аудио дорожки."),
+        };
+      });
+      replaceTracks(hydratedTracks);
+      applyTrackGains();
+      const position = Number.isFinite(hydration.state.currentTime)
+        ? Math.max(hydration.state.currentTime, 0)
+        : 0;
+      positionRef.current = position;
+      startedAtContextTimeRef.current = 0;
+      startedAtPositionRef.current = position;
+      setCurrentTime(position);
+      setProjectError(
+        hydration.failures.size > 0
+          ? "Часть аудиодорожек не удалось загрузить. Остальные дорожки доступны."
+          : null,
+      );
+      setPersistenceContext({
+        name: hydration.project.name,
+        revision: hydration.project.revision,
+      });
+      setStatusValue(
+        hydratedTracks.some((track) => track.status === "ready")
+          ? "paused"
+          : hydratedTracks.length === 0
+            ? "idle"
+            : "error",
+      );
+      return { failedAssetIds: [...hydration.failures.keys()] };
+    },
+    [
+      applyTrackGains,
+      cancelProgressLoop,
+      createTrackRuntime,
+      replaceTracks,
+      setStatusValue,
+      stopSources,
+    ],
   );
 
   const loadLocalFiles = useCallback(
@@ -477,14 +668,17 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           trackRuntimesRef.current.set(id, {
             file,
             buffer,
+            sourceType: "upload",
             outputGain,
             sources: new Map(),
           });
-          assetVaultRef.current.set(id, { file, buffer });
+          assetVaultRef.current.set(id, { file, buffer, sourceType: "upload" });
           const createdTrack: StudioLocalTrack = {
             id,
             fileName: file.name,
             fileSize: file.size,
+            assetId: null,
+            assetPersistenceStatus: "pending",
             clips: [{
               id: crypto.randomUUID(),
               startTime: 0,
@@ -504,6 +698,11 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         }
         replaceTracks(nextTracks);
         applyTrackGains();
+        if (persistenceProjectId) {
+          for (const track of createdTracks) {
+            startTrackAssetUpload(track.id);
+          }
+        }
         if (statusBeforeLoad === "playing") {
           const playbackPosition = getPlaybackPosition();
           cancelProgressLoop();
@@ -532,8 +731,10 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       cancelProgressLoop,
       getAudioContext,
       getPlaybackPosition,
+      persistenceProjectId,
       replaceTracks,
       setStatusValue,
+      startTrackAssetUpload,
       startSourcesAtPosition,
       stopSources,
     ],
@@ -577,6 +778,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
           id: getTrackId(file, tracksRef.current.length),
           fileName: file.name,
           fileSize: file.size,
+          assetId: null,
+          assetPersistenceStatus: "pending",
           clips: [{
             id: crypto.randomUUID(),
             startTime: Number.isFinite(startTime) && startTime >= 0 ? startTime : 0,
@@ -594,12 +797,16 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         trackRuntimesRef.current.set(track.id, {
           file,
           buffer,
+          sourceType: "recording",
           outputGain,
           sources: new Map(),
         });
-        assetVaultRef.current.set(track.id, { file, buffer });
+        assetVaultRef.current.set(track.id, { file, buffer, sourceType: "recording" });
         replaceTracks([...tracksRef.current, track]);
         applyTrackGains();
+        if (persistenceProjectId) {
+          startTrackAssetUpload(track.id);
+        }
         if (statusBeforeIngest !== "playing") {
           setStatusValue(statusBeforeIngest === "paused" ? "paused" : "ready");
         }
@@ -616,7 +823,14 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [applyTrackGains, getAudioContext, replaceTracks, setStatusValue],
+    [
+      applyTrackGains,
+      getAudioContext,
+      persistenceProjectId,
+      replaceTracks,
+      setStatusValue,
+      startTrackAssetUpload,
+    ],
   );
 
   const replaceTrackAudio = useCallback(
@@ -663,6 +877,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
 
       const generation = (replacementGenerationRef.current.get(trackId) ?? 0) + 1;
       replacementGenerationRef.current.set(trackId, generation);
+      cancelTrackAssetUpload(trackId);
       updateTrack(trackId, (item) => ({
         ...item,
         isReplacing: true,
@@ -698,10 +913,11 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         trackRuntimesRef.current.set(trackId, {
           file,
           buffer,
+          sourceType: "upload",
           outputGain,
           sources: new Map(),
         });
-        assetVaultRef.current.set(trackId, { file, buffer });
+        assetVaultRef.current.set(trackId, { file, buffer, sourceType: "upload" });
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
             ? (() => {
@@ -717,6 +933,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
                   }),
                   fileName: file.name,
                   fileSize: file.size,
+                  assetId: null,
+                  assetPersistenceStatus: "pending" as const,
                   isReplacing: false,
                   replacementError: null,
                 };
@@ -725,6 +943,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         );
         replaceTracks(nextTracks);
         applyTrackGains();
+        if (persistenceProjectId) {
+          startTrackAssetUpload(trackId);
+        }
         const nextPosition = clampStudioAudioPosition(
           positionRef.current,
           projectDurationRef.current,
@@ -749,10 +970,13 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [
       applyTrackGains,
       cancelProgressLoop,
+      cancelTrackAssetUpload,
       getAudioContext,
       getPlaybackPosition,
+      persistenceProjectId,
       replaceTracks,
       setStatusValue,
+      startTrackAssetUpload,
       stopSources,
       updateTrack,
     ],
@@ -1038,10 +1262,12 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       cancelProgressLoop();
       stopSources();
       const runtime = trackRuntimesRef.current.get(trackId);
+      cancelTrackAssetUpload(trackId);
       if (runtime) {
         assetVaultRef.current.set(trackId, {
           file: runtime.file,
           buffer: runtime.buffer,
+          sourceType: runtime.sourceType,
         });
       }
       runtime?.outputGain.disconnect();
@@ -1066,6 +1292,7 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     },
     [
       cancelProgressLoop,
+      cancelTrackAssetUpload,
       getPlaybackPosition,
       replaceTracks,
       setStatusValue,
@@ -1080,6 +1307,8 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
         id: track.id,
         fileName: track.fileName,
         fileSize: track.fileSize,
+        assetId: track.assetId,
+        assetPersistenceStatus: track.assetPersistenceStatus,
         clips: track.clips,
         volume: track.volume,
         muted: track.muted,
@@ -1183,7 +1412,11 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   const updateRetainedAssets = pruneRetainedAssets;
 
   useEffect(() => {
+    const uploadControllers = assetUploadControllersRef.current;
     return () => {
+      for (const controller of uploadControllers.values()) {
+        controller.abort();
+      }
       disposeResources();
     };
   }, [disposeResources]);
@@ -1191,6 +1424,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StudioAudioContextValue>(
     () => ({
       tracks,
+      hasPersistenceProject: Boolean(persistenceProjectId),
+      persistenceProjectName: persistenceContext.name,
+      persistenceProjectRevision: persistenceContext.revision,
       projectDuration,
       status,
       currentTime,
@@ -1199,6 +1435,9 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
       loadLocalFiles,
       ingestRecordedFile,
       replaceTrackAudio,
+      retryTrackAssetUpload,
+      decodePersistedAsset,
+      hydratePersistedProject,
       play,
       pause,
       seek,
@@ -1223,15 +1462,20 @@ export function StudioAudioProvider({ children }: { children: ReactNode }) {
     [
       currentTime,
       createMicrophoneAnalyser,
+      decodePersistedAsset,
       getTrackBuffer,
       exportEditingState,
       ingestRecordedFile,
       loadLocalFiles,
       pause,
       play,
+      persistenceProjectId,
+      persistenceContext,
       projectDuration,
       projectError,
       replaceTrackAudio,
+      retryTrackAssetUpload,
+      hydratePersistedProject,
       removeTrack,
       reset,
       seek,

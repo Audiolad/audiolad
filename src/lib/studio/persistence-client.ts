@@ -1,0 +1,258 @@
+"use client";
+
+export type StudioAssetSourceType = "upload" | "recording";
+
+export type StudioUploadedAsset = {
+  id: string;
+  projectId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationSeconds: number | null;
+  sourceType: StudioAssetSourceType;
+  createdAt: string;
+};
+
+export type StudioPersistenceClientErrorCode =
+  | "asset_too_large"
+  | "invalid_upload"
+  | "unauthenticated"
+  | "forbidden"
+  | "project_not_found"
+  | "invalid_project"
+  | "invalid_project_document"
+  | "asset_not_found"
+  | "revision_conflict"
+  | "server_error"
+  | "network_error";
+
+const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
+  asset_too_large: "Файл слишком большой для сохранения в проекте.",
+  invalid_upload: "Не удалось сохранить этот аудиофайл.",
+  unauthenticated: "Войдите в аккаунт, чтобы сохранить аудио.",
+  forbidden: "Нет доступа к этому проекту.",
+  project_not_found: "Проект для сохранения не найден.",
+  invalid_project: "Не удалось открыть этот проект.",
+  invalid_project_document: "Проект повреждён или создан в неподдерживаемой версии Студии.",
+  asset_not_found: "Аудиофайл проекта не найден.",
+  revision_conflict: "Проект был изменён в другом окне.",
+  server_error: "Сервер не смог сохранить аудио. Попробуйте ещё раз.",
+  network_error: "Не удалось связаться с сервером. Проверьте подключение и повторите.",
+};
+
+export class StudioPersistenceClientError extends Error {
+  constructor(
+    readonly code: StudioPersistenceClientErrorCode,
+    readonly status?: number,
+  ) {
+    super(ERROR_MESSAGES[code]);
+    this.name = "StudioPersistenceClientError";
+  }
+}
+
+function getErrorCode(status: number): StudioPersistenceClientErrorCode {
+  if (status === 413) return "asset_too_large";
+  if (status === 401) return "unauthenticated";
+  if (status === 403) return "forbidden";
+  if (status === 404) return "project_not_found";
+  if (status === 409) return "revision_conflict";
+  if (status === 422) return "invalid_upload";
+  return "server_error";
+}
+
+export type StudioPersistedProject = {
+  id: string;
+  name: string;
+  projectData: unknown;
+  revision: number;
+};
+
+export type StudioProjectAssetMetadata = StudioUploadedAsset;
+
+function isProject(value: unknown): value is StudioPersistedProject {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "id" in value &&
+      typeof value.id === "string" &&
+      "name" in value &&
+      typeof value.name === "string" &&
+      "revision" in value &&
+      typeof value.revision === "number" &&
+      "projectData" in value,
+  );
+}
+
+async function studioFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new StudioPersistenceClientError("network_error");
+  }
+}
+
+async function toStudioFetchError(response: Response): Promise<StudioPersistenceClientError> {
+  let serverCode: unknown;
+  try {
+    const body = await response.json();
+    serverCode = body && typeof body === "object" && "error" in body
+      ? body.error
+      : undefined;
+  } catch {
+    // Status normalization remains useful for binary and malformed responses.
+  }
+  return new StudioPersistenceClientError(
+    serverCode === "invalid_persisted_project_data"
+      ? "invalid_project_document"
+      : getErrorCode(response.status),
+    response.status,
+  );
+}
+
+export async function getStudioProjectForHydration({
+  projectId,
+  signal,
+}: {
+  projectId: string;
+  signal?: AbortSignal;
+}): Promise<{ project: StudioPersistedProject; assets: StudioProjectAssetMetadata[] }> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}`,
+    { signal },
+  );
+  if (!response.ok) {
+    throw await toStudioFetchError(response);
+  }
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("project" in body) ||
+    !isProject(body.project) ||
+    !("assets" in body) ||
+    !Array.isArray(body.assets) ||
+    !body.assets.every(isUploadedAsset)
+  ) {
+    throw new StudioPersistenceClientError("invalid_project", response.status);
+  }
+  return { project: body.project, assets: body.assets };
+}
+
+export async function updateStudioProject({
+  projectId,
+  expectedRevision,
+  name,
+  projectData,
+  signal,
+}: {
+  projectId: string;
+  expectedRevision: number;
+  name: string;
+  projectData: unknown;
+  signal?: AbortSignal;
+}): Promise<StudioPersistedProject> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, name, projectData }),
+      signal,
+    },
+  );
+  if (!response.ok) throw await toStudioFetchError(response);
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (!body || typeof body !== "object" || !("project" in body) || !isProject(body.project)) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return body.project;
+}
+
+export async function downloadStudioProjectAsset({
+  projectId,
+  assetId,
+  signal,
+}: {
+  projectId: string;
+  assetId: string;
+  signal?: AbortSignal;
+}): Promise<Blob> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
+    { signal },
+  );
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new StudioPersistenceClientError("asset_not_found", response.status);
+    }
+    throw await toStudioFetchError(response);
+  }
+  return response.blob();
+}
+
+function isUploadedAsset(value: unknown): value is StudioUploadedAsset {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "id" in value &&
+      typeof value.id === "string" &&
+      "projectId" in value &&
+      typeof value.projectId === "string",
+  );
+}
+
+export async function uploadStudioProjectAsset({
+  projectId,
+  file,
+  sourceType,
+  signal,
+}: {
+  projectId: string;
+  file: File;
+  sourceType: StudioAssetSourceType;
+  signal?: AbortSignal;
+}): Promise<StudioUploadedAsset> {
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("sourceType", sourceType);
+
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets`,
+    { method: "POST", body: formData, signal },
+  );
+
+  if (!response.ok) {
+    throw new StudioPersistenceClientError(getErrorCode(response.status), response.status);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("asset" in body) ||
+    !isUploadedAsset(body.asset)
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+
+  return body.asset;
+}
