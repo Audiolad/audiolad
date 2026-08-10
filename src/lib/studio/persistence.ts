@@ -45,7 +45,11 @@ export type StudioPersistedSlot = {
   id: string;
   name: string;
   audioTrackId: string | null;
+  trackKind?: StudioTrackKind;
 };
+
+export type StudioTrackKind = "voice" | "music";
+export type StudioVoicePreset = "clean" | "warm" | "deep" | "space";
 
 export type StudioPersistedTrack = {
   id: string;
@@ -53,6 +57,8 @@ export type StudioPersistedTrack = {
   name: string;
   volume: number;
   muted: boolean;
+  trackKind?: StudioTrackKind;
+  voicePreset?: StudioVoicePreset;
   clips: StudioPersistedClip[];
 };
 
@@ -83,6 +89,8 @@ export type StudioPersistableTrack = {
   name: string;
   volume: number;
   muted: boolean;
+  trackKind?: StudioTrackKind;
+  voicePreset?: StudioVoicePreset;
   clips: readonly StudioPersistedClip[];
 };
 
@@ -179,7 +187,7 @@ function parseClip(value: unknown, path: string): StudioPersistedClip {
 function parseTrack(value: unknown, path: string): StudioPersistedTrack {
   const track = assertKnownKeys(
     value,
-    ["id", "assetId", "name", "volume", "muted", "clips"],
+    ["id", "assetId", "name", "volume", "muted", "trackKind", "voicePreset", "clips"],
     "invalid_track",
     path,
   );
@@ -190,8 +198,10 @@ function parseTrack(value: unknown, path: string): StudioPersistedTrack {
     typeof track.volume !== "number" ||
     !Number.isFinite(track.volume) ||
     track.volume < 0 ||
-    track.volume > 1 ||
+    track.volume > 2 ||
     typeof track.muted !== "boolean" ||
+    (track.trackKind !== undefined && track.trackKind !== "voice" && track.trackKind !== "music") ||
+    (track.voicePreset !== undefined && !["clean", "warm", "deep", "space"].includes(track.voicePreset as string)) ||
     !Array.isArray(track.clips)
   ) {
     fail("invalid_track", path);
@@ -204,20 +214,32 @@ function parseTrack(value: unknown, path: string): StudioPersistedTrack {
     name: track.name,
     volume: track.volume,
     muted: track.muted,
+    ...(track.trackKind === "voice" || track.trackKind === "music"
+      ? { trackKind: track.trackKind }
+      : {}),
+    voicePreset: (track.voicePreset as StudioVoicePreset | undefined) ?? "clean",
     clips: clips.sort(compareClips),
   };
 }
 
 function parseSlot(value: unknown, path: string): StudioPersistedSlot {
-  const slot = assertKnownKeys(value, ["id", "name", "audioTrackId"], "invalid_slot", path);
+  const slot = assertKnownKeys(value, ["id", "name", "audioTrackId", "trackKind"], "invalid_slot", path);
   if (
     !isNonEmptyString(slot.id) ||
     !isNonEmptyString(slot.name) ||
-    (slot.audioTrackId !== null && !isNonEmptyString(slot.audioTrackId))
+    (slot.audioTrackId !== null && !isNonEmptyString(slot.audioTrackId)) ||
+    (slot.trackKind !== undefined && slot.trackKind !== "voice" && slot.trackKind !== "music")
   ) {
     fail("invalid_slot", path);
   }
-  return { id: slot.id, name: slot.name, audioTrackId: slot.audioTrackId };
+  return {
+    id: slot.id,
+    name: slot.name,
+    audioTrackId: slot.audioTrackId,
+    ...(slot.trackKind === "voice" || slot.trackKind === "music"
+      ? { trackKind: slot.trackKind }
+      : {}),
+  };
 }
 
 function serializeInputTrack(value: unknown, path: string): StudioPersistedTrack {
@@ -241,6 +263,8 @@ function serializeInputTrack(value: unknown, path: string): StudioPersistedTrack
     name: value.name,
     volume: value.volume,
     muted: value.muted,
+    trackKind: value.trackKind,
+    voicePreset: value.voicePreset,
     clips,
   }, path);
 }
@@ -251,6 +275,7 @@ function serializeInputSlot(value: unknown, path: string): StudioPersistedSlot {
     id: value.id,
     name: value.name,
     audioTrackId: value.audioTrackId,
+    trackKind: value.trackKind,
   }, path);
 }
 

@@ -68,7 +68,10 @@ assert.deepEqual(parseStudioProjectData(EMPTY_STUDIO_PROJECT_DATA), {
   schemaVersion: 2,
   studioVersion: 1,
   editor: { currentTime: 0 },
-  slots: [],
+  slots: [
+    { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
+    { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
+  ],
   tracks: [],
 });
 assert.throws(

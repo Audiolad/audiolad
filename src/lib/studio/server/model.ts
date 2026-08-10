@@ -20,7 +20,10 @@ export const EMPTY_STUDIO_PROJECT_DATA: StudioProjectDataV2 = {
   schemaVersion: STUDIO_SCHEMA_VERSION,
   studioVersion: STUDIO_TECHNICAL_VERSION,
   editor: { currentTime: 0 },
-  slots: [],
+  slots: [
+    { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
+    { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
+  ],
   tracks: [],
 };
 
@@ -28,6 +31,7 @@ export type StudioSlotV2 = {
   id: string;
   name: string;
   audioTrackId: string | null;
+  trackKind?: "voice" | "music";
 };
 
 export type StudioTrackV2 = {
@@ -36,6 +40,8 @@ export type StudioTrackV2 = {
   name: string;
   volume: number;
   muted: boolean;
+  trackKind?: "voice" | "music";
+  voicePreset?: "clean" | "warm" | "deep" | "space";
   clips: StudioClipV2[];
 };
 

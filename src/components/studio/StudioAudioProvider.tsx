@@ -26,6 +26,10 @@ import {
   type StudioClip,
   type StudioClipLayout,
 } from "@/lib/studio/clip-math";
+import type {
+  StudioTrackKind,
+  StudioVoicePreset,
+} from "@/lib/studio/persistence";
 import {
   clampStudioClipFades,
   getStudioFadeEnvelope,
@@ -84,6 +88,8 @@ export type StudioLocalTrack = {
   clips: StudioClip[];
   volume: number;
   muted: boolean;
+  trackKind: StudioTrackKind;
+  voicePreset: StudioVoicePreset;
   status: "loading" | "ready" | "error";
   isReplacing: boolean;
   replacementError: string | null;
@@ -102,7 +108,10 @@ type StudioAudioContextValue = {
   createMicrophoneAnalyser: (
     stream: MediaStream,
   ) => { analyser: AnalyserNode; disconnect: () => void };
-  loadLocalFiles: (files: Iterable<File>) => Promise<StudioLocalTrack[]>;
+  loadLocalFiles: (
+    files: Iterable<File>,
+    trackKind?: StudioTrackKind,
+  ) => Promise<StudioLocalTrack[]>;
   ingestRecordedFile: (
     file: File,
     options: { startTime: number },
@@ -119,6 +128,7 @@ type StudioAudioContextValue = {
   seekRelative: (offset: number) => void;
   removeTrack: (trackId: string) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackVoicePreset: (trackId: string, preset: StudioVoicePreset) => void;
   toggleTrackMuted: (trackId: string) => void;
   setClipLayout: (
     trackId: string,
@@ -159,6 +169,9 @@ type TrackRuntime = {
   buffer: AudioBuffer;
   sourceType: StudioAssetSourceType;
   outputGain: GainNode;
+  fxInput: GainNode;
+  fxNodes: AudioNode[];
+  voicePreset: StudioVoicePreset;
   sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
 };
 
@@ -269,8 +282,17 @@ export function StudioAudioProvider({
     (asset: TrackAsset): TrackRuntime => {
       const context = getAudioContext();
       const outputGain = context.createGain();
+      const fxInput = context.createGain();
+      fxInput.connect(outputGain);
       outputGain.connect(context.destination);
-      return { ...asset, outputGain, sources: new Map() };
+      return {
+        ...asset,
+        outputGain,
+        fxInput,
+        fxNodes: [],
+        voicePreset: "clean",
+        sources: new Map(),
+      };
     },
     [getAudioContext],
   );
@@ -318,6 +340,64 @@ export function StudioAudioProvider({
       }
     }
   }, []);
+
+  const applyVoicePreset = useCallback((
+    runtime: TrackRuntime,
+    preset: StudioVoicePreset,
+    enabled: boolean,
+  ) => {
+    runtime.fxInput.disconnect();
+    runtime.fxNodes.forEach((node) => node.disconnect());
+    runtime.fxNodes = [];
+    runtime.voicePreset = preset;
+    if (!enabled || preset === "clean") {
+      runtime.fxInput.connect(runtime.outputGain);
+      return;
+    }
+    const context = getAudioContext();
+    const nodes: AudioNode[] = [];
+    let output: AudioNode = runtime.fxInput;
+    const connectFilter = (
+      type: BiquadFilterType,
+      frequency: number,
+      gain: number,
+    ) => {
+      const filter = context.createBiquadFilter();
+      filter.type = type;
+      filter.frequency.value = frequency;
+      filter.gain.value = gain;
+      output.connect(filter);
+      output = filter;
+      nodes.push(filter);
+    };
+    if (preset === "warm") {
+      connectFilter("lowshelf", 180, 1.5);
+      connectFilter("highshelf", 5000, -1);
+    } else if (preset === "deep") {
+      connectFilter("lowshelf", 130, 2);
+      connectFilter("peaking", 300, 1);
+    } else {
+      const dry = context.createGain();
+      const delay = context.createDelay(0.2);
+      const wet = context.createGain();
+      const feedback = context.createGain();
+      dry.gain.value = 1;
+      delay.delayTime.value = 0.095;
+      wet.gain.value = 0.1;
+      feedback.gain.value = 0.08;
+      runtime.fxInput.connect(dry);
+      runtime.fxInput.connect(delay);
+      delay.connect(wet);
+      delay.connect(feedback);
+      feedback.connect(delay);
+      dry.connect(runtime.outputGain);
+      wet.connect(runtime.outputGain);
+      runtime.fxNodes = [dry, delay, wet, feedback];
+      return;
+    }
+    output.connect(runtime.outputGain);
+    runtime.fxNodes = nodes;
+  }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
     for (const runtime of trackRuntimesRef.current.values()) {
@@ -410,7 +490,7 @@ export function StudioAudioProvider({
           const envelopeGain = context.createGain();
           source.buffer = runtime.buffer;
           source.connect(envelopeGain);
-          envelopeGain.connect(runtime.outputGain);
+          envelopeGain.connect(runtime.fxInput);
           const sourceStartAt = startAt + Math.max(clip.startTime - position, 0);
           const fades = clampStudioClipFades(clip, clip.duration);
           const fadeGain = envelopeGain.gain;
@@ -458,6 +538,8 @@ export function StudioAudioProvider({
     cancelProgressLoop();
     stopSources();
     for (const runtime of trackRuntimesRef.current.values()) {
+      runtime.fxInput.disconnect();
+      runtime.fxNodes.forEach((node) => node.disconnect());
       runtime.outputGain.disconnect();
     }
     trackRuntimesRef.current.clear();
@@ -588,6 +670,8 @@ export function StudioAudioProvider({
       cancelProgressLoop();
       stopSources();
       for (const runtime of trackRuntimesRef.current.values()) {
+        runtime.fxInput.disconnect();
+        runtime.fxNodes.forEach((node) => node.disconnect());
         runtime.outputGain.disconnect();
       }
       trackRuntimesRef.current.clear();
@@ -603,6 +687,11 @@ export function StudioAudioProvider({
             sourceType: asset.metadata.sourceType,
           });
           trackRuntimesRef.current.set(track.id, runtime);
+          applyVoicePreset(
+            runtime,
+            track.voicePreset ?? "clean",
+            (track.trackKind ?? (asset.metadata.sourceType === "recording" ? "voice" : "music")) === "voice",
+          );
           assetVaultRef.current.set(track.id, {
             file: asset.file,
             buffer: asset.buffer,
@@ -619,6 +708,8 @@ export function StudioAudioProvider({
           clips: track.clips.map((clip) => ({ ...clip })),
           volume: track.volume,
           muted: track.muted,
+          trackKind: track.trackKind ?? (metadata?.sourceType === "recording" ? "voice" : "music"),
+          voicePreset: track.voicePreset ?? "clean",
           status: asset ? "ready" : "error",
           isReplacing: false,
           replacementError: failure?.message ?? (asset ? null : "Не удалось загрузить аудио дорожки."),
@@ -653,6 +744,7 @@ export function StudioAudioProvider({
     },
     [
       applyTrackGains,
+      applyVoicePreset,
       cancelProgressLoop,
       createTrackRuntime,
       replaceTracks,
@@ -662,7 +754,10 @@ export function StudioAudioProvider({
   );
 
   const loadLocalFiles = useCallback(
-    async (fileInput: Iterable<File>) => {
+    async (
+      fileInput: Iterable<File>,
+      trackKind: StudioTrackKind = "music",
+    ) => {
       const files = Array.from(fileInput);
       const validationError = files.map(validateStudioLocalFile).find(Boolean);
       if (validationError) {
@@ -718,16 +813,11 @@ export function StudioAudioProvider({
         const createdTracks: StudioLocalTrack[] = [];
         for (const [index, { file, buffer }] of decodedTracks.entries()) {
           const id = getTrackId(file, index);
-          const outputGain = context.createGain();
-          outputGain.gain.value = 1;
-          outputGain.connect(context.destination);
-          trackRuntimesRef.current.set(id, {
+          trackRuntimesRef.current.set(id, createTrackRuntime({
             file,
             buffer,
             sourceType: "upload",
-            outputGain,
-            sources: new Map(),
-          });
+          }));
           assetVaultRef.current.set(id, { file, buffer, sourceType: "upload" });
           const createdTrack: StudioLocalTrack = {
             id,
@@ -745,6 +835,8 @@ export function StudioAudioProvider({
             }],
             volume: 1,
             muted: false,
+            trackKind,
+            voicePreset: "clean",
             status: "ready",
             isReplacing: false,
             replacementError: null,
@@ -785,6 +877,7 @@ export function StudioAudioProvider({
     [
       applyTrackGains,
       cancelProgressLoop,
+      createTrackRuntime,
       getAudioContext,
       getPlaybackPosition,
       persistenceProjectId,
@@ -827,9 +920,6 @@ export function StudioAudioProvider({
         if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
           throw new Error("invalid recorded audio duration");
         }
-        const outputGain = context.createGain();
-        outputGain.gain.value = 1;
-        outputGain.connect(context.destination);
         const track: StudioLocalTrack = {
           id: getTrackId(file, tracksRef.current.length),
           fileName: file.name,
@@ -846,17 +936,14 @@ export function StudioAudioProvider({
           }],
           volume: 1,
           muted: false,
+          trackKind: "voice",
+          voicePreset: "clean",
           status: "ready",
           isReplacing: false,
           replacementError: null,
         };
-        trackRuntimesRef.current.set(track.id, {
-          file,
-          buffer,
-          sourceType: "recording",
-          outputGain,
-          sources: new Map(),
-        });
+        const runtime = createTrackRuntime({ file, buffer, sourceType: "recording" });
+        trackRuntimesRef.current.set(track.id, runtime);
         assetVaultRef.current.set(track.id, { file, buffer, sourceType: "recording" });
         replaceTracks([...tracksRef.current, track]);
         applyTrackGains();
@@ -881,6 +968,7 @@ export function StudioAudioProvider({
     },
     [
       applyTrackGains,
+      createTrackRuntime,
       getAudioContext,
       persistenceProjectId,
       replaceTracks,
@@ -963,16 +1051,12 @@ export function StudioAudioProvider({
           source.disconnect();
           envelopeGain.disconnect();
         }
+        oldRuntime.fxInput.disconnect();
+        oldRuntime.fxNodes.forEach((node) => node.disconnect());
         oldRuntime.outputGain.disconnect();
-        const outputGain = context.createGain();
-        outputGain.connect(context.destination);
-        trackRuntimesRef.current.set(trackId, {
-          file,
-          buffer,
-          sourceType: "upload",
-          outputGain,
-          sources: new Map(),
-        });
+        const nextRuntime = createTrackRuntime({ file, buffer, sourceType: "upload" });
+        applyVoicePreset(nextRuntime, currentTrack.voicePreset, currentTrack.trackKind === "voice");
+        trackRuntimesRef.current.set(trackId, nextRuntime);
         assetVaultRef.current.set(trackId, { file, buffer, sourceType: "upload" });
         const nextTracks = tracksRef.current.map((item) =>
           item.id === trackId
@@ -1025,8 +1109,10 @@ export function StudioAudioProvider({
     },
     [
       applyTrackGains,
+      applyVoicePreset,
       cancelProgressLoop,
       cancelTrackAssetUpload,
+      createTrackRuntime,
       getAudioContext,
       getPlaybackPosition,
       persistenceProjectId,
@@ -1165,10 +1251,21 @@ export function StudioAudioProvider({
 
   const setTrackVolume = useCallback(
     (trackId: string, requestedVolume: number) => {
-      const volume = Math.min(Math.max(requestedVolume, 0), 1);
+      const volume = Math.min(Math.max(requestedVolume, 0), 2);
       updateTrack(trackId, (track) => ({ ...track, volume }));
     },
     [updateTrack],
+  );
+
+  const setTrackVoicePreset = useCallback(
+    (trackId: string, voicePreset: StudioVoicePreset) => {
+      const runtime = trackRuntimesRef.current.get(trackId);
+      const track = tracksRef.current.find((item) => item.id === trackId);
+      if (!runtime || !track || track.trackKind !== "voice") return;
+      applyVoicePreset(runtime, voicePreset, true);
+      updateTrack(trackId, (item) => ({ ...item, voicePreset }));
+    },
+    [applyVoicePreset, updateTrack],
   );
 
   const toggleTrackMuted = useCallback(
@@ -1406,6 +1503,8 @@ export function StudioAudioProvider({
         clips: track.clips,
         volume: track.volume,
         muted: track.muted,
+        trackKind: track.trackKind,
+        voicePreset: track.voicePreset,
       }),
     );
     return createStudioEditingSnapshot({
@@ -1436,6 +1535,9 @@ export function StudioAudioProvider({
           continue;
         }
         const runtime = createTrackRuntime(asset);
+        const trackKind = track.trackKind ?? (asset.sourceType === "recording" ? "voice" : "music");
+        const voicePreset = track.voicePreset ?? "clean";
+        applyVoicePreset(runtime, voicePreset, trackKind === "voice");
         trackRuntimesRef.current.set(track.id, runtime);
         restoredTracks.push({
           ...track,
@@ -1443,6 +1545,8 @@ export function StudioAudioProvider({
           status: "ready",
           isReplacing: false,
           replacementError: null,
+          trackKind,
+          voicePreset,
         });
       }
 
@@ -1466,6 +1570,7 @@ export function StudioAudioProvider({
     },
     [
       applyTrackGains,
+      applyVoicePreset,
       cancelProgressLoop,
       createTrackRuntime,
       replaceTracks,
@@ -1538,6 +1643,7 @@ export function StudioAudioProvider({
       seek,
       seekRelative,
       setTrackVolume,
+      setTrackVoicePreset,
       toggleTrackMuted,
       setClipLayout,
       setClipFades,
@@ -1577,6 +1683,7 @@ export function StudioAudioProvider({
       seek,
       seekRelative,
       setTrackVolume,
+      setTrackVoicePreset,
       status,
       setClipLayout,
       setClipFades,

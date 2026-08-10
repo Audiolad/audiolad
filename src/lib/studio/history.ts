@@ -3,6 +3,7 @@ import {
   type StudioClip,
 } from "@/lib/studio/clip-math";
 import { clampStudioClipFades } from "@/lib/studio/fade-math";
+import type { StudioTrackKind, StudioVoicePreset } from "@/lib/studio/persistence";
 
 export const MAX_STUDIO_HISTORY_SNAPSHOTS = 50;
 
@@ -19,12 +20,15 @@ export type StudioTrackSnapshot = {
   clips: StudioClip[];
   volume: number;
   muted: boolean;
+  trackKind?: StudioTrackKind;
+  voicePreset?: StudioVoicePreset;
 };
 
 export type StudioSlotSnapshot = {
   id: string;
   name: string;
   audioTrackId: string | null;
+  trackKind?: StudioTrackKind;
 };
 
 export type StudioEditingSnapshot = {

@@ -128,7 +128,8 @@ function testProviderEngineLifecycle() {
   assert.match(fileValidation, /SUPPORTED_FILE_EXTENSIONS/);
   assert.match(provider, /local-file-validation/);
   assert.match(provider, /export \{ validateStudioLocalFile \}/);
-  assert.match(provider, /outputGain\.gain\.value = 1/);
+  assert.match(provider, /fxInput\.connect\(outputGain\)/);
+  assert.match(provider, /setTrackVoicePreset/);
   assert.match(provider, /toggleTrackMuted/);
   assert.match(provider, /getTrackBuffer/);
   assert.match(
@@ -266,11 +267,15 @@ function testStudioBoundariesAndCrossTabStop() {
     /scrollToEnd\(\);[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
   );
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
-  assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
-  assert.match(studioWorkspace, /Дорожка 1/);
-  assert.match(studioWorkspace, /Дорожка 2/);
-  assert.match(studioWorkspace, /slots\.length < MAX_TRACK_SLOTS/);
-  assert.match(studioWorkspace, /\+ Добавить дорожку/);
+  assert.match(studioWorkspace, /MAX_VOICE_TRACKS = 3/);
+  assert.match(studioWorkspace, /MAX_MUSIC_TRACKS = 2/);
+  assert.match(studioWorkspace, /Голос 1/);
+  assert.match(studioWorkspace, /Музыка 1/);
+  assert.match(studioWorkspace, /"Голос" : "Музыка"/);
+  assert.match(studioWorkspace, /trackKind === "voice"/);
+  assert.match(studioWorkspace, /currentSlots\.slice\(0, insertAt\)/);
+  assert.match(studioWorkspace, /\+ Голос/);
+  assert.match(studioWorkspace, /\+ Музыка/);
   assert.match(studioWorkspace, /disabled=\{!track\}/);
   assert.match(
     studioWorkspace,
@@ -294,18 +299,10 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
   assert.match(studioWorkspace, /Назад в Studio/);
-  assert.match(studioWorkspace, /studio-volume-fader flex h-28 w-5 shrink-0/);
-  assert.match(studioWorkspace, /studio-volume-fader__range/);
+  assert.match(studioWorkspace, /max="200"/);
+  assert.match(studioWorkspace, /setTrackVolume\(track\.id, Number\(event\.target\.value\) \/ 100\)/);
   assert.doesNotMatch(studioWorkspace, /transform:\s*["'`]?rotate/);
   assert.doesNotMatch(studioWorkspace, /style=\{\{[^}]*volume/);
-  assert.match(
-    globalStyles,
-    /\.studio-volume-fader \{[\s\S]*flex: 0 0 1\.25rem;[\s\S]*min-width: 1\.25rem;[\s\S]*max-width: 1\.25rem;/,
-  );
-  assert.match(
-    globalStyles,
-    /\.studio-volume-fader__range \{[\s\S]*box-sizing: border-box;[\s\S]*-webkit-appearance: slider-vertical;[\s\S]*writing-mode: vertical-lr;/,
-  );
   assert.match(
     globalStyles,
     /::-webkit-slider-runnable-track,[\s\S]*::-webkit-slider-thumb \{[\s\S]*box-sizing: border-box;/,
@@ -319,11 +316,11 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(
     studioWorkspace,
-    /\{ id: "slot-1", name: "Дорожка 1", audioTrackId: null \},[\s\S]*\{ id: "slot-2", name: "Дорожка 2", audioTrackId: null \}/,
+    /slot-voice-1[\s\S]*Голос 1[\s\S]*slot-music-1[\s\S]*Музыка 1/,
   );
   assert.match(
     studioWorkspace,
-    /name: `Дорожка \$\{nextNumber\}`,[\s\S]*audioTrackId: null/,
+    /name: `\$\{trackKind === "voice" \? "Голос" : "Музыка"\} \$\{nextNumber\}`,[\s\S]*audioTrackId: null,[\s\S]*trackKind/,
   );
   assert.match(
     studioWorkspace,
@@ -333,7 +330,9 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /renderEmpty=\{renderTimelineEmptyState\}/);
   assert.match(studioWorkspace, /useStudioRecorder/);
   assert.match(studioWorkspace, /recordingSlotId === slot\.id/);
-  assert.match(studioWorkspace, /Записать с микрофона/);
+  assert.match(studioWorkspace, /Записать голос/);
+  assert.match(studioWorkspace, /Загрузить голос/);
+  assert.match(studioWorkspace, /Добавить музыку/);
   assert.match(studioWorkspace, /Записать/);
   assert.match(studioWorkspace, /Стоп · \{formatTime\(recordingElapsed\)\}/);
   assert.match(studioWorkspace, /onPointerUp=\{\(event\) => event\.stopPropagation\(\)\}/);

@@ -129,12 +129,13 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
   for (const slot of value.slots) {
     if (
       !isRecord(slot) ||
-      !hasOnlyKeys(slot, ["id", "name", "audioTrackId"]) ||
+      !hasOnlyKeys(slot, ["id", "name", "audioTrackId", "trackKind"]) ||
       typeof slot.name !== "string" ||
       !slot.name.trim() ||
       (slot.audioTrackId !== null &&
         (typeof slot.audioTrackId !== "string" ||
-          !trackIds.has(slot.audioTrackId)))
+          !trackIds.has(slot.audioTrackId))) ||
+      (slot.trackKind !== undefined && slot.trackKind !== "voice" && slot.trackKind !== "music")
     ) {
       throw new StudioApiError("invalid_slot", 422);
     }
@@ -152,7 +153,7 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
   for (const track of value.tracks) {
     if (
       !isRecord(track) ||
-      !hasOnlyKeys(track, ["id", "assetId", "name", "volume", "muted", "clips"]) ||
+      !hasOnlyKeys(track, ["id", "assetId", "name", "volume", "muted", "trackKind", "voicePreset", "clips"]) ||
       typeof track.assetId !== "string" ||
       !UUID_PATTERN.test(track.assetId) ||
       typeof track.name !== "string" ||
@@ -160,8 +161,10 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
       typeof track.volume !== "number" ||
       !Number.isFinite(track.volume) ||
       track.volume < 0 ||
-      track.volume > 1 ||
+      track.volume > 2 ||
       typeof track.muted !== "boolean" ||
+      (track.trackKind !== undefined && track.trackKind !== "voice" && track.trackKind !== "music") ||
+      (track.voicePreset !== undefined && !["clean", "warm", "deep", "space"].includes(track.voicePreset as string)) ||
       !Array.isArray(track.clips)
     ) {
       throw new StudioApiError("invalid_track", 422);

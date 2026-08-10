@@ -164,7 +164,9 @@ assert.match(editor, /useStudioRecorder/);
 assert.match(editor, /recordingSlotId === slot\.id/);
 assert.match(editor, /recordingSlotId === slot\.id && isRecording/);
 assert.match(editor, /Включаем микрофон…/);
-assert.match(editor, /Записать с микрофона/);
+assert.match(editor, /Записать голос/);
+assert.match(editor, /\+ Голос/);
+assert.match(editor, /\+ Музыка/);
 assert.equal(
   (editor.match(/Стоп · \{formatTime\(recordingElapsed\)\}/g) ?? []).length,
   3,

@@ -36,6 +36,7 @@ import {
   type StudioHistory,
 } from "@/lib/studio/history";
 import type { StudioProjectHydration } from "@/lib/studio/hydration";
+import type { StudioTrackKind, StudioVoicePreset } from "@/lib/studio/persistence";
 import {
   StudioAutosaveController,
   type StudioAutosaveState,
@@ -47,9 +48,12 @@ type StudioTrackSlot = {
   id: string;
   name: string;
   audioTrackId: string | null;
+  trackKind: StudioTrackKind;
 };
 
-const MAX_TRACK_SLOTS = 5;
+const MAX_VOICE_TRACKS = 3;
+const MAX_MUSIC_TRACKS = 2;
+const MAX_TRACK_SLOTS = MAX_VOICE_TRACKS + MAX_MUSIC_TRACKS;
 const TRACK_ACCENTS = [
   "border-violet-400/70 bg-violet-400/15 text-violet-200",
   "border-sky-400/70 bg-sky-400/15 text-sky-200",
@@ -219,8 +223,8 @@ export default function StudioEditorShell({
   const assetSignatureRef = useRef<string | null>(null);
   const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
-    { id: "slot-1", name: "Дорожка 1", audioTrackId: null },
-    { id: "slot-2", name: "Дорожка 2", audioTrackId: null },
+    { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
+    { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
   ]);
   const {
     createMicrophoneAnalyser,
@@ -248,6 +252,7 @@ export default function StudioEditorShell({
     splitClip,
     removeClip,
     setTrackVolume,
+    setTrackVoicePreset,
     status,
     toggleTrackMuted,
     tracks,
@@ -284,6 +289,8 @@ export default function StudioEditorShell({
             name: track.fileName,
             volume: track.volume,
             muted: track.muted,
+            trackKind: track.trackKind,
+            voicePreset: track.voicePreset,
             clips: track.clips,
           })),
         });
@@ -322,7 +329,10 @@ export default function StudioEditorShell({
     hydratedProjectIdRef.current = persistedHydration.project.id;
     projectIdRef.current = persistedHydration.project.id;
     setProjectName(persistedHydration.project.name);
-    setSlots(persistedHydration.state.slots.map((slot) => ({ ...slot })));
+    setSlots(persistedHydration.state.slots.map((slot) => ({
+      ...slot,
+      trackKind: slot.trackKind ?? "voice",
+    })));
     setSelectedClipId(null);
     setClipboard(null);
     setEditingError(null);
@@ -336,6 +346,8 @@ export default function StudioEditorShell({
         clips: track.clips,
         volume: track.volume,
         muted: track.muted,
+        trackKind: track.trackKind,
+        voicePreset: track.voicePreset,
       })),
       slots: persistedHydration.state.slots,
       selectedClipId: null,
@@ -444,6 +456,7 @@ export default function StudioEditorShell({
             slot.audioTrackId && trackIds.has(slot.audioTrackId)
               ? slot.audioTrackId
               : null,
+          trackKind: slot.trackKind ?? "voice",
         })),
       );
       setSelectedClipId(
@@ -751,13 +764,16 @@ export default function StudioEditorShell({
   }, []);
 
   const openAddAudioDialog = (slotId: string) => {
+    const slot = slots.find((item) => item.id === slotId);
     if (addAudioInputRef.current) {
       addAudioInputRef.current.dataset.slotId = slotId;
+      addAudioInputRef.current.dataset.trackKind = slot?.trackKind ?? "music";
       addAudioInputRef.current.click();
     }
   };
 
   const startSlotRecording = (slotId: string) => {
+    if (slots.find((slot) => slot.id === slotId)?.trackKind !== "voice") return;
     void startRecording({
       slotId,
       startTime: tracks.length === 0 ? 0 : currentTime,
@@ -788,21 +804,27 @@ export default function StudioEditorShell({
     setSlotNameDraft("");
   };
 
-  const addSlot = () => {
+  const addSlot = (trackKind: StudioTrackKind) => {
     setSlots((currentSlots) => {
-      if (currentSlots.length >= MAX_TRACK_SLOTS) {
+      const sameKind = currentSlots.filter((slot) => slot.trackKind === trackKind).length;
+      const limit = trackKind === "voice" ? MAX_VOICE_TRACKS : MAX_MUSIC_TRACKS;
+      if (currentSlots.length >= MAX_TRACK_SLOTS || sameKind >= limit) {
         return currentSlots;
       }
 
-      const nextNumber = currentSlots.length + 1;
-      return [
-        ...currentSlots,
-        {
-          id: `slot-${crypto.randomUUID()}`,
-          name: `Дорожка ${nextNumber}`,
-          audioTrackId: null,
-        },
-      ];
+      const nextNumber = sameKind + 1;
+      const nextSlot = {
+        id: `slot-${crypto.randomUUID()}`,
+        name: `${trackKind === "voice" ? "Голос" : "Музыка"} ${nextNumber}`,
+        audioTrackId: null,
+        trackKind,
+      };
+      const insertAt = trackKind === "voice"
+        ? currentSlots.findIndex((slot) => slot.trackKind === "music")
+        : currentSlots.length;
+      return insertAt < 0
+        ? [...currentSlots, nextSlot]
+        : [...currentSlots.slice(0, insertAt), nextSlot, ...currentSlots.slice(insertAt)];
     });
     markSavedChange();
   };
@@ -813,13 +835,14 @@ export default function StudioEditorShell({
       ? tracksById.get(slot.audioTrackId)
       : undefined;
     const selectedClip = track?.clips.find((clip) => clip.id === selectedClipId);
+    const trackKind = track?.trackKind ?? slot.trackKind;
     if (!slot) {
       return null;
     }
     const accent = TRACK_ACCENTS[index % TRACK_ACCENTS.length];
 
     return (
-      <div className="flex min-h-40 gap-3">
+      <div className="flex gap-3 py-1 lg:min-h-0">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${accent}`}>
           {index + 1}
         </span>
@@ -908,7 +931,7 @@ export default function StudioEditorShell({
               ) : null}
             </div>
           ) : null}
-          <div className="mt-3 flex min-h-28 items-end gap-3">
+          <div className="mt-2 flex items-center gap-2">
             <TrackMuteButton
               track={track}
               onToggle={() => {
@@ -918,12 +941,12 @@ export default function StudioEditorShell({
                 }
               }}
             />
-            <div className="studio-volume-fader flex h-28 w-5 shrink-0 flex-col items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <input
                 aria-label={`Громкость ${slot.name}`}
                 type="range"
                 min="0"
-                max="100"
+                max="200"
                 value={Math.round((track?.volume ?? 1) * 100)}
                 disabled={!track}
                 onChange={(event) =>
@@ -934,14 +957,14 @@ export default function StudioEditorShell({
                     ? `Громкость: ${Math.round(track.volume * 100)}%`
                     : "Добавьте аудио, чтобы регулировать громкость"
                 }
-                className="studio-volume-fader__range accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-w-20 flex-1 accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
               />
               <span className="text-[10px] text-[#9ba7bb]">
                 {Math.round((track?.volume ?? 1) * 100)}%
               </span>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-2">
             <TrackFadeButton
               clip={selectedClip}
               kind="in"
@@ -972,8 +995,8 @@ export default function StudioEditorShell({
                 );
               }}
             />
-          </div>
-          <div className="mt-3 flex flex-col items-start gap-2 text-xs">
+          </div> : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             {track ? (
               <>
                 <button
@@ -1027,19 +1050,37 @@ export default function StudioEditorShell({
                   onClick={() => openAddAudioDialog(slot.id)}
                   className="text-[#d8c8fb] disabled:opacity-40"
                 >
-                  Добавить аудио
+                  {trackKind === "voice" ? "Загрузить голос" : "Добавить музыку"}
                 </button>
-                {recordingSlotId === slot.id && isRecording ? null : (
+                {trackKind === "voice" && (recordingSlotId === slot.id && isRecording ? null : (
                   <button
                     type="button"
                     disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
                     onClick={() => startSlotRecording(slot.id)}
                     className="text-[#d8c8fb] disabled:opacity-40"
                   >
-                    Записать
+                    Записать голос
                   </button>
-                )}
+                ))}
               </div>
+            ) : null}
+            {track?.trackKind === "voice" ? (
+              <select
+                aria-label={`Обработка голоса ${slot.name}`}
+                value={track.voicePreset}
+                onChange={(event) => {
+                  runEditingAction(() =>
+                    setTrackVoicePreset(track.id, event.target.value as StudioVoicePreset),
+                  );
+                  markSavedChange();
+                }}
+                className="rounded border border-white/15 bg-[#1c2433] px-2 py-1 text-xs text-white"
+              >
+                <option value="clean">Чистый</option>
+                <option value="warm">Тёплый</option>
+                <option value="deep">Глубокий</option>
+                <option value="space">Пространство</option>
+              </select>
             ) : null}
             {index >= 2 ? (
               <button
@@ -1069,14 +1110,17 @@ export default function StudioEditorShell({
       return null;
     }
     const isThisSlotRecording = recordingSlotId === slot.id && isRecording;
+    const isVoiceSlot = slot.trackKind === "voice";
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-        <p className="text-sm font-medium text-[#e2e8f5]">Добавьте аудио</p>
+        <p className="text-sm font-medium text-[#e2e8f5]">
+          {isVoiceSlot ? "Добавьте голос" : "Добавьте музыку"}
+        </p>
         <p className="mt-1 text-xs text-[#97a4b8]">
           Загрузите аудиофайл с устройства
         </p>
         <p className="mt-2 text-xs text-[#718096]">
-          При записи под музыку лучше использовать наушники.
+          {isVoiceSlot ? "При записи под музыку лучше использовать наушники." : "Загрузите фоновую музыку или ambience."}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button
@@ -1089,7 +1133,7 @@ export default function StudioEditorShell({
             }}
             className="h-10 rounded-lg bg-[#7650bd] px-4 text-sm font-semibold text-white disabled:opacity-40"
           >
-            Добавить аудио
+            {isVoiceSlot ? "Загрузить голос" : "Добавить музыку"}
           </button>
           {isThisSlotRecording ? (
             <button
@@ -1108,7 +1152,7 @@ export default function StudioEditorShell({
             >
               Стоп · {formatTime(recordingElapsed)}
             </button>
-          ) : (
+          ) : isVoiceSlot ? (
             <button
               type="button"
               disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
@@ -1119,9 +1163,9 @@ export default function StudioEditorShell({
               }}
               className="h-10 rounded-lg border border-violet-300/60 px-4 text-sm font-semibold text-violet-100 disabled:opacity-40"
             >
-              Записать с микрофона
+              Записать голос
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -1585,6 +1629,24 @@ export default function StudioEditorShell({
             renderControls={renderTimelineControls}
             renderEmpty={renderTimelineEmptyState}
           />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={slots.filter((slot) => slot.trackKind === "voice").length >= MAX_VOICE_TRACKS}
+              onClick={() => addSlot("voice")}
+              className="h-10 rounded-lg border border-dashed border-violet-300/40 px-3 text-sm font-semibold text-violet-100 disabled:opacity-40"
+            >
+              + Голос
+            </button>
+            <button
+              type="button"
+              disabled={slots.filter((slot) => slot.trackKind === "music").length >= MAX_MUSIC_TRACKS}
+              onClick={() => addSlot("music")}
+              className="h-10 rounded-lg border border-dashed border-sky-300/40 px-3 text-sm font-semibold text-sky-100 disabled:opacity-40"
+            >
+              + Музыка
+            </button>
+          </div>
 
           {false ? <div className="space-y-3">
             {slots.map((slot, index) => {
@@ -1778,7 +1840,7 @@ export default function StudioEditorShell({
           {slots.length < MAX_TRACK_SLOTS ? (
             <button
               type="button"
-              onClick={addSlot}
+              onClick={() => addSlot("voice")}
               className="mt-3 inline-flex h-11 items-center rounded-lg border border-dashed border-white/25 px-4 text-sm font-semibold text-[#d8c8fb]"
             >
               + Добавить дорожку
@@ -1796,13 +1858,15 @@ export default function StudioEditorShell({
             className="sr-only"
             onChange={(event) => {
               const slotId = event.currentTarget.dataset.slotId;
+              const trackKind = event.currentTarget.dataset.trackKind as StudioTrackKind | undefined;
               const file = event.target.files?.[0];
               event.currentTarget.value = "";
               delete event.currentTarget.dataset.slotId;
+              delete event.currentTarget.dataset.trackKind;
               if (!slotId || !file) {
                 return;
               }
-              void loadLocalFiles([file]).then(([track]) => {
+              void loadLocalFiles([file], trackKind ?? "music").then(([track]) => {
                 if (track) {
                   setSlots((currentSlots) =>
                     currentSlots.map((slot) =>

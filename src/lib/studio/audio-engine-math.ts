@@ -68,7 +68,7 @@ export function getStudioTrackGain({
     return 0;
   }
 
-  return Math.min(Math.max(volume, 0), 1);
+  return Math.min(Math.max(volume, 0), 2);
 }
 
 export function getStudioReplacementProjectSize(
