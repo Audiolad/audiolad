@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
-import { createAuthorFinanceExportHandler } from "@/app/api/author/finance/export/route";
-import { createAuthorFinanceSalesDetailHandler } from "@/app/api/author/finance/sales/[id]/route";
-import { createAuthorFinanceSalesListHandler } from "@/app/api/author/finance/sales/route";
+import {
+  createAuthorFinanceExportHandler,
+  createAuthorFinanceSalesDetailHandler,
+  createAuthorFinanceSalesListHandler,
+} from "@/lib/author-finance/route-handlers";
 import { AuthorAccessError } from "@/lib/author-products/auth";
 
 const AUTHOR_A = "b0000000-0000-0000-0000-000000000001";
@@ -44,6 +48,20 @@ function authorized() {
 }
 
 async function main() {
+  const routeModules = [
+    "src/app/api/author/finance/export/route.ts",
+    "src/app/api/author/finance/sales/route.ts",
+    "src/app/api/author/finance/sales/[id]/route.ts",
+  ];
+  for (const routeModule of routeModules) {
+    const source = await readFile(path.join(process.cwd(), routeModule), "utf8");
+    assert.doesNotMatch(
+      source,
+      /export\s+(?:function|const)\s+createAuthorFinance/,
+      `${routeModule} exports only route contract symbols`,
+    );
+  }
+
   const unauthenticated = createAuthorFinanceSalesListHandler({
     requireAccess: async () => {
       throw new AuthorAccessError("unauthorized", 401);
