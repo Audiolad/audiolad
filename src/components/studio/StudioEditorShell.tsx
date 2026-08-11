@@ -69,6 +69,10 @@ const TIMELINE_ACCENTS = ["#a78bfa", "#38bdf8", "#2dd4bf", "#fbbf24", "#34d399"]
 const STUDIO_CLIP_OVERLAP_ERROR =
   "Здесь недостаточно свободного места для вставки фрагмента.";
 
+function isDefaultStudioTrackSlot(slot: StudioTrackSlot): boolean {
+  return slot.id === "slot-voice-1" || slot.id === "slot-music-1";
+}
+
 function formatTime(value: number): string {
   if (!Number.isFinite(value) || value < 0) {
     return "0:00";
@@ -1101,7 +1105,7 @@ export default function StudioEditorShell({
                 <option value="trance">Транс</option>
               </select>
             ) : null}
-            {index >= 2 ? (
+            {!isDefaultStudioTrackSlot(slot) ? (
               <button
                 type="button"
                 disabled={recordingSlotId === slot.id || isArmingRecording || isProcessingRecording}
@@ -1800,7 +1804,7 @@ export default function StudioEditorShell({
                               </button>
                             </>
                           ) : null}
-                          {index >= 2 ? (
+                          {!isDefaultStudioTrackSlot(slot) ? (
                             <button
                               type="button"
                               onClick={() => {

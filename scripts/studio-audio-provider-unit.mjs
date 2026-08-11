@@ -389,6 +389,16 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /\+ Добавить дорожку/);
   assert.match(studioWorkspace, /disabled=\{slots\.length >= MAX_TRACK_SLOTS\}/);
   assert.match(studioWorkspace, /slot-\$\{crypto\.randomUUID\(\)\}/);
+  assert.match(
+    studioWorkspace,
+    /function isDefaultStudioTrackSlot\(slot: StudioTrackSlot\): boolean/,
+  );
+  assert.match(
+    studioWorkspace,
+    /slot\.id === "slot-voice-1" \|\| slot\.id === "slot-music-1"/,
+  );
+  assert.doesNotMatch(studioWorkspace, /index >= 2/);
+  assert.match(studioWorkspace, /!isDefaultStudioTrackSlot\(slot\)[\s\S]*Удалить дорожку/);
   assert.match(studioWorkspace, /disabled=\{!track\}/);
   assert.match(
     studioWorkspace,
@@ -401,7 +411,6 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /toggleTrackMuted/);
   assert.match(studioWorkspace, /Заменить аудио/);
   assert.match(studioWorkspace, /Очистить дорожку/);
-  assert.match(studioWorkspace, /index >= 2/);
   assert.match(studioWorkspace, /saveSlotRename/);
   assert.match(studioWorkspace, /event\.key === "Escape"/);
   assert.doesNotMatch(studioWorkspace, /Пустая универсальная дорожка/);
