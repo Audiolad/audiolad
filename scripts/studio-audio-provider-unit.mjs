@@ -377,8 +377,8 @@ function testStudioBoundariesAndCrossTabStop() {
     /scrollToEnd\(\);[\s\S]*className="h-10 rounded-lg border border-white\/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"/,
   );
   assert.doesNotMatch(studioWorkspace, /Статус движка/);
-  assert.match(studioWorkspace, /MAX_VOICE_TRACKS = 3/);
-  assert.match(studioWorkspace, /MAX_MUSIC_TRACKS = 2/);
+  assert.match(studioWorkspace, /MAX_TRACK_SLOTS = 5/);
+  assert.doesNotMatch(studioWorkspace, /MAX_VOICE_TRACKS|MAX_MUSIC_TRACKS/);
   assert.match(studioWorkspace, /Голос 1/);
   assert.match(studioWorkspace, /Музыка 1/);
   assert.match(studioWorkspace, /"Голос" : "Музыка"/);
@@ -386,6 +386,9 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /currentSlots\.slice\(0, insertAt\)/);
   assert.match(studioWorkspace, /\+ Голос/);
   assert.match(studioWorkspace, /\+ Музыка/);
+  assert.doesNotMatch(studioWorkspace, /\+ Добавить дорожку/);
+  assert.match(studioWorkspace, /disabled=\{slots\.length >= MAX_TRACK_SLOTS\}/);
+  assert.match(studioWorkspace, /slot-\$\{crypto\.randomUUID\(\)\}/);
   assert.match(studioWorkspace, /disabled=\{!track\}/);
   assert.match(
     studioWorkspace,
@@ -395,7 +398,6 @@ function testStudioBoundariesAndCrossTabStop() {
     studioWorkspace,
     /Добавьте аудио, чтобы управлять звуком/,
   );
-  assert.match(studioWorkspace, /В проект можно добавить не более пяти дорожек/);
   assert.match(studioWorkspace, /toggleTrackMuted/);
   assert.match(studioWorkspace, /Заменить аудио/);
   assert.match(studioWorkspace, /Очистить дорожку/);

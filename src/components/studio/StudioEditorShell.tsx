@@ -57,9 +57,7 @@ type StudioTrackSlot = {
   trackKind: StudioTrackKind;
 };
 
-const MAX_VOICE_TRACKS = 3;
-const MAX_MUSIC_TRACKS = 2;
-const MAX_TRACK_SLOTS = MAX_VOICE_TRACKS + MAX_MUSIC_TRACKS;
+const MAX_TRACK_SLOTS = 5;
 const TRACK_ACCENTS = [
   "border-violet-400/70 bg-violet-400/15 text-violet-200",
   "border-sky-400/70 bg-sky-400/15 text-sky-200",
@@ -813,8 +811,7 @@ export default function StudioEditorShell({
   const addSlot = (trackKind: StudioTrackKind) => {
     setSlots((currentSlots) => {
       const sameKind = currentSlots.filter((slot) => slot.trackKind === trackKind).length;
-      const limit = trackKind === "voice" ? MAX_VOICE_TRACKS : MAX_MUSIC_TRACKS;
-      if (currentSlots.length >= MAX_TRACK_SLOTS || sameKind >= limit) {
+      if (currentSlots.length >= MAX_TRACK_SLOTS) {
         return currentSlots;
       }
 
@@ -1654,18 +1651,25 @@ export default function StudioEditorShell({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={slots.filter((slot) => slot.trackKind === "voice").length >= MAX_VOICE_TRACKS}
+              disabled={slots.length >= MAX_TRACK_SLOTS}
               onClick={() => addSlot("voice")}
-              className="h-10 rounded-lg border border-dashed border-violet-300/40 px-3 text-sm font-semibold text-violet-100 disabled:opacity-40"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-dashed border-violet-300/40 px-3 text-sm font-semibold text-violet-100 disabled:opacity-40"
             >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-3 0h6" />
+              </svg>
               + Голос
             </button>
             <button
               type="button"
-              disabled={slots.filter((slot) => slot.trackKind === "music").length >= MAX_MUSIC_TRACKS}
+              disabled={slots.length >= MAX_TRACK_SLOTS}
               onClick={() => addSlot("music")}
-              className="h-10 rounded-lg border border-dashed border-sky-300/40 px-3 text-sm font-semibold text-sky-100 disabled:opacity-40"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-dashed border-sky-300/40 px-3 text-sm font-semibold text-sky-100 disabled:opacity-40"
             >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z" />
+              </svg>
               + Музыка
             </button>
           </div>
@@ -1858,20 +1862,6 @@ export default function StudioEditorShell({
               );
             })}
           </div> : null}
-
-          {slots.length < MAX_TRACK_SLOTS ? (
-            <button
-              type="button"
-              onClick={() => addSlot("voice")}
-              className="mt-3 inline-flex h-11 items-center rounded-lg border border-dashed border-white/25 px-4 text-sm font-semibold text-[#d8c8fb]"
-            >
-              + Добавить дорожку
-            </button>
-          ) : (
-            <p className="mt-3 text-sm text-[#a9b4c7]">
-              В проект можно добавить не более пяти дорожек
-            </p>
-          )}
 
           <input
             ref={addAudioInputRef}
