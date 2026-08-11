@@ -113,6 +113,172 @@ function testPlayRejectionHandling() {
   assert(player.includes("userWantsPlaybackRef.current = false"), "clears playback intent on rejection");
 }
 
+function testAutoplayNotConsumedUntilPlaying() {
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
+  );
+
+  assert(
+    player.includes("autoplayUrlCleanupPendingRef"),
+    "autoplay URL cleanup is gated by a pending flag",
+  );
+  assert(
+    player.includes("autoplayUrlCleanupPendingRef.current = true"),
+    "autoplay marks cleanup pending when play() is issued",
+  );
+  assert(
+    player.includes("autoplayUrlCleanupPendingRef.current = false"),
+    "autoplay clears cleanup pending on reject or success",
+  );
+
+  const playingHandlerStart = player.indexOf("const handlePlaying = () => {");
+  const playingHandlerEnd = player.indexOf(
+    "const handlePause = () => {",
+    playingHandlerStart,
+  );
+  assert(playingHandlerStart >= 0 && playingHandlerEnd > playingHandlerStart, "playing handler exists");
+  const playingHandler = player.slice(playingHandlerStart, playingHandlerEnd);
+  assert(
+    playingHandler.includes("onInitialAutoplayAttemptedRef.current?.()"),
+    "URL cleanup callback runs from playing, not before play()",
+  );
+
+  const canPlayStart = player.indexOf("const handleCanPlay = () => {");
+  const canPlayEnd = player.indexOf("const handleStalled = () => {", canPlayStart);
+  assert(canPlayStart >= 0 && canPlayEnd > canPlayStart, "canplay handler exists");
+  const canPlayHandler = player.slice(canPlayStart, canPlayEnd);
+  assert(
+    !canPlayHandler.includes("onInitialAutoplayAttempted"),
+    "canplay must not strip ?autoplay=1 before play resolves",
+  );
+
+  assert(
+    provider.includes("Called only after confirmed `playing`") ||
+      provider.includes("after confirmed `playing`"),
+    "provider documents deferred autoplay URL sync",
+  );
+}
+
+function testAutoplayBumpDoesNotRemountSameSource() {
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
+  );
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+
+  assert(
+    provider.includes('mode: "autoplay_intent_bump"'),
+    "same-key autoplay bump uses intent mode",
+  );
+  assert(
+    provider.includes("requestAutoplayIntentRef.current?.()"),
+    "autoplay bump calls requestAutoplayIntent on the mounted engine",
+  );
+  assert(
+    provider.includes("Autoplay-only bump: keep the mounted engine"),
+    "documents no remount for autoplay-only bump",
+  );
+  assert(
+    player.includes("const requestAutoplayIntent = useCallback"),
+    "engine exposes requestAutoplayIntent",
+  );
+  assert(
+    player.includes("requestAutoplayIntent,"),
+    "requestAutoplayIntent is returned from the engine API",
+  );
+}
+
+function testInitialAutoplayDefersResumeSeek() {
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+
+  assert(
+    player.includes("deferResumeSeekForInitialAutoplayRef"),
+    "resume seek deferral flag exists",
+  );
+  assert(
+    player.includes("deferResumeSeekForInitialAutoplayRef.current"),
+    "applyStartPosition respects deferral during initial autoplay",
+  );
+
+  const applyStart = player.indexOf("const applyStartPosition = () => {");
+  const applyEnd = player.indexOf("const updateDuration = () => {", applyStart);
+  assert(applyStart >= 0 && applyEnd > applyStart, "applyStartPosition exists");
+  const applyBody = player.slice(applyStart, applyEnd);
+  assert(
+    applyBody.includes("deferResumeSeekForInitialAutoplayRef.current"),
+    "applyStartPosition returns early while deferral is armed",
+  );
+
+  const playingHandlerStart = player.indexOf("const handlePlaying = () => {");
+  const playingHandlerEnd = player.indexOf(
+    "const handlePause = () => {",
+    playingHandlerStart,
+  );
+  const playingHandler = player.slice(playingHandlerStart, playingHandlerEnd);
+  assert(
+    playingHandler.includes("deferResumeSeekForInitialAutoplayRef.current = false"),
+    "playing clears deferral and applies resume seek",
+  );
+  assert(
+    playingHandler.includes("applyStartPosition()"),
+    "playing applies deferred resume seek after first playback",
+  );
+}
+
+function testForegroundRecoverySkipsInitialBuffering() {
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+
+  assert(
+    player.includes("initialPlaybackBufferingRef"),
+    "initial buffering guard exists",
+  );
+  assert(
+    player.includes('skip-initial-buffering'),
+    "recovery skips while initial buffering is armed",
+  );
+  assert(
+    player.includes('skip-buffering'),
+    "recovery skips when play is accepted but buffer is still filling",
+  );
+  assert(
+    player.includes("HAVE_FUTURE_DATA"),
+    "recovery uses readyState to detect normal buffering",
+  );
+}
+
+function testProductCtaPreservesSharedAudioGesture() {
+  const cta = readSource(
+    "src/components/products/practice-page/PracticeListenCtaLink.tsx",
+  );
+  const parts = readSource(
+    "src/components/products/practice-page/PracticePageParts.tsx",
+  );
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
+  );
+
+  assert(
+    provider.includes("prepareSharedAudioGesture"),
+    "provider exposes shared-audio gesture unlock",
+  );
+  assert(
+    cta.includes("prepareSharedAudioGesture"),
+    "product listen CTA calls gesture unlock on click",
+  );
+  assert(
+    cta.includes("useGlobalAudioPlayer"),
+    "CTA uses the shared Global Player context",
+  );
+  assert(
+    !/\n\s*<audio[\s>]/.test(cta) && !cta.includes("document.createElement(\"audio\")"),
+    "CTA does not create a second audio element",
+  );
+  assert(
+    parts.includes("PracticeListenCtaLink"),
+    "practice primary listen action uses the gesture-aware CTA",
+  );
+}
+
 function testSignedUrlRaceHandling() {
   const player = readSource("src/components/audio/useSequentialPlayer.ts");
   const provider = readSource(
@@ -162,6 +328,11 @@ function main() {
   testStartOverFromClick();
   testPlayRejectionHandling();
   testSignedUrlRaceHandling();
+  testAutoplayNotConsumedUntilPlaying();
+  testAutoplayBumpDoesNotRemountSameSource();
+  testInitialAutoplayDefersResumeSeek();
+  testForegroundRecoverySkipsInitialBuffering();
+  testProductCtaPreservesSharedAudioGesture();
   console.log("listen-autoplay-unit: ok");
 }
 

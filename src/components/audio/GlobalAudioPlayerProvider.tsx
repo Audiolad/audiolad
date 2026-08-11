@@ -72,6 +72,11 @@ type SessionContextValue = {
   loadSession: (input: LoadSessionInput) => void;
   stopAndClear: () => void;
   openFullPlayer: () => void;
+  /**
+   * Best-effort iOS/WebKit unlock of the shared <audio> element inside a
+   * user gesture (product CTA). Does not create a second media element.
+   */
+  prepareSharedAudioGesture: () => void;
   showMiniPlayer: boolean;
   desktopPlayerRestoreState: DesktopPlayerRestoreState;
   activeQueue: PlaylistQueue | null;
@@ -109,6 +114,7 @@ function GlobalPlayerEngine({
   sessionGenerationRef,
   stopEngineRef,
   persistentAudioRef,
+  requestAutoplayIntentRef,
   queueHasNext,
   queueHasPrevious,
   skipAutoplayUrlSync,
@@ -121,6 +127,7 @@ function GlobalPlayerEngine({
   sessionGenerationRef: MutableRefObject<number>;
   stopEngineRef: MutableRefObject<(() => void) | null>;
   persistentAudioRef: MutableRefObject<HTMLAudioElement | null>;
+  requestAutoplayIntentRef: MutableRefObject<(() => void) | null>;
   queueHasNext: boolean;
   queueHasPrevious: boolean;
   /** Queue path already called router.replace — avoid a duplicate replace. */
@@ -139,6 +146,7 @@ function GlobalPlayerEngine({
     : null;
   const privateSession = isPrivateAudioSession(session) ? session : null;
 
+  // Called only after confirmed `playing` so ?autoplay=1 survives rejected play().
   const handleInitialAutoplayAttempted = useCallback(() => {
     if (
       !catalogSession ||
@@ -208,15 +216,27 @@ function GlobalPlayerEngine({
     displayDuration,
     playbackRate,
     recoverPlaybackAfterForeground,
+    requestAutoplayIntent,
     handleMediaSessionPlay,
     handleMediaSessionPause,
     ...playerControls
   } = engine;
 
+  useEffect(() => {
+    requestAutoplayIntentRef.current = requestAutoplayIntent;
+
+    return () => {
+      if (requestAutoplayIntentRef.current === requestAutoplayIntent) {
+        requestAutoplayIntentRef.current = null;
+      }
+    };
+  }, [requestAutoplayIntent, requestAutoplayIntentRef]);
+
   const playerContextValue = {
     ...playerControls,
     audioRef,
     src: engine.src,
+    requestAutoplayIntent,
     currentTrack,
     isPlaying,
     isRecovering,
@@ -464,6 +484,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const [sessionGeneration, setSessionGeneration] = useState(0);
   const sessionGenerationRef = useRef(0);
   const stopEngineRef = useRef<(() => void) | null>(null);
+  const requestAutoplayIntentRef = useRef<(() => void) | null>(null);
   /** Survives engine remounts so iOS keeps the unlocked media element. */
   const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
   const sessionRef = useRef<LoadSessionInput | null>(null);
@@ -527,6 +548,32 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       if (!trackSelectionChanged && !autoplayBump) {
         // Same session key, no material change — bail without setState to avoid
         // ListenPageClient effect loops (new object identity every call).
+        return;
+      }
+
+      // Autoplay-only bump: keep the mounted engine and shared media element.
+      // Remount + audio.load() on iOS drops user activation and restarts buffer.
+      if (autoplayBump && !trackSelectionChanged) {
+        const merged: LoadSessionInput = {
+          ...current,
+          ...nextSession,
+        };
+        sessionRef.current = merged;
+        setSession(merged);
+
+        queueMicrotask(() => {
+          requestAutoplayIntentRef.current?.();
+        });
+
+        if (process.env.NODE_ENV !== "production") {
+          console.info("private_audio_session_switch", {
+            from: currentKey,
+            to: inputKey,
+            generation: sessionGenerationRef.current,
+            mode: "autoplay_intent_bump",
+          });
+        }
+
         return;
       }
 
@@ -718,6 +765,39 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     },
     [],
   );
+
+  const prepareSharedAudioGesture = useCallback(() => {
+    const audio = persistentAudioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    // Warm the shared element inside the user gesture. Keep any existing src;
+    // do not create a second <audio>.
+    const wasMuted = audio.muted;
+
+    try {
+      audio.muted = true;
+      const playAttempt = audio.play();
+
+      if (playAttempt && typeof playAttempt.then === "function") {
+        void playAttempt
+          .then(() => {
+            audio.pause();
+            audio.muted = wasMuted;
+          })
+          .catch(() => {
+            audio.muted = wasMuted;
+          });
+        return;
+      }
+
+      audio.muted = wasMuted;
+    } catch {
+      audio.muted = wasMuted;
+    }
+  }, []);
 
   const openFullPlayer = useCallback(() => {
     if (!session) {
@@ -1245,6 +1325,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       loadSession,
       stopAndClear,
       openFullPlayer,
+      prepareSharedAudioGesture,
       showMiniPlayer,
       desktopPlayerRestoreState,
       activeQueue,
@@ -1274,6 +1355,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       loadSession,
       noticeMessage,
       openFullPlayer,
+      prepareSharedAudioGesture,
       queueCompleted,
       restartPlaylistQueue,
       returnToPlaylistSource,
@@ -1300,6 +1382,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           sessionGenerationRef={sessionGenerationRef}
           stopEngineRef={stopEngineRef}
           persistentAudioRef={persistentAudioRef}
+          requestAutoplayIntentRef={requestAutoplayIntentRef}
           queueHasNext={queueHasNext}
           queueHasPrevious={queueHasPrevious}
           skipAutoplayUrlSync={Boolean(activeQueue)}

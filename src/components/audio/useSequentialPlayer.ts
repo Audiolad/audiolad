@@ -78,6 +78,7 @@ type UseSequentialPlayerOptions = {
   queueHasNext?: boolean;
   /** When true, Previous can leave the first track for the prior queue entry. */
   queueHasPrevious?: boolean;
+  /** Invoked only after confirmed `playing` for the initial autoplay attempt. */
   onInitialAutoplayAttempted?: () => void;
   /**
    * Called when the last track ends or Next is pressed on the last track.
@@ -147,6 +148,12 @@ export function useSequentialPlayer({
   const wasPlayingBeforeSwitchRef = useRef(false);
   const initialAutoplayPendingRef = useRef(requestInitialAutoplay);
   const initialAutoplayAttemptedRef = useRef(false);
+  /** True after autoplay play() was issued; URL cleanup runs only on `playing`. */
+  const autoplayUrlCleanupPendingRef = useRef(false);
+  /** Defer resume seek until after the first successful autoplay `playing`. */
+  const deferResumeSeekForInitialAutoplayRef = useRef(false);
+  /** Guards foreground recovery from interrupting normal initial buffering. */
+  const initialPlaybackBufferingRef = useRef(false);
   const userWantsPlaybackRef = useRef(false);
   const userInitiatedPauseRef = useRef(false);
   const lastRecoveryAttemptRef = useRef(0);
@@ -155,6 +162,7 @@ export function useSequentialPlayer({
   const recoveryAttemptIdRef = useRef(0);
   const resumePositionRef = useRef(0);
   const isPlayingRef = useRef(false);
+  const onInitialAutoplayAttemptedRef = useRef(onInitialAutoplayAttempted);
   const getSessionGenerationRef = useRef(getSessionGeneration);
   const onTracksExhaustedRef = useRef(onTracksExhausted);
   const onRequestPreviousProductRef = useRef(onRequestPreviousProduct);
@@ -258,10 +266,17 @@ export function useSequentialPlayer({
   }, []);
 
   useEffect(() => {
+    onInitialAutoplayAttemptedRef.current = onInitialAutoplayAttempted;
+  }, [onInitialAutoplayAttempted]);
+
+  useEffect(() => {
     if (requestInitialAutoplay && !initialAutoplayAttemptedRef.current) {
       initialAutoplayPendingRef.current = true;
+      if (pendingStartPosition > 0) {
+        deferResumeSeekForInitialAutoplayRef.current = true;
+      }
     }
-  }, [requestInitialAutoplay]);
+  }, [pendingStartPosition, requestInitialAutoplay]);
 
   useEffect(() => {
     progressRef.current = progress;
@@ -761,6 +776,12 @@ export function useSequentialPlayer({
         return;
       }
 
+      // iOS/WebKit: seeking at HAVE_METADATA before the first autoplay play()
+      // often leaves the element stuck in `waiting`. Apply resume after playing.
+      if (deferResumeSeekForInitialAutoplayRef.current) {
+        return;
+      }
+
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
         audio.currentTime = clamp(pendingStartPosition, 0, audio.duration);
         setCurrentTime(audio.currentTime);
@@ -810,6 +831,19 @@ export function useSequentialPlayer({
       setStatusMessage("");
       setAutoplayHint(null);
       recoveryUrlAttemptedRef.current = false;
+      initialPlaybackBufferingRef.current = false;
+
+      if (deferResumeSeekForInitialAutoplayRef.current) {
+        deferResumeSeekForInitialAutoplayRef.current = false;
+        applyStartPosition();
+      }
+
+      // Strip ?autoplay=1 only after confirmed playback — not before play().
+      if (autoplayUrlCleanupPendingRef.current) {
+        autoplayUrlCleanupPendingRef.current = false;
+        onInitialAutoplayAttemptedRef.current?.();
+      }
+
       debugSnapshot("audio-event", "playing");
     };
 
@@ -845,28 +879,39 @@ export function useSequentialPlayer({
         setStatusMessage("");
       }
 
+      const willInitialAutoplay =
+        !wasPlayingBeforeSwitchRef.current &&
+        initialAutoplayPendingRef.current &&
+        !initialAutoplayAttemptedRef.current;
+
+      if (willInitialAutoplay && pendingStartPosition > 0) {
+        deferResumeSeekForInitialAutoplayRef.current = true;
+      }
+
       applyStartPosition();
 
       if (wasPlayingBeforeSwitchRef.current) {
         wasPlayingBeforeSwitchRef.current = false;
+        userWantsPlaybackRef.current = true;
+        initialPlaybackBufferingRef.current = true;
         void audio.play().catch(() => {
           if (!isHandlerCurrent()) {
             return;
           }
 
+          initialPlaybackBufferingRef.current = false;
           setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
         });
         return;
       }
 
-      if (
-        initialAutoplayPendingRef.current &&
-        !initialAutoplayAttemptedRef.current
-      ) {
+      if (willInitialAutoplay) {
         initialAutoplayPendingRef.current = false;
         initialAutoplayAttemptedRef.current = true;
-        onInitialAutoplayAttempted?.();
+        // Keep ?autoplay=1 until `playing` confirms success.
+        autoplayUrlCleanupPendingRef.current = true;
         userWantsPlaybackRef.current = true;
+        initialPlaybackBufferingRef.current = true;
 
         void audio.play().catch((error: unknown) => {
           if (!isHandlerCurrent()) {
@@ -878,7 +923,12 @@ export function useSequentialPlayer({
               ? String((error as { name?: string }).name)
               : "unknown";
           debugSnapshot("autoplay", `blocked:${name}`);
+          autoplayUrlCleanupPendingRef.current = false;
+          initialPlaybackBufferingRef.current = false;
+          deferResumeSeekForInitialAutoplayRef.current = false;
           userWantsPlaybackRef.current = false;
+          // Intent was not successfully consumed — allow a later gesture retry
+          // via requestAutoplayIntent / manual Play, not a canplay loop.
           setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
         });
       }
@@ -1008,7 +1058,6 @@ export function useSequentialPlayer({
     tracks.length,
     saveProgress,
     src,
-    onInitialAutoplayAttempted,
     debugSnapshot,
     setPlayingState,
   ]);
@@ -1135,6 +1184,7 @@ export function useSequentialPlayer({
 
     if (!audio.paused) {
       userWantsPlaybackRef.current = false;
+      initialPlaybackBufferingRef.current = false;
       userInitiatedPauseRef.current = true;
       audio.pause();
       userInitiatedPauseRef.current = false;
@@ -1144,17 +1194,68 @@ export function useSequentialPlayer({
 
     userWantsPlaybackRef.current = true;
     recoveryUrlAttemptedRef.current = false;
+    initialPlaybackBufferingRef.current = true;
 
     try {
       await audio.play();
       setPlayerError(null);
       setAutoplayHint(null);
     } catch {
+      initialPlaybackBufferingRef.current = false;
       userWantsPlaybackRef.current = false;
       setPlayingState(false);
       setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
     }
   };
+
+  /**
+   * Re-arm autoplay on an already-mounted engine (same track/src) without
+   * remounting or calling audio.load() again.
+   */
+  const requestAutoplayIntent = useCallback(() => {
+    if (isPlayingRef.current) {
+      return;
+    }
+
+    initialAutoplayPendingRef.current = true;
+    initialAutoplayAttemptedRef.current = false;
+    autoplayUrlCleanupPendingRef.current = false;
+    setAutoplayHint(null);
+
+    if (pendingStartPosition > 0) {
+      deferResumeSeekForInitialAutoplayRef.current = true;
+    }
+
+    const audio = audioRef.current;
+
+    if (
+      !audio ||
+      (!audio.getAttribute("src") && !audio.currentSrc) ||
+      audio.readyState < HTMLMediaElement.HAVE_METADATA
+    ) {
+      // canplay handler will pick up initialAutoplayPendingRef.
+      return;
+    }
+
+    initialAutoplayPendingRef.current = false;
+    initialAutoplayAttemptedRef.current = true;
+    autoplayUrlCleanupPendingRef.current = true;
+    userWantsPlaybackRef.current = true;
+    initialPlaybackBufferingRef.current = true;
+
+    void audio.play().catch((error: unknown) => {
+      const name =
+        error && typeof error === "object" && "name" in error
+          ? String((error as { name?: string }).name)
+          : "unknown";
+      debugSnapshot("autoplay-intent", `blocked:${name}`);
+      autoplayUrlCleanupPendingRef.current = false;
+      initialPlaybackBufferingRef.current = false;
+      deferResumeSeekForInitialAutoplayRef.current = false;
+      userWantsPlaybackRef.current = false;
+      setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+    });
+  }, [audioRef, debugSnapshot, pendingStartPosition]);
 
   const handleSeekOffset = (offsetSeconds: number) => {
     const audio = audioRef.current;
@@ -1389,6 +1490,10 @@ export function useSequentialPlayer({
     recoveryUrlAttemptedRef.current = false;
     userWantsPlaybackRef.current = false;
     initialAutoplayPendingRef.current = false;
+    initialAutoplayAttemptedRef.current = false;
+    autoplayUrlCleanupPendingRef.current = false;
+    deferResumeSeekForInitialAutoplayRef.current = false;
+    initialPlaybackBufferingRef.current = false;
     wasPlayingBeforeSwitchRef.current = false;
     urlRequestRef.current += 1;
     urlAbortRef.current?.abort();
@@ -1442,6 +1547,12 @@ export function useSequentialPlayer({
       return false;
     }
 
+    // Normal initial buffering after play()/autoplay — not a stalled session.
+    if (initialPlaybackBufferingRef.current) {
+      debugSnapshot("foreground-recovery", "skip-initial-buffering");
+      return false;
+    }
+
     if (recoveryPromiseRef.current) {
       return recoveryPromiseRef.current;
     }
@@ -1459,6 +1570,15 @@ export function useSequentialPlayer({
         attemptId !== recoveryAttemptIdRef.current ||
         generationAtStart !== (getSessionGenerationRef.current?.() ?? 0)
       ) {
+        return false;
+      }
+
+      // Element is mid-buffer after an accepted play() — do not pause/reload.
+      if (
+        !audio.paused &&
+        audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+      ) {
+        debugSnapshot("foreground-recovery", "skip-buffering");
         return false;
       }
 
@@ -1782,6 +1902,7 @@ export function useSequentialPlayer({
     performStopAndClear,
     handleMediaSessionPlay,
     handleMediaSessionPause,
+    requestAutoplayIntent,
     userWantsPlaybackRef,
   };
 }

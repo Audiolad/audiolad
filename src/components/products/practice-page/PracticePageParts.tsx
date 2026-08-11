@@ -7,6 +7,7 @@ import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 
+import PracticeListenCtaLink from "./PracticeListenCtaLink";
 import PublishPreviewBanner from "./PublishPreviewBanner";
 import type { PracticePageCoverData, PracticePageViewModel } from "./types";
 
@@ -319,7 +320,7 @@ export function PracticePrimaryActionSection({
   return (
     <section className={className}>
       {presentation.primaryAction.kind === "listen" ? (
-        <Link
+        <PracticeListenCtaLink
           href={presentation.primaryAction.href}
           className="flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]"
         >
@@ -327,7 +328,7 @@ export function PracticePrimaryActionSection({
             <PlayIcon />
           </span>
           {presentation.primaryAction.label}
-        </Link>
+        </PracticeListenCtaLink>
       ) : presentation.primaryAction.kind === "buy" ? (
         presentation.primaryAction.disabled ? (
           <button

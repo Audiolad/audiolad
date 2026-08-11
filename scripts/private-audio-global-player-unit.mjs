@@ -67,6 +67,10 @@ function testProviderAndUi() {
       provider.includes("Same session key, no material change"),
     "same-key bailout prevents loops",
   );
+  assert(
+    provider.includes('mode: "autoplay_intent_bump"'),
+    "autoplay-only same-key bump does not remount the engine",
+  );
 
   const listenPage = read("src/components/audio/ListenPageClient.tsx");
   assert(
