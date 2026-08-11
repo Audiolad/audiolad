@@ -121,7 +121,7 @@ function testVoicePresetContract() {
   ]);
   assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.focus.reverb, {
     dryGain: 1,
-    wetGain: 0.02,
+    wetGain: 0.015,
     wetHighPassFrequency: 160,
     wetLowPassFrequency: 6500,
     impulseDurationSeconds: 0.25,

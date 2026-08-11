@@ -46,7 +46,7 @@ export const STUDIO_VOICE_PRESET_CONFIG: Record<
     ],
     reverb: {
       dryGain: 1,
-      wetGain: 0.02,
+      wetGain: 0.015,
       wetHighPassFrequency: 160,
       wetLowPassFrequency: 6500,
       impulseDurationSeconds: 0.25,
