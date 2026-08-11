@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { StudioVoicePreset } from "../voice-preset-dsp";
+
 export const STUDIO_SCHEMA_VERSION = 2 as const;
 export const STUDIO_TECHNICAL_VERSION = 1 as const;
 export const STUDIO_ASSETS_BUCKET = "studio-draft-assets" as const;
@@ -41,7 +43,7 @@ export type StudioTrackV2 = {
   volume: number;
   muted: boolean;
   trackKind?: "voice" | "music";
-  voicePreset?: "clean" | "warm" | "deep" | "space";
+  voicePreset?: StudioVoicePreset;
   clips: StudioClipV2[];
 };
 

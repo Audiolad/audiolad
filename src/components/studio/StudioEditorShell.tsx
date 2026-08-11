@@ -24,6 +24,12 @@ import {
   type StudioClip,
 } from "@/lib/studio/clip-math";
 import {
+  getStudioMusicVolumeDb,
+  getStudioMusicVolumeFromDb,
+  STUDIO_MUSIC_VOLUME_MAX_DB,
+  STUDIO_MUSIC_VOLUME_MIN_DB,
+} from "@/lib/studio/audio-engine-math";
+import {
   createStudioClipClipboard,
   createStudioEditingSnapshot,
   createStudioHistory,
@@ -840,6 +846,10 @@ export default function StudioEditorShell({
       return null;
     }
     const accent = TRACK_ACCENTS[index % TRACK_ACCENTS.length];
+    const musicVolumeDb = getStudioMusicVolumeDb(track?.volume ?? 1);
+    const displayedVolume = trackKind === "music"
+      ? `${Math.round(musicVolumeDb)} dB`
+      : `${Math.round((track?.volume ?? 1) * 100)}%`;
 
     return (
       <div className="flex gap-3 py-1 lg:min-h-0">
@@ -945,22 +955,29 @@ export default function StudioEditorShell({
               <input
                 aria-label={`Громкость ${slot.name}`}
                 type="range"
-                min="0"
-                max={trackKind === "voice" ? "400" : "200"}
-                value={Math.round((track?.volume ?? 1) * 100)}
+                min={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MIN_DB : "0"}
+                max={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MAX_DB : "400"}
+                value={trackKind === "music"
+                  ? Math.round(musicVolumeDb)
+                  : Math.round((track?.volume ?? 1) * 100)}
                 disabled={!track}
-                onChange={(event) =>
-                  track && (setTrackVolume(track.id, Number(event.target.value) / 100), markSavedChange())
-                }
+                onChange={(event) => {
+                  if (!track) return;
+                  const nextVolume = trackKind === "music"
+                    ? getStudioMusicVolumeFromDb(Number(event.target.value))
+                    : Number(event.target.value) / 100;
+                  setTrackVolume(track.id, nextVolume);
+                  markSavedChange();
+                }}
                 title={
                   track
-                    ? `Громкость: ${Math.round(track.volume * 100)}%`
+                    ? `Громкость: ${displayedVolume}`
                     : "Добавьте аудио, чтобы регулировать громкость"
                 }
                 className="min-w-20 flex-1 accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
               />
               <span className="text-[10px] text-[#9ba7bb]">
-                {Math.round((track?.volume ?? 1) * 100)}%
+                {displayedVolume}
               </span>
             </div>
           </div>
@@ -1081,10 +1098,10 @@ export default function StudioEditorShell({
                 }}
                 className="rounded border border-white/15 bg-[#1c2433] px-2 py-1 text-xs text-white"
               >
-                <option value="clean">Чистый</option>
-                <option value="warm">Тёплый</option>
-                <option value="deep">Глубокий</option>
-                <option value="space">Пространство</option>
+                <option value="none">Без эффекта</option>
+                <option value="focus">Фокус</option>
+                <option value="depth">Глубина</option>
+                <option value="trance">Транс</option>
               </select>
             ) : null}
             {index >= 2 ? (

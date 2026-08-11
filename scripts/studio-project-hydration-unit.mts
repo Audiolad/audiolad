@@ -27,6 +27,7 @@ const project = {
     slots: [{ id: "slot-1", name: "Голос", audioTrackId: "track-1" }],
     tracks: [{
       id: "track-1", assetId, name: "Голос", volume: 0.6, muted: true,
+      voicePreset: "space",
       clips: [
         { id: "clip-1", startTime: 3, offset: 1, duration: 2, fadeInDuration: 0.2, fadeOutDuration: 0.4 },
         { id: "clip-2", startTime: 9, offset: 4, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
@@ -57,6 +58,7 @@ assert.equal(decodes, 1);
 assert.equal(result.assets.get(assetId)?.file.type, "audio/webm");
 assert.equal(result.assets.get(assetId)?.metadata.sourceType, "recording");
 assert.equal(result.state.currentTime, 42);
+assert.equal(result.state.tracks[0].voicePreset, "trance");
 assert.deepEqual(result.state.tracks[0].clips.map((clip) => clip.startTime), [3, 9]);
 assert.equal(result.assets.get(assetId)?.buffer, result.assets.get(assetId)?.buffer);
 

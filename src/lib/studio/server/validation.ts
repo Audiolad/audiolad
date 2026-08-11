@@ -7,6 +7,7 @@ import {
   type StudioProjectDataV2,
 } from "./model";
 import { normalizeStudioMimeType } from "../recording-mime";
+import { parseStudioVoicePreset } from "../voice-preset-dsp";
 
 export class StudioApiError extends Error {
   constructor(
@@ -151,6 +152,9 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
   const clipIds = new Set<string>();
   const assetIds = new Set<string>();
   for (const track of value.tracks) {
+    const voicePreset = track && isRecord(track)
+      ? (track.voicePreset === undefined ? "none" : parseStudioVoicePreset(track.voicePreset))
+      : null;
     if (
       !isRecord(track) ||
       !hasOnlyKeys(track, ["id", "assetId", "name", "volume", "muted", "trackKind", "voicePreset", "clips"]) ||
@@ -164,7 +168,7 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
       track.volume > 4 ||
       typeof track.muted !== "boolean" ||
       (track.trackKind !== undefined && track.trackKind !== "voice" && track.trackKind !== "music") ||
-      (track.voicePreset !== undefined && !["clean", "warm", "deep", "space"].includes(track.voicePreset as string)) ||
+      voicePreset === null ||
       !Array.isArray(track.clips)
     ) {
       throw new StudioApiError("invalid_track", 422);
@@ -219,7 +223,15 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
     }
   }
 
-  return value as StudioProjectDataV2;
+  return {
+    ...value,
+    tracks: value.tracks.map((track) => ({
+      ...track,
+      voicePreset: parseStudioVoicePreset(
+        (track as Record<string, unknown>).voicePreset,
+      ) ?? "none",
+    })),
+  } as StudioProjectDataV2;
 }
 
 export function sanitizeStudioFilename(value: unknown): string {

@@ -23,6 +23,8 @@ const initial = createStudioEditingSnapshot({
     fileSize: 42,
     volume: 0.75,
     muted: false,
+    trackKind: "voice",
+    voicePreset: "depth",
     clips: [{
       id: "clip-a",
       startTime: 2,
@@ -36,8 +38,10 @@ const initial = createStudioEditingSnapshot({
 
 const history = createStudioHistory(initial);
 initial.tracks[0].clips[0].startTime = 99;
+initial.tracks[0].voicePreset = "trance";
 initial.slots[0].audioTrackId = null;
 assert.equal(history.past[0].tracks[0].clips[0].startTime, 2);
+assert.equal(history.past[0].tracks[0].voicePreset, "depth");
 assert.equal(history.past[0].slots[0].audioTrackId, "track-a");
 assert.equal(history.past[0].selectedClipId, "clip-a");
 

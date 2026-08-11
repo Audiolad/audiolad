@@ -42,6 +42,7 @@ const validProjectData = {
     name: "Голос",
     volume: 1,
     muted: false,
+    voicePreset: "none",
     clips: [
       {
         id: "clip-1",
@@ -70,6 +71,13 @@ assert.deepEqual(
     tracks: [{ ...validProjectData.tracks[0], volume: 4 }],
   }).tracks[0]?.volume,
   4,
+);
+assert.equal(
+  parseStudioProjectData({
+    ...validProjectData,
+    tracks: [{ ...validProjectData.tracks[0], voicePreset: "warm" }],
+  }).tracks[0]?.voicePreset,
+  "focus",
 );
 assert.throws(
   () => parseStudioProjectData({

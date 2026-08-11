@@ -9,11 +9,19 @@ import {
   clampStudioAudioPosition,
   getStudioAudioPlaybackPosition,
   getStudioAudioRelativeSeekPosition,
+  getStudioMusicVolumeDb,
+  getStudioMusicVolumeFromDb,
   getStudioProjectDuration,
   getStudioReplacementProjectSize,
   getStudioTrackGain,
+  STUDIO_MUSIC_VOLUME_MAX_DB,
+  STUDIO_MUSIC_VOLUME_MIN_DB,
 } from "../src/lib/studio/audio-engine-math.ts";
 import { validateStudioLocalFile } from "../src/lib/studio/local-file-validation.ts";
+import {
+  parseStudioVoicePreset,
+  STUDIO_VOICE_PRESET_CONFIG,
+} from "../src/lib/studio/voice-preset-dsp.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -68,7 +76,91 @@ function testPositionMath() {
   assert.equal(getStudioTrackGain({ volume: 2, muted: false }), 2);
   assert.equal(getStudioTrackGain({ volume: 4, muted: false }), 4);
   assert.equal(getStudioTrackGain({ volume: 5, muted: false }), 4);
+  assert.equal(STUDIO_MUSIC_VOLUME_MIN_DB, -48);
+  assert.equal(STUDIO_MUSIC_VOLUME_MAX_DB, 12);
+  assert.equal(getStudioMusicVolumeDb(0), -48);
+  assert.equal(getStudioMusicVolumeDb(1), 0);
+  assert.equal(getStudioMusicVolumeDb(4), 12);
+  assert.equal(getStudioMusicVolumeFromDb(-48), 0);
+  assert.equal(getStudioMusicVolumeFromDb(0), 1);
+  assert.equal(getStudioMusicVolumeFromDb(12), 4);
+  for (const decibels of [-24, -12, -6, 6.02]) {
+    assert.ok(
+      Math.abs(getStudioMusicVolumeDb(Math.pow(10, decibels / 20)) - decibels) < 1e-9,
+    );
+  }
+  assert.equal(getStudioMusicVolumeDb(Math.pow(10, 12.04 / 20)), 12);
   assert.equal(getStudioReplacementProjectSize(600, 150, 200), 650);
+}
+
+function testVoicePresetContract() {
+  const dsp = readSource("src/lib/studio/voice-preset-dsp.ts");
+  assert.deepEqual(Object.keys(STUDIO_VOICE_PRESET_CONFIG), [
+    "none",
+    "focus",
+    "depth",
+    "trance",
+  ]);
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.none, { filters: [], reverb: null });
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.focus.filters, [
+    { type: "highpass", frequency: 75, q: 1 },
+    { type: "peaking", frequency: 180, gain: 0.75, q: 0.7 },
+    { type: "peaking", frequency: 2800, gain: 1.75, q: 0.8 },
+  ]);
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.depth.filters, [
+    { type: "highpass", frequency: 65, q: 1 },
+    { type: "lowshelf", frequency: 140, gain: 3.5, q: 1 },
+    { type: "peaking", frequency: 300, gain: 1.75, q: 0.9 },
+    { type: "highshelf", frequency: 5000, gain: -1.5, q: 1 },
+  ]);
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.trance.filters, [
+    { type: "highpass", frequency: 58, q: 1 },
+    { type: "lowshelf", frequency: 125, gain: 4.5, q: 1 },
+    { type: "peaking", frequency: 270, gain: 2.5, q: 0.9 },
+    { type: "highshelf", frequency: 4500, gain: -2.5, q: 1 },
+  ]);
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.focus.reverb, {
+    dryGain: 1,
+    wetGain: 0.06,
+    wetHighPassFrequency: 160,
+    wetLowPassFrequency: 6500,
+    impulseDurationSeconds: 0.35,
+    impulseDecaySeconds: 0.18,
+    leftSeed: 0x6d2b79f5,
+    rightSeed: 0x1b873593,
+    normalize: false,
+  });
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.depth.reverb, {
+    dryGain: 1,
+    wetGain: 0.14,
+    wetHighPassFrequency: 150,
+    wetLowPassFrequency: 5500,
+    impulseDurationSeconds: 0.8,
+    impulseDecaySeconds: 0.45,
+    leftSeed: 0x9e3779b9,
+    rightSeed: 0x85ebca6b,
+    normalize: false,
+  });
+  assert.deepEqual(STUDIO_VOICE_PRESET_CONFIG.trance.reverb, {
+    dryGain: 1,
+    wetGain: 0.25,
+    wetHighPassFrequency: 130,
+    wetLowPassFrequency: 4800,
+    impulseDurationSeconds: 1.6,
+    impulseDecaySeconds: 1,
+    leftSeed: 0xc2b2ae35,
+    rightSeed: 0x27d4eb2f,
+    normalize: false,
+  });
+  assert.equal(parseStudioVoicePreset("clean"), "none");
+  assert.equal(parseStudioVoicePreset("warm"), "focus");
+  assert.equal(parseStudioVoicePreset("deep"), "depth");
+  assert.equal(parseStudioVoicePreset("space"), "trance");
+  assert.equal(parseStudioVoicePreset("invalid"), null);
+  assert.match(dsp, /new WeakMap<AudioContext, Map<string, AudioBuffer>>/);
+  assert.match(dsp, /leftSeed: 0xc2b2ae35/);
+  assert.match(dsp, /rightSeed: 0x27d4eb2f/);
+  assert.doesNotMatch(dsp, /createDelay\(|DynamicsCompressorNode/);
 }
 
 function testLocalFileValidation() {
@@ -136,13 +228,14 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /fxInput\.connect\(outputGain\)/);
   assert.match(provider, /setTrackVoicePreset/);
   assert.match(provider, /STUDIO_VOICE_PRESET_CONFIG/);
-  assert.match(provider, /lowShelf: \{ frequency: 200, gain: 3 \}/);
-  assert.match(provider, /lowShelf: \{ frequency: 135, gain: 4 \}/);
-  assert.match(provider, /lowMid: \{ frequency: 300, gain: 2 \}/);
-  assert.match(provider, /delaySeconds: 0\.14/);
-  assert.match(provider, /wetGain: 0\.22/);
-  assert.match(provider, /feedbackGain: 0\.14/);
-  assert.match(provider, /wetHighShelf/);
+  assert.match(provider, /getStudioVoicePresetImpulse/);
+  assert.match(provider, /filter\.Q\.value = config\.q/);
+  assert.match(provider, /context\.createConvolver\(\)/);
+  assert.match(provider, /convolver\.normalize = reverb\.normalize/);
+  assert.match(provider, /convolver\.buffer = getStudioVoicePresetImpulse\(context, preset\)/);
+  assert.doesNotMatch(provider, /createDelay\(|feedbackGain|delaySeconds|DynamicsCompressor/);
+  assert.match(provider, /STUDIO_FX_CROSSFADE_SECONDS/);
+  assert.match(provider, /fxCleanupTimers/);
   assert.match(provider, /track\.trackKind !== "voice"/);
   assert.match(provider, /toggleTrackMuted/);
   assert.match(provider, /getTrackBuffer/);
@@ -209,7 +302,8 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   const coordination = readSource("src/lib/audio/studio-audio-coordination.ts");
 
-  assert.match(studioWorkspace, /max=\{trackKind === "voice" \? "400" : "200"\}/);
+  assert.match(studioWorkspace, /STUDIO_MUSIC_VOLUME_MIN_DB/);
+  assert.match(studioWorkspace, /getStudioMusicVolumeFromDb/);
   assert.match(studioWorkspace, /Высокое усиление может вызвать искажения/);
   assert.match(editorLayout, /<StudioAudioProvider>/);
   assert.doesNotMatch(editorLayout, /GlobalAudioPlayerProvider/);
@@ -315,8 +409,8 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
   assert.match(studioWorkspace, /Назад в Studio/);
-  assert.match(studioWorkspace, /max=\{trackKind === "voice" \? "400" : "200"\}/);
-  assert.match(studioWorkspace, /setTrackVolume\(track\.id, Number\(event\.target\.value\) \/ 100\)/);
+  assert.match(studioWorkspace, /max=\{trackKind === "music" \? STUDIO_MUSIC_VOLUME_MAX_DB : "400"\}/);
+  assert.match(studioWorkspace, /getStudioMusicVolumeFromDb\(Number\(event\.target\.value\)\)/);
   assert.doesNotMatch(studioWorkspace, /transform:\s*["'`]?rotate/);
   assert.doesNotMatch(studioWorkspace, /style=\{\{[^}]*volume/);
   assert.match(
@@ -476,6 +570,7 @@ function testStudioBoundariesAndCrossTabStop() {
 }
 
 testPositionMath();
+testVoicePresetContract();
 testLocalFileValidation();
 testProviderEngineLifecycle();
 testStudioBoundariesAndCrossTabStop();

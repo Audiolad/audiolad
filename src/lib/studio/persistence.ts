@@ -1,4 +1,8 @@
 import { getStudioClipEnd } from "./clip-math";
+import {
+  parseStudioVoicePreset,
+  type StudioVoicePreset as StudioVoicePresetType,
+} from "./voice-preset-dsp";
 
 export const STUDIO_PROJECT_SCHEMA_VERSION = 2 as const;
 export const STUDIO_PROJECT_STUDIO_VERSION = 1 as const;
@@ -49,7 +53,7 @@ export type StudioPersistedSlot = {
 };
 
 export type StudioTrackKind = "voice" | "music";
-export type StudioVoicePreset = "clean" | "warm" | "deep" | "space";
+export type StudioVoicePreset = StudioVoicePresetType;
 
 export type StudioPersistedTrack = {
   id: string;
@@ -191,6 +195,9 @@ function parseTrack(value: unknown, path: string): StudioPersistedTrack {
     "invalid_track",
     path,
   );
+  const voicePreset = track.voicePreset === undefined
+    ? "none"
+    : parseStudioVoicePreset(track.voicePreset);
   if (
     !isNonEmptyString(track.id) ||
     !isUuid(track.assetId) ||
@@ -201,7 +208,7 @@ function parseTrack(value: unknown, path: string): StudioPersistedTrack {
     track.volume > 4 ||
     typeof track.muted !== "boolean" ||
     (track.trackKind !== undefined && track.trackKind !== "voice" && track.trackKind !== "music") ||
-    (track.voicePreset !== undefined && !["clean", "warm", "deep", "space"].includes(track.voicePreset as string)) ||
+    voicePreset === null ||
     !Array.isArray(track.clips)
   ) {
     fail("invalid_track", path);
@@ -217,7 +224,7 @@ function parseTrack(value: unknown, path: string): StudioPersistedTrack {
     ...(track.trackKind === "voice" || track.trackKind === "music"
       ? { trackKind: track.trackKind }
       : {}),
-    voicePreset: (track.voicePreset as StudioVoicePreset | undefined) ?? "clean",
+    voicePreset,
     clips: clips.sort(compareClips),
   };
 }

@@ -86,11 +86,32 @@ const oneTrack = serializeStudioProjectState(state({
   slots: [{ id: "slot-1", name: "Slot 1", audioTrackId: "track-1" }],
   tracks: [{
     ...track("track-1"),
+    voicePreset: "focus",
     assetPersistenceStatus: "saved",
   }],
 }));
 assert.equal(oneTrack.document.tracks.length, 1);
 assert.equal(oneTrack.document.tracks[0].assetId, assetId);
+assert.equal(oneTrack.document.tracks[0].voicePreset, "focus");
+
+const legacyPresetDocument = {
+  ...oneTrack.document,
+  tracks: [{ ...oneTrack.document.tracks[0], voicePreset: "space" }],
+};
+assert.equal(
+  deserializeStudioProjectDocument(legacyPresetDocument).tracks[0].voicePreset,
+  "trance",
+);
+assert.equal(
+  serializeStudioProjectState(state({
+    slots: [{ id: "slot-1", name: "Slot 1", audioTrackId: "track-1" }],
+    tracks: [{
+      ...track("track-1"),
+      voicePreset: "space",
+    } as never],
+  })).document.tracks[0].voicePreset,
+  "trance",
+);
 
 const fiveTracks = serializeStudioProjectState(state({
   tracks: Array.from({ length: 5 }, (_, index) =>

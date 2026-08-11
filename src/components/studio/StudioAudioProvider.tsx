@@ -31,6 +31,10 @@ import type {
   StudioVoicePreset,
 } from "@/lib/studio/persistence";
 import {
+  getStudioVoicePresetImpulse,
+  STUDIO_VOICE_PRESET_CONFIG,
+} from "@/lib/studio/voice-preset-dsp";
+import {
   clampStudioClipFades,
   getStudioFadeEnvelope,
   type StudioClipFades,
@@ -56,23 +60,8 @@ import type { StudioProjectHydration } from "@/lib/studio/hydration";
 const MAX_LOCAL_TRACKS = 5;
 const MAX_LOCAL_PROJECT_SIZE_BYTES = 750 * 1024 * 1024;
 
-export const STUDIO_VOICE_PRESET_CONFIG = {
-  warm: {
-    lowShelf: { frequency: 200, gain: 3 },
-    highShelf: { frequency: 5500, gain: -1.75 },
-  },
-  deep: {
-    lowShelf: { frequency: 135, gain: 4 },
-    lowMid: { frequency: 300, gain: 2 },
-    highShelf: { frequency: 5500, gain: -1 },
-  },
-  space: {
-    delaySeconds: 0.14,
-    wetGain: 0.22,
-    feedbackGain: 0.14,
-    wetHighShelf: { frequency: 5000, gain: -3 },
-  },
-} as const;
+const STUDIO_FX_CROSSFADE_SECONDS = 0.04;
+const STUDIO_FX_CLEANUP_GRACE_MS = 80;
 
 export type StudioAudioStatus =
   | "idle"
@@ -189,6 +178,9 @@ type TrackRuntime = {
   outputGain: GainNode;
   fxInput: GainNode;
   fxNodes: AudioNode[];
+  fxOutput: GainNode | null;
+  fxCleanupTimers: Set<number>;
+  retiredFxNodes: Set<AudioNode>;
   voicePreset: StudioVoicePreset;
   sources: Map<string, { source: AudioBufferSourceNode; envelopeGain: GainNode }>;
 };
@@ -308,7 +300,10 @@ export function StudioAudioProvider({
         outputGain,
         fxInput,
         fxNodes: [],
-        voicePreset: "clean",
+        fxOutput: null,
+        fxCleanupTimers: new Set(),
+        retiredFxNodes: new Set(),
+        voicePreset: "none",
         sources: new Map(),
       };
     },
@@ -364,84 +359,107 @@ export function StudioAudioProvider({
     preset: StudioVoicePreset,
     enabled: boolean,
   ) => {
-    runtime.fxInput.disconnect();
-    runtime.fxNodes.forEach((node) => node.disconnect());
-    runtime.fxNodes = [];
-    runtime.voicePreset = preset;
-    if (!enabled || preset === "clean") {
-      runtime.fxInput.connect(runtime.outputGain);
-      return;
-    }
     const context = getAudioContext();
+    const previousNodes = runtime.fxNodes;
+    const previousOutput = runtime.fxOutput;
+    const previousPreset = runtime.voicePreset;
+    runtime.fxInput.disconnect();
+    runtime.fxNodes = [];
+    runtime.fxOutput = null;
+    runtime.voicePreset = preset;
     const nodes: AudioNode[] = [];
-    let output: AudioNode = runtime.fxInput;
-    const connectFilter = (
-      type: BiquadFilterType,
-      frequency: number,
-      gain: number,
-    ) => {
-      const filter = context.createBiquadFilter();
-      filter.type = type;
-      filter.frequency.value = frequency;
-      filter.gain.value = gain;
-      output.connect(filter);
-      output = filter;
-      nodes.push(filter);
-    };
-    if (preset === "warm") {
-      connectFilter(
-        "lowshelf",
-        STUDIO_VOICE_PRESET_CONFIG.warm.lowShelf.frequency,
-        STUDIO_VOICE_PRESET_CONFIG.warm.lowShelf.gain,
-      );
-      connectFilter(
-        "highshelf",
-        STUDIO_VOICE_PRESET_CONFIG.warm.highShelf.frequency,
-        STUDIO_VOICE_PRESET_CONFIG.warm.highShelf.gain,
-      );
-    } else if (preset === "deep") {
-      connectFilter(
-        "lowshelf",
-        STUDIO_VOICE_PRESET_CONFIG.deep.lowShelf.frequency,
-        STUDIO_VOICE_PRESET_CONFIG.deep.lowShelf.gain,
-      );
-      connectFilter(
-        "peaking",
-        STUDIO_VOICE_PRESET_CONFIG.deep.lowMid.frequency,
-        STUDIO_VOICE_PRESET_CONFIG.deep.lowMid.gain,
-      );
-      connectFilter(
-        "highshelf",
-        STUDIO_VOICE_PRESET_CONFIG.deep.highShelf.frequency,
-        STUDIO_VOICE_PRESET_CONFIG.deep.highShelf.gain,
-      );
-    } else {
-      const dry = context.createGain();
-      const delay = context.createDelay(0.25);
-      const wetHighShelf = context.createBiquadFilter();
-      const wet = context.createGain();
-      const feedback = context.createGain();
-      dry.gain.value = 1;
-      delay.delayTime.value = STUDIO_VOICE_PRESET_CONFIG.space.delaySeconds;
-      wetHighShelf.type = "highshelf";
-      wetHighShelf.frequency.value =
-        STUDIO_VOICE_PRESET_CONFIG.space.wetHighShelf.frequency;
-      wetHighShelf.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.wetHighShelf.gain;
-      wet.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.wetGain;
-      feedback.gain.value = STUDIO_VOICE_PRESET_CONFIG.space.feedbackGain;
-      runtime.fxInput.connect(dry);
-      runtime.fxInput.connect(delay);
-      delay.connect(wetHighShelf);
-      wetHighShelf.connect(wet);
-      delay.connect(feedback);
-      feedback.connect(delay);
-      dry.connect(runtime.outputGain);
-      wet.connect(runtime.outputGain);
-      runtime.fxNodes = [dry, delay, wetHighShelf, wet, feedback];
-      return;
-    }
+    const output = context.createGain();
+    output.gain.setValueAtTime(0, context.currentTime);
     output.connect(runtime.outputGain);
+    nodes.push(output);
+    const connectFilter = (input: AudioNode, config: {
+      type: BiquadFilterType;
+      frequency: number;
+      gain?: number;
+      q: number;
+    }) => {
+      const filter = context.createBiquadFilter();
+      filter.type = config.type;
+      filter.frequency.value = config.frequency;
+      if (config.gain !== undefined) filter.gain.value = config.gain;
+      filter.Q.value = config.q;
+      input.connect(filter);
+      nodes.push(filter);
+      return filter;
+    };
+
+    const config = STUDIO_VOICE_PRESET_CONFIG[preset];
+    if (!enabled || preset === "none") {
+      runtime.fxInput.connect(output);
+    } else {
+      let processed: AudioNode = runtime.fxInput;
+      for (const filterConfig of config.filters) {
+        processed = connectFilter(processed, filterConfig);
+      }
+
+      const reverb = config.reverb;
+      if (!reverb) {
+        processed.connect(output);
+      } else {
+        const dry = context.createGain();
+        const convolver = context.createConvolver();
+        const wetHighPass = context.createBiquadFilter();
+        const wetLowPass = context.createBiquadFilter();
+        const wet = context.createGain();
+        dry.gain.value = reverb.dryGain;
+        wet.gain.value = reverb.wetGain;
+        convolver.normalize = reverb.normalize;
+        convolver.buffer = getStudioVoicePresetImpulse(context, preset);
+        wetHighPass.type = "highpass";
+        wetHighPass.frequency.value = reverb.wetHighPassFrequency;
+        wetLowPass.type = "lowpass";
+        wetLowPass.frequency.value = reverb.wetLowPassFrequency;
+        processed.connect(dry);
+        processed.connect(convolver);
+        convolver.connect(wetHighPass);
+        wetHighPass.connect(wetLowPass);
+        wetLowPass.connect(wet);
+        dry.connect(output);
+        wet.connect(output);
+        nodes.push(dry, convolver, wetHighPass, wetLowPass, wet);
+      }
+    }
     runtime.fxNodes = nodes;
+    runtime.fxOutput = output;
+    output.gain.linearRampToValueAtTime(
+      1,
+      context.currentTime + STUDIO_FX_CROSSFADE_SECONDS,
+    );
+
+    if (previousOutput) {
+      const outgoingFadeSeconds =
+        STUDIO_VOICE_PRESET_CONFIG[previousPreset].reverb?.impulseDurationSeconds ??
+        STUDIO_FX_CROSSFADE_SECONDS;
+      previousOutput.gain.cancelScheduledValues(context.currentTime);
+      previousOutput.gain.setValueAtTime(
+        previousOutput.gain.value,
+        context.currentTime,
+      );
+      previousOutput.gain.linearRampToValueAtTime(
+        0,
+        context.currentTime + outgoingFadeSeconds,
+      );
+      previousNodes.forEach((node) => runtime.retiredFxNodes.add(node));
+      const cleanupTimer = window.setTimeout(() => {
+        previousNodes.forEach((node) => node.disconnect());
+        previousNodes.forEach((node) => runtime.retiredFxNodes.delete(node));
+        runtime.fxCleanupTimers.delete(cleanupTimer);
+      }, Math.ceil(
+        Math.max(
+          STUDIO_VOICE_PRESET_CONFIG[previousPreset].reverb?.impulseDurationSeconds ??
+            STUDIO_FX_CROSSFADE_SECONDS,
+          outgoingFadeSeconds,
+        ) *
+          1000 +
+          STUDIO_FX_CLEANUP_GRACE_MS,
+      ));
+      runtime.fxCleanupTimers.add(cleanupTimer);
+    }
   }, [getAudioContext]);
 
   const stopSources = useCallback(() => {
@@ -583,8 +601,12 @@ export function StudioAudioProvider({
     cancelProgressLoop();
     stopSources();
     for (const runtime of trackRuntimesRef.current.values()) {
+      runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+      runtime.fxCleanupTimers.clear();
       runtime.fxInput.disconnect();
       runtime.fxNodes.forEach((node) => node.disconnect());
+      runtime.retiredFxNodes.forEach((node) => node.disconnect());
+      runtime.retiredFxNodes.clear();
       runtime.outputGain.disconnect();
     }
     trackRuntimesRef.current.clear();
@@ -715,8 +737,12 @@ export function StudioAudioProvider({
       cancelProgressLoop();
       stopSources();
       for (const runtime of trackRuntimesRef.current.values()) {
+        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+        runtime.fxCleanupTimers.clear();
         runtime.fxInput.disconnect();
         runtime.fxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.clear();
         runtime.outputGain.disconnect();
       }
       trackRuntimesRef.current.clear();
@@ -734,7 +760,7 @@ export function StudioAudioProvider({
           trackRuntimesRef.current.set(track.id, runtime);
           applyVoicePreset(
             runtime,
-            track.voicePreset ?? "clean",
+            track.voicePreset ?? "none",
             (track.trackKind ?? (asset.metadata.sourceType === "recording" ? "voice" : "music")) === "voice",
           );
           assetVaultRef.current.set(track.id, {
@@ -754,7 +780,7 @@ export function StudioAudioProvider({
           volume: track.volume,
           muted: track.muted,
           trackKind: track.trackKind ?? (metadata?.sourceType === "recording" ? "voice" : "music"),
-          voicePreset: track.voicePreset ?? "clean",
+          voicePreset: track.voicePreset ?? "none",
           status: asset ? "ready" : "error",
           isReplacing: false,
           replacementError: failure?.message ?? (asset ? null : "Не удалось загрузить аудио дорожки."),
@@ -881,7 +907,7 @@ export function StudioAudioProvider({
             volume: 1,
             muted: false,
             trackKind,
-            voicePreset: "clean",
+            voicePreset: "none",
             status: "ready",
             isReplacing: false,
             replacementError: null,
@@ -982,7 +1008,7 @@ export function StudioAudioProvider({
           volume: 1,
           muted: false,
           trackKind: "voice",
-          voicePreset: "clean",
+          voicePreset: "none",
           status: "ready",
           isReplacing: false,
           replacementError: null,
@@ -1097,7 +1123,11 @@ export function StudioAudioProvider({
           envelopeGain.disconnect();
         }
         oldRuntime.fxInput.disconnect();
+        oldRuntime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+        oldRuntime.fxCleanupTimers.clear();
         oldRuntime.fxNodes.forEach((node) => node.disconnect());
+        oldRuntime.retiredFxNodes.forEach((node) => node.disconnect());
+        oldRuntime.retiredFxNodes.clear();
         oldRuntime.outputGain.disconnect();
         const nextRuntime = createTrackRuntime({ file, buffer, sourceType: "upload" });
         applyVoicePreset(nextRuntime, currentTrack.voicePreset, currentTrack.trackKind === "voice");
@@ -1505,6 +1535,12 @@ export function StudioAudioProvider({
           buffer: runtime.buffer,
           sourceType: runtime.sourceType,
         });
+        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+        runtime.fxCleanupTimers.clear();
+        runtime.fxInput.disconnect();
+        runtime.fxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.clear();
       }
       runtime?.outputGain.disconnect();
       trackRuntimesRef.current.delete(trackId);
@@ -1567,6 +1603,12 @@ export function StudioAudioProvider({
       cancelProgressLoop();
       stopSources();
       for (const runtime of trackRuntimesRef.current.values()) {
+        runtime.fxCleanupTimers.forEach((timer) => window.clearTimeout(timer));
+        runtime.fxCleanupTimers.clear();
+        runtime.fxInput.disconnect();
+        runtime.fxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.forEach((node) => node.disconnect());
+        runtime.retiredFxNodes.clear();
         runtime.outputGain.disconnect();
       }
       trackRuntimesRef.current.clear();
@@ -1581,7 +1623,7 @@ export function StudioAudioProvider({
         }
         const runtime = createTrackRuntime(asset);
         const trackKind = track.trackKind ?? (asset.sourceType === "recording" ? "voice" : "music");
-        const voicePreset = track.voicePreset ?? "clean";
+        const voicePreset = track.voicePreset ?? "none";
         applyVoicePreset(runtime, voicePreset, trackKind === "voice");
         trackRuntimesRef.current.set(track.id, runtime);
         restoredTracks.push({
