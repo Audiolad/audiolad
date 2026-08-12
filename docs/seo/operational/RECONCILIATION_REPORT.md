@@ -7,8 +7,8 @@
 
 ## Result
 - Articles reconstructed from registry: **55**
-- New editorial operational entries published: **1**
-- PUBLISHED entries: **56**
+- New editorial operational entries published: **2**
+- PUBLISHED entries: **57**
 - Confirmed historical Article IDs: **40**
 - `ID_PENDING_RECONCILIATION`: **15**
 - Confirmed primary queries: **27**
@@ -22,10 +22,10 @@
 - Next Queue contains no published registry article.
 - Historical publication/queue/forecast statuses were intentionally not copied: the snapshot is from 2026-07-29 and contains 39 published rows, while the production-compatible registry contains 55.
 - Historical published audit entries remain `RECONSTRUCTED_FROM_PRODUCTION`,
-  not `VALIDATE PASS`; the divorce article has an explicit production-smoke
+  not `VALIDATE PASS`; both new divorce articles have explicit production-smoke
   `VALIDATE PASS`.
 
-## Current divorce article
+## Current divorce articles
 No committed operational-master or semantic-map entry was found for “Ребёнок и
 развод родителей”. It was therefore added as a new editorially approved
 operational entry rather than a reconstruction:
@@ -40,6 +40,18 @@ operational entry rather than a reconstruction:
   `https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie`.
 - Production smoke: `VALIDATE PASS` on release
   `20260812-142911-2588cc01` (BUILD_ID `is8Cnf-VY9yL9w-cRnOKw`).
+
+The decision-support article was also absent from committed historical planning
+artifacts and was added as a new editorial operational entry:
+
+- Article ID: `ART_new_20260812_kak-reshitsya-na-razvod`
+- Status: `PUBLISHED`
+- Frequency: `UNVERIFIED`; no committed verified frequency source exists.
+- Hub: pending; no new divorce/relationships Topic Hub was created.
+- Practice: `Развод: ясность и спокойствие`, `DIRECT`; canonical public URL
+  `https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie`.
+- Production smoke: `VALIDATE PASS` on release
+  `20260812-145406-c7460ef6` (BUILD_ID `vTE5BgziLHEFskAhXaqAz`).
 
 ## Required later reconciliation
 Reconcile the 15 pending IDs and any historical un-published candidates using only future committed planning artifacts. A new article may enter Next Queue only after an explicit plan record with primary query, frequency evidence, hub, practice mapping, and stable Article ID is committed.

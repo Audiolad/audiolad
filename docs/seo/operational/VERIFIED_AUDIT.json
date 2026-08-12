@@ -331,13 +331,12 @@
       "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-reshitsya-na-razvod",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-reshitsya-na-razvod",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-reshitsya-na-razvod",
+      "status": "PUBLISHED",
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-12T14:59:09Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, child-article link, FAQ, sitemap, and no page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie."
     },
     {
       "articleId": "ART_plan23_как-перестать-делать-импульсивные-покупк",
