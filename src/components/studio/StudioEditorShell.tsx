@@ -233,7 +233,6 @@ export default function StudioEditorShell({
   const assetSignatureRef = useRef<string | null>(null);
   const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
   const [renderJob, setRenderJob] = useState<StudioRenderJob | null>(null);
-  const [renderPreviewUrl, setRenderPreviewUrl] = useState<string | null>(null);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
@@ -423,7 +422,7 @@ export default function StudioEditorShell({
     const refresh = async () => {
       try {
         const state = await getStudioRender(projectId);
-        if (!cancelled) { setRenderJob(state.latest); setRenderPreviewUrl(state.previewUrl); }
+        if (!cancelled) setRenderJob(state.latest);
       } catch { /* Export state does not block editing. */ }
     };
     void refresh();
@@ -1300,7 +1299,6 @@ export default function StudioEditorShell({
       }
       const job = await queueStudioRender(projectId);
       setRenderJob(job);
-      setRenderPreviewUrl(null);
     } catch (error) {
       setRenderError(error instanceof Error ? error.message : "Не удалось поставить экспорт в очередь.");
     } finally {
@@ -1552,7 +1550,7 @@ export default function StudioEditorShell({
                 {saveButtonLabel}
               </button>
               <button type="button" disabled={saveIsUnavailable || renderBusy} onClick={() => void queueRender()} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">
-                {renderBusy ? "Подготовка…" : "Экспорт MP3"}
+                {renderBusy ? "Создаём MP3…" : "Создать MP3"}
               </button>
             </div>
           </div>
@@ -1593,9 +1591,9 @@ export default function StudioEditorShell({
           {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
           {renderJob ? (
             <section className="mb-4 rounded-lg border border-violet-300/30 bg-[#121b28] px-4 py-3 text-sm">
-              {renderJob.status === "queued" || renderJob.status === "processing" ? <p className="text-[#d8c8fb]">Экспорт ожидает серверной обработки.</p> : null}
+              {renderJob.status === "queued" || renderJob.status === "processing" ? <p className="text-[#d8c8fb]">Создаём MP3…</p> : null}
               {renderJob.status === "failed" ? <p role="alert" className="text-rose-200">{renderJob.error_message_safe ?? "Экспорт не выполнен. Исходники проекта сохранены."}</p> : null}
-              {renderJob.status === "completed" ? <div className="flex flex-wrap items-center gap-3"><p className="text-emerald-200">Экспорт готов.</p>{renderPreviewUrl ? <audio controls preload="none" src={renderPreviewUrl} className="h-8 max-w-full" /> : null}<a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="rounded border border-emerald-300/40 px-3 py-1.5 font-medium text-emerald-100">Скачать MP3</a></div> : null}
+              {renderJob.status === "completed" ? <div className="flex flex-wrap items-center gap-3"><p className="text-emerald-200">Аудиофайл готов.</p><a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="rounded border border-emerald-300/40 px-3 py-1.5 font-medium text-emerald-100">Скачать MP3</a></div> : null}
             </section>
           ) : null}
           {recordingError ? (
