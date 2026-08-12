@@ -6177,6 +6177,44 @@ assert(
   "child-divorce article links to child-conversation article",
 );
 
+const childSupportArticle = getArticleBySlug(
+  "kak-pomoch-rebenku-perezhit-razvod-roditeley",
+);
+assert(childSupportArticle, "child-support article registered");
+assert(
+  childSupportArticle.title ===
+    "Как помочь ребёнку пережить развод родителей",
+  "child-support H1",
+);
+assert(
+  childSupportArticle.metaTitle ===
+    "Как помочь ребёнку пережить развод родителей – АудиоЛад",
+  "child-support meta title",
+);
+assert(
+  childSupportArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie" &&
+    childSupportArticle.relatedPractices.length === 0 &&
+    childSupportArticle.finalAudioLead === "",
+  "child-support has canonical practice and one player",
+);
+assert(
+  childSupportArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ) &&
+    childSupportArticle.afterFinalAudio?.some(
+      (item) =>
+        item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+    ) &&
+    childSupportArticle.faq.length === 7,
+  "child-support has approved links and FAQ",
+);
+assert(
+  childSupportArticle.topicSlug === "pending-hub-reconciliation" &&
+    childSupportArticle.topicHref === "/articles",
+  "child-support keeps pending hub",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
