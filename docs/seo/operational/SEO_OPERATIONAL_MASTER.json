@@ -1,0 +1,2111 @@
+{
+  "schemaVersion": 1,
+  "kind": "SEO_OPERATIONAL_MASTER",
+  "generatedAt": "2026-08-12T10:21:24Z",
+  "productionCompatibleBase": {
+    "commit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+    "release": "20260812-083852-81d1f64"
+  },
+  "historicalSnapshot": {
+    "commit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+    "ref": "refs/stash",
+    "role": "field-level reconciliation only; historical status, queue, and forecast were not imported"
+  },
+  "dataPolicy": {
+    "publishedSourceOfTruth": "production-compatible article registry at productionCompatibleBase.commit",
+    "articleIdPolicy": "Only exact slug or exact H1 matches from the historical snapshot are marked confirmed. All other IDs are ID_PENDING_RECONCILIATION.",
+    "queuePolicy": "Empty until remaining historical candidates receive an explicit published-vs-planned reconciliation. This prevents any published registry article entering Next Queue.",
+    "validationPolicy": "RECONSTRUCTED_FROM_PRODUCTION is not VALIDATE PASS and must be replaced by a publication smoke result when available."
+  },
+  "articles": [
+    {
+      "articleId": "ART_affirmatsii-na-dengi",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Аффирмации на деньги: помогают ли они изменить отношение к финансам",
+      "slug": "affirmatsii-na-dengi",
+      "productionUrl": "https://audiolad.ru/articles/affirmatsii-na-dengi",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-25T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_affirmatsii-na-dengi"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_besplatnye-meditatsii-onlayn",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Бесплатные медитации онлайн: как выбрать практику, которая действительно поможет",
+      "slug": "besplatnye-meditatsii-onlayn",
+      "productionUrl": "https://audiolad.ru/articles/besplatnye-meditatsii-onlayn",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "elixir-molodosti",
+        "title": "Эликсир Молодости",
+        "slug": "elixir-molodosti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/elixir-molodosti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_elixir-molodosti"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-25T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_besplatnye-meditatsii-onlayn"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan31_благодарность-и-изобилие",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Благодарность и изобилие: как замечать опоры, не отрицая трудности",
+      "slug": "blagodarnost-i-izobilie",
+      "productionUrl": "https://audiolad.ru/articles/blagodarnost-i-izobilie",
+      "primaryQuery": "благодарность и изобилие",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan31_благодарность-и-изобилие"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_chto-takoe-denezhnyy-potok",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Что такое денежный поток и как изменить своё отношение к деньгам",
+      "slug": "chto-takoe-denezhnyy-potok",
+      "productionUrl": "https://audiolad.ru/articles/chto-takoe-denezhnyy-potok",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-28T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_chto-takoe-denezhnyy-potok"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan17_денежное-мышление",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Денежное мышление: что это такое и как оно проявляется в жизни",
+      "slug": "denezhnoe-myshlenie",
+      "productionUrl": "https://audiolad.ru/articles/denezhnoe-myshlenie",
+      "primaryQuery": "денежное мышление",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T16:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan17_денежное-мышление"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan13_денежные-установки",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Денежные установки: что это такое и как они влияют на отношение к деньгам",
+      "slug": "denezhnye-ustanovki",
+      "productionUrl": "https://audiolad.ru/articles/denezhnye-ustanovki",
+      "primaryQuery": "денежные установки",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-07-28T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan13_денежные-установки"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-izmenit-otnoshenie-k-dengam",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как изменить отношение к деньгам: почему это важно и с чего начать",
+      "slug": "kak-izmenit-otnoshenie-k-dengam",
+      "productionUrl": "https://audiolad.ru/articles/kak-izmenit-otnoshenie-k-dengam",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-28T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-izmenit-otnoshenie-k-dengam"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как начать копить деньги: почему это не получается и как превратить накопления в привычку",
+      "slug": "kak-nachat-kopit-dengi",
+      "productionUrl": "https://audiolad.ru/articles/kak-nachat-kopit-dengi",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T17:00:00.000Z",
+      "updatedAt": "2026-08-03T17:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan42_как-наполниться-женской-энергией",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как наполниться женской энергией и вернуть ощущение внутренней живости",
+      "slug": "kak-napolnitsya-zhenskoy-energiey",
+      "productionUrl": "https://audiolad.ru/articles/kak-napolnitsya-zhenskoy-energiey",
+      "primaryQuery": "как наполниться женской энергией",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+        "title": "Бастет – Богиня радости, любви и женской силы",
+        "slug": "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_bastet-boginya-radosti-lyubvi-i-zhenskoy-sily"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T08:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan42_как-наполниться-женской-энергией"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan25_как-найти-новые-источники-дохода",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как найти новые источники дохода: реалистичные направления и первые шаги",
+      "slug": "kak-nayti-novye-istochniki-dohoda",
+      "productionUrl": "https://audiolad.ru/articles/kak-nayti-novye-istochniki-dohoda",
+      "primaryQuery": "как найти новые источники дохода",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-07-28T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan25_как-найти-новые-источники-дохода"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как назвать цену за свою работу и перестать бояться говорить о стоимости",
+      "slug": "kak-nazvat-tsenu-za-svoyu-rabotu",
+      "productionUrl": "https://audiolad.ru/articles/kak-nazvat-tsenu-za-svoyu-rabotu",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T15:00:00.000Z",
+      "updatedAt": "2026-08-03T18:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-otpustit-obidu",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как отпустить обиду и перестать снова возвращаться к болезненной ситуации",
+      "slug": "kak-otpustit-obidu",
+      "productionUrl": "https://audiolad.ru/articles/kak-otpustit-obidu",
+      "primaryQuery": "как отпустить обиду",
+      "primaryQueryFrequency": 172,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T12:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-otpustit-obidu"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-otpustit-proshloe",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как отпустить прошлое и перестать жить воспоминаниями",
+      "slug": "kak-otpustit-proshloe",
+      "productionUrl": "https://audiolad.ru/articles/kak-otpustit-proshloe",
+      "primaryQuery": "как отпустить прошлое",
+      "primaryQueryFrequency": 177,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-otpustit-proshloe"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan15_как-перестать-бояться-больших-денег",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как перестать бояться больших денег и спокойнее относиться к росту дохода",
+      "slug": "kak-perestat-boyatsya-bolshih-deneg",
+      "productionUrl": "https://audiolad.ru/articles/kak-perestat-boyatsya-bolshih-deneg",
+      "primaryQuery": "как перестать бояться больших денег",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T13:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan15_как-перестать-бояться-больших-денег"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan11_как-перестать-экономить-на-себе",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как перестать экономить на себе и начать учитывать собственные потребности",
+      "slug": "kak-perestat-ekonomit-na-sebe",
+      "productionUrl": "https://audiolad.ru/articles/kak-perestat-ekonomit-na-sebe",
+      "primaryQuery": "как перестать экономить на себе",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-28T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan11_как-перестать-экономить-на-себе"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как перестать критиковать себя",
+      "slug": "kak-perestat-kritikovat-sebya",
+      "productionUrl": "https://audiolad.ru/articles/kak-perestat-kritikovat-sebya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "lyubov-k-sebe",
+        "title": "Любовь к себе",
+        "url": "/topics/lyubov-k-sebe"
+      },
+      "practice": {
+        "key": "lyubov-k-sebe",
+        "title": null,
+        "slug": "lyubov-k-sebe",
+        "productionUrl": null,
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": null
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-07-30T17:14:00.000Z",
+      "updatedAt": "2026-07-30T17:14:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan19_как-перестать-переживать-из-за-денег",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как перестать постоянно переживать из-за денег и вернуть ощущение опоры",
+      "slug": "kak-perestat-perezhivat-iz-za-deneg",
+      "productionUrl": "https://audiolad.ru/articles/kak-perestat-perezhivat-iz-za-deneg",
+      "primaryQuery": "как перестать переживать из-за денег",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T13:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan19_как-перестать-переживать-из-за-денег"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan05_как-перестать-злиться-на-человека",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как перестать постоянно злиться на человека и вернуть себе внутреннее спокойствие",
+      "slug": "kak-perestat-zlitsya-na-cheloveka",
+      "productionUrl": "https://audiolad.ru/articles/kak-perestat-zlitsya-na-cheloveka",
+      "primaryQuery": "как перестать злиться на человека",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan05_как-перестать-злиться-на-человека"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan35_как-понять-чего-я-хочу",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как понять, чего вы действительно хотите: вопросы для спокойного размышления",
+      "slug": "kak-ponyat-chego-ya-hochu",
+      "productionUrl": "https://audiolad.ru/articles/kak-ponyat-chego-ya-hochu",
+      "primaryQuery": "как понять чего я хочу",
+      "primaryQueryFrequency": 873,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "kod-prityazheniya",
+        "title": "Код Притяжения",
+        "slug": "kod-prityazheniya",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/kod-prityazheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_kod-prityazheniya"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-08-03T20:45:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan35_как-понять-чего-я-хочу"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как попросить повышение зарплаты и спокойно подготовиться к разговору",
+      "slug": "kak-poprosit-povyshenie-zarplaty",
+      "productionUrl": "https://audiolad.ru/articles/kak-poprosit-povyshenie-zarplaty",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T18:30:00.000Z",
+      "updatedAt": "2026-08-03T18:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan24_как-повысить-доход",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как повысить доход: реалистичные способы и практические шаги",
+      "slug": "kak-povysit-dohod",
+      "productionUrl": "https://audiolad.ru/articles/kak-povysit-dohod",
+      "primaryQuery": "как повысить доход",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "prityanut-dengi-legko",
+        "title": "Притянуть деньги легко",
+        "slug": "prityanut-dengi-legko",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/prityanut-dengi-legko",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_prityanut-dengi-legko"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T18:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan24_как-повысить-доход"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как правильно сформулировать желание и перейти от мечты к ясному намерению",
+      "slug": "kak-pravilno-sformulirovat-zhelanie",
+      "productionUrl": "https://audiolad.ru/articles/kak-pravilno-sformulirovat-zhelanie",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "kod-prityazheniya",
+        "title": "Код Притяжения",
+        "slug": "kod-prityazheniya",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/kod-prityazheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_kod-prityazheniya"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T20:45:00.000Z",
+      "updatedAt": "2026-08-03T20:45:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan12_как-принимать-деньги",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как принимать деньги без чувства вины и неловкости",
+      "slug": "kak-prinimat-dengi",
+      "productionUrl": "https://audiolad.ru/articles/kak-prinimat-dengi",
+      "primaryQuery": "как принимать деньги",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-28T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan12_как-принимать-деньги"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как принять себя, даже если мы пока не нравимся себе во всём",
+      "slug": "kak-prinyat-sebya",
+      "productionUrl": "https://audiolad.ru/articles/kak-prinyat-sebya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "lyubov-k-sebe",
+        "title": "Любовь к себе",
+        "url": "/topics/lyubov-k-sebe"
+      },
+      "practice": {
+        "key": "lyubov-k-sebe",
+        "title": null,
+        "slug": "lyubov-k-sebe",
+        "productionUrl": null,
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": null
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-07-30T15:57:00.000Z",
+      "updatedAt": "2026-07-30T15:57:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan39_как-принять-свой-возраст",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как принять свой возраст и спокойнее относиться к возрастным изменениям",
+      "slug": "kak-prinyat-svoy-vozrast",
+      "productionUrl": "https://audiolad.ru/articles/kak-prinyat-svoy-vozrast",
+      "primaryQuery": "как принять свой возраст",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "elixir-molodosti",
+        "title": "Эликсир Молодости",
+        "slug": "elixir-molodosti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/elixir-molodosti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_elixir-molodosti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan39_как-принять-свой-возраст"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-privlech-dengi-v-svoyu-zhizn",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как привлечь деньги в свою жизнь: что действительно помогает изменить отношение к финансам",
+      "slug": "kak-privlech-dengi-v-svoyu-zhizn",
+      "productionUrl": "https://audiolad.ru/articles/kak-privlech-dengi-v-svoyu-zhizn",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-25T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-privlech-dengi-v-svoyu-zhizn"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-prostit-cheloveka",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как простить человека, если обида всё ещё не отпускает",
+      "slug": "kak-prostit-cheloveka",
+      "productionUrl": "https://audiolad.ru/articles/kak-prostit-cheloveka",
+      "primaryQuery": "как простить человека",
+      "primaryQueryFrequency": 528,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-prostit-cheloveka"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan06_как-простить-себя",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как простить себя за прошлые ошибки и начать относиться к себе бережнее",
+      "slug": "kak-prostit-sebya",
+      "productionUrl": "https://audiolad.ru/articles/kak-prostit-sebya",
+      "primaryQuery": "как простить себя",
+      "primaryQueryFrequency": 489,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan06_как-простить-себя"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-razvit-lyubov-k-sebe",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как развить любовь к себе: 7 практических шагов",
+      "slug": "kak-razvit-lyubov-k-sebe",
+      "productionUrl": "https://audiolad.ru/articles/kak-razvit-lyubov-k-sebe",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "lyubov-k-sebe",
+        "title": "Любовь к себе",
+        "url": "/topics/lyubov-k-sebe"
+      },
+      "practice": {
+        "key": "elixir-molodosti",
+        "title": "Эликсир Молодости",
+        "slug": "elixir-molodosti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/elixir-molodosti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_elixir-molodosti"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-07-24T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-razvit-lyubov-k-sebe"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan23_как-перестать-делать-импульсивные-покупк",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как уменьшить импульсивные покупки и выбирать более осознанно",
+      "slug": "kak-umenshit-impulsivnye-pokupki",
+      "productionUrl": "https://audiolad.ru/articles/kak-umenshit-impulsivnye-pokupki",
+      "primaryQuery": "как перестать делать импульсивные покупки",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-03T17:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan23_как-перестать-делать-импульсивные-покупк"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan45_как-восстановить-силы-женщине",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как женщине восстановить силы, если она привыкла постоянно заботиться о других",
+      "slug": "kak-vosstanovit-sily-zhenshchine",
+      "productionUrl": "https://audiolad.ru/articles/kak-vosstanovit-sily-zhenshchine",
+      "primaryQuery": "как восстановить силы женщине",
+      "primaryQueryFrequency": 16,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "zhenskaya-energiya",
+        "title": "Женская энергия",
+        "url": "/topics/zhenskaya-energiya"
+      },
+      "practice": {
+        "key": "vosstanovlenie-zhenskoy-energii",
+        "title": null,
+        "slug": "vosstanovlenie-zhenskoy-energii",
+        "productionUrl": null,
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": null
+      },
+      "practiceRelevance": "REVIEW",
+      "publishedAt": "2026-08-03T08:00:00.000Z",
+      "updatedAt": "2026-08-03T09:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_H1",
+          "sourceArticleId": "ART_plan45_как-восстановить-силы-женщине"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как восстановить женскую энергию после усталости и перегрузки",
+      "slug": "kak-vosstanovit-zhenskuyu-energiyu",
+      "productionUrl": "https://audiolad.ru/articles/kak-vosstanovit-zhenskuyu-energiyu",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "zhenskaya-energiya",
+        "title": "Женская энергия",
+        "url": "/topics/zhenskaya-energiya"
+      },
+      "practice": {
+        "key": "vosstanovlenie-zhenskoy-energii",
+        "title": null,
+        "slug": "vosstanovlenie-zhenskoy-energii",
+        "productionUrl": null,
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": null
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-01T07:00:00.000Z",
+      "updatedAt": "2026-08-01T07:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_kak-voyti-v-sostoyanie-izobiliya",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как войти в состояние изобилия и перестать жить в ощущении постоянной нехватки",
+      "slug": "kak-voyti-v-sostoyanie-izobiliya",
+      "productionUrl": "https://audiolad.ru/articles/kak-voyti-v-sostoyanie-izobiliya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "izobilie",
+        "title": "Изобилие",
+        "url": "/topics/izobilie"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-08-03T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_kak-voyti-v-sostoyanie-izobiliya"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan29_как-выйти-из-состояния-нехватки",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как выйти из состояния нехватки и вернуть ощущение опоры",
+      "slug": "kak-vyyti-iz-sostoyaniya-nehvatki",
+      "productionUrl": "https://audiolad.ru/articles/kak-vyyti-iz-sostoyaniya-nehvatki",
+      "primaryQuery": "как выйти из состояния нехватки",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-08-04T07:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan29_как-выйти-из-состояния-нехватки"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как заботиться о себе и начать слышать свои потребности",
+      "slug": "kak-zabotitsya-o-sebe",
+      "productionUrl": "https://audiolad.ru/articles/kak-zabotitsya-o-sebe",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "lyubov-k-sebe",
+        "title": "Любовь к себе",
+        "url": "/topics/lyubov-k-sebe"
+      },
+      "practice": {
+        "key": "lyubov-k-sebe",
+        "title": null,
+        "slug": "lyubov-k-sebe",
+        "productionUrl": null,
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": null
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-07-30T17:45:00.000Z",
+      "updatedAt": "2026-08-03T09:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как замечать возможности и не проходить мимо важных перемен",
+      "slug": "kak-zamechat-vozmozhnosti",
+      "productionUrl": "https://audiolad.ru/articles/kak-zamechat-vozmozhnosti",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "izobilie",
+        "title": "Изобилие",
+        "url": "/topics/izobilie"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T21:00:00.000Z",
+      "updatedAt": "2026-08-03T21:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan08_как-женщине-разрешить-себе-деньги",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Как женщине разрешить себе деньги",
+      "slug": "kak-zhenshchine-razreshit-sebe-dengi",
+      "productionUrl": "https://audiolad.ru/articles/kak-zhenshchine-razreshit-sebe-dengi",
+      "primaryQuery": "как женщине разрешить себе деньги",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T19:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan08_как-женщине-разрешить-себе-деньги"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Медитация на деньги: как работать с вниманием и денежным настроем",
+      "slug": "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      "productionUrl": "https://audiolad.ru/articles/meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-08-03T16:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_meditatsiya-na-ispolnenie-zhelaniy",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Медитация на исполнение желаний: что это такое и чего от неё можно ожидать",
+      "slug": "meditatsiya-na-ispolnenie-zhelaniy",
+      "productionUrl": "https://audiolad.ru/articles/meditatsiya-na-ispolnenie-zhelaniy",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-27T12:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_meditatsiya-na-ispolnenie-zhelaniy"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_meditatsiya-na-izobilie",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Что такое медитация на изобилие и как она помогает изменить отношение к достатку",
+      "slug": "meditatsiya-na-izobilie",
+      "productionUrl": "https://audiolad.ru/articles/meditatsiya-na-izobilie",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "izobilie",
+        "title": "Изобилие",
+        "url": "/topics/izobilie"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-25T14:15:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_meditatsiya-na-izobilie"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_meditatsiya-na-privlechenie-deneg",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Медитация на привлечение денег: что это такое и как она помогает изменить отношение к финансам",
+      "slug": "meditatsiya-na-privlechenie-deneg",
+      "productionUrl": "https://audiolad.ru/articles/meditatsiya-na-privlechenie-deneg",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-25T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_meditatsiya-na-privlechenie-deneg"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan43_медитация-на-женскую-энергию",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий",
+      "slug": "meditatsiya-na-zhenskuyu-energiyu",
+      "productionUrl": "https://audiolad.ru/articles/meditatsiya-na-zhenskuyu-energiyu",
+      "primaryQuery": "медитация на женскую энергию",
+      "primaryQueryFrequency": 130,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskaya-energiya",
+        "title": "Женская энергия",
+        "slug": "zhenskaya-energiya",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskaya-energiya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskaya-energiya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-29T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan43_медитация-на-женскую-энергию"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Мышление изобилия: что это такое и как оно влияет на нашу жизнь",
+      "slug": "myshlenie-izobiliya",
+      "productionUrl": "https://audiolad.ru/articles/myshlenie-izobiliya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "izobilie",
+        "title": "Изобилие",
+        "url": "/topics/izobilie"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T14:00:00.000Z",
+      "updatedAt": "2026-08-04T07:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Что такое намерение и чем оно отличается от желания, цели и плана",
+      "slug": "namerenie-chto-eto",
+      "productionUrl": "https://audiolad.ru/articles/namerenie-chto-eto",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "kod-prityazheniya",
+        "title": "Код Притяжения",
+        "slug": "kod-prityazheniya",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/kod-prityazheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_kod-prityazheniya"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T10:00:00.000Z",
+      "updatedAt": "2026-08-03T20:45:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Настрой на деньги: как изменить внутреннее отношение к финансам и действовать спокойнее",
+      "slug": "nastroy-na-dengi",
+      "productionUrl": "https://audiolad.ru/articles/nastroy-na-dengi",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T16:00:00.000Z",
+      "updatedAt": "2026-08-03T17:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Как перестать жить в постоянной нехватке и развить ощущение достатка",
+      "slug": "oshchushchenie-dostatka",
+      "productionUrl": "https://audiolad.ru/articles/oshchushchenie-dostatka",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "izobilie",
+        "title": "Изобилие",
+        "url": "/topics/izobilie"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-04T07:30:00.000Z",
+      "updatedAt": "2026-08-04T07:30:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Почему мы постоянно обижаемся и что с этим делать",
+      "slug": "pochemu-my-postoyanno-obizhaemsya",
+      "productionUrl": "https://audiolad.ru/articles/pochemu-my-postoyanno-obizhaemsya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "13-shagov-radikalnogo-proscheniya",
+        "title": "13 шагов Радикального прощения",
+        "slug": "13-shagov-radikalnogo-proscheniya",
+        "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_13-shagov-radikalnogo-proscheniya"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-27T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_pochemu-my-postoyanno-obizhaemsya"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Почему желания не исполняются и что действительно может этому мешать",
+      "slug": "pochemu-zhelaniya-ne-ispolnyayutsya",
+      "productionUrl": "https://audiolad.ru/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "kod-prityazheniya",
+        "title": "Код Притяжения",
+        "slug": "kod-prityazheniya",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/kod-prityazheniya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_kod-prityazheniya"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T11:00:00.000Z",
+      "updatedAt": "2026-08-03T11:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": null,
+      "articleIdStatus": "ID_PENDING_RECONCILIATION",
+      "title": "Страх денег: почему финансовые вопросы вызывают напряжение и как с ним справляться",
+      "slug": "strah-deneg",
+      "productionUrl": "https://audiolad.ru/articles/strah-deneg",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "meditatsii-na-dengi",
+        "title": "Медитации на деньги",
+        "url": "/topics/meditatsii-na-dengi"
+      },
+      "practice": {
+        "key": "energiya-denezhnogo-puti",
+        "title": "Энергия Денежного Пути",
+        "slug": "energiya-denezhnogo-puti",
+        "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_energiya-denezhnogo-puti"
+      },
+      "practiceRelevance": "UNVERIFIED",
+      "publishedAt": "2026-08-03T13:00:00.000Z",
+      "updatedAt": "2026-08-03T15:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "NONE"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan10_страх-тратить-деньги-на-себя",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Страх тратить деньги на себя: почему он возникает и как относиться к своим расходам спокойнее",
+      "slug": "strah-tratit-dengi-na-sebya",
+      "productionUrl": "https://audiolad.ru/articles/strah-tratit-dengi-na-sebya",
+      "primaryQuery": "страх тратить деньги на себя",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-07-28T14:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan10_страх-тратить-деньги-на-себя"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_vizualizatsiya-zhelaniy",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Визуализация желаний: что это такое и может ли она быть полезной",
+      "slug": "vizualizatsiya-zhelaniy",
+      "productionUrl": "https://audiolad.ru/articles/vizualizatsiya-zhelaniy",
+      "primaryQuery": null,
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "klyuch-k-izobiliyu",
+        "title": "Ключ к Изобилию",
+        "slug": "klyuch-k-izobiliyu",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_klyuch-k-izobiliyu"
+      },
+      "practiceRelevance": "WEAK",
+      "publishedAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-07-27T12:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_vizualizatsiya-zhelaniy"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan07_женщина-и-деньги-психология",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Женщина и деньги: психология отношения к финансам и финансовым решениям",
+      "slug": "zhenshchina-i-dengi-psihologiya",
+      "productionUrl": "https://audiolad.ru/articles/zhenshchina-i-dengi-psihologiya",
+      "primaryQuery": "женщина и деньги психология",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-28T00:00:00.000Z",
+      "updatedAt": "2026-07-28T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan07_женщина-и-деньги-психология"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan41_женская-энергия-что-это",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Женская энергия: что обычно понимают под этим выражением",
+      "slug": "zhenskaya-energiya-chto-eto",
+      "productionUrl": "https://audiolad.ru/articles/zhenskaya-energiya-chto-eto",
+      "primaryQuery": "женская энергия что это",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskaya-energiya",
+        "title": "Женская энергия",
+        "slug": "zhenskaya-energiya",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskaya-energiya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskaya-energiya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-29T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan41_женская-энергия-что-это"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan09_женская-самоценность-и-деньги",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Женская самоценность и деньги: как уважение к себе влияет на финансовые решения",
+      "slug": "zhenskaya-samotsennost-i-dengi",
+      "productionUrl": "https://audiolad.ru/articles/zhenskaya-samotsennost-i-dengi",
+      "primaryQuery": "женская самоценность и деньги",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskie-dengi",
+        "title": "Женские деньги",
+        "slug": "zhenskie-dengi",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskie-dengi"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-27T00:00:00.000Z",
+      "updatedAt": "2026-08-03T15:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan09_женская-самоценность-и-деньги"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    },
+    {
+      "articleId": "ART_plan40_женская-сила",
+      "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
+      "title": "Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни",
+      "slug": "zhenskaya-sila",
+      "productionUrl": "https://audiolad.ru/articles/zhenskaya-sila",
+      "primaryQuery": "женская сила",
+      "primaryQueryFrequency": null,
+      "status": "PUBLISHED",
+      "hub": {
+        "slug": "besplatnye-meditatsii",
+        "title": "Бесплатные медитации",
+        "url": "/topics/besplatnye-meditatsii"
+      },
+      "practice": {
+        "key": "zhenskaya-energiya",
+        "title": "Женская энергия",
+        "slug": "zhenskaya-energiya",
+        "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskaya-energiya",
+        "availabilityStatus": "RECONSTRUCTED_FROM_PRODUCTION_ARTICLE",
+        "historicalPracticeId": "PR_zhenskaya-energiya"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": "2026-07-29T00:00:00.000Z",
+      "updatedAt": "2026-07-29T00:00:00.000Z",
+      "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
+      "sources": {
+        "registryCommit": "81d1f64dc0d834297b364ac00426a104c68c832d",
+        "historical": {
+          "snapshotCommit": "1a5694f9b2be97d2f5727f7c293dad73c8f63024",
+          "match": "EXACT_SLUG",
+          "sourceArticleId": "ART_plan40_женская-сила"
+        },
+        "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
+      }
+    }
+  ],
+  "nextQueue": [],
+  "practiceForecast": [
+    {
+      "practiceKey": "13-shagov-radikalnogo-proscheniya",
+      "practiceTitle": "13 шагов Радикального прощения",
+      "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 6,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+      "practiceTitle": "Бастет – Богиня радости, любви и женской силы",
+      "productionUrl": "https://audiolad.ru/practice/sergey-petrov/bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 1,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "elixir-molodosti",
+      "practiceTitle": "Эликсир Молодости",
+      "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/elixir-molodosti",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 3,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "energiya-denezhnogo-puti",
+      "practiceTitle": "Энергия Денежного Пути",
+      "productionUrl": "https://audiolad.ru/practice/sergey-petrov/energiya-denezhnogo-puti",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 13,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "klyuch-k-izobiliyu",
+      "practiceTitle": "Ключ к Изобилию",
+      "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/klyuch-k-izobiliyu",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 13,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "kod-prityazheniya",
+      "practiceTitle": "Код Притяжения",
+      "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/kod-prityazheniya",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 4,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "lyubov-k-sebe",
+      "practiceTitle": null,
+      "productionUrl": null,
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 3,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "prityanut-dengi-legko",
+      "practiceTitle": "Притянуть деньги легко",
+      "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/prityanut-dengi-legko",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 1,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "vosstanovlenie-zhenskoy-energii",
+      "practiceTitle": null,
+      "productionUrl": null,
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 2,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "zhenskaya-energiya",
+      "practiceTitle": "Женская энергия",
+      "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskaya-energiya",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 3,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    },
+    {
+      "practiceKey": "zhenskie-dengi",
+      "practiceTitle": "Женские деньги",
+      "productionUrl": "https://audiolad.ru/practice/zoya-petrova/zhenskie-dengi",
+      "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
+      "publishedArticleCount": 6,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Current production-compatible registry references this practice from published articles. Direct catalog validation is deferred to each article publication smoke check."
+    }
+  ]
+}
