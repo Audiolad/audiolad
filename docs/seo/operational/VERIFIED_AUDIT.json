@@ -221,13 +221,16 @@
       "articleId": "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-ponyat-chto-pora-razvoditsya",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-ponyat-chto-pora-razvoditsya",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-ponyat-chto-pora-razvoditsya",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-12T15:19:34Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, approved decision and child-article links, FAQ, sitemap, and no unexpected page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie. Release 20260812-151428-e03cb5f8; BUILD_ID RZt-0x07O8JY2RXnEmlHx.",
+      "release": "20260812-151428-e03cb5f8",
+      "buildId": "RZt-0x07O8JY2RXnEmlHx",
+      "validatedAt": "2026-08-12T15:19:34Z"
     },
     {
       "articleId": null,
