@@ -14,6 +14,6 @@ practice or audio item.
    `SUPABASE_SERVICE_ROLE_KEY` in the worker environment.
 3. Run `npm run run:studio-render-worker` once against a controlled queued job.
 4. After observing a successful download, explicitly start the prepared but
-   inactive `deploy/studio-render-worker.ecosystem.cjs` PM2 process.
+   inactive `deploy/studio-render-worker.ecosystem.config.cjs` PM2 process.
 5. Monitor failed jobs and expired leases; do not enable multiple workers
    without revisiting queue throughput and lease policy.

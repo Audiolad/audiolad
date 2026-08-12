@@ -1,6 +1,6 @@
 // Prepared only: this file is deliberately not referenced by the active PM2
 // ecosystem. An operator must apply the Phase 2A migration and explicitly run
-// `pm2 start deploy/studio-render-worker.ecosystem.cjs` after provisioning the
+// `pm2 start deploy/studio-render-worker.ecosystem.config.cjs` after provisioning the
 // service-role environment.
 module.exports = {
   apps: [{
