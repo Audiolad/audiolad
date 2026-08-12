@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Must-keep SEO article URLs. Candidate/public smoke fails if any path returns non-200.",
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-08-12",
   "paths": [
     "/articles/affirmatsii-na-dengi",
     "/articles/besplatnye-meditatsii-onlayn",
@@ -24,8 +24,8 @@
     "/articles/kak-ponyat-chego-ya-hochu",
     "/articles/kak-poprosit-povyshenie-zarplaty",
     "/articles/kak-povysit-dohod",
-    "/articles/kak-prinimat-dengi",
     "/articles/kak-pravilno-sformulirovat-zhelanie",
+    "/articles/kak-prinimat-dengi",
     "/articles/kak-prinyat-sebya",
     "/articles/kak-prinyat-svoy-vozrast",
     "/articles/kak-privlech-dengi-v-svoyu-zhizn",
@@ -47,10 +47,11 @@
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
     "/articles/myshlenie-izobiliya",
     "/articles/namerenie-chto-eto",
-    "/articles/oshchushchenie-dostatka",
     "/articles/nastroy-na-dengi",
+    "/articles/oshchushchenie-dostatka",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+    "/articles/rebenok-i-razvod-roditeley",
     "/articles/strah-deneg",
     "/articles/strah-tratit-dengi-na-sebya",
     "/articles/vizualizatsiya-zhelaniy",
@@ -166,14 +167,14 @@
       "path": "/articles/kak-povysit-dohod"
     },
     {
-      "articleId": "ART_kak-prinimat-dengi",
-      "slug": "kak-prinimat-dengi",
-      "path": "/articles/kak-prinimat-dengi"
-    },
-    {
       "articleId": "ART_plan33_как-сформулировать-желание",
       "slug": "kak-pravilno-sformulirovat-zhelanie",
       "path": "/articles/kak-pravilno-sformulirovat-zhelanie"
+    },
+    {
+      "articleId": "ART_kak-prinimat-dengi",
+      "slug": "kak-prinimat-dengi",
+      "path": "/articles/kak-prinimat-dengi"
     },
     {
       "articleId": "ART_plan48_как-принять-себя",
@@ -281,14 +282,14 @@
       "path": "/articles/namerenie-chto-eto"
     },
     {
-      "articleId": "ART_plan32_как-почувствовать-достаток",
-      "slug": "oshchushchenie-dostatka",
-      "path": "/articles/oshchushchenie-dostatka"
-    },
-    {
       "articleId": "ART_plan16_как-настроиться-на-деньги",
       "slug": "nastroy-na-dengi",
       "path": "/articles/nastroy-na-dengi"
+    },
+    {
+      "articleId": "ART_plan32_как-почувствовать-достаток",
+      "slug": "oshchushchenie-dostatka",
+      "path": "/articles/oshchushchenie-dostatka"
     },
     {
       "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",
@@ -299,6 +300,11 @@
       "articleId": "ART_plan37_почему-желания-не-исполняются",
       "slug": "pochemu-zhelaniya-ne-ispolnyayutsya",
       "path": "/articles/pochemu-zhelaniya-ne-ispolnyayutsya"
+    },
+    {
+      "articleId": "ART_new_20260812_rebenok-i-razvod-roditeley",
+      "slug": "rebenok-i-razvod-roditeley",
+      "path": "/articles/rebenok-i-razvod-roditeley"
     },
     {
       "articleId": "ART_plan14_страх-денег",

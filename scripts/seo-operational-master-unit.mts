@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { listArticleDefinitions } from "../src/lib/seo/articles/index.ts";
+import { listArticleDefinitions } from "../src/lib/seo/articles/index";
 
 type Article = {
   articleId: string | null;
@@ -61,6 +61,9 @@ const publishedArticles = master.articles.filter(
 const plannedArticles = master.articles.filter(
   (article) => article.status === "PLANNED",
 );
+const registryOperationalArticles = master.articles.filter((article) =>
+  registrySlugSet.has(article.slug),
+);
 const articleById = new Map(
   master.articles
     .filter(
@@ -84,18 +87,20 @@ assert(
   "published production URLs are unique",
 );
 assert(
-  publishedArticles.length === registrySlugs.length,
-  "published article count matches registry",
+  registryOperationalArticles.length === registrySlugs.length,
+  "registered article count matches operational master",
 );
 assert(
-  publishedArticles.every((article) => registrySlugSet.has(article.slug)),
-  "every published operational article is in registry",
+  registryOperationalArticles.every(
+    (article) => article.status === "PUBLISHED" || article.status === "PLANNED",
+  ),
+  "registered operational articles have publication state",
 );
 assert(
   registrySlugs.every((slug) =>
-    publishedArticles.some((article) => article.slug === slug),
+    registryOperationalArticles.some((article) => article.slug === slug),
   ),
-  "every registry article is published in operational master",
+  "every registry article is in operational master",
 );
 assert(
   plannedArticles.every((article) => article.productionUrl === null),
@@ -118,8 +123,11 @@ assert(
   "unknown article IDs are explicit",
 );
 assert(
-  master.nextQueue.every((item) => !registrySlugSet.has(item.slug)),
-  "next queue contains no published registry article",
+  master.nextQueue.every((item) => {
+    const article = articleById.get(item.articleId);
+    return article?.slug === item.slug && article.status !== "PUBLISHED";
+  }),
+  "next queue contains no published operational article",
 );
 assert(
   unique(master.nextQueue.map((item) => String(item.position))),

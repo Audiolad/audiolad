@@ -5994,6 +5994,59 @@ assert(
   "love-to-self reverse-links to female-energy-what-is",
 );
 
+const divorceChildArticle = getArticleBySlug("rebenok-i-razvod-roditeley");
+assert(divorceChildArticle, "divorce-child article registered");
+assert(
+  divorceChildArticle.title ===
+    "Ребёнок и развод родителей: как помочь ему пройти через перемены",
+  "divorce-child H1",
+);
+assert(
+  divorceChildArticle.metaTitle ===
+    "Ребёнок и развод родителей: как помочь пережить перемены – АудиоЛад",
+  "divorce-child meta title",
+);
+assert(
+  divorceChildArticle.metaDescription ===
+    "Как ребёнок переживает развод родителей, почему может винить себя, что помогает сохранить чувство безопасности и когда стоит обратиться за профессиональной помощью.",
+  "divorce-child meta description",
+);
+assert(
+  divorceChildArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-child primary practice",
+);
+assert(
+  divorceChildArticle.relatedPractices.length === 0,
+  "divorce-child has one practice",
+);
+assert(
+  divorceChildArticle.finalAudioLead === "" &&
+    !divorceChildArticle.sections.some((section) => section.id === "audiopraktika"),
+  "divorce-child renders one player",
+);
+assert(
+  divorceChildArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceChildArticle.topicHref === "/articles",
+  "divorce-child leaves hub pending without a new hub",
+);
+assert(
+  divorceChildArticle.faq.length === 6,
+  "divorce-child FAQ",
+);
+assert(
+  JSON.stringify(divorceChildArticle).includes(
+    "Ребёнок не является причиной развода",
+  ) &&
+    JSON.stringify(divorceChildArticle).includes(
+      "При насилии или угрозах приоритетом должна быть безопасность",
+    ) &&
+    JSON.stringify(divorceChildArticle).includes(
+      "Практика не меняет состояние ребёнка напрямую",
+    ),
+  "divorce-child preserves required safety boundaries",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
