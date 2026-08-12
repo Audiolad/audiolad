@@ -55,6 +55,7 @@ import { MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE } from "./content/meditatsiya
 import { ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE } from "./content/zhenskaya-energiya-chto-eto";
 import { REBENOK_I_RAZVOD_RODITELEY_ARTICLE } from "./content/rebenok-i-razvod-roditeley";
 import { KAK_RESHITSYA_NA_RAZVOD_ARTICLE } from "./content/kak-reshitsya-na-razvod";
+import { KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE } from "./content/kak-ponyat-chto-pora-razvoditsya";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -115,6 +116,7 @@ const ARTICLE_DEFINITIONS = [
   ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE,
   REBENOK_I_RAZVOD_RODITELEY_ARTICLE,
   KAK_RESHITSYA_NA_RAZVOD_ARTICLE,
+  KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

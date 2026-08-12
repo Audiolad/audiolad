@@ -6085,6 +6085,12 @@ assert(
   ),
   "divorce-decision links to child divorce article",
 );
+assert(
+  divorceDecisionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-ponyat-chto-pora-razvoditsya",
+  ),
+  "divorce-decision links to divorce assessment article",
+);
 assert(divorceDecisionArticle.faq.length === 6, "divorce-decision FAQ");
 assert(
   JSON.stringify(divorceDecisionArticle).includes(
@@ -6094,6 +6100,46 @@ assert(
       "приоритетом становится безопасность",
     ),
   "divorce-decision preserves decision and safety boundaries",
+);
+
+const divorceAssessmentArticle = getArticleBySlug(
+  "kak-ponyat-chto-pora-razvoditsya",
+);
+assert(divorceAssessmentArticle, "divorce-assessment article registered");
+assert(
+  divorceAssessmentArticle.title ===
+    "Как понять, что пора разводиться: вопросы, которые помогут увидеть ситуацию яснее",
+  "divorce-assessment H1",
+);
+assert(
+  divorceAssessmentArticle.metaTitle ===
+    "Как понять, что пора разводиться с мужем или женой – АудиоЛад",
+  "divorce-assessment meta title",
+);
+assert(
+  divorceAssessmentArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-assessment canonical practice",
+);
+assert(
+  divorceAssessmentArticle.relatedPractices.length === 0 &&
+    divorceAssessmentArticle.finalAudioLead === "",
+  "divorce-assessment renders one player",
+);
+assert(
+  divorceAssessmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-reshitsya-na-razvod",
+  ) &&
+    divorceAssessmentArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+    ),
+  "divorce-assessment has approved article links",
+);
+assert(
+  divorceAssessmentArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceAssessmentArticle.topicHref === "/articles" &&
+    divorceAssessmentArticle.faq.length === 6,
+  "divorce-assessment keeps pending hub and FAQ",
 );
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");

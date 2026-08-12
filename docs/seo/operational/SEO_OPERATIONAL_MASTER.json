@@ -701,6 +701,44 @@
       }
     },
     {
+      "articleId": "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как понять, что пора разводиться: вопросы, которые помогут увидеть ситуацию яснее",
+      "slug": "kak-ponyat-chto-pora-razvoditsya",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-ponyat-chto-pora-razvoditsya",
+      "primaryQuery": "как понять что пора разводиться",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "razvod-yasnost-i-spokoystvie",
+        "title": "Развод: ясность и спокойствие",
+        "slug": "razvod-yasnost-i-spokoystvie",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": null,
+      "updatedAt": "2026-08-12T00:00:00.000Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
+        "evidence": "Editorially approved primary query and publication scope. No committed verified frequency source was found; frequency remains UNVERIFIED.",
+        "operationalAddedAt": "2026-08-12"
+      }
+    },
+    {
       "articleId": null,
       "articleIdStatus": "ID_PENDING_RECONCILIATION",
       "title": "Как попросить повышение зарплаты и спокойно подготовиться к разговору",
@@ -2101,7 +2139,22 @@
       }
     }
   ],
-  "nextQueue": [],
+  "nextQueue": [
+    {
+      "position": 1,
+      "articleId": "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya",
+      "slug": "kak-ponyat-chto-pora-razvoditsya",
+      "title": "Как понять, что пора разводиться: вопросы, которые помогут увидеть ситуацию яснее",
+      "status": "PLANNED",
+      "primaryQuery": "как понять что пора разводиться",
+      "frequencyStatus": "UNVERIFIED",
+      "cluster": "Развод и отношения",
+      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
+      "practiceKey": "razvod-yasnost-i-spokoystvie",
+      "practiceRelevance": "DIRECT",
+      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
+    }
+  ],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2197,10 +2250,12 @@
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
       "publishedArticleCount": 2,
-      "remainingQueueDependencies": 0,
-      "waitingArticleIds": [],
-      "status": "NO_WAITING_PUBLISHED_ARTICLES",
-      "evidence": "The canonical practice is live and now supports two published divorce-related articles with no remaining queue dependency.",
+      "remainingQueueDependencies": 1,
+      "waitingArticleIds": [
+        "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya"
+      ],
+      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
+      "evidence": "The canonical practice is already live. It supports one planned article and is not itself awaiting publication.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
       "authorPath": "sergey-and-zoya"
     },

@@ -22,6 +22,7 @@
     "/articles/kak-perestat-perezhivat-iz-za-deneg",
     "/articles/kak-perestat-zlitsya-na-cheloveka",
     "/articles/kak-ponyat-chego-ya-hochu",
+    "/articles/kak-ponyat-chto-pora-razvoditsya",
     "/articles/kak-poprosit-povyshenie-zarplaty",
     "/articles/kak-povysit-dohod",
     "/articles/kak-pravilno-sformulirovat-zhelanie",
@@ -156,6 +157,11 @@
       "articleId": "ART_kak-ponyat-chego-ya-hochu",
       "slug": "kak-ponyat-chego-ya-hochu",
       "path": "/articles/kak-ponyat-chego-ya-hochu"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya",
+      "slug": "kak-ponyat-chto-pora-razvoditsya",
+      "path": "/articles/kak-ponyat-chto-pora-razvoditsya"
     },
     {
       "articleId": "ART_plan26_как-попросить-повышение-зарплаты",
