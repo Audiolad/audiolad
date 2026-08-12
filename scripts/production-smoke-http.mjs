@@ -70,6 +70,21 @@ async function main() {
     includes: ["Аудио, которое помогает вернуться к себе"],
   });
   await checkRoute("catalog", "/catalog", { status: 200 });
+  const catalog = await fetchResponse("/catalog", { ua: IPHONE_SAFARI_UA });
+  if (catalog.status !== 200) {
+    fail("iphone_catalog", `expected HTTP 200, got ${catalog.status}`);
+  } else if (
+    !catalog.body.includes('aria-label="Основная навигация"') ||
+    !catalog.body.includes("bottom-nav bottom-nav--default")
+  ) {
+    fail(
+      "iphone_catalog_ssr_bottom_nav",
+      "catalog SSR HTML missing BottomNav",
+    );
+  } else {
+    pass("iphone_catalog");
+    pass("iphone_catalog_ssr_bottom_nav");
+  }
   await checkRoute("privacy", "/privacy", { status: 200 });
 
   const home = await fetchResponse("/", { ua: IPHONE_SAFARI_UA });
@@ -77,6 +92,17 @@ async function main() {
     fail("iphone_home", `expected HTTP 200, got ${home.status}`);
   } else {
     pass("iphone_home");
+    if (
+      !home.body.includes('aria-label="Основная навигация"') ||
+      !home.body.includes("bottom-nav bottom-nav--default")
+    ) {
+      fail(
+        "iphone_home_ssr_bottom_nav",
+        "SSR HTML missing BottomNav (aria-label / bottom-nav--default)",
+      );
+    } else {
+      pass("iphone_home_ssr_bottom_nav");
+    }
     const cssHrefs = [
       ...home.body.matchAll(/href="(\/_next\/static\/[^"]+\.css)"/g),
     ].map((match) => match[1]);
@@ -146,6 +172,45 @@ async function main() {
     fail("manifest", `status=${manifest.status}`);
   } else {
     pass("manifest");
+  }
+
+  const listen = await fetchResponse(
+    "/listen/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+    { ua: IPHONE_SAFARI_UA },
+  );
+  if (listen.status !== 200) {
+    fail("iphone_listen", `expected HTTP 200, got ${listen.status}`);
+  } else if (
+    !listen.body.includes('aria-label="Основная навигация"') ||
+    !listen.body.includes("bottom-nav bottom-nav--player")
+  ) {
+    fail(
+      "iphone_listen_ssr_bottom_nav",
+      "listen SSR HTML missing player BottomNav",
+    );
+  } else {
+    pass("iphone_listen");
+    pass("iphone_listen_ssr_bottom_nav");
+  }
+
+  const schoolHost = new URL(BASE).hostname;
+  if (schoolHost === "audiolad.ru" || schoolHost === "www.audiolad.ru") {
+    const school = await fetchResponse("https://school.audiolad.ru/", {
+      ua: IPHONE_SAFARI_UA,
+    });
+    if (school.status !== 200) {
+      fail("school_home", `expected HTTP 200, got ${school.status}`);
+    } else if (school.body.includes('aria-label="Основная навигация"')) {
+      fail(
+        "school_no_bottom_nav",
+        "school host SSR HTML must not include BottomNav",
+      );
+    } else {
+      pass("school_home");
+      pass("school_no_bottom_nav");
+    }
+  } else {
+    pass("school_bottom_nav_skipped_non_prod");
   }
 
   pass("auth_scenario_skipped_http");

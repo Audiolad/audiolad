@@ -41,7 +41,7 @@
 
 1. **Глобальный `<audio>`** принадлежит `GlobalAudioPlayerProvider` внутри platform route group; полноэкранные studio routes его не монтируют.
 2. **Shell** не дублирует доменную логику страниц.
-3. **Мобильный интерфейс** — BottomNav через portal; author mode скрывает bottom nav.
+3. **Мобильный интерфейс** — BottomNav в SSR HTML, после hydration portal на `document.body`; author mode скрывает bottom nav.
 
 ## Связанные документы
 

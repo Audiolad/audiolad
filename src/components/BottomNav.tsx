@@ -52,7 +52,7 @@ type BottomNavProps = {
   className?: string;
 };
 
-function useClientMounted(): boolean {
+function useIsClient(): boolean {
   return useSyncExternalStore(
     () => () => {},
     () => true,
@@ -65,11 +65,11 @@ export default function BottomNav({
   className = "",
 }: BottomNavProps) {
   const pathname = usePathname();
-  const mounted = useClientMounted();
+  const isClient = useIsClient();
   const isPlayerVariant = variant === "player";
   const isNeutralPath = isBottomNavNeutralPathname(pathname);
 
-  if (!shouldShowBottomNav(pathname) || !mounted) {
+  if (!shouldShowBottomNav(pathname)) {
     return null;
   }
 
@@ -126,5 +126,9 @@ export default function BottomNav({
     </nav>
   );
 
-  return createPortal(nav, document.body);
+  if (isClient) {
+    return createPortal(nav, document.body);
+  }
+
+  return nav;
 }

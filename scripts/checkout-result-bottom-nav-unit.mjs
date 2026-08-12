@@ -67,6 +67,10 @@ function testOtherCheckoutRoutesStayHidden() {
     "BottomNav uses shared visibility helper",
   );
   assert(
+    !bottomNav.includes("|| !mounted"),
+    "BottomNav SSR must not depend on client mount",
+  );
+  assert(
     pwaInstall.includes('"/checkout/"'),
     "other checkout routes remain excluded elsewhere (unchanged baseline)",
   );

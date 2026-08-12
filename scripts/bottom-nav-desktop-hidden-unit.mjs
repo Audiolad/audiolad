@@ -26,7 +26,20 @@ const pwaBanner = readFileSync("src/components/pwa/PwaInstallBanner.tsx", "utf8"
 
 assert(
   bottomNav.includes("createPortal(nav, document.body)"),
-  "BottomNav should portal to document.body for mobile stability",
+  "BottomNav should portal to document.body after hydration for mobile stability",
+);
+assert(
+  bottomNav.includes("useSyncExternalStore"),
+  "BottomNav must detect client after SSR via useSyncExternalStore",
+);
+assert(
+  bottomNav.includes("return nav"),
+  "BottomNav must render in-place for SSR HTML before the portal attaches",
+);
+assert(
+  !bottomNav.includes("useClientMounted") &&
+    !bottomNav.includes("|| !mounted"),
+  "BottomNav must not wait for client mount before the first paint",
 );
 assert(
   bottomNav.includes("xl:hidden"),
