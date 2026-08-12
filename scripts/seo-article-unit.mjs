@@ -6142,6 +6142,41 @@ assert(
   "divorce-assessment keeps pending hub and FAQ",
 );
 
+const childConversationArticle = getArticleBySlug(
+  "kak-skazat-rebenku-o-razvode-roditeley",
+);
+assert(childConversationArticle, "child-conversation article registered");
+assert(
+  childConversationArticle.title ===
+    "Как сказать ребёнку о разводе родителей: что и как говорить",
+  "child-conversation H1",
+);
+assert(
+  childConversationArticle.metaTitle ===
+    "Как сказать ребёнку о разводе родителей – что и как говорить – АудиоЛад",
+  "child-conversation meta title",
+);
+assert(
+  childConversationArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie" &&
+    childConversationArticle.relatedPractices.length === 0 &&
+    childConversationArticle.finalAudioLead === "",
+  "child-conversation has canonical practice and one player",
+);
+assert(
+  childConversationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ) &&
+    childConversationArticle.faq.length === 8,
+  "child-conversation has approved link and FAQ",
+);
+assert(
+  divorceChildArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+  ),
+  "child-divorce article links to child-conversation article",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

@@ -156,6 +156,16 @@ export const REBENOK_I_RAZVOD_RODITELEY_ARTICLE = {
     },
   ],
   finalAudioLead: "",
+  afterFinalAudio: [
+    {
+      before:
+        "Если решение уже принято и нужно понять, как именно сообщить ребёнку о разводе, может быть полезна статья ",
+      linkLabel:
+        "«Как сказать ребёнку о разводе родителей: что и как говорить»",
+      href: "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+      after: ".",
+    },
+  ],
   seeAlsoLinks: [],
   closingSection: {
     id: "glavnoe",

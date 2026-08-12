@@ -34,6 +34,7 @@
     "/articles/kak-prostit-sebya",
     "/articles/kak-razvit-lyubov-k-sebe",
     "/articles/kak-reshitsya-na-razvod",
+    "/articles/kak-skazat-rebenku-o-razvode-roditeley",
     "/articles/kak-umenshit-impulsivnye-pokupki",
     "/articles/kak-vosstanovit-sily-zhenshchine",
     "/articles/kak-vosstanovit-zhenskuyu-energiyu",
@@ -217,6 +218,11 @@
       "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
       "slug": "kak-reshitsya-na-razvod",
       "path": "/articles/kak-reshitsya-na-razvod"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-skazat-rebenku-o-razvode-roditeley",
+      "slug": "kak-skazat-rebenku-o-razvode-roditeley",
+      "path": "/articles/kak-skazat-rebenku-o-razvode-roditeley"
     },
     {
       "articleId": "ART_kak-umenshit-impulsivnye-pokupki",
