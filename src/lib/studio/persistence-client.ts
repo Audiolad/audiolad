@@ -271,6 +271,28 @@ export async function updateStudioProject({
   return body.project;
 }
 
+export async function deleteStudioProject({
+  projectId,
+  expectedRevision,
+  signal,
+}: {
+  projectId: string;
+  expectedRevision: number;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}?expectedRevision=${encodeURIComponent(String(expectedRevision))}`,
+    {
+      method: "DELETE",
+      signal,
+    },
+  );
+  if (!response.ok) throw await toStudioFetchError(response);
+  if (response.status !== 204) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+}
+
 export async function downloadStudioProjectAsset({
   projectId,
   assetId,

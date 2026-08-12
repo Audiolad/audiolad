@@ -47,10 +47,18 @@ assert.match(library, /Студия аудиопрактик/);
 assert.match(library, /\+ Новый проект/);
 assert.match(library, /Мои проекты/);
 assert.match(library, /Открыть/);
+assert.match(library, /Удалить/);
 assert.match(library, /Загружаем проекты/);
 assert.match(library, /У вас пока нет проектов/);
 assert.match(library, /Создать первый проект/);
 assert.match(library, /role="alert"/);
+assert.match(library, /role="dialog"/);
+assert.match(library, /Удалить проект\?/);
+assert.match(library, /Проект «\{projectToDelete\.name\}» будет удалён из Студии\./);
+assert.match(library, /deleteStudioProject/);
+assert.match(library, /setProjects\(\(items\) => items\?\.filter/);
+assert.match(library, /Не удалось удалить проект/);
+assert.match(library, /deletingProjectId/);
 
 const studioProjectsPage = await readFile(
   new URL("../src/app/(studio)/studio/projects/page.tsx", import.meta.url),

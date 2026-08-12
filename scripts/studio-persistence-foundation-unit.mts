@@ -273,6 +273,10 @@ assert.match(repository, /requireAuthorMembership/);
 assert.match(repository, /validateStudioProjectAssetReferences/);
 assert.match(repository, /parseStudioProjectData\(\(data as StudioProjectRow\)\.project_data\)/);
 assert.match(repository, /project_conflict/);
+assert.match(repository, /softDeleteStudioProject/);
+assert.match(repository, /\.eq\("status", "active"\)/);
+assert.match(repository, /status: "deleted"/);
+assert.match(repository, /deleted_at: deletedAt/);
 assert.doesNotMatch(repository, /last_opened_at: lastOpenedAt/);
 assert.doesNotMatch(repository, /createSignedUrl|normalizeStorageSignedUrl/);
 
@@ -289,6 +293,8 @@ const projectRoute = await readFile(
   "utf8",
 );
 assert.match(projectRoute, /expectedRevision/);
+assert.match(projectRoute, /export async function DELETE/);
+assert.match(projectRoute, /softDeleteStudioProject/);
 assert.doesNotMatch(projectRoute, /body\?\.revision/);
 
 const routeErrorMapper = await readFile(
