@@ -49,7 +49,7 @@ import {
   type StudioAutosaveState,
 } from "@/lib/studio/autosave";
 import { serializeStudioProjectState, validateStudioProjectDocument } from "@/lib/studio/persistence";
-import { updateStudioProject } from "@/lib/studio/persistence-client";
+import { getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
 
 type StudioTrackSlot = {
   id: string;
@@ -232,6 +232,10 @@ export default function StudioEditorShell({
   const tracksRef = useRef<StudioLocalTrack[]>([]);
   const assetSignatureRef = useRef<string | null>(null);
   const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
+  const [renderJob, setRenderJob] = useState<StudioRenderJob | null>(null);
+  const [renderPreviewUrl, setRenderPreviewUrl] = useState<string | null>(null);
+  const [renderBusy, setRenderBusy] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
   const navigationInProgressRef = useRef(false);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
@@ -411,6 +415,21 @@ export default function StudioEditorShell({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [autosaveState?.canWarnBeforeUnload]);
+
+  useEffect(() => {
+    const projectId = persistedHydration?.project.id;
+    if (!projectId) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const state = await getStudioRender(projectId);
+        if (!cancelled) { setRenderJob(state.latest); setRenderPreviewUrl(state.previewUrl); }
+      } catch { /* Export state does not block editing. */ }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [persistedHydration?.project.id]);
 
   const tracksById = useMemo(
     () => new Map(tracks.map((track) => [track.id, track])),
@@ -1269,6 +1288,25 @@ export default function StudioEditorShell({
     : saveHasDirtyChanges
       ? "Сохранить"
       : "Сохранено";
+  const queueRender = async () => {
+    const projectId = persistedHydration?.project.id;
+    const controller = controllerRef.current;
+    if (!projectId || !controller || renderBusy) return;
+    setRenderError(null);
+    setRenderBusy(true);
+    try {
+      if (!(await controller.flushAndWait())) {
+        throw new Error("Сначала дождитесь сохранения проекта и аудиофайлов.");
+      }
+      const job = await queueStudioRender(projectId);
+      setRenderJob(job);
+      setRenderPreviewUrl(null);
+    } catch (error) {
+      setRenderError(error instanceof Error ? error.message : "Не удалось поставить экспорт в очередь.");
+    } finally {
+      setRenderBusy(false);
+    }
+  };
 
   return (
     <section className="min-h-dvh bg-[#0b1019] text-[#edf0f7]">
@@ -1513,8 +1551,8 @@ export default function StudioEditorShell({
               >
                 {saveButtonLabel}
               </button>
-              <button type="button" disabled title="Экспорт будет доступен после подключения серверного сведения" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm opacity-45">
-                Экспорт
+              <button type="button" disabled={saveIsUnavailable || renderBusy} onClick={() => void queueRender()} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">
+                {renderBusy ? "Подготовка…" : "Экспорт MP3"}
               </button>
             </div>
           </div>
@@ -1551,6 +1589,14 @@ export default function StudioEditorShell({
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {editingError}
             </p>
+          ) : null}
+          {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
+          {renderJob ? (
+            <section className="mb-4 rounded-lg border border-violet-300/30 bg-[#121b28] px-4 py-3 text-sm">
+              {renderJob.status === "queued" || renderJob.status === "processing" ? <p className="text-[#d8c8fb]">Экспорт ожидает серверной обработки.</p> : null}
+              {renderJob.status === "failed" ? <p role="alert" className="text-rose-200">{renderJob.error_message_safe ?? "Экспорт не выполнен. Исходники проекта сохранены."}</p> : null}
+              {renderJob.status === "completed" ? <div className="flex flex-wrap items-center gap-3"><p className="text-emerald-200">Экспорт готов.</p>{renderPreviewUrl ? <audio controls preload="none" src={renderPreviewUrl} className="h-8 max-w-full" /> : null}<a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="rounded border border-emerald-300/40 px-3 py-1.5 font-medium text-emerald-100">Скачать MP3</a></div> : null}
+            </section>
           ) : null}
           {recordingError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">

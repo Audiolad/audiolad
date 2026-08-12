@@ -23,6 +23,9 @@ export type StudioPersistenceClientErrorCode =
   | "invalid_project_document"
   | "asset_not_found"
   | "revision_conflict"
+  | "render_already_queued"
+  | "no_active_tracks"
+  | "invalid_project_asset"
   | "server_error"
   | "network_error";
 
@@ -36,6 +39,9 @@ const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   invalid_project_document: "Проект повреждён или создан в неподдерживаемой версии Студии.",
   asset_not_found: "Аудиофайл проекта не найден.",
   revision_conflict: "Проект был изменён в другом окне.",
+  render_already_queued: "Экспорт этой версии проекта уже ожидает обработки.",
+  no_active_tracks: "Добавьте незаглушённый аудиофрагмент перед экспортом.",
+  invalid_project_asset: "Один из аудиофайлов проекта недоступен для экспорта.",
   server_error: "Сервер не смог сохранить аудио. Попробуйте ещё раз.",
   network_error: "Не удалось связаться с сервером. Проверьте подключение и повторите.",
 };
@@ -76,6 +82,28 @@ export type StudioProjectListItem = {
 };
 
 export type StudioProjectAssetMetadata = StudioUploadedAsset;
+export type StudioRenderJob = {
+  id: string;
+  project_revision: number;
+  status: "queued" | "processing" | "completed" | "failed";
+  output_storage_path: string | null;
+  error_code: string | null;
+  error_message_safe: string | null;
+};
+
+export async function getStudioRender(projectId: string): Promise<{ latest: StudioRenderJob | null; previewUrl: string | null }> {
+  const response = await studioFetch(`/api/studio/projects/${encodeURIComponent(projectId)}/render`, { cache: "no-store" });
+  if (!response.ok) throw await toStudioFetchError(response);
+  return await response.json() as { latest: StudioRenderJob | null; previewUrl: string | null };
+}
+
+export async function queueStudioRender(projectId: string): Promise<StudioRenderJob> {
+  const response = await studioFetch(`/api/studio/projects/${encodeURIComponent(projectId)}/render`, { method: "POST" });
+  if (!response.ok) throw await toStudioFetchError(response);
+  const body = await response.json() as { job?: StudioRenderJob };
+  if (!body.job) throw new StudioPersistenceClientError("server_error", response.status);
+  return body.job;
+}
 
 function isProject(value: unknown): value is StudioPersistedProject {
   return Boolean(
@@ -197,7 +225,11 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
   return new StudioPersistenceClientError(
     serverCode === "invalid_persisted_project_data"
       ? "invalid_project_document"
-      : getErrorCode(response.status),
+      : serverCode === "render_already_queued" ||
+          serverCode === "no_active_tracks" ||
+          serverCode === "invalid_project_asset"
+        ? serverCode
+        : getErrorCode(response.status),
     response.status,
   );
 }

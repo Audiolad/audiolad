@@ -121,6 +121,40 @@ function nextDeterministicRandom(seed: number): [number, number] {
 }
 
 /**
+ * Shared browser/server IR sample generator. Keep this pure so an export can
+ * construct the exact same deterministic impulse response as ConvolverNode.
+ */
+export function generateStudioVoicePresetImpulseSamples(
+  preset: Exclude<StudioVoicePreset, "none">,
+  sampleRate: number,
+): [Float32Array, Float32Array] {
+  const reverb = STUDIO_VOICE_PRESET_CONFIG[preset].reverb;
+  if (!reverb) {
+    throw new Error(`Preset "${preset}" does not define an impulse response.`);
+  }
+  const length = Math.max(1, Math.round(sampleRate * reverb.impulseDurationSeconds));
+  const channels: [Float32Array, Float32Array] = [
+    new Float32Array(length),
+    new Float32Array(length),
+  ];
+  const seeds = [reverb.leftSeed, reverb.rightSeed];
+
+  for (let channel = 0; channel < channels.length; channel += 1) {
+    const samples = channels[channel];
+    let seed = seeds[channel];
+    for (let index = 0; index < length; index += 1) {
+      const [nextSeed, random] = nextDeterministicRandom(seed);
+      seed = nextSeed;
+      const elapsed = index / sampleRate;
+      samples[index] =
+        (random * 2 - 1) * Math.exp(-elapsed / reverb.impulseDecaySeconds);
+    }
+  }
+
+  return channels;
+}
+
+/**
  * Returns one immutable, deterministic stereo IR per AudioContext, preset,
  * and sample rate. Independent channel seeds keep the wet field decorrelated,
  * with Trance using deliberately unrelated seed values for extra width.
@@ -140,21 +174,11 @@ export function getStudioVoicePresetImpulse(
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const length = Math.max(1, Math.round(context.sampleRate * reverb.impulseDurationSeconds));
+  const [left, right] = generateStudioVoicePresetImpulseSamples(preset, context.sampleRate);
+  const length = left.length;
   const impulse = context.createBuffer(2, length, context.sampleRate);
-  const seeds = [reverb.leftSeed, reverb.rightSeed];
-
-  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
-    const samples = impulse.getChannelData(channel);
-    let seed = seeds[channel];
-    for (let index = 0; index < length; index += 1) {
-      const [nextSeed, random] = nextDeterministicRandom(seed);
-      seed = nextSeed;
-      const elapsed = index / context.sampleRate;
-      samples[index] =
-        (random * 2 - 1) * Math.exp(-elapsed / reverb.impulseDecaySeconds);
-    }
-  }
+  impulse.getChannelData(0).set(left);
+  impulse.getChannelData(1).set(right);
 
   cache.set(cacheKey, impulse);
   return impulse;
