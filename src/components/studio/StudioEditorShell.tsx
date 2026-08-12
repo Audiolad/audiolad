@@ -1224,7 +1224,7 @@ export default function StudioEditorShell({
       (state.status === "saved" && !state.dirty && !state.isInFlight)
     ) {
       navigationInProgressRef.current = true;
-      router.push("/studio");
+      router.push("/studio/projects");
       return;
     }
     if (state.status === "error" || state.status === "conflict") return;
@@ -1234,7 +1234,7 @@ export default function StudioEditorShell({
     try {
       if (await controller.flushAndWait()) {
         navigated = true;
-        router.push("/studio");
+        router.push("/studio/projects");
       }
     } finally {
       if (!navigated) {
@@ -1277,7 +1277,7 @@ export default function StudioEditorShell({
           <StudioBrand />
           <nav className="flex flex-wrap items-center gap-2">
             <Link
-              href="/studio"
+              href="/studio/projects"
               onClick={(event) => void navigateToMyProjects(event)}
               className="inline-flex min-h-9 items-center rounded-lg px-3 text-sm text-[#bfc9da] hover:bg-white/5"
             >

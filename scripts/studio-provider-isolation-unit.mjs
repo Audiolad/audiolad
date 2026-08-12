@@ -46,6 +46,7 @@ function testProviderComposition() {
 function testStudioIsolation() {
   const studioLayout = readSource("src/app/(studio)/studio/layout.tsx");
   const studioPage = readSource("src/app/(studio)/studio/page.tsx");
+  const studioProjectsPage = readSource("src/app/(studio)/studio/projects/page.tsx");
   const editorLayout = readSource(
     "src/app/(studio)/studio/project/new/layout.tsx",
   );
@@ -63,9 +64,17 @@ function testStudioIsolation() {
     "new project route mounts its local audio provider",
   );
   assert(
-    studioPage.includes("StudioProjectLibrary") &&
-      studioPage.includes("<StudioProjectLibrary authorId={workspace.id} />"),
-    "studio entry renders the authenticated Project Library",
+    studioPage.includes("Создать аудиопрактику") &&
+      studioPage.includes("Прямой аудиоэфир") &&
+      studioPage.includes('href="/studio/projects"') &&
+      studioPage.includes('href="/studio/live"'),
+    "studio entry renders launcher routes",
+  );
+  assert(
+    studioProjectsPage.includes("StudioProjectLibrary") &&
+      studioProjectsPage.includes("<StudioProjectLibrary authorId={workspace.id} />") &&
+      studioProjectsPage.includes('requireStudioAuthorAccess("/studio/projects")'),
+    "project library is protected at its dedicated route",
   );
   assert(
     studioBrand.includes('src="/brand/audiolad-logo-light.webp"') &&
@@ -79,6 +88,7 @@ function testStudioIsolation() {
   );
   assert(
     !studioPage.includes("AudioContext") &&
+      !studioProjectsPage.includes("AudioContext") &&
       !livePage.includes("AudioContext") &&
       !studioPage.includes("StudioAudioProvider") &&
       !livePage.includes("StudioAudioProvider"),

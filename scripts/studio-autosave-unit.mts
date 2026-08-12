@@ -206,8 +206,13 @@ assert.match(shell, /flushAndWait\(\)/);
 assert.match(shell, /navigationInProgressRef/);
 assert.match(
   shell,
-  /href="\/studio"\s+onClick=\{\(event\) => void navigateToMyProjects\(event\)\}/,
+  /href="\/studio\/projects"\s+onClick=\{\(event\) => void navigateToMyProjects\(event\)\}/,
   "My Projects has its own autosave-aware navigation handler",
+);
+assert.match(
+  shell,
+  /router\.push\("\/studio\/projects"\)/,
+  "My Projects navigation uses the Project Library route",
 );
 assert.match(client, /export async function updateStudioProject/);
 assert.match(client, /revision_conflict/);

@@ -52,16 +52,20 @@ assert.match(library, /У вас пока нет проектов/);
 assert.match(library, /Создать первый проект/);
 assert.match(library, /role="alert"/);
 
-const studioPage = await readFile(
-  new URL("../src/app/(studio)/studio/page.tsx", import.meta.url),
+const studioProjectsPage = await readFile(
+  new URL("../src/app/(studio)/studio/projects/page.tsx", import.meta.url),
   "utf8",
 );
-assert.match(studioPage, /<StudioProjectLibrary authorId=\{workspace\.id\} \/>/);
+assert.match(studioProjectsPage, /requireStudioAuthorAccess\("\/studio\/projects"\)/);
+assert.match(studioProjectsPage, /<StudioProjectLibrary authorId=\{workspace\.id\} \/>/);
+assert.match(studioProjectsPage, /← В Studio/);
+assert.match(studioProjectsPage, /href="\/studio"/);
 
 const editor = await readFile(
   new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url),
   "utf8",
 );
 assert.match(editor, /← Мои проекты/);
+assert.match(editor, /href="\/studio\/projects"/);
 
 console.log("studio-project-library-unit: ok");
