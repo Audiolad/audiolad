@@ -357,13 +357,16 @@
       "articleId": "ART_new_20260812_kak-skazat-rebenku-o-razvode-roditeley",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-skazat-rebenku-o-razvode-roditeley",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-skazat-rebenku-o-razvode-roditeley",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-skazat-rebenku-o-razvode-roditeley",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-12T15:46:45Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, approved child-divorce link, age blocks, FAQ, sitemap, and no unexpected page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie. Release 20260812-154151-305bf1ba; BUILD_ID jaUJ4QZX5U4zMQgdVbPpk.",
+      "release": "20260812-154151-305bf1ba",
+      "buildId": "jaUJ4QZX5U4zMQgdVbPpk",
+      "validatedAt": "2026-08-12T15:46:45Z"
     },
     {
       "articleId": "ART_plan23_как-перестать-делать-импульсивные-покупк",
