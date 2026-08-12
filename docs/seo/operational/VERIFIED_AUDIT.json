@@ -210,13 +210,16 @@
       "articleId": "ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-pomoch-rebenku-perezhit-razvod-roditeley",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-12T16:25:17Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, approved child-divorce and child-conversation links, FAQ, sitemap, and no unexpected page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie. Release 20260812-161916-a7dd95af; BUILD_ID Tp9Kjg1e39dnncmLNc6XJ.",
+      "release": "20260812-161916-a7dd95af",
+      "buildId": "Tp9Kjg1e39dnncmLNc6XJ",
+      "validatedAt": "2026-08-12T16:25:17Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",

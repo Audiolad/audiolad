@@ -669,12 +669,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Как помочь ребёнку пережить развод родителей",
       "slug": "kak-pomoch-rebenku-perezhit-razvod-roditeley",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      "productionUrl": "https://audiolad.ru/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      "plannedUrl": null,
       "primaryQuery": "как помочь ребёнку пережить развод родителей",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -693,12 +693,12 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "STRONG",
-      "publishedAt": null,
-      "updatedAt": "2026-08-12T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-12T16:25:17Z",
+      "updatedAt": "2026-08-12T16:25:17Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Editorially approved primary query and publication scope. No committed verified frequency source was found; frequency remains UNVERIFIED.",
+        "evidence": "Production smoke passed at 2026-08-12T16:25:17Z on release 20260812-161916-a7dd95af (BUILD_ID Tp9Kjg1e39dnncmLNc6XJ). HTTP 200, H1, Meta Title, Meta Description, self-canonical, one player, canonical practice URL, approved child-divorce and child-conversation links, FAQ, sitemap, and no unexpected page errors passed. Frequency remains UNVERIFIED because no committed verified source was found.",
         "operationalAddedAt": "2026-08-12"
       }
     },
@@ -2215,22 +2215,7 @@
       }
     }
   ],
-  "nextQueue": [
-    {
-      "position": 1,
-      "articleId": "ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley",
-      "slug": "kak-pomoch-rebenku-perezhit-razvod-roditeley",
-      "title": "Как помочь ребёнку пережить развод родителей",
-      "status": "PLANNED",
-      "primaryQuery": "как помочь ребёнку пережить развод родителей",
-      "frequencyStatus": "UNVERIFIED",
-      "cluster": "Развод и отношения",
-      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
-      "practiceKey": "razvod-yasnost-i-spokoystvie",
-      "practiceRelevance": "STRONG",
-      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
-    }
-  ],
+  "nextQueue": [],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2325,13 +2310,11 @@
       "practiceTitle": "Развод: ясность и спокойствие",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 4,
-      "remainingQueueDependencies": 1,
-      "waitingArticleIds": [
-        "ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley"
-      ],
-      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
-      "evidence": "The canonical practice is already live. It supports one planned article and is not itself awaiting publication.",
+      "publishedArticleCount": 5,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "The canonical practice is live and supports five published divorce-related articles with no remaining queue dependency.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
       "authorPath": "sergey-and-zoya"
     },

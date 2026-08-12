@@ -7,8 +7,8 @@
 
 ## Result
 - Articles reconstructed from registry: **55**
-- New editorial operational entries published: **4**
-- PUBLISHED entries: **59**
+- New editorial operational entries published: **5**
+- PUBLISHED entries: **60**
 - Confirmed historical Article IDs: **40**
 - `ID_PENDING_RECONCILIATION`: **15**
 - Confirmed primary queries: **27**
@@ -22,7 +22,7 @@
 - Next Queue contains no published registry article.
 - Historical publication/queue/forecast statuses were intentionally not copied: the snapshot is from 2026-07-29 and contains 39 published rows, while the production-compatible registry contains 55.
 - Historical published audit entries remain `RECONSTRUCTED_FROM_PRODUCTION`,
-  not `VALIDATE PASS`; all four new divorce articles have explicit
+  not `VALIDATE PASS`; all five new divorce articles have explicit
   production-smoke `VALIDATE PASS`.
 
 ## Current divorce articles
@@ -76,6 +76,18 @@ planning artifacts and was added as a new editorial operational entry:
   `https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie`.
 - Production smoke: `VALIDATE PASS` on release
   `20260812-154151-305bf1ba` (BUILD_ID `jaUJ4QZX5U4zMQgdVbPpk`).
+
+The child-support article was also absent from committed historical
+planning artifacts and was added as a new editorial operational entry:
+
+- Article ID: `ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley`
+- Status: `PUBLISHED`
+- Frequency: `UNVERIFIED`; no committed verified frequency source exists.
+- Hub: pending; no new divorce/relationships Topic Hub was created.
+- Practice: `Развод: ясность и спокойствие`, `STRONG`; canonical public URL
+  `https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie`.
+- Production smoke: `VALIDATE PASS` on release
+  `20260812-161916-a7dd95af` (BUILD_ID `Tp9Kjg1e39dnncmLNc6XJ`).
 
 ## Required later reconciliation
 Reconcile the 15 pending IDs and any historical un-published candidates using only future committed planning artifacts. A new article may enter Next Queue only after an explicit plan record with primary query, frequency evidence, hub, practice mapping, and stable Article ID is committed.
