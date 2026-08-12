@@ -25,4 +25,14 @@ worktrees.
   that records its stable ID, primary query, frequency evidence, hub, and
   practice mapping.
 
+## Article IDs
+
+- Historical `ART_planXX` IDs are preserved without changes.
+- An article absent from the historical Editorial Master receives an immutable
+  ID in the form `ART_new_<YYYYMMDD>_<slug>`, using its first Operational
+  Master entry date and final Latin SEO slug.
+- Never reuse an ID. A merged, held, cancelled, or deleted article retains its
+  original ID; only its status changes.
+- Do not reconstruct an unknown historical ID retroactively without evidence.
+
 Run `npx tsx scripts/seo-operational-master-unit.mts` after any update.
