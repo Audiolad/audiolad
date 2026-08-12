@@ -9,12 +9,12 @@ import {
 import { toStudioAssetDto } from "@/lib/studio/server/model";
 import {
   parseUuid,
-  parseDurationSeconds,
   parseStudioSourceType,
   StudioApiError,
   validateStudioUpload,
 } from "@/lib/studio/server/validation";
 import { studioRouteError } from "@/lib/studio/server/route-errors";
+import { probeStudioAudioDuration } from "@/lib/studio/server/audio-duration";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -50,11 +50,15 @@ export async function POST(request: Request, context: RouteContext) {
 
     const projectId = parseUuid((await context.params).projectId, "not_found");
     const upload = validateStudioUpload(file);
+    const durationSeconds = await probeStudioAudioDuration(file, upload.mimeType);
+    if (durationSeconds === null) {
+      throw new StudioApiError("invalid_audio_duration", 422);
+    }
     const reserved = await reserveStudioAssetUpload({
       projectId,
       ...upload,
       sourceType: parseStudioSourceType(formData.get("sourceType")),
-      durationSeconds: parseDurationSeconds(formData.get("durationSeconds")),
+      durationSeconds,
     });
 
     try {

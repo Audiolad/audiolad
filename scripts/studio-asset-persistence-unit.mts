@@ -29,7 +29,7 @@ function assetResponse(
       originalName: "voice.mp3",
       mimeType: "audio/mpeg",
       sizeBytes: 5,
-      durationSeconds: null,
+      durationSeconds: 12,
       sourceType: "upload",
       createdAt: "2026-08-09T00:00:00.000Z",
       ...overrides,
@@ -148,6 +148,7 @@ assert.match(provider, /assetUploadGenerationRef/);
 assert.match(provider, /assetUploadControllersRef/);
 assert.match(provider, /cancelTrackAssetUpload\(trackId\)/);
 assert.match(provider, /assetId: uploadedAsset\.id/);
+assert.match(provider, /assetPersistenceStatus: "saved"/);
 assert.match(provider, /assetId: null,\s+assetPersistenceStatus: "pending"/);
 assert.match(provider, /retryTrackAssetUpload/);
 assert.match(provider, /sourceType: "upload"/);
@@ -155,5 +156,11 @@ assert.match(provider, /assetId: track\.assetId/);
 assert.match(history, /assetPersistenceStatus/);
 assert.match(editor, /hasPersistenceProject && track/);
 assert.match(editor, /Повторить/);
+const assetRoute = await readFile(
+  new URL("../src/app/api/studio/projects/[projectId]/assets/route.ts", import.meta.url),
+  "utf8",
+);
+assert.match(assetRoute, /probeStudioAudioDuration/);
+assert.match(assetRoute, /invalid_audio_duration/);
 
 console.log("studio asset persistence checks passed");

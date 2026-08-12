@@ -16,6 +16,7 @@ export type StudioUploadedAsset = {
 export type StudioPersistenceClientErrorCode =
   | "asset_too_large"
   | "invalid_upload"
+  | "invalid_audio_duration"
   | "unauthenticated"
   | "forbidden"
   | "project_not_found"
@@ -32,6 +33,7 @@ export type StudioPersistenceClientErrorCode =
 const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   asset_too_large: "Файл слишком большой для сохранения в проекте.",
   invalid_upload: "Не удалось сохранить этот аудиофайл.",
+  invalid_audio_duration: "Не удалось определить длительность аудиофайла. Выберите другой файл.",
   unauthenticated: "Войдите в аккаунт, чтобы сохранить аудио.",
   forbidden: "Нет доступа к этому проекту.",
   project_not_found: "Проект для сохранения не найден.",
@@ -227,7 +229,8 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
       ? "invalid_project_document"
       : serverCode === "render_already_queued" ||
           serverCode === "no_active_tracks" ||
-          serverCode === "invalid_project_asset"
+          serverCode === "invalid_project_asset" ||
+          serverCode === "invalid_audio_duration"
         ? serverCode
         : getErrorCode(response.status),
     response.status,
@@ -379,7 +382,7 @@ export async function uploadStudioProjectAsset({
   );
 
   if (!response.ok) {
-    throw new StudioPersistenceClientError(getErrorCode(response.status), response.status);
+    throw await toStudioFetchError(response);
   }
 
   let body: unknown;
