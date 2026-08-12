@@ -328,6 +328,18 @@
       "evidence": "Registry at 81d1f64dc0d834297b364ac00426a104c68c832d; historical mapping=EXACT_SLUG from 1a5694f9b2be97d2f5727f7c293dad73c8f63024."
     },
     {
+      "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-reshitsya-na-razvod",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-reshitsya-na-razvod",
+      "status": "PLANNED",
+      "practiceKey": "razvod-yasnost-i-spokoystvie",
+      "practiceRelevance": "DIRECT",
+      "validationStatus": "PLANNED",
+      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+    },
+    {
       "articleId": "ART_plan23_как-перестать-делать-импульсивные-покупк",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "slug": "kak-umenshit-impulsivnye-pokupki",

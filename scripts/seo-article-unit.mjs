@@ -6047,6 +6047,55 @@ assert(
   "divorce-child preserves required safety boundaries",
 );
 
+const divorceDecisionArticle = getArticleBySlug("kak-reshitsya-na-razvod");
+assert(divorceDecisionArticle, "divorce-decision article registered");
+assert(
+  divorceDecisionArticle.title ===
+    "Как решиться на развод, если страшно изменить жизнь",
+  "divorce-decision H1",
+);
+assert(
+  divorceDecisionArticle.metaTitle ===
+    "Как решиться на развод, если страшно изменить жизнь – АудиоЛад",
+  "divorce-decision meta title",
+);
+assert(
+  divorceDecisionArticle.metaDescription ===
+    "Как решиться на развод, если мешают страх, вина и неопределённость: как оценить отношения, последствия решения и определить следующий безопасный шаг.",
+  "divorce-decision meta description",
+);
+assert(
+  divorceDecisionArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-decision canonical practice key",
+);
+assert(
+  divorceDecisionArticle.relatedPractices.length === 0 &&
+    divorceDecisionArticle.finalAudioLead === "",
+  "divorce-decision renders one player",
+);
+assert(
+  divorceDecisionArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceDecisionArticle.topicHref === "/articles",
+  "divorce-decision leaves hub pending without a new hub",
+);
+assert(
+  divorceDecisionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ),
+  "divorce-decision links to child divorce article",
+);
+assert(divorceDecisionArticle.faq.length === 6, "divorce-decision FAQ");
+assert(
+  JSON.stringify(divorceDecisionArticle).includes(
+    "Практика не определяет, нужно ли сохранять брак или завершать его",
+  ) &&
+    JSON.stringify(divorceDecisionArticle).includes(
+      "приоритетом становится безопасность",
+    ),
+  "divorce-decision preserves decision and safety boundaries",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

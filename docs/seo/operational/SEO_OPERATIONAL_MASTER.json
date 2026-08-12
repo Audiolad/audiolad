@@ -1058,6 +1058,44 @@
       }
     },
     {
+      "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как решиться на развод, если страшно изменить жизнь",
+      "slug": "kak-reshitsya-na-razvod",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-reshitsya-na-razvod",
+      "primaryQuery": "как решиться на развод",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "razvod-yasnost-i-spokoystvie",
+        "title": "Развод: ясность и спокойствие",
+        "slug": "razvod-yasnost-i-spokoystvie",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": null,
+      "updatedAt": "2026-08-12T00:00:00.000Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
+        "evidence": "Editorially approved primary query and publication scope. No committed verified frequency source was found; frequency remains UNVERIFIED.",
+        "operationalAddedAt": "2026-08-12"
+      }
+    },
+    {
       "articleId": "ART_plan23_как-перестать-делать-импульсивные-покупк",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "title": "Как уменьшить импульсивные покупки и выбирать более осознанно",
@@ -2045,7 +2083,22 @@
       }
     }
   ],
-  "nextQueue": [],
+  "nextQueue": [
+    {
+      "position": 1,
+      "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
+      "slug": "kak-reshitsya-na-razvod",
+      "title": "Как решиться на развод, если страшно изменить жизнь",
+      "status": "PLANNED",
+      "primaryQuery": "как решиться на развод",
+      "frequencyStatus": "UNVERIFIED",
+      "cluster": "Развод и отношения",
+      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
+      "practiceKey": "razvod-yasnost-i-spokoystvie",
+      "practiceRelevance": "DIRECT",
+      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
+    }
+  ],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2141,10 +2194,12 @@
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
       "publishedArticleCount": 1,
-      "remainingQueueDependencies": 0,
-      "waitingArticleIds": [],
-      "status": "NO_WAITING_PUBLISHED_ARTICLES",
-      "evidence": "Production catalog selected sergey-and-zoya as the canonical author-path. Article smoke passed on 2026-08-12; the practice is live and has no publication dependency.",
+      "remainingQueueDependencies": 1,
+      "waitingArticleIds": [
+        "ART_new_20260812_kak-reshitsya-na-razvod"
+      ],
+      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
+      "evidence": "The canonical practice is already live. It supports one planned article and is not itself awaiting publication.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
       "authorPath": "sergey-and-zoya"
     },

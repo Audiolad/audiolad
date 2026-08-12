@@ -32,6 +32,7 @@
     "/articles/kak-prostit-cheloveka",
     "/articles/kak-prostit-sebya",
     "/articles/kak-razvit-lyubov-k-sebe",
+    "/articles/kak-reshitsya-na-razvod",
     "/articles/kak-umenshit-impulsivnye-pokupki",
     "/articles/kak-vosstanovit-sily-zhenshchine",
     "/articles/kak-vosstanovit-zhenskuyu-energiyu",
@@ -205,6 +206,11 @@
       "articleId": "ART_kak-razvit-lyubov-k-sebe",
       "slug": "kak-razvit-lyubov-k-sebe",
       "path": "/articles/kak-razvit-lyubov-k-sebe"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
+      "slug": "kak-reshitsya-na-razvod",
+      "path": "/articles/kak-reshitsya-na-razvod"
     },
     {
       "articleId": "ART_kak-umenshit-impulsivnye-pokupki",
