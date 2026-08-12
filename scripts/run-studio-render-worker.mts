@@ -18,8 +18,9 @@ const outputBucket = "studio-renders";
 async function main() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("render_worker_environment_missing");
   await service.rpc("recover_stale_studio_render_jobs");
-  const { data: job, error } = await service.rpc("claim_studio_render_job", { p_lease_seconds: 1800 });
+  const { data: claimed, error } = await service.rpc("claim_studio_render_job", { p_lease_seconds: 1800 });
   if (error) throw error;
+  const job = Array.isArray(claimed) ? claimed[0] : claimed;
   if (!job) return console.log("studio-render-worker: no queued jobs");
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
   try {
