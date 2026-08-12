@@ -17,6 +17,14 @@ Production больше **не собирается** внутри активн�
 /var/www/audiolad-deploy/previous  -> releases/<предыдущий>
 ```
 
+Hashed `/_next/static/*` files are also copied into:
+
+```text
+/var/www/audiolad-deploy/shared/next-static/
+```
+
+Nginx serves that overlay first so Safari/PWA clients with a previous HTML document still get 200 for old CSS/JS hashes after cutover. Overlay files older than 14 days are pruned on deploy.
+
 ## Команда деплоя
 
 ```bash

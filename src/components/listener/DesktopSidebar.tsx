@@ -32,7 +32,7 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
             width={SIDEBAR_LOGO_WIDTH}
             height={SIDEBAR_LOGO_HEIGHT}
             className="h-10 w-auto max-w-full object-contain object-left"
-            priority
+            sizes="280px"
           />
         </Link>
       </div>

@@ -19,13 +19,17 @@ type AudioladHorizontalLogoProps = {
   className?: string;
   linkClassName?: string;
   priority?: boolean;
+  sizes?: string;
   variant?: "default" | "profile";
 };
+
+const DEFAULT_LOGO_SIZES = "(min-width: 768px) 128px, 192px";
 
 export default function AudioladHorizontalLogo({
   className = audioladHorizontalLogoImageClassName,
   linkClassName,
   priority = false,
+  sizes = DEFAULT_LOGO_SIZES,
   variant = "default",
 }: AudioladHorizontalLogoProps) {
   const resolvedLinkClassName =
@@ -41,6 +45,7 @@ export default function AudioladHorizontalLogo({
         width={HORIZONTAL_LOGO_WIDTH}
         height={HORIZONTAL_LOGO_HEIGHT}
         className={className}
+        sizes={sizes}
         priority={priority}
       />
     </Link>

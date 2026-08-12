@@ -328,6 +328,30 @@ get_release_name() {
   date -u +"%Y%m%d-%H%M%S-${short}"
 }
 
+NEXT_STATIC_OVERLAY_DIR="${NEXT_STATIC_OVERLAY_DIR:-$DEPLOY_ROOT/shared/next-static}"
+NEXT_STATIC_OVERLAY_MAX_AGE_DAYS="${NEXT_STATIC_OVERLAY_MAX_AGE_DAYS:-14}"
+
+publish_next_static_overlay() {
+  local release_dir="$1"
+  local src="$release_dir/.next/static"
+
+  if [[ ! -d "$src" ]]; then
+    log_error "No .next/static in release: $release_dir"
+    return 1
+  fi
+
+  mkdir -p "$NEXT_STATIC_OVERLAY_DIR"
+  cp -a "$src/." "$NEXT_STATIC_OVERLAY_DIR/"
+  log_info "Published hashed static overlay from $release_dir to $NEXT_STATIC_OVERLAY_DIR"
+  prune_next_static_overlay
+}
+
+prune_next_static_overlay() {
+  [[ -d "$NEXT_STATIC_OVERLAY_DIR" ]] || return 0
+  find "$NEXT_STATIC_OVERLAY_DIR" -type f -mtime +"$NEXT_STATIC_OVERLAY_MAX_AGE_DAYS" -delete
+  find "$NEXT_STATIC_OVERLAY_DIR" -type d -empty -delete 2>/dev/null || true
+}
+
 # shellcheck source=release-retention.sh
 source "$(dirname "${BASH_SOURCE[0]}")/release-retention.sh"
 # shellcheck source=zero-downtime.sh

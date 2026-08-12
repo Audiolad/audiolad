@@ -1,6 +1,7 @@
 "use client";
 
 import type { PwaPlatform } from "@/lib/pwa/constants";
+import { isSchoolHostname } from "@/lib/school/host";
 
 export async function syncPwaProfileState(input: {
   action: "installed" | "standalone_open";
@@ -21,8 +22,16 @@ export async function syncPwaProfileState(input: {
   }
 }
 
+export function shouldRegisterPwaServiceWorker(hostname: string): boolean {
+  return !isSchoolHostname(hostname);
+}
+
 export function registerPwaServiceWorker(): void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+
+  if (!shouldRegisterPwaServiceWorker(window.location.hostname)) {
     return;
   }
 

@@ -613,6 +613,40 @@ function testCorruptedStorageFallback() {
   assert(storage.includes("PWA_DEFAULT_DEVICE_STATE"), "fallback default state");
 }
 
+function testSchoolHostDoesNotRegisterServiceWorker() {
+  const register = readRoot("src/lib/pwa/register-sw.ts");
+  const proxy = readRoot("src/proxy.ts");
+
+  assert(
+    register.includes("shouldRegisterPwaServiceWorker"),
+    "SW registration is gated by hostname",
+  );
+  assert(
+    register.includes("isSchoolHostname"),
+    "school host must not register the main PWA worker",
+  );
+  assert(
+    proxy.includes("sw\\\\.js"),
+    "proxy matcher skips sw.js",
+  );
+  assert(
+    proxy.includes("/manifest.webmanifest"),
+    "school public asset allowlist includes manifest",
+  );
+}
+
+function testDesktopSidebarLogoDoesNotPreloadOnMobile() {
+  const sidebar = readRoot("src/components/listener/DesktopSidebar.tsx");
+  const logo = readRoot("src/components/brand/AudioladHorizontalLogo.tsx");
+
+  assert(
+    !/src="\/brand\/audiolad-logo-sidebar.png"[\s\S]{0,250}priority/.test(sidebar),
+    "hidden desktop sidebar logo must not priority-preload 3840px on mobile",
+  );
+  assert(sidebar.includes('sizes="280px"'), "sidebar logo has bounded sizes");
+  assert(logo.includes("sizes={sizes}"), "horizontal logo forwards sizes");
+}
+
 function testServiceWorkerNoOfflineHtml() {
   const sw = readRoot("public/sw.js");
 
@@ -917,6 +951,8 @@ const tests = [
   ["in-app browser fallback", testInAppBrowserFallback],
   ["corrupted storage fallback", testCorruptedStorageFallback],
   ["service worker no offline html", testServiceWorkerNoOfflineHtml],
+  ["school host does not register service worker", testSchoolHostDoesNotRegisterServiceWorker],
+  ["desktop sidebar logo does not preload on mobile", testDesktopSidebarLogoDoesNotPreloadOnMobile],
   ["click does not confirm install", testClickDoesNotConfirmInstallAlone],
   ["menu item visibility rules", testMenuItemVisibilityRules],
   ["open install flow always opens dialog", testOpenInstallFlowAlwaysOpensDialog],

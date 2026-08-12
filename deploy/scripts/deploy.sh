@@ -126,6 +126,7 @@ main() {
 
   EXPECTED_BUILD_ID="$(read_build_id "$RELEASE_DIR")"
   log_info "candidate_build_passed release=${RELEASE_NAME} buildId=${EXPECTED_BUILD_ID}"
+  publish_next_static_overlay "$RELEASE_DIR"
   log_info "Active production remains on port ${OLD_ACTIVE_PORT} app=${OLD_ACTIVE_PM2_APP}"
   # Leave release tree before any destructive cleanup/rollback paths.
   cd "$DEPLOY_ROOT"

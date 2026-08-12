@@ -31,6 +31,7 @@ export default function HomeMobileHeader({ shellData }: HomeMobileHeaderProps) {
       >
         <AudioladHorizontalLogo
           priority
+          sizes={isGuest ? "165px" : undefined}
           className={isGuest ? guestHomeMobileLogoImageClassName : undefined}
           linkClassName={isGuest ? guestHomeMobileLogoLinkClassName : undefined}
         />

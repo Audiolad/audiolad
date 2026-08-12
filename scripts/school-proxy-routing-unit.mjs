@@ -16,10 +16,14 @@ import {
   SCHOOL_HOSTNAME,
   SCHOOL_SITE_PATH,
 } from "../src/lib/school/host.ts";
-import { resolveSchoolProxyAction } from "../src/proxy.ts";
+import { resolveSchoolProxyAction } from "../src/lib/school/proxy-policy.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const proxySource = readFileSync(join(repoRoot, "src/proxy.ts"), "utf8");
+const policySource = readFileSync(
+  join(repoRoot, "src/lib/school/proxy-policy.ts"),
+  "utf8",
+);
 
 function assertAction(hostname, pathname, expected) {
   const actual = resolveSchoolProxyAction(hostname, pathname);
@@ -46,6 +50,8 @@ assertAction(SCHOOL_HOSTNAME, "/", "rewrite_school_landing");
 assertAction(SCHOOL_HOSTNAME, SCHOOL_SITE_PATH, "pass_through");
 assertAction(SCHOOL_HOSTNAME, "/robots.txt", "pass_through");
 assertAction(SCHOOL_HOSTNAME, "/sitemap.xml", "pass_through");
+assertAction(SCHOOL_HOSTNAME, "/sw.js", "pass_through");
+assertAction(SCHOOL_HOSTNAME, "/manifest.webmanifest", "pass_through");
 for (const pathname of [
   "/listen/sergey-petrov/dengi-menya-obozhayut",
   "/catalog",
@@ -85,14 +91,34 @@ assert.equal(
   "proxy must not redirect SCHOOL_SITE_PATH on school host",
 );
 assert.match(
-  proxySource,
+  policySource,
   /action:\s*"not_found"/,
   "main-site school-site block must remain",
 );
 assert.match(
   proxySource,
+  /schoolAction\.action === "not_found"/,
+  "proxy still returns 404 for school not_found actions",
+);
+assert.match(
+  proxySource,
   /rewritePathname:\s*SCHOOL_SITE_PATH/,
   "school root rewrite must remain",
+);
+assert.match(
+  policySource,
+  /SCHOOL_PUBLIC_ASSET_PATHS/,
+  "school public asset allowlist exists",
+);
+assert.match(
+  proxySource,
+  /sw\\\\.js/,
+  "proxy matcher skips /sw.js so school host cannot 404 it",
+);
+assert.match(
+  proxySource,
+  /manifest\\\\.webmanifest/,
+  "proxy matcher skips /manifest.webmanifest so school host cannot 404 it",
 );
 
 console.log("school-proxy-routing-unit: ok");
