@@ -1738,13 +1738,13 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Ребёнок и развод родителей: как помочь ему пройти через перемены",
       "slug": "rebenok-i-razvod-roditeley",
-      "productionUrl": null,
+      "productionUrl": "https://audiolad.ru/articles/rebenok-i-razvod-roditeley",
       "plannedUrl": "https://audiolad.ru/articles/rebenok-i-razvod-roditeley",
       "primaryQuery": "ребёнок и развод родителей",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
       "researchFrequencyCandidate": 3015,
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -1757,21 +1757,40 @@
         "key": "razvod-yasnost-i-spokoystvie",
         "title": "Развод: ясность и спокойствие",
         "slug": "razvod-yasnost-i-spokoystvie",
-        "productionUrls": [
-          "https://audiolad.ru/practice/sergey-petrov/razvod-yasnost-i-spokoystvie",
-          "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie"
-        ],
-        "authorStatus": "PENDING_CATALOG_AUTHOR_RECONCILIATION",
-        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
+        "nonCanonicalRoute": {
+          "url": "https://audiolad.ru/practice/sergey-petrov/razvod-yasnost-i-spokoystvie",
+          "status": "ACTIVE_ROUTE_NOT_SELECTED_BY_PRODUCTION_CATALOG"
+        }
       },
       "practiceRelevance": "STRONG",
-      "publishedAt": null,
-      "updatedAt": "2026-08-12T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-12T14:35:12Z",
+      "updatedAt": "2026-08-12T14:35:12Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
         "evidence": "Editorially approved primary query and scope. Research frequency candidate 3015 is intentionally not treated as verified Master frequency.",
-        "operationalAddedAt": "2026-08-12"
+        "operationalAddedAt": "2026-08-12",
+        "productionSmoke": {
+          "validatedAt": "2026-08-12T14:35:12Z",
+          "release": "20260812-142911-2588cc01",
+          "buildId": "is8Cnf-VY9yL9w-cRnOKw",
+          "checks": [
+            "HTTP_200",
+            "H1",
+            "META_TITLE",
+            "META_DESCRIPTION",
+            "CANONICAL",
+            "ONE_PLAYER",
+            "CANONICAL_PRACTICE",
+            "FAQ",
+            "SITEMAP",
+            "NO_PAGE_ERRORS"
+          ]
+        }
       }
     },
     {
@@ -2026,22 +2045,7 @@
       }
     }
   ],
-  "nextQueue": [
-    {
-      "position": 1,
-      "articleId": "ART_new_20260812_rebenok-i-razvod-roditeley",
-      "slug": "rebenok-i-razvod-roditeley",
-      "title": "Ребёнок и развод родителей: как помочь ему пройти через перемены",
-      "status": "PLANNED",
-      "primaryQuery": "ребёнок и развод родителей",
-      "frequencyStatus": "UNVERIFIED",
-      "cluster": "Развод и отношения",
-      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
-      "practiceKey": "razvod-yasnost-i-spokoystvie",
-      "practiceRelevance": "STRONG",
-      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
-    }
-  ],
+  "nextQueue": [],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2134,19 +2138,15 @@
     {
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceTitle": "Развод: ясность и спокойствие",
-      "productionUrls": [
-        "https://audiolad.ru/practice/sergey-petrov/razvod-yasnost-i-spokoystvie",
-        "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie"
-      ],
-      "authorStatus": "PENDING_CATALOG_AUTHOR_RECONCILIATION",
+      "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 0,
-      "remainingQueueDependencies": 1,
-      "waitingArticleIds": [
-        "ART_new_20260812_rebenok-i-razvod-roditeley"
-      ],
-      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
-      "evidence": "Both public practice URLs returned HTTP 200 on 2026-08-12. This forecasts support for a planned article; it does not mark the practice as awaiting publication."
+      "publishedArticleCount": 1,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Production catalog selected sergey-and-zoya as the canonical author-path. Article smoke passed on 2026-08-12; the practice is live and has no publication dependency.",
+      "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+      "authorPath": "sergey-and-zoya"
     },
     {
       "practiceKey": "vosstanovlenie-zhenskoy-energii",

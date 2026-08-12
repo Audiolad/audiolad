@@ -540,13 +540,12 @@
       "articleId": "ART_new_20260812_rebenok-i-razvod-roditeley",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "rebenok-i-razvod-roditeley",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/rebenok-i-razvod-roditeley",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/rebenok-i-razvod-roditeley",
+      "status": "PUBLISHED",
       "practiceKey": "razvod-yasnost-i-spokoystvie",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency candidate 3015 remains UNVERIFIED."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-12T14:35:12Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, FAQ, sitemap, and no page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie."
     },
     {
       "articleId": null,

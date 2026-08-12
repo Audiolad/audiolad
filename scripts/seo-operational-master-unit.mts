@@ -169,7 +169,8 @@ assert(
           article.status === entry.status,
       ) &&
       (entry.status === "PUBLISHED"
-        ? entry.validationStatus === "RECONSTRUCTED_FROM_PRODUCTION"
+        ? entry.validationStatus === "RECONSTRUCTED_FROM_PRODUCTION" ||
+          entry.validationStatus === "VALIDATE PASS"
         : entry.validationStatus === "PLANNED"),
   ),
   "audit records the correct validation state",

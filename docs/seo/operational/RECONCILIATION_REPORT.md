@@ -7,22 +7,23 @@
 
 ## Result
 - Articles reconstructed from registry: **55**
-- New planned operational entries: **1**
-- PUBLISHED entries: **55**
+- New editorial operational entries published: **1**
+- PUBLISHED entries: **56**
 - Confirmed historical Article IDs: **40**
 - `ID_PENDING_RECONCILIATION`: **15**
 - Confirmed primary queries: **27**
 - Confirmed frequencies: **7**
-- Next Queue: **1** planned article
-- Practice Forecast: **12** practice keys; one published practice supports one
-  planned article.
+- Next Queue: **0** planned articles
+- Practice Forecast: **12** practice keys, all with **0** remaining queue
+  dependencies.
 
 ## Validation
 - Registry slugs are unique and each operational article has one canonical production URL.
-- Next Queue contains only the planned article and no published registry article.
+- Next Queue contains no published registry article.
 - Historical publication/queue/forecast statuses were intentionally not copied: the snapshot is from 2026-07-29 and contains 39 published rows, while the production-compatible registry contains 55.
-- Published audit entries are `RECONSTRUCTED_FROM_PRODUCTION`, not
-  `VALIDATE PASS`; the new planned entry is explicitly `PLANNED`.
+- Historical published audit entries remain `RECONSTRUCTED_FROM_PRODUCTION`,
+  not `VALIDATE PASS`; the divorce article has an explicit production-smoke
+  `VALIDATE PASS`.
 
 ## Current divorce article
 No committed operational-master or semantic-map entry was found for “Ребёнок и
@@ -30,13 +31,15 @@ No committed operational-master or semantic-map entry was found for “Ребё�
 operational entry rather than a reconstruction:
 
 - Article ID: `ART_new_20260812_rebenok-i-razvod-roditeley`
-- Status: `PLANNED`
+- Status: `PUBLISHED`
 - Frequency: `UNVERIFIED`; research candidate `3015` is not a verified Master
   frequency.
 - Hub: pending; there is no existing divorce/relationships Topic Hub in the
   production-compatible registry.
-- Practice: `Развод: ясность и спокойствие`, `STRONG`; the linked public
-  practice is already live and is not treated as awaiting publication.
+- Practice: `Развод: ясность и спокойствие`, `STRONG`; canonical public URL
+  `https://audiolad.ru/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie`.
+- Production smoke: `VALIDATE PASS` on release
+  `20260812-142911-2588cc01` (BUILD_ID `is8Cnf-VY9yL9w-cRnOKw`).
 
 ## Required later reconciliation
 Reconcile the 15 pending IDs and any historical un-published candidates using only future committed planning artifacts. A new article may enter Next Queue only after an explicit plan record with primary query, frequency evidence, hub, practice mapping, and stable Article ID is committed.
