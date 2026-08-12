@@ -136,6 +136,53 @@ retryable.retry();
 await tick();
 assert.equal(retryable.getState().status, "saved", "manual Save retries network/server failures");
 
+let navigationSnapshot: StudioAutosaveSnapshot = {
+  name: "Навигация",
+  document: document(),
+};
+const navigationRequests: Array<(value: { revision: number }) => void> = [];
+const navigationSave = new StudioAutosaveController({
+  getSnapshot: () => navigationSnapshot,
+  timers: fakeTimers,
+  update: () => new Promise((resolve) => navigationRequests.push(resolve)),
+});
+navigationSave.hydrate({
+  revision: 1,
+  name: "Навигация",
+  document: document(),
+  complete: true,
+});
+navigationSnapshot = { name: "Навигация v2", document: document(30) };
+navigationSave.markDirty();
+const settledNavigation = navigationSave.flushAndWait();
+assert.equal(navigationRequests.length, 1, "navigation flush starts the pending save immediately");
+navigationSnapshot = { name: "Навигация v3", document: document(35) };
+navigationSave.markDirty();
+navigationRequests.shift()?.({ revision: 2 });
+await tick();
+assert.equal(
+  navigationRequests.length,
+  1,
+  "navigation flush saves edits made while the first request was in flight",
+);
+navigationRequests.shift()?.({ revision: 3 });
+assert.equal(await settledNavigation, true, "navigation waits for a clean save state");
+
+const failedNavigation = new StudioAutosaveController({
+  getSnapshot: () => ({ name: "Ошибка", document: document(40) }),
+  timers: fakeTimers,
+  update: async () => {
+    throw { status: 500 };
+  },
+});
+failedNavigation.hydrate({ revision: 1, name: "Ошибка", document: document(), complete: true });
+failedNavigation.markDirty();
+assert.equal(
+  await failedNavigation.flushAndWait(),
+  false,
+  "navigation flush refuses to settle after a save error",
+);
+
 assert(states.includes("saving") && states.includes("saved") && states.includes("conflict"));
 const shell = await readFile(
   new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url), "utf8",
@@ -154,6 +201,14 @@ assert.match(shell, /autosaveState\?\.isInFlight/);
 assert.match(shell, /saveButtonDisabled/);
 assert.match(shell, /Сохранено/);
 assert.match(shell, /assetPersistenceStatus !== "saved"/);
+assert.match(shell, /useRouter/);
+assert.match(shell, /flushAndWait\(\)/);
+assert.match(shell, /navigationInProgressRef/);
+assert.match(
+  shell,
+  /href="\/studio"\s+onClick=\{\(event\) => void navigateToMyProjects\(event\)\}/,
+  "My Projects has its own autosave-aware navigation handler",
+);
 assert.match(client, /export async function updateStudioProject/);
 assert.match(client, /revision_conflict/);
 

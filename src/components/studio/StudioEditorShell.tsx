@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import {
@@ -205,6 +206,7 @@ export default function StudioEditorShell({
   recorderDebug?: boolean;
   audioDebug?: boolean;
 }) {
+  const router = useRouter();
   const addAudioInputRef = useRef<HTMLInputElement | null>(null);
   const replaceAudioInputRef = useRef<HTMLInputElement | null>(null);
   const timelineRef = useRef<StudioTimelineHandle | null>(null);
@@ -230,6 +232,8 @@ export default function StudioEditorShell({
   const tracksRef = useRef<StudioLocalTrack[]>([]);
   const assetSignatureRef = useRef<string | null>(null);
   const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
+  const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
+  const navigationInProgressRef = useRef(false);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
     { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
@@ -321,7 +325,10 @@ export default function StudioEditorShell({
         });
         return { revision: project.revision };
       },
-      onChange: setAutosaveState,
+      onChange: (state) => {
+        autosaveStateRef.current = state;
+        setAutosaveState(state);
+      },
     });
   }, [exportEditingState]);
 
@@ -1203,6 +1210,39 @@ export default function StudioEditorShell({
     }
   }, [autosaveState?.canWarnBeforeUnload]);
 
+  const navigateToMyProjects = useCallback(async (
+    event: MouseEvent<HTMLAnchorElement>,
+  ) => {
+    event.preventDefault();
+    if (navigationInProgressRef.current) return;
+
+    const controller = controllerRef.current;
+    const state = autosaveStateRef.current ?? controller?.getState();
+    if (
+      !controller ||
+      !state ||
+      (state.status === "saved" && !state.dirty && !state.isInFlight)
+    ) {
+      navigationInProgressRef.current = true;
+      router.push("/studio");
+      return;
+    }
+    if (state.status === "error" || state.status === "conflict") return;
+
+    navigationInProgressRef.current = true;
+    let navigated = false;
+    try {
+      if (await controller.flushAndWait()) {
+        navigated = true;
+        router.push("/studio");
+      }
+    } finally {
+      if (!navigated) {
+        navigationInProgressRef.current = false;
+      }
+    }
+  }, [router]);
+
   const autosaveMessage = autosaveState?.status === "partial-disabled"
     ? "Проект открыт не полностью. Сохранение отключено."
     : autosaveState?.status === "conflict"
@@ -1238,10 +1278,10 @@ export default function StudioEditorShell({
           <nav className="flex flex-wrap items-center gap-2">
             <Link
               href="/studio"
-              onClick={guardNavigation}
+              onClick={(event) => void navigateToMyProjects(event)}
               className="inline-flex min-h-9 items-center rounded-lg px-3 text-sm text-[#bfc9da] hover:bg-white/5"
             >
-              ← Назад в Studio
+              ← Мои проекты
             </Link>
             <Link
               href="/author-dashboard"

@@ -76,6 +76,7 @@ export class StudioAutosaveController {
   private conflict = false;
   private automaticStopped = false;
   private status: StudioAutosaveStatus = "saved";
+  private settleWaiters: Array<(saved: boolean) => void> = [];
 
   constructor(private readonly options: StudioAutosaveControllerOptions) {
     this.debounceMs = options.debounceMs ?? 1500;
@@ -129,8 +130,31 @@ export class StudioAutosaveController {
     this.saveNow();
   }
 
+  /**
+   * Immediately persists outstanding edits and resolves only after they are
+   * saved, or when saving can no longer make progress.
+   */
+  flushAndWait(): Promise<boolean> {
+    this.clearTimer();
+    const state = this.getState();
+    if (!this.enabled || this.conflict || state.status === "error" ||
+      state.status === "asset-uploading" || state.status === "partial-disabled") {
+      return Promise.resolve(false);
+    }
+    if (!state.dirty && !state.isInFlight && state.status === "saved") {
+      return Promise.resolve(true);
+    }
+
+    const settled = new Promise<boolean>((resolve) => {
+      this.settleWaiters.push(resolve);
+    });
+    if (!this.inFlight) this.saveNow();
+    return settled;
+  }
+
   dispose() {
     this.clearTimer();
+    this.resolveSettleWaiters(false);
   }
 
   getState(): StudioAutosaveState {
@@ -200,7 +224,13 @@ export class StudioAutosaveController {
         this.savedGeneration = generation;
         this.status = "saved";
         this.emit();
-        if (this.generation > generation) this.schedule();
+        if (this.generation > generation) {
+          if (this.settleWaiters.length) {
+            this.saveNow();
+          } else {
+            this.schedule();
+          }
+        }
       },
       (error: unknown) => {
         this.inFlight = false;
@@ -225,5 +255,18 @@ export class StudioAutosaveController {
 
   private emit() {
     this.options.onChange?.(this.getState());
+    const state = this.getState();
+    if (state.status === "error" || state.status === "conflict" ||
+      state.status === "asset-uploading" || state.status === "partial-disabled") {
+      this.resolveSettleWaiters(false);
+    } else if (!state.dirty && !state.isInFlight && state.status === "saved") {
+      this.resolveSettleWaiters(true);
+    }
+  }
+
+  private resolveSettleWaiters(saved: boolean) {
+    const waiters = this.settleWaiters;
+    this.settleWaiters = [];
+    for (const resolve of waiters) resolve(saved);
   }
 }

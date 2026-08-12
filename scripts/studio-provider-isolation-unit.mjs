@@ -63,10 +63,9 @@ function testStudioIsolation() {
     "new project route mounts its local audio provider",
   );
   assert(
-    studioPage.includes("Создать аудиопрактику") &&
-      studioPage.includes("Прямой аудиоэфир") &&
-      studioPage.includes('href="/studio/project/new"'),
-    "studio entry renders both mode cards",
+    studioPage.includes("StudioProjectLibrary") &&
+      studioPage.includes("<StudioProjectLibrary authorId={workspace.id} />"),
+    "studio entry renders the authenticated Project Library",
   );
   assert(
     studioBrand.includes('src="/brand/audiolad-logo-light.webp"') &&

@@ -67,6 +67,14 @@ export type StudioPersistedProject = {
   revision: number;
 };
 
+export type StudioProjectListItem = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+  revision: number;
+};
+
 export type StudioProjectAssetMetadata = StudioUploadedAsset;
 
 function isProject(value: unknown): value is StudioPersistedProject {
@@ -81,6 +89,53 @@ function isProject(value: unknown): value is StudioPersistedProject {
       typeof value.revision === "number" &&
       "projectData" in value,
   );
+}
+
+function isProjectListItem(value: unknown): value is StudioProjectListItem {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "id" in value &&
+      typeof value.id === "string" &&
+      "name" in value &&
+      typeof value.name === "string" &&
+      "updatedAt" in value &&
+      typeof value.updatedAt === "string" &&
+      "lastOpenedAt" in value &&
+      ("revision" in value) &&
+      typeof value.revision === "number",
+  );
+}
+
+export async function listStudioProjects({
+  authorId,
+  signal,
+}: {
+  authorId: string;
+  signal?: AbortSignal;
+}): Promise<StudioProjectListItem[]> {
+  const response = await studioFetch(
+    `/api/studio/projects?authorId=${encodeURIComponent(authorId)}`,
+    { signal },
+  );
+  if (!response.ok) throw await toStudioFetchError(response);
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("projects" in body) ||
+    !Array.isArray(body.projects) ||
+    !body.projects.every(isProjectListItem)
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return body.projects;
 }
 
 export async function createStudioProject({

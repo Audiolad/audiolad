@@ -419,7 +419,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, />\s*[MS]\s*</);
   assert.doesNotMatch(studioWorkspace, /\bSolo\b/i);
   assert.match(studioWorkspace, /href="\/studio"/);
-  assert.match(studioWorkspace, /Назад в Studio/);
+  assert.match(studioWorkspace, /Мои проекты/);
   assert.match(studioWorkspace, /max=\{trackKind === "music" \? STUDIO_MUSIC_VOLUME_MAX_DB : "400"\}/);
   assert.match(studioWorkspace, /getStudioMusicVolumeFromDb\(Number\(event\.target\.value\)\)/);
   assert.doesNotMatch(studioWorkspace, /transform:\s*["'`]?rotate/);
