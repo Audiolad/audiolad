@@ -15,6 +15,7 @@ assert.match(worker, /renderStudioProjectToMp3/);
 assert.match(worker, /renderOutputPath/);
 assert.match(worker, /upsert: true/);
 assert.match(worker, /Array\.isArray\(claimed\) \? claimed\[0\] : claimed/);
+assert.match(worker, /typeof job\.id !== "string"/);
 assert.match(worker, /render_job_completion_state_lost/);
 assert.match(worker, /failure state was not persisted/);
 assert.match(shell, /flushAndWait/);

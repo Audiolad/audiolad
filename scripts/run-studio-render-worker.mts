@@ -21,7 +21,13 @@ async function main() {
   const { data: claimed, error } = await service.rpc("claim_studio_render_job", { p_lease_seconds: 1800 });
   if (error) throw error;
   const job = Array.isArray(claimed) ? claimed[0] : claimed;
-  if (!job) return console.log("studio-render-worker: no queued jobs");
+  if (
+    !job ||
+    typeof job !== "object" ||
+    typeof job.id !== "string" ||
+    !job.project_snapshot ||
+    typeof job.project_snapshot !== "object"
+  ) return console.log("studio-render-worker: no queued jobs");
   const workspace = join(tmpdir(), `audiolad-render-${randomUUID()}`);
   try {
     await mkdir(workspace, { recursive: true });
