@@ -225,13 +225,16 @@
       "articleId": "ART_new_20260813_zhizn-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "zhizn-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-13T05:10:57Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, approved decision and let-go-of-past links, FAQ, sitemap, and no unexpected page errors. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda. Release 20260813-050540-b78b6490; BUILD_ID wBBf_1IYQVPSKlLoIpW30.",
+      "release": "20260813-050540-b78b6490",
+      "buildId": "wBBf_1IYQVPSKlLoIpW30",
+      "validatedAt": "2026-08-13T05:10:57Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",

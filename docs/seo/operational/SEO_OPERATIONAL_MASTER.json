@@ -707,12 +707,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Жизнь после развода: как принять перемены и двигаться дальше",
       "slug": "zhizn-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda",
+      "plannedUrl": null,
       "primaryQuery": "жизнь после развода",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -731,12 +731,12 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T05:10:57Z",
+      "updatedAt": "2026-08-13T05:10:57Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Editorially approved primary query and publication scope. No committed verified frequency source was found; frequency remains UNVERIFIED.",
+        "evidence": "Production smoke passed at 2026-08-13T05:10:57Z on release 20260813-050540-b78b6490 (BUILD_ID wBBf_1IYQVPSKlLoIpW30). HTTP 200, H1, Meta Title, Meta Description, self-canonical, one player, canonical practice URL, approved decision and let-go-of-past links, FAQ, sitemap, and no unexpected page errors passed. Frequency remains UNVERIFIED because no committed verified source was found.",
         "operationalAddedAt": "2026-08-13"
       }
     },
@@ -2253,22 +2253,7 @@
       }
     }
   ],
-  "nextQueue": [
-    {
-      "position": 1,
-      "articleId": "ART_new_20260813_zhizn-posle-razvoda",
-      "slug": "zhizn-posle-razvoda",
-      "title": "Жизнь после развода: как принять перемены и двигаться дальше",
-      "status": "PLANNED",
-      "primaryQuery": "жизнь после развода",
-      "frequencyStatus": "UNVERIFIED",
-      "cluster": "Развод и отношения",
-      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
-      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
-      "practiceRelevance": "DIRECT",
-      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
-    }
-  ],
+  "nextQueue": [],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2376,13 +2361,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 0,
-      "remainingQueueDependencies": 1,
-      "waitingArticleIds": [
-        "ART_new_20260813_zhizn-posle-razvoda"
-      ],
-      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
-      "evidence": "The canonical practice is already live. It supports one planned article and is not itself awaiting publication.",
+      "publishedArticleCount": 1,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "The canonical practice is live and supports one published life-after-divorce article with no remaining queue dependency.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
