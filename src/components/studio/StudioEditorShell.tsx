@@ -1337,6 +1337,14 @@ export default function StudioEditorShell({
               ← Мои проекты
             </Link>
             <Link
+              href="/studio/help"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-9 items-center rounded-lg px-3 text-sm text-[#d9c9f7] hover:bg-white/5"
+            >
+              Инструкция
+            </Link>
+            <Link
               href="/author-dashboard"
               onClick={guardNavigation}
               className="inline-flex min-h-9 items-center rounded-lg border border-white/15 px-3 text-sm font-medium text-white"
