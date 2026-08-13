@@ -240,13 +240,16 @@
       "articleId": "ART_new_20260813_kak-perezhit-razvod",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-perezhit-razvod",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-razvod",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-perezhit-razvod",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Production smoke passed at 2026-08-13T05:35:59Z: HTTP 200, H1, Meta Title, Meta Description, canonical, one player, canonical practice URL, approved life-after-divorce and let-go-of-past links, FAQ, sitemap, and no unexpected page errors. Decision-article link omitted because the final text had no natural place. Canonical practice URL: https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda. Release 20260813-053044-4584ec71; BUILD_ID ru4jgzG65OBxFX44cklnj.",
+      "release": "20260813-053044-4584ec71",
+      "buildId": "ru4jgzG65OBxFX44cklnj",
+      "validatedAt": "2026-08-13T05:35:59Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
