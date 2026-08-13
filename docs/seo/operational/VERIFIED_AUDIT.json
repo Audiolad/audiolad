@@ -282,6 +282,18 @@
       "validatedAt": "2026-08-13T07:51:12Z"
     },
     {
+      "articleId": "ART_new_20260813_novye-otnosheniya-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "novye-otnosheniya-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/novye-otnosheniya-posle-razvoda",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "STRONG",
+      "validationStatus": "PLANNED",
+      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+    },
+    {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "slug": "kak-ponyat-chego-ya-hochu",

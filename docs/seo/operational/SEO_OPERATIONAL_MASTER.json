@@ -855,6 +855,44 @@
       }
     },
     {
+      "articleId": "ART_new_20260813_novye-otnosheniya-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Новые отношения после развода: когда и как начинать",
+      "slug": "novye-otnosheniya-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/novye-otnosheniya-posle-razvoda",
+      "primaryQuery": "новые отношения после развода",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": null,
+      "updatedAt": "2026-08-13T08:00:00Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
+        "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13"
+      }
+    },
+    {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "title": "Как понять, чего вы действительно хотите: вопросы для спокойного размышления",
@@ -2367,7 +2405,22 @@
       }
     }
   ],
-  "nextQueue": [],
+  "nextQueue": [
+    {
+      "position": 1,
+      "articleId": "ART_new_20260813_novye-otnosheniya-posle-razvoda",
+      "slug": "novye-otnosheniya-posle-razvoda",
+      "title": "Новые отношения после развода: когда и как начинать",
+      "status": "PLANNED",
+      "primaryQuery": "новые отношения после развода",
+      "frequencyStatus": "UNVERIFIED",
+      "cluster": "Развод и отношения",
+      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "STRONG",
+      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
+    }
+  ],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2476,10 +2529,12 @@
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
       "publishedArticleCount": 4,
-      "remainingQueueDependencies": 0,
-      "waitingArticleIds": [],
-      "status": "NO_WAITING_PUBLISHED_ARTICLES",
-      "evidence": "Canonical practice is live and currently supports four published divorce-recovery and next-stage articles after public production validation.",
+      "remainingQueueDependencies": 1,
+      "waitingArticleIds": [
+        "ART_new_20260813_novye-otnosheniya-posle-razvoda"
+      ],
+      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
+      "evidence": "Canonical practice is live and supports four published divorce-recovery and next-stage articles; one approved relationships article awaits public production validation.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
