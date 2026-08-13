@@ -799,6 +799,18 @@
       "release": "20260813-122238-52b61a57",
       "buildId": "7pDGmKc-nBXTy0DylgGoB",
       "validatedAt": "2026-08-13T12:28:07Z"
+    },
+    {
+      "articleId": "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "otnosheniya-s-byvshim-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/otnosheniya-s-byvshim-posle-razvoda",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "STRONG",
+      "validationStatus": "PLANNED",
+      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and external public smoke; frequency remains UNVERIFIED because no committed verified value is available."
     }
   ]
 }

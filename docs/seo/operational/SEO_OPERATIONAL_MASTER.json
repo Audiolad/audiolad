@@ -2548,9 +2548,54 @@
       "release": "20260813-122238-52b61a57",
       "buildId": "7pDGmKc-nBXTy0DylgGoB",
       "validatedAt": "2026-08-13T12:28:07Z"
+    },
+    {
+      "articleId": "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Отношения с бывшим супругом после развода: как общаться и сохранить границы",
+      "slug": "otnosheniya-s-byvshim-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/otnosheniya-s-byvshim-posle-razvoda",
+      "primaryQuery": "отношения с бывшим супругом после развода",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": null,
+      "updatedAt": "2026-08-13T13:52:00Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and external public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13"
+      }
     }
   ],
-  "nextQueue": [],
+  "nextQueue": [
+    {
+      "position": 1,
+      "articleId": "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda",
+      "slug": "otnosheniya-s-byvshim-posle-razvoda",
+      "status": "PLANNED"
+    }
+  ],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2659,10 +2704,12 @@
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
       "publishedArticleCount": 8,
-      "remainingQueueDependencies": 0,
-      "waitingArticleIds": [],
-      "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports 8 published divorce-related articles; no approved queue dependency remains.",
+      "remainingQueueDependencies": 1,
+      "waitingArticleIds": [
+        "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda"
+      ],
+      "status": "PUBLISHED_PRACTICE_WITH_QUEUED_DEPENDENCIES",
+      "evidence": "Canonical practice is live and supports 8 published divorce-related articles; one approved planned article remains in the publication queue.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },

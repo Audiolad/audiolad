@@ -6385,6 +6385,41 @@ assert(
   "survive-divorce-husband keeps pending hub",
 );
 
+const exSpouseAfterDivorceArticle = getArticleBySlug(
+  "otnosheniya-s-byvshim-posle-razvoda",
+);
+assert(exSpouseAfterDivorceArticle, "ex-spouse-after-divorce article registered");
+assert(
+  exSpouseAfterDivorceArticle.title ===
+    "Отношения с бывшим супругом после развода: как общаться и сохранить границы",
+  "ex-spouse-after-divorce H1",
+);
+assert(
+  exSpouseAfterDivorceArticle.leadBeforeAudio ===
+    "После развода супружеские отношения заканчиваются, но взаимодействие иногда продолжается. Могут оставаться общие дети, документы, имущество, финансовые и бытовые вопросы или другие причины периодически общаться." &&
+    exSpouseAfterDivorceArticle.shortAnswer.length > 0 &&
+    !exSpouseAfterDivorceArticle.leadBeforeAudio.startsWith("#") &&
+    !exSpouseAfterDivorceArticle.shortAnswer.startsWith("#") &&
+    !exSpouseAfterDivorceArticle.introAfterAudio.includes(
+      exSpouseAfterDivorceArticle.leadBeforeAudio,
+    ),
+  "ex-spouse-after-divorce keeps one lead and a non-empty non-Markdown short answer",
+);
+assert(
+  exSpouseAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    exSpouseAfterDivorceArticle.relatedPractices.length === 0 &&
+    exSpouseAfterDivorceArticle.finalAudioLead === "" &&
+    exSpouseAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+    ) &&
+    exSpouseAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-byvshego-muzha",
+    ) &&
+    exSpouseAfterDivorceArticle.faq.length === 7,
+  "ex-spouse-after-divorce has one player, approved links, and FAQ",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");
