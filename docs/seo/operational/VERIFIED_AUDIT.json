@@ -825,10 +825,10 @@
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "STRONG",
       "validationStatus": "VALIDATE PASS",
-      "evidence": "Public browser smoke passed at 2026-08-13T15:23:29Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer with approved text, four approved internal links, clickable canonical practice-section title, visible «Главное», FAQ, sitemap, and no console or page errors. Frequency remains UNVERIFIED because no committed verified value is available.",
-      "release": "20260813-151523-4e3835ee",
-      "buildId": "j7KL_zxe47ATCIFs75VcI",
-      "validatedAt": "2026-08-13T15:23:29Z"
+      "evidence": "Independent public smoke passed at 2026-08-13T16:25:30Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer with approved text, four approved internal links, clickable canonical practice-section title, visible «Главное», FAQ, sitemap, and no page errors. The creator-path regression also passed without the ArticlePlaybackProvider runtime error; the 120-second post-deploy health watch completed and the release remained active. Release 20260813-162017-de083d1c; BUILD_ID yBLvB_ukyEqTJJJp8uOFp. Frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260813-162017-de083d1c",
+      "buildId": "yBLvB_ukyEqTJJJp8uOFp",
+      "validatedAt": "2026-08-13T16:28:26Z"
     }
   ]
 }
