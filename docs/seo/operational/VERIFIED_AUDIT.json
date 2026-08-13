@@ -285,13 +285,16 @@
       "articleId": "ART_new_20260813_novye-otnosheniya-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "novye-otnosheniya-posle-razvoda",
-      "productionUrl": null,
+      "productionUrl": "https://audiolad.ru/articles/novye-otnosheniya-posle-razvoda",
       "plannedUrl": "https://audiolad.ru/articles/novye-otnosheniya-posle-razvoda",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260813-080250-5e29213b",
+      "buildId": "5ZYfz_CkmKw93wGQJTytR",
+      "validatedAt": "2026-08-13T08:15:00Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",

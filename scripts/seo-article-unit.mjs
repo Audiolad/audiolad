@@ -6351,6 +6351,26 @@ assert(
     newLifeAfterDivorceArticle.faq.length === 7,
   "new-life-after-divorce has approved recovery links and FAQ",
 );
+const newRelationshipsAfterDivorceArticle = getArticleBySlug(
+  "novye-otnosheniya-posle-razvoda",
+);
+assert(
+  newRelationshipsAfterDivorceArticle?.title ===
+    "Новые отношения после развода: когда и как начинать",
+  "new-relationships-after-divorce H1",
+);
+assert(
+  newRelationshipsAfterDivorceArticle?.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    newRelationshipsAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/novaya-zhizn-posle-razvoda",
+    ) &&
+    newRelationshipsAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-perezhit-razvod",
+    ) &&
+    newRelationshipsAfterDivorceArticle.faq.length === 8,
+  "new-relationships-after-divorce keeps canonical practice and approved links",
+);
 assert(
   surviveDivorceHusbandArticle.topicSlug === "pending-hub-reconciliation" &&
     surviveDivorceHusbandArticle.topicHref === "/articles",
