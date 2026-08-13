@@ -1058,13 +1058,13 @@ export default function StudioEditorShell({
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7v-3h3M20 17v3h-3M7 4a8 8 0 0 1 12 6M17 20A8 8 0 0 1 5 14" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="6" cy="17" r="2.5" /><circle cx="18" cy="17" r="2.5" /><path d="m8 15 8-10M8 19l8-10M9 7l6 6" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Удалить и сдвинуть" disabled={!selectedClip} onClick={rippleDeleteSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h9M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13M18 12h4m-3-3 3 3-3 3" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 5h10M10 9v5m4-5v5M9 5l1-2h4l1 2M8 5l1 11h6l1-11M20 19H4m0 0 3-3M4 19l3 3" /></svg>
                   </TrackActionButton>
                   <TrackActionButton
                     label="Очистить дорожку"
@@ -1076,7 +1076,7 @@ export default function StudioEditorShell({
                       setSelectedClipId(null);
                     }}
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /><path d="m16 16 4 4m0-4-4 4" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m14 4 6 6M9 9l6 6M4 16c3 3 7 4 11 4l4-4c-4 0-8-1-11-4L4 16Z" /><path d="M3 21h18" /></svg>
                   </TrackActionButton>
                 </div>
                 {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-1">
