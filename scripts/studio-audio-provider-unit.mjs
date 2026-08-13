@@ -460,7 +460,9 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /<p className="truncate text-sm font-semibold text-white">\s*\{projectName\}/);
   assert.doesNotMatch(studioWorkspace, /Проект: \{projectName\}/);
   assert.match(studioWorkspace, /Сохранить/);
-  assert.match(studioWorkspace, /Экспорт будет доступен после подключения серверного сведения/);
+  assert.match(studioWorkspace, /Создать MP3/);
+  assert.match(studioWorkspace, /role="tooltip"/);
+  assert.match(studioWorkspace, /group-hover:opacity-100/);
   assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);
   const timeline = readSource("src/components/studio/StudioTimeline.tsx");
   const waveformCanvas = readSource(
@@ -482,13 +484,13 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(timeline, /WAVEFORM_OVERSCAN_PIXELS/);
   assert.match(timeline, /renderStartX/);
   assert.match(timeline, /onScroll/);
-  assert.match(timeline, /grid-cols-\[250px_minmax\(0,1fr\)\]/);
+  assert.match(timeline, /grid-cols-\[190px_minmax\(0,1fr\)\]/);
   assert.match(
     timeline,
-    /gridTemplateColumns: `250px \$\{timelineWidth\}px`/,
+    /gridTemplateColumns: `190px \$\{timelineWidth\}px`/,
   );
   assert.match(timeline, /className="contents"/);
-  assert.match(timeline, /sticky left-0 z-20 min-h-\[190px\]/);
+  assert.match(timeline, /sticky left-0 z-20 min-h-\[140px\]/);
   assert.match(timeline, /renderControls\(track, index\)/);
   assert.match(timeline, /hasAudio: boolean/);
   assert.match(timeline, /track\.clips\.length === 0 \? renderEmpty\(track, index\) : null/);

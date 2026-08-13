@@ -454,7 +454,7 @@ function StudioTimeline({
           {tracks.map((track, index) => {
             return (
               <div key={track.id} className="contents">
-                <aside className="sticky left-0 z-20 min-h-[140px] border-b border-r border-white/10 bg-[#101722] px-2 py-3">
+                <aside className="sticky left-0 z-20 min-h-[140px] border-b border-r border-white/10 bg-[#101722] px-1 py-3">
                   {renderControls(track, index)}
                 </aside>
                 <div

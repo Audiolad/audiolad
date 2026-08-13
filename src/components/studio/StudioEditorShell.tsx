@@ -209,16 +209,24 @@ function TrackActionButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#d8c8fb] hover:border-violet-300/60 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {children}
-    </button>
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        title={label}
+        aria-label={label}
+        className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#d8c8fb] hover:border-violet-300/60 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {children}
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-[#070c14] px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 
@@ -992,9 +1000,8 @@ export default function StudioEditorShell({
               ) : null}
             </div>
           ) : null}
-          <div className="mt-2 flex gap-2">
-            <div className="flex w-9 shrink-0 flex-col items-center gap-1">
-              <span className={`flex h-7 w-7 items-center justify-center rounded text-xs font-semibold ${accent}`}>{index + 1}</span>
+          <div className="mt-2 flex min-w-0 gap-2">
+            <div className="flex w-10 shrink-0 flex-col items-center gap-1">
               <TrackMuteButton
                 track={track}
                 onToggle={() => {
@@ -1004,33 +1011,139 @@ export default function StudioEditorShell({
                   }
                 }}
               />
-              <div className="flex h-20 items-center">
-              <input
-                aria-label={`Громкость ${slot.name}`}
-                type="range"
-                min={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MIN_DB : "0"}
-                max={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MAX_DB : "400"}
-                value={trackKind === "music"
-                  ? Math.round(musicVolumeDb)
-                  : Math.round((track?.volume ?? 1) * 100)}
-                disabled={!track}
-                onChange={(event) => {
-                  if (!track) return;
-                  const nextVolume = trackKind === "music"
-                    ? getStudioMusicVolumeFromDb(Number(event.target.value))
-                    : Number(event.target.value) / 100;
-                  setTrackVolume(track.id, nextVolume);
-                  markSavedChange();
-                }}
-                title={
-                  track
-                    ? `Громкость: ${displayedVolume}`
-                    : "Добавьте аудио, чтобы регулировать громкость"
-                }
-                className="h-20 w-5 [direction:rtl] [writing-mode:vertical-lr] accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
-              />
+              <div className="flex h-16 items-center">
+                <input
+                  aria-label={`Громкость ${slot.name}`}
+                  type="range"
+                  min={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MIN_DB : "0"}
+                  max={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MAX_DB : "400"}
+                  value={trackKind === "music"
+                    ? Math.round(musicVolumeDb)
+                    : Math.round((track?.volume ?? 1) * 100)}
+                  disabled={!track}
+                  onChange={(event) => {
+                    if (!track) return;
+                    const nextVolume = trackKind === "music"
+                      ? getStudioMusicVolumeFromDb(Number(event.target.value))
+                      : Number(event.target.value) / 100;
+                    setTrackVolume(track.id, nextVolume);
+                    markSavedChange();
+                  }}
+                  title={
+                    track
+                      ? `Громкость: ${displayedVolume}`
+                      : "Добавьте аудио, чтобы регулировать громкость"
+                  }
+                  className="h-16 w-5 [direction:rtl] [writing-mode:vertical-lr] accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
+                />
               </div>
               <span className="text-center text-[10px] text-[#9ba7bb]">{displayedVolume}</span>
+            </div>
+            <div className="min-w-0 flex-1 text-xs">
+              {track ? (
+                <>
+                <div className="flex justify-between">
+                  <TrackActionButton
+                    label="Заменить аудио"
+                    disabled={track.isReplacing || track.clips.length > 1}
+                    onClick={() => {
+                      pause();
+                      if (replaceAudioInputRef.current) {
+                        replaceAudioInputRef.current.dataset.trackId = track.id;
+                        replaceAudioInputRef.current.click();
+                      }
+                    }}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7v-3h3M20 17v3h-3M7 4a8 8 0 0 1 12 6M17 20A8 8 0 0 1 5 14" /></svg>
+                  </TrackActionButton>
+                  <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
+                  </TrackActionButton>
+                  <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
+                  </TrackActionButton>
+                  <TrackActionButton label="Удалить и сдвинуть" disabled={!selectedClip} onClick={rippleDeleteSelectedClip}>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h9M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13M18 12h4m-3-3 3 3-3 3" /></svg>
+                  </TrackActionButton>
+                  <TrackActionButton
+                    label="Очистить дорожку"
+                    onClick={() => {
+                      runEditingAction(() => {
+                        removeTrack(track.id);
+                        detachTrackFromSlots(track.id);
+                      });
+                      setSelectedClipId(null);
+                    }}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /><path d="m16 16 4 4m0-4-4 4" /></svg>
+                  </TrackActionButton>
+                </div>
+                {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-1">
+                  <TrackFadeButton
+                    clip={selectedClip}
+                    kind="in"
+                    onToggle={() => {
+                      if (!track || !selectedClip) return;
+                      runEditingAction(() =>
+                        setClipFades(track.id, selectedClip.id, {
+                          fadeInDuration: selectedClip.fadeInDuration > 0 ? 0 : getStudioDefaultFadeDuration(selectedClip.duration),
+                        }),
+                      );
+                    }}
+                  />
+                  <TrackFadeButton
+                    clip={selectedClip}
+                    kind="out"
+                    onToggle={() => {
+                      if (!track || !selectedClip) return;
+                      runEditingAction(() =>
+                        setClipFades(track.id, selectedClip.id, {
+                          fadeOutDuration: selectedClip.fadeOutDuration > 0 ? 0 : getStudioDefaultFadeDuration(selectedClip.duration),
+                        }),
+                      );
+                    }}
+                  />
+                </div> : (
+                  <select
+                    aria-label={`Обработка голоса ${slot.name}`}
+                    value={track.voicePreset}
+                    onChange={(event) => {
+                      runEditingAction(() =>
+                        setTrackVoicePreset(track.id, event.target.value as StudioVoicePreset),
+                      );
+                      markSavedChange();
+                    }}
+                    className="mt-2 max-w-full rounded border border-white/15 bg-[#1c2433] px-2 py-1 text-xs text-white"
+                  >
+                    <option value="none">Без эффекта</option>
+                    <option value="focus">Фокус</option>
+                    <option value="depth">Глубина</option>
+                    <option value="trance">Транс</option>
+                  </select>
+                )}
+                </>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
+                    onClick={() => openAddAudioDialog(slot.id)}
+                    className="text-[#d8c8fb] disabled:opacity-40"
+                  >
+                    {trackKind === "voice" ? "Загрузить голос" : "Добавить музыку"}
+                  </button>
+                  {trackKind === "voice" && (recordingSlotId === slot.id && isRecording ? null : (
+                    <button
+                      type="button"
+                      disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
+                      onClick={() => startSlotRecording(slot.id)}
+                      className="text-[#d8c8fb] disabled:opacity-40"
+                    >
+                      Записать голос
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           {trackKind === "voice" && (track?.volume ?? 1) > 2 ? (
@@ -1038,119 +1151,6 @@ export default function StudioEditorShell({
               Высокое усиление может вызвать искажения
             </p>
           ) : null}
-          {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-2">
-            <TrackFadeButton
-              clip={selectedClip}
-              kind="in"
-              onToggle={() => {
-                if (!track || !selectedClip) return;
-                runEditingAction(() =>
-                  setClipFades(track.id, selectedClip.id, {
-                    fadeInDuration:
-                      selectedClip.fadeInDuration > 0
-                        ? 0
-                        : getStudioDefaultFadeDuration(selectedClip.duration),
-                  }),
-                );
-              }}
-            />
-            <TrackFadeButton
-              clip={selectedClip}
-              kind="out"
-              onToggle={() => {
-                if (!track || !selectedClip) return;
-                runEditingAction(() =>
-                  setClipFades(track.id, selectedClip.id, {
-                    fadeOutDuration:
-                      selectedClip.fadeOutDuration > 0
-                        ? 0
-                        : getStudioDefaultFadeDuration(selectedClip.duration),
-                  }),
-                );
-              }}
-            />
-          </div> : null}
-          <div className="mt-2 flex min-w-0 flex-1 flex-col gap-2 text-xs">
-            {track ? (
-              <>
-                <div className="flex flex-wrap gap-1">
-                <TrackActionButton
-                  label="Заменить аудио"
-                  disabled={track.isReplacing || track.clips.length > 1}
-                  onClick={() => {
-                    pause();
-                    if (replaceAudioInputRef.current) {
-                      replaceAudioInputRef.current.dataset.trackId = track.id;
-                      replaceAudioInputRef.current.click();
-                    }
-                  }}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7v-3h3M20 17v3h-3M7 4a8 8 0 0 1 12 6M17 20A8 8 0 0 1 5 14" /></svg>
-                </TrackActionButton>
-                <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m14 5-9 9M4 4l16 16M17 4l3 3M4 17l3 3" /></svg>
-                </TrackActionButton>
-                <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
-                </TrackActionButton>
-                <TrackActionButton label="Удалить и сдвинуть" disabled={!selectedClip} onClick={rippleDeleteSelectedClip}>
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h9M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13M18 12h4m-3-3 3 3-3 3" /></svg>
-                </TrackActionButton>
-                <TrackActionButton
-                  label="Очистить дорожку"
-                  onClick={() => {
-                    runEditingAction(() => {
-                      removeTrack(track.id);
-                      detachTrackFromSlots(track.id);
-                    });
-                    setSelectedClipId(null);
-                  }}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /><path d="m16 16 4 4m0-4-4 4" /></svg>
-                </TrackActionButton>
-                </div>
-              </>
-            ) : null}
-            {!track ? (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
-                  onClick={() => openAddAudioDialog(slot.id)}
-                  className="text-[#d8c8fb] disabled:opacity-40"
-                >
-                  {trackKind === "voice" ? "Загрузить голос" : "Добавить музыку"}
-                </button>
-                {trackKind === "voice" && (recordingSlotId === slot.id && isRecording ? null : (
-                  <button
-                    type="button"
-                    disabled={isLoading || isArmingRecording || isRecording || isProcessingRecording}
-                    onClick={() => startSlotRecording(slot.id)}
-                    className="text-[#d8c8fb] disabled:opacity-40"
-                  >
-                    Записать голос
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {track?.trackKind === "voice" ? (
-              <select
-                aria-label={`Обработка голоса ${slot.name}`}
-                value={track.voicePreset}
-                onChange={(event) => {
-                  runEditingAction(() =>
-                    setTrackVoicePreset(track.id, event.target.value as StudioVoicePreset),
-                  );
-                  markSavedChange();
-                }}
-                className="rounded border border-white/15 bg-[#1c2433] px-2 py-1 text-xs text-white"
-              >
-                <option value="none">Без эффекта</option>
-                <option value="focus">Фокус</option>
-                <option value="depth">Глубина</option>
-                <option value="trance">Транс</option>
-              </select>
-            ) : null}
             {!isDefaultStudioTrackSlot(slot) ? (
               <button
                 type="button"
@@ -1167,7 +1167,6 @@ export default function StudioEditorShell({
                 Удалить дорожку
               </button>
             ) : null}
-          </div>
         </div>
       </div>
     );
