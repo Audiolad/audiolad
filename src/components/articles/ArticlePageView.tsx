@@ -15,6 +15,7 @@ import CatalogProductCard from "@/components/products/CatalogProductCard";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildArticleJsonLdGraph } from "@/lib/seo/articles";
 import type { ArticlePageData } from "@/lib/seo/articles";
+import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
 
 type ArticlePageViewProps = {
   data: ArticlePageData;
@@ -40,6 +41,7 @@ const SECTION_SCROLL_CLASS =
 
 export default function ArticlePageView({ data }: ArticlePageViewProps) {
   const { article, primaryPractice } = data;
+  const closingHeading = resolveArticleClosingHeading(article.closingSection.title);
   const jsonLd = buildArticleJsonLdGraph(data);
   const tocItems = [
     ...article.sections.map((section) => ({
@@ -48,7 +50,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
     })),
     {
       id: article.closingSection.id,
-      title: article.closingSection.title,
+      title: closingHeading,
     },
   ];
   const accessLabel = primaryPractice.isFree ? "Бесплатно" : primaryPractice.priceLabel;
@@ -177,6 +179,26 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                   <p key={paragraph.slice(0, 64)}>{paragraph}</p>
                 ))}
               </div>
+              {section.links?.length ? (
+                <div className={`mt-4 ${articleBodyStackClass}`}>
+                  {section.links.map((item) => (
+                    <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+                      {item.before}
+                      {item.href && item.linkLabel ? (
+                        <Link
+                          href={item.href}
+                          className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        >
+                          {item.linkLabel}
+                        </Link>
+                      ) : (
+                        item.linkLabel
+                      )}
+                      {item.after ?? ""}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               {section.id === "audiopraktika" ? (
                 <div className="mt-6 space-y-4">
@@ -261,7 +283,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
               id={article.closingSection.id}
               className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
             >
-              {article.closingSection.title}
+              {closingHeading}
             </h2>
             <div className={`mt-4 ${articleBodyStackClass}`}>
               {article.closingSection.paragraphs.map((paragraph) => (

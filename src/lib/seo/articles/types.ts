@@ -9,6 +9,7 @@ export type ArticleSection = {
   id: string;
   title: string;
   paragraphs: string[];
+  links?: readonly ArticleCrossLinkParagraph[];
 };
 
 /**

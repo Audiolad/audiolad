@@ -2548,6 +2548,47 @@
       "release": "20260813-122238-52b61a57",
       "buildId": "7pDGmKc-nBXTy0DylgGoB",
       "validatedAt": "2026-08-13T12:28:07Z"
+    },
+    {
+      "articleId": "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Отношения с бывшим супругом после развода: как общаться и сохранить границы",
+      "slug": "otnosheniya-s-byvshim-posle-razvoda",
+      "productionUrl": "https://audiolad.ru/articles/otnosheniya-s-byvshim-posle-razvoda",
+      "plannedUrl": null,
+      "primaryQuery": "отношения с бывшим супругом после развода",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PUBLISHED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": "2026-08-13T14:02:57Z",
+      "updatedAt": "2026-08-13T14:02:57Z",
+      "validationStatus": "VALIDATE PASS",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "External public smoke passed at 2026-08-13T14:02:57Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, relative canonical practice path, one lead after the player, populated short answer with its actual text, table of contents, no Markdown H1 in body, approved child-divorce and former-husband links, FAQ, sitemap, no page-error markers, and ancestry guard. Release 20260813-135648-b403e299; BUILD_ID rQgtRrXDk19u7j5EnTZ0e. Frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13"
+      },
+      "release": "20260813-135648-b403e299",
+      "buildId": "rQgtRrXDk19u7j5EnTZ0e",
+      "validatedAt": "2026-08-13T14:02:57Z"
     }
   ],
   "nextQueue": [],
@@ -2658,11 +2699,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 8,
+      "publishedArticleCount": 9,
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports 8 published divorce-related articles; no approved queue dependency remains.",
+      "evidence": "Canonical practice is live and supports 9 published divorce-related articles; no approved queue dependency remains.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },

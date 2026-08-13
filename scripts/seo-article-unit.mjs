@@ -22,6 +22,7 @@ import {
   listArticlesByTopicSlug,
   resolveArticlePrimaryPractice,
 } from "../src/lib/seo/articles/index.ts";
+import { resolveArticleClosingHeading } from "../src/lib/seo/articles/public-heading.ts";
 import { mapArticleDefinitionsToSitemapEntries } from "../src/lib/seo/sitemap-data.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -6043,6 +6044,26 @@ assert(
   "divorce-child FAQ",
 );
 assert(
+  divorceChildArticle.sections.some((section) =>
+    section.links?.some(
+      (item) => item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+    ),
+  ) &&
+    divorceChildArticle.sections.some((section) =>
+      section.links?.some(
+        (item) => item.href === "/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      ),
+    ) &&
+    divorceChildArticle.sections
+      .find((section) => section.id === "praktika-razvod-yasnost-i-spokoystvie")
+      ?.links?.some(
+        (item) =>
+          item.href ===
+          "/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+      ),
+  "divorce-child renders approved article and canonical practice links in sections",
+);
+assert(
   JSON.stringify(divorceChildArticle).includes(
     "Ребёнок не является причиной развода",
   ) &&
@@ -6383,6 +6404,60 @@ assert(
   surviveDivorceHusbandArticle.topicSlug === "pending-hub-reconciliation" &&
     surviveDivorceHusbandArticle.topicHref === "/articles",
   "survive-divorce-husband keeps pending hub",
+);
+
+const exSpouseAfterDivorceArticle = getArticleBySlug(
+  "otnosheniya-s-byvshim-posle-razvoda",
+);
+assert(exSpouseAfterDivorceArticle, "ex-spouse-after-divorce article registered");
+assert(
+  exSpouseAfterDivorceArticle.title ===
+    "Отношения с бывшим супругом после развода: как общаться и сохранить границы",
+  "ex-spouse-after-divorce H1",
+);
+assert(
+  exSpouseAfterDivorceArticle.leadBeforeAudio ===
+    "После развода супружеские отношения заканчиваются, но взаимодействие иногда продолжается. Могут оставаться общие дети, документы, имущество, финансовые и бытовые вопросы или другие причины периодически общаться." &&
+    exSpouseAfterDivorceArticle.shortAnswer.length > 0 &&
+    !exSpouseAfterDivorceArticle.leadBeforeAudio.startsWith("#") &&
+    !exSpouseAfterDivorceArticle.shortAnswer.startsWith("#") &&
+    !exSpouseAfterDivorceArticle.introAfterAudio.includes(
+      exSpouseAfterDivorceArticle.leadBeforeAudio,
+    ),
+  "ex-spouse-after-divorce keeps one lead and a non-empty non-Markdown short answer",
+);
+assert(
+  exSpouseAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    exSpouseAfterDivorceArticle.relatedPractices.length === 0 &&
+    exSpouseAfterDivorceArticle.finalAudioLead === "" &&
+    exSpouseAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+    ) &&
+    exSpouseAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-byvshego-muzha",
+    ) &&
+    exSpouseAfterDivorceArticle.faq.length === 7,
+  "ex-spouse-after-divorce has one player, approved links, and FAQ",
+);
+assert(
+  exSpouseAfterDivorceArticle.closingSection.title === "Финальный CTA" &&
+    exSpouseAfterDivorceArticle.closingSection.paragraphs[0] ===
+      "Если перед разговором с бывшим супругом вы заранее чувствуете напряжение и внутри уже начинается старый спор, можно сначала обратиться к практике «Возвращение к себе после развода».",
+  "ex-spouse-after-divorce keeps its final block content",
+);
+assert(
+  ["Финальный CTA", "Final CTA", "afterFinalAudio", "after final audio"].every(
+    (technicalTitle) =>
+      resolveArticleClosingHeading(technicalTitle) === "Главное",
+  ) && resolveArticleClosingHeading("Итог") === "Итог",
+  "technical closing titles never reach public article headings",
+);
+const articlePageViewSource = read("src/components/articles/ArticlePageView.tsx");
+assert(
+  articlePageViewSource.includes("resolveArticleClosingHeading") &&
+    !articlePageViewSource.includes("{article.closingSection.title}"),
+  "article renderer uses public closing heading",
 );
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
