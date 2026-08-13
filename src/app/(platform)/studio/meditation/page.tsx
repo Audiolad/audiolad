@@ -42,7 +42,7 @@ const productEpisodes = [
 export default function StudioMeditationPage() {
   return (
     <main className="min-h-screen scroll-smooth overflow-hidden bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto w-full max-w-[900px] px-5 pb-24 pt-5 sm:px-8 sm:pt-7 lg:px-10 lg:pb-32">
+      <div className="mx-auto w-full max-w-[1050px] px-5 pb-24 pt-5 sm:px-8 sm:pt-7 lg:px-10 lg:pb-32">
         <header className="flex items-center justify-between gap-4 border-b border-[#e6dbf5] pb-4 sm:pb-5">
           <AudioladHorizontalLogo
             priority
@@ -63,15 +63,15 @@ export default function StudioMeditationPage() {
           </div>
         </header>
 
-        <section className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,43fr)_minmax(0,57fr)] lg:gap-8 lg:py-20">
-          <div className="max-w-xl">
+        <section className="py-10 text-center sm:py-12 lg:py-14">
+          <div className="mx-auto max-w-[880px]">
             <p className="text-xs font-semibold tracking-[0.16em] text-[#7042c5]">
               СТУДИЯ АУДИОЛАД
             </p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-[-0.045em] text-[#25135c] sm:text-5xl sm:leading-[1.06] xl:text-6xl">
+            <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-[#25135c] sm:text-5xl sm:leading-[1.06] lg:text-6xl lg:leading-[1.04] xl:text-[68px]">
               {STUDIO_MEDITATION_PAGE_H1}
             </h1>
-            <p className={bodyClassName}>
+            <p className="mx-auto mt-5 max-w-[760px] text-[17px] leading-8 text-[#4c3d78] sm:text-lg sm:leading-8">
               Запишите или загрузите голос, добавьте музыку, настройте звучание
               и соберите свою медитацию прямо в браузере — без сложных программ
               для работы со звуком.
@@ -82,34 +82,29 @@ export default function StudioMeditationPage() {
             >
               Посмотреть возможности
             </a>
-            <p className="mt-4 max-w-md text-sm leading-6 text-[#796ba0]">
-              Бесплатный режим Студии без регистрации скоро появится в
-              АудиоЛаде.
+            <p className="mt-3 text-sm leading-6 text-[#796ba0]">
+              Бесплатный режим без регистрации скоро появится.
             </p>
           </div>
 
-          <div className="min-w-0">
-            <div className="aspect-[1.35] overflow-hidden rounded-[18px] shadow-[0_18px_42px_rgba(28,14,61,0.16)] sm:rounded-[22px] lg:aspect-auto">
+          <div className="mx-auto mt-8 max-w-[1024px] sm:mt-10">
+            <div className="aspect-[1.35] overflow-hidden rounded-[18px] shadow-[0_18px_42px_rgba(28,14,61,0.16)] sm:rounded-[22px] md:aspect-auto">
               <Image
                 src="/images/studio/studio-interface.png"
                 alt="Интерфейс Студии АудиоЛад для записи медитаций"
                 width={1024}
                 height={547}
                 priority
-                sizes="(max-width: 1023px) calc(100vw - 40px), 480px"
-                className="h-full w-full object-cover object-[54%_50%] lg:h-auto"
+                sizes="(max-width: 767px) calc(100vw - 40px), (max-width: 1099px) calc(100vw - 80px), 1024px"
+                className="h-full w-full object-cover object-[54%_50%] md:h-auto"
               />
             </div>
-            <p className="mt-3 text-xs leading-5 text-[#796ba0]">
-              Интерфейс Студии АудиоЛад: голос, музыка и монтаж в одном
-              пространстве.
-            </p>
           </div>
         </section>
 
         <section
           id="studio-meditation-features"
-          className="scroll-mt-8 border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
+          className="mx-auto max-w-[900px] scroll-mt-8 border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
           aria-labelledby="studio-meditation-features-heading"
         >
           <div className="max-w-2xl">
@@ -159,7 +154,7 @@ export default function StudioMeditationPage() {
         </section>
 
         <section
-          className="border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
+          className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
           aria-labelledby="studio-meditation-process-heading"
         >
           <div className="flex max-w-2xl flex-col gap-5">
@@ -198,7 +193,7 @@ export default function StudioMeditationPage() {
           </ol>
         </section>
 
-        <section className="border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-28">
+        <section className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-28">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-semibold tracking-[0.16em] text-[#7042c5]">
               ПРОСТОЙ СЦЕНАРИЙ
@@ -226,7 +221,7 @@ export default function StudioMeditationPage() {
           </div>
         </section>
 
-        <section className="border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24">
+        <section className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24">
           <div className="rounded-[28px] border border-[#d8c8ee] bg-white px-6 py-9 sm:px-10 sm:py-12 lg:grid lg:grid-cols-[1.1fr_0.9fr] lg:items-end lg:gap-12">
             <div>
               <h2 className={sectionHeadingClassName}>
@@ -254,7 +249,7 @@ export default function StudioMeditationPage() {
         </section>
 
         <section
-          className="border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
+          className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
           aria-labelledby="studio-meditation-audience-heading"
         >
           <div className="max-w-2xl">
@@ -282,7 +277,7 @@ export default function StudioMeditationPage() {
           </ul>
         </section>
 
-        <section className="border-t border-[#e6dbf5] pt-16 text-center sm:pt-20 lg:pt-24">
+        <section className="mx-auto max-w-[900px] border-t border-[#e6dbf5] pt-16 text-center sm:pt-20 lg:pt-24">
           <div className="mx-auto max-w-3xl">
             <h2 className="text-4xl font-semibold tracking-[-0.045em] text-[#25135c] sm:text-5xl lg:text-6xl">
               Создайте свою первую медитацию в АудиоЛаде
