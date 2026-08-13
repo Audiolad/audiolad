@@ -6044,6 +6044,26 @@ assert(
   "divorce-child FAQ",
 );
 assert(
+  divorceChildArticle.sections.some((section) =>
+    section.links?.some(
+      (item) => item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+    ),
+  ) &&
+    divorceChildArticle.sections.some((section) =>
+      section.links?.some(
+        (item) => item.href === "/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      ),
+    ) &&
+    divorceChildArticle.sections
+      .find((section) => section.id === "praktika-razvod-yasnost-i-spokoystvie")
+      ?.links?.some(
+        (item) =>
+          item.href ===
+          "/practice/sergey-and-zoya/razvod-yasnost-i-spokoystvie",
+      ),
+  "divorce-child renders approved article and canonical practice links in sections",
+);
+assert(
   JSON.stringify(divorceChildArticle).includes(
     "Ребёнок не является причиной развода",
   ) &&

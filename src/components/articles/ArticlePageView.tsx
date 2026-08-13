@@ -179,6 +179,26 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
                   <p key={paragraph.slice(0, 64)}>{paragraph}</p>
                 ))}
               </div>
+              {section.links?.length ? (
+                <div className={`mt-4 ${articleBodyStackClass}`}>
+                  {section.links.map((item) => (
+                    <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+                      {item.before}
+                      {item.href && item.linkLabel ? (
+                        <Link
+                          href={item.href}
+                          className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                        >
+                          {item.linkLabel}
+                        </Link>
+                      ) : (
+                        item.linkLabel
+                      )}
+                      {item.after ?? ""}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               {section.id === "audiopraktika" ? (
                 <div className="mt-6 space-y-4">
