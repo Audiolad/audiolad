@@ -431,8 +431,8 @@ function StudioTimeline({
         }}
       >
         <div
-          className="relative grid min-w-max grid-cols-[250px_minmax(0,1fr)]"
-          style={{ gridTemplateColumns: `250px ${timelineWidth}px` }}
+          className="relative grid min-w-max grid-cols-[190px_minmax(0,1fr)]"
+          style={{ gridTemplateColumns: `190px ${timelineWidth}px` }}
         >
           <div className="sticky left-0 z-20 h-8 border-b border-r border-white/10 bg-[#101722]" />
           <div
@@ -454,11 +454,11 @@ function StudioTimeline({
           {tracks.map((track, index) => {
             return (
               <div key={track.id} className="contents">
-                <aside className="sticky left-0 z-20 min-h-[190px] border-b border-r border-white/10 bg-[#101722] p-4">
+                <aside className="sticky left-0 z-20 min-h-[140px] border-b border-r border-white/10 bg-[#101722] px-2 py-3">
                   {renderControls(track, index)}
                 </aside>
                 <div
-                  className="relative min-h-[190px] border-b border-white/10 last:border-b-0"
+                  className="relative min-h-[140px] border-b border-white/10 last:border-b-0"
                   style={{ width: timelineWidth }}
                   onPointerUp={seekFromPointer}
                 >
@@ -649,7 +649,7 @@ function StudioTimeline({
 
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 top-0 z-10 ml-[250px] w-px bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]"
+            className="pointer-events-none absolute bottom-0 top-0 z-10 ml-[190px] w-px bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]"
             style={{ left: playheadX }}
           />
         </div>

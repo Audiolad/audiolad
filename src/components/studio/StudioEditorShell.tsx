@@ -197,6 +197,31 @@ function TrackFadeButton({
   );
 }
 
+function TrackActionButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#d8c8fb] hover:border-violet-300/60 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function StudioEditorShell({
   persistedHydration,
   recorderDebug = false,
@@ -967,17 +992,19 @@ export default function StudioEditorShell({
               ) : null}
             </div>
           ) : null}
-          <div className="mt-2 flex items-center gap-2">
-            <TrackMuteButton
-              track={track}
-              onToggle={() => {
-                if (track) {
-                  toggleTrackMuted(track.id);
-                  markSavedChange();
-                }
-              }}
-            />
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="mt-2 flex gap-2">
+            <div className="flex w-9 shrink-0 flex-col items-center gap-1">
+              <span className={`flex h-7 w-7 items-center justify-center rounded text-xs font-semibold ${accent}`}>{index + 1}</span>
+              <TrackMuteButton
+                track={track}
+                onToggle={() => {
+                  if (track) {
+                    toggleTrackMuted(track.id);
+                    markSavedChange();
+                  }
+                }}
+              />
+              <div className="flex h-20 items-center">
               <input
                 aria-label={`Громкость ${slot.name}`}
                 type="range"
@@ -1000,11 +1027,10 @@ export default function StudioEditorShell({
                     ? `Громкость: ${displayedVolume}`
                     : "Добавьте аудио, чтобы регулировать громкость"
                 }
-                className="min-w-20 flex-1 accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-20 w-5 [direction:rtl] [writing-mode:vertical-lr] accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
               />
-              <span className="text-[10px] text-[#9ba7bb]">
-                {displayedVolume}
-              </span>
+              </div>
+              <span className="text-center text-[10px] text-[#9ba7bb]">{displayedVolume}</span>
             </div>
           </div>
           {trackKind === "voice" && (track?.volume ?? 1) > 2 ? (
@@ -1044,11 +1070,12 @@ export default function StudioEditorShell({
               }}
             />
           </div> : null}
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <div className="mt-2 flex min-w-0 flex-1 flex-col gap-2 text-xs">
             {track ? (
               <>
-                <button
-                  type="button"
+                <div className="flex flex-wrap gap-1">
+                <TrackActionButton
+                  label="Заменить аудио"
                   disabled={track.isReplacing || track.clips.length > 1}
                   onClick={() => {
                     pause();
@@ -1057,26 +1084,20 @@ export default function StudioEditorShell({
                       replaceAudioInputRef.current.click();
                     }
                   }}
-                  title={
-                    track.clips.length > 1
-                      ? "Объедините или очистите фрагменты перед заменой аудио"
-                      : undefined
-                  }
-                  className="text-[#d8c8fb] disabled:opacity-40"
                 >
-                  Заменить аудио
-                </button>
-                <button type="button" disabled={!canSplitSelectedClip} onClick={splitSelectedClip} className="text-[#d8c8fb] disabled:opacity-40">
-                  Разрезать
-                </button>
-                <button type="button" disabled={!selectedClip} onClick={deleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">
-                  Удалить фрагмент
-                </button>
-                <button type="button" disabled={!selectedClip} onClick={rippleDeleteSelectedClip} className="text-[#a9b4c7] disabled:opacity-40">
-                  Удалить + сдвиг
-                </button>
-                <button
-                  type="button"
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7v-3h3M20 17v3h-3M7 4a8 8 0 0 1 12 6M17 20A8 8 0 0 1 5 14" /></svg>
+                </TrackActionButton>
+                <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m14 5-9 9M4 4l16 16M17 4l3 3M4 17l3 3" /></svg>
+                </TrackActionButton>
+                <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
+                </TrackActionButton>
+                <TrackActionButton label="Удалить и сдвинуть" disabled={!selectedClip} onClick={rippleDeleteSelectedClip}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h9M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13M18 12h4m-3-3 3 3-3 3" /></svg>
+                </TrackActionButton>
+                <TrackActionButton
+                  label="Очистить дорожку"
                   onClick={() => {
                     runEditingAction(() => {
                       removeTrack(track.id);
@@ -1084,10 +1105,10 @@ export default function StudioEditorShell({
                     });
                     setSelectedClipId(null);
                   }}
-                  className="text-[#a9b4c7]"
                 >
-                  Очистить дорожку
-                </button>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /><path d="m16 16 4 4m0-4-4 4" /></svg>
+                </TrackActionButton>
+                </div>
               </>
             ) : null}
             {!track ? (
@@ -1283,7 +1304,9 @@ export default function StudioEditorShell({
     autosaveState?.status === "conflict";
   const saveButtonDisabled = saveIsUnavailable || saveIsInFlight || !saveHasDirtyChanges;
   const saveButtonLabel = saveIsInFlight
-    ? "Сохранение…"
+    ? "Сохраняем..."
+    : autosaveState?.status === "error" || autosaveState?.status === "conflict"
+      ? "Ошибка"
     : saveHasDirtyChanges
       ? "Сохранить"
       : "Сохранено";
@@ -1545,13 +1568,11 @@ export default function StudioEditorShell({
                 type="button"
                 disabled={saveButtonDisabled}
                 onClick={() => controllerRef.current?.retry()}
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-45"
+                className={`h-10 rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-45 ${saveButtonLabel === "Сохранено" ? "border-emerald-300/35 text-emerald-100" : saveButtonLabel === "Ошибка" ? "border-rose-300/45 text-rose-100" : "border-white/15"}`}
               >
                 {saveButtonLabel}
               </button>
-              <button type="button" disabled={saveIsUnavailable || renderBusy} onClick={() => void queueRender()} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">
-                {renderBusy ? "Создаём MP3…" : "Создать MP3"}
-              </button>
+              {renderJob?.status === "completed" ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-3 text-sm text-emerald-100">Скачать MP3</a> : <button type="button" disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing"} onClick={() => void queueRender()} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</button>}
             </div>
           </div>
         </div>
@@ -1562,7 +1583,7 @@ export default function StudioEditorShell({
               {projectError}
             </p>
           ) : null}
-          {autosaveMessage ? (
+          {autosaveMessage && false ? (
             <p
               role={autosaveState?.status === "error" || autosaveState?.status === "conflict" ? "alert" : "status"}
               className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
@@ -1589,13 +1610,6 @@ export default function StudioEditorShell({
             </p>
           ) : null}
           {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
-          {renderJob ? (
-            <section className="mb-4 rounded-lg border border-violet-300/30 bg-[#121b28] px-4 py-3 text-sm">
-              {renderJob.status === "queued" || renderJob.status === "processing" ? <p className="text-[#d8c8fb]">Создаём MP3…</p> : null}
-              {renderJob.status === "failed" ? <p role="alert" className="text-rose-200">{renderJob.error_message_safe ?? "Экспорт не выполнен. Исходники проекта сохранены."}</p> : null}
-              {renderJob.status === "completed" ? <div className="flex flex-wrap items-center gap-3"><p className="text-emerald-200">Аудиофайл готов.</p><a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="rounded border border-emerald-300/40 px-3 py-1.5 font-medium text-emerald-100">Скачать MP3</a></div> : null}
-            </section>
-          ) : null}
           {recordingError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {recordingError}

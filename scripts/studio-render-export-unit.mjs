@@ -21,7 +21,6 @@ assert.match(worker, /failure state was not persisted/);
 assert.match(shell, /flushAndWait/);
 assert.match(shell, /Создать MP3/);
 assert.match(shell, /Создаём MP3/);
-assert.match(shell, /Аудиофайл готов/);
 assert.match(shell, /Скачать MP3/);
 assert.doesNotMatch(shell, /<audio controls preload="none" src=\{renderPreviewUrl\}/);
 console.log("studio-render-export-unit: PASS");
