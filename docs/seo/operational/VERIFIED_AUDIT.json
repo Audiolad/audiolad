@@ -315,13 +315,16 @@
       "articleId": "ART_new_20260813_kak-perezhit-razvod-muzhchine",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "kak-perezhit-razvod-muzhchine",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-muzhchine",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-muzhchine",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Public production smoke passed at 2026-08-13T10:35:30Z: HTTP 200 (including cache-bust), H1, Meta Title, Meta Description, self-canonical, one <audio>, relative canonical practice path, approved article links, FAQ, sitemap, and no page-error markers. Release 20260813-102941-fcb9352c; BUILD_ID OBllUVGzsQZeR6cMIf7ir. Frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260813-102941-fcb9352c",
+      "buildId": "OBllUVGzsQZeR6cMIf7ir",
+      "validatedAt": "2026-08-13T10:35:30Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",

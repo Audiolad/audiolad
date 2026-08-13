@@ -960,12 +960,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Как пережить развод мужчине и постепенно восстановить свою жизнь",
       "slug": "kak-perezhit-razvod-muzhchine",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-muzhchine",
+      "productionUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-muzhchine",
+      "plannedUrl": null,
       "primaryQuery": "как пережить развод мужчине",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -984,14 +984,17 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T10:35:30Z",
+      "updatedAt": "2026-08-13T10:35:30Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "evidence": "Public production smoke passed at 2026-08-13T10:35:30Z: HTTP 200 (including cache-bust), H1, Meta Title, Meta Description, self-canonical, one <audio>, relative canonical practice path, approved article links, FAQ, sitemap, and no page-error markers. Release 20260813-102941-fcb9352c; BUILD_ID OBllUVGzsQZeR6cMIf7ir. Frequency remains UNVERIFIED because no committed verified value is available.",
         "operationalAddedAt": "2026-08-13"
-      }
+      },
+      "release": "20260813-102941-fcb9352c",
+      "buildId": "OBllUVGzsQZeR6cMIf7ir",
+      "validatedAt": "2026-08-13T10:35:30Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
@@ -2513,7 +2516,7 @@
       "practiceTitle": "13 шагов Радикального прощения",
       "productionUrl": "https://audiolad.ru/practice/german-semenuk/13-shagov-radikalnogo-proscheniya",
       "catalogStatus": "PUBLISHED_CATALOG_INFERRED_FROM_PRODUCTION_ARTICLE",
-      "publishedArticleCount": 6,
+      "publishedArticleCount": 7,
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "NO_WAITING_PUBLISHED_ARTICLES",
@@ -2618,7 +2621,7 @@
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports six published divorce-related articles; no approved queue dependency remains.",
+      "evidence": "Canonical practice is live and supports seven published divorce-related articles; no approved queue dependency remains.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
