@@ -58,6 +58,7 @@ import { KAK_RESHITSYA_NA_RAZVOD_ARTICLE } from "./content/kak-reshitsya-na-razv
 import { KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE } from "./content/kak-ponyat-chto-pora-razvoditsya";
 import { KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE } from "./content/kak-skazat-rebenku-o-razvode-roditeley";
 import { KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE } from "./content/kak-pomoch-rebenku-perezhit-razvod-roditeley";
+import { ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-posle-razvoda";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -121,6 +122,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE,
   KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE,
   KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE,
+  ZHIZN_POSLE_RAZVODA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

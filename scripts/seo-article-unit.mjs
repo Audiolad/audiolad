@@ -6215,6 +6215,41 @@ assert(
   "child-support keeps pending hub",
 );
 
+const lifeAfterDivorceArticle = getArticleBySlug("zhizn-posle-razvoda");
+assert(lifeAfterDivorceArticle, "life-after-divorce article registered");
+assert(
+  lifeAfterDivorceArticle.title ===
+    "Жизнь после развода: как принять перемены и двигаться дальше",
+  "life-after-divorce H1",
+);
+assert(
+  lifeAfterDivorceArticle.metaTitle ===
+    "Жизнь после развода: как привыкнуть к переменам и жить дальше – АудиоЛад",
+  "life-after-divorce meta title",
+);
+assert(
+  lifeAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    lifeAfterDivorceArticle.relatedPractices.length === 0 &&
+    lifeAfterDivorceArticle.finalAudioLead === "",
+  "life-after-divorce has canonical practice and one player",
+);
+assert(
+  lifeAfterDivorceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-reshitsya-na-razvod",
+  ) &&
+    lifeAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-proshloe",
+    ) &&
+    lifeAfterDivorceArticle.faq.length === 7,
+  "life-after-divorce has approved links and FAQ",
+);
+assert(
+  lifeAfterDivorceArticle.topicSlug === "pending-hub-reconciliation" &&
+    lifeAfterDivorceArticle.topicHref === "/articles",
+  "life-after-divorce keeps pending hub",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

@@ -222,6 +222,18 @@
       "validatedAt": "2026-08-12T16:25:17Z"
     },
     {
+      "articleId": "ART_new_20260813_zhizn-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "zhizn-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "DIRECT",
+      "validationStatus": "PLANNED",
+      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+    },
+    {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "slug": "kak-ponyat-chego-ya-hochu",

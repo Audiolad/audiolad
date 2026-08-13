@@ -62,7 +62,8 @@
     "/articles/zhenshchina-i-dengi-psihologiya",
     "/articles/zhenskaya-energiya-chto-eto",
     "/articles/zhenskaya-samotsennost-i-dengi",
-    "/articles/zhenskaya-sila"
+    "/articles/zhenskaya-sila",
+    "/articles/zhizn-posle-razvoda"
   ],
   "articles": [
     {
@@ -364,6 +365,11 @@
       "articleId": "ART_zhenskaya-sila",
       "slug": "zhenskaya-sila",
       "path": "/articles/zhenskaya-sila"
+    },
+    {
+      "articleId": "ART_new_20260813_zhizn-posle-razvoda",
+      "slug": "zhizn-posle-razvoda",
+      "path": "/articles/zhizn-posle-razvoda"
     }
   ]
 }
