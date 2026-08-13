@@ -779,6 +779,44 @@
       }
     },
     {
+      "articleId": "ART_new_20260813_kak-perezhit-razvod-s-muzhem",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как пережить развод с мужем, которого всё ещё любишь",
+      "slug": "kak-perezhit-razvod-s-muzhem",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-s-muzhem",
+      "primaryQuery": "как пережить развод с мужем",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": null,
+      "updatedAt": "2026-08-13T00:00:00.000Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
+        "evidence": "Editorially approved primary query and publication scope. No committed verified frequency source was found; frequency remains UNVERIFIED.",
+        "operationalAddedAt": "2026-08-13"
+      }
+    },
+    {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "title": "Как понять, чего вы действительно хотите: вопросы для спокойного размышления",
@@ -2291,7 +2329,22 @@
       }
     }
   ],
-  "nextQueue": [],
+  "nextQueue": [
+    {
+      "position": 1,
+      "articleId": "ART_new_20260813_kak-perezhit-razvod-s-muzhem",
+      "slug": "kak-perezhit-razvod-s-muzhem",
+      "title": "Как пережить развод с мужем, которого всё ещё любишь",
+      "status": "PLANNED",
+      "primaryQuery": "как пережить развод с мужем",
+      "frequencyStatus": "UNVERIFIED",
+      "cluster": "Развод и отношения",
+      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "DIRECT",
+      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
+    }
+  ],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2400,10 +2453,12 @@
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
       "publishedArticleCount": 2,
-      "remainingQueueDependencies": 0,
-      "waitingArticleIds": [],
-      "status": "NO_WAITING_PUBLISHED_ARTICLES",
-      "evidence": "The canonical practice is live and supports two published recovery-related articles with no remaining queue dependency.",
+      "remainingQueueDependencies": 1,
+      "waitingArticleIds": [
+        "ART_new_20260813_kak-perezhit-razvod-s-muzhem"
+      ],
+      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
+      "evidence": "The canonical practice is already live. It supports two published recovery-related articles and one planned husband-focused article, and is not itself awaiting publication.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },

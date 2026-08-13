@@ -6288,6 +6288,43 @@ assert(
   "survive-divorce keeps pending hub",
 );
 
+const surviveDivorceHusbandArticle = getArticleBySlug(
+  "kak-perezhit-razvod-s-muzhem",
+);
+assert(surviveDivorceHusbandArticle, "survive-divorce-husband article registered");
+assert(
+  surviveDivorceHusbandArticle.title ===
+    "Как пережить развод с мужем, которого всё ещё любишь",
+  "survive-divorce-husband H1",
+);
+assert(
+  surviveDivorceHusbandArticle.metaTitle ===
+    "Как пережить развод с мужем, которого всё ещё любишь – АудиоЛад",
+  "survive-divorce-husband meta title",
+);
+assert(
+  surviveDivorceHusbandArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    surviveDivorceHusbandArticle.relatedPractices.length === 0 &&
+    surviveDivorceHusbandArticle.finalAudioLead === "",
+  "survive-divorce-husband has canonical practice and one player",
+);
+assert(
+  surviveDivorceHusbandArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhizn-posle-razvoda",
+  ) &&
+    surviveDivorceHusbandArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-perezhit-razvod",
+    ) &&
+    surviveDivorceHusbandArticle.faq.length === 7,
+  "survive-divorce-husband has approved recovery links and FAQ",
+);
+assert(
+  surviveDivorceHusbandArticle.topicSlug === "pending-hub-reconciliation" &&
+    surviveDivorceHusbandArticle.topicHref === "/articles",
+  "survive-divorce-husband keeps pending hub",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

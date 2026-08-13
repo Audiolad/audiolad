@@ -252,6 +252,18 @@
       "validatedAt": "2026-08-13T05:35:59Z"
     },
     {
+      "articleId": "ART_new_20260813_kak-perezhit-razvod-s-muzhem",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-perezhit-razvod-s-muzhem",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-razvod-s-muzhem",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "DIRECT",
+      "validationStatus": "PLANNED",
+      "evidence": "New editorially approved operational entry; not published and not validated. Frequency remains UNVERIFIED because no committed verified source was found."
+    },
+    {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
       "articleIdStatus": "CONFIRMED_FROM_HISTORIC_SNAPSHOT",
       "slug": "kak-ponyat-chego-ya-hochu",
