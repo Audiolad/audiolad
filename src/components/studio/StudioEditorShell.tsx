@@ -1058,7 +1058,7 @@ export default function StudioEditorShell({
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V4h4M4 4a8 8 0 0 1 15 3M20 16v4h-4m4 0a8 8 0 0 1-15-3" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /><path d="m8.5 15.5 7-10M8.5 19.5l7-10M9 8l6 6" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /><path d="m8.5 15.5 3.5-2-5-10M15.5 15.5 12 13.5l5-10" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
