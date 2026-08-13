@@ -807,12 +807,12 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": "2026-08-13T06:00:40Z",
-      "updatedAt": "2026-08-13T06:00:40Z",
+      "publishedAt": "2026-08-13T06:20:16Z",
+      "updatedAt": "2026-08-13T06:20:16Z",
       "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Production smoke passed at 2026-08-13T06:00:40Z on release 20260813-055443-b6afb242 (BUILD_ID ZYPyMtleTCnr-Voaca28r). HTTP 200, H1, Meta Title, Meta Description, self-canonical, one player, canonical practice URL, approved general-recovery and life-after-divorce links, FAQ, sitemap, and no unexpected page errors passed. Frequency remains UNVERIFIED because no committed verified source was found.",
+        "evidence": "Public production smoke passed at 2026-08-13T06:20:16Z after SEO redeploy restored production from origin/main overwrite: HTTP 200 on https://audiolad.ru/articles/kak-perezhit-razvod-s-muzhem (independent public curl), H1, Meta Title, canonical, one player (<audio>), canonical practice URL https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda, live internal links /articles/kak-perezhit-razvod and /articles/zhizn-posle-razvoda, FAQ, sitemap. Previous VALIDATE PASS on 20260813-055443-b6afb242/ZYPyMtleTCnr-Voaca28r was invalidated when origin/main release 20260813-060156-15e67837/omxKD_1MQRv9ZNLsGqcVK overwrote production and returned HTTP 404. Restored release 20260813-061256-11800cb7; BUILD_ID OjPdNuMVKg6NmQh50yzyb.",
         "operationalAddedAt": "2026-08-13"
       }
     },
@@ -2441,7 +2441,7 @@
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "NO_WAITING_PUBLISHED_ARTICLES",
-      "evidence": "The canonical practice is live and supports three published recovery-related articles with no remaining queue dependency.",
+      "evidence": "Canonical practice is live and currently supports three published divorce-recovery articles after public SEO redeploy validation.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
