@@ -21,6 +21,7 @@
     "/articles/kak-perestat-kritikovat-sebya",
     "/articles/kak-perestat-perezhivat-iz-za-deneg",
     "/articles/kak-perestat-zlitsya-na-cheloveka",
+    "/articles/kak-perezhit-razvod",
     "/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
     "/articles/kak-ponyat-chego-ya-hochu",
     "/articles/kak-ponyat-chto-pora-razvoditsya",
@@ -155,6 +156,11 @@
       "articleId": "ART_kak-perestat-zlitsya-na-cheloveka",
       "slug": "kak-perestat-zlitsya-na-cheloveka",
       "path": "/articles/kak-perestat-zlitsya-na-cheloveka"
+    },
+    {
+      "articleId": "ART_new_20260813_kak-perezhit-razvod",
+      "slug": "kak-perezhit-razvod",
+      "path": "/articles/kak-perezhit-razvod"
     },
     {
       "articleId": "ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley",
