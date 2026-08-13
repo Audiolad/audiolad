@@ -2513,12 +2513,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Как отпустить бывшего мужа после развода и вернуть внимание к себе",
       "slug": "kak-otpustit-byvshego-muzha",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/kak-otpustit-byvshego-muzha",
+      "productionUrl": "https://audiolad.ru/articles/kak-otpustit-byvshego-muzha",
+      "plannedUrl": null,
       "primaryQuery": "как отпустить бывшего мужа",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -2537,14 +2537,17 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T12:28:07Z",
+      "updatedAt": "2026-08-13T12:28:07Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "evidence": "Public production smoke passed at 2026-08-13T12:28:07Z: HTTP 200 including cache-bust, H1, Meta Title, Meta Description, self-canonical, one audio, relative canonical practice path, approved links, FAQ, sitemap, and no page-error markers. Release 20260813-122238-52b61a57; BUILD_ID 7pDGmKc-nBXTy0DylgGoB.",
         "operationalAddedAt": "2026-08-13"
-      }
+      },
+      "release": "20260813-122238-52b61a57",
+      "buildId": "7pDGmKc-nBXTy0DylgGoB",
+      "validatedAt": "2026-08-13T12:28:07Z"
     }
   ],
   "nextQueue": [],
