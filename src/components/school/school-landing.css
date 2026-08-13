@@ -137,6 +137,16 @@
   isolation: isolate;
 }
 
+.school-first-screen__eyebrow {
+  max-width: 31rem;
+  margin: 0 0 0.7rem;
+  text-align: left;
+  font-size: clamp(0.95rem, 3.7vw, 1.1rem);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--school-muted);
+}
+
 .school-first-screen__title {
   margin: 0;
   text-align: left;
@@ -159,10 +169,11 @@
 
 .school-first-screen__offer {
   margin: 0.95rem 0 0;
+  max-width: 38rem;
   text-align: left;
-  font-size: var(--school-body-size);
-  line-height: var(--school-body-leading);
-  font-weight: 500;
+  font-size: clamp(1.12rem, 4.4vw, 1.3rem);
+  line-height: 1.42;
+  font-weight: 600;
   color: var(--school-body-color);
 }
 
@@ -753,6 +764,11 @@
     justify-content: center;
     margin-top: 0;
     padding: 2.5rem 2.5rem 2.5rem 2rem;
+  }
+
+  .school-first-screen__eyebrow {
+    max-width: 27rem;
+    font-size: 1rem;
   }
 
   .school-first-screen__title {
