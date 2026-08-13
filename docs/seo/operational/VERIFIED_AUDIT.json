@@ -834,16 +834,16 @@
       "articleId": "ART_new_20260813_zhizn-zhenshchiny-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "zhizn-zhenshchiny-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-zhenshchiny-posle-razvoda",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-zhenshchiny-posle-razvoda",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PENDING",
-      "evidence": "Final authoritative Markdown received; publication awaits canonical deploy and independent public validation.",
-      "release": null,
-      "buildId": null,
-      "validatedAt": null
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Independent public smoke passed at 2026-08-13T17:57:16Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer, four approved internal links, clickable canonical practice-section title, visible «Главное», FAQ, and sitemap. The 120-second post-deploy health watch completed without rollback and release remained active. Release 20260813-175433-72864bc1; BUILD_ID GUcz1BCHTXBp-9KNgGdxi.",
+      "release": "20260813-175433-72864bc1",
+      "buildId": "GUcz1BCHTXBp-9KNgGdxi",
+      "validatedAt": "2026-08-13T18:01:00Z"
     }
   ]
 }
