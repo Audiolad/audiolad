@@ -7,8 +7,8 @@
 
 ## Result
 - Articles reconstructed from registry: **55**
-- New editorial operational entries published: **7**
-- PUBLISHED entries: **62**
+- New editorial operational entries published: **8**
+- PUBLISHED entries: **63**
 - Confirmed historical Article IDs: **40**
 - `ID_PENDING_RECONCILIATION`: **15**
 - Confirmed primary queries: **27**
@@ -22,7 +22,7 @@
 - Next Queue contains no published registry article.
 - Historical publication/queue/forecast statuses were intentionally not copied: the snapshot is from 2026-07-29 and contains 39 published rows, while the production-compatible registry contains 55.
 - Historical published audit entries remain `RECONSTRUCTED_FROM_PRODUCTION`,
-  not `VALIDATE PASS`; all seven new divorce articles have explicit
+  not `VALIDATE PASS`; all eight new divorce articles have explicit
   production-smoke `VALIDATE PASS`.
 
 ## Current divorce articles
@@ -112,6 +112,18 @@ planning artifacts and was added as a new editorial operational entry:
   `https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda`.
 - Production smoke: `VALIDATE PASS` on release
   `20260813-053044-4584ec71` (BUILD_ID `ru4jgzG65OBxFX44cklnj`).
+
+The husband-focused divorce recovery article was also absent from committed
+historical planning artifacts and was added as a new editorial operational entry:
+
+- Article ID: `ART_new_20260813_kak-perezhit-razvod-s-muzhem`
+- Status: `PUBLISHED`
+- Frequency: `UNVERIFIED`; no committed verified frequency source exists.
+- Hub: pending; no new divorce/relationships Topic Hub was created.
+- Practice: `Возвращение к себе после развода`, `DIRECT`; canonical public URL
+  `https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda`.
+- Production smoke: `VALIDATE PASS` on release
+  `20260813-055443-b6afb242` (BUILD_ID `ZYPyMtleTCnr-Voaca28r`).
 
 ## Required later reconciliation
 Reconcile the 15 pending IDs and any historical un-published candidates using only future committed planning artifacts. A new article may enter Next Queue only after an explicit plan record with primary query, frequency evidence, hub, practice mapping, and stable Article ID is committed.
