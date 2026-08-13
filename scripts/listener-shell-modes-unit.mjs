@@ -17,6 +17,7 @@ const listenerNav = read("src/lib/navigation/listener-nav.ts");
 const profileShell = read("src/components/profile/ProfilePageShell.tsx");
 const profileLayout = read("src/app/(platform)/profile/layout.tsx");
 const authorLayout = read("src/app/(platform)/author-dashboard/layout.tsx");
+const authorDashboardPage = read("src/app/(platform)/author-dashboard/page.tsx");
 const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
 const bottomNav = read("src/lib/navigation/bottom-nav.ts");
 const listenerLayout = read("src/app/(platform)/(listener)/layout.tsx");
@@ -151,6 +152,13 @@ assert(
 assert(
   authorShell.includes("internalBackHref"),
   "AuthorShell must support internal cabinet back navigation",
+);
+
+assert(
+  authorDashboardPage.includes('href="/studio"') &&
+    authorDashboardPage.includes("StudioMicrophoneIcon") &&
+    authorDashboardPage.includes(">Студия</span>"),
+  "Author dashboard must provide a labeled Studio entry action",
 );
 
 console.log("listener-shell-modes-unit: ok");
