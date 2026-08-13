@@ -64,6 +64,7 @@ import { KAK_PEREZHIT_RAZVOD_S_MUZHEM_ARTICLE } from "./content/kak-perezhit-raz
 import { NOVAYA_ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/novaya-zhizn-posle-razvoda";
 import { NOVYE_OTNOSHENIYA_POSLE_RAZVODA_ARTICLE } from "./content/novye-otnosheniya-posle-razvoda";
 import { LICHNAYA_ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/lichnaya-zhizn-posle-razvoda";
+import { KAK_PEREZHIT_RAZVOD_MUZHCHINE_ARTICLE } from "./content/kak-perezhit-razvod-muzhchine";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -133,6 +134,7 @@ const ARTICLE_DEFINITIONS = [
   NOVAYA_ZHIZN_POSLE_RAZVODA_ARTICLE,
   NOVYE_OTNOSHENIYA_POSLE_RAZVODA_ARTICLE,
   LICHNAYA_ZHIZN_POSLE_RAZVODA_ARTICLE,
+  KAK_PEREZHIT_RAZVOD_MUZHCHINE_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
