@@ -23,21 +23,63 @@ const bodyClassName =
 
 const productEpisodes = [
   {
-    kicker: "01 — Голос",
+    kicker: "01 - Голос",
     title: "Начните с того, что хотите сказать",
     featureIndexes: [0, 5],
+    icon: "microphone",
   },
   {
-    kicker: "02 — Голос и музыка",
+    kicker: "02 - Голос и музыка",
     title: "Создайте спокойное, поддерживающее звучание",
     featureIndexes: [1, 3],
+    icon: "audio",
   },
   {
-    kicker: "03 — Монтаж",
+    kicker: "03 - Монтаж",
     title: "Соберите запись в нужном ритме",
     featureIndexes: [2, 4],
+    icon: "edit",
   },
 ] as const;
+
+function FeatureIcon({
+  kind,
+}: {
+  kind: (typeof productEpisodes)[number]["icon"];
+}) {
+  const commonProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.7,
+  };
+
+  if (kind === "microphone") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>
+        <rect x="8.25" y="3" width="7.5" height="12" rx="3.75" />
+        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" />
+      </svg>
+    );
+  }
+
+  if (kind === "audio") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>
+        <path d="M5 15V9M9 18V6M13 15v-6M17 20V4M21 15V9" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>
+      <path d="m5 7 14 10M19 7 5 17M9 5l6 14" />
+      <circle cx="6" cy="6" r="2.25" />
+      <circle cx="18" cy="18" r="2.25" />
+    </svg>
+  );
+}
 
 export default function StudioMeditationPage() {
   return (
@@ -73,7 +115,7 @@ export default function StudioMeditationPage() {
             </h1>
             <p className="mx-auto mt-5 max-w-[760px] text-[17px] leading-8 text-[#4c3d78] sm:text-lg sm:leading-8">
               Запишите или загрузите голос, добавьте музыку, настройте звучание
-              и соберите свою медитацию прямо в браузере — без сложных программ
+              и соберите свою медитацию прямо в браузере - без сложных программ
               для работы со звуком.
             </p>
             <a
@@ -112,7 +154,7 @@ export default function StudioMeditationPage() {
               id="studio-meditation-features-heading"
               className={sectionHeadingClassName}
             >
-              Голос, музыка и монтаж — в одной Студии
+              Голос, музыка и монтаж - в одной Студии
             </h2>
             <p className={bodyClassName}>
               Всё необходимое, чтобы превратить записанный голос в готовую
@@ -126,7 +168,10 @@ export default function StudioMeditationPage() {
                 key={episode.title}
                 className="border-b border-[#dccdee] py-8 lg:border-b-0 lg:border-r lg:px-8 lg:py-3 first:lg:pl-0 last:lg:border-r-0 last:lg:pr-0"
               >
-                <p className="text-xs font-semibold tracking-[0.14em] text-[#7042c5]">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eee5f8] p-2.5 text-[#7042c5]">
+                  <FeatureIcon kind={episode.icon} />
+                </span>
+                <p className="mt-5 text-xs font-semibold tracking-[0.14em] text-[#7042c5]">
                   {episode.kicker}
                 </p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#25135c]">
