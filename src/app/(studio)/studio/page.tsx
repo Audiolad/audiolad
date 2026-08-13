@@ -15,6 +15,14 @@ export default async function StudioPage() {
           <StudioBrand />
           <nav className="flex flex-wrap gap-2">
             <Link
+              href="/studio/help"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#a98be0] px-4 text-sm font-semibold text-[#eadfff] hover:bg-white/10"
+            >
+              Инструкция
+            </Link>
+            <Link
               href="/author-dashboard"
               className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#7051ae] px-4 text-sm font-semibold text-white"
             >
