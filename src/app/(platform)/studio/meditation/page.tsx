@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
-import StudioMeditationPreview from "@/components/studio/StudioMeditationPreview";
 import { buildStudioMeditationMetadata } from "@/lib/seo/public-page-metadata";
 import {
   STUDIO_MEDITATION_AUDIENCES,
@@ -42,7 +42,7 @@ const productEpisodes = [
 export default function StudioMeditationPage() {
   return (
     <main className="min-h-screen scroll-smooth overflow-hidden bg-[#f7f2fc] text-[#25135c]">
-      <div className="mx-auto w-full max-w-[1440px] px-5 pb-24 pt-5 sm:px-8 sm:pt-7 lg:px-12 lg:pb-32 xl:px-16">
+      <div className="mx-auto w-full max-w-[900px] px-5 pb-24 pt-5 sm:px-8 sm:pt-7 lg:px-10 lg:pb-32">
         <header className="flex items-center justify-between gap-4 border-b border-[#e6dbf5] pb-4 sm:pb-5">
           <AudioladHorizontalLogo
             priority
@@ -63,7 +63,7 @@ export default function StudioMeditationPage() {
           </div>
         </header>
 
-        <section className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,44fr)_minmax(0,56fr)] lg:gap-12 lg:py-20 xl:gap-16 xl:py-24">
+        <section className="grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,43fr)_minmax(0,57fr)] lg:gap-8 lg:py-20">
           <div className="max-w-xl">
             <p className="text-xs font-semibold tracking-[0.16em] text-[#7042c5]">
               СТУДИЯ АУДИОЛАД
@@ -88,8 +88,18 @@ export default function StudioMeditationPage() {
             </p>
           </div>
 
-          <div className="min-w-0 lg:pl-2">
-            <StudioMeditationPreview />
+          <div className="min-w-0">
+            <div className="aspect-[1.35] overflow-hidden rounded-[18px] shadow-[0_18px_42px_rgba(28,14,61,0.16)] sm:rounded-[22px] lg:aspect-auto">
+              <Image
+                src="/images/studio/studio-interface.png"
+                alt="Интерфейс Студии АудиоЛад для записи медитаций"
+                width={1024}
+                height={547}
+                priority
+                sizes="(max-width: 1023px) calc(100vw - 40px), 480px"
+                className="h-full w-full object-cover object-[54%_50%] lg:h-auto"
+              />
+            </div>
             <p className="mt-3 text-xs leading-5 text-[#796ba0]">
               Интерфейс Студии АудиоЛад: голос, музыка и монтаж в одном
               пространстве.
