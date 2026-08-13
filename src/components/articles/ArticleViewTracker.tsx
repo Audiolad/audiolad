@@ -12,7 +12,7 @@ type ArticleViewTrackerProps = {
   path: string;
   articleSlug: string;
   topicSlug: string;
-  practiceSlug: string;
+  practiceSlug?: string;
 };
 
 export default function ArticleViewTracker({
@@ -43,7 +43,7 @@ export default function ArticleViewTracker({
       properties: {
         article_slug: articleSlug,
         topic_slug: topicSlug,
-        practice_slug: practiceSlug,
+        ...(practiceSlug ? { practice_slug: practiceSlug } : {}),
       },
     });
   }, [articleSlug, path, practiceSlug, topicSlug]);

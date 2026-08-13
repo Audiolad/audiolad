@@ -1,9 +1,9 @@
 import type { CatalogProduct } from "@/lib/products/catalog";
 
 import type {
-  ArticleDefinition,
   ArticlePracticeSlot,
   ArticleRelatedPracticeSlot,
+  PracticeArticleDefinition,
 } from "./types";
 
 /**
@@ -33,14 +33,14 @@ export function buildCatalogPracticeKeyIndex(
 }
 
 export function resolveArticlePrimaryPractice(
-  article: ArticleDefinition,
+  article: PracticeArticleDefinition,
   catalogByKey: ReadonlyMap<string, CatalogProduct>,
 ): CatalogProduct | null {
   return resolveCatalogPracticeByKey(catalogByKey, article.primaryPractice);
 }
 
 export function resolveArticleRelatedPractices(
-  article: ArticleDefinition,
+  article: PracticeArticleDefinition,
   catalogByKey: ReadonlyMap<string, CatalogProduct>,
   primaryPracticeId: string,
 ): Array<{ product: CatalogProduct; blurb: string; slot: ArticleRelatedPracticeSlot }> {

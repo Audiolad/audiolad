@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ArticleAudioBlock from "@/components/articles/ArticleAudioBlock";
+import CreatorPathsCta from "@/components/articles/CreatorPathsCta";
 import ArticleFaqList from "@/components/articles/ArticleFaqList";
 import { ArticlePlaybackProvider } from "@/components/articles/ArticlePlaybackProvider";
 import ArticleRelatedPracticeClickTracker from "@/components/articles/ArticleRelatedPracticeClickTracker";
@@ -14,7 +15,11 @@ import {
 import CatalogProductCard from "@/components/products/CatalogProductCard";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildArticleJsonLdGraph } from "@/lib/seo/articles";
-import type { ArticlePageData } from "@/lib/seo/articles";
+import type {
+  ArticlePageData,
+  CreatorPathsArticlePageData,
+  PracticeArticlePageData,
+} from "@/lib/seo/articles";
 import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
 
 type ArticlePageViewProps = {
@@ -40,6 +45,204 @@ const SECTION_SCROLL_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
 
 export default function ArticlePageView({ data }: ArticlePageViewProps) {
+  if (data.kind === "creator_paths") {
+    return <CreatorPathsArticlePageView data={data} />;
+  }
+
+  return <PracticeArticlePageView data={data} />;
+}
+
+function CreatorPathsArticlePageView({
+  data,
+}: {
+  data: CreatorPathsArticlePageData;
+}) {
+  const { article } = data;
+  const jsonLd = buildArticleJsonLdGraph(data);
+  const closingHeading = resolveArticleClosingHeading(article.closingSection.title);
+  const tocItems = [
+    ...article.sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+    })),
+    {
+      id: article.closingSection.id,
+      title: closingHeading,
+    },
+  ];
+  const linkClassName =
+    "font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+  return (
+    <>
+      <JsonLdScript data={jsonLd} />
+      <ArticleViewTracker
+        path={data.path}
+        articleSlug={article.slug}
+        topicSlug={article.topicSlug}
+      />
+      <article className="mx-auto max-w-[40rem] pb-10 pt-3 xl:pt-2">
+        <nav
+          aria-label="Хлебные крошки"
+          className="text-[13px] leading-5 text-[#7d70a2] sm:text-sm sm:leading-6"
+        >
+          <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+            <li>
+              <Link href="/" className={linkClassName}>
+                Главная
+              </Link>
+            </li>
+            <li aria-hidden="true">→</li>
+            <li>
+              <ArticleTopicLink href={article.topicHref} className={linkClassName}>
+                {article.topicTitle}
+              </ArticleTopicLink>
+            </li>
+            <li aria-hidden="true">→</li>
+            <li className="text-[#25135c]" aria-current="page">
+              {article.breadcrumbTitle}
+            </li>
+          </ol>
+        </nav>
+
+        <header className="mt-3 sm:mt-5">
+          <h1 className="text-[1.5rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.625rem] sm:text-[1.75rem] sm:leading-tight md:text-[2rem]">
+            {article.title}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+            {article.authorLabel} · {readingTimeLabel(data.readingTimeMinutes)}
+          </p>
+        </header>
+
+        <div className={`mt-4 sm:mt-5 ${articleBodyStackClass}`}>
+          <p>{article.leadBeforeAudio}</p>
+        </div>
+
+        <div className="mt-5 sm:mt-6">
+          <CreatorPathsCta
+            emphasis={article.productContinuation.emphasis}
+            placement="top"
+          />
+        </div>
+
+        {article.introAfterAudio.length > 0 ? (
+          <div className={`mt-5 ${articleBodyStackClass}`}>
+            {article.introAfterAudio.map((paragraph) => (
+              <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+            ))}
+          </div>
+        ) : null}
+
+        <aside
+          aria-labelledby="article-short-answer-title"
+          className="mt-8 rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5"
+        >
+          <h2
+            id="article-short-answer-title"
+            className="text-xl font-semibold tracking-tight text-[#25135c]"
+          >
+            Короткий ответ
+          </h2>
+          <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
+        </aside>
+
+        <ArticleToc items={tocItems} />
+
+        {article.sections.map((section) => (
+          <section key={section.id} className="mt-10">
+            <h2
+              id={section.id}
+              className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
+            >
+              {section.title}
+            </h2>
+            <div className={`mt-4 ${articleBodyStackClass}`}>
+              {section.paragraphs.map((paragraph) => (
+                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+              ))}
+            </div>
+            {section.links?.length ? (
+              <div className={`mt-4 ${articleBodyStackClass}`}>
+                {section.links.map((item) => (
+                  <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+                    {item.before}
+                    {item.href && item.linkLabel ? (
+                      <Link href={item.href} className={linkClassName}>
+                        {item.linkLabel}
+                      </Link>
+                    ) : (
+                      item.linkLabel
+                    )}
+                    {item.after ?? ""}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ))}
+
+        <section className="mt-10">
+          <h2
+            id={article.closingSection.id}
+            className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
+          >
+            {closingHeading}
+          </h2>
+          <div className={`mt-4 ${articleBodyStackClass}`}>
+            {article.closingSection.paragraphs.map((paragraph) => (
+              <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-8">
+          <CreatorPathsCta
+            emphasis={article.productContinuation.emphasis}
+            placement="bottom"
+          />
+        </div>
+
+        <section id="faq" className={`mt-12 ${SECTION_SCROLL_CLASS}`}>
+          <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
+            Частые вопросы
+          </h2>
+          <ArticleFaqList items={article.faq} />
+        </section>
+
+        {article.seeAlsoLinks.length > 0 ? (
+          <section className="mt-12">
+            <h2 className="text-2xl font-semibold tracking-tight text-[#25135c]">
+              Смотрите также
+            </h2>
+            <ul className="mt-4 grid list-none gap-3 p-0">
+              {article.seeAlsoLinks.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                  >
+                    <span className="text-base font-semibold text-[#7042c5]">
+                      {item.title}
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-[#7d70a2]">
+                      {item.description}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </article>
+    </>
+  );
+}
+
+function PracticeArticlePageView({
+  data,
+}: {
+  data: PracticeArticlePageData;
+}) {
   const { article, primaryPractice } = data;
   const closingHeading = resolveArticleClosingHeading(article.closingSection.title);
   const jsonLd = buildArticleJsonLdGraph(data);

@@ -52,22 +52,45 @@ export type ArticleSeeAlsoLink = {
   description: string;
 };
 
-/**
- * Serializable article document. Safe to load from registry today and from DB later.
- * Keep this shape free of React nodes and runtime-only fields.
- */
-export type ArticleDefinition = {
+/** Fields shared by every serializable SEO article document. */
+type ArticleDefinitionBase = {
   slug: string;
   title: string;
   /** Shorter label for breadcrumbs / compact UI */
   breadcrumbTitle: string;
   metaTitle: string;
   metaDescription: string;
-  /**
-   * Opening paragraph of the article body (after the practice block).
-   * Not rendered under H1 — use metaDescription for SEO/cards/previews.
-   */
+  /** Opening paragraph of the article body. */
   leadBeforeAudio: string;
+  shortAnswer: string;
+  authorLabel: string;
+  topicSlug: string;
+  topicTitle: string;
+  topicHref: string;
+  faq: readonly ArticleFaqItem[];
+  /** Body sections after short answer / TOC (each becomes h2) */
+  sections: readonly ArticleSection[];
+  /**
+   * Body paragraphs after the top product continuation, when one is shown.
+   * Template prepends leadBeforeAudio before these paragraphs.
+   */
+  introAfterAudio: readonly string[];
+  /** Footer “Смотрите также” cards (topic hub + related hubs) */
+  seeAlsoLinks: readonly ArticleSeeAlsoLink[];
+  /** Closing h2 section after the product continuation. */
+  closingSection: ArticleSection;
+  publishedAt: string;
+  updatedAt: string;
+};
+
+export type ArticleCreatorPathsContinuation = {
+  kind: "creator_paths";
+  emphasis: "balanced" | "studio" | "school";
+};
+
+/** Existing listener article funnel with an embedded catalog practice. */
+export type PracticeArticleDefinition = ArticleDefinitionBase & {
+  productContinuation?: undefined;
   /** Caption under top audio block */
   captionAfterAudio: string;
   /**
@@ -77,21 +100,8 @@ export type ArticleDefinition = {
   primaryPracticeEyebrow: string;
   /** Short intro paragraph immediately before the primary audio card */
   primaryPracticeIntro: string;
-  shortAnswer: string;
-  authorLabel: string;
-  topicSlug: string;
-  topicTitle: string;
-  topicHref: string;
   primaryPractice: ArticlePracticeSlot;
   relatedPractices: readonly ArticleRelatedPracticeSlot[];
-  faq: readonly ArticleFaqItem[];
-  /** Body sections after short answer / TOC (each becomes h2) */
-  sections: readonly ArticleSection[];
-  /**
-   * Body paragraphs after the practice block (continuation of leadBeforeAudio).
-   * Template prepends leadBeforeAudio before these paragraphs.
-   */
-  introAfterAudio: readonly string[];
   finalAudioLead: string;
   /**
    * Optional editorial cross-links after the final audio block
@@ -103,19 +113,33 @@ export type ArticleDefinition = {
    * (Audiolad positioning; not a second H2).
    */
   brandNote?: string;
-  /** Footer “Смотрите также” cards (topic hub + related hubs) */
-  seeAlsoLinks: readonly ArticleSeeAlsoLink[];
-  /** Closing h2 section after the final audio block */
-  closingSection: ArticleSection;
-  publishedAt: string;
-  updatedAt: string;
 };
 
-export type ArticlePageData = {
+/** Author-focused funnel with Studio and School as equal product paths. */
+export type CreatorPathsArticleDefinition = ArticleDefinitionBase & {
+  productContinuation: ArticleCreatorPathsContinuation;
+};
+
+export type ArticleDefinition =
+  | PracticeArticleDefinition
+  | CreatorPathsArticleDefinition;
+
+export function isCreatorPathsArticleDefinition(
+  article: ArticleDefinition,
+): article is CreatorPathsArticleDefinition {
+  return article.productContinuation?.kind === "creator_paths";
+}
+
+type ArticlePageDataBase = {
   article: ArticleDefinition;
   path: string;
   canonicalUrl: string;
   readingTimeMinutes: number;
+};
+
+export type PracticeArticlePageData = ArticlePageDataBase & {
+  kind: "practice";
+  article: PracticeArticleDefinition;
   primaryPractice: CatalogProduct;
   relatedPractices: Array<{
     product: CatalogProduct;
@@ -123,3 +147,12 @@ export type ArticlePageData = {
   }>;
   libraryAction: "sign_in" | "add" | "in_library" | "hidden";
 };
+
+export type CreatorPathsArticlePageData = ArticlePageDataBase & {
+  kind: "creator_paths";
+  article: CreatorPathsArticleDefinition;
+};
+
+export type ArticlePageData =
+  | PracticeArticlePageData
+  | CreatorPathsArticlePageData;

@@ -5074,8 +5074,30 @@ for (const slug of listArticleSlugs()) {
       item.metaDescription !== item.leadBeforeAudio,
     `${slug} keeps separate SEO metaDescription`,
   );
-  assert(item.primaryPractice?.practiceKey, `${slug} has primary practice key`);
+  if (item.productContinuation?.kind === "creator_paths") {
+    assert(
+      ["balanced", "studio", "school"].includes(item.productContinuation.emphasis),
+      `${slug} has a supported creator paths emphasis`,
+    );
+  } else {
+    assert(item.primaryPractice?.practiceKey, `${slug} has primary practice key`);
+  }
 }
+
+const creatorPathsArticle = getArticleBySlug("kak-sozdat-svoyu-meditatsiyu");
+assert(creatorPathsArticle, "creator paths article registered");
+assert(
+  creatorPathsArticle.productContinuation?.kind === "creator_paths",
+  "creator paths article uses creator continuation",
+);
+assert(
+  creatorPathsArticle.productContinuation?.emphasis === "balanced",
+  "creator paths article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in creatorPathsArticle),
+  "creator paths article does not require a catalog practice",
+);
 
 const jsonLd = buildArticleJsonLdGraph(pageData);
 const serialized = JSON.stringify(jsonLd);
@@ -5291,7 +5313,31 @@ const layoutSource = read("src/app/(platform)/(listener)/articles/layout.tsx");
 assert(layoutSource.includes("HomeMobileHeader"), "reuses guest mobile header");
 assert(layoutSource.includes("ListenerAppShell") === false, "no parallel shell");
 
-const viewSource = read("src/components/articles/ArticlePageView.tsx");
+const fullViewSource = read("src/components/articles/ArticlePageView.tsx");
+assert(
+  fullViewSource.includes("CreatorPathsCta"),
+  "creator paths CTA is rendered by article view",
+);
+const creatorPathsCtaSource = read(
+  "src/components/articles/CreatorPathsCta.tsx",
+);
+assert(
+  creatorPathsCtaSource.includes(
+    'const STUDIO_HREF = "https://audiolad.ru/studio/meditation"',
+  ),
+  "creator paths CTA links Studio directly to meditation studio",
+);
+assert(
+  creatorPathsCtaSource.includes('import { SCHOOL_ORIGIN }'),
+  "creator paths CTA uses the configured School production origin",
+);
+assert(
+  creatorPathsCtaSource.includes("Посмотреть Школу"),
+  "creator paths CTA shortens the School label on mobile",
+);
+const viewSource = fullViewSource.slice(
+  fullViewSource.indexOf("function PracticeArticlePageView"),
+);
 assert(viewSource.includes("Короткий ответ"), "short answer block");
 assert(viewSource.includes("ArticleAudioBlock"), "audio blocks");
 assert(viewSource.includes("placement=\"final_audio\""), "final audio placement");
