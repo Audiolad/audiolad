@@ -7,7 +7,9 @@ import type { ArticlePageData } from "./types";
 export function buildArticleMetadata(data: ArticlePageData): Metadata {
   const title = data.article.metaTitle;
   const description = data.article.metaDescription;
-  const ogImage = data.primaryPractice.coverUrl;
+  const ogImage = data.kind === "practice" ? data.primaryPractice.coverUrl : null;
+  const ogImageAlt =
+    data.kind === "practice" ? data.primaryPractice.title : undefined;
 
   return {
     title,
@@ -23,7 +25,7 @@ export function buildArticleMetadata(data: ArticlePageData): Metadata {
       siteName: SITE_BRAND,
       locale: "ru_RU",
       images: ogImage
-        ? [{ url: ogImage, alt: data.primaryPractice.title }]
+        ? [{ url: ogImage, alt: ogImageAlt }]
         : undefined,
     },
     twitter: {

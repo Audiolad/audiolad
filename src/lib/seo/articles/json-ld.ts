@@ -38,7 +38,10 @@ export function buildArticleJsonLd(
   origin = getAppOrigin(),
 ): JsonLdNode {
   const siteOrigin = originUrl(origin);
-  const image = resolveJsonLdImageUrl(data.primaryPractice.coverUrl, origin);
+  const image =
+    data.kind === "practice"
+      ? resolveJsonLdImageUrl(data.primaryPractice.coverUrl, origin)
+      : null;
 
   return {
     "@type": "Article",

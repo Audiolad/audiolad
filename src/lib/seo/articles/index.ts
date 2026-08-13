@@ -41,6 +41,9 @@ export {
 } from "./resolve-practices";
 export type {
   ArticleCrossLinkParagraph,
+  ArticleCreatorPathsContinuation,
+  CreatorPathsArticleDefinition,
+  CreatorPathsArticlePageData,
   ArticleDefinition,
   ArticleFaqItem,
   ArticlePageData,
@@ -48,4 +51,6 @@ export type {
   ArticleRelatedPracticeSlot,
   ArticleSection,
   ArticleSeeAlsoLink,
+  PracticeArticleDefinition,
+  PracticeArticlePageData,
 } from "./types";

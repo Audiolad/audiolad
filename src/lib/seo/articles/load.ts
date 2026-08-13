@@ -17,12 +17,16 @@ import {
   resolveArticlePrimaryPractice,
   resolveArticleRelatedPractices,
 } from "./resolve-practices";
-import type { ArticlePageData } from "./types";
+import {
+  isCreatorPathsArticleDefinition,
+  type ArticlePageData,
+  type PracticeArticlePageData,
+} from "./types";
 
 async function resolvePrimaryLibraryAction(
   supabase: SupabaseClient,
   product: CatalogProduct,
-): Promise<ArticlePageData["libraryAction"]> {
+): Promise<PracticeArticlePageData["libraryAction"]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -77,6 +81,17 @@ export async function loadArticlePageData(
     return null;
   }
 
+  const path = buildArticlePath(article.slug);
+  if (isCreatorPathsArticleDefinition(article)) {
+    return {
+      kind: "creator_paths",
+      article,
+      path,
+      canonicalUrl: buildSiteCanonicalUrl(path),
+      readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
+    };
+  }
+
   const catalog = await getPublishedCatalogProducts(supabase, {
     productKind: PRODUCT_KIND.PRACTICE,
   });
@@ -93,13 +108,13 @@ export async function loadArticlePageData(
     primaryPractice.id,
   ).map(({ product, blurb }) => ({ product, blurb }));
 
-  const path = buildArticlePath(article.slug);
   const libraryAction = await resolvePrimaryLibraryAction(
     supabase,
     primaryPractice,
   );
 
   return {
+    kind: "practice",
     article,
     path,
     canonicalUrl: buildSiteCanonicalUrl(path),
@@ -107,5 +122,5 @@ export async function loadArticlePageData(
     primaryPractice,
     relatedPractices,
     libraryAction,
-  };
+  } satisfies PracticeArticlePageData;
 }
