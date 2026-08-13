@@ -1,6 +1,9 @@
 "use client";
 
-import { useArticlePlayback } from "@/components/articles/ArticlePlaybackProvider";
+import {
+  getCachedAnalyticsSessionId,
+  trackPlatformEvent,
+} from "@/lib/analytics/client";
 
 export type ArticleTocItem = {
   id: string;
@@ -9,10 +12,42 @@ export type ArticleTocItem = {
 
 type ArticleTocProps = {
   items: readonly ArticleTocItem[];
+  articleSlug: string;
+  topicSlug: string;
+  path: string;
+  practiceId?: string;
+  practiceSlug?: string;
 };
 
-export default function ArticleToc({ items }: ArticleTocProps) {
-  const { trackEvent } = useArticlePlayback();
+export default function ArticleToc({
+  items,
+  articleSlug,
+  topicSlug,
+  path,
+  practiceId,
+  practiceSlug,
+}: ArticleTocProps) {
+  function handleClick(sectionId: string) {
+    const sessionId = getCachedAnalyticsSessionId();
+
+    if (!sessionId) {
+      return;
+    }
+
+    void trackPlatformEvent({
+      sessionId,
+      event_name: "article_toc_click",
+      path,
+      practice_id: practiceId,
+      properties: {
+        article_slug: articleSlug,
+        topic_slug: topicSlug,
+        ...(practiceSlug ? { practice_slug: practiceSlug } : {}),
+        placement: "toc",
+        section_id: sectionId,
+      },
+    });
+  }
 
   if (items.length === 0) {
     return null;
@@ -41,12 +76,7 @@ export default function ArticleToc({ items }: ArticleTocProps) {
               <a
                 href={`#${item.id}`}
                 className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                onClick={() =>
-                  trackEvent("article_toc_click", {
-                    placement: "toc",
-                    section_id: item.id,
-                  })
-                }
+                onClick={() => handleClick(item.id)}
               >
                 {item.title}
               </a>

@@ -94,7 +94,13 @@ function CreatorPathsArticlePageView({
             </li>
             <li aria-hidden="true">→</li>
             <li>
-              <ArticleTopicLink href={article.topicHref} className={linkClassName}>
+              <ArticleTopicLink
+                href={article.topicHref}
+                className={linkClassName}
+                articleSlug={article.slug}
+                topicSlug={article.topicSlug}
+                path={data.path}
+              >
                 {article.topicTitle}
               </ArticleTopicLink>
             </li>
@@ -146,7 +152,12 @@ function CreatorPathsArticlePageView({
           <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
         </aside>
 
-        <ArticleToc items={tocItems} />
+        <ArticleToc
+          items={tocItems}
+          articleSlug={article.slug}
+          topicSlug={article.topicSlug}
+          path={data.path}
+        />
 
         {article.sections.map((section) => (
           <section key={section.id} className="mt-10">
@@ -302,6 +313,11 @@ function PracticeArticlePageView({
                 <ArticleTopicLink
                   href={article.topicHref}
                   className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                  articleSlug={article.slug}
+                  topicSlug={article.topicSlug}
+                  path={data.path}
+                  practiceId={primaryPractice.id}
+                  practiceSlug={primaryPractice.slug}
                 >
                   {article.topicTitle}
                 </ArticleTopicLink>
@@ -393,7 +409,14 @@ function PracticeArticlePageView({
             <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
           </aside>
 
-          <ArticleToc items={tocItems} />
+          <ArticleToc
+            items={tocItems}
+            articleSlug={article.slug}
+            topicSlug={article.topicSlug}
+            path={data.path}
+            practiceId={primaryPractice.id}
+            practiceSlug={primaryPractice.slug}
+          />
 
           {article.sections.map((section) => (
             <section key={section.id} className="mt-10">
@@ -582,7 +605,15 @@ function PracticeArticlePageView({
                   if (item.href.startsWith("/topics/")) {
                     return (
                       <li key={item.href}>
-                        <ArticleTopicLink href={item.href} className={className}>
+                        <ArticleTopicLink
+                          href={item.href}
+                          className={className}
+                          articleSlug={article.slug}
+                          topicSlug={article.topicSlug}
+                          path={data.path}
+                          practiceId={primaryPractice.id}
+                          practiceSlug={primaryPractice.slug}
+                        >
                           {content}
                         </ArticleTopicLink>
                       </li>

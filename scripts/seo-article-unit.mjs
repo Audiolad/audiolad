@@ -5318,6 +5318,26 @@ assert(
   fullViewSource.includes("CreatorPathsCta"),
   "creator paths CTA is rendered by article view",
 );
+const articleTopicLinkSource = read(
+  "src/components/articles/ArticleTopicLink.tsx",
+);
+assert(
+  !articleTopicLinkSource.includes("useArticlePlayback"),
+  "topic links do not require the practice playback provider",
+);
+assert(
+  articleTopicLinkSource.includes('event_name: "article_topic_click"'),
+  "topic links preserve article topic click analytics",
+);
+const articleTocSource = read("src/components/articles/ArticleToc.tsx");
+assert(
+  !articleTocSource.includes("useArticlePlayback"),
+  "table of contents does not require the practice playback provider",
+);
+assert(
+  articleTocSource.includes('event_name: "article_toc_click"'),
+  "table of contents preserves article click analytics",
+);
 const creatorPathsCtaSource = read(
   "src/components/articles/CreatorPathsCta.tsx",
 );
