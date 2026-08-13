@@ -5057,6 +5057,14 @@ for (const slug of listArticleSlugs()) {
   assert(item.authorLabel === "Редакция АудиоЛада", `${slug} editorial byline`);
   assert(item.leadBeforeAudio.trim().length > 0, `${slug} keeps opening paragraph`);
   assert(
+    item.shortAnswer.trim().length > 0,
+    `${slug} keeps a non-empty short answer`,
+  );
+  assert(
+    !item.leadBeforeAudio.startsWith("# "),
+    `${slug} does not duplicate Markdown H1 in article body`,
+  );
+  assert(
     !item.introAfterAudio.includes(item.leadBeforeAudio),
     `${slug} opening paragraph not duplicated in introAfterAudio`,
   );
