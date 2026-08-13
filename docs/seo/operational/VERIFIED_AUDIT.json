@@ -804,13 +804,16 @@
       "articleId": "ART_new_20260813_otnosheniya-s-byvshim-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "otnosheniya-s-byvshim-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/otnosheniya-s-byvshim-posle-razvoda",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/otnosheniya-s-byvshim-posle-razvoda",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and external public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "External public smoke passed at 2026-08-13T14:02:57Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, relative canonical practice path, one lead after the player, populated short answer with its actual text, table of contents, no Markdown H1 in body, approved child-divorce and former-husband links, FAQ, sitemap, no page-error markers, and ancestry guard. Release 20260813-135648-b403e299; BUILD_ID rQgtRrXDk19u7j5EnTZ0e.",
+      "release": "20260813-135648-b403e299",
+      "buildId": "rQgtRrXDk19u7j5EnTZ0e",
+      "validatedAt": "2026-08-13T14:02:57Z"
     }
   ]
 }
