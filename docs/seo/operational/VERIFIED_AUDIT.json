@@ -829,6 +829,21 @@
       "release": "20260813-162017-de083d1c",
       "buildId": "yBLvB_ukyEqTJJJp8uOFp",
       "validatedAt": "2026-08-13T16:28:26Z"
+    },
+    {
+      "articleId": "ART_new_20260813_zhizn-zhenshchiny-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "zhizn-zhenshchiny-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/zhizn-zhenshchiny-posle-razvoda",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "DIRECT",
+      "validationStatus": "PENDING",
+      "evidence": "Final authoritative Markdown received; publication awaits canonical deploy and independent public validation.",
+      "release": null,
+      "buildId": null,
+      "validatedAt": null
     }
   ]
 }
