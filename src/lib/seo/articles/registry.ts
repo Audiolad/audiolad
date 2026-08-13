@@ -70,6 +70,7 @@ import { KAK_OTPUSTIT_BYVSHEGO_MUZHA_ARTICLE } from "./content/kak-otpustit-byvs
 import { OTNOSHENIYA_S_BYVSHIM_POSLE_RAZVODA_ARTICLE } from "./content/otnosheniya-s-byvshim-posle-razvoda";
 import { ZHIZN_MUZHCHINY_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-muzhchiny-posle-razvoda";
 import { ZHIZN_ZHENSHCHINY_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-zhenshchiny-posle-razvoda";
+import { ODINOCHESTVO_POSLE_RAZVODA_ARTICLE } from "./content/odinochestvo-posle-razvoda";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -145,6 +146,7 @@ const ARTICLE_DEFINITIONS = [
   OTNOSHENIYA_S_BYVSHIM_POSLE_RAZVODA_ARTICLE,
   ZHIZN_MUZHCHINY_POSLE_RAZVODA_ARTICLE,
   ZHIZN_ZHENSHCHINY_POSLE_RAZVODA_ARTICLE,
+  ODINOCHESTVO_POSLE_RAZVODA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(

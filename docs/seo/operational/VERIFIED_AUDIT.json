@@ -844,6 +844,21 @@
       "release": "20260813-175433-72864bc1",
       "buildId": "GUcz1BCHTXBp-9KNgGdxi",
       "validatedAt": "2026-08-13T18:01:00Z"
+    },
+    {
+      "articleId": "ART_new_20260813_odinochestvo-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "odinochestvo-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/odinochestvo-posle-razvoda",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "STRONG",
+      "validationStatus": "PENDING",
+      "evidence": "Final authoritative Markdown received; publication awaits canonical deploy and independent public validation.",
+      "release": null,
+      "buildId": null,
+      "validatedAt": null
     }
   ]
 }
