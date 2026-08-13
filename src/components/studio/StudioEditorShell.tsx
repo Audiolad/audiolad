@@ -1043,7 +1043,7 @@ export default function StudioEditorShell({
           <div className="mt-2 min-w-0 text-xs">
               {track ? (
                 <>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-0.5">
                   <TrackActionButton
                     label="Заменить аудио"
                     disabled={track.isReplacing || track.clips.length > 1}
@@ -1055,16 +1055,16 @@ export default function StudioEditorShell({
                       }
                     }}
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h3m10 13v3h3M7 4a8 8 0 0 1 12 6M17 20A8 8 0 0 1 5 14" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V4h4m8 8v4h4M8 4a8 8 0 0 1 12 6M16 20a8 8 0 0 1-12-6" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Разрезать" disabled={!canSplitSelectedClip} onClick={splitSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /><path d="m8.5 15.5 7-10M8.5 19.5l7-10M9 8l6 6" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /><path d="m8.5 15.5 7-10M8.5 19.5l7-10M9 8l6 6" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Удалить фрагмент" disabled={!selectedClip} onClick={deleteSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6m4-6v6M9 7l1-2h4l1 2M6 7l1 13h10l1-13" /></svg>
                   </TrackActionButton>
                   <TrackActionButton label="Удалить и сдвинуть" disabled={!selectedClip} onClick={rippleDeleteSelectedClip}>
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M7 5h10M10 9v5m4-5v5M9 5l1-2h4l1 2M8 5l1 11h6l1-11M20 19H4m0 0 3-3M4 19l3 3" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 5h10M10 9v5m4-5v5M9 5l1-2h4l1 2M8 5l1 11h6l1-11M20 19H4m0 0 3-3M4 19l3 3" /></svg>
                   </TrackActionButton>
                   <TrackActionButton
                     label="Очистить дорожку"
@@ -1076,7 +1076,7 @@ export default function StudioEditorShell({
                       setSelectedClipId(null);
                     }}
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="m14 4 6 6M9 9l6 6M4 16l4-4c3 3 7 4 11 4l-4 4c-4 0-8-1-11-4Z" /><path d="M3 21h18" /></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m14 3 7 7M10 7l7 7M4 17l5-5c2 2 5 4 10 4l-4 4c-5 0-9-1-11-3Z" /><path d="M3 21h18" /></svg>
                   </TrackActionButton>
                 </div>
                 {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-1">

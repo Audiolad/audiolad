@@ -463,7 +463,7 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.match(studioWorkspace, /Создать MP3/);
   assert.match(studioWorkspace, /role="tooltip"/);
   assert.match(studioWorkspace, /group-hover:opacity-100/);
-  assert.match(studioWorkspace, /grid grid-cols-3 gap-1/);
+  assert.match(studioWorkspace, /grid grid-cols-3 gap-0\.5/);
   assert.doesNotMatch(studioWorkspace, /Высокое усиление может вызвать искажения/);
   assert.doesNotMatch(studioWorkspace, /Мастер-(дорожка|трек)/);
   const timeline = readSource("src/components/studio/StudioTimeline.tsx");
