@@ -270,13 +270,16 @@
       "articleId": "ART_new_20260813_novaya-zhizn-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "novaya-zhizn-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/novaya-zhizn-posle-razvoda",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/novaya-zhizn-posle-razvoda",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
-      "validationStatus": "PLANNED",
-      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Public production smoke passed at 2026-08-13T07:51:12Z: independent public HTTP 200 (including cache-bust), H1, Meta Title, Meta Description, self-canonical, one player (<audio>), canonical practice URL, approved /articles/kak-perezhit-razvod and /articles/zhizn-posle-razvoda links, FAQ, sitemap, and no page errors. Release 20260813-074501-39e1ce65; BUILD_ID tgUnoe1FbKhHE1TpLRkZI. Frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260813-074501-39e1ce65",
+      "buildId": "tgUnoe1FbKhHE1TpLRkZI",
+      "validatedAt": "2026-08-13T07:51:12Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",

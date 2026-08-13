@@ -821,12 +821,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Новая жизнь после развода: как начать следующий этап",
       "slug": "novaya-zhizn-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/novaya-zhizn-posle-razvoda",
+      "productionUrl": "https://audiolad.ru/articles/novaya-zhizn-posle-razvoda",
+      "plannedUrl": null,
       "primaryQuery": "новая жизнь после развода",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -845,12 +845,12 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T07:34:34Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T07:51:12Z",
+      "updatedAt": "2026-08-13T07:51:12Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "evidence": "Public production smoke passed at 2026-08-13T07:51:12Z: independent public HTTP 200 (including cache-bust), H1, Meta Title, Meta Description, self-canonical, one player (<audio>), canonical practice URL, approved /articles/kak-perezhit-razvod and /articles/zhizn-posle-razvoda links, FAQ, sitemap, and no page errors. Release 20260813-074501-39e1ce65; BUILD_ID tgUnoe1FbKhHE1TpLRkZI. Frequency remains UNVERIFIED because no committed verified value is available.",
         "operationalAddedAt": "2026-08-13"
       }
     },
@@ -2367,22 +2367,7 @@
       }
     }
   ],
-  "nextQueue": [
-    {
-      "position": 1,
-      "articleId": "ART_new_20260813_novaya-zhizn-posle-razvoda",
-      "slug": "novaya-zhizn-posle-razvoda",
-      "title": "Новая жизнь после развода: как начать следующий этап",
-      "status": "PLANNED",
-      "primaryQuery": "новая жизнь после развода",
-      "frequencyStatus": "UNVERIFIED",
-      "cluster": "Развод и отношения",
-      "hubStatus": "PENDING_EXISTING_HUB_RECONCILIATION",
-      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
-      "practiceRelevance": "DIRECT",
-      "source": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY"
-    }
-  ],
+  "nextQueue": [],
   "practiceForecast": [
     {
       "practiceKey": "13-shagov-radikalnogo-proscheniya",
@@ -2490,13 +2475,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 3,
-      "remainingQueueDependencies": 1,
-      "waitingArticleIds": [
-        "ART_new_20260813_novaya-zhizn-posle-razvoda"
-      ],
-      "status": "PUBLISHED_PRACTICE_SUPPORTS_PLANNED_ARTICLE",
-      "evidence": "Canonical practice is live and supports three published divorce-recovery articles; one approved next-stage article awaits public production validation.",
+      "publishedArticleCount": 4,
+      "remainingQueueDependencies": 0,
+      "waitingArticleIds": [],
+      "status": "NO_WAITING_PUBLISHED_ARTICLES",
+      "evidence": "Canonical practice is live and currently supports four published divorce-recovery and next-stage articles after public production validation.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
