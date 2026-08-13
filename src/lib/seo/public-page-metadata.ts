@@ -10,6 +10,11 @@ import {
   PHILOSOPHY_SEO_TITLE,
 } from "@/lib/seo/philosophy/content";
 import {
+  STUDIO_MEDITATION_PATH,
+  STUDIO_MEDITATION_SEO_DESCRIPTION,
+  STUDIO_MEDITATION_SEO_TITLE,
+} from "@/lib/seo/studio-meditation/content";
+import {
   HOME_SEO_DESCRIPTION,
   HOME_SEO_TITLE,
   SITE_BRAND,
@@ -200,6 +205,35 @@ export function buildForAuthorsMetadata(): Metadata {
       card: "summary",
       title: FOR_AUTHORS_SEO_TITLE,
       description: FOR_AUTHORS_SEO_DESCRIPTION,
+    },
+  };
+}
+
+export function buildStudioMeditationMetadata(): Metadata {
+  const canonical = buildSiteCanonicalUrl(STUDIO_MEDITATION_PATH);
+
+  return {
+    title: STUDIO_MEDITATION_SEO_TITLE,
+    description: STUDIO_MEDITATION_SEO_DESCRIPTION,
+    alternates: {
+      canonical,
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+    openGraph: {
+      title: STUDIO_MEDITATION_SEO_TITLE,
+      description: STUDIO_MEDITATION_SEO_DESCRIPTION,
+      url: canonical,
+      type: "website",
+      siteName: SITE_BRAND,
+      locale: "ru_RU",
+    },
+    twitter: {
+      card: "summary",
+      title: STUDIO_MEDITATION_SEO_TITLE,
+      description: STUDIO_MEDITATION_SEO_DESCRIPTION,
     },
   };
 }
