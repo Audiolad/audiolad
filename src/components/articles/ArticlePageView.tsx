@@ -15,6 +15,7 @@ import CatalogProductCard from "@/components/products/CatalogProductCard";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildArticleJsonLdGraph } from "@/lib/seo/articles";
 import type { ArticlePageData } from "@/lib/seo/articles";
+import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
 
 type ArticlePageViewProps = {
   data: ArticlePageData;
@@ -40,6 +41,7 @@ const SECTION_SCROLL_CLASS =
 
 export default function ArticlePageView({ data }: ArticlePageViewProps) {
   const { article, primaryPractice } = data;
+  const closingHeading = resolveArticleClosingHeading(article.closingSection.title);
   const jsonLd = buildArticleJsonLdGraph(data);
   const tocItems = [
     ...article.sections.map((section) => ({
@@ -48,7 +50,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
     })),
     {
       id: article.closingSection.id,
-      title: article.closingSection.title,
+      title: closingHeading,
     },
   ];
   const accessLabel = primaryPractice.isFree ? "Бесплатно" : primaryPractice.priceLabel;
@@ -261,7 +263,7 @@ export default function ArticlePageView({ data }: ArticlePageViewProps) {
               id={article.closingSection.id}
               className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
             >
-              {article.closingSection.title}
+              {closingHeading}
             </h2>
             <div className={`mt-4 ${articleBodyStackClass}`}>
               {article.closingSection.paragraphs.map((paragraph) => (

@@ -22,6 +22,7 @@ import {
   listArticlesByTopicSlug,
   resolveArticlePrimaryPractice,
 } from "../src/lib/seo/articles/index.ts";
+import { resolveArticleClosingHeading } from "../src/lib/seo/articles/public-heading.ts";
 import { mapArticleDefinitionsToSitemapEntries } from "../src/lib/seo/sitemap-data.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -6418,6 +6419,25 @@ assert(
     ) &&
     exSpouseAfterDivorceArticle.faq.length === 7,
   "ex-spouse-after-divorce has one player, approved links, and FAQ",
+);
+assert(
+  exSpouseAfterDivorceArticle.closingSection.title === "Финальный CTA" &&
+    exSpouseAfterDivorceArticle.closingSection.paragraphs[0] ===
+      "Если перед разговором с бывшим супругом вы заранее чувствуете напряжение и внутри уже начинается старый спор, можно сначала обратиться к практике «Возвращение к себе после развода».",
+  "ex-spouse-after-divorce keeps its final block content",
+);
+assert(
+  ["Финальный CTA", "Final CTA", "afterFinalAudio", "after final audio"].every(
+    (technicalTitle) =>
+      resolveArticleClosingHeading(technicalTitle) === "Главное",
+  ) && resolveArticleClosingHeading("Итог") === "Итог",
+  "technical closing titles never reach public article headings",
+);
+const articlePageViewSource = read("src/components/articles/ArticlePageView.tsx");
+assert(
+  articlePageViewSource.includes("resolveArticleClosingHeading") &&
+    !articlePageViewSource.includes("{article.closingSection.title}"),
+  "article renderer uses public closing heading",
 );
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
