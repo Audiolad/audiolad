@@ -314,13 +314,21 @@ export function BecomeAuthorInfoSections() {
           Нужна помощь с созданием аудиопрактик?
         </h2>
         <p className={`mt-3 ${becomeAuthorBodyClass}`}>
-          Мы развиваем отдельное обучение для авторов: от выбора темы и
-          подготовки сценария до записи, оформления и монетизации
-          аудиопродуктов.
+          <strong>Школа Аудиопрактик</strong> — обучение для тех, кто хочет
+          создавать собственные медитации и аудиопрактики, работать с голосом и
+          превращать свои знания и опыт в любимое дело.
         </p>
-        <p className="mt-3 text-[15px] leading-snug text-[#9485b4]">
-          Информация о первых программах появится позже.
+        <p className={`mt-3 ${becomeAuthorBodyClass}`}>
+          Смотрите программу Школы прямо сейчас и присоединяйтесь.
         </p>
+        <a
+          href="https://school.audiolad.ru/"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:w-auto"
+        >
+          Перейти в Школу Аудиопрактик
+        </a>
       </section>
     </div>
   );
