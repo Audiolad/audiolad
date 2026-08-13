@@ -912,9 +912,49 @@ export default function StudioEditorShell({
 
     return (
       <div className="flex gap-3 py-1 lg:min-h-0">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${accent}`}>
-          {index + 1}
-        </span>
+        <div className="flex w-10 shrink-0 flex-col items-center">
+          <span className={`flex h-8 w-8 items-center justify-center rounded ${accent}`}>
+            {index + 1}
+          </span>
+          <div className="mt-4 flex flex-col items-center gap-1">
+            <TrackMuteButton
+              track={track}
+              onToggle={() => {
+                if (track) {
+                  toggleTrackMuted(track.id);
+                  markSavedChange();
+                }
+              }}
+            />
+            <div className="flex h-16 items-center">
+              <input
+                aria-label={`Громкость ${slot.name}`}
+                type="range"
+                min={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MIN_DB : "0"}
+                max={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MAX_DB : "400"}
+                value={trackKind === "music"
+                  ? Math.round(musicVolumeDb)
+                  : Math.round((track?.volume ?? 1) * 100)}
+                disabled={!track}
+                onChange={(event) => {
+                  if (!track) return;
+                  const nextVolume = trackKind === "music"
+                    ? getStudioMusicVolumeFromDb(Number(event.target.value))
+                    : Number(event.target.value) / 100;
+                  setTrackVolume(track.id, nextVolume);
+                  markSavedChange();
+                }}
+                title={
+                  track
+                    ? `Громкость: ${displayedVolume}`
+                    : "Добавьте аудио, чтобы регулировать громкость"
+                }
+                className="h-16 w-5 [direction:rtl] [writing-mode:vertical-lr] accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
+              />
+            </div>
+            <span className="text-center text-[10px] text-[#9ba7bb]">{displayedVolume}</span>
+          </div>
+        </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex min-w-0 items-center gap-1">
             {editingSlotId === slot.id ? (
@@ -1000,49 +1040,10 @@ export default function StudioEditorShell({
               ) : null}
             </div>
           ) : null}
-          <div className="mt-2 flex min-w-0 gap-2">
-            <div className="flex w-10 shrink-0 flex-col items-center gap-1">
-              <TrackMuteButton
-                track={track}
-                onToggle={() => {
-                  if (track) {
-                    toggleTrackMuted(track.id);
-                    markSavedChange();
-                  }
-                }}
-              />
-              <div className="flex h-16 items-center">
-                <input
-                  aria-label={`Громкость ${slot.name}`}
-                  type="range"
-                  min={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MIN_DB : "0"}
-                  max={trackKind === "music" ? STUDIO_MUSIC_VOLUME_MAX_DB : "400"}
-                  value={trackKind === "music"
-                    ? Math.round(musicVolumeDb)
-                    : Math.round((track?.volume ?? 1) * 100)}
-                  disabled={!track}
-                  onChange={(event) => {
-                    if (!track) return;
-                    const nextVolume = trackKind === "music"
-                      ? getStudioMusicVolumeFromDb(Number(event.target.value))
-                      : Number(event.target.value) / 100;
-                    setTrackVolume(track.id, nextVolume);
-                    markSavedChange();
-                  }}
-                  title={
-                    track
-                      ? `Громкость: ${displayedVolume}`
-                      : "Добавьте аудио, чтобы регулировать громкость"
-                  }
-                  className="h-16 w-5 [direction:rtl] [writing-mode:vertical-lr] accent-[#9f7aea] disabled:cursor-not-allowed disabled:opacity-40"
-                />
-              </div>
-              <span className="text-center text-[10px] text-[#9ba7bb]">{displayedVolume}</span>
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
+          <div className="mt-2 min-w-0 text-xs">
               {track ? (
                 <>
-                <div className="flex justify-between">
+                <div className="grid grid-cols-3 gap-1">
                   <TrackActionButton
                     label="Заменить аудио"
                     disabled={track.isReplacing || track.clips.length > 1}
@@ -1145,12 +1146,6 @@ export default function StudioEditorShell({
                 </div>
               )}
             </div>
-          </div>
-          {trackKind === "voice" && (track?.volume ?? 1) > 2 ? (
-            <p className="mt-1 text-[10px] text-[#9ba7bb]">
-              Высокое усиление может вызвать искажения
-            </p>
-          ) : null}
             {!isDefaultStudioTrackSlot(slot) ? (
               <button
                 type="button"
