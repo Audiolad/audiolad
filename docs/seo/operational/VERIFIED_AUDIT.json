@@ -784,6 +784,18 @@
       "practiceRelevance": "DIRECT",
       "validationStatus": "RECONSTRUCTED_FROM_PRODUCTION",
       "evidence": "Registry at 81d1f64dc0d834297b364ac00426a104c68c832d; historical mapping=EXACT_SLUG from 1a5694f9b2be97d2f5727f7c293dad73c8f63024."
+    },
+    {
+      "articleId": "ART_new_20260813_kak-otpustit-byvshego-muzha",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-otpustit-byvshego-muzha",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-otpustit-byvshego-muzha",
+      "status": "PLANNED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "DIRECT",
+      "validationStatus": "PLANNED",
+      "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
     }
   ]
 }

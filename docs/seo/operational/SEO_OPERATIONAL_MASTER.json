@@ -2507,6 +2507,44 @@
         },
         "practiceEvidence": "Article is present in the production-compatible registry; do not treat this reconstruction as historical VALIDATE PASS."
       }
+    },
+    {
+      "articleId": "ART_new_20260813_kak-otpustit-byvshego-muzha",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как отпустить бывшего мужа после развода и вернуть внимание к себе",
+      "slug": "kak-otpustit-byvshego-muzha",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-otpustit-byvshego-muzha",
+      "primaryQuery": "как отпустить бывшего мужа",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "DIRECT",
+      "publishedAt": null,
+      "updatedAt": "2026-08-13T00:00:00.000Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
+        "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13"
+      }
     }
   ],
   "nextQueue": [],
