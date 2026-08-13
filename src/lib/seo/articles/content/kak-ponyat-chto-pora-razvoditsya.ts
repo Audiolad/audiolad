@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-ponyat-chto-pora-razvoditsya",
   title:
     "Как понять, что пора разводиться: вопросы, которые помогут увидеть ситуацию яснее",

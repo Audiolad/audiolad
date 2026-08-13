@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const OTNOSHENIYA_S_BYVSHIM_POSLE_RAZVODA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "otnosheniya-s-byvshim-posle-razvoda",
   title: "Отношения с бывшим супругом после развода: как общаться и сохранить границы",
   breadcrumbTitle: "Отношения с бывшим после развода",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "chto-takoe-denezhnyy-potok",
   title: "Что такое денежный поток и как изменить своё отношение к деньгам",
   breadcrumbTitle: "Что такое денежный поток",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const AFFIRMATSII_NA_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "affirmatsii-na-dengi",
   title:
     "Аффирмации на деньги: помогают ли они изменить отношение к финансам",

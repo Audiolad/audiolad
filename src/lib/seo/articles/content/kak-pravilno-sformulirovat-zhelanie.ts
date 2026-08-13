@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PRAVILNO_SFORMULIROVAT_ZHELANIE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-pravilno-sformulirovat-zhelanie",
   title:
     "Как правильно сформулировать желание и перейти от мечты к ясному намерению",

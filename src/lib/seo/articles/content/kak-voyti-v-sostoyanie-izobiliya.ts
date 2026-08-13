@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-voyti-v-sostoyanie-izobiliya",
   title:
     "Как войти в состояние изобилия и перестать жить в ощущении постоянной нехватки",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "meditatsiya-na-ispolnenie-zhelaniy",
   title:
     "Медитация на исполнение желаний: что это такое и чего от неё можно ожидать",

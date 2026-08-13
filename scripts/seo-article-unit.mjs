@@ -5074,29 +5074,70 @@ for (const slug of listArticleSlugs()) {
       item.metaDescription !== item.leadBeforeAudio,
     `${slug} keeps separate SEO metaDescription`,
   );
-  if (item.productContinuation?.kind === "creator_paths") {
-    assert(
-      ["balanced", "studio", "school"].includes(item.productContinuation.emphasis),
-      `${slug} has a supported creator paths emphasis`,
-    );
-  } else {
-    assert(item.primaryPractice?.practiceKey, `${slug} has primary practice key`);
+  switch (item.productContinuation.kind) {
+    case "creator_paths":
+      assert(
+        ["balanced", "studio", "school"].includes(item.productContinuation.emphasis),
+        `${slug} has a supported creator paths emphasis`,
+      );
+      for (const field of [
+        "captionAfterAudio",
+        "primaryPracticeEyebrow",
+        "primaryPracticeIntro",
+        "primaryPractice",
+        "relatedPractices",
+        "finalAudioLead",
+        "afterFinalAudio",
+        "brandNote",
+      ]) {
+        assert(
+          !(field in item),
+          `${slug} creator article excludes practice field ${field}`,
+        );
+      }
+      break;
+
+    case "practice":
+      assert(item.primaryPractice.practiceKey, `${slug} has primary practice key`);
+      assert(
+        Array.isArray(item.relatedPractices),
+        `${slug} has related practice configuration`,
+      );
+      break;
+
+    default:
+      throw new Error(`${slug} has unsupported article continuation`);
   }
 }
 
 const creatorPathsArticle = getArticleBySlug("kak-sozdat-svoyu-meditatsiyu");
 assert(creatorPathsArticle, "creator paths article registered");
 assert(
-  creatorPathsArticle.productContinuation?.kind === "creator_paths",
+  creatorPathsArticle.productContinuation.kind === "creator_paths",
   "creator paths article uses creator continuation",
 );
 assert(
-  creatorPathsArticle.productContinuation?.emphasis === "balanced",
+  creatorPathsArticle.productContinuation.emphasis === "balanced",
   "creator paths article uses balanced emphasis",
 );
 assert(
   !("primaryPractice" in creatorPathsArticle),
   "creator paths article does not require a catalog practice",
+);
+const creatorPageData = {
+  article: creatorPathsArticle,
+  path: "/articles/kak-sozdat-svoyu-meditatsiyu",
+  canonicalUrl: "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(creatorPathsArticle),
+};
+const creatorMetadata = buildArticleMetadata(creatorPageData);
+assert(
+  !creatorMetadata.openGraph?.images,
+  "creator paths metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(creatorPageData)).includes('"image"'),
+  "creator paths json-ld omits practice image",
 );
 
 const jsonLd = buildArticleJsonLdGraph(pageData);
@@ -5357,6 +5398,26 @@ assert(
 );
 const viewSource = fullViewSource.slice(
   fullViewSource.indexOf("function PracticeArticlePageView"),
+);
+const creatorViewSource = fullViewSource.slice(
+  fullViewSource.indexOf("function CreatorPathsArticlePageView"),
+  fullViewSource.indexOf("function PracticeArticlePageView"),
+);
+assert(
+  creatorViewSource.includes("CreatorPathsCta"),
+  "creator article renders CreatorPathsCta",
+);
+assert(
+  !creatorViewSource.includes("ArticlePlaybackProvider"),
+  "creator article excludes playback provider",
+);
+assert(
+  !creatorViewSource.includes("ArticleAudioBlock"),
+  "creator article excludes practice player blocks",
+);
+assert(
+  !viewSource.includes("CreatorPathsCta"),
+  "practice article excludes creator CTA",
 );
 assert(viewSource.includes("Короткий ответ"), "short answer block");
 assert(viewSource.includes("ArticleAudioBlock"), "audio blocks");

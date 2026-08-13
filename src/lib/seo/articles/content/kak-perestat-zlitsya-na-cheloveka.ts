@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perestat-zlitsya-na-cheloveka",
   title:
     "Как перестать постоянно злиться на человека и вернуть себе внутреннее спокойствие",

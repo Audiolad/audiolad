@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perestat-perezhivat-iz-za-deneg",
   title:
     "Как перестать постоянно переживать из-за денег и вернуть ощущение опоры",

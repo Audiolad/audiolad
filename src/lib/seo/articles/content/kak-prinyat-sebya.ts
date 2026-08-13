@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PRINYAT_SEBYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-prinyat-sebya",
   title: "Как принять себя, даже если мы пока не нравимся себе во всём",
   breadcrumbTitle: "Как принять себя",

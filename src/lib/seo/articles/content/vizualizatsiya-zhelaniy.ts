@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "vizualizatsiya-zhelaniy",
   title: "Визуализация желаний: что это такое и может ли она быть полезной",
   breadcrumbTitle: "Визуализация желаний",

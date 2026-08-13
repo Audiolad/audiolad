@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PERESTAT_EKONOMIT_NA_SEBE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perestat-ekonomit-na-sebe",
   title:
     "Как перестать экономить на себе и начать учитывать собственные потребности",

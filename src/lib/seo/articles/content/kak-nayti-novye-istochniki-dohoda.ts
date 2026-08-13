@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-nayti-novye-istochniki-dohoda",
   title:
     "Как найти новые источники дохода: реалистичные направления и первые шаги",

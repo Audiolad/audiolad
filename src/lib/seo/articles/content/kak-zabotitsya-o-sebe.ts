@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_ZABOTITSYA_O_SEBE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-zabotitsya-o-sebe",
   title: "Как заботиться о себе и начать слышать свои потребности",
   breadcrumbTitle: "Как заботиться о себе",

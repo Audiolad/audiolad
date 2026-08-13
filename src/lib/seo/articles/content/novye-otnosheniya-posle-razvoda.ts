@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const NOVYE_OTNOSHENIYA_POSLE_RAZVODA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "novye-otnosheniya-posle-razvoda",
   title: "Новые отношения после развода: когда и как начинать",
   breadcrumbTitle: "Новые отношения после развода",

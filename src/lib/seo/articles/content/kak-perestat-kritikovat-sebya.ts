@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PERESTAT_KRITIKOVAT_SEBYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perestat-kritikovat-sebya",
   title: "Как перестать критиковать себя",
   breadcrumbTitle: "Как перестать критиковать себя",

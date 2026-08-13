@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-ponyat-chego-ya-hochu",
   title:
     "Как понять, чего вы действительно хотите: вопросы для спокойного размышления",

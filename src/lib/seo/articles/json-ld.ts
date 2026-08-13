@@ -6,7 +6,7 @@ import {
 import { resolveJsonLdImageUrl } from "@/lib/seo/json-ld/url-policy";
 import { SITE_BRAND } from "@/lib/seo/site-copy";
 
-import type { ArticlePageData } from "./types";
+import { isPracticeArticlePageData, type ArticlePageData } from "./types";
 
 function originUrl(origin = getAppOrigin()): string {
   return origin.replace(/\/$/, "");
@@ -38,10 +38,9 @@ export function buildArticleJsonLd(
   origin = getAppOrigin(),
 ): JsonLdNode {
   const siteOrigin = originUrl(origin);
-  const image =
-    data.kind === "practice"
-      ? resolveJsonLdImageUrl(data.primaryPractice.coverUrl, origin)
-      : null;
+  const image = isPracticeArticlePageData(data)
+    ? resolveJsonLdImageUrl(data.primaryPractice.coverUrl, origin)
+    : null;
 
   return {
     "@type": "Article",

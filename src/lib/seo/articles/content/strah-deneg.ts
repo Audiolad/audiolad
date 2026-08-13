@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const STRAH_DENEG_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "strah-deneg",
   title:
     "Страх денег: почему финансовые вопросы вызывают напряжение и как с ним справляться",

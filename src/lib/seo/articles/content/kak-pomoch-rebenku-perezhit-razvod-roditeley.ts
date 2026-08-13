@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-pomoch-rebenku-perezhit-razvod-roditeley",
   title: "Как помочь ребёнку пережить развод родителей",
   breadcrumbTitle: "Как помочь ребёнку пережить развод",

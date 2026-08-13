@@ -20,6 +20,7 @@ import type {
   CreatorPathsArticlePageData,
   PracticeArticlePageData,
 } from "@/lib/seo/articles";
+import { isCreatorArticlePageData } from "@/lib/seo/articles";
 import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
 
 type ArticlePageViewProps = {
@@ -45,7 +46,7 @@ const SECTION_SCROLL_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
 
 export default function ArticlePageView({ data }: ArticlePageViewProps) {
-  if (data.kind === "creator_paths") {
+  if (isCreatorArticlePageData(data)) {
     return <CreatorPathsArticlePageView data={data} />;
   }
 

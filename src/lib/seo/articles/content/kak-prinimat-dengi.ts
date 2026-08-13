@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PRINIMAT_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-prinimat-dengi",
   title: "Как принимать деньги без чувства вины и неловкости",
   breadcrumbTitle: "Как принимать деньги",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const ZHENSKAYA_SILA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "zhenskaya-sila",
   title: "Женская сила: что обычно понимают под этим понятием и как она проявляется в жизни",
   breadcrumbTitle: "Женская сила",

@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 
 import { SITE_BRAND } from "@/lib/seo/site-copy";
 
-import type { ArticlePageData } from "./types";
+import { isPracticeArticlePageData, type ArticlePageData } from "./types";
 
 export function buildArticleMetadata(data: ArticlePageData): Metadata {
   const title = data.article.metaTitle;
   const description = data.article.metaDescription;
-  const ogImage = data.kind === "practice" ? data.primaryPractice.coverUrl : null;
+  const practiceData = isPracticeArticlePageData(data) ? data : null;
+  const ogImage = practiceData?.primaryPractice.coverUrl ?? null;
   const ogImageAlt =
-    data.kind === "practice" ? data.primaryPractice.title : undefined;
+    practiceData?.primaryPractice.title;
 
   return {
     title,

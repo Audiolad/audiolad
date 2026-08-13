@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-prostit-cheloveka",
   title: "Как простить человека, если обида всё ещё не отпускает",
   breadcrumbTitle: "Как простить человека",

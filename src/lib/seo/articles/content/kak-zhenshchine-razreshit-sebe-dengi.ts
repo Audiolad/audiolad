@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_ZHENSHCHINE_RAZRESHIT_SEBE_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-zhenshchine-razreshit-sebe-dengi",
   title: "Как женщине разрешить себе деньги",
   breadcrumbTitle: "Как женщине разрешить себе деньги",

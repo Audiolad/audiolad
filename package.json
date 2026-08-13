@@ -34,6 +34,7 @@
     "test:fixtures:guard": "node scripts/production-fixtures-guard-unit.mjs && node scripts/fixture-registry-unit.mjs && node scripts/fixture-write-scripts-audit-unit.mjs && node scripts/test-user-reset-guard-unit.mjs",
     "test:fixtures": "npm run test:fixtures:guard && npx tsx scripts/test-fixture-marker-unit.mjs && npx tsx scripts/fixture-marker-image-safety-unit.mjs && npx tsx scripts/public-feed-fixture-guard-unit.mjs",
     "test:seo-topic-hub": "npx tsx scripts/seo-topic-hub-unit.mjs && npx tsx scripts/seo-article-unit.mjs",
+    "test:seo-article-runtime": "node scripts/seo-article-runtime.mjs",
     "test:articles-directory": "npx tsx scripts/articles-directory-unit.mjs",
     "test:platform-rbac": "npx tsx scripts/platform-rbac-unit.mjs",
     "test:platform-rbac:migration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/platform-rbac-migration-validation.mjs",

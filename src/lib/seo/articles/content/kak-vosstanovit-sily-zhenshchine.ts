@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_VOSSTANOVIT_SILY_ZHENSHCHINE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-vosstanovit-sily-zhenshchine",
   title:
     "Как женщине восстановить силы, если она привыкла постоянно заботиться о других",

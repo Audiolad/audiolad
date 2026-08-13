@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "meditatsiya-na-zhenskuyu-energiyu",
   title: "Медитация на женскую энергию: как провести практику спокойно и без завышенных ожиданий",
   breadcrumbTitle: "Медитация на женскую энергию",

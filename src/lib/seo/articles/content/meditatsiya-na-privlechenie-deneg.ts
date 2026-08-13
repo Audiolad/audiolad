@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "meditatsiya-na-privlechenie-deneg",
   title:
     "Медитация на привлечение денег: что это такое и как она помогает изменить отношение к финансам",

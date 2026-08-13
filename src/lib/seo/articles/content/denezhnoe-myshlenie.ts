@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const DENEZHNOE_MYSHLENIE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "denezhnoe-myshlenie",
   title:
     "Денежное мышление: что это такое и как оно проявляется в жизни",

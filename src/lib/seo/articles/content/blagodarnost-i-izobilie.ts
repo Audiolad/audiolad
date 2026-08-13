@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "blagodarnost-i-izobilie",
   title:
     "Благодарность и изобилие: как замечать опоры, не отрицая трудности",

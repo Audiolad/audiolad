@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PEREZHIT_RAZVOD_MUZHCHINE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perezhit-razvod-muzhchine",
   title: "Как пережить развод мужчине и постепенно восстановить свою жизнь",
   breadcrumbTitle: "Как пережить развод мужчине",

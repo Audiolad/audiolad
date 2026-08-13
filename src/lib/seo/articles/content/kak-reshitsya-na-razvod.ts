@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_RESHITSYA_NA_RAZVOD_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-reshitsya-na-razvod",
   title: "Как решиться на развод, если страшно изменить жизнь",
   breadcrumbTitle: "Как решиться на развод",

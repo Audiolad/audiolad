@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-vyyti-iz-sostoyaniya-nehvatki",
   title:
     "Как выйти из состояния нехватки и вернуть ощущение опоры",

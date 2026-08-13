@@ -87,6 +87,10 @@ type ArticleDefinitionBase = {
   updatedAt: string;
 };
 
+export type ArticlePracticeContinuation = {
+  kind: "practice";
+};
+
 export type ArticleCreatorPathsContinuation = {
   kind: "creator_paths";
   emphasis: "balanced" | "studio" | "school";
@@ -94,7 +98,7 @@ export type ArticleCreatorPathsContinuation = {
 
 /** Existing listener article funnel with an embedded catalog practice. */
 export type PracticeArticleDefinition = ArticleDefinitionBase & {
-  productContinuation?: undefined;
+  productContinuation: ArticlePracticeContinuation;
   /** Caption under top audio block */
   captionAfterAudio: string;
   /**
@@ -120,29 +124,47 @@ export type PracticeArticleDefinition = ArticleDefinitionBase & {
 };
 
 /** Author-focused funnel with Studio and School as equal product paths. */
-export type CreatorPathsArticleDefinition = ArticleDefinitionBase & {
+export type CreatorArticleDefinition = ArticleDefinitionBase & {
   productContinuation: ArticleCreatorPathsContinuation;
+  captionAfterAudio?: never;
+  primaryPracticeEyebrow?: never;
+  primaryPracticeIntro?: never;
+  primaryPractice?: never;
+  relatedPractices?: never;
+  finalAudioLead?: never;
+  afterFinalAudio?: never;
+  brandNote?: never;
 };
 
 export type ArticleDefinition =
   | PracticeArticleDefinition
-  | CreatorPathsArticleDefinition;
+  | CreatorArticleDefinition;
 
-export function isCreatorPathsArticleDefinition(
+/** Backward-compatible alias for the creator product continuation variant. */
+export type CreatorPathsArticleDefinition = CreatorArticleDefinition;
+
+export function isCreatorArticleDefinition(
   article: ArticleDefinition,
-): article is CreatorPathsArticleDefinition {
-  return article.productContinuation?.kind === "creator_paths";
+): article is CreatorArticleDefinition {
+  return article.productContinuation.kind === "creator_paths";
 }
 
-type ArticlePageDataBase = {
-  article: ArticleDefinition;
+export const isCreatorPathsArticleDefinition = isCreatorArticleDefinition;
+
+export function isPracticeArticleDefinition(
+  article: ArticleDefinition,
+): article is PracticeArticleDefinition {
+  return article.productContinuation.kind === "practice";
+}
+
+type ArticlePageDataBase<TArticle extends ArticleDefinition> = {
+  article: TArticle;
   path: string;
   canonicalUrl: string;
   readingTimeMinutes: number;
 };
 
-export type PracticeArticlePageData = ArticlePageDataBase & {
-  kind: "practice";
+export type PracticeArticlePageData = ArticlePageDataBase<PracticeArticleDefinition> & {
   article: PracticeArticleDefinition;
   primaryPractice: CatalogProduct;
   relatedPractices: Array<{
@@ -152,11 +174,25 @@ export type PracticeArticlePageData = ArticlePageDataBase & {
   libraryAction: "sign_in" | "add" | "in_library" | "hidden";
 };
 
-export type CreatorPathsArticlePageData = ArticlePageDataBase & {
-  kind: "creator_paths";
-  article: CreatorPathsArticleDefinition;
-};
+export type CreatorArticlePageData = ArticlePageDataBase<CreatorArticleDefinition>;
+
+/** Backward-compatible alias for the creator product continuation page data. */
+export type CreatorPathsArticlePageData = CreatorArticlePageData;
 
 export type ArticlePageData =
   | PracticeArticlePageData
-  | CreatorPathsArticlePageData;
+  | CreatorArticlePageData;
+
+export function isCreatorArticlePageData(
+  data: ArticlePageData,
+): data is CreatorArticlePageData {
+  return data.article.productContinuation.kind === "creator_paths";
+}
+
+export const isCreatorPathsArticlePageData = isCreatorArticlePageData;
+
+export function isPracticeArticlePageData(
+  data: ArticlePageData,
+): data is PracticeArticlePageData {
+  return data.article.productContinuation.kind === "practice";
+}

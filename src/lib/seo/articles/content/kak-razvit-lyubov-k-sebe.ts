@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-razvit-lyubov-k-sebe",
   title: "Как развить любовь к себе: 7 практических шагов",
   breadcrumbTitle: "Как развить любовь к себе",

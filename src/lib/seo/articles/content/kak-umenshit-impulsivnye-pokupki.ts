@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-umenshit-impulsivnye-pokupki",
   title:
     "Как уменьшить импульсивные покупки и выбирать более осознанно",

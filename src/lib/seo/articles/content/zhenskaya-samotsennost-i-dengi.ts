@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "zhenskaya-samotsennost-i-dengi",
   title:
     "Женская самоценность и деньги: как уважение к себе влияет на финансовые решения",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const NASTROY_NA_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "nastroy-na-dengi",
   title:
     "Настрой на деньги: как изменить внутреннее отношение к финансам и действовать спокойнее",

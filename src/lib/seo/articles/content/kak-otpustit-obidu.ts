@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-otpustit-obidu",
   title:
     "Как отпустить обиду и перестать снова возвращаться к болезненной ситуации",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const POCHEMU_ZHELANIYA_NE_ISPOLNYAYUTSYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "pochemu-zhelaniya-ne-ispolnyayutsya",
   title: "Почему желания не исполняются и что действительно может этому мешать",
   breadcrumbTitle: "Почему желания не исполняются",

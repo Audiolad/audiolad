@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "pochemu-my-postoyanno-obizhaemsya",
   title: "Почему мы постоянно обижаемся и что с этим делать",
   breadcrumbTitle: "Почему мы постоянно обижаемся",

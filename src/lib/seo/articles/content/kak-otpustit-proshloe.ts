@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_OTPUSTIT_PROSHLOE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-otpustit-proshloe",
   title: "Как отпустить прошлое и перестать жить воспоминаниями",
   breadcrumbTitle: "Как отпустить прошлое",

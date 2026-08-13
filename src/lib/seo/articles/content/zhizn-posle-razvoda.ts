@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const ZHIZN_POSLE_RAZVODA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "zhizn-posle-razvoda",
   title: "Жизнь после развода: как принять перемены и двигаться дальше",
   breadcrumbTitle: "Жизнь после развода",

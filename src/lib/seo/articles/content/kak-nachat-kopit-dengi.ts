@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_NACHAT_KOPIT_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-nachat-kopit-dengi",
   title:
     "Как начать копить деньги: почему это не получается и как превратить накопления в привычку",

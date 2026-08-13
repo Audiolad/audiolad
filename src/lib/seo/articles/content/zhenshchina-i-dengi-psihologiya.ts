@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "zhenshchina-i-dengi-psihologiya",
   title:
     "Женщина и деньги: психология отношения к финансам и финансовым решениям",

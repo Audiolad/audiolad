@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PERESTAT_BOYATSYA_BOLSHIH_DENEG_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-perestat-boyatsya-bolshih-deneg",
   title:
     "Как перестать бояться больших денег и спокойнее относиться к росту дохода",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_NAZVAT_TSENU_ZA_SVOYU_RABOTU_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-nazvat-tsenu-za-svoyu-rabotu",
   title:
     "Как назвать цену за свою работу и перестать бояться говорить о стоимости",

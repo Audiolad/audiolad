@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PRINYAT_SVOY_VOZRAST_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-prinyat-svoy-vozrast",
   title: "Как принять свой возраст и спокойнее относиться к возрастным изменениям",
   breadcrumbTitle: "Как принять свой возраст",

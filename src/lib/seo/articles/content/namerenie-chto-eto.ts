@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const NAMERENIE_CHTO_ETO_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "namerenie-chto-eto",
   title: "Что такое намерение и чем оно отличается от желания, цели и плана",
   breadcrumbTitle: "Что такое намерение",

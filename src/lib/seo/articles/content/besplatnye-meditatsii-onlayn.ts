@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "besplatnye-meditatsii-onlayn",
   title:
     "Бесплатные медитации онлайн: как выбрать практику, которая действительно поможет",

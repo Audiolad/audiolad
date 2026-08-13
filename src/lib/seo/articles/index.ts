@@ -42,6 +42,9 @@ export {
 export type {
   ArticleCrossLinkParagraph,
   ArticleCreatorPathsContinuation,
+  ArticlePracticeContinuation,
+  CreatorArticleDefinition,
+  CreatorArticlePageData,
   CreatorPathsArticleDefinition,
   CreatorPathsArticlePageData,
   ArticleDefinition,
@@ -53,4 +56,12 @@ export type {
   ArticleSeeAlsoLink,
   PracticeArticleDefinition,
   PracticeArticlePageData,
+} from "./types";
+export {
+  isCreatorArticleDefinition,
+  isCreatorArticlePageData,
+  isCreatorPathsArticleDefinition,
+  isCreatorPathsArticlePageData,
+  isPracticeArticleDefinition,
+  isPracticeArticlePageData,
 } from "./types";

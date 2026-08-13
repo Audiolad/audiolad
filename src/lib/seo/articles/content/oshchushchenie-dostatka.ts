@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const OSHCHUSHCHENIE_DOSTATKA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "oshchushchenie-dostatka",
   title: "Как перестать жить в постоянной нехватке и развить ощущение достатка",
   breadcrumbTitle: "Ощущение достатка",

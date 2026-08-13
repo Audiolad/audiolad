@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-skazat-rebenku-o-razvode-roditeley",
   title: "Как сказать ребёнку о разводе родителей: что и как говорить",
   breadcrumbTitle: "Как сказать ребёнку о разводе",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_ZAMECHAT_VOZMOZHNOSTI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-zamechat-vozmozhnosti",
   title: "Как замечать возможности и не проходить мимо важных перемен",
   breadcrumbTitle: "Как замечать возможности",

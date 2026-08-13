@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_PRIVLECH_DENGI_V_SVOYU_ZHIZN_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-privlech-dengi-v-svoyu-zhizn",
   title:
     "Как привлечь деньги в свою жизнь: что действительно помогает изменить отношение к финансам",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "zhenskaya-energiya-chto-eto",
   title: "Женская энергия: что обычно понимают под этим выражением",
   breadcrumbTitle: "Женская энергия",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_OTPUSTIT_BYVSHEGO_MUZHA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-otpustit-byvshego-muzha",
   title: "Как отпустить бывшего мужа после развода и вернуть внимание к себе",
   breadcrumbTitle: "Как отпустить бывшего мужа",

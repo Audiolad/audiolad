@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "strah-tratit-dengi-na-sebya",
   title:
     "Страх тратить деньги на себя: почему он возникает и как относиться к своим расходам спокойнее",

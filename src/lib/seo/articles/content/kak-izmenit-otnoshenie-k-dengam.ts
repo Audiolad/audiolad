@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_IZMENIT_OTNOSHENIE_K_DENGAM_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-izmenit-otnoshenie-k-dengam",
   title:
     "Как изменить отношение к деньгам: почему это важно и с чего начать",

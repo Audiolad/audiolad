@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MEDITATSIYA_NA_DENGI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "meditatsiya-na-dengi-kak-rabotat-s-vnimaniem-i-denezhnym-nastroem",
   title: "Медитация на деньги: как работать с вниманием и денежным настроем",
   breadcrumbTitle: "Медитация на деньги",

@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-napolnitsya-zhenskoy-energiey",
   title: "Как наполниться женской энергией и вернуть ощущение внутренней живости",
   breadcrumbTitle: "Как наполниться женской энергией",

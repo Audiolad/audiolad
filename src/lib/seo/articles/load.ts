@@ -18,10 +18,20 @@ import {
   resolveArticleRelatedPractices,
 } from "./resolve-practices";
 import {
-  isCreatorPathsArticleDefinition,
+  isCreatorArticleDefinition,
+  isPracticeArticleDefinition,
   type ArticlePageData,
+  type CreatorArticlePageData,
   type PracticeArticlePageData,
 } from "./types";
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported article continuation: ${JSON.stringify(value)}`);
+}
+
+function assertInvalidArticleDefinition(): never {
+  throw new Error("Article continuation does not match its definition");
+}
 
 async function resolvePrimaryLibraryAction(
   supabase: SupabaseClient,
@@ -82,45 +92,59 @@ export async function loadArticlePageData(
   }
 
   const path = buildArticlePath(article.slug);
-  if (isCreatorPathsArticleDefinition(article)) {
-    return {
-      kind: "creator_paths",
-      article,
-      path,
-      canonicalUrl: buildSiteCanonicalUrl(path),
-      readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
-    };
+
+  switch (article.productContinuation.kind) {
+    case "creator_paths": {
+      if (!isCreatorArticleDefinition(article)) {
+        return assertInvalidArticleDefinition();
+      }
+
+      return {
+        article,
+        path,
+        canonicalUrl: buildSiteCanonicalUrl(path),
+        readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
+      } satisfies CreatorArticlePageData;
+    }
+
+    case "practice": {
+      if (!isPracticeArticleDefinition(article)) {
+        return assertInvalidArticleDefinition();
+      }
+
+      const catalog = await getPublishedCatalogProducts(supabase, {
+        productKind: PRODUCT_KIND.PRACTICE,
+      });
+      const catalogByKey = buildCatalogPracticeKeyIndex(catalog);
+      const primaryPractice = resolveArticlePrimaryPractice(article, catalogByKey);
+
+      if (!primaryPractice || !primaryPractice.authorSlug) {
+        return null;
+      }
+
+      const relatedPractices = resolveArticleRelatedPractices(
+        article,
+        catalogByKey,
+        primaryPractice.id,
+      ).map(({ product, blurb }) => ({ product, blurb }));
+
+      const libraryAction = await resolvePrimaryLibraryAction(
+        supabase,
+        primaryPractice,
+      );
+
+      return {
+        article,
+        path,
+        canonicalUrl: buildSiteCanonicalUrl(path),
+        readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
+        primaryPractice,
+        relatedPractices,
+        libraryAction,
+      } satisfies PracticeArticlePageData;
+    }
+
+    default:
+      return assertNever(article.productContinuation);
   }
-
-  const catalog = await getPublishedCatalogProducts(supabase, {
-    productKind: PRODUCT_KIND.PRACTICE,
-  });
-  const catalogByKey = buildCatalogPracticeKeyIndex(catalog);
-  const primaryPractice = resolveArticlePrimaryPractice(article, catalogByKey);
-
-  if (!primaryPractice || !primaryPractice.authorSlug) {
-    return null;
-  }
-
-  const relatedPractices = resolveArticleRelatedPractices(
-    article,
-    catalogByKey,
-    primaryPractice.id,
-  ).map(({ product, blurb }) => ({ product, blurb }));
-
-  const libraryAction = await resolvePrimaryLibraryAction(
-    supabase,
-    primaryPractice,
-  );
-
-  return {
-    kind: "practice",
-    article,
-    path,
-    canonicalUrl: buildSiteCanonicalUrl(path),
-    readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
-    primaryPractice,
-    relatedPractices,
-    libraryAction,
-  } satisfies PracticeArticlePageData;
 }

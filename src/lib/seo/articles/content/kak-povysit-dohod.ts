@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_POVYSIT_DOHOD_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-povysit-dohod",
   title:
     "Как повысить доход: реалистичные способы и практические шаги",

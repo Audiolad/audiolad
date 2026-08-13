@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const DENEZHNYE_USTANOVKI_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "denezhnye-ustanovki",
   title:
     "Денежные установки: что это такое и как они влияют на отношение к деньгам",

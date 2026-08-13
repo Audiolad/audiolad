@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MEDITATSIYA_NA_IZOBILIE_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "meditatsiya-na-izobilie",
   title:
     "Что такое медитация на изобилие и как она помогает изменить отношение к достатку",

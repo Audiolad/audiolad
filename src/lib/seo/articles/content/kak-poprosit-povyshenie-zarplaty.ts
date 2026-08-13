@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const KAK_POPROSIT_POVYSHENIE_ZARPLATY_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "kak-poprosit-povyshenie-zarplaty",
   title:
     "Как попросить повышение зарплаты и спокойно подготовиться к разговору",

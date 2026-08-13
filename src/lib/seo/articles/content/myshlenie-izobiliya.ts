@@ -1,6 +1,7 @@
 import type { ArticleDefinition } from "../types";
 
 export const MYSHLENIE_IZOBILIYA_ARTICLE = {
+  productContinuation: { kind: "practice" },
   slug: "myshlenie-izobiliya",
   title:
     "Мышление изобилия: что это такое и как оно влияет на нашу жизнь",
