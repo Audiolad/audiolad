@@ -900,12 +900,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Личная жизнь после развода: как заново почувствовать себя собой",
       "slug": "lichnaya-zhizn-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/lichnaya-zhizn-posle-razvoda",
+      "productionUrl": "https://audiolad.ru/articles/lichnaya-zhizn-posle-razvoda",
+      "plannedUrl": null,
       "primaryQuery": "личная жизнь после развода",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -924,14 +924,36 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "DIRECT",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T08:53:08Z",
+      "updatedAt": "2026-08-13T08:53:08Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "EDITORIALLY_APPROVED_OPERATIONAL_ENTRY",
-        "evidence": "Authoritative editorial text received. Publication is planned pending canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
-        "operationalAddedAt": "2026-08-13"
-      }
+        "evidence": "Public production smoke passed at 2026-08-13T08:53:08Z: HTTP 200 (including cache-bust), H1, Meta Title, Meta Description, self-canonical, one <audio>, relative canonical practice path, approved /articles/zhizn-posle-razvoda and /articles/novye-otnosheniya-posle-razvoda links, FAQ, sitemap, and no page-error markers. Release 20260813-084737-5c8e849e; BUILD_ID IUzZT4Y-iOwnGYUBOPwZl. Frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13",
+        "productionSmoke": {
+          "validatedAt": "2026-08-13T08:53:08Z",
+          "release": "20260813-084737-5c8e849e",
+          "buildId": "IUzZT4Y-iOwnGYUBOPwZl",
+          "checks": [
+            "HTTP_200",
+            "CACHE_BUST_HTTP_200",
+            "H1",
+            "META_TITLE",
+            "META_DESCRIPTION",
+            "SELF_CANONICAL",
+            "ONE_AUDIO",
+            "RELATIVE_CANONICAL_PRACTICE_PATH",
+            "APPROVED_ARTICLE_LINKS",
+            "FAQ",
+            "SITEMAP",
+            "NO_PAGE_ERRORS"
+          ]
+        }
+      },
+      "release": "20260813-084737-5c8e849e",
+      "buildId": "IUzZT4Y-iOwnGYUBOPwZl",
+      "validatedAt": "2026-08-13T08:53:08Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
@@ -2554,11 +2576,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 5,
+      "publishedArticleCount": 6,
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports five published divorce-related articles; no approved queue dependency remains.",
+      "evidence": "Canonical practice is live and supports six published divorce-related articles; no approved queue dependency remains.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },
