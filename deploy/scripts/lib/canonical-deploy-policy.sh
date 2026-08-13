@@ -22,6 +22,62 @@ verify_commit_object_exists() {
   git -C "$GIT_WORKDIR" cat-file -e "${full_commit}^{commit}"
 }
 
+resolve_active_production_commit() {
+  local active_release=""
+  local active_commit_file=""
+  local active_commit=""
+
+  if [[ ! -L "$DEPLOY_ROOT/current" ]]; then
+    return 0
+  fi
+
+  active_release="$(readlink -f "$DEPLOY_ROOT/current" 2>/dev/null || true)"
+  if [[ -z "$active_release" || ! -d "$active_release" ]]; then
+    log_error "Active production release cannot be resolved from $DEPLOY_ROOT/current"
+    return 1
+  fi
+
+  active_commit_file="$active_release/.deploy-commit"
+  if [[ ! -s "$active_commit_file" ]]; then
+    log_error "Active production release is missing deploy commit metadata: $active_commit_file"
+    log_error "Refusing deployment until production lineage is restored."
+    return 1
+  fi
+
+  active_commit="$(tr -d '\n' < "$active_commit_file")"
+  if ! verify_commit_object_exists "$active_commit"; then
+    log_error "Active production commit is unavailable in GIT_WORKDIR: $active_commit"
+    log_error "Fetch or restore the production commit before deploying another release."
+    return 1
+  fi
+
+  printf '%s\n' "$active_commit"
+}
+
+verify_active_production_ancestry() {
+  local candidate_commit="$1"
+  local active_commit=""
+
+  if ! active_commit="$(resolve_active_production_commit)"; then
+    return 1
+  fi
+
+  if [[ -z "$active_commit" ]]; then
+    log_info "Active production ancestry guard: no current release metadata; allowing initial deploy"
+    return 0
+  fi
+
+  if ! git -C "$GIT_WORKDIR" merge-base --is-ancestor "$active_commit" "$candidate_commit"; then
+    log_error "Active production ancestry guard rejected candidate before release creation."
+    log_error "Candidate $candidate_commit does not contain current production commit $active_commit."
+    log_error "Integrate the current production tip into the target branch, resolve conflicts, and deploy the resulting commit."
+    return 1
+  fi
+
+  log_info "Active production ancestry guard OK: current=$active_commit is ancestor of candidate=$candidate_commit"
+  return 0
+}
+
 resolve_canonical_head() {
   git -C "$GIT_WORKDIR" rev-parse --verify "${CANONICAL_REF}^{commit}"
 }
@@ -136,6 +192,10 @@ run_deploy_policy_gate() {
 
   if ! verify_commit_object_exists "$full_commit"; then
     log_error "Deploy commit object missing after fetch: $full_commit"
+    return 1
+  fi
+
+  if ! verify_active_production_ancestry "$full_commit"; then
     return 1
   fi
 

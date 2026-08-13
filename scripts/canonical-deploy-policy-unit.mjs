@@ -10,6 +10,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const commonSh = join(repoRoot, "deploy/scripts/lib/common.sh");
 const policySh = join(repoRoot, "deploy/scripts/lib/canonical-deploy-policy.sh");
 const deploySh = join(repoRoot, "deploy/scripts/deploy.sh");
+const policyDeployRoot = mkdtempSync(join(tmpdir(), "audiolad-policy-deploy-root-"));
 
 function assert(condition, message) {
   if (!condition) {
@@ -36,11 +37,13 @@ function runBash(scriptBody, { env = {}, cwd = repoRoot, timeoutMs = 30000 } = {
 function sourcePolicy(envExtra = {}) {
   const gitWorkdir = envExtra.GIT_WORKDIR ?? repoRoot;
   const canonicalRef = envExtra.CANONICAL_REF ?? "origin/main";
+  const deployRoot = envExtra.DEPLOY_ROOT ?? policyDeployRoot;
   return `
     source "${commonSh}"
     source "${policySh}"
     GIT_WORKDIR="${gitWorkdir}"
     CANONICAL_REF="${canonicalRef}"
+    DEPLOY_ROOT="${deployRoot}"
   `;
 }
 
@@ -58,18 +61,31 @@ function initMockGitRepo() {
       git branch -M main
       git commit --allow-empty -q -m "canonical-head"
       CANONICAL_HEAD=$(git rev-parse HEAD)
+      git branch production "$CANONICAL_HEAD"
+      git checkout -q production
+      git commit --allow-empty -q -m "published-seo-change"
+      PRODUCTION_HEAD=$(git rev-parse HEAD)
+      git checkout -q main
+      git checkout -q -b integrated-production
+      git merge --no-ff -q production -m "integrate production changes"
+      INTEGRATED_HEAD=$(git rev-parse HEAD)
+      git checkout -q main
       git commit --allow-empty -q -m "newer-not-deployed"
       NEWER=$(git rev-parse HEAD)
-      git reset --hard HEAD~1
+      git reset --hard -q HEAD~1
       echo "$CANONICAL_HEAD" > .canonical-head
+      echo "$PRODUCTION_HEAD" > .production-head
+      echo "$INTEGRATED_HEAD" > .integrated-head
       echo "$NEWER" > .outside-sha
     `,
     { cwd: dir },
   );
 
   const canonicalHead = readFileSync(join(dir, ".canonical-head"), "utf8").trim();
+  const productionHead = readFileSync(join(dir, ".production-head"), "utf8").trim();
+  const integratedHead = readFileSync(join(dir, ".integrated-head"), "utf8").trim();
   const outsideSha = readFileSync(join(dir, ".outside-sha"), "utf8").trim();
-  return { dir, canonicalHead, outsideSha };
+  return { dir, canonicalHead, productionHead, integratedHead, outsideSha };
 }
 
 function testMissingShaRejected() {
@@ -178,6 +194,82 @@ function testAncestorDirection(mock) {
   assert(bad.output.includes("rejected"), "outside SHA must not be ancestor of main");
 }
 
+function configureActiveProductionRelease(mock) {
+  const deployRoot = mkdtempSync(join(tmpdir(), "audiolad-active-production-"));
+  const releaseDir = join(deployRoot, "releases", "published-seo-release");
+  runBash(
+    `
+      set -euo pipefail
+      mkdir -p "${releaseDir}"
+      printf '%s\\n' "${mock.productionHead}" > "${releaseDir}/.deploy-commit"
+      ln -s "${releaseDir}" "${deployRoot}/current"
+    `,
+  );
+  return deployRoot;
+}
+
+function testStaleCandidateCannotReplaceActiveProduction(mock) {
+  const deployRoot = configureActiveProductionRelease(mock);
+  try {
+    const result = runBash(
+      `
+        ${sourcePolicy({ GIT_WORKDIR: mock.dir, CANONICAL_REF: "main", DEPLOY_ROOT: deployRoot })}
+        if run_deploy_policy_gate "${mock.canonicalHead}"; then
+          echo should_not_pass
+          exit 9
+        fi
+        exit 0
+      `,
+    );
+    assert(result.status === 0, result.output);
+    assert(result.output.includes("Active production ancestry guard rejected"), result.output);
+    assert(result.output.includes(mock.productionHead), result.output);
+    assert(!result.output.includes("should_not_pass"), result.output);
+  } finally {
+    rmSync(deployRoot, { recursive: true, force: true });
+  }
+}
+
+function testOverrideCannotBypassActiveProductionGuard(mock) {
+  const deployRoot = configureActiveProductionRelease(mock);
+  try {
+    const result = runBash(
+      `
+        ${sourcePolicy({ GIT_WORKDIR: mock.dir, CANONICAL_REF: "main", DEPLOY_ROOT: deployRoot })}
+        export AUDIOLAD_DEPLOY_OVERRIDE=1
+        export AUDIOLAD_DEPLOY_OVERRIDE_REASON="emergency hotfix validation"
+        if run_deploy_policy_gate "${mock.canonicalHead}"; then
+          echo should_not_pass
+          exit 9
+        fi
+        exit 0
+      `,
+    );
+    assert(result.status === 0, result.output);
+    assert(result.output.includes("Active production ancestry guard rejected"), result.output);
+    assert(!result.output.includes("OVERRIDE ACTIVE"), result.output);
+    assert(!result.output.includes("should_not_pass"), result.output);
+  } finally {
+    rmSync(deployRoot, { recursive: true, force: true });
+  }
+}
+
+function testIntegratedCandidateCanReplaceActiveProduction(mock) {
+  const deployRoot = configureActiveProductionRelease(mock);
+  try {
+    const result = runBash(
+      `
+        ${sourcePolicy({ GIT_WORKDIR: mock.dir, CANONICAL_REF: "integrated-production", DEPLOY_ROOT: deployRoot })}
+        run_deploy_policy_gate "${mock.integratedHead}"
+      `,
+    );
+    assert(result.status === 0, result.output);
+    assert(result.output.includes("Active production ancestry guard OK"), result.output);
+  } finally {
+    rmSync(deployRoot, { recursive: true, force: true });
+  }
+}
+
 function testDirtyWorkdirWarningDoesNotBlock() {
   const dirtyDir = mkdtempSync(join(tmpdir(), "audiolad-policy-dirty-"));
   runBash(
@@ -263,11 +355,15 @@ function main() {
     testOverrideWithoutReasonRejected(mock);
     testOverrideWithReasonSkipsAncestorCheck(mock);
     testAncestorDirection(mock);
+    testStaleCandidateCannotReplaceActiveProduction(mock);
+    testOverrideCannotBypassActiveProductionGuard(mock);
+    testIntegratedCandidateCanReplaceActiveProduction(mock);
     testDirtyWorkdirWarningDoesNotBlock();
     testMetadataFormatter();
     console.log("canonical-deploy-policy-unit: all tests passed");
   } finally {
     rmSync(mock.dir, { recursive: true, force: true });
+    rmSync(policyDeployRoot, { recursive: true, force: true });
   }
 }
 
