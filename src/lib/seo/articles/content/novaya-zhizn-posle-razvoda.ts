@@ -133,7 +133,7 @@ export const NOVAYA_ZHIZN_POSLE_RAZVODA_ARTICLE = {
       ],
     },
     {
-      id: "praktika-vozvrashchenie-k-sebe-posle-razvoda",
+      id: "audiopraktika",
       title: "Практика «Возвращение к себе после развода»",
       paragraphs: [
         "После развода легко продолжать мысленно жить вокруг того, что уже закончилось – возвращаться к разговорам, решениям бывшего партнёра, своим ошибкам и вопросам о том, что могло сложиться иначе.",
