@@ -2595,12 +2595,12 @@
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "title": "Жизнь мужчины после развода: как перестроиться и идти дальше",
       "slug": "zhizn-muzhchiny-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-muzhchiny-posle-razvoda",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-muzhchiny-posle-razvoda",
+      "plannedUrl": null,
       "primaryQuery": "жизнь мужчины после развода",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "PLANNED",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -2619,14 +2619,17 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "STRONG",
-      "publishedAt": null,
-      "updatedAt": "2026-08-13T00:00:00.000Z",
-      "validationStatus": "PLANNED",
+      "publishedAt": "2026-08-13T15:23:29Z",
+      "updatedAt": "2026-08-13T15:23:29Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
-        "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "evidence": "Public browser smoke passed at 2026-08-13T15:23:29Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer with approved text, four approved internal links, clickable canonical practice-section title, visible «Главное», FAQ, sitemap, and no console or page errors. Frequency remains UNVERIFIED because no committed verified value is available.",
         "operationalAddedAt": "2026-08-13"
-      }
+      },
+      "release": "20260813-151523-4e3835ee",
+      "buildId": "j7KL_zxe47ATCIFs75VcI",
+      "validatedAt": "2026-08-13T15:23:29Z"
     }
   ],
   "nextQueue": [],
@@ -2737,11 +2740,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 9,
+      "publishedArticleCount": 10,
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports 9 published divorce-related articles; no approved queue dependency remains.",
+      "evidence": "Canonical practice is live and supports 10 published divorce-related articles; no approved queue dependency remains.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },

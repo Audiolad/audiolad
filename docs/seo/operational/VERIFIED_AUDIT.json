@@ -819,13 +819,16 @@
       "articleId": "ART_new_20260813_zhizn-muzhchiny-posle-razvoda",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "zhizn-muzhchiny-posle-razvoda",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-muzhchiny-posle-razvoda",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-muzhchiny-posle-razvoda",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PLANNED",
-      "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available."
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Public browser smoke passed at 2026-08-13T15:23:29Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer with approved text, four approved internal links, clickable canonical practice-section title, visible «Главное», FAQ, sitemap, and no console or page errors. Frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260813-151523-4e3835ee",
+      "buildId": "j7KL_zxe47ATCIFs75VcI",
+      "validatedAt": "2026-08-13T15:23:29Z"
     }
   ]
 }
