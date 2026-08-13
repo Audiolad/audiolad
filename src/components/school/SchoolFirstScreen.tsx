@@ -26,16 +26,16 @@ export default function SchoolFirstScreen() {
       </div>
 
       <div className="school-first-screen__content">
-        <h1 className="school-first-screen__title">
-          Школа
-          <br />
-          Аудиопрактик
-        </h1>
+        <p className="school-first-screen__eyebrow">
+          Раскройте свои таланты и предназначение через создание собственных
+          медитаций и аудиопрактик
+        </p>
+
+        <h1 className="school-first-screen__title">Школа Аудиопрактик</h1>
 
         <p className="school-first-screen__offer">
-          Превратите свои знания, голос и внутреннее состояние в авторские
-          аудиопродукты, чтобы раскрыть своё предназначение, помогать людям и
-          зарабатывать на любимом деле
+          Превратите свои знания, голос и внутреннее состояние в любимое дело,
+          которое помогает людям и приносит доход
         </p>
 
         <p className="school-first-screen__start">
