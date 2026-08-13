@@ -261,10 +261,10 @@
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "DIRECT",
       "validationStatus": "VALIDATE PASS",
-      "evidence": "Public production smoke passed at 2026-08-13T06:20:16Z after SEO redeploy restored production from origin/main overwrite: HTTP 200 on https://audiolad.ru/articles/kak-perezhit-razvod-s-muzhem (independent public curl), H1, Meta Title, canonical, one player (<audio>), canonical practice URL https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda, live internal links /articles/kak-perezhit-razvod and /articles/zhizn-posle-razvoda, FAQ, sitemap. Previous VALIDATE PASS on 20260813-055443-b6afb242/ZYPyMtleTCnr-Voaca28r was invalidated when origin/main release 20260813-060156-15e67837/omxKD_1MQRv9ZNLsGqcVK overwrote production and returned HTTP 404. Restored release 20260813-061256-11800cb7; BUILD_ID OjPdNuMVKg6NmQh50yzyb.",
-      "release": "20260813-061256-11800cb7",
-      "buildId": "OjPdNuMVKg6NmQh50yzyb",
-      "validatedAt": "2026-08-13T06:20:16Z"
+      "evidence": "Public production smoke passed at 2026-08-13T07:15:16Z after the integrated main release restored the shared production lineage: independent public HTTP 200 (including cache-bust), H1, Meta Title, canonical, one player (<audio>), canonical practice URL https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda, live internal links /articles/kak-perezhit-razvod and /articles/zhizn-posle-razvoda, FAQ, sitemap, and four previously published divorce SEO articles all passed. Release 20260813-071028-88f2ccd9; BUILD_ID 3qGl04dbVUfVcL2UzG7Sa.",
+      "release": "20260813-071028-88f2ccd9",
+      "buildId": "3qGl04dbVUfVcL2UzG7Sa",
+      "validatedAt": "2026-08-13T07:15:16Z"
     },
     {
       "articleId": "ART_plan35_как-понять-чего-я-хочу",
