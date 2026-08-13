@@ -864,16 +864,16 @@
       "articleId": "ART_new_20260813_zhizn-posle-razvoda-s-rebenkom",
       "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
       "slug": "zhizn-posle-razvoda-s-rebenkom",
-      "productionUrl": null,
-      "plannedUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda-s-rebenkom",
-      "status": "PLANNED",
+      "productionUrl": "https://audiolad.ru/articles/zhizn-posle-razvoda-s-rebenkom",
+      "plannedUrl": null,
+      "status": "PUBLISHED",
       "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
       "practiceRelevance": "STRONG",
-      "validationStatus": "PENDING",
-      "evidence": "Final authoritative Markdown received; publication awaits canonical deploy and independent public validation.",
-      "release": null,
-      "buildId": null,
-      "validatedAt": null
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Independent public smoke passed: HTTP 200 including cache-bust, one H1, one audio, short answer, three approved links, clickable canonical practice section, «Главное», FAQ, sitemap, and completed health watch. Release 20260813-190235-00b2ec2f; BUILD_ID UeExd6Rvodmud8e-8V3Sq.",
+      "release": "20260813-190235-00b2ec2f",
+      "buildId": "UeExd6Rvodmud8e-8V3Sq",
+      "validatedAt": "2026-08-13T19:07:46Z"
     }
   ]
 }
