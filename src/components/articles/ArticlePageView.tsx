@@ -154,7 +154,13 @@ function CreatorPathsArticlePageView({
               id={section.id}
               className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
             >
-              {section.title}
+              {section.titleHref ? (
+                <Link href={section.titleHref} className={linkClassName}>
+                  {section.title}
+                </Link>
+              ) : (
+                section.title
+              )}
             </h2>
             <div className={`mt-4 ${articleBodyStackClass}`}>
               {section.paragraphs.map((paragraph) => (
@@ -347,6 +353,26 @@ function PracticeArticlePageView({
               ),
             )}
           </div>
+          {article.introAfterAudioLinks?.length ? (
+            <div className={`mt-4 ${articleBodyStackClass}`}>
+              {article.introAfterAudioLinks.map((item) => (
+                <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+                  {item.before}
+                  {item.href && item.linkLabel ? (
+                    <Link
+                      href={item.href}
+                      className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    >
+                      {item.linkLabel}
+                    </Link>
+                  ) : (
+                    item.linkLabel
+                  )}
+                  {item.after ?? ""}
+                </p>
+              ))}
+            </div>
+          ) : null}
 
           {article.captionAfterAudio ? (
             <p className={`mt-4 ${articleBodyClass}`}>
@@ -375,7 +401,16 @@ function PracticeArticlePageView({
                 id={section.id}
                 className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
               >
-                {section.title}
+                {section.titleHref ? (
+                  <Link
+                    href={section.titleHref}
+                    className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                  >
+                    {section.title}
+                  </Link>
+                ) : (
+                  section.title
+                )}
               </h2>
               <div className={`mt-4 ${articleBodyStackClass}`}>
                 {section.paragraphs.map((paragraph) => (

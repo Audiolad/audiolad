@@ -8,6 +8,8 @@ export type ArticleFaqItem = {
 export type ArticleSection = {
   id: string;
   title: string;
+  /** Optional canonical URL for a linked section heading. */
+  titleHref?: string;
   paragraphs: string[];
   links?: readonly ArticleCrossLinkParagraph[];
 };
@@ -75,6 +77,8 @@ type ArticleDefinitionBase = {
    * Template prepends leadBeforeAudio before these paragraphs.
    */
   introAfterAudio: readonly string[];
+  /** Optional inline editorial links immediately following the introduction. */
+  introAfterAudioLinks?: readonly ArticleCrossLinkParagraph[];
   /** Footer “Смотрите также” cards (topic hub + related hubs) */
   seeAlsoLinks: readonly ArticleSeeAlsoLink[];
   /** Closing h2 section after the product continuation. */

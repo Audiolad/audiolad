@@ -6499,11 +6499,59 @@ assert(
   ) && resolveArticleClosingHeading("Итог") === "Итог",
   "technical closing titles never reach public article headings",
 );
+const maleLifeAfterDivorceArticle = getArticleBySlug(
+  "zhizn-muzhchiny-posle-razvoda",
+);
+assert(maleLifeAfterDivorceArticle, "male-life-after-divorce article registered");
+assert(
+  maleLifeAfterDivorceArticle.title ===
+    "Жизнь мужчины после развода: как перестроиться и идти дальше" &&
+    maleLifeAfterDivorceArticle.metaTitle ===
+      "Жизнь мужчины после развода: как жить дальше – АудиоЛад" &&
+    maleLifeAfterDivorceArticle.shortAnswer ===
+      "Жизнь мужчины после развода постепенно перестраивается вокруг нового быта, свободного времени, отношений с детьми, друзей, работы и собственных планов. Не нужно устраивать всю жизнь сразу – устойчивый новый ритм обычно складывается из небольших практических изменений.",
+  "male-life-after-divorce keeps approved SEO metadata and short answer",
+);
+assert(
+  maleLifeAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    maleLifeAfterDivorceArticle.relatedPractices.length === 0 &&
+    maleLifeAfterDivorceArticle.finalAudioLead === "" &&
+    maleLifeAfterDivorceArticle.introAfterAudioLinks?.some(
+      (item) => item.href === "/articles/kak-perezhit-razvod-muzhchine",
+    ) &&
+    [
+      "/articles/rebenok-i-razvod-roditeley",
+      "/articles/novye-otnosheniya-posle-razvoda",
+      "/articles/novaya-zhizn-posle-razvoda",
+    ].every((href) =>
+      maleLifeAfterDivorceArticle.sections.some((section) =>
+        section.links?.some((item) => item.href === href),
+      ),
+    ) &&
+    maleLifeAfterDivorceArticle.sections.some(
+      (section) =>
+        section.id === "audiopraktika" &&
+        section.titleHref ===
+          "/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+    ),
+  "male-life-after-divorce has canonical practice and approved links",
+);
+assert(
+  maleLifeAfterDivorceArticle.faq.length === 7 &&
+    maleLifeAfterDivorceArticle.closingSection.title === "Главное",
+  "male-life-after-divorce keeps FAQ and public closing heading",
+);
 const articlePageViewSource = read("src/components/articles/ArticlePageView.tsx");
 assert(
   articlePageViewSource.includes("resolveArticleClosingHeading") &&
     !articlePageViewSource.includes("{article.closingSection.title}"),
   "article renderer uses public closing heading",
+);
+assert(
+  articlePageViewSource.includes("introAfterAudioLinks") &&
+    articlePageViewSource.includes("section.titleHref"),
+  "article renderer supports introductory and section-heading links",
 );
 
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");

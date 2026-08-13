@@ -2589,6 +2589,44 @@
       "release": "20260813-135648-b403e299",
       "buildId": "rQgtRrXDk19u7j5EnTZ0e",
       "validatedAt": "2026-08-13T14:02:57Z"
+    },
+    {
+      "articleId": "ART_new_20260813_zhizn-muzhchiny-posle-razvoda",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Жизнь мужчины после развода: как перестроиться и идти дальше",
+      "slug": "zhizn-muzhchiny-posle-razvoda",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/zhizn-muzhchiny-posle-razvoda",
+      "primaryQuery": "жизнь мужчины после развода",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PLANNED",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": null,
+      "updatedAt": "2026-08-13T00:00:00.000Z",
+      "validationStatus": "PLANNED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Authoritative editorial text received. Publication awaits canonical production deploy and public smoke; frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-13"
+      }
     }
   ],
   "nextQueue": [],
