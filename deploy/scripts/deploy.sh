@@ -12,8 +12,13 @@ usage() {
 Usage: deploy.sh <commit-sha>
 
 Safely deploy a new release without rebuilding inside the active current directory.
-Deploy commit SHA is required. Only commits reachable from origin/main are allowed
-unless AUDIOLAD_DEPLOY_OVERRIDE=1 with AUDIOLAD_DEPLOY_OVERRIDE_REASON set.
+Deploy commit SHA is required. By default, only commits reachable from origin/main
+are allowed. Overrides require AUDIOLAD_DEPLOY_OVERRIDE=1 with
+AUDIOLAD_DEPLOY_OVERRIDE_REASON set.
+
+Every candidate must contain the active production commit recorded in
+current/.deploy-commit. Integrate the active production tip before deploying a
+diverged branch; this ancestry guard cannot be overridden.
 
 Release content is extracted via git archive from the commit object only;
 dirty working tree files are never included.

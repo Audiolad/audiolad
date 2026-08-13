@@ -5994,6 +5994,337 @@ assert(
   "love-to-self reverse-links to female-energy-what-is",
 );
 
+const divorceChildArticle = getArticleBySlug("rebenok-i-razvod-roditeley");
+assert(divorceChildArticle, "divorce-child article registered");
+assert(
+  divorceChildArticle.title ===
+    "Ребёнок и развод родителей: как помочь ему пройти через перемены",
+  "divorce-child H1",
+);
+assert(
+  divorceChildArticle.metaTitle ===
+    "Ребёнок и развод родителей: как помочь пережить перемены – АудиоЛад",
+  "divorce-child meta title",
+);
+assert(
+  divorceChildArticle.metaDescription ===
+    "Как ребёнок переживает развод родителей, почему может винить себя, что помогает сохранить чувство безопасности и когда стоит обратиться за профессиональной помощью.",
+  "divorce-child meta description",
+);
+assert(
+  divorceChildArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-child primary practice",
+);
+assert(
+  divorceChildArticle.relatedPractices.length === 0,
+  "divorce-child has one practice",
+);
+assert(
+  divorceChildArticle.finalAudioLead === "" &&
+    !divorceChildArticle.sections.some((section) => section.id === "audiopraktika"),
+  "divorce-child renders one player",
+);
+assert(
+  divorceChildArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceChildArticle.topicHref === "/articles",
+  "divorce-child leaves hub pending without a new hub",
+);
+assert(
+  divorceChildArticle.faq.length === 6,
+  "divorce-child FAQ",
+);
+assert(
+  JSON.stringify(divorceChildArticle).includes(
+    "Ребёнок не является причиной развода",
+  ) &&
+    JSON.stringify(divorceChildArticle).includes(
+      "При насилии или угрозах приоритетом должна быть безопасность",
+    ) &&
+    JSON.stringify(divorceChildArticle).includes(
+      "Практика не меняет состояние ребёнка напрямую",
+    ),
+  "divorce-child preserves required safety boundaries",
+);
+
+const divorceDecisionArticle = getArticleBySlug("kak-reshitsya-na-razvod");
+assert(divorceDecisionArticle, "divorce-decision article registered");
+assert(
+  divorceDecisionArticle.title ===
+    "Как решиться на развод, если страшно изменить жизнь",
+  "divorce-decision H1",
+);
+assert(
+  divorceDecisionArticle.metaTitle ===
+    "Как решиться на развод, если страшно изменить жизнь – АудиоЛад",
+  "divorce-decision meta title",
+);
+assert(
+  divorceDecisionArticle.metaDescription ===
+    "Как решиться на развод, если мешают страх, вина и неопределённость: как оценить отношения, последствия решения и определить следующий безопасный шаг.",
+  "divorce-decision meta description",
+);
+assert(
+  divorceDecisionArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-decision canonical practice key",
+);
+assert(
+  divorceDecisionArticle.relatedPractices.length === 0 &&
+    divorceDecisionArticle.finalAudioLead === "",
+  "divorce-decision renders one player",
+);
+assert(
+  divorceDecisionArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceDecisionArticle.topicHref === "/articles",
+  "divorce-decision leaves hub pending without a new hub",
+);
+assert(
+  divorceDecisionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ),
+  "divorce-decision links to child divorce article",
+);
+assert(
+  divorceDecisionArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-ponyat-chto-pora-razvoditsya",
+  ),
+  "divorce-decision links to divorce assessment article",
+);
+assert(divorceDecisionArticle.faq.length === 6, "divorce-decision FAQ");
+assert(
+  JSON.stringify(divorceDecisionArticle).includes(
+    "Практика не определяет, нужно ли сохранять брак или завершать его",
+  ) &&
+    JSON.stringify(divorceDecisionArticle).includes(
+      "приоритетом становится безопасность",
+    ),
+  "divorce-decision preserves decision and safety boundaries",
+);
+
+const divorceAssessmentArticle = getArticleBySlug(
+  "kak-ponyat-chto-pora-razvoditsya",
+);
+assert(divorceAssessmentArticle, "divorce-assessment article registered");
+assert(
+  divorceAssessmentArticle.title ===
+    "Как понять, что пора разводиться: вопросы, которые помогут увидеть ситуацию яснее",
+  "divorce-assessment H1",
+);
+assert(
+  divorceAssessmentArticle.metaTitle ===
+    "Как понять, что пора разводиться с мужем или женой – АудиоЛад",
+  "divorce-assessment meta title",
+);
+assert(
+  divorceAssessmentArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie",
+  "divorce-assessment canonical practice",
+);
+assert(
+  divorceAssessmentArticle.relatedPractices.length === 0 &&
+    divorceAssessmentArticle.finalAudioLead === "",
+  "divorce-assessment renders one player",
+);
+assert(
+  divorceAssessmentArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-reshitsya-na-razvod",
+  ) &&
+    divorceAssessmentArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+    ),
+  "divorce-assessment has approved article links",
+);
+assert(
+  divorceAssessmentArticle.topicSlug === "pending-hub-reconciliation" &&
+    divorceAssessmentArticle.topicHref === "/articles" &&
+    divorceAssessmentArticle.faq.length === 6,
+  "divorce-assessment keeps pending hub and FAQ",
+);
+
+const childConversationArticle = getArticleBySlug(
+  "kak-skazat-rebenku-o-razvode-roditeley",
+);
+assert(childConversationArticle, "child-conversation article registered");
+assert(
+  childConversationArticle.title ===
+    "Как сказать ребёнку о разводе родителей: что и как говорить",
+  "child-conversation H1",
+);
+assert(
+  childConversationArticle.metaTitle ===
+    "Как сказать ребёнку о разводе родителей – что и как говорить – АудиоЛад",
+  "child-conversation meta title",
+);
+assert(
+  childConversationArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie" &&
+    childConversationArticle.relatedPractices.length === 0 &&
+    childConversationArticle.finalAudioLead === "",
+  "child-conversation has canonical practice and one player",
+);
+assert(
+  childConversationArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ) &&
+    childConversationArticle.faq.length === 8,
+  "child-conversation has approved link and FAQ",
+);
+assert(
+  divorceChildArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+  ),
+  "child-divorce article links to child-conversation article",
+);
+
+const childSupportArticle = getArticleBySlug(
+  "kak-pomoch-rebenku-perezhit-razvod-roditeley",
+);
+assert(childSupportArticle, "child-support article registered");
+assert(
+  childSupportArticle.title ===
+    "Как помочь ребёнку пережить развод родителей",
+  "child-support H1",
+);
+assert(
+  childSupportArticle.metaTitle ===
+    "Как помочь ребёнку пережить развод родителей – АудиоЛад",
+  "child-support meta title",
+);
+assert(
+  childSupportArticle.primaryPractice.practiceKey ===
+    "razvod-yasnost-i-spokoystvie" &&
+    childSupportArticle.relatedPractices.length === 0 &&
+    childSupportArticle.finalAudioLead === "",
+  "child-support has canonical practice and one player",
+);
+assert(
+  childSupportArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/rebenok-i-razvod-roditeley",
+  ) &&
+    childSupportArticle.afterFinalAudio?.some(
+      (item) =>
+        item.href === "/articles/kak-skazat-rebenku-o-razvode-roditeley",
+    ) &&
+    childSupportArticle.faq.length === 7,
+  "child-support has approved links and FAQ",
+);
+assert(
+  childSupportArticle.topicSlug === "pending-hub-reconciliation" &&
+    childSupportArticle.topicHref === "/articles",
+  "child-support keeps pending hub",
+);
+
+const lifeAfterDivorceArticle = getArticleBySlug("zhizn-posle-razvoda");
+assert(lifeAfterDivorceArticle, "life-after-divorce article registered");
+assert(
+  lifeAfterDivorceArticle.title ===
+    "Жизнь после развода: как принять перемены и двигаться дальше",
+  "life-after-divorce H1",
+);
+assert(
+  lifeAfterDivorceArticle.metaTitle ===
+    "Жизнь после развода: как привыкнуть к переменам и жить дальше – АудиоЛад",
+  "life-after-divorce meta title",
+);
+assert(
+  lifeAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    lifeAfterDivorceArticle.relatedPractices.length === 0 &&
+    lifeAfterDivorceArticle.finalAudioLead === "",
+  "life-after-divorce has canonical practice and one player",
+);
+assert(
+  lifeAfterDivorceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-reshitsya-na-razvod",
+  ) &&
+    lifeAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-proshloe",
+    ) &&
+    lifeAfterDivorceArticle.faq.length === 7,
+  "life-after-divorce has approved links and FAQ",
+);
+assert(
+  lifeAfterDivorceArticle.topicSlug === "pending-hub-reconciliation" &&
+    lifeAfterDivorceArticle.topicHref === "/articles",
+  "life-after-divorce keeps pending hub",
+);
+
+const surviveDivorceArticle = getArticleBySlug("kak-perezhit-razvod");
+assert(surviveDivorceArticle, "survive-divorce article registered");
+assert(
+  surviveDivorceArticle.title ===
+    "Как пережить развод и постепенно вернуться к себе",
+  "survive-divorce H1",
+);
+assert(
+  surviveDivorceArticle.metaTitle ===
+    "Как пережить развод и постепенно вернуться к себе – АудиоЛад",
+  "survive-divorce meta title",
+);
+assert(
+  surviveDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    surviveDivorceArticle.relatedPractices.length === 0 &&
+    surviveDivorceArticle.finalAudioLead === "",
+  "survive-divorce has canonical practice and one player",
+);
+assert(
+  surviveDivorceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhizn-posle-razvoda",
+  ) &&
+    surviveDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-otpustit-proshloe",
+    ) &&
+    !surviveDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-reshitsya-na-razvod",
+    ) &&
+    surviveDivorceArticle.faq.length === 7,
+  "survive-divorce has approved live links without forced decision link",
+);
+assert(
+  surviveDivorceArticle.topicSlug === "pending-hub-reconciliation" &&
+    surviveDivorceArticle.topicHref === "/articles",
+  "survive-divorce keeps pending hub",
+);
+
+const surviveDivorceHusbandArticle = getArticleBySlug(
+  "kak-perezhit-razvod-s-muzhem",
+);
+assert(surviveDivorceHusbandArticle, "survive-divorce-husband article registered");
+assert(
+  surviveDivorceHusbandArticle.title ===
+    "Как пережить развод с мужем, которого всё ещё любишь",
+  "survive-divorce-husband H1",
+);
+assert(
+  surviveDivorceHusbandArticle.metaTitle ===
+    "Как пережить развод с мужем, которого всё ещё любишь – АудиоЛад",
+  "survive-divorce-husband meta title",
+);
+assert(
+  surviveDivorceHusbandArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    surviveDivorceHusbandArticle.relatedPractices.length === 0 &&
+    surviveDivorceHusbandArticle.finalAudioLead === "",
+  "survive-divorce-husband has canonical practice and one player",
+);
+assert(
+  surviveDivorceHusbandArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/zhizn-posle-razvoda",
+  ) &&
+    surviveDivorceHusbandArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/kak-perezhit-razvod",
+    ) &&
+    surviveDivorceHusbandArticle.faq.length === 7,
+  "survive-divorce-husband has approved recovery links and FAQ",
+);
+assert(
+  surviveDivorceHusbandArticle.topicSlug === "pending-hub-reconciliation" &&
+    surviveDivorceHusbandArticle.topicHref === "/articles",
+  "survive-divorce-husband keeps pending hub",
+);
+
 const audioSource = read("src/components/articles/ArticleAudioBlock.tsx");
 assert(audioSource.includes("PlayIcon"), "circular play icon");
 assert(audioSource.includes("PauseIcon"), "circular pause icon");

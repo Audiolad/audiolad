@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Must-keep SEO article URLs. Candidate/public smoke fails if any path returns non-200.",
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-08-12",
   "paths": [
     "/articles/affirmatsii-na-dengi",
     "/articles/besplatnye-meditatsii-onlayn",
@@ -21,17 +21,23 @@
     "/articles/kak-perestat-kritikovat-sebya",
     "/articles/kak-perestat-perezhivat-iz-za-deneg",
     "/articles/kak-perestat-zlitsya-na-cheloveka",
+    "/articles/kak-perezhit-razvod",
+    "/articles/kak-perezhit-razvod-s-muzhem",
+    "/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley",
     "/articles/kak-ponyat-chego-ya-hochu",
+    "/articles/kak-ponyat-chto-pora-razvoditsya",
     "/articles/kak-poprosit-povyshenie-zarplaty",
     "/articles/kak-povysit-dohod",
-    "/articles/kak-prinimat-dengi",
     "/articles/kak-pravilno-sformulirovat-zhelanie",
+    "/articles/kak-prinimat-dengi",
     "/articles/kak-prinyat-sebya",
     "/articles/kak-prinyat-svoy-vozrast",
     "/articles/kak-privlech-dengi-v-svoyu-zhizn",
     "/articles/kak-prostit-cheloveka",
     "/articles/kak-prostit-sebya",
     "/articles/kak-razvit-lyubov-k-sebe",
+    "/articles/kak-reshitsya-na-razvod",
+    "/articles/kak-skazat-rebenku-o-razvode-roditeley",
     "/articles/kak-umenshit-impulsivnye-pokupki",
     "/articles/kak-vosstanovit-sily-zhenshchine",
     "/articles/kak-vosstanovit-zhenskuyu-energiyu",
@@ -47,17 +53,19 @@
     "/articles/meditatsiya-na-zhenskuyu-energiyu",
     "/articles/myshlenie-izobiliya",
     "/articles/namerenie-chto-eto",
-    "/articles/oshchushchenie-dostatka",
     "/articles/nastroy-na-dengi",
+    "/articles/oshchushchenie-dostatka",
     "/articles/pochemu-my-postoyanno-obizhaemsya",
     "/articles/pochemu-zhelaniya-ne-ispolnyayutsya",
+    "/articles/rebenok-i-razvod-roditeley",
     "/articles/strah-deneg",
     "/articles/strah-tratit-dengi-na-sebya",
     "/articles/vizualizatsiya-zhelaniy",
     "/articles/zhenshchina-i-dengi-psihologiya",
     "/articles/zhenskaya-energiya-chto-eto",
     "/articles/zhenskaya-samotsennost-i-dengi",
-    "/articles/zhenskaya-sila"
+    "/articles/zhenskaya-sila",
+    "/articles/zhizn-posle-razvoda"
   ],
   "articles": [
     {
@@ -151,9 +159,29 @@
       "path": "/articles/kak-perestat-zlitsya-na-cheloveka"
     },
     {
+      "articleId": "ART_new_20260813_kak-perezhit-razvod",
+      "slug": "kak-perezhit-razvod",
+      "path": "/articles/kak-perezhit-razvod"
+    },
+    {
+      "articleId": "ART_new_20260813_kak-perezhit-razvod-s-muzhem",
+      "slug": "kak-perezhit-razvod-s-muzhem",
+      "path": "/articles/kak-perezhit-razvod-s-muzhem"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      "slug": "kak-pomoch-rebenku-perezhit-razvod-roditeley",
+      "path": "/articles/kak-pomoch-rebenku-perezhit-razvod-roditeley"
+    },
+    {
       "articleId": "ART_kak-ponyat-chego-ya-hochu",
       "slug": "kak-ponyat-chego-ya-hochu",
       "path": "/articles/kak-ponyat-chego-ya-hochu"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-ponyat-chto-pora-razvoditsya",
+      "slug": "kak-ponyat-chto-pora-razvoditsya",
+      "path": "/articles/kak-ponyat-chto-pora-razvoditsya"
     },
     {
       "articleId": "ART_plan26_как-попросить-повышение-зарплаты",
@@ -166,14 +194,14 @@
       "path": "/articles/kak-povysit-dohod"
     },
     {
-      "articleId": "ART_kak-prinimat-dengi",
-      "slug": "kak-prinimat-dengi",
-      "path": "/articles/kak-prinimat-dengi"
-    },
-    {
       "articleId": "ART_plan33_как-сформулировать-желание",
       "slug": "kak-pravilno-sformulirovat-zhelanie",
       "path": "/articles/kak-pravilno-sformulirovat-zhelanie"
+    },
+    {
+      "articleId": "ART_kak-prinimat-dengi",
+      "slug": "kak-prinimat-dengi",
+      "path": "/articles/kak-prinimat-dengi"
     },
     {
       "articleId": "ART_plan48_как-принять-себя",
@@ -204,6 +232,16 @@
       "articleId": "ART_kak-razvit-lyubov-k-sebe",
       "slug": "kak-razvit-lyubov-k-sebe",
       "path": "/articles/kak-razvit-lyubov-k-sebe"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-reshitsya-na-razvod",
+      "slug": "kak-reshitsya-na-razvod",
+      "path": "/articles/kak-reshitsya-na-razvod"
+    },
+    {
+      "articleId": "ART_new_20260812_kak-skazat-rebenku-o-razvode-roditeley",
+      "slug": "kak-skazat-rebenku-o-razvode-roditeley",
+      "path": "/articles/kak-skazat-rebenku-o-razvode-roditeley"
     },
     {
       "articleId": "ART_kak-umenshit-impulsivnye-pokupki",
@@ -281,14 +319,14 @@
       "path": "/articles/namerenie-chto-eto"
     },
     {
-      "articleId": "ART_plan32_как-почувствовать-достаток",
-      "slug": "oshchushchenie-dostatka",
-      "path": "/articles/oshchushchenie-dostatka"
-    },
-    {
       "articleId": "ART_plan16_как-настроиться-на-деньги",
       "slug": "nastroy-na-dengi",
       "path": "/articles/nastroy-na-dengi"
+    },
+    {
+      "articleId": "ART_plan32_как-почувствовать-достаток",
+      "slug": "oshchushchenie-dostatka",
+      "path": "/articles/oshchushchenie-dostatka"
     },
     {
       "articleId": "ART_pochemu-my-postoyanno-obizhaemsya",
@@ -299,6 +337,11 @@
       "articleId": "ART_plan37_почему-желания-не-исполняются",
       "slug": "pochemu-zhelaniya-ne-ispolnyayutsya",
       "path": "/articles/pochemu-zhelaniya-ne-ispolnyayutsya"
+    },
+    {
+      "articleId": "ART_new_20260812_rebenok-i-razvod-roditeley",
+      "slug": "rebenok-i-razvod-roditeley",
+      "path": "/articles/rebenok-i-razvod-roditeley"
     },
     {
       "articleId": "ART_plan14_страх-денег",
@@ -334,6 +377,11 @@
       "articleId": "ART_zhenskaya-sila",
       "slug": "zhenskaya-sila",
       "path": "/articles/zhenskaya-sila"
+    },
+    {
+      "articleId": "ART_new_20260813_zhizn-posle-razvoda",
+      "slug": "zhizn-posle-razvoda",
+      "path": "/articles/zhizn-posle-razvoda"
     }
   ]
 }

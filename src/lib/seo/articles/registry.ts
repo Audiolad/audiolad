@@ -53,6 +53,14 @@ import { ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE } from "./content/zhenshchina-i
 import { ZHENSKAYA_SILA_ARTICLE } from "./content/zhenskaya-sila";
 import { MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE } from "./content/meditatsiya-na-zhenskuyu-energiyu";
 import { ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE } from "./content/zhenskaya-energiya-chto-eto";
+import { REBENOK_I_RAZVOD_RODITELEY_ARTICLE } from "./content/rebenok-i-razvod-roditeley";
+import { KAK_RESHITSYA_NA_RAZVOD_ARTICLE } from "./content/kak-reshitsya-na-razvod";
+import { KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE } from "./content/kak-ponyat-chto-pora-razvoditsya";
+import { KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE } from "./content/kak-skazat-rebenku-o-razvode-roditeley";
+import { KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE } from "./content/kak-pomoch-rebenku-perezhit-razvod-roditeley";
+import { ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-posle-razvoda";
+import { KAK_PEREZHIT_RAZVOD_ARTICLE } from "./content/kak-perezhit-razvod";
+import { KAK_PEREZHIT_RAZVOD_S_MUZHEM_ARTICLE } from "./content/kak-perezhit-razvod-s-muzhem";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -111,6 +119,14 @@ const ARTICLE_DEFINITIONS = [
   ZHENSKAYA_SILA_ARTICLE,
   MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE,
   ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE,
+  REBENOK_I_RAZVOD_RODITELEY_ARTICLE,
+  KAK_RESHITSYA_NA_RAZVOD_ARTICLE,
+  KAK_PONYAT_CHTO_PORA_RAZVODITSYA_ARTICLE,
+  KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE,
+  KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE,
+  ZHIZN_POSLE_RAZVODA_ARTICLE,
+  KAK_PEREZHIT_RAZVOD_ARTICLE,
+  KAK_PEREZHIT_RAZVOD_S_MUZHEM_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
