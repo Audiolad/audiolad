@@ -6319,6 +6319,38 @@ assert(
     surviveDivorceHusbandArticle.faq.length === 7,
   "survive-divorce-husband has approved recovery links and FAQ",
 );
+
+const newLifeAfterDivorceArticle = getArticleBySlug(
+  "novaya-zhizn-posle-razvoda",
+);
+assert(newLifeAfterDivorceArticle, "new-life-after-divorce article registered");
+assert(
+  newLifeAfterDivorceArticle.title ===
+    "Новая жизнь после развода: как начать следующий этап",
+  "new-life-after-divorce H1",
+);
+assert(
+  newLifeAfterDivorceArticle.metaTitle ===
+    "Новая жизнь после развода: как начать следующий этап – АудиоЛад",
+  "new-life-after-divorce meta title",
+);
+assert(
+  newLifeAfterDivorceArticle.primaryPractice.practiceKey ===
+    "vozvraschenie-k-sebe-posle-razvoda" &&
+    newLifeAfterDivorceArticle.relatedPractices.length === 0 &&
+    newLifeAfterDivorceArticle.finalAudioLead === "",
+  "new-life-after-divorce has canonical practice and one player",
+);
+assert(
+  newLifeAfterDivorceArticle.afterFinalAudio?.some(
+    (item) => item.href === "/articles/kak-perezhit-razvod",
+  ) &&
+    newLifeAfterDivorceArticle.afterFinalAudio?.some(
+      (item) => item.href === "/articles/zhizn-posle-razvoda",
+    ) &&
+    newLifeAfterDivorceArticle.faq.length === 7,
+  "new-life-after-divorce has approved recovery links and FAQ",
+);
 assert(
   surviveDivorceHusbandArticle.topicSlug === "pending-hub-reconciliation" &&
     surviveDivorceHusbandArticle.topicHref === "/articles",
