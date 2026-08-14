@@ -8,7 +8,6 @@ import {
   STUDIO_MEDITATION_AUDIENCES,
   STUDIO_MEDITATION_FEATURES,
   STUDIO_MEDITATION_PAGE_H1,
-  STUDIO_MEDITATION_STEPS,
 } from "@/lib/seo/studio-meditation/content";
 
 export function generateMetadata(): Metadata {
@@ -77,6 +76,52 @@ function FeatureIcon({
       <path d="m5 7 14 10M19 7 5 17M9 5l6 14" />
       <circle cx="6" cy="6" r="2.25" />
       <circle cx="18" cy="18" r="2.25" />
+    </svg>
+  );
+}
+
+const scenarioSteps = [
+  { label: "Голос", icon: "voice" },
+  { label: "Музыка", icon: "music" },
+  { label: "Монтаж", icon: "edit" },
+  { label: "Медитация", icon: "meditation" },
+] as const;
+
+function ScenarioIcon({
+  kind,
+}: {
+  kind: (typeof scenarioSteps)[number]["icon"];
+}) {
+  const commonProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.55,
+  };
+
+  if (kind === "voice") {
+    return <FeatureIcon kind="microphone" />;
+  }
+
+  if (kind === "music") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>
+        <path d="M8 18V7l10-2v11" />
+        <circle cx="6" cy="18" r="2.5" />
+        <circle cx="16" cy="16" r="2.5" />
+      </svg>
+    );
+  }
+
+  if (kind === "edit") {
+    return <FeatureIcon kind="edit" />;
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>
+      <path d="M12 3c2.1 2.8 3.5 5.2 3.5 7.5A3.5 3.5 0 0 1 12 14a3.5 3.5 0 0 1-3.5-3.5C8.5 8.2 9.9 5.8 12 3Z" />
+      <path d="M5 17.5c1.8 1.8 4.2 2.7 7 2.7s5.2-.9 7-2.7M7.5 15.5c1.2 1.1 2.7 1.7 4.5 1.7s3.3-.6 4.5-1.7" />
     </svg>
   );
 }
@@ -198,53 +243,13 @@ export default function StudioMeditationPage() {
           </div>
         </section>
 
-        <section
-          className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-24"
-          aria-labelledby="studio-meditation-process-heading"
-        >
-          <div className="flex max-w-2xl flex-col gap-5">
-            <h2
-              id="studio-meditation-process-heading"
-              className={sectionHeadingClassName}
-            >
-              Как создать свою медитацию
-            </h2>
-          </div>
-          <ol className="mt-10 grid gap-0 border-y border-[#dccdee] lg:mt-14 lg:grid-cols-4">
-            {STUDIO_MEDITATION_STEPS.map((step, index) => (
-              <li
-                key={step.number}
-                className="relative border-b border-[#dccdee] py-7 last:border-b-0 lg:border-b-0 lg:border-r lg:px-6 lg:py-8 first:lg:pl-0 last:lg:border-r-0 last:lg:pr-0"
-              >
-                <p className="text-sm font-semibold text-[#7042c5]">
-                  {step.number}
-                </p>
-                <h3 className="mt-3 text-xl font-semibold tracking-[-0.025em] text-[#25135c]">
-                  {step.title}
-                </h3>
-                <p className="mt-3 text-[15px] leading-6 text-[#5a4c7e]">
-                  {step.description}
-                </p>
-                {index < STUDIO_MEDITATION_STEPS.length - 1 ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute right-0 top-8 hidden translate-x-1/2 rounded-full bg-[#f7f2fc] px-1 text-sm text-[#9d85c2] lg:block"
-                  >
-                    →
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </section>
-
         <section className="mx-auto max-w-[900px] border-t border-[#e6dbf5] py-16 sm:py-20 lg:py-28">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-semibold tracking-[0.16em] text-[#7042c5]">
               ПРОСТОЙ СЦЕНАРИЙ
             </p>
             <h2 className={`mt-4 ${sectionHeadingClassName}`}>
-              Создано специально для медитаций и аудиопрактик
+              Специально для медитаций и аудиопрактик
             </h2>
             <p className="mx-auto mt-6 max-w-3xl text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
               Чтобы записать хорошую медитацию, не обязательно изучать
@@ -254,14 +259,34 @@ export default function StudioMeditationPage() {
             <p className="mx-auto mt-5 max-w-3xl text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
               Студия АудиоЛад строится вокруг простого сценария:
             </p>
-            <p className="mt-9 text-2xl font-semibold tracking-[-0.04em] text-[#7042c5] sm:text-3xl lg:text-4xl">
-              Голос <span aria-hidden="true">→</span> Музыка{" "}
-              <span aria-hidden="true">→</span> Монтаж{" "}
-              <span aria-hidden="true">→</span> Готовая медитация
-            </p>
-            <p className="mx-auto mt-9 max-w-3xl text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
-              Перед вами инструменты, которые действительно нужны для создания
-              голосовых аудиопрактик. И всё работает прямо в браузере.
+            <ol className="mx-auto mt-10 flex max-w-3xl flex-col items-center gap-2 sm:mt-12 lg:flex-row lg:items-start lg:justify-between lg:gap-0">
+              {scenarioSteps.map((step, index) => (
+                <li
+                  key={step.label}
+                  className="flex w-full flex-col items-center lg:w-auto lg:flex-1 lg:flex-row"
+                >
+                  <div className="flex flex-col items-center">
+                    <span className="grid h-20 w-20 place-items-center rounded-[28px] bg-[#eee5f8] p-5 text-[#7042c5] sm:h-24 sm:w-24 sm:p-6">
+                      <ScenarioIcon kind={step.icon} />
+                    </span>
+                    <span className="mt-3 text-base font-semibold text-[#25135c]">
+                      {step.label}
+                    </span>
+                  </div>
+                  {index < scenarioSteps.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className="my-2 text-2xl text-[#a890c8] lg:mx-3 lg:my-9 lg:text-3xl"
+                    >
+                      →
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+            <p className="mx-auto mt-10 max-w-3xl text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
+              Все необходимые инструменты для создания аудиопрактики работают
+              прямо в браузере.
             </p>
           </div>
         </section>
