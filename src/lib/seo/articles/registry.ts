@@ -61,6 +61,7 @@ import { KAK_SKAZAT_REBENKU_O_RAZVODE_RODITELEY_ARTICLE } from "./content/kak-sk
 import { KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE } from "./content/kak-pomoch-rebenku-perezhit-razvod-roditeley";
 import { ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-posle-razvoda";
 import { KAK_PEREZHIT_RAZVOD_ARTICLE } from "./content/kak-perezhit-razvod";
+import { KAK_PEREZHIT_IZMENU_I_RAZVOD_ARTICLE } from "./content/kak-perezhit-izmenu-i-razvod";
 import { KAK_PEREZHIT_RAZVOD_S_MUZHEM_ARTICLE } from "./content/kak-perezhit-razvod-s-muzhem";
 import { NOVAYA_ZHIZN_POSLE_RAZVODA_ARTICLE } from "./content/novaya-zhizn-posle-razvoda";
 import { NOVYE_OTNOSHENIYA_POSLE_RAZVODA_ARTICLE } from "./content/novye-otnosheniya-posle-razvoda";
@@ -138,6 +139,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_POMOCH_REBENKU_PEREZHIT_RAZVOD_RODITELEY_ARTICLE,
   ZHIZN_POSLE_RAZVODA_ARTICLE,
   KAK_PEREZHIT_RAZVOD_ARTICLE,
+  KAK_PEREZHIT_IZMENU_I_RAZVOD_ARTICLE,
   KAK_PEREZHIT_RAZVOD_S_MUZHEM_ARTICLE,
   NOVAYA_ZHIZN_POSLE_RAZVODA_ARTICLE,
   NOVYE_OTNOSHENIYA_POSLE_RAZVODA_ARTICLE,

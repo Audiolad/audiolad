@@ -2717,6 +2717,44 @@
       "release": "20260813-190235-00b2ec2f",
       "buildId": "UeExd6Rvodmud8e-8V3Sq",
       "validatedAt": "2026-08-13T19:07:46Z"
+    },
+    {
+      "articleId": "ART_new_20260814_kak-perezhit-izmenu-i-razvod",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как пережить измену и развод и снова вернуть доверие к себе",
+      "slug": "kak-perezhit-izmenu-i-razvod",
+      "productionUrl": "https://audiolad.ru/articles/kak-perezhit-izmenu-i-razvod",
+      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-izmenu-i-razvod",
+      "primaryQuery": "как пережить измену и развод",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "READY_FOR_PUBLICATION",
+      "cluster": "Развод и отношения",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "No existing divorce/relationships Topic Hub is present in the operational architecture; no new hub was created."
+      },
+      "practice": {
+        "key": "vozvraschenie-k-sebe-posle-razvoda",
+        "title": "Возвращение к себе после развода",
+        "slug": "vozvraschenie-k-sebe-posle-razvoda",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
+        "authorPath": "sergey-and-zoya",
+        "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "STRONG",
+      "publishedAt": null,
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "validationStatus": "PENDING_PUBLIC_SMOKE",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Authoritative editorial Markdown received. Frequency remains UNVERIFIED because no committed verified value is available.",
+        "operationalAddedAt": "2026-08-14"
+      }
     }
   ],
   "nextQueue": [],
