@@ -7,6 +7,7 @@ import {
   arePracticesEligibleForPublicPlaylist,
   type PlaylistPublishPractice,
 } from "@/lib/playlists/public-content";
+import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import type { PlaylistListItem, PlaylistRow, EditorialPlaylistListItem } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -330,7 +331,12 @@ export async function listEditorialPlaylists(
 
 export async function listEditablePlatformPlaylists(
   supabase: SupabaseClient,
-  options: { userId: string; canManageAll: boolean },
+  options: {
+    userId: string;
+    canManageAll: boolean;
+    /** Stage 2 workspace: include published platform playlists the user can edit. */
+    includePublished?: boolean;
+  },
 ): Promise<{ playlists: PlaylistListItem[]; error: string | null }> {
   const userId = options.userId.trim();
 
@@ -374,12 +380,19 @@ export async function listEditablePlatformPlaylists(
       cover_updated_at,
       is_editorial,
       owner_type,
+      created_by,
+      first_published_at,
+      description,
       playlist_items(count)
     `,
     )
     .eq("owner_type", "platform")
-    .eq("visibility", "private")
+    .eq("is_editorial", true)
     .order("updated_at", { ascending: false });
+
+  if (!options.includePublished) {
+    query = query.eq("visibility", "private");
+  }
 
   if (playlistIds) {
     query = query.in("id", playlistIds);
@@ -405,6 +418,9 @@ export async function listEditablePlatformPlaylists(
     cover_updated_at: row.cover_updated_at ?? null,
     is_editorial: true,
     owner_type: "platform" as const,
+    created_by: row.created_by ?? null,
+    first_published_at: row.first_published_at ?? null,
+    description: row.description ?? null,
     items_count: row.playlist_items?.[0]?.count ?? 0,
     coverUrl: null,
     mosaicCoverUrls: [],
@@ -416,12 +432,15 @@ export async function listEditablePlatformPlaylists(
 export async function playlistSlugExists(
   supabase: SupabaseClient,
   slug: string,
+  excludeId?: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("playlists")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
+  let query = supabase.from("playlists").select("id").eq("slug", slug);
+
+  if (excludeId) {
+    query = query.neq("id", excludeId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     throw new Error("playlist_slug_lookup_failed");
@@ -492,4 +511,72 @@ export async function assertPlaylistPublicContentAllowed(
   }
 
   return { ok: true };
+}
+
+export async function assertEditorialPlaylistPublishReady(
+  supabase: SupabaseClient,
+  playlistId: string,
+): Promise<
+  | { ok: true; itemsCount: number }
+  | { ok: false; reason: "empty" | "invalid" | "error" }
+> {
+  const { data, error } = await supabase
+    .from("playlist_items")
+    .select(
+      `
+      practice_id,
+      practices (
+        id,
+        status,
+        is_catalog_listed,
+        slug,
+        author_id,
+        audio_url
+      )
+    `,
+    )
+    .eq("playlist_id", playlistId);
+
+  if (error) {
+    return { ok: false, reason: "error" };
+  }
+
+  const rows = data ?? [];
+
+  if (rows.length === 0) {
+    return { ok: false, reason: "empty" };
+  }
+
+  let eligibleCount = 0;
+
+  for (const row of rows) {
+    const practice = Array.isArray(row.practices)
+      ? row.practices[0]
+      : row.practices;
+
+    if (!practice || typeof practice !== "object") {
+      continue;
+    }
+
+    if (
+      isPracticeEligibleForEditorialPlaylist(
+        practice as {
+          status: string | null;
+          is_catalog_listed: boolean | null;
+          slug: string | null;
+          author_id: string | null;
+          audio_url: string | null;
+        },
+        1,
+      )
+    ) {
+      eligibleCount += 1;
+    }
+  }
+
+  if (eligibleCount === 0) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  return { ok: true, itemsCount: rows.length };
 }

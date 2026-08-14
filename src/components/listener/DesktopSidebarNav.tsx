@@ -11,6 +11,7 @@ import {
 
 type DesktopSidebarNavProps = {
   showMyMaterialsNav: boolean;
+  showEditorialNav?: boolean;
 };
 
 function HelpNavIcon({ className }: { className?: string }) {
@@ -35,41 +36,67 @@ function HelpNavIcon({ className }: { className?: string }) {
 
 export default function DesktopSidebarNav({
   showMyMaterialsNav,
+  showEditorialNav = false,
 }: DesktopSidebarNavProps) {
   const pathname = usePathname();
   const items = getListenerSidebarNavItems({ showMyMaterialsNav });
+  const editorialActive =
+    pathname === "/editorial/playlists" ||
+    pathname.startsWith("/editorial/playlists/");
 
   return (
-    <nav aria-label="Моё пространство">
-      <ul className="space-y-1">
-        {items.map((item) => {
-          const active = isListenerPrimaryNavItemActive(pathname, item.href, {
-            isNeutralPath: pathname === "/",
-          });
+    <>
+      <nav aria-label="Моё пространство">
+        <ul className="space-y-1">
+          {items.map((item) => {
+            const active = isListenerPrimaryNavItemActive(pathname, item.href, {
+              isNeutralPath: pathname === "/",
+            });
 
-          return (
-            <li key={item.key}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
-                  active
-                    ? "bg-[#f3ebfc] font-semibold text-[#7042c5]"
-                    : "font-medium text-[#4a3d6b] hover:bg-[#faf6ff] hover:text-[#7042c5]"
-                }`}
-              >
-                {item.icon === "lock" ? (
-                  <PersonalMaterialLockIcon className="h-4 w-4 shrink-0" />
-                ) : null}
-                {item.icon === "help" ? (
-                  <HelpNavIcon className="h-4 w-4 shrink-0" />
-                ) : null}
-                <span className="min-w-0 break-words">{item.title}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+            return (
+              <li key={item.key}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                    active
+                      ? "bg-[#f3ebfc] font-semibold text-[#7042c5]"
+                      : "font-medium text-[#4a3d6b] hover:bg-[#faf6ff] hover:text-[#7042c5]"
+                  }`}
+                >
+                  {item.icon === "lock" ? (
+                    <PersonalMaterialLockIcon className="h-4 w-4 shrink-0" />
+                  ) : null}
+                  {item.icon === "help" ? (
+                    <HelpNavIcon className="h-4 w-4 shrink-0" />
+                  ) : null}
+                  <span className="min-w-0 break-words">{item.title}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      {showEditorialNav ? (
+        <div className="mt-5">
+          <p className="px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#9485b4]">
+            Редакция
+          </p>
+          <nav aria-label="Редакция" className="mt-1">
+            <Link
+              href="/editorial/playlists"
+              aria-current={editorialActive ? "page" : undefined}
+              className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                editorialActive
+                  ? "bg-[#f3ebfc] font-semibold text-[#7042c5]"
+                  : "font-medium text-[#4a3d6b] hover:bg-[#faf6ff] hover:text-[#7042c5]"
+              }`}
+            >
+              <span className="min-w-0 break-words">Открытые плейлисты</span>
+            </Link>
+          </nav>
+        </div>
+      ) : null}
+    </>
   );
 }

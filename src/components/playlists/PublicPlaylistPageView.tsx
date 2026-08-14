@@ -47,6 +47,10 @@ export default function PublicPlaylistPageView({
 
       <p className="mt-2 text-sm text-[#7d70a2]">{detail.ownerLabel}</p>
 
+      {playlist.description ? (
+        <p className="mt-3 text-sm leading-6 text-[#5c4f82]">{playlist.description}</p>
+      ) : null}
+
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm text-[#5c4f82]">
         <span>
           {detail.itemsCount === 0

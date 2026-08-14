@@ -7,6 +7,7 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
 import { resolveProfileApplicationVariant } from "@/lib/author-applications/status";
 import { hasAdminPanelAccess } from "@/lib/auth/platform-admin";
+import { getEditorialWorkspaceAccess } from "@/lib/playlists/editorial-workspace";
 import {
   resolveListenerAuthorCta,
   resolveShowAuthorEntry,
@@ -39,6 +40,8 @@ export type ListenerShellData = {
   showSidebarAuthorPromo: boolean;
   /** True only after confirmed claimed personal material (no loading flash). */
   showMyMaterialsNav: boolean;
+  /** Редакция → Открытые плейлисты. Never true for ordinary listeners. */
+  showEditorialNav: boolean;
 };
 
 type ProfileRow = {
@@ -75,10 +78,11 @@ async function loadListenerShellData(
       adminPanelHref: "/admin",
       showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(guestAuthorInput),
       showMyMaterialsNav: false,
+      showEditorialNav: false,
     };
   }
 
-  const [profileResult, workspaces, application, showAdminPanel, showMyMaterialsNav] =
+  const [profileResult, workspaces, application, showAdminPanel, showMyMaterialsNav, editorialAccess] =
     await Promise.all([
       client
         .from("profiles")
@@ -100,6 +104,16 @@ async function loadListenerShellData(
       hasClaimedPersonalMaterials(client).catch((error) => {
         console.error("listener_shell_my_materials_nav_error", error);
         return false;
+      }),
+      getEditorialWorkspaceAccess(client, user.id).catch((error) => {
+        console.error("listener_shell_editorial_nav_error", error);
+        return {
+          userId: user.id,
+          hasAccess: false,
+          canManage: false,
+          canCreate: false,
+          isCollaborator: false,
+        };
       }),
     ]);
 
@@ -138,6 +152,7 @@ async function loadListenerShellData(
     adminPanelHref: "/admin",
     showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(authorInput),
     showMyMaterialsNav,
+    showEditorialNav: editorialAccess.hasAccess,
   };
 }
 

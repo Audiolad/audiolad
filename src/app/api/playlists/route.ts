@@ -28,6 +28,8 @@ function toPlaylistResponse(row: PlaylistRow) {
     is_editorial: row.is_editorial,
     owner_type: row.owner_type ?? (row.is_editorial ? "platform" : "user"),
     description: row.description ?? null,
+    first_published_at: row.first_published_at ?? null,
+    created_by: row.created_by ?? null,
   };
 }
 
@@ -76,22 +78,36 @@ export async function POST(request: Request) {
       );
     }
 
-    let slug: string | null;
+    let slug: string | null = parsed.slug ?? null;
 
-    try {
-      slug = await allocateUniquePlaylistSlug(parsed.title, (candidate) =>
-        playlistSlugExists(supabase, candidate),
-      );
-    } catch (error) {
-      console.error(
-        "playlists_create_slug_lookup_error",
-        error instanceof Error ? error.message : error,
-      );
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
+    if (slug) {
+      try {
+        if (await playlistSlugExists(supabase, slug)) {
+          return NextResponse.json({ error: "slug_conflict" }, { status: 409 });
+        }
+      } catch (error) {
+        console.error(
+          "playlists_create_slug_lookup_error",
+          error instanceof Error ? error.message : error,
+        );
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+    } else {
+      try {
+        slug = await allocateUniquePlaylistSlug(parsed.title, (candidate) =>
+          playlistSlugExists(supabase, candidate),
+        );
+      } catch (error) {
+        console.error(
+          "playlists_create_slug_lookup_error",
+          error instanceof Error ? error.message : error,
+        );
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
 
-    if (!slug) {
-      return NextResponse.json({ error: "slug_conflict" }, { status: 409 });
+      if (!slug) {
+        return NextResponse.json({ error: "slug_conflict" }, { status: 409 });
+      }
     }
 
     const { data, error } = await supabase

@@ -1,3 +1,4 @@
+import { isValidPlaylistPublicSlug } from "@/lib/playlists/public-slug";
 import {
   PLAYLIST_COLLABORATOR_ROLES,
   PLAYLIST_DESCRIPTION_MAX_LENGTH,
@@ -9,7 +10,6 @@ import {
 
 const FORBIDDEN_CLIENT_KEYS = new Set([
   "user_id",
-  "slug",
   "published_at",
   "created_at",
   "updated_at",
@@ -105,6 +105,24 @@ export function validatePlaylistVisibility(
   return { ok: true, visibility: value as PlaylistVisibility };
 }
 
+export type SlugValidationResult =
+  | { ok: true; slug: string }
+  | { ok: false; error: "invalid_request" };
+
+export function validatePlaylistSlug(value: unknown): SlugValidationResult {
+  if (typeof value !== "string") {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const slug = value.trim().toLowerCase();
+
+  if (!isValidPlaylistPublicSlug(slug)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, slug };
+}
+
 export type CreatePlaylistInput =
   | {
       ok: true;
@@ -112,6 +130,7 @@ export type CreatePlaylistInput =
       visibility: PlaylistVisibility;
       isEditorial: boolean;
       description: string | null;
+      slug?: string;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -131,6 +150,7 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     "visibility",
     "is_editorial",
     "description",
+    "slug",
   ]);
 
   for (const key of Object.keys(parsed)) {
@@ -172,12 +192,25 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     description = descriptionResult.description;
   }
 
+  let slug: string | undefined;
+
+  if ("slug" in parsed) {
+    const slugResult = validatePlaylistSlug(parsed.slug);
+
+    if (!slugResult.ok) {
+      return slugResult;
+    }
+
+    slug = slugResult.slug;
+  }
+
   return {
     ok: true,
     title: titleResult.title,
     visibility: visibilityResult.visibility,
     isEditorial,
     description,
+    slug,
   };
 }
 
@@ -188,6 +221,7 @@ export type PatchPlaylistInput =
       visibility?: PlaylistVisibility;
       isEditorial?: boolean;
       description?: string | null;
+      slug?: string;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -207,6 +241,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     "visibility",
     "is_editorial",
     "description",
+    "slug",
   ]);
   const keys = Object.keys(parsed);
 
@@ -225,6 +260,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     visibility?: PlaylistVisibility;
     isEditorial?: boolean;
     description?: string | null;
+    slug?: string;
   } = {};
 
   if ("title" in parsed) {
@@ -265,11 +301,22 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     result.description = descriptionResult.description;
   }
 
+  if ("slug" in parsed) {
+    const slugResult = validatePlaylistSlug(parsed.slug);
+
+    if (!slugResult.ok) {
+      return slugResult;
+    }
+
+    result.slug = slugResult.slug;
+  }
+
   if (
     result.title === undefined &&
     result.visibility === undefined &&
     result.isEditorial === undefined &&
-    result.description === undefined
+    result.description === undefined &&
+    result.slug === undefined
   ) {
     return { ok: false, error: "invalid_request" };
   }
@@ -472,6 +519,38 @@ export function parseCollaboratorUpsertBody(
     userId: parsed.user_id,
     role: parsed.role as PlaylistCollaboratorRole,
   };
+}
+
+export type ReplacePlaylistItemInput =
+  | { ok: true; practiceId: string }
+  | { ok: false; error: "invalid_request" };
+
+/**
+ * POST /api/playlists/[id]/items/[practiceId]/replace body:
+ * { practiceId: uuid } — replacement product, no unknown keys.
+ */
+export function parseReplacePlaylistItemBody(
+  body: unknown,
+): ReplacePlaylistItemInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["practiceId"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (typeof parsed.practiceId !== "string" || !isUuid(parsed.practiceId)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, practiceId: parsed.practiceId };
 }
 
 export type CollaboratorDeleteInput =

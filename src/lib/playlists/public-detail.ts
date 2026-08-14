@@ -64,6 +64,7 @@ type PlaylistDbRow = {
   cover_path: string | null;
   cover_updated_at: string | null;
   is_editorial: boolean | null;
+  description?: string | null;
 };
 
 export type PublicPlaylistItemView = ProductCoverFields & {
@@ -87,6 +88,7 @@ export type PublicPlaylistView = {
     published_at: string;
     updated_at: string;
     isEditorial: boolean;
+    description: string | null;
   };
   items: PublicPlaylistItemView[];
   itemsCount: number;
@@ -145,7 +147,8 @@ export const loadPublicPlaylistBySlug = cache(
       updated_at,
       cover_path,
       cover_updated_at,
-      is_editorial
+      is_editorial,
+      description
     `,
       )
       .eq("slug", slug)
@@ -380,6 +383,7 @@ export const loadPublicPlaylistBySlug = cache(
           published_at: playlist.published_at,
           updated_at: playlist.updated_at,
           isEditorial: playlist.is_editorial === true,
+          description: playlist.description?.trim() || null,
         },
         items,
         itemsCount: items.length,

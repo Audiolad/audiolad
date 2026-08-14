@@ -19,6 +19,9 @@ type EditorialPracticePickerSheetProps = {
   open: boolean;
   onClose: () => void;
   onAdded?: () => void;
+  onReplaced?: () => void;
+  mode?: "add" | "replace";
+  replacePracticeId?: string | null;
 };
 
 type LoadState =
@@ -28,6 +31,7 @@ type LoadState =
   | { status: "ready"; practices: EditorialPracticeOption[] };
 
 type PriceFilter = "all" | "free" | "paid";
+type KindFilter = "all" | "practice" | "music";
 
 function CheckIcon() {
   return (
@@ -48,12 +52,16 @@ export default function EditorialPracticePickerSheet({
   open,
   onClose,
   onAdded,
+  onReplaced,
+  mode = "add",
+  replacePracticeId = null,
 }: EditorialPracticePickerSheetProps) {
   const router = useRouter();
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
   const [authorFilter, setAuthorFilter] = useState<string>("all");
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,6 +82,7 @@ export default function EditorialPracticePickerSheet({
       setQuery("");
       setAuthorFilter("all");
       setPriceFilter("all");
+      setKindFilter("all");
       setSelectedIds(new Set());
       setFormError(null);
 
@@ -181,6 +190,14 @@ export default function EditorialPracticePickerSheet({
         return false;
       }
 
+      if (kindFilter === "music" && practice.productKind !== "music") {
+        return false;
+      }
+
+      if (kindFilter === "practice" && practice.productKind === "music") {
+        return false;
+      }
+
       if (!normalizedQuery) {
         return true;
       }
@@ -190,10 +207,15 @@ export default function EditorialPracticePickerSheet({
         practice.authorName.toLowerCase().includes(normalizedQuery)
       );
     });
-  }, [authorFilter, loadState, priceFilter, query]);
+  }, [authorFilter, kindFilter, loadState, priceFilter, query]);
 
   function toggleSelection(practiceId: string, alreadyAdded: boolean) {
     if (alreadyAdded || submitting) {
+      return;
+    }
+
+    if (mode === "replace") {
+      setSelectedIds(new Set([practiceId]));
       return;
     }
 
@@ -219,15 +241,20 @@ export default function EditorialPracticePickerSheet({
     setFormError(null);
 
     try {
+      const isReplace = mode === "replace" && replacePracticeId;
       const response = await fetch(
-        `/api/playlists/${playlistId}/editorial-practices`,
+        isReplace
+          ? `/api/playlists/${playlistId}/items/${replacePracticeId}/replace`
+          : `/api/playlists/${playlistId}/editorial-practices`,
         {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            practiceIds: Array.from(selectedIds),
-          }),
+          body: JSON.stringify(
+            isReplace
+              ? { practiceId: Array.from(selectedIds)[0] }
+              : { practiceIds: Array.from(selectedIds) },
+          ),
         },
       );
 
@@ -245,7 +272,11 @@ export default function EditorialPracticePickerSheet({
       }
 
       onClose();
-      onAdded?.();
+      if (isReplace) {
+        onReplaced?.();
+      } else {
+        onAdded?.();
+      }
       startTransition(() => {
         router.refresh();
       });
@@ -279,10 +310,12 @@ export default function EditorialPracticePickerSheet({
       >
         <div className="border-b border-[#f0e8fb] px-5 py-5">
           <h2 id={titleId} className="text-[22px] font-semibold">
-            Добавить практики
+            {mode === "replace" ? "Заменить материал" : "Добавить материалы"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            Выберите опубликованные материалы из каталога.
+            {mode === "replace"
+              ? "Выберите опубликованный материал из каталога. Позиция сохранится."
+              : "Выберите опубликованные материалы из каталога."}
           </p>
         </div>
 
@@ -298,6 +331,29 @@ export default function EditorialPracticePickerSheet({
               className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
             />
           </label>
+
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Тип">
+            {(
+              [
+                ["all", "Все"],
+                ["practice", "Практики"],
+                ["music", "Музыка"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setKindFilter(value)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  kindFilter === value
+                    ? "bg-[#7042c5] text-white"
+                    : "border border-[#ddcfef] bg-white text-[#7042c5]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -405,9 +461,11 @@ export default function EditorialPracticePickerSheet({
                         </p>
                         <p className="mt-1 truncate text-xs text-[#7d70a2]">
                           {practice.authorName}
-                          {practice.formatLabel
-                            ? ` · ${practice.formatLabel}`
-                            : ""}
+                          {practice.productKindLabel
+                            ? ` · ${practice.productKindLabel}`
+                            : practice.formatLabel
+                              ? ` · ${practice.formatLabel}`
+                              : ""}
                         </p>
                         <p className="mt-1 text-xs text-[#8a7ca9]">
                           {!practice.isFree && practice.priceLabel
@@ -465,8 +523,12 @@ export default function EditorialPracticePickerSheet({
               className="rounded-[18px] bg-[#7042c5] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
               {submitting
-                ? "Добавление…"
-                : `Добавить (${selectedIds.size})`}
+                ? mode === "replace"
+                  ? "Замена…"
+                  : "Добавление…"
+                : mode === "replace"
+                  ? "Заменить"
+                  : `Добавить (${selectedIds.size})`}
             </button>
           </div>
         </div>

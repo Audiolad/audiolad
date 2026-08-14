@@ -57,7 +57,10 @@ export default async function ProfilePage({
       <ProfileUserCard card={profileData.card} />
       <ProfileContinueSection state={profileData.continueState} />
       <ProfileCounters counters={profileData.counters} />
-      <ProfileQuickLinks showMyMaterialsNav={shellData.showMyMaterialsNav} />
+      <ProfileQuickLinks
+        showMyMaterialsNav={shellData.showMyMaterialsNav}
+        showEditorialNav={shellData.showEditorialNav}
+      />
       <ProfileAuthorBlock section={profileData.authorSection} />
       {profileData.showAdminPanel ? <ProfileAdminPanelSection /> : null}
       <ProfileAccountSection />
