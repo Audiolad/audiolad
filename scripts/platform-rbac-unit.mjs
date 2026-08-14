@@ -282,6 +282,29 @@ assert.doesNotMatch(
 );
 
 const playlistApi = read("src/app/api/playlists/route.ts");
-assert.match(playlistApi, /products\.moderate/);
+assert.match(playlistApi, /playlists\.create_editorial/);
+assert.doesNotMatch(playlistApi, /products\.moderate/);
+assert.ok(
+  rolesGrantPermission(["admin"], "playlists.manage"),
+  "admin can manage platform playlists",
+);
+assert.ok(
+  rolesGrantPermission(["admin"], "playlists.create_editorial"),
+  "admin can create editorial playlists",
+);
+assert.ok(
+  rolesGrantPermission(["editor"], "playlists.create_editorial"),
+  "editor can create editorial playlists",
+);
+assert.equal(
+  rolesGrantPermission(["editor"], "playlists.manage"),
+  false,
+  "editor must not have global playlists.manage",
+);
+assert.equal(
+  rolesGrantPermission(["support"], "playlists.create_editorial"),
+  false,
+  "support cannot create editorial playlists",
+);
 
 console.log("platform-rbac-unit: ok");

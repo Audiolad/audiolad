@@ -4,6 +4,7 @@ import { getOwnedPlaylistById } from "@/lib/playlists/queries";
 import {
   canUserEditPlaylist,
   loadPlaylistForAccessCheck,
+  logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
 import { isUuid } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
@@ -102,6 +103,10 @@ export async function DELETE(request: Request, context: RouteContext) {
     console.error("playlist_item_delete_touch_error", touchError.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
+
+  await logPlaylistAudit(supabase, id, "item_removed", {
+    practice_id: practiceId,
+  });
 
   return new NextResponse(null, { status: 204 });
 }

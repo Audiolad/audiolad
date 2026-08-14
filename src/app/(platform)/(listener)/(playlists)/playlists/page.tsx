@@ -1,6 +1,10 @@
 import PlaylistsClient from "@/components/playlists/PlaylistsClient";
 import { hasPermission } from "@/lib/auth/platform-access";
-import { listEditorialPlaylists, listOwnedPlaylists } from "@/lib/playlists/queries";
+import {
+  listEditablePlatformPlaylists,
+  listEditorialPlaylists,
+  listOwnedPlaylists,
+} from "@/lib/playlists/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -34,19 +38,47 @@ export default async function PlaylistsPage() {
     canCreateEditorial = await hasPermission(
       supabase,
       user.id,
-      "products.moderate",
+      "playlists.create_editorial",
     );
   } catch (adminError) {
     console.error("playlists_page_admin_check_error", adminError);
+  }
+
+  let canManagePlatform = false;
+
+  try {
+    canManagePlatform = await hasPermission(
+      supabase,
+      user.id,
+      "playlists.manage",
+    );
+  } catch (manageError) {
+    console.error("playlists_page_manage_check_error", manageError);
+  }
+
+  const { playlists: platformPlaylists, error: platformError } =
+    await listEditablePlatformPlaylists(supabase, {
+      userId: user.id,
+      canManageAll: canManagePlatform,
+    });
+
+  if (platformError) {
+    console.error("playlists_page_platform_load_error", platformError);
   }
 
   if (error) {
     console.error("playlists_page_load_error", error);
   }
 
+  const ownedIds = new Set(playlists.map((row) => row.id));
+  const mergedPlaylists = [
+    ...playlists,
+    ...platformPlaylists.filter((row) => !ownedIds.has(row.id)),
+  ];
+
   return (
     <PlaylistsClient
-      playlists={playlists}
+      playlists={mergedPlaylists}
       editorialPlaylists={editorialPlaylists}
       canCreateEditorial={canCreateEditorial}
       loadError={Boolean(error)}

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { assertPermission } from "@/lib/auth/platform-access";
 import {
   isEditorialAddRpcResult,
   listEditorialPracticeOptions,
@@ -45,15 +44,6 @@ export async function GET(request: Request, context: RouteContext) {
   if (authError) {
     console.error("editorial_practices_get_auth_error", authError.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  const adminCheck = await assertPermission(supabase, user.id, "products.moderate");
-
-  if (!adminCheck.ok) {
-    return NextResponse.json(
-      { error: adminCheck.status === 403 ? "forbidden" : "internal_error" },
-      { status: adminCheck.status },
-    );
   }
 
   const { playlist, error: loadError } = await loadPlaylistForAccessCheck(
@@ -114,15 +104,6 @@ export async function POST(request: Request, context: RouteContext) {
   if (authError) {
     console.error("editorial_practices_post_auth_error", authError.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  const adminCheck = await assertPermission(supabase, user.id, "products.moderate");
-
-  if (!adminCheck.ok) {
-    return NextResponse.json(
-      { error: adminCheck.status === 403 ? "forbidden" : "internal_error" },
-      { status: adminCheck.status },
-    );
   }
 
   let body: unknown;
