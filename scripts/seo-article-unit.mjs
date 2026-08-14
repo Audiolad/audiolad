@@ -5424,8 +5424,9 @@ assert(
   "creator paths CTA uses the configured School production origin",
 );
 assert(
-  creatorPathsCtaSource.includes("Посмотреть Школу"),
-  "creator paths CTA shortens the School label on mobile",
+  creatorPathsCtaSource.includes("Посмотреть Школу Аудиопрактик") &&
+    !creatorPathsCtaSource.includes("sm:hidden"),
+  "creator paths CTA uses the full School label on every viewport",
 );
 assert(
   creatorPathsCtaSource.includes('target="_blank"') &&

@@ -108,16 +108,9 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
       </h3>
       <p className="mt-2 text-sm leading-6 text-[#4a3d73]">{description}</p>
       <span className="mt-auto pt-3 text-sm font-semibold text-[#7042c5] group-hover:text-[#6338b0]">
-        {isStudio ? (
-          "Попробуйте бесплатно прямо сейчас"
-        ) : (
-          <>
-            <span className="sm:hidden">Посмотреть Школу</span>
-            <span className="hidden sm:inline">
-              Посмотреть Школу Аудиопрактик
-            </span>
-          </>
-        )}
+        {isStudio
+          ? "Попробуйте бесплатно прямо сейчас"
+          : "Посмотреть Школу Аудиопрактик"}
         <span className="ml-1.5" aria-hidden="true">
           →
         </span>
