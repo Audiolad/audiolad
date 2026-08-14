@@ -15,6 +15,10 @@ import {
   removePlaylistCoverObject,
   replacePlaylistCoverPathCas,
 } from "@/lib/playlists/covers";
+import {
+  canUserEditPlaylist,
+  loadPlaylistForAccessCheck,
+} from "@/lib/playlists/playlist-access";
 import { getOwnedPlaylistById } from "@/lib/playlists/queries";
 import { isUuid } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
@@ -73,6 +77,17 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!playlist) {
     return notFoundResponse();
+  }
+
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, id);
+
+  if (accessError || !accessRow) {
+    return notFoundResponse();
+  }
+
+  if (!(await canUserEditPlaylist(supabase, user.id, accessRow))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   let formData: FormData;
@@ -277,6 +292,17 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (!playlist) {
     return notFoundResponse();
+  }
+
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, id);
+
+  if (accessError || !accessRow) {
+    return notFoundResponse();
+  }
+
+  if (!(await canUserEditPlaylist(supabase, user.id, accessRow))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const previousPath = playlist.cover_path;

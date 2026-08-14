@@ -1,6 +1,9 @@
 import {
+  PLAYLIST_COLLABORATOR_ROLES,
+  PLAYLIST_DESCRIPTION_MAX_LENGTH,
   PLAYLIST_TITLE_MAX_LENGTH,
   PLAYLIST_VISIBILITIES,
+  type PlaylistCollaboratorRole,
   type PlaylistVisibility,
 } from "@/lib/playlists/types";
 
@@ -11,6 +14,9 @@ const FORBIDDEN_CLIENT_KEYS = new Set([
   "created_at",
   "updated_at",
   "id",
+  "owner_type",
+  "created_by",
+  "first_published_at",
 ]);
 
 export type ParsedJsonObject = Record<string, unknown>;
@@ -51,6 +57,34 @@ export function validatePlaylistTitle(value: unknown): TitleValidationResult {
   return { ok: true, title };
 }
 
+export type DescriptionValidationResult =
+  | { ok: true; description: string | null }
+  | { ok: false; error: "invalid_request" };
+
+export function validatePlaylistDescription(
+  value: unknown,
+): DescriptionValidationResult {
+  if (value === null) {
+    return { ok: true, description: null };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const description = value.trim();
+
+  if (description.length === 0) {
+    return { ok: true, description: null };
+  }
+
+  if (description.length > PLAYLIST_DESCRIPTION_MAX_LENGTH) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, description };
+}
+
 export type VisibilityValidationResult =
   | { ok: true; visibility: PlaylistVisibility }
   | { ok: false; error: "invalid_request" };
@@ -77,6 +111,7 @@ export type CreatePlaylistInput =
       title: string;
       visibility: PlaylistVisibility;
       isEditorial: boolean;
+      description: string | null;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -91,7 +126,12 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["title", "visibility", "is_editorial"]);
+  const allowedKeys = new Set([
+    "title",
+    "visibility",
+    "is_editorial",
+    "description",
+  ]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -120,8 +160,16 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
   const isEditorial =
     "is_editorial" in parsed && parsed.is_editorial === true;
 
-  if (isEditorial && visibilityResult.visibility !== "public") {
-    return { ok: false, error: "invalid_request" };
+  let description: string | null = null;
+
+  if ("description" in parsed) {
+    const descriptionResult = validatePlaylistDescription(parsed.description);
+
+    if (!descriptionResult.ok) {
+      return descriptionResult;
+    }
+
+    description = descriptionResult.description;
   }
 
   return {
@@ -129,6 +177,7 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     title: titleResult.title,
     visibility: visibilityResult.visibility,
     isEditorial,
+    description,
   };
 }
 
@@ -138,6 +187,7 @@ export type PatchPlaylistInput =
       title?: string;
       visibility?: PlaylistVisibility;
       isEditorial?: boolean;
+      description?: string | null;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -152,7 +202,12 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["title", "visibility", "is_editorial"]);
+  const allowedKeys = new Set([
+    "title",
+    "visibility",
+    "is_editorial",
+    "description",
+  ]);
   const keys = Object.keys(parsed);
 
   if (keys.length === 0) {
@@ -169,6 +224,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     title?: string;
     visibility?: PlaylistVisibility;
     isEditorial?: boolean;
+    description?: string | null;
   } = {};
 
   if ("title" in parsed) {
@@ -199,17 +255,21 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     result.isEditorial = parsed.is_editorial;
   }
 
-  if (
-    result.isEditorial === true &&
-    result.visibility === "private"
-  ) {
-    return { ok: false, error: "invalid_request" };
+  if ("description" in parsed) {
+    const descriptionResult = validatePlaylistDescription(parsed.description);
+
+    if (!descriptionResult.ok) {
+      return descriptionResult;
+    }
+
+    result.description = descriptionResult.description;
   }
 
   if (
     result.title === undefined &&
     result.visibility === undefined &&
-    result.isEditorial === undefined
+    result.isEditorial === undefined &&
+    result.description === undefined
   ) {
     return { ok: false, error: "invalid_request" };
   }
@@ -373,4 +433,71 @@ export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput 
   }
 
   return { ok: true, direction };
+}
+
+export type CollaboratorMutationInput =
+  | { ok: true; userId: string; role: PlaylistCollaboratorRole }
+  | { ok: false; error: "invalid_request" };
+
+export function parseCollaboratorUpsertBody(
+  body: unknown,
+): CollaboratorMutationInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["user_id", "role"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (typeof parsed.user_id !== "string" || !isUuid(parsed.user_id)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (
+    typeof parsed.role !== "string" ||
+    !(PLAYLIST_COLLABORATOR_ROLES as readonly string[]).includes(parsed.role)
+  ) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return {
+    ok: true,
+    userId: parsed.user_id,
+    role: parsed.role as PlaylistCollaboratorRole,
+  };
+}
+
+export type CollaboratorDeleteInput =
+  | { ok: true; userId: string }
+  | { ok: false; error: "invalid_request" };
+
+export function parseCollaboratorDeleteBody(
+  body: unknown,
+): CollaboratorDeleteInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["user_id"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (typeof parsed.user_id !== "string" || !isUuid(parsed.user_id)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, userId: parsed.user_id };
 }

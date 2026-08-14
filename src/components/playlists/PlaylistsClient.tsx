@@ -264,7 +264,7 @@ export default function PlaylistsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          visibility: createEditorial ? "public" : visibility,
+          visibility: createEditorial ? "private" : visibility,
           is_editorial: createEditorial,
         }),
       });
@@ -715,8 +715,9 @@ export default function PlaylistsClient({
 
                 {dialog.type === "create" && createEditorial ? (
                   <p className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm leading-6 text-[#70628e]">
-                    Плейлист будет публичным и отмечен как {EDITORIAL_PLAYLIST_LABEL}.
-                    После создания вы сможете добавить практики из каталога.
+                    Плейлист создаётся как черновик {EDITORIAL_PLAYLIST_LABEL}:
+                    он не виден гостям, пока вы не опубликуете его. После
+                    создания можно добавить практики из каталога.
                   </p>
                 ) : null}
 
