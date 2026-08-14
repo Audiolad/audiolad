@@ -88,13 +88,13 @@ BEGIN
   DELETE FROM public.playlist_items
   WHERE playlist_id IN (
     SELECT id FROM public.playlists
-    WHERE user_id IN (v_admin_id, v_listener_id)
-      AND (title LIKE 'Editorial smoke%' OR slug LIKE 'editorial-smoke-%')
+    WHERE title LIKE 'Editorial smoke%'
+      OR slug LIKE 'editorial-smoke-%'
   );
 
   DELETE FROM public.playlists
-  WHERE user_id IN (v_admin_id, v_listener_id)
-    AND (title LIKE 'Editorial smoke%' OR slug LIKE 'editorial-smoke-%');
+  WHERE title LIKE 'Editorial smoke%'
+    OR slug LIKE 'editorial-smoke-%';
 
   DELETE FROM public.user_practices
   WHERE user_id = v_admin_id
@@ -136,9 +136,9 @@ BEGIN
   ) RETURNING id INTO second_free;
 
   INSERT INTO public.playlists (
-    user_id, title, visibility, slug, published_at, is_editorial
+    user_id, owner_type, created_by, title, visibility, slug, published_at, is_editorial
   ) VALUES (
-    v_admin_id, 'Editorial smoke playlist', 'public', 'editorial-smoke-public', now(), true
+    NULL, 'platform', v_admin_id, 'Editorial smoke playlist', 'public', 'editorial-smoke-public', now(), true
   ) RETURNING id INTO v_editorial_pl;
 
   INSERT INTO public.playlists (user_id, title, visibility)

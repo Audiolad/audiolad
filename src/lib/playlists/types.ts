@@ -1,11 +1,17 @@
 export const PLAYLIST_TITLE_MAX_LENGTH = 80;
+export const PLAYLIST_DESCRIPTION_MAX_LENGTH = 1000;
 export const PLAYLIST_MAX_PER_USER = 50;
 export const PLAYLIST_MAX_ITEMS = 100;
 export const PLAYLIST_MEMBERSHIP_MAX_IDS = 50;
 
 export const PLAYLIST_VISIBILITIES = ["private", "public"] as const;
+export const PLAYLIST_OWNER_TYPES = ["user", "platform"] as const;
+export const PLAYLIST_COLLABORATOR_ROLES = ["editor", "manager"] as const;
 
 export type PlaylistVisibility = (typeof PLAYLIST_VISIBILITIES)[number];
+export type PlaylistOwnerType = (typeof PLAYLIST_OWNER_TYPES)[number];
+export type PlaylistCollaboratorRole =
+  (typeof PLAYLIST_COLLABORATOR_ROLES)[number];
 
 export type PlaylistRow = {
   id: string;
@@ -19,6 +25,10 @@ export type PlaylistRow = {
   cover_image?: unknown;
   cover_updated_at: string | null;
   is_editorial: boolean;
+  owner_type?: PlaylistOwnerType;
+  user_id?: string | null;
+  created_by?: string | null;
+  description?: string | null;
 };
 
 export type EditorialPlaylistListItem = {

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { assertPermission } from "@/lib/auth/platform-access";
 import {
   assertPlaylistCoverPathForOwner,
   removePlaylistCoverObject,
@@ -12,15 +11,15 @@ import {
   playlistSlugExists,
 } from "@/lib/playlists/queries";
 import {
+  canUserDeletePlaylist,
   canUserEditPlaylist,
+  isPlatformPlaylist,
   loadPlaylistForAccessCheck,
+  logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
 import { allocateUniquePlaylistSlug } from "@/lib/playlists/slug";
 import type { PlaylistRow } from "@/lib/playlists/types";
-import {
-  isUuid,
-  parsePatchPlaylistBody,
-} from "@/lib/playlists/validation";
+import { isUuid, parsePatchPlaylistBody } from "@/lib/playlists/validation";
 import {
   playlistCanonicalFromSlug,
   scheduleIndexNowNotification,
@@ -44,6 +43,8 @@ function toPlaylistResponse(row: PlaylistRow) {
     created_at: row.created_at,
     updated_at: row.updated_at,
     is_editorial: row.is_editorial,
+    owner_type: row.owner_type ?? (row.is_editorial ? "platform" : "user"),
+    description: row.description ?? null,
   };
 }
 
@@ -116,41 +117,22 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  if (parsed.isEditorial !== undefined) {
-    const adminCheck = await assertPermission(
-      supabase,
-      user.id,
-      "products.moderate",
-    );
-
-    if (!adminCheck.ok) {
-      return NextResponse.json(
-        { error: adminCheck.status === 403 ? "forbidden" : "internal_error" },
-        { status: adminCheck.status },
-      );
-    }
-  }
-
-  const nextTitle = parsed.title ?? playlist.title;
-  const nextVisibility = parsed.visibility ?? playlist.visibility;
-  const nextIsEditorial =
-    parsed.isEditorial !== undefined
-      ? parsed.isEditorial
-      : playlist.is_editorial;
-
-  if (nextIsEditorial && nextVisibility === "private") {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  }
-
-  if (playlist.is_editorial && nextVisibility === "private") {
+  if (
+    parsed.isEditorial !== undefined &&
+    parsed.isEditorial !== playlist.is_editorial
+  ) {
     return NextResponse.json(
       {
         error: "invalid_request",
-        message: "Редакционный плейлист нельзя сделать приватным.",
+        message: "Тип владения плейлиста нельзя изменить.",
       },
       { status: 400 },
     );
   }
+
+  const nextTitle = parsed.title ?? playlist.title;
+  const nextVisibility = parsed.visibility ?? playlist.visibility;
+  const platform = isPlatformPlaylist(accessRow);
 
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -160,14 +142,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.title = parsed.title;
   }
 
-  if (parsed.isEditorial !== undefined) {
-    updates.is_editorial = parsed.isEditorial;
+  if (parsed.description !== undefined) {
+    updates.description = parsed.description;
   }
 
   if (nextVisibility === playlist.visibility) {
-    // title-only or no-op visibility
+    // title/description-only or no-op visibility
   } else if (nextVisibility === "public") {
-    if (!nextIsEditorial) {
+    if (!platform) {
       const contentCheck = await assertPlaylistPublicContentAllowed(
         supabase,
         id,
@@ -212,6 +194,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.visibility = "public";
     updates.slug = slug;
     updates.published_at = new Date().toISOString();
+  } else if (platform) {
+    updates.visibility = "private";
+    updates.published_at = null;
+    // Keep allocated editorial slug after unpublish / while drafting.
   } else {
     updates.visibility = "private";
     updates.slug = null;
@@ -223,13 +209,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(updates)
     .eq("id", id)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description",
     )
     .maybeSingle();
 
   if (error) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "slug_conflict" }, { status: 409 });
+    }
+
+    if ((error.message ?? "").includes("editorial_slug_locked")) {
+      return NextResponse.json(
+        {
+          error: "slug_locked",
+          message: "После публикации slug редакционного плейлиста нельзя менять.",
+        },
+        { status: 409 },
+      );
     }
 
     console.error("playlists_patch_update_error", error.message);
@@ -241,15 +237,33 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const updated = data as PlaylistRow;
+  const becamePublic =
+    playlist.visibility !== "public" && updated.visibility === "public";
+  const becamePrivate =
+    playlist.visibility === "public" && updated.visibility === "private";
+
+  if (becamePublic) {
+    await logPlaylistAudit(supabase, id, "published", {
+      slug: updated.slug,
+    });
+  } else if (becamePrivate) {
+    await logPlaylistAudit(supabase, id, "unpublished", {
+      slug: updated.slug,
+    });
+  } else {
+    await logPlaylistAudit(supabase, id, "metadata_updated", {
+      title: parsed.title !== undefined,
+      description: parsed.description !== undefined,
+    });
+  }
+
   const event = resolvePlaylistIndexNowEvent({
     previousVisibility: playlist.visibility,
     nextVisibility: updated.visibility,
     previousSlug: playlist.slug,
     nextSlug: updated.slug,
     titleChanged: parsed.title !== undefined && parsed.title !== playlist.title,
-    editorialChanged:
-      parsed.isEditorial !== undefined &&
-      parsed.isEditorial !== playlist.is_editorial,
+    editorialChanged: false,
   });
 
   if (event.reason && event.slugs.length > 0) {
@@ -307,14 +321,27 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
+  const { playlist: accessRow, error: accessError } =
+    await loadPlaylistForAccessCheck(supabase, id);
+
+  if (accessError || !accessRow) {
+    return notFoundResponse();
+  }
+
+  const canDelete = await canUserDeletePlaylist(supabase, user.id, accessRow);
+
+  if (!canDelete) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const coverPathToRemove = playlist.cover_path;
+  const coverOwnerId = accessRow.user_id ?? user.id;
 
   if (
     coverPathToRemove &&
-    !assertPlaylistCoverPathForOwner(coverPathToRemove, user.id, id)
+    !assertPlaylistCoverPathForOwner(coverPathToRemove, coverOwnerId, id)
   ) {
     console.error("playlist_delete_invalid_cover_path");
-    // Still allow playlist delete; skip unsafe storage cleanup.
   }
 
   const { error } = await supabase.from("playlists").delete().eq("id", id);
@@ -326,22 +353,19 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (
     coverPathToRemove &&
-    assertPlaylistCoverPathForOwner(coverPathToRemove, user.id, id)
+    assertPlaylistCoverPathForOwner(coverPathToRemove, coverOwnerId, id)
   ) {
     try {
       const storage = createServiceRoleClient();
       const removed = await removePlaylistCoverObject(
         storage,
         coverPathToRemove,
-        user.id,
+        coverOwnerId,
         id,
       );
 
       if (!removed.ok) {
-        console.error(
-          "playlist_delete_cover_cleanup_error",
-          removed.error,
-        );
+        console.error("playlist_delete_cover_cleanup_error", removed.error);
       }
     } catch (cleanupError) {
       console.error(

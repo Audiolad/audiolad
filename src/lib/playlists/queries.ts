@@ -132,10 +132,13 @@ export async function listOwnedPlaylists(
 
 export async function countOwnedPlaylists(
   supabase: SupabaseClient,
+  userId: string,
 ): Promise<{ count: number | null; error: string | null }> {
   const { count, error } = await supabase
     .from("playlists")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("owner_type", "user");
 
   if (error) {
     return { count: null, error: error.message };
@@ -151,7 +154,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial, owner_type, user_id, created_by, description",
     )
     .eq("id", playlistId)
     .maybeSingle();
@@ -172,6 +175,10 @@ export async function getOwnedPlaylistById(
       cover_path: row.cover_path ?? null,
       cover_updated_at: row.cover_updated_at ?? null,
       is_editorial: row.is_editorial === true,
+      owner_type: row.owner_type === "platform" ? "platform" : "user",
+      user_id: row.user_id ?? null,
+      created_by: row.created_by ?? null,
+      description: row.description ?? null,
     },
     error: null,
   };
@@ -286,7 +293,7 @@ export async function listEditorialPlaylists(
       signedByPath = await createPlaylistCoverSignedUrlsBatch(
         storage,
         coverPaths,
-        { userId: rows[0]?.user_id ?? "" },
+        rows[0]?.user_id ? { userId: rows[0].user_id } : undefined,
       );
     } catch (signedError) {
       console.error(
@@ -316,6 +323,91 @@ export async function listEditorialPlaylists(
       },
     ];
   });
+
+  return { playlists, error: null };
+}
+
+export async function listEditablePlatformPlaylists(
+  supabase: SupabaseClient,
+  options: { userId: string; canManageAll: boolean },
+): Promise<{ playlists: PlaylistListItem[]; error: string | null }> {
+  const userId = options.userId.trim();
+
+  if (!userId) {
+    return { playlists: [], error: null };
+  }
+
+  let playlistIds: string[] | null = null;
+
+  if (!options.canManageAll) {
+    const { data: collabRows, error: collabError } = await supabase
+      .from("playlist_collaborators")
+      .select("playlist_id")
+      .eq("user_id", userId);
+
+    if (collabError) {
+      return { playlists: [], error: collabError.message };
+    }
+
+    playlistIds = (collabRows ?? [])
+      .map((row) => row.playlist_id)
+      .filter((id): id is string => typeof id === "string");
+
+    if (playlistIds.length === 0) {
+      return { playlists: [], error: null };
+    }
+  }
+
+  let query = supabase
+    .from("playlists")
+    .select(
+      `
+      id,
+      title,
+      visibility,
+      slug,
+      published_at,
+      created_at,
+      updated_at,
+      cover_path,
+      cover_updated_at,
+      is_editorial,
+      owner_type,
+      playlist_items(count)
+    `,
+    )
+    .eq("owner_type", "platform")
+    .eq("visibility", "private")
+    .order("updated_at", { ascending: false });
+
+  if (playlistIds) {
+    query = query.in("id", playlistIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return { playlists: [], error: error.message };
+  }
+
+  const rows = (data as PlaylistListRow[] | null) ?? [];
+
+  const playlists = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    visibility: row.visibility,
+    slug: row.slug,
+    published_at: row.published_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    cover_path: row.cover_path ?? null,
+    cover_updated_at: row.cover_updated_at ?? null,
+    is_editorial: true,
+    owner_type: "platform" as const,
+    items_count: row.playlist_items?.[0]?.count ?? 0,
+    coverUrl: null,
+    mosaicCoverUrls: [],
+  }));
 
   return { playlists, error: null };
 }
