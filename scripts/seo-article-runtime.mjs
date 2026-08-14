@@ -78,6 +78,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
     ],
   },
+  {
+    path: "/articles/obuchenie-sozdaniyu-meditatsiy",
+    h1: "Обучение созданию медитаций: как научиться создавать свои аудиопрактики",
+    metaTitle: "Обучение созданию медитаций и аудиопрактик",
+    metaDescription:
+      "Обучение созданию медитаций: сценарий, текст, голос, запись и музыка. Как освоить создание собственных аудиопрактик с нуля и пройти весь путь системно.",
+    canonicalUrl: "https://audiolad.ru/articles/obuchenie-sozdaniyu-meditatsiy",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {

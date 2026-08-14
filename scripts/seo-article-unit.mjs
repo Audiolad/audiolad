@@ -5446,6 +5446,88 @@ assert(
   ),
   "tool creator json-ld omits practice image",
 );
+
+const trainingCreatorArticle = getArticleBySlug(
+  "obuchenie-sozdaniyu-meditatsiy",
+);
+assert(trainingCreatorArticle, "training creator article registered");
+assert(
+  trainingCreatorArticle.productContinuation.kind === "creator_paths",
+  "training creator article uses creator continuation",
+);
+assert(
+  trainingCreatorArticle.productContinuation.emphasis === "balanced",
+  "training creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in trainingCreatorArticle),
+  "training creator article does not require a catalog practice",
+);
+assert(
+  trainingCreatorArticle.title ===
+    "Обучение созданию медитаций: как научиться создавать свои аудиопрактики",
+  "training creator article keeps the approved H1",
+);
+assert(
+  trainingCreatorArticle.metaTitle ===
+    "Обучение созданию медитаций и аудиопрактик",
+  "training creator article keeps the approved meta title",
+);
+assert(
+  trainingCreatorArticle.metaDescription ===
+    "Обучение созданию медитаций: сценарий, текст, голос, запись и музыка. Как освоить создание собственных аудиопрактик с нуля и пройти весь путь системно.",
+  "training creator article keeps the approved meta description",
+);
+assert(
+  trainingCreatorArticle.shortAnswer === undefined,
+  "training creator article does not add unapproved summary copy",
+);
+assert(
+  trainingCreatorArticle.seeAlsoLinks.length === 0,
+  "training creator article does not add unapproved product links",
+);
+assert(
+  trainingCreatorArticle.faq.length === 8,
+  "training creator article keeps the approved FAQ set",
+);
+const trainingCreatorSerialized = JSON.stringify(trainingCreatorArticle);
+assert(
+  trainingCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  ) &&
+    trainingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+    ) &&
+    trainingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ) &&
+    trainingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+    ),
+  "training creator article keeps all approved creator article links",
+);
+const trainingCreatorPageData = {
+  article: trainingCreatorArticle,
+  path: "/articles/obuchenie-sozdaniyu-meditatsiy",
+  canonicalUrl: "https://audiolad.ru/articles/obuchenie-sozdaniyu-meditatsiy",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(trainingCreatorArticle),
+};
+const trainingCreatorMetadata = buildArticleMetadata(trainingCreatorPageData);
+assert(
+  trainingCreatorMetadata.robots?.index === true &&
+    trainingCreatorMetadata.robots?.follow === true,
+  "training creator metadata stays indexable",
+);
+assert(
+  !trainingCreatorMetadata.openGraph?.images,
+  "training creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(trainingCreatorPageData)).includes(
+    '"image"',
+  ),
+  "training creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5487,6 +5569,20 @@ assert(
       "https://audiolad.ru/articles/prilozhenie-dlya-zapisi-meditatsiy",
   ).length === 1,
   "tool creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/obuchenie-sozdaniyu-meditatsiy",
+  ),
+  "training creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/obuchenie-sozdaniyu-meditatsiy",
+  ).length === 1,
+  "training creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
