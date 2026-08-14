@@ -5294,6 +5294,79 @@ assert(
   ),
   "music creator json-ld omits practice image",
 );
+
+const scriptCreatorArticle = getArticleBySlug("kak-napisat-tekst-meditatsii");
+assert(scriptCreatorArticle, "script creator article registered");
+assert(
+  scriptCreatorArticle.productContinuation.kind === "creator_paths",
+  "script creator article uses creator continuation",
+);
+assert(
+  scriptCreatorArticle.productContinuation.emphasis === "balanced",
+  "script creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in scriptCreatorArticle),
+  "script creator article does not require a catalog practice",
+);
+assert(
+  scriptCreatorArticle.title ===
+    "Как написать текст медитации: структура, сценарий и примеры",
+  "script creator article keeps the approved H1",
+);
+assert(
+  scriptCreatorArticle.metaTitle ===
+    "Как написать текст медитации: структура и примеры",
+  "script creator article keeps the approved meta title",
+);
+assert(
+  scriptCreatorArticle.metaDescription ===
+    "Как написать текст медитации: определить задачу, выстроить структуру и сценарий, подобрать фразы, расставить паузы и проверить текст голосом.",
+  "script creator article keeps the approved meta description",
+);
+assert(
+  scriptCreatorArticle.shortAnswer === undefined,
+  "script creator article does not add unapproved summary copy",
+);
+assert(
+  scriptCreatorArticle.seeAlsoLinks.length === 0,
+  "script creator article does not add unapproved product links",
+);
+assert(
+  scriptCreatorArticle.faq.length === 8,
+  "script creator article keeps the approved FAQ set",
+);
+assert(
+  JSON.stringify(scriptCreatorArticle).includes(
+    "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  ) &&
+    JSON.stringify(scriptCreatorArticle).includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ),
+  "script creator article keeps both approved creator article links",
+);
+const scriptCreatorPageData = {
+  article: scriptCreatorArticle,
+  path: "/articles/kak-napisat-tekst-meditatsii",
+  canonicalUrl: "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(scriptCreatorArticle),
+};
+const scriptCreatorMetadata = buildArticleMetadata(scriptCreatorPageData);
+assert(
+  scriptCreatorMetadata.robots?.index === true &&
+    scriptCreatorMetadata.robots?.follow === true,
+  "script creator metadata stays indexable",
+);
+assert(
+  !scriptCreatorMetadata.openGraph?.images,
+  "script creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(scriptCreatorPageData)).includes(
+    '"image"',
+  ),
+  "script creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5320,6 +5393,20 @@ assert(serialized.includes('"@type":"BreadcrumbList"'), "BreadcrumbList schema")
 assert(serialized.includes("Редакция АудиоЛада"), "editorial author in json-ld");
 
 const sitemapEntries = mapArticleDefinitionsToSitemapEntries(undefined, "https://audiolad.ru");
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+  ),
+  "script creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+  ).length === 1,
+  "script creator article has a single sitemap URL",
+);
 assert(
   sitemapEntries.some(
     (entry) =>

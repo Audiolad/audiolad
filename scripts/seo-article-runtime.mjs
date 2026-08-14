@@ -47,6 +47,20 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
     ],
   },
+  {
+    path: "/articles/kak-napisat-tekst-meditatsii",
+    h1: "Как написать текст медитации: структура, сценарий и примеры",
+    metaTitle: "Как написать текст медитации: структура и примеры",
+    metaDescription:
+      "Как написать текст медитации: определить задачу, выстроить структуру и сценарий, подобрать фразы, расставить паузы и проверить текст голосом.",
+    canonicalUrl: "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+    productLinkCount: 8,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {
