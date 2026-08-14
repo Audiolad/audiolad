@@ -184,6 +184,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/reklama-psikhologa",
     ],
   },
+  {
+    path: "/articles/blog-psikhologa",
+    h1: "Блог психолога: как вести блог, который помогает находить клиентов",
+    metaTitle: "Блог психолога: как вести блог и находить клиентов",
+    metaDescription:
+      "Блог психолога: как выбрать темы, вести блог регулярно, формировать доверие, находить клиентов и превращать накопленный контент в полезные материалы.",
+    canonicalUrl: "https://audiolad.ru/articles/blog-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {

@@ -6011,6 +6011,85 @@ assert(
   ),
   "private practice creator json-ld omits practice image",
 );
+const blogCreatorArticle = getArticleBySlug("blog-psikhologa");
+assert(blogCreatorArticle, "blog creator article registered");
+assert(
+  blogCreatorArticle.productContinuation.kind === "creator_paths",
+  "blog creator article uses creator continuation",
+);
+assert(
+  blogCreatorArticle.productContinuation.emphasis === "balanced",
+  "blog creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in blogCreatorArticle),
+  "blog creator article does not require a catalog practice",
+);
+assert(
+  blogCreatorArticle.title ===
+    "Блог психолога: как вести блог, который помогает находить клиентов",
+  "blog creator article keeps the approved H1",
+);
+assert(
+  blogCreatorArticle.metaTitle ===
+    "Блог психолога: как вести блог и находить клиентов",
+  "blog creator article keeps the approved meta title",
+);
+assert(
+  blogCreatorArticle.metaDescription ===
+    "Блог психолога: как выбрать темы, вести блог регулярно, формировать доверие, находить клиентов и превращать накопленный контент в полезные материалы.",
+  "blog creator article keeps the approved meta description",
+);
+assert(
+  blogCreatorArticle.shortAnswer === undefined,
+  "blog creator article does not add unapproved summary copy",
+);
+assert(
+  blogCreatorArticle.seeAlsoLinks.length === 0,
+  "blog creator article does not add unapproved product links",
+);
+assert(
+  blogCreatorArticle.faq.length === 8,
+  "blog creator article keeps the approved FAQ set",
+);
+const blogCreatorSerialized = JSON.stringify(blogCreatorArticle);
+assert(
+  blogCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  ) &&
+    blogCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    ) &&
+    blogCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    blogCreatorSerialized.includes(
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ),
+  "blog creator article keeps the approved creator article links",
+);
+const blogCreatorPageData = {
+  article: blogCreatorArticle,
+  path: "/articles/blog-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/blog-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(blogCreatorArticle),
+};
+const blogCreatorMetadata = buildArticleMetadata(blogCreatorPageData);
+assert(
+  blogCreatorMetadata.robots?.index === true &&
+    blogCreatorMetadata.robots?.follow === true,
+  "blog creator metadata stays indexable",
+);
+assert(
+  !blogCreatorMetadata.openGraph?.images,
+  "blog creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(blogCreatorPageData)).includes(
+    '"image"',
+  ),
+  "blog creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6152,6 +6231,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
   ).length === 1,
   "private practice creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/blog-psikhologa",
+  ),
+  "blog creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/blog-psikhologa",
+  ).length === 1,
+  "blog creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
