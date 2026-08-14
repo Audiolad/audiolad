@@ -6,6 +6,7 @@ import {
 } from "@/lib/playlists/covers";
 import { PUBLIC_PLAYLIST_CONTENT_ERROR_MESSAGE } from "@/lib/playlists/public-content";
 import {
+  assertEditorialPlaylistPublishReady,
   assertPlaylistPublicContentAllowed,
   getOwnedPlaylistById,
   playlistSlugExists,
@@ -45,6 +46,8 @@ function toPlaylistResponse(row: PlaylistRow) {
     is_editorial: row.is_editorial,
     owner_type: row.owner_type ?? (row.is_editorial ? "platform" : "user"),
     description: row.description ?? null,
+    first_published_at: row.first_published_at ?? null,
+    created_by: row.created_by ?? null,
   };
 }
 
@@ -146,10 +149,63 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.description = parsed.description;
   }
 
+  if (parsed.slug !== undefined) {
+    if (!platform) {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    if (playlist.first_published_at) {
+      return NextResponse.json(
+        {
+          error: "slug_locked",
+          message: "После публикации slug редакционного плейлиста нельзя менять.",
+        },
+        { status: 409 },
+      );
+    }
+
+    if (parsed.slug !== playlist.slug) {
+      try {
+        if (await playlistSlugExists(supabase, parsed.slug, id)) {
+          return NextResponse.json({ error: "slug_conflict" }, { status: 409 });
+        }
+      } catch (error) {
+        console.error(
+          "playlists_patch_slug_lookup_error",
+          error instanceof Error ? error.message : error,
+        );
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      updates.slug = parsed.slug;
+    }
+  }
+
   if (nextVisibility === playlist.visibility) {
     // title/description-only or no-op visibility
   } else if (nextVisibility === "public") {
-    if (!platform) {
+    if (platform) {
+      const publishCheck = await assertEditorialPlaylistPublishReady(
+        supabase,
+        id,
+      );
+
+      if (!publishCheck.ok) {
+        if (publishCheck.reason === "empty" || publishCheck.reason === "invalid") {
+          return NextResponse.json(
+            {
+              error: "invalid_request",
+              message:
+                "Чтобы опубликовать плейлист, добавьте хотя бы один материал из каталога.",
+            },
+            { status: 400 },
+          );
+        }
+
+        console.error("playlists_patch_editorial_publish_check_error");
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+    } else {
       const contentCheck = await assertPlaylistPublicContentAllowed(
         supabase,
         id,
@@ -171,7 +227,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    let slug = playlist.slug;
+    let slug =
+      typeof updates.slug === "string" ? updates.slug : playlist.slug;
 
     if (!slug) {
       try {

@@ -2,6 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
+import {
+  isMusicProductKind,
+  normalizeProductKind,
+  type ProductKind,
+} from "@/lib/author-products/product-kind";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { formatCatalogProductStats } from "@/lib/products/duration";
@@ -26,6 +31,7 @@ type EditorialPracticeRow = {
   status: string | null;
   is_catalog_listed: boolean | null;
   author_id: string | null;
+  product_kind: string | null;
   authors:
     | { id: string; name: string; slug: string }
     | { id: string; name: string; slug: string }[]
@@ -39,6 +45,8 @@ export type EditorialPracticeOption = ProductCoverFields & {
   authorName: string;
   authorSlug: string;
   formatLabel: string | null;
+  productKind: ProductKind;
+  productKindLabel: "Практика" | "Музыка";
   metaLabel: string | null;
   isFree: boolean;
   priceLabel: string;
@@ -83,6 +91,7 @@ export async function listEditorialPracticeOptions(
       status,
       is_catalog_listed,
       author_id,
+      product_kind,
       authors!practices_author_id_fkey (
         id,
         name,
@@ -162,6 +171,8 @@ export async function listEditorialPracticeOptions(
       continue;
     }
 
+    const productKind = normalizeProductKind(row.product_kind);
+
     practices.push({
       id: row.id,
       title: row.title.trim() || "Без названия",
@@ -169,6 +180,8 @@ export async function listEditorialPracticeOptions(
       authorName: author.name,
       authorSlug: author.slug,
       formatLabel: getDisplayFormat(row.format),
+      productKind,
+      productKindLabel: isMusicProductKind(productKind) ? "Музыка" : "Практика",
       metaLabel: formatCatalogProductStats({
         audioCount,
         totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
@@ -268,6 +281,93 @@ export function mapEditorialAddRpcError(message: string): {
       status: 409,
       error: "limit_reached",
       message: "В плейлисте может быть не больше 100 материалов.",
+    };
+  }
+
+  return { status: 500, error: "internal_error" };
+}
+
+export type EditorialReplaceRpcResult = {
+  playlist_id: string;
+  position: number;
+  old_practice_id: string;
+  new_practice_id: string;
+  replaced: boolean;
+};
+
+export function isEditorialReplaceRpcResult(
+  value: unknown,
+): value is EditorialReplaceRpcResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const row = value as EditorialReplaceRpcResult;
+
+  return (
+    typeof row.playlist_id === "string" &&
+    typeof row.position === "number" &&
+    typeof row.old_practice_id === "string" &&
+    typeof row.new_practice_id === "string" &&
+    typeof row.replaced === "boolean"
+  );
+}
+
+export function mapEditorialReplaceRpcError(message: string): {
+  status: number;
+  error: string;
+  message?: string;
+} {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("not_authenticated")) {
+    return { status: 401, error: "unauthorized" };
+  }
+
+  if (normalized.includes("forbidden")) {
+    return { status: 403, error: "forbidden" };
+  }
+
+  if (
+    normalized.includes("playlist_id_required") ||
+    normalized.includes("practice_id_required") ||
+    normalized.includes("invalid input")
+  ) {
+    return { status: 400, error: "invalid_request" };
+  }
+
+  if (
+    normalized.includes("playlist_not_found") ||
+    normalized.includes("practice_not_found") ||
+    normalized.includes("item_not_found")
+  ) {
+    return { status: 404, error: "not_found" };
+  }
+
+  if (normalized.includes("not_editorial_playlist")) {
+    return {
+      status: 409,
+      error: "not_editorial_playlist",
+      message: "Это не редакционный плейлист АудиоЛада.",
+    };
+  }
+
+  if (normalized.includes("already_in_playlist")) {
+    return {
+      status: 409,
+      error: "already_in_playlist",
+      message: "Этот материал уже есть в плейлисте.",
+    };
+  }
+
+  if (
+    normalized.includes("practice_not_publishable") ||
+    normalized.includes("practice_not_playable")
+  ) {
+    return {
+      status: 409,
+      error: "practice_not_publishable",
+      message: "Можно добавлять только опубликованные материалы из каталога.",
     };
   }
 

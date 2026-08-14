@@ -5,12 +5,14 @@ import {
   loadPlaylistForAccessCheck,
   logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
+import { loadProfileSummaries } from "@/lib/playlists/profile-summaries";
 import {
   isUuid,
   parseCollaboratorDeleteBody,
   parseCollaboratorUpsertBody,
 } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -103,7 +105,45 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  return NextResponse.json({ collaborators: data ?? [] });
+  const rows = data ?? [];
+  const profileIds = rows.flatMap((row) =>
+    [row.user_id, row.added_by].filter(
+      (id): id is string => typeof id === "string",
+    ),
+  );
+
+  let profiles = new Map<
+    string,
+    { displayName: string; email: string | null }
+  >();
+
+  try {
+    const service = createServiceRoleClient();
+    profiles = await loadProfileSummaries(service, profileIds);
+  } catch (profileError) {
+    console.error(
+      "playlist_collaborators_profiles_error",
+      profileError instanceof Error ? profileError.message : profileError,
+    );
+  }
+
+  return NextResponse.json({
+    collaborators: rows.map((row) => {
+      const profile = profiles.get(row.user_id);
+      const addedBy = row.added_by ? profiles.get(row.added_by) : null;
+
+      return {
+        user_id: row.user_id,
+        role: row.role,
+        added_by: row.added_by,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        displayName: profile?.displayName ?? "Пользователь",
+        email: profile?.email ?? null,
+        addedByName: addedBy?.displayName ?? null,
+      };
+    }),
+  });
 }
 
 export async function POST(request: Request, context: RouteContext) {

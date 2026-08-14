@@ -43,6 +43,22 @@ export type EditorialPlaylistListItem = {
   mosaicCoverUrls: Array<string | null>;
 };
 
+export type EditorialWorkspaceListItem = {
+  id: string;
+  title: string;
+  slug: string | null;
+  visibility: PlaylistVisibility;
+  published_at: string | null;
+  first_published_at: string | null;
+  updated_at: string;
+  items_count: number;
+  unique_author_count: number;
+  created_by: string | null;
+  creatorName: string | null;
+  coverUrl: string | null;
+  mosaicCoverUrls: Array<string | null>;
+};
+
 export type PlaylistListItem = PlaylistRow & {
   items_count: number;
   coverUrl: string | null;

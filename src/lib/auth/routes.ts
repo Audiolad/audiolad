@@ -7,6 +7,7 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/downloads",
   "/purchases",
   "/playlists",
+  "/editorial",
   "/settings",
   "/author-dashboard",
   "/admin",
