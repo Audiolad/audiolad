@@ -949,6 +949,18 @@
       "practiceRelevance": "NOT_APPLICABLE",
       "validationStatus": "VALIDATE PASS",
       "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy."
+    },
+    {
+      "articleId": "ART_new_20260814_sozdanie-muzyki-dlya-meditatsiy",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "sozdanie-muzyki-dlya-meditatsiy",
+      "productionUrl": "https://audiolad.ru/articles/sozdanie-muzyki-dlya-meditatsiy",
+      "plannedUrl": "https://audiolad.ru/articles/sozdanie-muzyki-dlya-meditatsiy",
+      "status": "PUBLISHED",
+      "practiceKey": null,
+      "practiceRelevance": "NOT_APPLICABLE",
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy."
     }
   ]
 }
