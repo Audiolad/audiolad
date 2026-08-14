@@ -11,6 +11,11 @@ const CREATOR_PATH = "/articles/kak-sozdat-svoyu-meditatsiyu";
 const CTA_HEADING = "Хотите создать свою медитацию? Выберите, с чего начать.";
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
 const SCHOOL_ORIGIN = "https://school.audiolad.ru";
+const ARTICLE_H1 = "Как создать свою медитацию: от идеи до готовой аудиозаписи";
+const META_TITLE = "Как сделать медитацию самому: пошаговое руководство";
+const META_DESCRIPTION =
+  "Как сделать медитацию самому: запишите голос, добавьте музыку и соберите готовую аудиопрактику в браузере. Пошаговое руководство для начинающих.";
+const CANONICAL_URL = "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu";
 
 function assert(condition, message) {
   if (!condition) {
@@ -139,6 +144,19 @@ async function main() {
     assert(
       response.status === 200,
       `Creator article returned HTTP ${response.status}:\n${html.slice(0, 1_000)}`,
+    );
+    assert(pageHtml.includes(ARTICLE_H1), "Creator article is missing the approved H1");
+    assert(
+      renderedHtml.includes(META_TITLE),
+      "Creator article is missing the approved meta title",
+    );
+    assert(
+      renderedHtml.includes(META_DESCRIPTION),
+      "Creator article is missing the approved meta description",
+    );
+    assert(
+      renderedHtml.includes(`href="${CANONICAL_URL}"`),
+      "Creator article has an incorrect canonical URL",
     );
     const ctaCount = pageHtml.split(CTA_HEADING).length - 1;
     assert(

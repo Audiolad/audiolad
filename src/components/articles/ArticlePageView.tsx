@@ -16,7 +16,9 @@ import CatalogProductCard from "@/components/products/CatalogProductCard";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildArticleJsonLdGraph } from "@/lib/seo/articles";
 import type {
+  ArticleInlineSegment,
   ArticlePageData,
+  ArticleSection,
   CreatorPathsArticlePageData,
   PracticeArticlePageData,
 } from "@/lib/seo/articles";
@@ -44,6 +46,101 @@ function readingTimeLabel(minutes: number): string {
 
 const SECTION_SCROLL_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
+
+function renderInlineSegments(
+  segments: readonly ArticleInlineSegment[],
+  linkClassName: string,
+) {
+  return segments.map((segment, index) => {
+    if ("text" in segment) {
+      return <span key={`text-${index}`}>{segment.text}</span>;
+    }
+
+    if ("strong" in segment) {
+      return <strong key={`strong-${index}`}>{segment.strong}</strong>;
+    }
+
+    return (
+      <Link key={`${segment.href}:${segment.label}:${index}`} href={segment.href} className={linkClassName}>
+        {segment.label}
+      </Link>
+    );
+  });
+}
+
+function ArticleSectionContent({
+  section,
+  linkClassName,
+}: {
+  section: ArticleSection;
+  linkClassName: string;
+}) {
+  if (section.blocks) {
+    return (
+      <div className="mt-4">
+        {section.blocks.map((block, index) => {
+          const key = `${block.kind}-${index}`;
+
+          switch (block.kind) {
+            case "paragraph":
+              return (
+                <p key={key} className={index === 0 ? articleBodyClass : `mt-4 ${articleBodyClass}`}>
+                  {block.text}
+                </p>
+              );
+            case "rich_paragraph":
+              return (
+                <p key={key} className={index === 0 ? articleBodyClass : `mt-4 ${articleBodyClass}`}>
+                  {renderInlineSegments(block.segments, linkClassName)}
+                </p>
+              );
+            case "heading":
+              return (
+                <h3 key={key} className="mt-7 text-xl font-semibold tracking-tight text-[#25135c]">
+                  {block.title}
+                </h3>
+              );
+            case "list":
+              return (
+                <ul key={key} className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-[#4a3d73]">
+                  {block.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              );
+          }
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={`mt-4 ${articleBodyStackClass}`}>
+        {section.paragraphs.map((paragraph) => (
+          <p key={paragraph.slice(0, 64)}>{paragraph}</p>
+        ))}
+      </div>
+      {section.links?.length ? (
+        <div className={`mt-4 ${articleBodyStackClass}`}>
+          {section.links.map((item) => (
+            <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+              {item.before}
+              {item.href && item.linkLabel ? (
+                <Link href={item.href} className={linkClassName}>
+                  {item.linkLabel}
+                </Link>
+              ) : (
+                item.linkLabel
+              )}
+              {item.after ?? ""}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 export default function ArticlePageView({ data }: ArticlePageViewProps) {
   if (isCreatorArticlePageData(data)) {
@@ -140,18 +237,20 @@ function CreatorPathsArticlePageView({
           </div>
         ) : null}
 
-        <aside
-          aria-labelledby="article-short-answer-title"
-          className="mt-8 rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5"
-        >
-          <h2
-            id="article-short-answer-title"
-            className="text-xl font-semibold tracking-tight text-[#25135c]"
+        {article.shortAnswer ? (
+          <aside
+            aria-labelledby="article-short-answer-title"
+            className="mt-8 rounded-[24px] border border-[#dfd0f3] bg-[#f7f1fc] px-5 py-5"
           >
-            Короткий ответ
-          </h2>
-          <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
-        </aside>
+            <h2
+              id="article-short-answer-title"
+              className="text-xl font-semibold tracking-tight text-[#25135c]"
+            >
+              Короткий ответ
+            </h2>
+            <p className={`mt-3 ${articleBodyClass}`}>{article.shortAnswer}</p>
+          </aside>
+        ) : null}
 
         <ArticleToc
           items={tocItems}
@@ -174,28 +273,10 @@ function CreatorPathsArticlePageView({
                 section.title
               )}
             </h2>
-            <div className={`mt-4 ${articleBodyStackClass}`}>
-              {section.paragraphs.map((paragraph) => (
-                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-              ))}
-            </div>
-            {section.links?.length ? (
-              <div className={`mt-4 ${articleBodyStackClass}`}>
-                {section.links.map((item) => (
-                  <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
-                    {item.before}
-                    {item.href && item.linkLabel ? (
-                      <Link href={item.href} className={linkClassName}>
-                        {item.linkLabel}
-                      </Link>
-                    ) : (
-                      item.linkLabel
-                    )}
-                    {item.after ?? ""}
-                  </p>
-                ))}
-              </div>
-            ) : null}
+            <ArticleSectionContent
+              section={section}
+              linkClassName={linkClassName}
+            />
           </section>
         ))}
 
@@ -206,11 +287,10 @@ function CreatorPathsArticlePageView({
           >
             {closingHeading}
           </h2>
-          <div className={`mt-4 ${articleBodyStackClass}`}>
-            {article.closingSection.paragraphs.map((paragraph) => (
-              <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-            ))}
-          </div>
+          <ArticleSectionContent
+            section={article.closingSection}
+            linkClassName={linkClassName}
+          />
         </section>
 
         <div className="mt-8">
@@ -436,31 +516,10 @@ function PracticeArticlePageView({
                   section.title
                 )}
               </h2>
-              <div className={`mt-4 ${articleBodyStackClass}`}>
-                {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-                ))}
-              </div>
-              {section.links?.length ? (
-                <div className={`mt-4 ${articleBodyStackClass}`}>
-                  {section.links.map((item) => (
-                    <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
-                      {item.before}
-                      {item.href && item.linkLabel ? (
-                        <Link
-                          href={item.href}
-                          className="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        >
-                          {item.linkLabel}
-                        </Link>
-                      ) : (
-                        item.linkLabel
-                      )}
-                      {item.after ?? ""}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
+              <ArticleSectionContent
+                section={section}
+                linkClassName="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              />
 
               {section.id === "audiopraktika" ? (
                 <div className="mt-6 space-y-4">
@@ -487,25 +546,15 @@ function PracticeArticlePageView({
                             .map((segment) =>
                               "href" in segment
                                 ? `${segment.href}:${segment.label}`
-                                : segment.text,
+                                : "strong" in segment
+                                  ? segment.strong
+                                  : segment.text,
                             )
                             .join("|");
 
                           return (
                             <p key={key}>
-                              {item.segments.map((segment) =>
-                                "href" in segment ? (
-                                  <Link
-                                    key={`${segment.href}:${segment.label}`}
-                                    href={segment.href}
-                                    className={linkClassName}
-                                  >
-                                    {segment.label}
-                                  </Link>
-                                ) : (
-                                  <span key={segment.text}>{segment.text}</span>
-                                ),
-                              )}
+                              {renderInlineSegments(item.segments, linkClassName)}
                             </p>
                           );
                         }
@@ -547,11 +596,10 @@ function PracticeArticlePageView({
             >
               {closingHeading}
             </h2>
-            <div className={`mt-4 ${articleBodyStackClass}`}>
-              {article.closingSection.paragraphs.map((paragraph) => (
-                <p key={paragraph.slice(0, 64)}>{paragraph}</p>
-              ))}
-            </div>
+            <ArticleSectionContent
+              section={article.closingSection}
+              linkClassName="font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            />
           </section>
 
           <section id="faq" className={`mt-12 ${SECTION_SCROLL_CLASS}`}>

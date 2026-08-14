@@ -12,12 +12,35 @@ function countWords(text: string): number {
     .filter(Boolean).length;
 }
 
+function sectionBlockText(section: ArticleDefinition["sections"][number]): string[] {
+  return (
+    section.blocks?.flatMap((block) => {
+      switch (block.kind) {
+        case "paragraph":
+          return [block.text];
+        case "rich_paragraph":
+          return block.segments.map((segment) =>
+            "text" in segment
+              ? segment.text
+              : "strong" in segment
+                ? segment.strong
+                : segment.label,
+          );
+        case "heading":
+          return [block.title];
+        case "list":
+          return block.items;
+      }
+    }) ?? []
+  );
+}
+
 export function estimateArticleReadingTimeMinutes(
   article: ArticleDefinition,
 ): number {
   const chunks = [
     article.leadBeforeAudio,
-    article.shortAnswer,
+    article.shortAnswer ?? "",
     ...article.introAfterAudio,
     ...article.sections.flatMap((section) => [
       section.title,
@@ -27,10 +50,12 @@ export function estimateArticleReadingTimeMinutes(
         item.linkLabel ?? "",
         item.after ?? "",
       ]),
+      ...sectionBlockText(section),
     ]),
     ...article.seeAlsoLinks.flatMap((item) => [item.title, item.description]),
     article.closingSection.title,
     ...article.closingSection.paragraphs,
+    ...sectionBlockText(article.closingSection),
     ...article.faq.flatMap((item) => [item.question, item.answer]),
   ];
 

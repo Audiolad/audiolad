@@ -5058,10 +5058,6 @@ for (const slug of listArticleSlugs()) {
   assert(item.authorLabel === "Редакция АудиоЛада", `${slug} editorial byline`);
   assert(item.leadBeforeAudio.trim().length > 0, `${slug} keeps opening paragraph`);
   assert(
-    item.shortAnswer.trim().length > 0,
-    `${slug} keeps a non-empty short answer`,
-  );
-  assert(
     !item.leadBeforeAudio.startsWith("# "),
     `${slug} does not duplicate Markdown H1 in article body`,
   );
@@ -5079,6 +5075,10 @@ for (const slug of listArticleSlugs()) {
       assert(
         ["balanced", "studio", "school"].includes(item.productContinuation.emphasis),
         `${slug} has a supported creator paths emphasis`,
+      );
+      assert(
+        item.shortAnswer === undefined || item.shortAnswer.trim().length > 0,
+        `${slug} omits or keeps a non-empty short answer`,
       );
       for (const field of [
         "captionAfterAudio",
@@ -5098,6 +5098,10 @@ for (const slug of listArticleSlugs()) {
       break;
 
     case "practice":
+      assert(
+        item.shortAnswer.trim().length > 0,
+        `${slug} keeps a non-empty short answer`,
+      );
       assert(item.primaryPractice.practiceKey, `${slug} has primary practice key`);
       assert(
         Array.isArray(item.relatedPractices),
@@ -5123,6 +5127,33 @@ assert(
 assert(
   !("primaryPractice" in creatorPathsArticle),
   "creator paths article does not require a catalog practice",
+);
+assert(
+  creatorPathsArticle.title ===
+    "Как создать свою медитацию: от идеи до готовой аудиозаписи",
+  "creator paths article keeps the approved H1",
+);
+assert(
+  creatorPathsArticle.metaTitle ===
+    "Как сделать медитацию самому: пошаговое руководство",
+  "creator paths article keeps the approved meta title",
+);
+assert(
+  creatorPathsArticle.metaDescription ===
+    "Как сделать медитацию самому: запишите голос, добавьте музыку и соберите готовую аудиопрактику в браузере. Пошаговое руководство для начинающих.",
+  "creator paths article keeps the approved meta description",
+);
+assert(
+  creatorPathsArticle.shortAnswer === undefined,
+  "creator paths article does not add unapproved summary copy",
+);
+assert(
+  creatorPathsArticle.seeAlsoLinks.length === 0,
+  "creator paths article does not add unapproved product links",
+);
+assert(
+  creatorPathsArticle.faq.length === 8,
+  "creator paths article keeps the approved FAQ set",
 );
 const creatorPageData = {
   article: creatorPathsArticle,

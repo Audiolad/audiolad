@@ -5,6 +5,18 @@ export type ArticleFaqItem = {
   answer: string;
 };
 
+/** Inline content supported inside an editorial rich paragraph. */
+export type ArticleInlineSegment =
+  | { text: string }
+  | { strong: string }
+  | { href: string; label: string };
+
+export type ArticleSectionBlock =
+  | { kind: "paragraph"; text: string }
+  | { kind: "rich_paragraph"; segments: readonly ArticleInlineSegment[] }
+  | { kind: "heading"; level: 3; title: string }
+  | { kind: "list"; items: readonly string[] };
+
 export type ArticleSection = {
   id: string;
   title: string;
@@ -12,6 +24,8 @@ export type ArticleSection = {
   titleHref?: string;
   paragraphs: string[];
   links?: readonly ArticleCrossLinkParagraph[];
+  /** Ordered content for articles that need H3, lists, or multi-link paragraphs. */
+  blocks?: readonly ArticleSectionBlock[];
 };
 
 /**
@@ -27,11 +41,6 @@ export type ArticlePracticeSlot = {
 export type ArticleRelatedPracticeSlot = ArticlePracticeSlot & {
   blurb: string;
 };
-
-/** Inline text or link segment for multi-link editorial paragraphs. */
-export type ArticleInlineSegment =
-  | { text: string }
-  | { href: string; label: string };
 
 /**
  * Cross-link paragraph after the final audio CTA.
@@ -64,7 +73,6 @@ type ArticleDefinitionBase = {
   metaDescription: string;
   /** Opening paragraph of the article body. */
   leadBeforeAudio: string;
-  shortAnswer: string;
   authorLabel: string;
   topicSlug: string;
   topicTitle: string;
@@ -99,6 +107,7 @@ export type ArticleCreatorPathsContinuation = {
 /** Existing listener article funnel with an embedded catalog practice. */
 export type PracticeArticleDefinition = ArticleDefinitionBase & {
   productContinuation: ArticlePracticeContinuation;
+  shortAnswer: string;
   /** Caption under top audio block */
   captionAfterAudio: string;
   /**
@@ -126,6 +135,8 @@ export type PracticeArticleDefinition = ArticleDefinitionBase & {
 /** Author-focused funnel with Studio and School as equal product paths. */
 export type CreatorArticleDefinition = ArticleDefinitionBase & {
   productContinuation: ArticleCreatorPathsContinuation;
+  /** Optional editorial summary; omit when the authoritative copy has no summary. */
+  shortAnswer?: string;
   captionAfterAudio?: never;
   primaryPracticeEyebrow?: never;
   primaryPracticeIntro?: never;
