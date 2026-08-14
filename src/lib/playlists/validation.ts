@@ -16,6 +16,7 @@ const FORBIDDEN_CLIENT_KEYS = new Set([
   "id",
   "owner_type",
   "created_by",
+  "first_published_at",
 ]);
 
 export type ParsedJsonObject = Record<string, unknown>;

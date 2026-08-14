@@ -48,6 +48,17 @@ assert(migration.includes("playlist_audit_log"), "audit table");
 assert(migration.includes("playlists.manage"), "RBAC manage");
 assert(migration.includes("playlists.create_editorial"), "RBAC create");
 assert(migration.includes("editorial_slug_locked"), "slug lock");
+assert(migration.includes("first_published_at"), "first_published_at column");
+assert(
+  /OLD\.first_published_at IS NOT NULL/.test(migration),
+  "slug-lock trigger uses first_published_at, not only published_at",
+);
+assert(
+  !/OLD\.owner_type = 'platform'\s+AND OLD\.published_at IS NOT NULL\s+AND NEW\.slug/.test(
+    migration,
+  ),
+  "slug-lock must not key only on published_at",
+);
 assert(migration.includes("ADD COLUMN IF NOT EXISTS"), "additive guards");
 assert(
   migration.includes("user_id = NULL") || migration.includes("user_id = NULL"),
@@ -129,6 +140,13 @@ assert(
 assert(
   parseCreatePlaylistBody({
     title: "x",
+    first_published_at: "2026-08-14T00:00:00.000Z",
+  }).ok === false,
+  "first_published_at forbidden on create",
+);
+assert(
+  parseCreatePlaylistBody({
+    title: "x",
     description: "a".repeat(PLAYLIST_DESCRIPTION_MAX_LENGTH + 1),
   }).ok === false,
   "description length check",
@@ -184,6 +202,24 @@ assert(
   createApi.includes("attach_playlist_creator_as_manager"),
   "creator becomes manager",
 );
+{
+  const attachLogAt = createApi.indexOf(
+    "playlists_create_editorial_attach_error",
+  );
+  assert(attachLogAt !== -1, "logs attach failure");
+  const afterAttach = createApi.slice(attachLogAt);
+  const return500At = afterAttach.indexOf("status: 500");
+  const return201At = afterAttach.indexOf("status: 201");
+  assert(
+    return500At !== -1 && (return201At === -1 || return500At < return201At),
+    "attachError must return 500, not continue to 201",
+  );
+  assert(
+    afterAttach.includes("rollback_unpublished_editorial_create") ||
+      afterAttach.includes(".delete()"),
+    "attach failure attempts to remove the orphan draft",
+  );
+}
 assert(
   createApi.includes("countOwnedPlaylists") && createApi.includes("user.id"),
   "personal limit uses user id",
@@ -197,6 +233,10 @@ assert(
   "old editorial-private reject removed",
 );
 assert(patchApi.includes("Keep allocated editorial slug"), "unpublish keeps slug");
+assert(
+  patchApi.includes("first_published_at"),
+  "publish path stamps first_published_at",
+);
 
 const queries = read("src/lib/playlists/queries.ts");
 assert(queries.includes('.eq("user_id", userId)'), "owned list still filters user_id");

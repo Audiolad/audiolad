@@ -236,6 +236,43 @@ BEGIN
     RAISE EXCEPTION 'published editorial slug rename must fail';
   END IF;
 
+  -- Unpublish keeps first_published_at; slug rename still locked
+  UPDATE public.playlists
+  SET visibility = 'private', published_at = NULL
+  WHERE id = v_pub_pl;
+
+  IF (SELECT first_published_at FROM public.playlists WHERE id = v_pub_pl) IS NULL THEN
+    RAISE EXCEPTION 'unpublish must not clear first_published_at';
+  END IF;
+
+  IF (SELECT published_at FROM public.playlists WHERE id = v_pub_pl) IS NOT NULL THEN
+    RAISE EXCEPTION 'unpublish must clear published_at';
+  END IF;
+
+  raised := false;
+  BEGIN
+    UPDATE public.playlists
+    SET slug = 'stage1-smoke-pub-after-unpublish'
+    WHERE id = v_pub_pl;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%editorial_slug_locked%' THEN
+      raised := true;
+    ELSE
+      RAISE;
+    END IF;
+  END;
+  IF NOT raised THEN
+    RAISE EXCEPTION 'slug rename after unpublish must still fail';
+  END IF;
+
+  IF (SELECT first_published_at FROM public.playlists WHERE id = v_draft_pl) IS NOT NULL THEN
+    RAISE EXCEPTION 'never-published draft must not have first_published_at';
+  END IF;
+
+  UPDATE public.playlists
+  SET visibility = 'public', published_at = now()
+  WHERE id = v_pub_pl;
+
   -- User private still cannot have a slug
   raised := false;
   BEGIN

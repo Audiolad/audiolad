@@ -133,6 +133,35 @@ export async function POST(request: Request) {
         "playlists_create_editorial_attach_error",
         attachError.message,
       );
+
+      const { error: deleteError } = await supabase
+        .from("playlists")
+        .delete()
+        .eq("id", created.id);
+
+      if (deleteError) {
+        console.error(
+          "playlists_create_editorial_attach_rollback_error",
+          deleteError.message,
+        );
+      }
+
+      const { error: rollbackError } = await supabase.rpc(
+        "rollback_unpublished_editorial_create",
+        { p_playlist_id: created.id },
+      );
+
+      if (
+        rollbackError &&
+        !/playlist_not_found/i.test(rollbackError.message ?? "")
+      ) {
+        console.error(
+          "playlists_create_editorial_attach_rollback_rpc_error",
+          rollbackError.message,
+        );
+      }
+
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
     await logPlaylistAudit(supabase, created.id, "playlist_created", {

@@ -24,6 +24,8 @@ BEGIN;
 --   platform: is_editorial TRUE, user_id IS NULL, created_by = actor (nullable later)
 --   Editorial draft: platform + private + published_at NULL + slug allowed
 --   Editorial published: platform + public + published_at + slug
+--   first_published_at set once on first publish; never cleared on unpublish
+--   Editorial slug locked when first_published_at IS NOT NULL
 --   User private still requires slug NULL
 --   Public SELECT: visibility = 'public' AND published_at IS NOT NULL
 --   playlist_items follow parent edit/read authority (not user_id alone)
@@ -42,6 +44,9 @@ ALTER TABLE public.playlists
 
 ALTER TABLE public.playlists
   ADD COLUMN IF NOT EXISTS description text;
+
+ALTER TABLE public.playlists
+  ADD COLUMN IF NOT EXISTS first_published_at timestamptz;
 
 DO $$
 BEGIN
@@ -92,6 +97,11 @@ SET published_at = COALESCE(published_at, created_at)
 WHERE visibility = 'public'
   AND published_at IS NULL;
 
+UPDATE public.playlists
+SET first_published_at = published_at
+WHERE published_at IS NOT NULL
+  AND first_published_at IS NULL;
+
 ALTER TABLE public.playlists
   ALTER COLUMN owner_type SET DEFAULT 'user';
 
@@ -118,6 +128,9 @@ COMMENT ON COLUMN public.playlists.user_id IS
 
 COMMENT ON COLUMN public.playlists.is_editorial IS
   'True iff owner_type=platform. Curated AudioLad playlist. Draft may be private.';
+
+COMMENT ON COLUMN public.playlists.first_published_at IS
+  'Set once on first publish. Never cleared on unpublish. Locks editorial slug after first publication.';
 
 -- ---------------------------------------------------------------------------
 -- 3. Constraints (drop old, add relaxed/new)
@@ -487,6 +500,47 @@ REVOKE ALL ON FUNCTION public.attach_playlist_creator_as_manager(uuid) FROM anon
 GRANT EXECUTE ON FUNCTION public.attach_playlist_creator_as_manager(uuid)
   TO authenticated, service_role;
 
+CREATE OR REPLACE FUNCTION public.rollback_unpublished_editorial_create(
+  p_playlist_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_deleted integer;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated'
+      USING ERRCODE = '28000';
+  END IF;
+
+  DELETE FROM public.playlists AS pl
+  WHERE pl.id = p_playlist_id
+    AND pl.owner_type = 'platform'
+    AND pl.created_by = v_user_id
+    AND pl.published_at IS NULL
+    AND pl.first_published_at IS NULL;
+
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+  IF v_deleted = 0 THEN
+    RAISE EXCEPTION 'playlist_not_found'
+      USING ERRCODE = 'P0002';
+  END IF;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rollback_unpublished_editorial_create(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rollback_unpublished_editorial_create(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rollback_unpublished_editorial_create(uuid)
+  TO authenticated, service_role;
+
+COMMENT ON FUNCTION public.rollback_unpublished_editorial_create(uuid) IS
+  'Deletes a never-published platform draft created by auth.uid(). Used when manager attach fails on create.';
+
 -- ---------------------------------------------------------------------------
 -- 7. Triggers
 -- ---------------------------------------------------------------------------
@@ -515,6 +569,19 @@ BEGIN
       RAISE EXCEPTION 'playlist_ownership_immutable'
         USING ERRCODE = '42501';
     END IF;
+
+    -- first_published_at: JWT may stamp NULL → value on first publish.
+    -- Once set, JWT cannot clear or change it. Service without JWT may
+    -- set it once (NULL → value) but cannot change or clear afterwards.
+    IF OLD.first_published_at IS NOT NULL
+      AND NEW.first_published_at IS DISTINCT FROM OLD.first_published_at THEN
+      IF v_jwt_sub IS NOT NULL THEN
+        RAISE EXCEPTION 'playlist_ownership_immutable'
+          USING ERRCODE = '42501';
+      END IF;
+
+      NEW.first_published_at := OLD.first_published_at;
+    END IF;
   END IF;
 
   RETURN NEW;
@@ -523,10 +590,35 @@ $$;
 
 DROP TRIGGER IF EXISTS playlists_protect_ownership ON public.playlists;
 CREATE TRIGGER playlists_protect_ownership
-  BEFORE UPDATE OF owner_type, user_id, is_editorial, created_by
+  BEFORE UPDATE OF owner_type, user_id, is_editorial, created_by, first_published_at
   ON public.playlists
   FOR EACH ROW
   EXECUTE FUNCTION public.protect_playlist_ownership_columns();
+
+CREATE OR REPLACE FUNCTION public.stamp_playlist_first_published_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.first_published_at IS NULL
+    AND (
+      NEW.published_at IS NOT NULL
+      OR NEW.visibility = 'public'
+    ) THEN
+    NEW.first_published_at := COALESCE(NEW.published_at, now());
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS playlists_stamp_first_published_at ON public.playlists;
+CREATE TRIGGER playlists_stamp_first_published_at
+  BEFORE INSERT OR UPDATE OF visibility, published_at, first_published_at
+  ON public.playlists
+  FOR EACH ROW
+  EXECUTE FUNCTION public.stamp_playlist_first_published_at();
 
 CREATE OR REPLACE FUNCTION public.prevent_published_editorial_slug_change()
 RETURNS trigger
@@ -535,7 +627,7 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF OLD.owner_type = 'platform'
-    AND OLD.published_at IS NOT NULL
+    AND OLD.first_published_at IS NOT NULL
     AND NEW.slug IS DISTINCT FROM OLD.slug THEN
     RAISE EXCEPTION 'editorial_slug_locked'
       USING ERRCODE = '42501';
@@ -605,6 +697,11 @@ CREATE POLICY "Platform editors can select platform playlists"
     AND (
       public.has_platform_permission(auth.uid(), 'playlists.manage')
       OR public.is_playlist_collaborator(id, auth.uid())
+      OR (
+        created_by = auth.uid()
+        AND published_at IS NULL
+        AND first_published_at IS NULL
+      )
     )
   );
 
@@ -1579,6 +1676,16 @@ BEGIN
       AND column_name = 'owner_type'
   ) THEN
     RAISE EXCEPTION 'Post-check failed: playlists.owner_type missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'playlists'
+      AND column_name = 'first_published_at'
+  ) THEN
+    RAISE EXCEPTION 'Post-check failed: playlists.first_published_at missing';
   END IF;
 
   IF to_regclass('public.playlist_collaborators') IS NULL THEN

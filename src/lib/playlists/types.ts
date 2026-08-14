@@ -29,6 +29,7 @@ export type PlaylistRow = {
   user_id?: string | null;
   created_by?: string | null;
   description?: string | null;
+  first_published_at?: string | null;
 };
 
 export type EditorialPlaylistListItem = {

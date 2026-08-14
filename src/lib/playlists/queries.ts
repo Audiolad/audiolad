@@ -154,7 +154,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial, owner_type, user_id, created_by, description",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial, owner_type, user_id, created_by, description, first_published_at",
     )
     .eq("id", playlistId)
     .maybeSingle();
@@ -179,6 +179,7 @@ export async function getOwnedPlaylistById(
       user_id: row.user_id ?? null,
       created_by: row.created_by ?? null,
       description: row.description ?? null,
+      first_published_at: row.first_published_at ?? null,
     },
     error: null,
   };

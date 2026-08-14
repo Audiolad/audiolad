@@ -194,6 +194,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.visibility = "public";
     updates.slug = slug;
     updates.published_at = new Date().toISOString();
+    updates.first_published_at =
+      playlist.first_published_at ?? updates.published_at;
   } else if (platform) {
     updates.visibility = "private";
     updates.published_at = null;
@@ -209,7 +211,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(updates)
     .eq("id", id)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description, first_published_at",
     )
     .maybeSingle();
 
