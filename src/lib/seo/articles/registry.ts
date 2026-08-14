@@ -15,6 +15,7 @@ import { KAK_PSIKHOLOGU_NAYTI_KLIENTOV_ARTICLE } from "./content/kak-psikhologu-
 import { PRODVIZHENIE_PSIKHOLOGA_ARTICLE } from "./content/prodvizhenie-psikhologa";
 import { REKLAMA_PSIKHOLOGA_ARTICLE } from "./content/reklama-psikhologa";
 import { KAK_NACHINAYUSHCHEMU_PSIKHOLOGU_NAYTI_PERVYKH_KLIENTOV_ARTICLE } from "./content/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov";
+import { CHASTNAYA_PRAKTIKA_PSIKHOLOGA_ARTICLE } from "./content/chastnaya-praktika-psikhologa";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
 import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
@@ -101,6 +102,7 @@ const ARTICLE_DEFINITIONS = [
   PRODVIZHENIE_PSIKHOLOGA_ARTICLE,
   REKLAMA_PSIKHOLOGA_ARTICLE,
   KAK_NACHINAYUSHCHEMU_PSIKHOLOGU_NAYTI_PERVYKH_KLIENTOV_ARTICLE,
+  CHASTNAYA_PRAKTIKA_PSIKHOLOGA_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,

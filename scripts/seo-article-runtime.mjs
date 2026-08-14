@@ -168,6 +168,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
     ],
   },
+  {
+    path: "/articles/chastnaya-praktika-psikhologa",
+    h1: "Частная практика психолога: как начать и развивать своё дело",
+    metaTitle: "Частная практика психолога: как начать и развивать",
+    metaDescription:
+      "Частная практика психолога: как начать работать на себя, организовать консультации, привлечение клиентов, доход и развитие собственной практики.",
+    canonicalUrl: "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/reklama-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {

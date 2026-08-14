@@ -5931,6 +5931,86 @@ assert(
   ),
   "beginner creator json-ld omits practice image",
 );
+
+const practiceCreatorArticle = getArticleBySlug("chastnaya-praktika-psikhologa");
+assert(practiceCreatorArticle, "private practice creator article registered");
+assert(
+  practiceCreatorArticle.productContinuation.kind === "creator_paths",
+  "private practice creator article uses creator continuation",
+);
+assert(
+  practiceCreatorArticle.productContinuation.emphasis === "balanced",
+  "private practice creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in practiceCreatorArticle),
+  "private practice creator article does not require a catalog practice",
+);
+assert(
+  practiceCreatorArticle.title ===
+    "Частная практика психолога: как начать и развивать своё дело",
+  "private practice creator article keeps the approved H1",
+);
+assert(
+  practiceCreatorArticle.metaTitle ===
+    "Частная практика психолога: как начать и развивать",
+  "private practice creator article keeps the approved meta title",
+);
+assert(
+  practiceCreatorArticle.metaDescription ===
+    "Частная практика психолога: как начать работать на себя, организовать консультации, привлечение клиентов, доход и развитие собственной практики.",
+  "private practice creator article keeps the approved meta description",
+);
+assert(
+  practiceCreatorArticle.shortAnswer === undefined,
+  "private practice creator article does not add unapproved summary copy",
+);
+assert(
+  practiceCreatorArticle.seeAlsoLinks.length === 0,
+  "private practice creator article does not add unapproved product links",
+);
+assert(
+  practiceCreatorArticle.faq.length === 8,
+  "private practice creator article keeps the approved FAQ set",
+);
+const practiceCreatorSerialized = JSON.stringify(practiceCreatorArticle);
+assert(
+  practiceCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  ) &&
+    practiceCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    ) &&
+    practiceCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    practiceCreatorSerialized.includes(
+      "https://audiolad.ru/articles/reklama-psikhologa",
+    ),
+  "private practice creator article keeps the approved creator article links",
+);
+const practiceCreatorPageData = {
+  article: practiceCreatorArticle,
+  path: "/articles/chastnaya-praktika-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(practiceCreatorArticle),
+};
+const practiceCreatorMetadata = buildArticleMetadata(practiceCreatorPageData);
+assert(
+  practiceCreatorMetadata.robots?.index === true &&
+    practiceCreatorMetadata.robots?.follow === true,
+  "private practice creator metadata stays indexable",
+);
+assert(
+  !practiceCreatorMetadata.openGraph?.images,
+  "private practice creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(practiceCreatorPageData)).includes(
+    '"image"',
+  ),
+  "private practice creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6058,6 +6138,20 @@ assert(
       "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
   ).length === 1,
   "beginner creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+  ),
+  "private practice creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+  ).length === 1,
+  "private practice creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
