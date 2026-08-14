@@ -32,6 +32,21 @@ const CREATOR_ARTICLES = [
     requiredSnippet:
       "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
   },
+  {
+    path: "/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+    h1: "Как записать медитацию с музыкой самостоятельно: пошаговое руководство",
+    metaTitle: "Как записать медитацию с музыкой самостоятельно",
+    metaDescription:
+      "Как записать медитацию с музыкой самостоятельно: выбрать подходящий фон, соединить голос и музыку, настроить громкость и плавные переходы.",
+    canonicalUrl:
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    ],
+  },
 ];
 
 function assert(condition, message) {
@@ -198,10 +213,14 @@ async function main() {
         renderedHtml.includes(SCHOOL_ORIGIN),
         `${article.path} is missing School URL`,
       );
-      if (article.requiredSnippet) {
+      const requiredSnippets = [
+        ...(article.requiredSnippet ? [article.requiredSnippet] : []),
+        ...(article.requiredSnippets ?? []),
+      ];
+      for (const snippet of requiredSnippets) {
         assert(
-          renderedHtml.includes(article.requiredSnippet),
-          `${article.path} is missing the required parent-article link`,
+          renderedHtml.includes(snippet),
+          `${article.path} is missing required link ${snippet}`,
         );
       }
       const creatorProductAnchors = [

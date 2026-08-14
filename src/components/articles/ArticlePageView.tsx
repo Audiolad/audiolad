@@ -275,6 +275,48 @@ function CreatorPathsArticlePageView({
           </div>
         ) : null}
 
+        {article.introAfterAudioLinks?.length ? (
+          <div className={`mt-4 ${articleBodyStackClass}`}>
+            {article.introAfterAudioLinks.map((item) => {
+              if (item.segments && item.segments.length > 0) {
+                const key = item.segments
+                  .map((segment) =>
+                    "href" in segment
+                      ? `${segment.href}:${segment.label}`
+                      : "strong" in segment
+                        ? segment.strong
+                        : segment.text,
+                  )
+                  .join("|");
+
+                return (
+                  <p key={key}>
+                    {renderInlineSegments(item.segments, linkClassName, true)}
+                  </p>
+                );
+              }
+
+              return (
+                <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
+                  {item.before}
+                  {item.href && item.linkLabel ? (
+                    <Link
+                      href={item.href}
+                      className={linkClassName}
+                      {...creatorProductLinkProps(item.href, true)}
+                    >
+                      {item.linkLabel}
+                    </Link>
+                  ) : (
+                    item.linkLabel
+                  )}
+                  {item.after ?? ""}
+                </p>
+              );
+            })}
+          </div>
+        ) : null}
+
         {article.shortAnswer ? (
           <aside
             aria-labelledby="article-short-answer-title"

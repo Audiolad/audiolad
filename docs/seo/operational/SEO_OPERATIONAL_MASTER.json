@@ -2795,6 +2795,43 @@
         "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
         "operationalAddedAt": "2026-08-14"
       }
+    },
+    {
+      "articleId": "ART_new_20260814_kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как записать медитацию с музыкой самостоятельно: пошаговое руководство",
+      "slug": "kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+      "productionUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+      "plannedUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+      "primaryQuery": "как записать медитацию с музыкой самостоятельно",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PUBLISHED",
+      "articleType": "creator",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Creator music-assembly article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": null,
+        "title": null,
+        "slug": null,
+        "productionUrl": null,
+        "availabilityStatus": "NOT_APPLICABLE_CREATOR_ARTICLE",
+        "note": "Creator article uses Studio and School paths; no catalog practice is attached."
+      },
+      "practiceRelevance": "NOT_APPLICABLE",
+      "publishedAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "validationStatus": "VALIDATE PASS",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
+        "operationalAddedAt": "2026-08-14"
+      }
     }
   ],
   "nextQueue": [],

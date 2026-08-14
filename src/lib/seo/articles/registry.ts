@@ -6,6 +6,7 @@ import { KAK_OTPUSTIT_OBIDU_ARTICLE } from "./content/kak-otpustit-obidu";
 import { KAK_OTPUSTIT_PROSHLOE_ARTICLE } from "./content/kak-otpustit-proshloe";
 import { KAK_SOZDAT_SVOYU_MEDITATSIYU_ARTICLE } from "./content/kak-sozdat-svoyu-meditatsiyu";
 import { KAK_ZAPISAT_MEDITATSIYU_SAMOSTOYATELNO_ARTICLE } from "./content/kak-zapisat-meditatsiyu-samostoyatelno";
+import { KAK_ZAPISAT_MEDITATSIYU_S_MUZYKOY_SAMOSTOYATELNO_ARTICLE } from "./content/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
 import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
@@ -83,6 +84,7 @@ const ARTICLE_DEFINITIONS = [
   KAK_PERESTAT_KRITIKOVAT_SEBYA_ARTICLE,
   KAK_SOZDAT_SVOYU_MEDITATSIYU_ARTICLE,
   KAK_ZAPISAT_MEDITATSIYU_SAMOSTOYATELNO_ARTICLE,
+  KAK_ZAPISAT_MEDITATSIYU_S_MUZYKOY_SAMOSTOYATELNO_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,
