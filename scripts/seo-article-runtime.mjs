@@ -57,6 +57,12 @@ function decodeUnicodeEscapes(value) {
   );
 }
 
+function anchorsForHref(html, href) {
+  return [...html.matchAll(/<a\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((anchor) => anchor.includes(`href="${href}"`));
+}
+
 async function fetchWhenReady(url, processRef, logs) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     if (processRef.exitCode !== null) {
@@ -170,6 +176,32 @@ async function main() {
     assert(
       renderedHtml.includes(SCHOOL_ORIGIN),
       "Creator article is missing School URL",
+    );
+    const creatorProductAnchors = [
+      ...anchorsForHref(pageHtml, STUDIO_HREF),
+      ...anchorsForHref(pageHtml, SCHOOL_ORIGIN),
+    ];
+    assert(
+      creatorProductAnchors.length === 9,
+      `Creator article must render all Studio and School links (found ${creatorProductAnchors.length})`,
+    );
+    assert(
+      creatorProductAnchors.every(
+        (anchor) =>
+          anchor.includes('target="_blank"') &&
+          anchor.includes('rel="noopener noreferrer"'),
+      ),
+      "Creator Studio and School links must preserve the article in a safe new tab",
+    );
+    assert(
+      [...pageHtml.matchAll(/<a\b[^>]*target="_blank"[^>]*>/gi)]
+        .map((match) => match[0])
+        .every(
+          (anchor) =>
+            anchor.includes(`href="${STUDIO_HREF}"`) ||
+            anchor.includes(`href="${SCHOOL_ORIGIN}"`),
+        ),
+      "Only creator Studio and School links may open in a new tab",
     );
     assert(
       renderedHtml.lastIndexOf("Частые вопросы") >

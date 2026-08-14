@@ -74,22 +74,30 @@ type CreatorPathCardProps = {
 function CreatorPathCard({ kind }: CreatorPathCardProps) {
   const isStudio = kind === "studio";
   const title = isStudio
-    ? "Уже готовы записывать?"
+    ? "Уже готовы записать свою медитацию?"
     : "Хотите научиться создавать медитации?";
   const description = isStudio
-    ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере."
+    ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере — без сложных программ."
     : "Научитесь выбирать тему, писать сценарий, работать с голосом и создавать собственные аудиопрактики.";
   const href = isStudio ? STUDIO_HREF : SCHOOL_ORIGIN;
 
   return (
     <a
       href={href}
-      {...(!isStudio ? { target: "_blank", rel: "noreferrer" } : {})}
+      target="_blank"
+      rel="noopener noreferrer"
       className="group flex min-h-[13.5rem] flex-col rounded-[22px] border border-[#dfd0f3] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:border-[#c9b6ea] hover:bg-[#fdfbff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] motion-reduce:transform-none sm:p-5"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold tracking-[0.08em] text-[#7d70a2]">
-          {isStudio ? "СТУДИЯ АУДИОЛАД" : "ШКОЛА АУДИОПРАКТИК"}
+          {isStudio ? (
+            "СТУДИЯ АУДИОЛАД"
+          ) : (
+            <>
+              <span className="block">ШКОЛА</span>
+              <span className="block">АУДИОПРАКТИК</span>
+            </>
+          )}
         </p>
         <div className="w-[7.25rem] shrink-0">
           {isStudio ? <StudioVisual /> : <SchoolVisual />}

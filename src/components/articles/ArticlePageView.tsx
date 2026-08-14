@@ -24,6 +24,7 @@ import type {
 } from "@/lib/seo/articles";
 import { isCreatorArticlePageData } from "@/lib/seo/articles";
 import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
+import { SCHOOL_ORIGIN } from "@/lib/school/host";
 
 type ArticlePageViewProps = {
   data: ArticlePageData;
@@ -46,10 +47,26 @@ function readingTimeLabel(minutes: number): string {
 
 const SECTION_SCROLL_CLASS =
   "scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]";
+const STUDIO_MEDITATION_HREF = "https://audiolad.ru/studio/meditation";
+
+function shouldOpenCreatorProductLinkInNewTab(href: string): boolean {
+  return (
+    href === STUDIO_MEDITATION_HREF ||
+    href === SCHOOL_ORIGIN ||
+    href === `${SCHOOL_ORIGIN}/`
+  );
+}
+
+function creatorProductLinkProps(href: string, enabled: boolean) {
+  return enabled && shouldOpenCreatorProductLinkInNewTab(href)
+    ? { target: "_blank", rel: "noopener noreferrer" }
+    : {};
+}
 
 function renderInlineSegments(
   segments: readonly ArticleInlineSegment[],
   linkClassName: string,
+  openCreatorProductLinksInNewTab = false,
 ) {
   return segments.map((segment, index) => {
     if ("text" in segment) {
@@ -61,7 +78,15 @@ function renderInlineSegments(
     }
 
     return (
-      <Link key={`${segment.href}:${segment.label}:${index}`} href={segment.href} className={linkClassName}>
+      <Link
+        key={`${segment.href}:${segment.label}:${index}`}
+        href={segment.href}
+        className={linkClassName}
+        {...creatorProductLinkProps(
+          segment.href,
+          openCreatorProductLinksInNewTab,
+        )}
+      >
         {segment.label}
       </Link>
     );
@@ -71,9 +96,11 @@ function renderInlineSegments(
 function ArticleSectionContent({
   section,
   linkClassName,
+  openCreatorProductLinksInNewTab = false,
 }: {
   section: ArticleSection;
   linkClassName: string;
+  openCreatorProductLinksInNewTab?: boolean;
 }) {
   if (section.blocks) {
     return (
@@ -91,7 +118,11 @@ function ArticleSectionContent({
             case "rich_paragraph":
               return (
                 <p key={key} className={index === 0 ? articleBodyClass : `mt-4 ${articleBodyClass}`}>
-                  {renderInlineSegments(block.segments, linkClassName)}
+                  {renderInlineSegments(
+                    block.segments,
+                    linkClassName,
+                    openCreatorProductLinksInNewTab,
+                  )}
                 </p>
               );
             case "heading":
@@ -127,7 +158,14 @@ function ArticleSectionContent({
             <p key={`${item.before}${item.linkLabel ?? ""}${item.after ?? ""}`}>
               {item.before}
               {item.href && item.linkLabel ? (
-                <Link href={item.href} className={linkClassName}>
+                <Link
+                  href={item.href}
+                  className={linkClassName}
+                  {...creatorProductLinkProps(
+                    item.href,
+                    openCreatorProductLinksInNewTab,
+                  )}
+                >
                   {item.linkLabel}
                 </Link>
               ) : (
@@ -266,7 +304,11 @@ function CreatorPathsArticlePageView({
               className={`${SECTION_SCROLL_CLASS} text-2xl font-semibold tracking-tight text-[#25135c]`}
             >
               {section.titleHref ? (
-                <Link href={section.titleHref} className={linkClassName}>
+                <Link
+                  href={section.titleHref}
+                  className={linkClassName}
+                  {...creatorProductLinkProps(section.titleHref, true)}
+                >
                   {section.title}
                 </Link>
               ) : (
@@ -276,6 +318,7 @@ function CreatorPathsArticlePageView({
             <ArticleSectionContent
               section={section}
               linkClassName={linkClassName}
+              openCreatorProductLinksInNewTab
             />
           </section>
         ))}
@@ -290,6 +333,7 @@ function CreatorPathsArticlePageView({
           <ArticleSectionContent
             section={article.closingSection}
             linkClassName={linkClassName}
+            openCreatorProductLinksInNewTab
           />
         </section>
 

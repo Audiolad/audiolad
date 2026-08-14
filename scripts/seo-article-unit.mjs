@@ -5427,6 +5427,16 @@ assert(
   creatorPathsCtaSource.includes("Посмотреть Школу"),
   "creator paths CTA shortens the School label on mobile",
 );
+assert(
+  creatorPathsCtaSource.includes('target="_blank"') &&
+    creatorPathsCtaSource.includes('rel="noopener noreferrer"'),
+  "creator paths CTA preserves the article in a new tab",
+);
+assert(
+  creatorPathsCtaSource.includes("Уже готовы записать свою медитацию?") &&
+    creatorPathsCtaSource.includes("без сложных программ."),
+  "creator paths CTA uses the balanced Studio copy",
+);
 const viewSource = fullViewSource.slice(
   fullViewSource.indexOf("function PracticeArticlePageView"),
 );
@@ -5445,6 +5455,12 @@ assert(
 assert(
   !creatorViewSource.includes("ArticleAudioBlock"),
   "creator article excludes practice player blocks",
+);
+assert(
+  creatorViewSource.includes("openCreatorProductLinksInNewTab") &&
+    fullViewSource.includes("shouldOpenCreatorProductLinkInNewTab") &&
+    fullViewSource.includes('rel: "noopener noreferrer"'),
+  "creator article opens only Studio and School product links in a new tab",
 );
 assert(
   !viewSource.includes("CreatorPathsCta"),
