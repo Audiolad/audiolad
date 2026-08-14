@@ -61,6 +61,23 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
     ],
   },
+  {
+    path: "/articles/prilozhenie-dlya-zapisi-meditatsiy",
+    h1: "Приложение для записи медитаций: как записать практику онлайн",
+    metaTitle: "Приложение для записи медитаций онлайн",
+    metaDescription:
+      "Приложение для записи медитаций: запишите или загрузите голос, добавьте музыку, настройте дорожки и создайте готовую аудиопрактику онлайн.",
+    canonicalUrl:
+      "https://audiolad.ru/articles/prilozhenie-dlya-zapisi-meditatsiy",
+    productLinkCount: 11,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {
