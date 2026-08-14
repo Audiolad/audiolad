@@ -12,6 +12,7 @@ import { PRILOZHENIE_DLYA_ZAPISI_MEDITATSIY_ARTICLE } from "./content/prilozheni
 import { OBUCHENIE_SOZDANIYU_MEDITATSIY_ARTICLE } from "./content/obuchenie-sozdaniyu-meditatsiy";
 import { SOZDANIE_MUZYKI_DLYA_MEDITATSIY_ARTICLE } from "./content/sozdanie-muzyki-dlya-meditatsiy";
 import { KAK_PSIKHOLOGU_NAYTI_KLIENTOV_ARTICLE } from "./content/kak-psikhologu-nayti-klientov";
+import { PRODVIZHENIE_PSIKHOLOGA_ARTICLE } from "./content/prodvizhenie-psikhologa";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
 import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
@@ -95,6 +96,7 @@ const ARTICLE_DEFINITIONS = [
   OBUCHENIE_SOZDANIYU_MEDITATSIY_ARTICLE,
   SOZDANIE_MUZYKI_DLYA_MEDITATSIY_ARTICLE,
   KAK_PSIKHOLOGU_NAYTI_KLIENTOV_ARTICLE,
+  PRODVIZHENIE_PSIKHOLOGA_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,
