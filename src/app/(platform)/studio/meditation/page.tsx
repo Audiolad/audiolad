@@ -7,7 +7,6 @@ import { buildStudioMeditationMetadata } from "@/lib/seo/public-page-metadata";
 import {
   STUDIO_MEDITATION_AUDIENCES,
   STUDIO_MEDITATION_FEATURES,
-  STUDIO_MEDITATION_PAGE_H1,
 } from "@/lib/seo/studio-meditation/content";
 
 export function generateMetadata(): Metadata {
@@ -22,21 +21,21 @@ const bodyClassName =
 
 const productEpisodes = [
   {
-    kicker: "01 - Голос",
+    kicker: "01 – Голос",
     title: "Начните с того, что хотите сказать",
     featureIndexes: [0, 5],
     icon: "microphone",
   },
   {
-    kicker: "02 - Голос и музыка",
+    kicker: "02 – Голос и музыка",
     title: "Создайте спокойное, поддерживающее звучание",
     featureIndexes: [1, 3],
     icon: "audio",
   },
   {
-    kicker: "03 - Монтаж",
+    kicker: "03 – Монтаж",
     title: "Соберите запись в нужном ритме",
-    featureIndexes: [2, 4],
+    featureIndexes: [2, 4, 6],
     icon: "edit",
   },
 ] as const;
@@ -177,11 +176,11 @@ export default function StudioMeditationPage() {
               СТУДИЯ АУДИОЛАД
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-[#25135c] sm:text-5xl sm:leading-[1.06] lg:text-6xl lg:leading-[1.04] xl:text-[68px]">
-              {STUDIO_MEDITATION_PAGE_H1}
+              Онлайн студия для записи медитаций
             </h1>
             <p className="mx-auto mt-5 max-w-[760px] text-[17px] leading-8 text-[#4c3d78] sm:text-lg sm:leading-8">
               Запишите или загрузите голос, добавьте музыку, настройте звучание
-              и соберите свою медитацию прямо в браузере - без сложных программ
+              и соберите свою медитацию прямо в браузере – без сложных программ
               для работы со звуком.
             </p>
             <a
@@ -220,7 +219,7 @@ export default function StudioMeditationPage() {
               id="studio-meditation-features-heading"
               className={sectionHeadingClassName}
             >
-              Голос, музыка и монтаж - в одной Студии
+              Голос, музыка и монтаж – в одной Студии
             </h2>
             <p className={bodyClassName}>
               Всё необходимое, чтобы превратить записанный голос в готовую
@@ -240,7 +239,7 @@ export default function StudioMeditationPage() {
                 <p className="mt-5 text-xs font-semibold tracking-[0.14em] text-[#7042c5]">
                   {episode.kicker}
                 </p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#25135c]">
+                <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#25135c]">
                   {episode.title}
                 </h3>
                 <dl className="mt-7 space-y-6">
@@ -252,7 +251,7 @@ export default function StudioMeditationPage() {
                         <dt className="text-base font-semibold text-[#25135c]">
                           {feature.title}
                         </dt>
-                        <dd className="mt-2 text-[15px] leading-6 text-[#5a4c7e]">
+                        <dd className="mt-2 text-[17px] leading-7 text-[#5a4c7e]">
                           {feature.description}
                         </dd>
                       </div>
