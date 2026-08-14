@@ -5761,6 +5761,90 @@ assert(
   ),
   "promotion creator json-ld omits practice image",
 );
+
+const advertisingCreatorArticle = getArticleBySlug("reklama-psikhologa");
+assert(advertisingCreatorArticle, "advertising creator article registered");
+assert(
+  advertisingCreatorArticle.productContinuation.kind === "creator_paths",
+  "advertising creator article uses creator continuation",
+);
+assert(
+  advertisingCreatorArticle.productContinuation.emphasis === "balanced",
+  "advertising creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in advertisingCreatorArticle),
+  "advertising creator article does not require a catalog practice",
+);
+assert(
+  advertisingCreatorArticle.title ===
+    "Реклама психолога: где и как рекламировать свои услуги",
+  "advertising creator article keeps the approved H1",
+);
+assert(
+  advertisingCreatorArticle.metaTitle ===
+    "Реклама психолога: где и как рекламировать услуги",
+  "advertising creator article keeps the approved meta title",
+);
+assert(
+  advertisingCreatorArticle.metaDescription ===
+    "Реклама психолога: где рекламировать услуги, куда вести аудиторию, как написать объявление, избежать ошибок и оценивать реальные обращения.",
+  "advertising creator article keeps the approved meta description",
+);
+assert(
+  advertisingCreatorArticle.shortAnswer === undefined,
+  "advertising creator article does not add unapproved summary copy",
+);
+assert(
+  advertisingCreatorArticle.seeAlsoLinks.length === 0,
+  "advertising creator article does not add unapproved product links",
+);
+assert(
+  advertisingCreatorArticle.faq.length === 8,
+  "advertising creator article keeps the approved FAQ set",
+);
+const advertisingCreatorSerialized = JSON.stringify(advertisingCreatorArticle);
+assert(
+  advertisingCreatorSerialized.includes(
+    "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+  ) &&
+    advertisingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    ) &&
+    advertisingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    ) &&
+    advertisingCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ),
+  "advertising creator article keeps the approved creator article links",
+);
+const advertisingCreatorPageData = {
+  article: advertisingCreatorArticle,
+  path: "/articles/reklama-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/reklama-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    advertisingCreatorArticle,
+  ),
+};
+const advertisingCreatorMetadata = buildArticleMetadata(
+  advertisingCreatorPageData,
+);
+assert(
+  advertisingCreatorMetadata.robots?.index === true &&
+    advertisingCreatorMetadata.robots?.follow === true,
+  "advertising creator metadata stays indexable",
+);
+assert(
+  !advertisingCreatorMetadata.openGraph?.images,
+  "advertising creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(advertisingCreatorPageData)).includes(
+    '"image"',
+  ),
+  "advertising creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5858,6 +5942,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-psikhologa",
   ).length === 1,
   "promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/reklama-psikhologa",
+  ),
+  "advertising creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/reklama-psikhologa",
+  ).length === 1,
+  "advertising creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

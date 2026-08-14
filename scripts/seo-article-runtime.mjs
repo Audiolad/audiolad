@@ -134,6 +134,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
     ],
   },
+  {
+    path: "/articles/reklama-psikhologa",
+    h1: "Реклама психолога: где и как рекламировать свои услуги",
+    metaTitle: "Реклама психолога: где и как рекламировать услуги",
+    metaDescription:
+      "Реклама психолога: где рекламировать услуги, куда вести аудиторию, как написать объявление, избежать ошибок и оценивать реальные обращения.",
+    canonicalUrl: "https://audiolad.ru/articles/reklama-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {
