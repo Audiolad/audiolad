@@ -40,6 +40,11 @@ export const STUDIO_MEDITATION_FEATURES = [
     description:
       "Используйте доступные настройки обработки, чтобы подобрать подходящее звучание записи.",
   },
+  {
+    title: "Скачайте готовую медитацию",
+    description:
+      "Создайте готовый аудиофайл и скачайте свою медитацию в MP3-формате.",
+  },
 ] as const;
 
 export const STUDIO_MEDITATION_STEPS = [
