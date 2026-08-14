@@ -77,7 +77,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
     ? "Уже готовы записать свою медитацию?"
     : "Хотите научиться создавать медитации?";
   const description = isStudio
-    ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере — без сложных программ."
+    ? "Запишите голос, добавьте музыку и соберите готовую медитацию прямо в браузере – без специальных навыков и сложных программ."
     : "Научитесь выбирать тему, писать сценарий, работать с голосом и создавать собственные аудиопрактики.";
   const href = isStudio ? STUDIO_HREF : SCHOOL_ORIGIN;
 
@@ -109,7 +109,7 @@ function CreatorPathCard({ kind }: CreatorPathCardProps) {
       <p className="mt-2 text-sm leading-6 text-[#4a3d73]">{description}</p>
       <span className="mt-auto pt-3 text-sm font-semibold text-[#7042c5] group-hover:text-[#6338b0]">
         {isStudio ? (
-          "Попробовать бесплатно"
+          "Попробуйте бесплатно прямо сейчас"
         ) : (
           <>
             <span className="sm:hidden">Посмотреть Школу</span>

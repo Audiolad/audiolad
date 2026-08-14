@@ -5434,7 +5434,9 @@ assert(
 );
 assert(
   creatorPathsCtaSource.includes("Уже готовы записать свою медитацию?") &&
-    creatorPathsCtaSource.includes("без сложных программ."),
+    creatorPathsCtaSource.includes(
+      "без специальных навыков и сложных программ.",
+    ),
   "creator paths CTA uses the balanced Studio copy",
 );
 const viewSource = fullViewSource.slice(
