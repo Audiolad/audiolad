@@ -2728,7 +2728,7 @@
       "primaryQuery": "как пережить измену и развод",
       "primaryQueryFrequency": null,
       "frequencyStatus": "UNVERIFIED",
-      "status": "READY_FOR_PUBLICATION",
+      "status": "PUBLISHED",
       "cluster": "Развод и отношения",
       "hub": {
         "slug": null,
@@ -2747,14 +2747,17 @@
         "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
       },
       "practiceRelevance": "STRONG",
-      "publishedAt": null,
-      "updatedAt": "2026-08-14T00:00:00.000Z",
-      "validationStatus": "PENDING_PUBLIC_SMOKE",
+      "publishedAt": "2026-08-14T04:30:07Z",
+      "updatedAt": "2026-08-14T04:30:07Z",
+      "validationStatus": "VALIDATE PASS",
       "sources": {
         "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
-        "evidence": "Authoritative editorial Markdown received. Frequency remains UNVERIFIED because no committed verified value is available.",
+        "evidence": "Independent public smoke passed at 2026-08-14T04:30:07Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer, all three approved internal links, clickable canonical practice section title, FAQ, «Главное», sitemap, and no page-error markers. Canonical release 20260814-042524-7b4f3249 completed its 120-second health watch without rollback; BUILD_ID HpHXTHmzidY8ehpePBQXT. Frequency remains UNVERIFIED because no committed verified value is available.",
         "operationalAddedAt": "2026-08-14"
-      }
+      },
+      "release": "20260814-042524-7b4f3249",
+      "buildId": "HpHXTHmzidY8ehpePBQXT",
+      "validatedAt": "2026-08-14T04:30:07Z"
     }
   ],
   "nextQueue": [],
@@ -2865,11 +2868,11 @@
       "practiceTitle": "Возвращение к себе после развода",
       "authorStatus": "CATALOG_CANONICAL_CONFIRMED_PRODUCTION",
       "catalogStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL",
-      "publishedArticleCount": 13,
+      "publishedArticleCount": 14,
       "remainingQueueDependencies": 0,
       "waitingArticleIds": [],
       "status": "PUBLISHED_PRACTICE_NO_QUEUED_DEPENDENCIES",
-      "evidence": "Canonical practice is live and supports 13 published divorce-related articles; no approved queue dependency remains.",
+      "evidence": "Canonical practice is live and supports 14 published divorce-related articles; no approved queue dependency remains.",
       "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/vozvraschenie-k-sebe-posle-razvoda",
       "authorPath": "sergey-and-zoya"
     },

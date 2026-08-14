@@ -874,6 +874,21 @@
       "release": "20260813-190235-00b2ec2f",
       "buildId": "UeExd6Rvodmud8e-8V3Sq",
       "validatedAt": "2026-08-13T19:07:46Z"
+    },
+    {
+      "articleId": "ART_new_20260814_kak-perezhit-izmenu-i-razvod",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-perezhit-izmenu-i-razvod",
+      "productionUrl": "https://audiolad.ru/articles/kak-perezhit-izmenu-i-razvod",
+      "plannedUrl": "https://audiolad.ru/articles/kak-perezhit-izmenu-i-razvod",
+      "status": "PUBLISHED",
+      "practiceKey": "vozvraschenie-k-sebe-posle-razvoda",
+      "practiceRelevance": "STRONG",
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Independent public smoke passed at 2026-08-14T04:30:07Z: HTTP 200 including cache-bust, one H1, Meta Title, Meta Description, self-canonical, one audio, non-empty short answer, all three approved internal links, clickable canonical practice section title, FAQ, «Главное», sitemap, and no page-error markers. Canonical release 20260814-042524-7b4f3249 completed its 120-second health watch without rollback; BUILD_ID HpHXTHmzidY8ehpePBQXT. Frequency remains UNVERIFIED because no committed verified value is available.",
+      "release": "20260814-042524-7b4f3249",
+      "buildId": "HpHXTHmzidY8ehpePBQXT",
+      "validatedAt": "2026-08-14T04:30:07Z"
     }
   ]
 }
