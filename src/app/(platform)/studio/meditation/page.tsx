@@ -126,6 +126,27 @@ function ScenarioIcon({
   );
 }
 
+function AudienceIcon({ index }: { index: number }) {
+  const commonProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.55,
+  };
+
+  const paths = [
+    <><path d="M12 3c2.1 2.8 3.5 5.2 3.5 7.5A3.5 3.5 0 0 1 12 14a3.5 3.5 0 0 1-3.5-3.5C8.5 8.2 9.9 5.8 12 3Z" /><path d="M5 17.5c1.8 1.8 4.2 2.7 7 2.7s5.2-.9 7-2.7" /></>,
+    <><path d="M5 6.5h14v9H9l-4 3v-12Z" /><path d="M9 10h6M9 13h3" /></>,
+    <><path d="M12 4c-2.6 3-3.9 5.7-3.9 8.1A3.9 3.9 0 0 0 12 16a3.9 3.9 0 0 0 3.9-3.9C15.9 9.7 14.6 7 12 4Z" /><path d="M5 19c2.1-1.1 4.4-1.6 7-1.6s4.9.5 7 1.6" /></>,
+    <><path d="M12 4c-2 3-4.5 4.7-7 5.2 1.1 5.4 3.8 8.4 7 10.8 3.2-2.4 5.9-5.4 7-10.8C16.5 8.7 14 7 12 4Z" /><path d="M12 8v7M8.5 11.5h7" /></>,
+    <><circle cx="12" cy="12" r="7.5" /><path d="m14.5 9.5-5 2.2-2.2 5 5-2.2 2.2-5Z" /></>,
+    <><path d="M5 15V9M9 18V6M13 15v-6M17 20V4M21 15V9" /></>,
+  ];
+
+  return <svg viewBox="0 0 24 24" aria-hidden="true" {...commonProps}>{paths[index]}</svg>;
+}
+
 export default function StudioMeditationPage() {
   return (
     <main className="min-h-screen scroll-smooth overflow-hidden bg-[#f7f2fc] text-[#25135c]">
@@ -331,12 +352,15 @@ export default function StudioMeditationPage() {
             </h2>
           </div>
           <ul className="mt-10 grid gap-x-10 border-t border-[#dccdee] sm:grid-cols-2 lg:mt-14 lg:grid-cols-3">
-            {STUDIO_MEDITATION_AUDIENCES.map((audience) => (
+            {STUDIO_MEDITATION_AUDIENCES.map((audience, index) => (
               <li
                 key={audience.title}
                 className="border-b border-[#dccdee] py-6 lg:py-7"
               >
-                <h3 className="text-lg font-semibold tracking-[-0.02em] text-[#25135c]">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eee5f8] p-3 text-[#7042c5]">
+                  <AudienceIcon index={index} />
+                </span>
+                <h3 className="mt-4 text-lg font-semibold tracking-[-0.02em] text-[#25135c]">
                   {audience.title}
                 </h3>
                 <p className="mt-3 text-[15px] leading-6 text-[#5a4c7e]">
