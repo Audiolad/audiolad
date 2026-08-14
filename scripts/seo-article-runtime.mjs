@@ -7,15 +7,32 @@ import { dirname, resolve } from "node:path";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const NEXT_BIN = resolve(ROOT, "node_modules/next/dist/bin/next");
 const BUILD_ID_PATH = resolve(ROOT, ".next/BUILD_ID");
-const CREATOR_PATH = "/articles/kak-sozdat-svoyu-meditatsiyu";
 const CTA_HEADING = "Хотите создать свою медитацию? Выберите, с чего начать.";
 const STUDIO_HREF = "https://audiolad.ru/studio/meditation";
 const SCHOOL_ORIGIN = "https://school.audiolad.ru";
-const ARTICLE_H1 = "Как создать свою медитацию: от идеи до готовой аудиозаписи";
-const META_TITLE = "Как сделать медитацию самому: пошаговое руководство";
-const META_DESCRIPTION =
-  "Как сделать медитацию самому: запишите голос, добавьте музыку и соберите готовую аудиопрактику в браузере. Пошаговое руководство для начинающих.";
-const CANONICAL_URL = "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu";
+const CREATOR_ARTICLES = [
+  {
+    path: "/articles/kak-sozdat-svoyu-meditatsiyu",
+    h1: "Как создать свою медитацию: от идеи до готовой аудиозаписи",
+    metaTitle: "Как сделать медитацию самому: пошаговое руководство",
+    metaDescription:
+      "Как сделать медитацию самому: запишите голос, добавьте музыку и соберите готовую аудиопрактику в браузере. Пошаговое руководство для начинающих.",
+    canonicalUrl: "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    productLinkCount: 9,
+  },
+  {
+    path: "/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    h1: "Как записать медитацию самостоятельно: пошаговая инструкция",
+    metaTitle: "Как записать медитацию самостоятельно: пошаговая инструкция",
+    metaDescription:
+      "Как записать медитацию самостоятельно дома: подготовить помещение, телефон или микрофон, голос, сделать тестовую запись и обработать результат.",
+    canonicalUrl:
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    productLinkCount: 8,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  },
+];
 
 function assert(condition, message) {
   if (!condition) {
@@ -136,84 +153,99 @@ async function main() {
   });
 
   try {
-    const response = await fetchWhenReady(
-      `${baseUrl}${CREATOR_PATH}`,
-      nextProcess,
-      () => output,
-    );
-    const html = await response.text();
-    const renderedHtml = decodeUnicodeEscapes(html);
-    const pageHtml = decodeUnicodeEscapes(
-      html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ""),
-    );
+    for (const article of CREATOR_ARTICLES) {
+      const response = await fetchWhenReady(
+        `${baseUrl}${article.path}`,
+        nextProcess,
+        () => output,
+      );
+      const html = await response.text();
+      const renderedHtml = decodeUnicodeEscapes(html);
+      const pageHtml = decodeUnicodeEscapes(
+        html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ""),
+      );
 
-    assert(
-      response.status === 200,
-      `Creator article returned HTTP ${response.status}:\n${html.slice(0, 1_000)}`,
-    );
-    assert(pageHtml.includes(ARTICLE_H1), "Creator article is missing the approved H1");
-    assert(
-      renderedHtml.includes(META_TITLE),
-      "Creator article is missing the approved meta title",
-    );
-    assert(
-      renderedHtml.includes(META_DESCRIPTION),
-      "Creator article is missing the approved meta description",
-    );
-    assert(
-      renderedHtml.includes(`href="${CANONICAL_URL}"`),
-      "Creator article has an incorrect canonical URL",
-    );
-    const ctaCount = pageHtml.split(CTA_HEADING).length - 1;
-    assert(
-      ctaCount === 2,
-      `Creator article must render two CreatorPathsCta blocks (found ${ctaCount})`,
-    );
-    assert(
-      renderedHtml.includes(STUDIO_HREF),
-      "Creator article is missing Studio URL",
-    );
-    assert(
-      renderedHtml.includes(SCHOOL_ORIGIN),
-      "Creator article is missing School URL",
-    );
-    const creatorProductAnchors = [
-      ...anchorsForHref(pageHtml, STUDIO_HREF),
-      ...anchorsForHref(pageHtml, SCHOOL_ORIGIN),
-    ];
-    assert(
-      creatorProductAnchors.length === 9,
-      `Creator article must render all Studio and School links (found ${creatorProductAnchors.length})`,
-    );
-    assert(
-      creatorProductAnchors.every(
-        (anchor) =>
-          anchor.includes('target="_blank"') &&
-          anchor.includes('rel="noopener noreferrer"'),
-      ),
-      "Creator Studio and School links must preserve the article in a safe new tab",
-    );
-    assert(
-      [...pageHtml.matchAll(/<a\b[^>]*target="_blank"[^>]*>/gi)]
-        .map((match) => match[0])
-        .every(
+      assert(
+        response.status === 200,
+        `${article.path} returned HTTP ${response.status}:\n${html.slice(0, 1_000)}`,
+      );
+      assert(
+        pageHtml.includes(article.h1),
+        `${article.path} is missing the approved H1`,
+      );
+      assert(
+        renderedHtml.includes(article.metaTitle),
+        `${article.path} is missing the approved meta title`,
+      );
+      assert(
+        renderedHtml.includes(article.metaDescription),
+        `${article.path} is missing the approved meta description`,
+      );
+      assert(
+        renderedHtml.includes(`href="${article.canonicalUrl}"`),
+        `${article.path} has an incorrect canonical URL`,
+      );
+      const ctaCount = pageHtml.split(CTA_HEADING).length - 1;
+      assert(
+        ctaCount === 2,
+        `${article.path} must render two CreatorPathsCta blocks (found ${ctaCount})`,
+      );
+      assert(
+        renderedHtml.includes(STUDIO_HREF),
+        `${article.path} is missing Studio URL`,
+      );
+      assert(
+        renderedHtml.includes(SCHOOL_ORIGIN),
+        `${article.path} is missing School URL`,
+      );
+      if (article.requiredSnippet) {
+        assert(
+          renderedHtml.includes(article.requiredSnippet),
+          `${article.path} is missing the required parent-article link`,
+        );
+      }
+      const creatorProductAnchors = [
+        ...anchorsForHref(pageHtml, STUDIO_HREF),
+        ...anchorsForHref(pageHtml, SCHOOL_ORIGIN),
+      ];
+      assert(
+        creatorProductAnchors.length === article.productLinkCount,
+        `${article.path} must render all Studio and School links (found ${creatorProductAnchors.length})`,
+      );
+      assert(
+        creatorProductAnchors.every(
           (anchor) =>
-            anchor.includes(`href="${STUDIO_HREF}"`) ||
-            anchor.includes(`href="${SCHOOL_ORIGIN}"`),
+            anchor.includes('target="_blank"') &&
+            anchor.includes('rel="noopener noreferrer"'),
         ),
-      "Only creator Studio and School links may open in a new tab",
-    );
-    assert(
-      renderedHtml.lastIndexOf("Частые вопросы") >
-        renderedHtml.lastIndexOf(CTA_HEADING),
-      "Creator FAQ must follow the bottom CreatorPathsCta",
-    );
-    assert(
-      !renderedHtml.includes(
-        "useArticlePlayback must be used within ArticlePlaybackProvider",
-      ),
-      "Creator article must not require ArticlePlaybackProvider",
-    );
+        `${article.path} Studio and School links must preserve the article in a safe new tab`,
+      );
+      assert(
+        [...pageHtml.matchAll(/<a\b[^>]*target="_blank"[^>]*>/gi)]
+          .map((match) => match[0])
+          .every(
+            (anchor) =>
+              anchor.includes(`href="${STUDIO_HREF}"`) ||
+              anchor.includes(`href="${SCHOOL_ORIGIN}"`),
+          ),
+        `${article.path} may open only Studio and School links in a new tab`,
+      );
+      assert(
+        renderedHtml.lastIndexOf("Частые вопросы") >
+          renderedHtml.lastIndexOf(CTA_HEADING),
+        `${article.path} FAQ must follow the bottom CreatorPathsCta`,
+      );
+      assert(
+        !renderedHtml.includes(
+          "useArticlePlayback must be used within ArticlePlaybackProvider",
+        ),
+        `${article.path} must not require ArticlePlaybackProvider`,
+      );
+      assert(
+        !pageHtml.includes("article-primary-practice-heading"),
+        `${article.path} must not render a practice player`,
+      );
+    }
 
     console.log("seo-article-runtime: OK");
   } finally {

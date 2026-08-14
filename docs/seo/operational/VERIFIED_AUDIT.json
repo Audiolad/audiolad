@@ -889,6 +889,18 @@
       "release": "20260814-042524-7b4f3249",
       "buildId": "HpHXTHmzidY8ehpePBQXT",
       "validatedAt": "2026-08-14T04:30:07Z"
+    },
+    {
+      "articleId": "ART_new_20260814_kak-zapisat-meditatsiyu-samostoyatelno",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "slug": "kak-zapisat-meditatsiyu-samostoyatelno",
+      "productionUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "plannedUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "status": "PUBLISHED",
+      "practiceKey": null,
+      "practiceRelevance": "NOT_APPLICABLE",
+      "validationStatus": "VALIDATE PASS",
+      "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy."
     }
   ]
 }

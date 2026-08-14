@@ -5155,6 +5155,74 @@ assert(
   creatorPathsArticle.faq.length === 8,
   "creator paths article keeps the approved FAQ set",
 );
+
+const recordingCreatorArticle = getArticleBySlug(
+  "kak-zapisat-meditatsiyu-samostoyatelno",
+);
+assert(recordingCreatorArticle, "recording creator article registered");
+assert(
+  recordingCreatorArticle.productContinuation.kind === "creator_paths",
+  "recording creator article uses creator continuation",
+);
+assert(
+  recordingCreatorArticle.productContinuation.emphasis === "balanced",
+  "recording creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in recordingCreatorArticle),
+  "recording creator article does not require a catalog practice",
+);
+assert(
+  recordingCreatorArticle.title ===
+    "Как записать медитацию самостоятельно: пошаговая инструкция",
+  "recording creator article keeps the approved H1",
+);
+assert(
+  recordingCreatorArticle.metaTitle ===
+    "Как записать медитацию самостоятельно: пошаговая инструкция",
+  "recording creator article keeps the approved meta title",
+);
+assert(
+  recordingCreatorArticle.metaDescription ===
+    "Как записать медитацию самостоятельно дома: подготовить помещение, телефон или микрофон, голос, сделать тестовую запись и обработать результат.",
+  "recording creator article keeps the approved meta description",
+);
+assert(
+  recordingCreatorArticle.shortAnswer === undefined,
+  "recording creator article does not add unapproved summary copy",
+);
+assert(
+  recordingCreatorArticle.seeAlsoLinks.length === 0,
+  "recording creator article does not add unapproved product links",
+);
+assert(
+  recordingCreatorArticle.faq.length === 8,
+  "recording creator article keeps the approved FAQ set",
+);
+assert(
+  JSON.stringify(recordingCreatorArticle).includes(
+    "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  ),
+  "recording creator article keeps the parent creator article link",
+);
+const recordingCreatorPageData = {
+  article: recordingCreatorArticle,
+  path: "/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+  canonicalUrl:
+    "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(recordingCreatorArticle),
+};
+const recordingCreatorMetadata = buildArticleMetadata(recordingCreatorPageData);
+assert(
+  !recordingCreatorMetadata.openGraph?.images,
+  "recording creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(recordingCreatorPageData)).includes(
+    '"image"',
+  ),
+  "recording creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5181,6 +5249,22 @@ assert(serialized.includes('"@type":"BreadcrumbList"'), "BreadcrumbList schema")
 assert(serialized.includes("Редакция АудиоЛада"), "editorial author in json-ld");
 
 const sitemapEntries = mapArticleDefinitionsToSitemapEntries(undefined, "https://audiolad.ru");
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+  ),
+  "recording creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+  ).length === 1,
+  "recording creator article has a single sitemap URL",
+);
 assert(
   sitemapEntries.some(
     (entry) =>

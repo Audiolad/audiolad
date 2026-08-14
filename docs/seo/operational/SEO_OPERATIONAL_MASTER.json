@@ -2758,6 +2758,43 @@
       "release": "20260814-042524-7b4f3249",
       "buildId": "HpHXTHmzidY8ehpePBQXT",
       "validatedAt": "2026-08-14T04:30:07Z"
+    },
+    {
+      "articleId": "ART_new_20260814_kak-zapisat-meditatsiyu-samostoyatelno",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как записать медитацию самостоятельно: пошаговая инструкция",
+      "slug": "kak-zapisat-meditatsiyu-samostoyatelno",
+      "productionUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "plannedUrl": "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "primaryQuery": "как записать медитацию самостоятельно",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PUBLISHED",
+      "articleType": "creator",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Creator recording article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": null,
+        "title": null,
+        "slug": null,
+        "productionUrl": null,
+        "availabilityStatus": "NOT_APPLICABLE_CREATOR_ARTICLE",
+        "note": "Creator article uses Studio and School paths; no catalog practice is attached."
+      },
+      "practiceRelevance": "NOT_APPLICABLE",
+      "publishedAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "validationStatus": "VALIDATE PASS",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
+        "operationalAddedAt": "2026-08-14"
+      }
     }
   ],
   "nextQueue": [],
