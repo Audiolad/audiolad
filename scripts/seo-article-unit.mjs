@@ -5845,6 +5845,92 @@ assert(
   ),
   "advertising creator json-ld omits practice image",
 );
+
+const beginnerCreatorArticle = getArticleBySlug(
+  "kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+);
+assert(beginnerCreatorArticle, "beginner creator article registered");
+assert(
+  beginnerCreatorArticle.productContinuation.kind === "creator_paths",
+  "beginner creator article uses creator continuation",
+);
+assert(
+  beginnerCreatorArticle.productContinuation.emphasis === "balanced",
+  "beginner creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in beginnerCreatorArticle),
+  "beginner creator article does not require a catalog practice",
+);
+assert(
+  beginnerCreatorArticle.title ===
+    "Как начинающему психологу найти первых клиентов",
+  "beginner creator article keeps the approved H1",
+);
+assert(
+  beginnerCreatorArticle.metaTitle ===
+    "Как начинающему психологу найти первых клиентов",
+  "beginner creator article keeps the approved meta title",
+);
+assert(
+  beginnerCreatorArticle.metaDescription ===
+    "Как начинающему психологу найти первых клиентов: где искать первые обращения, как сформировать доверие, начать без большой аудитории и выстроить простую систему.",
+  "beginner creator article keeps the approved meta description",
+);
+assert(
+  beginnerCreatorArticle.shortAnswer === undefined,
+  "beginner creator article does not add unapproved summary copy",
+);
+assert(
+  beginnerCreatorArticle.seeAlsoLinks.length === 0,
+  "beginner creator article does not add unapproved product links",
+);
+assert(
+  beginnerCreatorArticle.faq.length === 8,
+  "beginner creator article keeps the approved FAQ set",
+);
+const beginnerCreatorSerialized = JSON.stringify(beginnerCreatorArticle);
+assert(
+  beginnerCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+  ) &&
+    beginnerCreatorSerialized.includes(
+      "https://audiolad.ru/articles/reklama-psikhologa",
+    ) &&
+    beginnerCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    beginnerCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    ) &&
+    beginnerCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ),
+  "beginner creator article keeps the approved creator article links",
+);
+const beginnerCreatorPageData = {
+  article: beginnerCreatorArticle,
+  path: "/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  canonicalUrl:
+    "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(beginnerCreatorArticle),
+};
+const beginnerCreatorMetadata = buildArticleMetadata(beginnerCreatorPageData);
+assert(
+  beginnerCreatorMetadata.robots?.index === true &&
+    beginnerCreatorMetadata.robots?.follow === true,
+  "beginner creator metadata stays indexable",
+);
+assert(
+  !beginnerCreatorMetadata.openGraph?.images,
+  "beginner creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(beginnerCreatorPageData)).includes(
+    '"image"',
+  ),
+  "beginner creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5956,6 +6042,22 @@ assert(
       entry.url === "https://audiolad.ru/articles/reklama-psikhologa",
   ).length === 1,
   "advertising creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  ),
+  "beginner creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+  ).length === 1,
+  "beginner creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

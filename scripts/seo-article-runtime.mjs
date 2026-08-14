@@ -150,6 +150,24 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
     ],
   },
+  {
+    path: "/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+    h1: "Как начинающему психологу найти первых клиентов",
+    metaTitle: "Как начинающему психологу найти первых клиентов",
+    metaDescription:
+      "Как начинающему психологу найти первых клиентов: где искать первые обращения, как сформировать доверие, начать без большой аудитории и выстроить простую систему.",
+    canonicalUrl:
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/reklama-psikhologa",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {
