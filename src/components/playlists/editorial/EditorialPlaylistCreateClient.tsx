@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { buildEditorialDraftSlug } from "@/lib/playlists/editorial-slug";
 import {
@@ -16,17 +16,11 @@ export default function EditorialPlaylistCreateClient() {
   const slugId = useId();
   const descriptionId = useId();
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugManual, setSlugManual] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!slugTouched) {
-      setSlug(buildEditorialDraftSlug(title));
-    }
-  }, [slugTouched, title]);
+  const slug = slugManual ?? buildEditorialDraftSlug(title);
 
   async function submit() {
     if (submitting) {
@@ -120,10 +114,7 @@ export default function EditorialPlaylistCreateClient() {
           <input
             id={slugId}
             value={slug}
-            onChange={(event) => {
-              setSlugTouched(true);
-              setSlug(event.target.value);
-            }}
+            onChange={(event) => setSlugManual(event.target.value)}
             className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
           />
           <span className="mt-2 block text-xs leading-5 text-[#7d70a2]">

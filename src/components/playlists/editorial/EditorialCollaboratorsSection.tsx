@@ -44,8 +44,6 @@ export default function EditorialCollaboratorsSection({
   const [newRole, setNewRole] = useState<PlaylistCollaboratorRole>("editor");
 
   async function loadCollaborators() {
-    setLoadError(null);
-
     try {
       const response = await fetch(`/api/playlists/${playlistId}/collaborators`, {
         credentials: "same-origin",
@@ -58,31 +56,63 @@ export default function EditorialCollaboratorsSection({
 
       const data = (await response.json()) as { collaborators?: CollaboratorRow[] };
       setRows(data.collaborators ?? []);
+      setLoadError(null);
     } catch {
       setLoadError("Не удалось загрузить редакторов.");
     }
   }
 
   useEffect(() => {
-    void loadCollaborators();
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch(
+          `/api/playlists/${playlistId}/collaborators`,
+          { credentials: "same-origin" },
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          setLoadError("Не удалось загрузить редакторов.");
+          return;
+        }
+
+        const data = (await response.json()) as {
+          collaborators?: CollaboratorRow[];
+        };
+        setRows(data.collaborators ?? []);
+        setLoadError(null);
+      } catch {
+        if (!cancelled) {
+          setLoadError("Не удалось загрузить редакторов.");
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [playlistId]);
 
-  useEffect(() => {
-    const trimmed = query.trim();
+  const trimmedQuery = query.trim();
+  const searchActive = trimmedQuery.length >= 2;
 
-    if (trimmed.length < 2) {
-      setResults([]);
-      setNotFound(false);
+  useEffect(() => {
+    if (!searchActive) {
       return;
     }
 
     const timer = window.setTimeout(async () => {
       setSearching(true);
-      setNotFound(false);
 
       try {
         const response = await fetch(
-          `/api/editorial/users/search?q=${encodeURIComponent(trimmed)}`,
+          `/api/editorial/users/search?q=${encodeURIComponent(trimmedQuery)}`,
           { credentials: "same-origin" },
         );
         const data = (await response.json().catch(() => ({}))) as {
@@ -91,6 +121,7 @@ export default function EditorialCollaboratorsSection({
 
         if (!response.ok) {
           setResults([]);
+          setNotFound(false);
           return;
         }
 
@@ -99,13 +130,14 @@ export default function EditorialCollaboratorsSection({
         setNotFound(users.length === 0);
       } catch {
         setResults([]);
+        setNotFound(false);
       } finally {
         setSearching(false);
       }
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [query]);
+  }, [searchActive, trimmedQuery]);
 
   async function addUser(user: SearchUser) {
     setBusyUserId(user.id);
@@ -232,17 +264,17 @@ export default function EditorialCollaboratorsSection({
         </label>
       </div>
 
-      {searching ? (
+      {searchActive && searching ? (
         <p className="mt-3 text-sm text-[#7d70a2]">Поиск…</p>
       ) : null}
 
-      {notFound ? (
+      {searchActive && notFound ? (
         <p className="mt-3 text-sm text-[#7d70a2]">
           Пользователь Audiolad не найден. Сначала он должен создать аккаунт.
         </p>
       ) : null}
 
-      {results.length > 0 ? (
+      {searchActive && results.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {results.map((user) => (
             <li key={user.id}>

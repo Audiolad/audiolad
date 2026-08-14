@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -61,7 +60,7 @@ export default function EditorialPlaylistEditorClient({
   const [title, setTitle] = useState(detail.playlist.title);
   const [slug, setSlug] = useState(detail.playlist.slug ?? "");
   const [description, setDescription] = useState(detail.playlist.description ?? "");
-  const [items, setItems] = useState(detail.items);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [coverUrl, setCoverUrl] = useState(detail.coverUrl);
   const [page, setPage] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -74,6 +73,7 @@ export default function EditorialPlaylistEditorClient({
 
   const published = detail.playlist.visibility === "public";
   const slugLocked = detail.slugLocked;
+  const items = detail.items.filter((item) => !removedIds.has(item.practiceId));
   const itemsCount = items.length;
   const uniqueAuthorCount = useMemo(() => {
     const ids = new Set(
@@ -87,14 +87,6 @@ export default function EditorialPlaylistEditorClient({
   const pageItems = items.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const softCountWarning = itemsCount > 0 && itemsCount < 7;
   const diversityHint = detail.diversityHint;
-
-  useEffect(() => {
-    setItems(detail.items);
-    setCoverUrl(detail.coverUrl);
-    setTitle(detail.playlist.title);
-    setSlug(detail.playlist.slug ?? "");
-    setDescription(detail.playlist.description ?? "");
-  }, [detail]);
 
   function refresh() {
     startTransition(() => {
@@ -286,9 +278,11 @@ export default function EditorialPlaylistEditorClient({
         return;
       }
 
-      setItems((current) =>
-        current.filter((item) => item.practiceId !== practiceId),
-      );
+      setRemovedIds((current) => {
+        const next = new Set(current);
+        next.add(practiceId);
+        return next;
+      });
       refresh();
     } catch {
       setListError("Не удалось удалить материал.");

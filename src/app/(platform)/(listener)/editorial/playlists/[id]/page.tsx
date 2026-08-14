@@ -50,5 +50,10 @@ export default async function EditorialPlaylistEditorPage({
     );
   }
 
-  return <EditorialPlaylistEditorClient detail={loaded.detail} />;
+  return (
+    <EditorialPlaylistEditorClient
+      key={`${loaded.detail.playlist.updated_at}-${loaded.detail.itemsCount}-${loaded.detail.playlist.slug ?? ""}`}
+      detail={loaded.detail}
+    />
+  );
 }
