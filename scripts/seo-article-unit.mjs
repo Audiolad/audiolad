@@ -5604,6 +5604,86 @@ assert(
   ),
   "music creation creator json-ld omits practice image",
 );
+
+const psychologistCreatorArticle = getArticleBySlug(
+  "kak-psikhologu-nayti-klientov",
+);
+assert(psychologistCreatorArticle, "psychologist creator article registered");
+assert(
+  psychologistCreatorArticle.productContinuation.kind === "creator_paths",
+  "psychologist creator article uses creator continuation",
+);
+assert(
+  psychologistCreatorArticle.productContinuation.emphasis === "balanced",
+  "psychologist creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in psychologistCreatorArticle),
+  "psychologist creator article does not require a catalog practice",
+);
+assert(
+  psychologistCreatorArticle.title ===
+    "Как психологу найти клиентов: способы привлечения клиентов в частную практику",
+  "psychologist creator article keeps the approved H1",
+);
+assert(
+  psychologistCreatorArticle.metaTitle ===
+    "Как психологу найти клиентов в частную практику",
+  "psychologist creator article keeps the approved meta title",
+);
+assert(
+  psychologistCreatorArticle.metaDescription ===
+    "Как психологу найти клиентов: рекомендации, блог, поисковый трафик, соцсети, партнёрства и другие способы выстроить систему привлечения в частную практику.",
+  "psychologist creator article keeps the approved meta description",
+);
+assert(
+  psychologistCreatorArticle.shortAnswer === undefined,
+  "psychologist creator article does not add unapproved summary copy",
+);
+assert(
+  psychologistCreatorArticle.seeAlsoLinks.length === 0,
+  "psychologist creator article does not add unapproved product links",
+);
+assert(
+  psychologistCreatorArticle.faq.length === 8,
+  "psychologist creator article keeps the approved FAQ set",
+);
+const psychologistCreatorSerialized = JSON.stringify(psychologistCreatorArticle);
+assert(
+  psychologistCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+  ) &&
+    psychologistCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ),
+  "psychologist creator article keeps the approved creator article links",
+);
+const psychologistCreatorPageData = {
+  article: psychologistCreatorArticle,
+  path: "/articles/kak-psikhologu-nayti-klientov",
+  canonicalUrl: "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    psychologistCreatorArticle,
+  ),
+};
+const psychologistCreatorMetadata = buildArticleMetadata(
+  psychologistCreatorPageData,
+);
+assert(
+  psychologistCreatorMetadata.robots?.index === true &&
+    psychologistCreatorMetadata.robots?.follow === true,
+  "psychologist creator metadata stays indexable",
+);
+assert(
+  !psychologistCreatorMetadata.openGraph?.images,
+  "psychologist creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(psychologistCreatorPageData)).includes(
+    '"image"',
+  ),
+  "psychologist creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -5673,6 +5753,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/sozdanie-muzyki-dlya-meditatsiy",
   ).length === 1,
   "music creation creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+  ),
+  "psychologist creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+  ).length === 1,
+  "psychologist creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

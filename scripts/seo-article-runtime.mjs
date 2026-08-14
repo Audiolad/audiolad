@@ -105,6 +105,20 @@ const CREATOR_ARTICLES = [
     requiredSnippet:
       "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-s-muzykoy-samostoyatelno",
   },
+  {
+    path: "/articles/kak-psikhologu-nayti-klientov",
+    h1: "Как психологу найти клиентов: способы привлечения клиентов в частную практику",
+    metaTitle: "Как психологу найти клиентов в частную практику",
+    metaDescription:
+      "Как психологу найти клиентов: рекомендации, блог, поисковый трафик, соцсети, партнёрства и другие способы выстроить систему привлечения в частную практику.",
+    canonicalUrl: "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ],
+  },
 ];
 
 function assert(condition, message) {
