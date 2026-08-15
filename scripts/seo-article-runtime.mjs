@@ -298,6 +298,24 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/prodazhi-psikhologa",
     ],
   },
+  {
+    path: "/articles/meditatsii-dlya-klientov-psikhologa",
+    h1: "Медитации и аудиопрактики для клиентов психолога: как создать свой аудиопродукт",
+    metaTitle: "Медитации для клиентов психолога: как создать аудиопрактику",
+    metaDescription:
+      "Как психологу создать медитацию или аудиопрактику для клиентов: выбрать тему, написать сценарий, записать голос и превратить материал в аудиопродукт.",
+    canonicalUrl: "https://audiolad.ru/articles/meditatsii-dlya-klientov-psikhologa",
+    productLinkCount: 11,
+    requiredSnippet: "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/produkty-psikhologa",
+      "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+      "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+      "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+    ],
+  },
 ];
 
 function assert(condition, message) {

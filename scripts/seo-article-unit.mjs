@@ -6602,6 +6602,110 @@ assert(
   ),
   "lead magnet creator json-ld omits practice image",
 );
+const clientMeditationsCreatorArticle = getArticleBySlug(
+  "meditatsii-dlya-klientov-psikhologa",
+);
+assert(
+  clientMeditationsCreatorArticle,
+  "client meditations creator article registered",
+);
+assert(
+  clientMeditationsCreatorArticle.productContinuation.kind === "creator_paths",
+  "client meditations creator article uses creator continuation",
+);
+assert(
+  clientMeditationsCreatorArticle.productContinuation.emphasis === "balanced",
+  "client meditations creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in clientMeditationsCreatorArticle),
+  "client meditations creator article does not require a catalog practice",
+);
+assert(
+  clientMeditationsCreatorArticle.title ===
+    "Медитации и аудиопрактики для клиентов психолога: как создать свой аудиопродукт",
+  "client meditations creator article keeps the approved H1",
+);
+assert(
+  clientMeditationsCreatorArticle.metaTitle ===
+    "Медитации для клиентов психолога: как создать аудиопрактику",
+  "client meditations creator article keeps the approved meta title",
+);
+assert(
+  clientMeditationsCreatorArticle.metaDescription ===
+    "Как психологу создать медитацию или аудиопрактику для клиентов: выбрать тему, написать сценарий, записать голос и превратить материал в аудиопродукт.",
+  "client meditations creator article keeps the approved meta description",
+);
+assert(
+  clientMeditationsCreatorArticle.leadBeforeAudio ===
+    "Медитации для клиентов психолога – это не обязательно отдельный большой курс или сложный технический проект. В работе специалиста уже накапливаются упражнения, вопросы, сценарии, способы самонаблюдения и объяснения, которые иногда удобно перевести в аудиоформат.",
+  "client meditations creator article keeps the approved lead",
+);
+assert(
+  clientMeditationsCreatorArticle.shortAnswer === undefined,
+  "client meditations creator article does not add unapproved summary copy",
+);
+assert(
+  clientMeditationsCreatorArticle.seeAlsoLinks.length === 0,
+  "client meditations creator article does not add unapproved product links",
+);
+assert(
+  clientMeditationsCreatorArticle.faq.length === 8,
+  "client meditations creator article keeps the approved FAQ set",
+);
+const clientMeditationsCreatorSerialized = JSON.stringify(
+  clientMeditationsCreatorArticle,
+);
+assert(
+  clientMeditationsCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+  ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/produkty-psikhologa",
+    ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-napisat-tekst-meditatsii",
+    ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-sozdat-svoyu-meditatsiyu",
+    ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-zapisat-meditatsiyu-samostoyatelno",
+    ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+    ) &&
+    clientMeditationsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+    ),
+  "client meditations creator article keeps the approved creator article links",
+);
+const clientMeditationsCreatorPageData = {
+  article: clientMeditationsCreatorArticle,
+  path: "/articles/meditatsii-dlya-klientov-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/meditatsii-dlya-klientov-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    clientMeditationsCreatorArticle,
+  ),
+};
+const clientMeditationsCreatorMetadata = buildArticleMetadata(
+  clientMeditationsCreatorPageData,
+);
+assert(
+  clientMeditationsCreatorMetadata.robots?.index === true &&
+    clientMeditationsCreatorMetadata.robots?.follow === true,
+  "client meditations creator metadata stays indexable",
+);
+assert(
+  !clientMeditationsCreatorMetadata.openGraph?.images,
+  "client meditations creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(clientMeditationsCreatorPageData),
+  ).includes('"image"'),
+  "client meditations creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6841,6 +6945,22 @@ assert(
       entry.url === "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
   ).length === 1,
   "lead magnet creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/meditatsii-dlya-klientov-psikhologa",
+  ),
+  "client meditations creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url ===
+      "https://audiolad.ru/articles/meditatsii-dlya-klientov-psikhologa",
+  ).length === 1,
+  "client meditations creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
