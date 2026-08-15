@@ -7169,6 +7169,111 @@ assert(
   ).includes('"image"'),
   "consultant promotion creator json-ld omits practice image",
 );
+const mentorPromotionCreatorArticle = getArticleBySlug(
+  "prodvizhenie-nastavnika",
+);
+assert(
+  mentorPromotionCreatorArticle,
+  "mentor promotion creator article registered",
+);
+assert(
+  mentorPromotionCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "mentor promotion creator article uses creator continuation",
+);
+assert(
+  mentorPromotionCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "mentor promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in mentorPromotionCreatorArticle),
+  "mentor promotion creator article does not require a catalog practice",
+);
+assert(
+  mentorPromotionCreatorArticle.title ===
+    "Продвижение наставника: как находить клиентов и развивать свою практику",
+  "mentor promotion creator article keeps the approved H1",
+);
+assert(
+  mentorPromotionCreatorArticle.metaTitle ===
+    "Продвижение наставника: как находить клиентов",
+  "mentor promotion creator article keeps the approved meta title",
+);
+assert(
+  mentorPromotionCreatorArticle.metaDescription ===
+    "Продвижение наставника: как определить специализацию, сформулировать предложение, находить клиентов через контент, рекомендации, сообщества и рекламу.",
+  "mentor promotion creator article keeps the approved meta description",
+);
+assert(
+  mentorPromotionCreatorArticle.topicSlug === "articles" &&
+    mentorPromotionCreatorArticle.topicTitle === "Статьи" &&
+    mentorPromotionCreatorArticle.topicHref === "/articles",
+  "mentor promotion creator article keeps the articles topic",
+);
+assert(
+  mentorPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение наставника начинается не с выбора социальной сети, а с понятной профессиональной роли. Потенциальному клиенту нужно быстро понять, в чём реальный опыт специалиста, кому он полезен, как выглядит сопровождение и что происходит внутри наставничества.",
+  "mentor promotion creator article keeps the approved lead",
+);
+assert(
+  mentorPromotionCreatorArticle.shortAnswer === undefined,
+  "mentor promotion creator article does not add unapproved summary copy",
+);
+assert(
+  mentorPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "mentor promotion creator article does not add unapproved product links",
+);
+assert(
+  mentorPromotionCreatorArticle.faq.length === 8,
+  "mentor promotion creator article keeps the approved FAQ set",
+);
+const mentorPromotionCreatorSerialized = JSON.stringify(
+  mentorPromotionCreatorArticle,
+);
+assert(
+  mentorPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "mentor promotion creator article keeps the approved internal article links",
+);
+assert(
+  mentorPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/studio/meditation",
+  ) &&
+    mentorPromotionCreatorSerialized.includes("https://school.audiolad.ru"),
+  "mentor promotion creator article keeps Studio and School product links",
+);
+assert(
+  !mentorPromotionCreatorSerialized.includes("—"),
+  "mentor promotion creator article uses medium dash, not em dash",
+);
+const mentorPromotionCreatorPageData = {
+  article: mentorPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-nastavnika",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-nastavnika",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    mentorPromotionCreatorArticle,
+  ),
+};
+const mentorPromotionCreatorMetadata = buildArticleMetadata(
+  mentorPromotionCreatorPageData,
+);
+assert(
+  mentorPromotionCreatorMetadata.robots?.index === true &&
+    mentorPromotionCreatorMetadata.robots?.follow === true,
+  "mentor promotion creator metadata stays indexable",
+);
+assert(
+  !mentorPromotionCreatorMetadata.openGraph?.images,
+  "mentor promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(mentorPromotionCreatorPageData),
+  ).includes('"image"'),
+  "mentor promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7494,6 +7599,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-konsultanta",
   ).length === 1,
   "consultant promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-nastavnika",
+  ),
+  "mentor promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-nastavnika",
+  ).length === 1,
+  "mentor promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
