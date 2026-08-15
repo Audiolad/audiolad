@@ -352,7 +352,7 @@ export const SKOLKO_ZARABATYVAET_KOUCH_ARTICLE = {
             {
               text: "Если хочется научиться находить темы, писать сценарии, работать с голосом и создавать серии собственных аудиопродуктов, для этого есть ",
             },
-            { href: "https://school.audiolad.ru", label: "Школе Аудиопрактик" },
+            { href: "https://school.audiolad.ru", label: "Школа Аудиопрактик" },
             { text: "." },
           ],
         },
