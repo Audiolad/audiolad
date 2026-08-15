@@ -200,6 +200,23 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
     ],
   },
+  {
+    path: "/articles/prodazhi-psikhologa",
+    h1: "Продажи психолога: как продавать консультации и свои услуги",
+    metaTitle: "Продажи психолога: как продавать консультации и услуги",
+    metaDescription:
+      "Продажи психолога: как продавать консультации и услуги без давления, выстроить понятное предложение, воронку и путь от интереса к записи.",
+    canonicalUrl: "https://audiolad.ru/articles/prodazhi-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/blog-psikhologa",
+      "https://audiolad.ru/articles/reklama-psikhologa",
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {
