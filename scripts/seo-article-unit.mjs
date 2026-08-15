@@ -6172,6 +6172,91 @@ assert(
   ),
   "sales creator json-ld omits practice image",
 );
+const incomeCreatorArticle = getArticleBySlug("kak-psikhologu-zarabotat");
+assert(incomeCreatorArticle, "income creator article registered");
+assert(
+  incomeCreatorArticle.productContinuation.kind === "creator_paths",
+  "income creator article uses creator continuation",
+);
+assert(
+  incomeCreatorArticle.productContinuation.emphasis === "balanced",
+  "income creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in incomeCreatorArticle),
+  "income creator article does not require a catalog practice",
+);
+assert(
+  incomeCreatorArticle.title ===
+    "Как психологу заработать: способы увеличить доход и монетизировать опыт",
+  "income creator article keeps the approved H1",
+);
+assert(
+  incomeCreatorArticle.metaTitle ===
+    "Как психологу заработать: способы увеличить доход",
+  "income creator article keeps the approved meta title",
+);
+assert(
+  incomeCreatorArticle.metaDescription ===
+    "Как психологу заработать: консультации, группы, цифровые материалы и аудиопродукты. Как увеличить доход и монетизировать профессиональный опыт.",
+  "income creator article keeps the approved meta description",
+);
+assert(
+  incomeCreatorArticle.shortAnswer === undefined,
+  "income creator article does not add unapproved summary copy",
+);
+assert(
+  incomeCreatorArticle.seeAlsoLinks.length === 0,
+  "income creator article does not add unapproved product links",
+);
+assert(
+  incomeCreatorArticle.faq.length === 8,
+  "income creator article keeps the approved FAQ set",
+);
+const incomeCreatorSerialized = JSON.stringify(incomeCreatorArticle);
+assert(
+  incomeCreatorSerialized.includes(
+    "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+  ) &&
+    incomeCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    ) &&
+    incomeCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+    ) &&
+    incomeCreatorSerialized.includes(
+      "https://audiolad.ru/articles/blog-psikhologa",
+    ) &&
+    incomeCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    incomeCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+    ),
+  "income creator article keeps the approved creator article links",
+);
+const incomeCreatorPageData = {
+  article: incomeCreatorArticle,
+  path: "/articles/kak-psikhologu-zarabotat",
+  canonicalUrl: "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(incomeCreatorArticle),
+};
+const incomeCreatorMetadata = buildArticleMetadata(incomeCreatorPageData);
+assert(
+  incomeCreatorMetadata.robots?.index === true &&
+    incomeCreatorMetadata.robots?.follow === true,
+  "income creator metadata stays indexable",
+);
+assert(
+  !incomeCreatorMetadata.openGraph?.images,
+  "income creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(incomeCreatorPageData)).includes(
+    '"image"',
+  ),
+  "income creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6341,6 +6426,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodazhi-psikhologa",
   ).length === 1,
   "sales creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+  ),
+  "income creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+  ).length === 1,
+  "income creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

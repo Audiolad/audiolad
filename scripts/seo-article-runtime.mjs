@@ -217,6 +217,24 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
     ],
   },
+  {
+    path: "/articles/kak-psikhologu-zarabotat",
+    h1: "Как психологу заработать: способы увеличить доход и монетизировать опыт",
+    metaTitle: "Как психологу заработать: способы увеличить доход",
+    metaDescription:
+      "Как психологу заработать: консультации, группы, цифровые материалы и аудиопродукты. Как увеличить доход и монетизировать профессиональный опыт.",
+    canonicalUrl: "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+    productLinkCount: 10,
+    requiredSnippet:
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+      "https://audiolad.ru/articles/kak-nachinayushchemu-psikhologu-nayti-pervykh-klientov",
+      "https://audiolad.ru/articles/blog-psikhologa",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {
