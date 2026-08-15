@@ -6428,6 +6428,93 @@ assert(
   ),
   "content creator json-ld omits practice image",
 );
+const brandCreatorArticle = getArticleBySlug("lichnyy-brend-psikhologa");
+assert(brandCreatorArticle, "brand creator article registered");
+assert(
+  brandCreatorArticle.productContinuation.kind === "creator_paths",
+  "brand creator article uses creator continuation",
+);
+assert(
+  brandCreatorArticle.productContinuation.emphasis === "balanced",
+  "brand creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in brandCreatorArticle),
+  "brand creator article does not require a catalog practice",
+);
+assert(
+  brandCreatorArticle.title ===
+    "Личный бренд психолога: как позиционировать себя и отличаться от конкурентов",
+  "brand creator article keeps the approved H1",
+);
+assert(
+  brandCreatorArticle.metaTitle ===
+    "Личный бренд психолога: как позиционировать себя",
+  "brand creator article keeps the approved meta title",
+);
+assert(
+  brandCreatorArticle.metaDescription ===
+    "Личный бренд психолога: как выстроить позиционирование, выбрать специализацию, рассказать о себе и сформировать узнаваемый профессиональный образ.",
+  "brand creator article keeps the approved meta description",
+);
+assert(
+  brandCreatorArticle.leadBeforeAudio ===
+    "Личный бренд психолога – это не логотип, красивые фотографии и количество подписчиков. Это устойчивое представление о специалисте: с какими темами он работает, как думает, какой подход использует и чего ожидать от взаимодействия.",
+  "brand creator article keeps the approved lead",
+);
+assert(
+  brandCreatorArticle.shortAnswer === undefined,
+  "brand creator article does not add unapproved summary copy",
+);
+assert(
+  brandCreatorArticle.seeAlsoLinks.length === 0,
+  "brand creator article does not add unapproved product links",
+);
+assert(
+  brandCreatorArticle.faq.length === 8,
+  "brand creator article keeps the approved FAQ set",
+);
+const brandCreatorSerialized = JSON.stringify(brandCreatorArticle);
+assert(
+  brandCreatorSerialized.includes(
+    "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+  ) &&
+    brandCreatorSerialized.includes(
+      "https://audiolad.ru/articles/blog-psikhologa",
+    ) &&
+    brandCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+    ) &&
+    brandCreatorSerialized.includes(
+      "https://audiolad.ru/articles/produkty-psikhologa",
+    ) &&
+    brandCreatorSerialized.includes(
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ),
+  "brand creator article keeps the approved creator article links",
+);
+const brandCreatorPageData = {
+  article: brandCreatorArticle,
+  path: "/articles/lichnyy-brend-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/lichnyy-brend-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(brandCreatorArticle),
+};
+const brandCreatorMetadata = buildArticleMetadata(brandCreatorPageData);
+assert(
+  brandCreatorMetadata.robots?.index === true &&
+    brandCreatorMetadata.robots?.follow === true,
+  "brand creator metadata stays indexable",
+);
+assert(
+  !brandCreatorMetadata.openGraph?.images,
+  "brand creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(brandCreatorPageData)).includes(
+    '"image"',
+  ),
+  "brand creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6639,6 +6726,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/kontent-dlya-psikhologa",
   ).length === 1,
   "content creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/lichnyy-brend-psikhologa",
+  ),
+  "brand creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/lichnyy-brend-psikhologa",
+  ).length === 1,
+  "brand creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

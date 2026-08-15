@@ -266,6 +266,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/produkty-psikhologa",
     ],
   },
+  {
+    path: "/articles/lichnyy-brend-psikhologa",
+    h1: "Личный бренд психолога: как позиционировать себя и отличаться от конкурентов",
+    metaTitle: "Личный бренд психолога: как позиционировать себя",
+    metaDescription:
+      "Личный бренд психолога: как выстроить позиционирование, выбрать специализацию, рассказать о себе и сформировать узнаваемый профессиональный образ.",
+    canonicalUrl: "https://audiolad.ru/articles/lichnyy-brend-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/blog-psikhologa",
+      "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+      "https://audiolad.ru/articles/produkty-psikhologa",
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {
