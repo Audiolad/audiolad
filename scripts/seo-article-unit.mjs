@@ -7274,6 +7274,111 @@ assert(
   ).includes('"image"'),
   "mentor promotion creator json-ld omits practice image",
 );
+const esotericistPromotionCreatorArticle = getArticleBySlug(
+  "prodvizhenie-ezoterika",
+);
+assert(
+  esotericistPromotionCreatorArticle,
+  "esotericist promotion creator article registered",
+);
+assert(
+  esotericistPromotionCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "esotericist promotion creator article uses creator continuation",
+);
+assert(
+  esotericistPromotionCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "esotericist promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in esotericistPromotionCreatorArticle),
+  "esotericist promotion creator article does not require a catalog practice",
+);
+assert(
+  esotericistPromotionCreatorArticle.title ===
+    "Продвижение эзотерика: как продвигать свои услуги и находить клиентов",
+  "esotericist promotion creator article keeps the approved H1",
+);
+assert(
+  esotericistPromotionCreatorArticle.metaTitle ===
+    "Продвижение эзотерика: как продвигать свои услуги",
+  "esotericist promotion creator article keeps the approved meta title",
+);
+assert(
+  esotericistPromotionCreatorArticle.metaDescription ===
+    "Продвижение эзотерика: как выбрать позиционирование, оформить услуги, находить клиентов через контент, рекомендации, поиск, партнёрства и рекламу.",
+  "esotericist promotion creator article keeps the approved meta description",
+);
+assert(
+  esotericistPromotionCreatorArticle.topicSlug === "articles" &&
+    esotericistPromotionCreatorArticle.topicTitle === "Статьи" &&
+    esotericistPromotionCreatorArticle.topicHref === "/articles",
+  "esotericist promotion creator article keeps the articles topic",
+);
+assert(
+  esotericistPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение эзотерика начинается не с количества подписчиков и не с рекламы. Само слово «эзотерик» слишком широкое: один специалист проводит практики, другой работает с символическими системами, третий создаёт медитации, четвёртый занимается духовным сопровождением.",
+  "esotericist promotion creator article keeps the approved lead",
+);
+assert(
+  esotericistPromotionCreatorArticle.shortAnswer === undefined,
+  "esotericist promotion creator article does not add unapproved summary copy",
+);
+assert(
+  esotericistPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "esotericist promotion creator article does not add unapproved product links",
+);
+assert(
+  esotericistPromotionCreatorArticle.faq.length === 8,
+  "esotericist promotion creator article keeps the approved FAQ set",
+);
+const esotericistPromotionCreatorSerialized = JSON.stringify(
+  esotericistPromotionCreatorArticle,
+);
+assert(
+  esotericistPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "esotericist promotion creator article keeps the approved internal article links",
+);
+assert(
+  esotericistPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/studio/meditation",
+  ) &&
+    esotericistPromotionCreatorSerialized.includes("https://school.audiolad.ru"),
+  "esotericist promotion creator article keeps Studio and School product links",
+);
+assert(
+  !esotericistPromotionCreatorSerialized.includes("—"),
+  "esotericist promotion creator article uses medium dash, not em dash",
+);
+const esotericistPromotionCreatorPageData = {
+  article: esotericistPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-ezoterika",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-ezoterika",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    esotericistPromotionCreatorArticle,
+  ),
+};
+const esotericistPromotionCreatorMetadata = buildArticleMetadata(
+  esotericistPromotionCreatorPageData,
+);
+assert(
+  esotericistPromotionCreatorMetadata.robots?.index === true &&
+    esotericistPromotionCreatorMetadata.robots?.follow === true,
+  "esotericist promotion creator metadata stays indexable",
+);
+assert(
+  !esotericistPromotionCreatorMetadata.openGraph?.images,
+  "esotericist promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(esotericistPromotionCreatorPageData),
+  ).includes('"image"'),
+  "esotericist promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7613,6 +7718,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-nastavnika",
   ).length === 1,
   "mentor promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-ezoterika",
+  ),
+  "esotericist promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-ezoterika",
+  ).length === 1,
+  "esotericist promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

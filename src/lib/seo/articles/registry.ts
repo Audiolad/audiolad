@@ -30,6 +30,7 @@ import { KAK_PRODAVAT_SVOI_USLUGI_ARTICLE } from "./content/kak-prodavat-svoi-us
 import { REKLAMA_TAROLOGA_ARTICLE } from "./content/reklama-tarologa";
 import { PRODVIZHENIE_KONSULTANTA_ARTICLE } from "./content/prodvizhenie-konsultanta";
 import { PRODVIZHENIE_NASTAVNIKA_ARTICLE } from "./content/prodvizhenie-nastavnika";
+import { PRODVIZHENIE_EZOTERIKA_ARTICLE } from "./content/prodvizhenie-ezoterika";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
 import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
@@ -131,6 +132,7 @@ const ARTICLE_DEFINITIONS = [
   REKLAMA_TAROLOGA_ARTICLE,
   PRODVIZHENIE_KONSULTANTA_ARTICLE,
   PRODVIZHENIE_NASTAVNIKA_ARTICLE,
+  PRODVIZHENIE_EZOTERIKA_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,

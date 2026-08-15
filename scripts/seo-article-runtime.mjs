@@ -379,6 +379,16 @@ const CREATOR_ARTICLES = [
     productLinkCount: 8,
     requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
   },
+  {
+    path: "/articles/prodvizhenie-ezoterika",
+    h1: "Продвижение эзотерика: как продвигать свои услуги и находить клиентов",
+    metaTitle: "Продвижение эзотерика: как продвигать свои услуги",
+    metaDescription:
+      "Продвижение эзотерика: как выбрать позиционирование, оформить услуги, находить клиентов через контент, рекомендации, поиск, партнёрства и рекламу.",
+    canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-ezoterika",
+    productLinkCount: 8,
+    requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  },
 ];
 
 function assert(condition, message) {
