@@ -64,7 +64,38 @@ export default function EditorialDirectionDetailClient({
   }
 
   useEffect(() => {
-    void loadMembers();
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch(
+          `/api/editorial/directions/${direction.id}/members`,
+          { credentials: "same-origin" },
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          setMemberError("Не удалось загрузить редакторов направления.");
+          return;
+        }
+
+        const data = (await response.json()) as { members?: MemberRow[] };
+        setMembers(data.members ?? []);
+        setMemberError(null);
+      } catch {
+        if (!cancelled) {
+          setMemberError("Не удалось загрузить редакторов направления.");
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [direction.id]);
 
   const trimmedQuery = query.trim();
