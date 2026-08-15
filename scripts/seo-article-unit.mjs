@@ -6515,6 +6515,93 @@ assert(
   ),
   "brand creator json-ld omits practice image",
 );
+const leadMagnetCreatorArticle = getArticleBySlug("lid-magnit-dlya-psikhologa");
+assert(leadMagnetCreatorArticle, "lead magnet creator article registered");
+assert(
+  leadMagnetCreatorArticle.productContinuation.kind === "creator_paths",
+  "lead magnet creator article uses creator continuation",
+);
+assert(
+  leadMagnetCreatorArticle.productContinuation.emphasis === "balanced",
+  "lead magnet creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in leadMagnetCreatorArticle),
+  "lead magnet creator article does not require a catalog practice",
+);
+assert(
+  leadMagnetCreatorArticle.title ===
+    "Лид-магнит для психолога: что создать для привлечения новых клиентов",
+  "lead magnet creator article keeps the approved H1",
+);
+assert(
+  leadMagnetCreatorArticle.metaTitle ===
+    "Лид-магнит для психолога: идеи для привлечения клиентов",
+  "lead magnet creator article keeps the approved meta title",
+);
+assert(
+  leadMagnetCreatorArticle.metaDescription ===
+    "Лид-магнит для психолога: идеи бесплатных материалов, выбор темы и формата, аудиопрактика и понятный следующий шаг после первого знакомства.",
+  "lead magnet creator article keeps the approved meta description",
+);
+assert(
+  leadMagnetCreatorArticle.leadBeforeAudio ===
+    "Лид-магнит для психолога – это небольшой бесплатный материал, который помогает человеку познакомиться с подходом специалиста до консультации. Это может быть рабочий лист, упражнение, видео, аудиопрактика или другой формат с понятной самостоятельной пользой.",
+  "lead magnet creator article keeps the approved lead",
+);
+assert(
+  leadMagnetCreatorArticle.shortAnswer === undefined,
+  "lead magnet creator article does not add unapproved summary copy",
+);
+assert(
+  leadMagnetCreatorArticle.seeAlsoLinks.length === 0,
+  "lead magnet creator article does not add unapproved product links",
+);
+assert(
+  leadMagnetCreatorArticle.faq.length === 8,
+  "lead magnet creator article keeps the approved FAQ set",
+);
+const leadMagnetCreatorSerialized = JSON.stringify(leadMagnetCreatorArticle);
+assert(
+  leadMagnetCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+  ) &&
+    leadMagnetCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    leadMagnetCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+    ) &&
+    leadMagnetCreatorSerialized.includes(
+      "https://audiolad.ru/articles/produkty-psikhologa",
+    ) &&
+    leadMagnetCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+    ),
+  "lead magnet creator article keeps the approved creator article links",
+);
+const leadMagnetCreatorPageData = {
+  article: leadMagnetCreatorArticle,
+  path: "/articles/lid-magnit-dlya-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(leadMagnetCreatorArticle),
+};
+const leadMagnetCreatorMetadata = buildArticleMetadata(leadMagnetCreatorPageData);
+assert(
+  leadMagnetCreatorMetadata.robots?.index === true &&
+    leadMagnetCreatorMetadata.robots?.follow === true,
+  "lead magnet creator metadata stays indexable",
+);
+assert(
+  !leadMagnetCreatorMetadata.openGraph?.images,
+  "lead magnet creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(leadMagnetCreatorPageData)).includes(
+    '"image"',
+  ),
+  "lead magnet creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6740,6 +6827,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/lichnyy-brend-psikhologa",
   ).length === 1,
   "brand creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+  ),
+  "lead magnet creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+  ).length === 1,
+  "lead magnet creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

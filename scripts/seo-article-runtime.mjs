@@ -282,6 +282,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
     ],
   },
+  {
+    path: "/articles/lid-magnit-dlya-psikhologa",
+    h1: "Лид-магнит для психолога: что создать для привлечения новых клиентов",
+    metaTitle: "Лид-магнит для психолога: идеи для привлечения клиентов",
+    metaDescription:
+      "Лид-магнит для психолога: идеи бесплатных материалов, выбор темы и формата, аудиопрактика и понятный следующий шаг после первого знакомства.",
+    canonicalUrl: "https://audiolad.ru/articles/lid-magnit-dlya-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+      "https://audiolad.ru/articles/produkty-psikhologa",
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {
