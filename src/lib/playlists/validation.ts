@@ -131,6 +131,7 @@ export type CreatePlaylistInput =
       isEditorial: boolean;
       description: string | null;
       slug?: string;
+      directionId?: string;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -151,6 +152,7 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     "is_editorial",
     "description",
     "slug",
+    "direction_id",
   ]);
 
   for (const key of Object.keys(parsed)) {
@@ -204,6 +206,24 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     slug = slugResult.slug;
   }
 
+  let directionId: string | undefined;
+
+  if ("direction_id" in parsed) {
+    if (typeof parsed.direction_id !== "string" || !isUuid(parsed.direction_id)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    directionId = parsed.direction_id;
+  }
+
+  if (isEditorial && !directionId) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (!isEditorial && directionId) {
+    return { ok: false, error: "invalid_request" };
+  }
+
   return {
     ok: true,
     title: titleResult.title,
@@ -211,6 +231,7 @@ export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
     isEditorial,
     description,
     slug,
+    directionId,
   };
 }
 
@@ -222,6 +243,7 @@ export type PatchPlaylistInput =
       isEditorial?: boolean;
       description?: string | null;
       slug?: string;
+      directionId?: string;
     }
   | { ok: false; error: "invalid_request" };
 
@@ -242,6 +264,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     "is_editorial",
     "description",
     "slug",
+    "direction_id",
   ]);
   const keys = Object.keys(parsed);
 
@@ -261,6 +284,7 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     isEditorial?: boolean;
     description?: string | null;
     slug?: string;
+    directionId?: string;
   } = {};
 
   if ("title" in parsed) {
@@ -311,12 +335,21 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
     result.slug = slugResult.slug;
   }
 
+  if ("direction_id" in parsed) {
+    if (typeof parsed.direction_id !== "string" || !isUuid(parsed.direction_id)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    result.directionId = parsed.direction_id;
+  }
+
   if (
     result.title === undefined &&
     result.visibility === undefined &&
     result.isEditorial === undefined &&
     result.description === undefined &&
-    result.slug === undefined
+    result.slug === undefined &&
+    result.directionId === undefined
   ) {
     return { ok: false, error: "invalid_request" };
   }
@@ -507,17 +540,23 @@ export function parseCollaboratorUpsertBody(
     return { ok: false, error: "invalid_request" };
   }
 
-  if (
-    typeof parsed.role !== "string" ||
-    !(PLAYLIST_COLLABORATOR_ROLES as readonly string[]).includes(parsed.role)
-  ) {
-    return { ok: false, error: "invalid_request" };
+  let role: PlaylistCollaboratorRole = "playlist_admin";
+
+  if ("role" in parsed) {
+    if (
+      typeof parsed.role !== "string" ||
+      !(PLAYLIST_COLLABORATOR_ROLES as readonly string[]).includes(parsed.role)
+    ) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    role = parsed.role as PlaylistCollaboratorRole;
   }
 
   return {
     ok: true,
     userId: parsed.user_id,
-    role: parsed.role as PlaylistCollaboratorRole,
+    role,
   };
 }
 
@@ -560,6 +599,119 @@ export type CollaboratorDeleteInput =
 export function parseCollaboratorDeleteBody(
   body: unknown,
 ): CollaboratorDeleteInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["user_id"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  if (typeof parsed.user_id !== "string" || !isUuid(parsed.user_id)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, userId: parsed.user_id };
+}
+
+export type DirectionMutationInput =
+  | { ok: true; name: string; slug: string }
+  | { ok: false; error: "invalid_request" };
+
+export type DirectionPatchInput =
+  | { ok: true; name?: string; slug?: string }
+  | { ok: false; error: "invalid_request" };
+
+export function parseCreateDirectionBody(body: unknown): DirectionMutationInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["name", "slug"]);
+
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  const nameResult = validatePlaylistTitle(parsed.name);
+
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+
+  const slugResult = validatePlaylistSlug(parsed.slug);
+
+  if (!slugResult.ok) {
+    return slugResult;
+  }
+
+  return { ok: true, name: nameResult.title, slug: slugResult.slug };
+}
+
+export function parsePatchDirectionBody(body: unknown): DirectionPatchInput {
+  const parsed = parseJsonObject(body);
+
+  if (!parsed) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  const allowedKeys = new Set(["name", "slug"]);
+  const keys = Object.keys(parsed);
+
+  if (keys.length === 0) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  for (const key of keys) {
+    if (!allowedKeys.has(key)) {
+      return { ok: false, error: "invalid_request" };
+    }
+  }
+
+  const result: { name?: string; slug?: string } = {};
+
+  if ("name" in parsed) {
+    const nameResult = validatePlaylistTitle(parsed.name);
+
+    if (!nameResult.ok) {
+      return nameResult;
+    }
+
+    result.name = nameResult.title;
+  }
+
+  if ("slug" in parsed) {
+    const slugResult = validatePlaylistSlug(parsed.slug);
+
+    if (!slugResult.ok) {
+      return slugResult;
+    }
+
+    result.slug = slugResult.slug;
+  }
+
+  if (result.name === undefined && result.slug === undefined) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, ...result };
+}
+
+export type DirectionMemberInput =
+  | { ok: true; userId: string }
+  | { ok: false; error: "invalid_request" };
+
+export function parseDirectionMemberBody(body: unknown): DirectionMemberInput {
   const parsed = parseJsonObject(body);
 
   if (!parsed) {

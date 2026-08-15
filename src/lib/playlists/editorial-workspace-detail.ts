@@ -8,6 +8,7 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
+import { getEditorialDirectionById } from "@/lib/playlists/editorial-directions";
 import { getEditorialDiversityHint } from "@/lib/playlists/editorial-diversity";
 import {
   canUserEditEditorialPlaylist,
@@ -94,6 +95,7 @@ export type EditorialWorkspaceDetail = {
   canEdit: boolean;
   canManageCollaborators: boolean;
   slugLocked: boolean;
+  directionName: string | null;
   auditEvents: EditorialAuditEventView[];
 };
 
@@ -160,6 +162,24 @@ export async function loadEditorialWorkspaceDetail(
     userId,
     accessRow,
   );
+
+  let directionName: string | null = null;
+
+  if (playlist.direction_id) {
+    const { direction, error: directionError } = await getEditorialDirectionById(
+      supabase,
+      playlist.direction_id,
+    );
+
+    if (directionError) {
+      console.error(
+        "editorial_workspace_detail_direction_error",
+        directionError,
+      );
+    }
+
+    directionName = direction?.name ?? null;
+  }
 
   const { data: itemRows, error: itemsError } = await supabase
     .from("playlist_items")
@@ -371,6 +391,7 @@ export async function loadEditorialWorkspaceDetail(
       canEdit,
       canManageCollaborators,
       slugLocked: Boolean(playlist.first_published_at),
+      directionName,
       auditEvents,
     },
   };
@@ -395,7 +416,7 @@ export function editorialAuditActionLabel(action: string): string {
     case "unpublished":
       return "Снят с публикации";
     case "collaborator_added":
-      return "Добавлен редактор";
+      return "Добавлен администратор плейлиста";
     case "collaborator_removed":
       return "Отозван доступ";
     case "collaborator_role_changed":

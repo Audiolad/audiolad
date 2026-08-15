@@ -11,6 +11,7 @@ import {
   getOwnedPlaylistById,
   playlistSlugExists,
 } from "@/lib/playlists/queries";
+import { hasPermission } from "@/lib/auth/platform-access";
 import {
   canUserDeletePlaylist,
   canUserEditPlaylist,
@@ -48,6 +49,7 @@ function toPlaylistResponse(row: PlaylistRow) {
     description: row.description ?? null,
     first_published_at: row.first_published_at ?? null,
     created_by: row.created_by ?? null,
+    direction_id: row.direction_id ?? null,
   };
 }
 
@@ -147,6 +149,26 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (parsed.description !== undefined) {
     updates.description = parsed.description;
+  }
+
+  if (parsed.directionId !== undefined) {
+    if (!platform) {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const canMoveDirection = await hasPermission(
+      supabase,
+      user.id,
+      "playlists.manage",
+    );
+
+    if (!canMoveDirection) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    if (parsed.directionId !== (playlist.direction_id ?? null)) {
+      updates.direction_id = parsed.directionId;
+    }
   }
 
   if (parsed.slug !== undefined) {
@@ -268,7 +290,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(updates)
     .eq("id", id)
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description, first_published_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description, first_published_at, direction_id",
     )
     .maybeSingle();
 

@@ -3,11 +3,10 @@
 import { useEffect, useId, useState } from "react";
 
 import { formatEditorialUpdatedAt } from "@/lib/playlists/editorial-workspace";
-import type { PlaylistCollaboratorRole } from "@/lib/playlists/types";
 
 type CollaboratorRow = {
   user_id: string;
-  role: PlaylistCollaboratorRole;
+  role: string;
   added_by: string | null;
   created_at: string;
   displayName: string;
@@ -25,10 +24,6 @@ type EditorialCollaboratorsSectionProps = {
   playlistId: string;
 };
 
-function roleLabel(role: PlaylistCollaboratorRole): string {
-  return role === "manager" ? "Manager" : "Editor";
-}
-
 export default function EditorialCollaboratorsSection({
   playlistId,
 }: EditorialCollaboratorsSectionProps) {
@@ -41,7 +36,6 @@ export default function EditorialCollaboratorsSection({
   const [notFound, setNotFound] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [newRole, setNewRole] = useState<PlaylistCollaboratorRole>("editor");
 
   async function loadCollaborators() {
     try {
@@ -50,7 +44,7 @@ export default function EditorialCollaboratorsSection({
       });
 
       if (!response.ok) {
-        setLoadError("Не удалось загрузить редакторов.");
+        setLoadError("Не удалось загрузить администраторов плейлиста.");
         return;
       }
 
@@ -58,7 +52,7 @@ export default function EditorialCollaboratorsSection({
       setRows(data.collaborators ?? []);
       setLoadError(null);
     } catch {
-      setLoadError("Не удалось загрузить редакторов.");
+      setLoadError("Не удалось загрузить администраторов плейлиста.");
     }
   }
 
@@ -77,7 +71,7 @@ export default function EditorialCollaboratorsSection({
         }
 
         if (!response.ok) {
-          setLoadError("Не удалось загрузить редакторов.");
+          setLoadError("Не удалось загрузить администраторов плейлиста.");
           return;
         }
 
@@ -88,7 +82,7 @@ export default function EditorialCollaboratorsSection({
         setLoadError(null);
       } catch {
         if (!cancelled) {
-          setLoadError("Не удалось загрузить редакторов.");
+          setLoadError("Не удалось загрузить администраторов плейлиста.");
         }
       }
     }
@@ -148,7 +142,7 @@ export default function EditorialCollaboratorsSection({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, role: newRole }),
+        body: JSON.stringify({ user_id: user.id, role: "playlist_admin" }),
       });
 
       const data = (await response.json().catch(() => ({}))) as {
@@ -162,7 +156,7 @@ export default function EditorialCollaboratorsSection({
           return;
         }
 
-        setFormError(data.message || "Не удалось добавить редактора.");
+        setFormError(data.message || "Не удалось добавить администратора.");
         return;
       }
 
@@ -170,32 +164,7 @@ export default function EditorialCollaboratorsSection({
       setResults([]);
       await loadCollaborators();
     } catch {
-      setFormError("Не удалось добавить редактора.");
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function changeRole(userId: string, role: PlaylistCollaboratorRole) {
-    setBusyUserId(userId);
-    setFormError(null);
-
-    try {
-      const response = await fetch(`/api/playlists/${playlistId}/collaborators`, {
-        method: "PATCH",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, role }),
-      });
-
-      if (!response.ok) {
-        setFormError("Не удалось изменить роль.");
-        return;
-      }
-
-      await loadCollaborators();
-    } catch {
-      setFormError("Не удалось изменить роль.");
+      setFormError("Не удалось добавить администратора.");
     } finally {
       setBusyUserId(null);
     }
@@ -228,7 +197,7 @@ export default function EditorialCollaboratorsSection({
 
   return (
     <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
-      <h2 className="text-[21px] font-semibold">Редакторы</h2>
+      <h2 className="text-[21px] font-semibold">Администраторы плейлиста</h2>
       <p className="mt-1 text-sm leading-6 text-[#7d70a2]">
         Добавьте существующего пользователя Аудиолада. Новые аккаунты здесь не
         создаются.
@@ -245,22 +214,6 @@ export default function EditorialCollaboratorsSection({
             placeholder="Имя или email"
             className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
           />
-        </label>
-
-        <label className="block">
-          <span className="mb-2 block text-xs font-medium text-[#7d70a2]">
-            Роль
-          </span>
-          <select
-            value={newRole}
-            onChange={(event) =>
-              setNewRole(event.target.value as PlaylistCollaboratorRole)
-            }
-            className="w-full rounded-[16px] border border-[#ddcfef] px-3 py-2.5 text-sm outline-none focus:border-[#7042c5]"
-          >
-            <option value="editor">Editor</option>
-            <option value="manager">Manager</option>
-          </select>
         </label>
       </div>
 
@@ -292,7 +245,9 @@ export default function EditorialCollaboratorsSection({
                     </span>
                   ) : null}
                 </span>
-                <span className="shrink-0 text-[#7042c5]">Добавить</span>
+                <span className="shrink-0 text-[#7042c5]">
+                  Добавить администратора
+                </span>
               </button>
             </li>
           ))}
@@ -320,26 +275,13 @@ export default function EditorialCollaboratorsSection({
               <p className="mt-0.5 text-sm text-[#7d70a2]">{row.email}</p>
             ) : null}
             <p className="mt-1 text-sm text-[#7d70a2]">
-              {roleLabel(row.role)}
+              Администратор плейлиста
               {row.addedByName ? ` · добавил ${row.addedByName}` : ""}
               {row.created_at
                 ? ` · ${formatEditorialUpdatedAt(row.created_at)}`
                 : ""}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busyUserId === row.user_id}
-                onClick={() =>
-                  void changeRole(
-                    row.user_id,
-                    row.role === "editor" ? "manager" : "editor",
-                  )
-                }
-                className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-medium text-[#7042c5] disabled:opacity-50"
-              >
-                Сделать {row.role === "editor" ? "Manager" : "Editor"}
-              </button>
               <button
                 type="button"
                 disabled={busyUserId === row.user_id}

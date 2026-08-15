@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { assertPermission } from "@/lib/auth/platform-access";
+import { hasPermission } from "@/lib/auth/platform-access";
+import { isAnyDirectionEditor } from "@/lib/playlists/playlist-access";
 import { searchAudioladProfiles } from "@/lib/playlists/profile-summaries";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -22,17 +23,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  const manageCheck = await assertPermission(
-    supabase,
-    user.id,
-    "playlists.manage",
-  );
+  let canSearch = false;
 
-  if (!manageCheck.ok) {
-    return NextResponse.json(
-      { error: manageCheck.status === 403 ? "forbidden" : "internal_error" },
-      { status: manageCheck.status },
+  try {
+    canSearch =
+      (await hasPermission(supabase, user.id, "playlists.manage")) ||
+      (await isAnyDirectionEditor(supabase, user.id));
+  } catch (error) {
+    console.error(
+      "editorial_user_search_access_error",
+      error instanceof Error ? error.message : error,
     );
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (!canSearch) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const url = new URL(request.url);

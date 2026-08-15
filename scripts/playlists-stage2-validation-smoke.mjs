@@ -64,8 +64,9 @@ assert(
 
 const access = read("src/lib/playlists/editorial-workspace.ts");
 assert(access.includes("playlists.manage"), "manage access");
-assert(access.includes("playlists.create_editorial"), "create access");
+assert(access.includes("canManageDirections"), "directions gated to manage");
 assert(access.includes("playlist_collaborators"), "collaborator access");
+assert(access.includes("listDirectionEditorIds"), "direction editor access");
 
 const shell = read("src/lib/listener/shell-data.ts");
 assert(shell.includes("showEditorialNav"), "shell exposes editorial nav");
@@ -100,11 +101,13 @@ const create = parseCreatePlaylistBody({
   is_editorial: true,
   slug: "utrenniy-fokus",
   description: "Короткое описание",
+  direction_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 });
 assert(create.ok === true, "create accepts draft slug");
 if (create.ok) {
   assert(create.slug === "utrenniy-fokus", "slug parsed");
   assert(create.isEditorial === true, "editorial flag");
+  assert(create.directionId === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "direction required");
 }
 
 assert(
@@ -149,7 +152,11 @@ const createApi = read("src/app/api/playlists/route.ts");
 assert(createApi.includes("parsed.slug"), "create uses client draft slug");
 assert(createApi.includes('owner_type: "platform"'), "create stays platform");
 assert(createApi.includes("user_id: null"), "create nulls user_id");
-assert(createApi.includes("attach_playlist_creator_as_manager"), "manager attach");
+assert(createApi.includes("direction_id: parsed.directionId"), "create sets direction");
+assert(
+  !createApi.includes("attach_playlist_creator_as_manager"),
+  "no auto-attach collaborator on create",
+);
 
 const patchApi = read("src/app/api/playlists/[id]/route.ts");
 assert(patchApi.includes("parsed.slug"), "patch can edit draft slug");
@@ -187,7 +194,7 @@ const editor = read(
 assert(!editor.includes("Удалить плейлист"), "no delete playlist button");
 assert(editor.includes("Опубликовать"), "publish button");
 assert(editor.includes("Снять с публикации"), "unpublish button");
-assert(editor.includes("Slug закреплён"), "locked slug copy");
+assert(editor.includes("Адрес плейлиста закреплён"), "locked address copy");
 assert(editor.includes("рекомендуется не менее 7"), "soft 7 warning");
 assert(editor.includes("первых 7 позиций"), "diversity hint");
 assert(editor.includes("Заменить"), "replace action");
@@ -208,7 +215,7 @@ assert(picker.includes("mode === \"replace\""), "replace mode");
 const collabUi = read(
   "src/components/playlists/editorial/EditorialCollaboratorsSection.tsx",
 );
-assert(collabUi.includes("Редакторы"), "collaborators section");
+assert(collabUi.includes("Администраторы плейлиста"), "collaborators section");
 assert(collabUi.includes("/api/editorial/users/search"), "reuses user search");
 assert(
   collabUi.includes("Пользователь Audiolad не найден"),
@@ -218,6 +225,7 @@ assert(!collabUi.includes("invite"), "no invite-by-email");
 
 const searchApi = read("src/app/api/editorial/users/search/route.ts");
 assert(searchApi.includes("playlists.manage"), "search gated by manage");
+assert(searchApi.includes("isAnyDirectionEditor"), "search also allows direction editor");
 assert(!searchApi.includes("auth.admin"), "does not create auth users");
 
 const userPlaylists = read(

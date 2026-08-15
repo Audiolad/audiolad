@@ -60,6 +60,7 @@ export default async function ProfilePage({
       <ProfileQuickLinks
         showMyMaterialsNav={shellData.showMyMaterialsNav}
         showEditorialNav={shellData.showEditorialNav}
+        showEditorialDirectionsNav={shellData.showEditorialDirectionsNav}
       />
       <ProfileAuthorBlock section={profileData.authorSection} />
       {profileData.showAdminPanel ? <ProfileAdminPanelSection /> : null}

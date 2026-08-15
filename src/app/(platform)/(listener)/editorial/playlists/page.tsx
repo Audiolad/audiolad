@@ -1,4 +1,5 @@
 import EditorialPlaylistsListClient from "@/components/playlists/editorial/EditorialPlaylistsListClient";
+import { listVisibleEditorialDirections } from "@/lib/playlists/editorial-directions";
 import { getEditorialWorkspaceAccess } from "@/lib/playlists/editorial-workspace";
 import { listEditorialWorkspacePlaylists } from "@/lib/playlists/editorial-workspace-list";
 import { createClient } from "@/lib/supabase/server";
@@ -17,19 +18,35 @@ export default async function EditorialPlaylistsPage() {
   }
 
   const access = await getEditorialWorkspaceAccess(supabase, user.id);
-  const { playlists, error } = await listEditorialWorkspacePlaylists(supabase, {
-    userId: user.id,
-    canManageAll: access.canManage,
-  });
+  const [{ playlists, error }, directionsResult] = await Promise.all([
+    listEditorialWorkspacePlaylists(supabase, {
+      userId: user.id,
+      canManageAll: access.canManage,
+      directionIds: access.directionIds,
+    }),
+    listVisibleEditorialDirections(
+      supabase,
+      access.canManage ? undefined : { ids: access.directionIds },
+    ),
+  ]);
 
   if (error) {
     console.error("editorial_playlists_page_load_error", error);
   }
 
+  if (directionsResult.error) {
+    console.error(
+      "editorial_playlists_page_directions_error",
+      directionsResult.error,
+    );
+  }
+
   return (
     <EditorialPlaylistsListClient
       playlists={playlists}
+      directions={directionsResult.directions}
       canCreate={access.canCreate}
+      canManage={access.canManage}
       loadError={Boolean(error)}
     />
   );

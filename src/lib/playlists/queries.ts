@@ -155,7 +155,7 @@ export async function getOwnedPlaylistById(
   const { data, error } = await supabase
     .from("playlists")
     .select(
-      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial, owner_type, user_id, created_by, description, first_published_at",
+      "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_image, cover_updated_at, is_editorial, owner_type, user_id, created_by, description, first_published_at, direction_id",
     )
     .eq("id", playlistId)
     .maybeSingle();
@@ -181,6 +181,7 @@ export async function getOwnedPlaylistById(
       created_by: row.created_by ?? null,
       description: row.description ?? null,
       first_published_at: row.first_published_at ?? null,
+      direction_id: row.direction_id ?? null,
     },
     error: null,
   };
@@ -336,6 +337,7 @@ export async function listEditablePlatformPlaylists(
     canManageAll: boolean;
     /** Stage 2 workspace: include published platform playlists the user can edit. */
     includePublished?: boolean;
+    directionIds?: string[];
   },
 ): Promise<{ playlists: PlaylistListItem[]; error: string | null }> {
   const userId = options.userId.trim();
@@ -345,6 +347,9 @@ export async function listEditablePlatformPlaylists(
   }
 
   let playlistIds: string[] | null = null;
+  const directionIds = (options.directionIds ?? []).filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
 
   if (!options.canManageAll) {
     const { data: collabRows, error: collabError } = await supabase
@@ -360,7 +365,7 @@ export async function listEditablePlatformPlaylists(
       .map((row) => row.playlist_id)
       .filter((id): id is string => typeof id === "string");
 
-    if (playlistIds.length === 0) {
+    if (playlistIds.length === 0 && directionIds.length === 0) {
       return { playlists: [], error: null };
     }
   }
@@ -383,6 +388,7 @@ export async function listEditablePlatformPlaylists(
       created_by,
       first_published_at,
       description,
+      direction_id,
       playlist_items(count)
     `,
     )
@@ -394,8 +400,22 @@ export async function listEditablePlatformPlaylists(
     query = query.eq("visibility", "private");
   }
 
-  if (playlistIds) {
-    query = query.in("id", playlistIds);
+  if (!options.canManageAll) {
+    const filters: string[] = [];
+
+    if (playlistIds && playlistIds.length > 0) {
+      filters.push(`id.in.(${playlistIds.join(",")})`);
+    }
+
+    if (directionIds.length > 0) {
+      filters.push(`direction_id.in.(${directionIds.join(",")})`);
+    }
+
+    if (filters.length === 0) {
+      return { playlists: [], error: null };
+    }
+
+    query = query.or(filters.join(","));
   }
 
   const { data, error } = await query;
@@ -421,6 +441,7 @@ export async function listEditablePlatformPlaylists(
     created_by: row.created_by ?? null,
     first_published_at: row.first_published_at ?? null,
     description: row.description ?? null,
+    direction_id: row.direction_id ?? null,
     items_count: row.playlist_items?.[0]?.count ?? 0,
     coverUrl: null,
     mosaicCoverUrls: [],
