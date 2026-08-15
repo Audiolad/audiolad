@@ -235,6 +235,22 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/prodazhi-psikhologa",
     ],
   },
+  {
+    path: "/articles/produkty-psikhologa",
+    h1: "Продукты психолога: что можно создать кроме консультаций",
+    metaTitle: "Продукты психолога: что создать кроме консультаций",
+    metaDescription:
+      "Продукты психолога: какие форматы можно создать кроме консультаций, как выбрать первый продукт, собрать онлайн-продукт и выстроить продуктовую линейку.",
+    canonicalUrl: "https://audiolad.ru/articles/produkty-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/blog-psikhologa",
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {

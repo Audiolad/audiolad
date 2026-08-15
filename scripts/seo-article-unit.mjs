@@ -6257,6 +6257,93 @@ assert(
   ),
   "income creator json-ld omits practice image",
 );
+const productsCreatorArticle = getArticleBySlug("produkty-psikhologa");
+assert(productsCreatorArticle, "products creator article registered");
+assert(
+  productsCreatorArticle.productContinuation.kind === "creator_paths",
+  "products creator article uses creator continuation",
+);
+assert(
+  productsCreatorArticle.productContinuation.emphasis === "balanced",
+  "products creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in productsCreatorArticle),
+  "products creator article does not require a catalog practice",
+);
+assert(
+  productsCreatorArticle.title ===
+    "Продукты психолога: что можно создать кроме консультаций",
+  "products creator article keeps the approved H1",
+);
+assert(
+  productsCreatorArticle.metaTitle ===
+    "Продукты психолога: что создать кроме консультаций",
+  "products creator article keeps the approved meta title",
+);
+assert(
+  productsCreatorArticle.metaDescription ===
+    "Продукты психолога: какие форматы можно создать кроме консультаций, как выбрать первый продукт, собрать онлайн-продукт и выстроить продуктовую линейку.",
+  "products creator article keeps the approved meta description",
+);
+assert(
+  productsCreatorArticle.leadBeforeAudio ===
+    "Продукты психолога – это не обязательно большой онлайн-курс. Профессиональные знания, упражнения и методические материалы можно превращать в небольшие самостоятельные форматы, которые решают одну понятную задачу.",
+  "products creator article keeps the approved lead",
+);
+assert(
+  productsCreatorArticle.shortAnswer === undefined,
+  "products creator article does not add unapproved summary copy",
+);
+assert(
+  productsCreatorArticle.seeAlsoLinks.length === 0,
+  "products creator article does not add unapproved product links",
+);
+assert(
+  productsCreatorArticle.faq.length === 8,
+  "products creator article keeps the approved FAQ set",
+);
+const productsCreatorSerialized = JSON.stringify(productsCreatorArticle);
+assert(
+  productsCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
+  ) &&
+    productsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/blog-psikhologa",
+    ) &&
+    productsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodazhi-psikhologa",
+    ) &&
+    productsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/chastnaya-praktika-psikhologa",
+    ) &&
+    productsCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ),
+  "products creator article keeps the approved creator article links",
+);
+const productsCreatorPageData = {
+  article: productsCreatorArticle,
+  path: "/articles/produkty-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/produkty-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(productsCreatorArticle),
+};
+const productsCreatorMetadata = buildArticleMetadata(productsCreatorPageData);
+assert(
+  productsCreatorMetadata.robots?.index === true &&
+    productsCreatorMetadata.robots?.follow === true,
+  "products creator metadata stays indexable",
+);
+assert(
+  !productsCreatorMetadata.openGraph?.images,
+  "products creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(productsCreatorPageData)).includes(
+    '"image"',
+  ),
+  "products creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6440,6 +6527,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
   ).length === 1,
   "income creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/produkty-psikhologa",
+  ),
+  "products creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/produkty-psikhologa",
+  ).length === 1,
+  "products creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
