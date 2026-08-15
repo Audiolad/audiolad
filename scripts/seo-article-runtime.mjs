@@ -251,6 +251,21 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/prodvizhenie-psikhologa",
     ],
   },
+  {
+    path: "/articles/kontent-dlya-psikhologa",
+    h1: "Контент для психолога: темы и контент-план для блога",
+    metaTitle: "Контент для психолога: темы и контент-план",
+    metaDescription:
+      "Контент для психолога: где брать темы, какие рубрики использовать, как составить контент-план для блога и превращать сильные темы в разные форматы.",
+    canonicalUrl: "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/blog-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/produkty-psikhologa",
+    ],
+  },
 ];
 
 function assert(condition, message) {

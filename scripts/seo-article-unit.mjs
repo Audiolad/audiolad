@@ -6344,6 +6344,90 @@ assert(
   ),
   "products creator json-ld omits practice image",
 );
+const contentCreatorArticle = getArticleBySlug("kontent-dlya-psikhologa");
+assert(contentCreatorArticle, "content creator article registered");
+assert(
+  contentCreatorArticle.productContinuation.kind === "creator_paths",
+  "content creator article uses creator continuation",
+);
+assert(
+  contentCreatorArticle.productContinuation.emphasis === "balanced",
+  "content creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in contentCreatorArticle),
+  "content creator article does not require a catalog practice",
+);
+assert(
+  contentCreatorArticle.title ===
+    "Контент для психолога: темы и контент-план для блога",
+  "content creator article keeps the approved H1",
+);
+assert(
+  contentCreatorArticle.metaTitle ===
+    "Контент для психолога: темы и контент-план",
+  "content creator article keeps the approved meta title",
+);
+assert(
+  contentCreatorArticle.metaDescription ===
+    "Контент для психолога: где брать темы, какие рубрики использовать, как составить контент-план для блога и превращать сильные темы в разные форматы.",
+  "content creator article keeps the approved meta description",
+);
+assert(
+  contentCreatorArticle.leadBeforeAudio ===
+    "Контент для психолога проще создавать, когда не приходится каждый раз начинать с вопроса «что сегодня написать?». Вместо случайных идей полезнее собрать несколько тематических направлений, реальные вопросы аудитории и повторяющиеся рубрики.",
+  "content creator article keeps the approved lead",
+);
+assert(
+  contentCreatorArticle.shortAnswer === undefined,
+  "content creator article does not add unapproved summary copy",
+);
+assert(
+  contentCreatorArticle.seeAlsoLinks.length === 0,
+  "content creator article does not add unapproved product links",
+);
+assert(
+  contentCreatorArticle.faq.length === 8,
+  "content creator article keeps the approved FAQ set",
+);
+const contentCreatorSerialized = JSON.stringify(contentCreatorArticle);
+assert(
+  contentCreatorSerialized.includes(
+    "https://audiolad.ru/articles/blog-psikhologa",
+  ) &&
+    contentCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-psikhologu-nayti-klientov",
+    ) &&
+    contentCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    contentCreatorSerialized.includes(
+      "https://audiolad.ru/articles/produkty-psikhologa",
+    ),
+  "content creator article keeps the approved creator article links",
+);
+const contentCreatorPageData = {
+  article: contentCreatorArticle,
+  path: "/articles/kontent-dlya-psikhologa",
+  canonicalUrl: "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(contentCreatorArticle),
+};
+const contentCreatorMetadata = buildArticleMetadata(contentCreatorPageData);
+assert(
+  contentCreatorMetadata.robots?.index === true &&
+    contentCreatorMetadata.robots?.follow === true,
+  "content creator metadata stays indexable",
+);
+assert(
+  !contentCreatorMetadata.openGraph?.images,
+  "content creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(buildArticleJsonLdGraph(contentCreatorPageData)).includes(
+    '"image"',
+  ),
+  "content creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6541,6 +6625,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/produkty-psikhologa",
   ).length === 1,
   "products creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+  ),
+  "content creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kontent-dlya-psikhologa",
+  ).length === 1,
+  "content creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
