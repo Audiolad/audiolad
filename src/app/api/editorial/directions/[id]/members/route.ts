@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 
-import {
-  canUserManageCollaborators,
-  loadPlaylistForAccessCheck,
-  logPlaylistAudit,
-} from "@/lib/playlists/playlist-access";
+import { hasPermission } from "@/lib/auth/platform-access";
+import { getEditorialDirectionById } from "@/lib/playlists/editorial-directions";
+import { logEditorialDirectionAudit } from "@/lib/playlists/playlist-access";
 import { loadProfileSummaries } from "@/lib/playlists/profile-summaries";
 import {
   isUuid,
   parseCollaboratorDeleteBody,
-  parseCollaboratorUpsertBody,
+  parseDirectionMemberBody,
 } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -22,10 +20,7 @@ function notFoundResponse() {
   return NextResponse.json({ error: "not_found" }, { status: 404 });
 }
 
-async function requireManager(
-  request: Request,
-  playlistId: string,
-) {
+async function requireManage(request: Request, directionId: string) {
   const supabase = await createClientFromRequest(request);
 
   const {
@@ -41,44 +36,53 @@ async function requireManager(
   }
 
   if (authError) {
-    console.error("playlist_collaborators_auth_error", authError.message);
+    console.error("editorial_direction_members_auth_error", authError.message);
     return {
       ok: false as const,
       response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
     };
   }
 
-  const { playlist, error } = await loadPlaylistForAccessCheck(
-    supabase,
-    playlistId,
-  );
+  let canManage = false;
 
-  if (error) {
-    console.error("playlist_collaborators_load_error", error);
+  try {
+    canManage = await hasPermission(supabase, user.id, "playlists.manage");
+  } catch (error) {
+    console.error(
+      "editorial_direction_members_access_error",
+      error instanceof Error ? error.message : error,
+    );
     return {
       ok: false as const,
       response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
     };
   }
 
-  if (!playlist) {
-    return { ok: false as const, response: notFoundResponse() };
-  }
-
-  const allowed = await canUserManageCollaborators(
-    supabase,
-    user.id,
-    playlist,
-  );
-
-  if (!allowed) {
+  if (!canManage) {
     return {
       ok: false as const,
       response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
     };
   }
 
-  return { ok: true as const, supabase, user, playlist };
+  const { direction, error } = await getEditorialDirectionById(
+    supabase,
+    directionId,
+  );
+
+  if (error) {
+    console.error("editorial_direction_members_direction_error", error);
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
+    };
+  }
+
+  if (!direction) {
+    return { ok: false as const, response: notFoundResponse() };
+  }
+
+  return { ok: true as const, supabase, user, direction };
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -88,27 +92,28 @@ export async function GET(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
-  const gate = await requireManager(request, id);
+  const gate = await requireManage(request, id);
 
   if (!gate.ok) {
     return gate.response;
   }
 
   const { data, error } = await gate.supabase
-    .from("playlist_collaborators")
-    .select("user_id, role, added_by, created_at, updated_at")
-    .eq("playlist_id", id)
+    .from("editorial_direction_members")
+    .select("user_id, role, added_by, created_at")
+    .eq("direction_id", id)
+    .eq("role", "direction_editor")
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("playlist_collaborators_list_error", error.message);
+    console.error("editorial_direction_members_list_error", error.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   const rows = data ?? [];
   const profileIds = rows.flatMap((row) =>
     [row.user_id, row.added_by].filter(
-      (id): id is string => typeof id === "string",
+      (value): value is string => typeof value === "string",
     ),
   );
 
@@ -122,13 +127,13 @@ export async function GET(request: Request, context: RouteContext) {
     profiles = await loadProfileSummaries(service, profileIds);
   } catch (profileError) {
     console.error(
-      "playlist_collaborators_profiles_error",
+      "editorial_direction_members_profiles_error",
       profileError instanceof Error ? profileError.message : profileError,
     );
   }
 
   return NextResponse.json({
-    collaborators: rows.map((row) => {
+    members: rows.map((row) => {
       const profile = profiles.get(row.user_id);
       const addedBy = row.added_by ? profiles.get(row.added_by) : null;
 
@@ -137,7 +142,6 @@ export async function GET(request: Request, context: RouteContext) {
         role: row.role,
         added_by: row.added_by,
         created_at: row.created_at,
-        updated_at: row.updated_at,
         displayName: profile?.displayName ?? "Пользователь",
         email: profile?.email ?? null,
         addedByName: addedBy?.displayName ?? null,
@@ -153,7 +157,7 @@ export async function POST(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
-  const gate = await requireManager(request, id);
+  const gate = await requireManage(request, id);
 
   if (!gate.ok) {
     return gate.response;
@@ -167,21 +171,21 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const parsed = parseCollaboratorUpsertBody(body);
+  const parsed = parseDirectionMemberBody(body);
 
   if (!parsed.ok) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   const { data, error } = await gate.supabase
-    .from("playlist_collaborators")
+    .from("editorial_direction_members")
     .insert({
-      playlist_id: id,
+      direction_id: id,
       user_id: parsed.userId,
-      role: "playlist_admin",
+      role: "direction_editor",
       added_by: gate.user.id,
     })
-    .select("user_id, role, added_by, created_at, updated_at")
+    .select("user_id, role, added_by, created_at")
     .single();
 
   if (error) {
@@ -189,71 +193,15 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "already_exists" }, { status: 409 });
     }
 
-    console.error("playlist_collaborators_insert_error", error.message);
+    console.error("editorial_direction_members_insert_error", error.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
-  await logPlaylistAudit(gate.supabase, id, "collaborator_added", {
+  await logEditorialDirectionAudit(gate.supabase, id, "direction_editor_added", {
     user_id: parsed.userId,
-    role: "playlist_admin",
   });
 
-  return NextResponse.json({ collaborator: data }, { status: 201 });
-}
-
-export async function PATCH(request: Request, context: RouteContext) {
-  const { id } = await context.params;
-
-  if (!isUuid(id)) {
-    return notFoundResponse();
-  }
-
-  const gate = await requireManager(request, id);
-
-  if (!gate.ok) {
-    return gate.response;
-  }
-
-  let body: unknown;
-
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  }
-
-  const parsed = parseCollaboratorUpsertBody(body);
-
-  if (!parsed.ok) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  }
-
-  const { data, error } = await gate.supabase
-    .from("playlist_collaborators")
-    .update({
-      role: "playlist_admin",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("playlist_id", id)
-    .eq("user_id", parsed.userId)
-    .select("user_id, role, added_by, created_at, updated_at")
-    .maybeSingle();
-
-  if (error) {
-    console.error("playlist_collaborators_update_error", error.message);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
-  }
-
-  if (!data) {
-    return notFoundResponse();
-  }
-
-  await logPlaylistAudit(gate.supabase, id, "collaborator_role_changed", {
-    user_id: parsed.userId,
-    role: "playlist_admin",
-  });
-
-  return NextResponse.json({ collaborator: data });
+  return NextResponse.json({ member: data }, { status: 201 });
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
@@ -263,7 +211,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
-  const gate = await requireManager(request, id);
+  const gate = await requireManage(request, id);
 
   if (!gate.ok) {
     return gate.response;
@@ -284,15 +232,15 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const { data, error } = await gate.supabase
-    .from("playlist_collaborators")
+    .from("editorial_direction_members")
     .delete()
-    .eq("playlist_id", id)
+    .eq("direction_id", id)
     .eq("user_id", parsed.userId)
     .select("user_id")
     .maybeSingle();
 
   if (error) {
-    console.error("playlist_collaborators_delete_error", error.message);
+    console.error("editorial_direction_members_delete_error", error.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
@@ -300,9 +248,12 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
-  await logPlaylistAudit(gate.supabase, id, "collaborator_removed", {
-    user_id: parsed.userId,
-  });
+  await logEditorialDirectionAudit(
+    gate.supabase,
+    id,
+    "direction_editor_removed",
+    { user_id: parsed.userId },
+  );
 
   return new NextResponse(null, { status: 204 });
 }

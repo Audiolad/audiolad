@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import EditorialPlaylistCreateClient from "@/components/playlists/editorial/EditorialPlaylistCreateClient";
+import { listVisibleEditorialDirections } from "@/lib/playlists/editorial-directions";
 import { getEditorialWorkspaceAccess } from "@/lib/playlists/editorial-workspace";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,5 +23,14 @@ export default async function EditorialPlaylistNewPage() {
     notFound();
   }
 
-  return <EditorialPlaylistCreateClient />;
+  const { directions, error } = await listVisibleEditorialDirections(
+    supabase,
+    access.canManage ? undefined : { ids: access.directionIds },
+  );
+
+  if (error) {
+    console.error("editorial_playlist_new_directions_error", error);
+  }
+
+  return <EditorialPlaylistCreateClient directions={directions} />;
 }

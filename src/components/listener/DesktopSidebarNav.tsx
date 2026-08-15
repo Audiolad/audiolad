@@ -12,6 +12,7 @@ import {
 type DesktopSidebarNavProps = {
   showMyMaterialsNav: boolean;
   showEditorialNav?: boolean;
+  showEditorialDirectionsNav?: boolean;
 };
 
 function HelpNavIcon({ className }: { className?: string }) {
@@ -37,12 +38,16 @@ function HelpNavIcon({ className }: { className?: string }) {
 export default function DesktopSidebarNav({
   showMyMaterialsNav,
   showEditorialNav = false,
+  showEditorialDirectionsNav = false,
 }: DesktopSidebarNavProps) {
   const pathname = usePathname();
   const items = getListenerSidebarNavItems({ showMyMaterialsNav });
   const editorialActive =
     pathname === "/editorial/playlists" ||
     pathname.startsWith("/editorial/playlists/");
+  const directionsActive =
+    pathname === "/editorial/directions" ||
+    pathname.startsWith("/editorial/directions/");
 
   return (
     <>
@@ -94,6 +99,19 @@ export default function DesktopSidebarNav({
             >
               <span className="min-w-0 break-words">Открытые плейлисты</span>
             </Link>
+            {showEditorialDirectionsNav ? (
+              <Link
+                href="/editorial/directions"
+                aria-current={directionsActive ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-[15px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                  directionsActive
+                    ? "bg-[#f3ebfc] font-semibold text-[#7042c5]"
+                    : "font-medium text-[#4a3d6b] hover:bg-[#faf6ff] hover:text-[#7042c5]"
+                }`}
+              >
+                <span className="min-w-0 break-words">Направления</span>
+              </Link>
+            ) : null}
           </nav>
         </div>
       ) : null}

@@ -48,6 +48,7 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
         <DesktopSidebarNav
           showMyMaterialsNav={shellData.showMyMaterialsNav}
           showEditorialNav={shellData.showEditorialNav}
+          showEditorialDirectionsNav={shellData.showEditorialDirectionsNav}
         />
       </div>
 

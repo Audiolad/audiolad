@@ -42,6 +42,8 @@ export type ListenerShellData = {
   showMyMaterialsNav: boolean;
   /** Редакция → Открытые плейлисты. Never true for ordinary listeners. */
   showEditorialNav: boolean;
+  /** Редакция → Направления. playlists.manage only. */
+  showEditorialDirectionsNav: boolean;
 };
 
 type ProfileRow = {
@@ -79,6 +81,7 @@ async function loadListenerShellData(
       showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(guestAuthorInput),
       showMyMaterialsNav: false,
       showEditorialNav: false,
+      showEditorialDirectionsNav: false,
     };
   }
 
@@ -112,7 +115,10 @@ async function loadListenerShellData(
           hasAccess: false,
           canManage: false,
           canCreate: false,
+          canManageDirections: false,
           isCollaborator: false,
+          isDirectionEditor: false,
+          directionIds: [],
         };
       }),
     ]);
@@ -153,6 +159,7 @@ async function loadListenerShellData(
     showSidebarAuthorPromo: resolveShowSidebarAuthorPromo(authorInput),
     showMyMaterialsNav,
     showEditorialNav: editorialAccess.hasAccess,
+    showEditorialDirectionsNav: editorialAccess.canManageDirections,
   };
 }
 

@@ -4,6 +4,7 @@ import {
   createPlaylistCoverSignedUrlsBatch,
 } from "@/lib/playlists/covers";
 import { loadProfileSummaries } from "@/lib/playlists/profile-summaries";
+import { listVisibleEditorialDirections } from "@/lib/playlists/editorial-directions";
 import { listEditablePlatformPlaylists } from "@/lib/playlists/queries";
 import type { EditorialWorkspaceListItem } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
@@ -32,12 +33,17 @@ function normalizeOne<T>(value: T | T[] | null | undefined): T | null {
 
 export async function listEditorialWorkspacePlaylists(
   supabase: SupabaseClient,
-  options: { userId: string; canManageAll: boolean },
+  options: {
+    userId: string;
+    canManageAll: boolean;
+    directionIds?: string[];
+  },
 ): Promise<{ playlists: EditorialWorkspaceListItem[]; error: string | null }> {
   const { playlists, error } = await listEditablePlatformPlaylists(supabase, {
     userId: options.userId,
     canManageAll: options.canManageAll,
     includePublished: true,
+    directionIds: options.directionIds,
   });
 
   if (error) {
@@ -149,6 +155,28 @@ export async function listEditorialWorkspacePlaylists(
     }
   }
 
+  const directionIds = Array.from(
+    new Set(
+      playlists
+        .map((row) => row.direction_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  );
+  const directionNameById = new Map<string, string>();
+
+  if (directionIds.length > 0) {
+    const { directions, error: directionError } =
+      await listVisibleEditorialDirections(supabase, { ids: directionIds });
+
+    if (directionError) {
+      console.error("editorial_workspace_list_direction_error", directionError);
+    }
+
+    for (const direction of directions) {
+      directionNameById.set(direction.id, direction.name);
+    }
+  }
+
   const workspacePlaylists: EditorialWorkspaceListItem[] = playlists.map(
     (row) => ({
       id: row.id,
@@ -168,6 +196,10 @@ export async function listEditorialWorkspacePlaylists(
         ? (signedByPath.get(row.cover_path) ?? null)
         : null,
       mosaicCoverUrls: mosaicByPlaylist.get(row.id) ?? [],
+      direction_id: row.direction_id ?? null,
+      directionName: row.direction_id
+        ? (directionNameById.get(row.direction_id) ?? null)
+        : null,
     }),
   );
 

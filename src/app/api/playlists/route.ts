@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { assertPermission } from "@/lib/auth/platform-access";
-import { logPlaylistAudit } from "@/lib/playlists/playlist-access";
+import { getEditorialDirectionById } from "@/lib/playlists/editorial-directions";
+import {
+  canUserCreateEditorialInDirection,
+  logPlaylistAudit,
+} from "@/lib/playlists/playlist-access";
 import { allocateUniquePlaylistSlug } from "@/lib/playlists/slug";
 import {
   countOwnedPlaylists,
@@ -30,6 +33,7 @@ function toPlaylistResponse(row: PlaylistRow) {
     description: row.description ?? null,
     first_published_at: row.first_published_at ?? null,
     created_by: row.created_by ?? null,
+    direction_id: row.direction_id ?? null,
   };
 }
 
@@ -65,17 +69,32 @@ export async function POST(request: Request) {
   }
 
   if (parsed.isEditorial) {
-    const createCheck = await assertPermission(
+    if (!parsed.directionId) {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const { direction, error: directionError } = await getEditorialDirectionById(
       supabase,
-      user.id,
-      "playlists.create_editorial",
+      parsed.directionId,
     );
 
-    if (!createCheck.ok) {
-      return NextResponse.json(
-        { error: createCheck.status === 403 ? "forbidden" : "internal_error" },
-        { status: createCheck.status },
-      );
+    if (directionError) {
+      console.error("playlists_create_direction_lookup_error", directionError);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    if (!direction) {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const canCreate = await canUserCreateEditorialInDirection(
+      supabase,
+      user.id,
+      parsed.directionId,
+    );
+
+    if (!canCreate) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
     let slug: string | null = parsed.slug ?? null;
@@ -122,9 +141,10 @@ export async function POST(request: Request) {
         slug,
         published_at: null,
         is_editorial: true,
+        direction_id: parsed.directionId,
       })
       .select(
-        "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description",
+        "id, title, visibility, slug, published_at, created_at, updated_at, cover_path, cover_updated_at, is_editorial, owner_type, created_by, description, direction_id",
       )
       .single();
 
@@ -139,50 +159,10 @@ export async function POST(request: Request) {
 
     const created = data as PlaylistRow;
 
-    const { error: attachError } = await supabase.rpc(
-      "attach_playlist_creator_as_manager",
-      { p_playlist_id: created.id },
-    );
-
-    if (attachError) {
-      console.error(
-        "playlists_create_editorial_attach_error",
-        attachError.message,
-      );
-
-      const { error: deleteError } = await supabase
-        .from("playlists")
-        .delete()
-        .eq("id", created.id);
-
-      if (deleteError) {
-        console.error(
-          "playlists_create_editorial_attach_rollback_error",
-          deleteError.message,
-        );
-      }
-
-      const { error: rollbackError } = await supabase.rpc(
-        "rollback_unpublished_editorial_create",
-        { p_playlist_id: created.id },
-      );
-
-      if (
-        rollbackError &&
-        !/playlist_not_found/i.test(rollbackError.message ?? "")
-      ) {
-        console.error(
-          "playlists_create_editorial_attach_rollback_rpc_error",
-          rollbackError.message,
-        );
-      }
-
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
-
     await logPlaylistAudit(supabase, created.id, "playlist_created", {
       owner_type: "platform",
       visibility: "private",
+      direction_id: parsed.directionId,
     });
 
     return NextResponse.json(

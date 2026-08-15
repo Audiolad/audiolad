@@ -105,18 +105,33 @@ const editorialCreate = parseCreatePlaylistBody({
   visibility: "private",
   is_editorial: true,
   description: "Краткое описание",
+  direction_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 });
 assert(editorialCreate.ok === true, "editorial draft create body allowed");
 if (editorialCreate.ok) {
   assert(editorialCreate.isEditorial === true, "create flags editorial");
   assert(editorialCreate.visibility === "private", "create keeps private");
   assert(editorialCreate.description === "Краткое описание", "description parsed");
+  assert(
+    editorialCreate.directionId === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "editorial create requires direction",
+  );
 }
+
+assert(
+  parseCreatePlaylistBody({
+    title: "АудиоЛад подборка",
+    visibility: "private",
+    is_editorial: true,
+  }).ok === false,
+  "editorial create without direction_id is rejected",
+);
 
 const editorialPublicCreate = parseCreatePlaylistBody({
   title: "АудиоЛад подборка",
   visibility: "public",
   is_editorial: true,
+  direction_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 });
 assert(
   editorialPublicCreate.ok === true,
@@ -164,7 +179,7 @@ assert(descPatch.ok === true && descPatch.description === "hello", "patch descri
 assert(
   parseCollaboratorUpsertBody({
     user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    role: "editor",
+    role: "playlist_admin",
   }).ok === true,
   "collaborator upsert",
 );
@@ -194,32 +209,18 @@ assert(
 );
 
 const createApi = read("src/app/api/playlists/route.ts");
-assert(createApi.includes("playlists.create_editorial"), "create uses new permission");
+assert(
+  createApi.includes("canUserCreateEditorialInDirection"),
+  "create uses direction-scoped access",
+);
+assert(createApi.includes("direction_id: parsed.directionId"), "create sets direction");
 assert(createApi.includes('owner_type: "platform"'), "editorial insert is platform");
 assert(createApi.includes("user_id: null"), "editorial insert nulls user_id");
 assert(createApi.includes('visibility: "private"'), "editorial starts draft");
 assert(
-  createApi.includes("attach_playlist_creator_as_manager"),
-  "creator becomes manager",
+  !createApi.includes("attach_playlist_creator_as_manager"),
+  "direction editor is not auto-attached as collaborator",
 );
-{
-  const attachLogAt = createApi.indexOf(
-    "playlists_create_editorial_attach_error",
-  );
-  assert(attachLogAt !== -1, "logs attach failure");
-  const afterAttach = createApi.slice(attachLogAt);
-  const return500At = afterAttach.indexOf("status: 500");
-  const return201At = afterAttach.indexOf("status: 201");
-  assert(
-    return500At !== -1 && (return201At === -1 || return500At < return201At),
-    "attachError must return 500, not continue to 201",
-  );
-  assert(
-    afterAttach.includes("rollback_unpublished_editorial_create") ||
-      afterAttach.includes(".delete()"),
-    "attach failure attempts to remove the orphan draft",
-  );
-}
 assert(
   createApi.includes("countOwnedPlaylists") && createApi.includes("user.id"),
   "personal limit uses user id",

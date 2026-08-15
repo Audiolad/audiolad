@@ -5,25 +5,42 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { buildEditorialDraftSlug } from "@/lib/playlists/editorial-slug";
+import type { EditorialDirectionRow } from "@/lib/playlists/types";
 import {
   PLAYLIST_DESCRIPTION_MAX_LENGTH,
   PLAYLIST_TITLE_MAX_LENGTH,
 } from "@/lib/playlists/types";
 
-export default function EditorialPlaylistCreateClient() {
+type EditorialPlaylistCreateClientProps = {
+  directions: EditorialDirectionRow[];
+};
+
+export default function EditorialPlaylistCreateClient({
+  directions,
+}: EditorialPlaylistCreateClientProps) {
   const router = useRouter();
   const titleId = useId();
   const slugId = useId();
   const descriptionId = useId();
+  const directionId = useId();
+  const singleDirection = directions.length === 1 ? directions[0] : null;
   const [title, setTitle] = useState("");
   const [slugManual, setSlugManual] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [selectedDirectionId, setSelectedDirectionId] = useState(
+    singleDirection?.id ?? "",
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const slug = slugManual ?? buildEditorialDraftSlug(title);
 
   async function submit() {
     if (submitting) {
+      return;
+    }
+
+    if (!selectedDirectionId) {
+      setFormError("Выберите направление.");
       return;
     }
 
@@ -40,6 +57,7 @@ export default function EditorialPlaylistCreateClient() {
           is_editorial: true,
           description: description.trim() || null,
           slug: slug.trim() || undefined,
+          direction_id: selectedDirectionId,
         }),
       });
 
@@ -51,7 +69,9 @@ export default function EditorialPlaylistCreateClient() {
 
       if (!response.ok) {
         if (data.error === "slug_conflict") {
-          setFormError("Такой slug уже занят. Измените его и попробуйте ещё раз.");
+          setFormError(
+            "Такой адрес плейлиста уже занят. Измените его и попробуйте ещё раз.",
+          );
           return;
         }
 
@@ -87,7 +107,7 @@ export default function EditorialPlaylistCreateClient() {
       <h1 className="mt-4 text-[28px] font-semibold">Новый открытый плейлист</h1>
       <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
         Плейлист будет создан как черновик Аудиолада. После первой публикации
-        slug изменить нельзя.
+        адрес плейлиста изменить нельзя.
       </p>
 
       <form
@@ -97,6 +117,33 @@ export default function EditorialPlaylistCreateClient() {
           void submit();
         }}
       >
+        {singleDirection ? (
+          <p className="text-sm text-[#7d70a2]">
+            Направление:{" "}
+            <span className="font-medium text-[#25135c]">
+              {singleDirection.name}
+            </span>
+          </p>
+        ) : (
+          <label className="block" htmlFor={directionId}>
+            <span className="mb-2 block text-sm font-medium">Направление</span>
+            <select
+              id={directionId}
+              value={selectedDirectionId}
+              onChange={(event) => setSelectedDirectionId(event.target.value)}
+              required
+              className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
+            >
+              <option value="">Выберите направление</option>
+              {directions.map((direction) => (
+                <option key={direction.id} value={direction.id}>
+                  {direction.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label className="block" htmlFor={titleId}>
           <span className="mb-2 block text-sm font-medium">Название</span>
           <input
@@ -110,7 +157,9 @@ export default function EditorialPlaylistCreateClient() {
         </label>
 
         <label className="block" htmlFor={slugId}>
-          <span className="mb-2 block text-sm font-medium">Slug</span>
+          <span className="mb-2 block text-sm font-medium">
+            Адрес плейлиста
+          </span>
           <input
             id={slugId}
             value={slug}
@@ -118,7 +167,7 @@ export default function EditorialPlaylistCreateClient() {
             className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
           />
           <span className="mt-2 block text-xs leading-5 text-[#7d70a2]">
-            После первой публикации slug изменить нельзя.
+            После первой публикации адрес плейлиста изменить нельзя.
           </span>
         </label>
 
@@ -145,7 +194,12 @@ export default function EditorialPlaylistCreateClient() {
 
         <button
           type="submit"
-          disabled={submitting || title.trim().length === 0}
+          disabled={
+            submitting ||
+            title.trim().length === 0 ||
+            !selectedDirectionId ||
+            directions.length === 0
+          }
           className="w-full rounded-[18px] bg-[#7042c5] px-4 py-3 font-semibold text-white disabled:opacity-50 sm:w-auto"
         >
           {submitting ? "Создание…" : "Создать плейлист"}

@@ -2,13 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { hasPermission } from "@/lib/auth/platform-access";
+import { listDirectionEditorIds } from "@/lib/playlists/playlist-access";
 
 export type EditorialWorkspaceAccess = {
   userId: string;
   hasAccess: boolean;
   canManage: boolean;
   canCreate: boolean;
+  canManageDirections: boolean;
   isCollaborator: boolean;
+  isDirectionEditor: boolean;
+  directionIds: string[];
 };
 
 async function hasAnyPlaylistCollaboratorRow(
@@ -40,12 +44,14 @@ export async function loadEditorialWorkspaceAccess(
       hasAccess: false,
       canManage: false,
       canCreate: false,
+      canManageDirections: false,
       isCollaborator: false,
+      isDirectionEditor: false,
+      directionIds: [],
     };
   }
 
   let canManage = false;
-  let canCreateEditorial = false;
 
   try {
     canManage = await hasPermission(supabase, userId, "playlists.manage");
@@ -56,30 +62,22 @@ export async function loadEditorialWorkspaceAccess(
     );
   }
 
-  try {
-    canCreateEditorial = await hasPermission(
-      supabase,
-      userId,
-      "playlists.create_editorial",
-    );
-  } catch (error) {
-    console.error(
-      "editorial_workspace_create_check_error",
-      error instanceof Error ? error.message : error,
-    );
-  }
-
-  const canCreate = canManage || canCreateEditorial;
+  const directionIds = await listDirectionEditorIds(supabase, userId);
+  const isDirectionEditorMember = directionIds.length > 0;
+  const canCreate = canManage || isDirectionEditorMember;
   const isCollaborator = canManage
     ? false
     : await hasAnyPlaylistCollaboratorRow(supabase, userId);
 
   return {
     userId,
-    hasAccess: canManage || canCreateEditorial || isCollaborator,
+    hasAccess: canManage || isDirectionEditorMember || isCollaborator,
     canManage,
     canCreate,
+    canManageDirections: canManage,
     isCollaborator,
+    isDirectionEditor: isDirectionEditorMember,
+    directionIds,
   };
 }
 

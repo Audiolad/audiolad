@@ -321,13 +321,13 @@ export default function EditorialPracticePickerSheet({
 
         <div className="space-y-3 border-b border-[#f0e8fb] px-5 py-4">
           <label className="block" htmlFor={searchId}>
-            <span className="sr-only">Поиск по названию</span>
+            <span className="sr-only">Поиск практик и музыки</span>
             <input
               id={searchId}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Поиск по названию или автору"
+              placeholder="Поиск практик и музыки"
               className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
             />
           </label>

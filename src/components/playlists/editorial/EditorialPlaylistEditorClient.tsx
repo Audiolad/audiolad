@@ -126,12 +126,12 @@ export default function EditorialPlaylistEditorClient({
 
       if (!response.ok) {
         if (data.error === "slug_conflict") {
-          setFormError("Такой slug уже занят.");
+          setFormError("Такой адрес плейлиста уже занят.");
           return;
         }
 
         if (data.error === "slug_locked") {
-          setFormError("Slug закреплён после первой публикации.");
+          setFormError("Адрес плейлиста закреплён после первой публикации.");
           return;
         }
 
@@ -316,6 +316,11 @@ export default function EditorialPlaylistEditorClient({
             {detail.playlist.title}
           </h1>
           <p className="mt-2 text-sm text-[#7d70a2]">Владелец: Аудиолад</p>
+          {detail.directionName ? (
+            <p className="mt-1 text-sm text-[#7d70a2]">
+              Направление: {detail.directionName}
+            </p>
+          ) : null}
           {detail.creatorName ? (
             <p className="mt-1 text-sm text-[#7d70a2]">
               Создал: {detail.creatorName}
@@ -346,7 +351,9 @@ export default function EditorialPlaylistEditorClient({
           </label>
 
           <label className="block" htmlFor={slugId}>
-            <span className="mb-2 block text-sm font-medium">Slug</span>
+            <span className="mb-2 block text-sm font-medium">
+              Адрес плейлиста
+            </span>
             <input
               id={slugId}
               value={slug}
@@ -356,8 +363,8 @@ export default function EditorialPlaylistEditorClient({
             />
             <span className="mt-2 block text-xs text-[#7d70a2]">
               {slugLocked
-                ? "Slug закреплён"
-                : "После первой публикации slug изменить нельзя."}
+                ? "Адрес плейлиста закреплён"
+                : "После первой публикации адрес плейлиста изменить нельзя."}
             </span>
           </label>
 

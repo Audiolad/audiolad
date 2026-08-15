@@ -5,11 +5,16 @@ import { useMemo, useState } from "react";
 
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import { formatEditorialUpdatedAt } from "@/lib/playlists/editorial-workspace";
-import type { EditorialWorkspaceListItem } from "@/lib/playlists/types";
+import type {
+  EditorialDirectionRow,
+  EditorialWorkspaceListItem,
+} from "@/lib/playlists/types";
 
 type EditorialPlaylistsListClientProps = {
   playlists: EditorialWorkspaceListItem[];
+  directions: EditorialDirectionRow[];
   canCreate: boolean;
+  canManage: boolean;
   loadError: boolean;
 };
 
@@ -77,11 +82,21 @@ function PlusIcon() {
 
 export default function EditorialPlaylistsListClient({
   playlists,
+  directions,
   canCreate,
+  canManage,
   loadError,
 }: EditorialPlaylistsListClientProps) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [directionFilter, setDirectionFilter] = useState<string>(
+    !canManage && directions.length === 1 ? directions[0].id : "all",
+  );
+
+  const showDirectionSwitcher = canManage || directions.length > 1;
+  const hasLegacyWithoutDirection = playlists.some(
+    (playlist) => !playlist.direction_id,
+  );
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -97,16 +112,29 @@ export default function EditorialPlaylistsListClient({
         return false;
       }
 
+      if (directionFilter === "none" && playlist.direction_id) {
+        return false;
+      }
+
+      if (
+        directionFilter !== "all" &&
+        directionFilter !== "none" &&
+        playlist.direction_id !== directionFilter
+      ) {
+        return false;
+      }
+
       if (!normalized) {
         return true;
       }
 
       return (
         playlist.title.toLowerCase().includes(normalized) ||
-        (playlist.slug ?? "").toLowerCase().includes(normalized)
+        (playlist.slug ?? "").toLowerCase().includes(normalized) ||
+        (playlist.directionName ?? "").toLowerCase().includes(normalized)
       );
     });
-  }, [playlists, query, statusFilter]);
+  }, [playlists, query, statusFilter, directionFilter]);
 
   return (
     <div className="px-5 pb-10 pt-6">
@@ -114,7 +142,7 @@ export default function EditorialPlaylistsListClient({
         <div>
           <h1 className="text-[28px] font-semibold">Открытые плейлисты</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#7d70a2]">
-            Редакционные подборки Audiolad для страниц прослушивания и других
+            Редакционные подборки Аудиолада для страниц прослушивания и других
             поверхностей платформы.
           </p>
         </div>
@@ -132,15 +160,58 @@ export default function EditorialPlaylistsListClient({
 
       <div className="mt-6 space-y-3">
         <label className="block">
-          <span className="sr-only">Поиск по названию или slug</span>
+          <span className="sr-only">Поиск по названию</span>
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по названию или slug"
+            placeholder="Поиск по названию"
             className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
           />
         </label>
+
+        {showDirectionSwitcher ? (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Направление">
+            <button
+              type="button"
+              onClick={() => setDirectionFilter("all")}
+              className={`rounded-full px-4 py-2 text-sm font-medium ${
+                directionFilter === "all"
+                  ? "bg-[#7042c5] text-white"
+                  : "border border-[#ddcfef] bg-white text-[#7042c5]"
+              }`}
+            >
+              Все направления
+            </button>
+            {directions.map((direction) => (
+              <button
+                key={direction.id}
+                type="button"
+                onClick={() => setDirectionFilter(direction.id)}
+                className={`rounded-full px-4 py-2 text-sm font-medium ${
+                  directionFilter === direction.id
+                    ? "bg-[#7042c5] text-white"
+                    : "border border-[#ddcfef] bg-white text-[#7042c5]"
+                }`}
+              >
+                {direction.name}
+              </button>
+            ))}
+            {canManage && hasLegacyWithoutDirection ? (
+              <button
+                type="button"
+                onClick={() => setDirectionFilter("none")}
+                className={`rounded-full px-4 py-2 text-sm font-medium ${
+                  directionFilter === "none"
+                    ? "bg-[#7042c5] text-white"
+                    : "border border-[#ddcfef] bg-white text-[#7042c5]"
+                }`}
+              >
+                Без направления
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2" role="group" aria-label="Статус">
           {(
@@ -178,7 +249,7 @@ export default function EditorialPlaylistsListClient({
         <section className="mt-8 rounded-[24px] border border-dashed border-[#d4c2eb] bg-[#faf6ff] px-5 py-10 text-center">
           <p className="text-[18px] font-semibold">Пока нет плейлистов</p>
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-            {query || statusFilter !== "all"
+            {query || statusFilter !== "all" || directionFilter !== "all"
               ? "Ничего не найдено. Измените поиск или фильтр."
               : "Создайте редакционную подборку для платформы."}
           </p>
@@ -218,8 +289,15 @@ export default function EditorialPlaylistsListClient({
                       <p className="text-[18px] font-semibold leading-6">
                         {playlist.title}
                       </p>
+                      {playlist.directionName ? (
+                        <p className="mt-1 truncate text-sm text-[#7d70a2]">
+                          {playlist.directionName}
+                        </p>
+                      ) : null}
                       <p className="mt-1 truncate text-sm text-[#7d70a2]">
-                        {playlist.slug ?? "без slug"}
+                        {playlist.slug
+                          ? `Адрес плейлиста: ${playlist.slug}`
+                          : "Адрес плейлиста не задан"}
                       </p>
                       <p className="mt-2 text-sm font-medium text-[#7042c5]">
                         {published ? "Опубликован" : "Draft"}
