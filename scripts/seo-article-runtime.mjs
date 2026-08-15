@@ -325,6 +325,16 @@ const CREATOR_ARTICLES = [
     canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-koucha",
     productLinkCount: 10,
   },
+  {
+    path: "/articles/skolko-zarabatyvaet-kouch",
+    h1: "Сколько зарабатывает коуч: от чего зависит доход и как зарабатывать больше",
+    metaTitle: "Сколько зарабатывает коуч: от чего зависит доход",
+    metaDescription:
+      "Сколько зарабатывает коуч, от чего зависит доход частного специалиста и как увеличить заработок через загрузку, форматы работы и собственные продукты.",
+    canonicalUrl: "https://audiolad.ru/articles/skolko-zarabatyvaet-kouch",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/prodvizhenie-koucha",
+  },
 ];
 
 function assert(condition, message) {

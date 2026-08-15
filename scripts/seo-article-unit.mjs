@@ -6792,6 +6792,92 @@ assert(
   ).includes('"image"'),
   "coach promotion creator json-ld omits practice image",
 );
+const coachIncomeCreatorArticle = getArticleBySlug("skolko-zarabatyvaet-kouch");
+assert(
+  coachIncomeCreatorArticle,
+  "coach income creator article registered",
+);
+assert(
+  coachIncomeCreatorArticle.productContinuation.kind === "creator_paths",
+  "coach income creator article uses creator continuation",
+);
+assert(
+  coachIncomeCreatorArticle.productContinuation.emphasis === "balanced",
+  "coach income creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in coachIncomeCreatorArticle),
+  "coach income creator article does not require a catalog practice",
+);
+assert(
+  coachIncomeCreatorArticle.title ===
+    "Сколько зарабатывает коуч: от чего зависит доход и как зарабатывать больше",
+  "coach income creator article keeps the approved H1",
+);
+assert(
+  coachIncomeCreatorArticle.metaTitle ===
+    "Сколько зарабатывает коуч: от чего зависит доход",
+  "coach income creator article keeps the approved meta title",
+);
+assert(
+  coachIncomeCreatorArticle.metaDescription ===
+    "Сколько зарабатывает коуч, от чего зависит доход частного специалиста и как увеличить заработок через загрузку, форматы работы и собственные продукты.",
+  "coach income creator article keeps the approved meta description",
+);
+assert(
+  coachIncomeCreatorArticle.leadBeforeAudio ===
+    "На вопрос, сколько зарабатывает коуч, нельзя корректно ответить одной универсальной суммой. Доход двух специалистов может заметно различаться даже при похожей стоимости сессии – из-за разной загрузки, количества клиентов, продолжительности работы, специализации и форматов.",
+  "coach income creator article keeps the approved lead",
+);
+assert(
+  coachIncomeCreatorArticle.shortAnswer === undefined,
+  "coach income creator article does not add unapproved summary copy",
+);
+assert(
+  coachIncomeCreatorArticle.seeAlsoLinks.length === 0,
+  "coach income creator article does not add unapproved product links",
+);
+assert(
+  coachIncomeCreatorArticle.faq.length === 8,
+  "coach income creator article keeps the approved FAQ set",
+);
+const coachIncomeCreatorSerialized = JSON.stringify(coachIncomeCreatorArticle);
+assert(
+  coachIncomeCreatorSerialized.includes(
+    "https://audiolad.ru/articles/prodvizhenie-koucha",
+  ),
+  "coach income creator article keeps the approved internal article link",
+);
+assert(
+  !coachIncomeCreatorSerialized.includes("—"),
+  "coach income creator article uses medium dash, not em dash",
+);
+const coachIncomeCreatorPageData = {
+  article: coachIncomeCreatorArticle,
+  path: "/articles/skolko-zarabatyvaet-kouch",
+  canonicalUrl: "https://audiolad.ru/articles/skolko-zarabatyvaet-kouch",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    coachIncomeCreatorArticle,
+  ),
+};
+const coachIncomeCreatorMetadata = buildArticleMetadata(
+  coachIncomeCreatorPageData,
+);
+assert(
+  coachIncomeCreatorMetadata.robots?.index === true &&
+    coachIncomeCreatorMetadata.robots?.follow === true,
+  "coach income creator metadata stays indexable",
+);
+assert(
+  !coachIncomeCreatorMetadata.openGraph?.images,
+  "coach income creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(coachIncomeCreatorPageData),
+  ).includes('"image"'),
+  "coach income creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7061,6 +7147,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-koucha",
   ).length === 1,
   "coach promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/skolko-zarabatyvaet-kouch",
+  ),
+  "coach income creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/skolko-zarabatyvaet-kouch",
+  ).length === 1,
+  "coach income creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
