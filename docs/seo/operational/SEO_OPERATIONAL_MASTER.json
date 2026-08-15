@@ -3535,6 +3535,43 @@
         "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
         "operationalAddedAt": "2026-08-15"
       }
+    },
+    {
+      "articleId": "ART_new_20260815_kak-prodavat-svoi-uslugi",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как продавать свои услуги: как находить клиентов и продавать без навязывания",
+      "slug": "kak-prodavat-svoi-uslugi",
+      "productionUrl": "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+      "plannedUrl": "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+      "primaryQuery": "как продавать свои услуги",
+      "primaryQueryFrequency": null,
+      "frequencyStatus": "UNVERIFIED",
+      "status": "PUBLISHED",
+      "articleType": "creator",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Creator selling-services article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": null,
+        "title": null,
+        "slug": null,
+        "productionUrl": null,
+        "availabilityStatus": "NOT_APPLICABLE_CREATOR_ARTICLE",
+        "note": "Creator article uses Studio and School paths; no catalog practice is attached."
+      },
+      "practiceRelevance": "NOT_APPLICABLE",
+      "publishedAt": "2026-08-15T00:00:00.000Z",
+      "updatedAt": "2026-08-15T00:00:00.000Z",
+      "validationStatus": "VALIDATE PASS",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
+        "operationalAddedAt": "2026-08-15"
+      }
     }
   ],
   "nextQueue": [],

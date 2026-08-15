@@ -335,6 +335,20 @@ const CREATOR_ARTICLES = [
     productLinkCount: 10,
     requiredSnippet: "https://audiolad.ru/articles/prodvizhenie-koucha",
   },
+  {
+    path: "/articles/kak-prodavat-svoi-uslugi",
+    h1: "Как продавать свои услуги: как находить клиентов и продавать без навязывания",
+    metaTitle: "Как продавать свои услуги без навязывания",
+    metaDescription:
+      "Как продавать свои услуги без навязывания: сформулировать понятное предложение, объяснить цену и формат, вести клиента к покупке и не давить на решение.",
+    canonicalUrl: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/prodazhi-psikhologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+      "https://audiolad.ru/articles/prodvizhenie-koucha",
+    ],
+  },
 ];
 
 function assert(condition, message) {

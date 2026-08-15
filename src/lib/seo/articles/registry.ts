@@ -26,6 +26,7 @@ import { LID_MAGNIT_DLYA_PSIKHOLOGA_ARTICLE } from "./content/lid-magnit-dlya-ps
 import { MEDITATSII_DLYA_KLIENTOV_PSIKHOLOGA_ARTICLE } from "./content/meditatsii-dlya-klientov-psikhologa";
 import { PRODVIZHENIE_KOUCHA_ARTICLE } from "./content/prodvizhenie-koucha";
 import { SKOLKO_ZARABATYVAET_KOUCH_ARTICLE } from "./content/skolko-zarabatyvaet-kouch";
+import { KAK_PRODAVAT_SVOI_USLUGI_ARTICLE } from "./content/kak-prodavat-svoi-uslugi";
 import { KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE } from "./content/kak-perestat-zlitsya-na-cheloveka";
 import { KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE } from "./content/kak-ponyat-chego-ya-hochu";
 import { NAMERENIE_CHTO_ETO_ARTICLE } from "./content/namerenie-chto-eto";
@@ -123,6 +124,7 @@ const ARTICLE_DEFINITIONS = [
   MEDITATSII_DLYA_KLIENTOV_PSIKHOLOGA_ARTICLE,
   PRODVIZHENIE_KOUCHA_ARTICLE,
   SKOLKO_ZARABATYVAET_KOUCH_ARTICLE,
+  KAK_PRODAVAT_SVOI_USLUGI_ARTICLE,
   MEDITATSIYA_NA_DENGI_ARTICLE,
   KAK_VOYTI_V_SOSTOYANIE_IZOBILIYA_ARTICLE,
   BESPLATNYE_MEDITATSII_ONLAYN_ARTICLE,

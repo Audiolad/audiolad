@@ -6878,6 +6878,100 @@ assert(
   ).includes('"image"'),
   "coach income creator json-ld omits practice image",
 );
+const sellServicesCreatorArticle = getArticleBySlug("kak-prodavat-svoi-uslugi");
+assert(
+  sellServicesCreatorArticle,
+  "sell services creator article registered",
+);
+assert(
+  sellServicesCreatorArticle.productContinuation.kind === "creator_paths",
+  "sell services creator article uses creator continuation",
+);
+assert(
+  sellServicesCreatorArticle.productContinuation.emphasis === "balanced",
+  "sell services creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in sellServicesCreatorArticle),
+  "sell services creator article does not require a catalog practice",
+);
+assert(
+  sellServicesCreatorArticle.title ===
+    "Как продавать свои услуги: как находить клиентов и продавать без навязывания",
+  "sell services creator article keeps the approved H1",
+);
+assert(
+  sellServicesCreatorArticle.metaTitle ===
+    "Как продавать свои услуги без навязывания",
+  "sell services creator article keeps the approved meta title",
+);
+assert(
+  sellServicesCreatorArticle.metaDescription ===
+    "Как продавать свои услуги без навязывания: сформулировать понятное предложение, объяснить цену и формат, вести клиента к покупке и не давить на решение.",
+  "sell services creator article keeps the approved meta description",
+);
+assert(
+  sellServicesCreatorArticle.leadBeforeAudio ===
+    "Вопрос «как продавать свои услуги» часто возникает у специалистов, которые хорошо работают с клиентами, но чувствуют себя неуверенно в момент предложения. Продажа кажется чем-то связанным с уговорами, давлением или постоянной саморекламой.",
+  "sell services creator article keeps the approved lead",
+);
+assert(
+  sellServicesCreatorArticle.shortAnswer === undefined,
+  "sell services creator article does not add unapproved summary copy",
+);
+assert(
+  sellServicesCreatorArticle.seeAlsoLinks.length === 0,
+  "sell services creator article does not add unapproved product links",
+);
+assert(
+  sellServicesCreatorArticle.faq.length === 8,
+  "sell services creator article keeps the approved FAQ set",
+);
+const sellServicesCreatorSerialized = JSON.stringify(
+  sellServicesCreatorArticle,
+);
+assert(
+  sellServicesCreatorSerialized.includes(
+    "https://audiolad.ru/articles/prodazhi-psikhologa",
+  ) &&
+    sellServicesCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-psikhologa",
+    ) &&
+    sellServicesCreatorSerialized.includes(
+      "https://audiolad.ru/articles/prodvizhenie-koucha",
+    ),
+  "sell services creator article keeps the approved internal article links",
+);
+assert(
+  !sellServicesCreatorSerialized.includes("—"),
+  "sell services creator article uses medium dash, not em dash",
+);
+const sellServicesCreatorPageData = {
+  article: sellServicesCreatorArticle,
+  path: "/articles/kak-prodavat-svoi-uslugi",
+  canonicalUrl: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    sellServicesCreatorArticle,
+  ),
+};
+const sellServicesCreatorMetadata = buildArticleMetadata(
+  sellServicesCreatorPageData,
+);
+assert(
+  sellServicesCreatorMetadata.robots?.index === true &&
+    sellServicesCreatorMetadata.robots?.follow === true,
+  "sell services creator metadata stays indexable",
+);
+assert(
+  !sellServicesCreatorMetadata.openGraph?.images,
+  "sell services creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(sellServicesCreatorPageData),
+  ).includes('"image"'),
+  "sell services creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7161,6 +7255,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/skolko-zarabatyvaet-kouch",
   ).length === 1,
   "coach income creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "sell services creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ).length === 1,
+  "sell services creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
