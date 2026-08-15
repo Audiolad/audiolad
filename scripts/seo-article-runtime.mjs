@@ -316,6 +316,15 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-psikhologu-zarabotat",
     ],
   },
+  {
+    path: "/articles/prodvizhenie-koucha",
+    h1: "Продвижение коуча: как продвигать себя и находить клиентов",
+    metaTitle: "Продвижение коуча: как продвигать себя и находить клиентов",
+    metaDescription:
+      "Продвижение коуча: как определить специализацию, выбрать каналы и контент, выстроить понятное предложение и системно находить клиентов.",
+    canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-koucha",
+    productLinkCount: 10,
+  },
 ];
 
 function assert(condition, message) {

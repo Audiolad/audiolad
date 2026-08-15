@@ -6706,6 +6706,92 @@ assert(
   ).includes('"image"'),
   "client meditations creator json-ld omits practice image",
 );
+const coachPromotionCreatorArticle = getArticleBySlug("prodvizhenie-koucha");
+assert(
+  coachPromotionCreatorArticle,
+  "coach promotion creator article registered",
+);
+assert(
+  coachPromotionCreatorArticle.productContinuation.kind === "creator_paths",
+  "coach promotion creator article uses creator continuation",
+);
+assert(
+  coachPromotionCreatorArticle.productContinuation.emphasis === "balanced",
+  "coach promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in coachPromotionCreatorArticle),
+  "coach promotion creator article does not require a catalog practice",
+);
+assert(
+  coachPromotionCreatorArticle.title ===
+    "Продвижение коуча: как продвигать себя и находить клиентов",
+  "coach promotion creator article keeps the approved H1",
+);
+assert(
+  coachPromotionCreatorArticle.metaTitle ===
+    "Продвижение коуча: как продвигать себя и находить клиентов",
+  "coach promotion creator article keeps the approved meta title",
+);
+assert(
+  coachPromotionCreatorArticle.metaDescription ===
+    "Продвижение коуча: как определить специализацию, выбрать каналы и контент, выстроить понятное предложение и системно находить клиентов.",
+  "coach promotion creator article keeps the approved meta description",
+);
+assert(
+  coachPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение коуча начинается не с выбора социальной сети и не с количества публикаций. Сначала потенциальному клиенту должно быть понятно, с какими ситуациями работает специалист, какой формат предлагает и что происходит в процессе взаимодействия.",
+  "coach promotion creator article keeps the approved lead",
+);
+assert(
+  coachPromotionCreatorArticle.shortAnswer === undefined,
+  "coach promotion creator article does not add unapproved summary copy",
+);
+assert(
+  coachPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "coach promotion creator article does not add unapproved product links",
+);
+assert(
+  coachPromotionCreatorArticle.faq.length === 8,
+  "coach promotion creator article keeps the approved FAQ set",
+);
+const coachPromotionCreatorSerialized = JSON.stringify(
+  coachPromotionCreatorArticle,
+);
+assert(
+  !coachPromotionCreatorSerialized.includes("https://audiolad.ru/articles/"),
+  "coach promotion creator article does not add unapproved internal article links",
+);
+assert(
+  !coachPromotionCreatorSerialized.includes("—"),
+  "coach promotion creator article uses medium dash, not em dash",
+);
+const coachPromotionCreatorPageData = {
+  article: coachPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-koucha",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-koucha",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    coachPromotionCreatorArticle,
+  ),
+};
+const coachPromotionCreatorMetadata = buildArticleMetadata(
+  coachPromotionCreatorPageData,
+);
+assert(
+  coachPromotionCreatorMetadata.robots?.index === true &&
+    coachPromotionCreatorMetadata.robots?.follow === true,
+  "coach promotion creator metadata stays indexable",
+);
+assert(
+  !coachPromotionCreatorMetadata.openGraph?.images,
+  "coach promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(coachPromotionCreatorPageData),
+  ).includes('"image"'),
+  "coach promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -6961,6 +7047,20 @@ assert(
       "https://audiolad.ru/articles/meditatsii-dlya-klientov-psikhologa",
   ).length === 1,
   "client meditations creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-koucha",
+  ),
+  "coach promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-koucha",
+  ).length === 1,
+  "coach promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
