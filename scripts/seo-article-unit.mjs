@@ -7064,6 +7064,111 @@ assert(
   ).includes('"image"'),
   "tarologist advertising creator json-ld omits practice image",
 );
+const consultantPromotionCreatorArticle = getArticleBySlug(
+  "prodvizhenie-konsultanta",
+);
+assert(
+  consultantPromotionCreatorArticle,
+  "consultant promotion creator article registered",
+);
+assert(
+  consultantPromotionCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "consultant promotion creator article uses creator continuation",
+);
+assert(
+  consultantPromotionCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "consultant promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in consultantPromotionCreatorArticle),
+  "consultant promotion creator article does not require a catalog practice",
+);
+assert(
+  consultantPromotionCreatorArticle.title ===
+    "Продвижение консультанта: как продвигать свои услуги и находить клиентов",
+  "consultant promotion creator article keeps the approved H1",
+);
+assert(
+  consultantPromotionCreatorArticle.metaTitle ===
+    "Продвижение консультанта: как продвигать услуги",
+  "consultant promotion creator article keeps the approved meta title",
+);
+assert(
+  consultantPromotionCreatorArticle.metaDescription ===
+    "Продвижение консультанта: как определить специализацию, сформулировать предложение, находить клиентов через экспертный контент, рекомендации, поиск и рекламу.",
+  "consultant promotion creator article keeps the approved meta description",
+);
+assert(
+  consultantPromotionCreatorArticle.topicSlug === "articles" &&
+    consultantPromotionCreatorArticle.topicTitle === "Статьи" &&
+    consultantPromotionCreatorArticle.topicHref === "/articles",
+  "consultant promotion creator article keeps the articles topic",
+);
+assert(
+  consultantPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение консультанта отличается от продвижения материального продукта: до покупки человек не может заранее увидеть консультацию или полностью оценить качество анализа. Поэтому особенно важно сделать понятными специализацию, формат работы, профессиональный подход и самого специалиста.",
+  "consultant promotion creator article keeps the approved lead",
+);
+assert(
+  consultantPromotionCreatorArticle.shortAnswer === undefined,
+  "consultant promotion creator article does not add unapproved summary copy",
+);
+assert(
+  consultantPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "consultant promotion creator article does not add unapproved product links",
+);
+assert(
+  consultantPromotionCreatorArticle.faq.length === 8,
+  "consultant promotion creator article keeps the approved FAQ set",
+);
+const consultantPromotionCreatorSerialized = JSON.stringify(
+  consultantPromotionCreatorArticle,
+);
+assert(
+  consultantPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "consultant promotion creator article keeps the approved internal article links",
+);
+assert(
+  consultantPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/studio/meditation",
+  ) &&
+    consultantPromotionCreatorSerialized.includes("https://school.audiolad.ru"),
+  "consultant promotion creator article keeps Studio and School product links",
+);
+assert(
+  !consultantPromotionCreatorSerialized.includes("—"),
+  "consultant promotion creator article uses medium dash, not em dash",
+);
+const consultantPromotionCreatorPageData = {
+  article: consultantPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-konsultanta",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-konsultanta",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    consultantPromotionCreatorArticle,
+  ),
+};
+const consultantPromotionCreatorMetadata = buildArticleMetadata(
+  consultantPromotionCreatorPageData,
+);
+assert(
+  consultantPromotionCreatorMetadata.robots?.index === true &&
+    consultantPromotionCreatorMetadata.robots?.follow === true,
+  "consultant promotion creator metadata stays indexable",
+);
+assert(
+  !consultantPromotionCreatorMetadata.openGraph?.images,
+  "consultant promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(consultantPromotionCreatorPageData),
+  ).includes('"image"'),
+  "consultant promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7375,6 +7480,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/reklama-tarologa",
   ).length === 1,
   "tarologist advertising creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-konsultanta",
+  ),
+  "consultant promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-konsultanta",
+  ).length === 1,
+  "consultant promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

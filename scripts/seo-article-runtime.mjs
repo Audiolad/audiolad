@@ -359,6 +359,16 @@ const CREATOR_ARTICLES = [
     productLinkCount: 10,
     requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
   },
+  {
+    path: "/articles/prodvizhenie-konsultanta",
+    h1: "Продвижение консультанта: как продвигать свои услуги и находить клиентов",
+    metaTitle: "Продвижение консультанта: как продвигать услуги",
+    metaDescription:
+      "Продвижение консультанта: как определить специализацию, сформулировать предложение, находить клиентов через экспертный контент, рекомендации, поиск и рекламу.",
+    canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-konsultanta",
+    productLinkCount: 8,
+    requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  },
 ];
 
 function assert(condition, message) {
