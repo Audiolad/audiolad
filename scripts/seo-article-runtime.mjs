@@ -349,6 +349,16 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/prodvizhenie-koucha",
     ],
   },
+  {
+    path: "/articles/reklama-tarologa",
+    h1: "Реклама таролога: где и как рекламировать свои услуги",
+    metaTitle: "Реклама таролога: где и как рекламировать услуги",
+    metaDescription:
+      "Реклама таролога: где рекламировать услуги, что написать в объявлении, куда вести человека, как оценивать обращения и рекламироваться без манипуляций.",
+    canonicalUrl: "https://audiolad.ru/articles/reklama-tarologa",
+    productLinkCount: 10,
+    requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  },
 ];
 
 function assert(condition, message) {

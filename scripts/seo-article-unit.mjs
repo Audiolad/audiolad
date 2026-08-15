@@ -6972,6 +6972,98 @@ assert(
   ).includes('"image"'),
   "sell services creator json-ld omits practice image",
 );
+const tarologistAdvertisingCreatorArticle = getArticleBySlug(
+  "reklama-tarologa",
+);
+assert(
+  tarologistAdvertisingCreatorArticle,
+  "tarologist advertising creator article registered",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "tarologist advertising creator article uses creator continuation",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "tarologist advertising creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in tarologistAdvertisingCreatorArticle),
+  "tarologist advertising creator article does not require a catalog practice",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.title ===
+    "Реклама таролога: где и как рекламировать свои услуги",
+  "tarologist advertising creator article keeps the approved H1",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.metaTitle ===
+    "Реклама таролога: где и как рекламировать услуги",
+  "tarologist advertising creator article keeps the approved meta title",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.metaDescription ===
+    "Реклама таролога: где рекламировать услуги, что написать в объявлении, куда вести человека, как оценивать обращения и рекламироваться без манипуляций.",
+  "tarologist advertising creator article keeps the approved meta description",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.leadBeforeAudio ===
+    "Реклама таролога может привести новых людей к предложению, но сама по себе не гарантирует обращений. Если человеку непонятно, что именно предлагает специалист, для кого предназначена услуга и что делать после перехода, дополнительный трафик редко решает проблему.",
+  "tarologist advertising creator article keeps the approved lead",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.shortAnswer === undefined,
+  "tarologist advertising creator article does not add unapproved summary copy",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.seeAlsoLinks.length === 0,
+  "tarologist advertising creator article does not add unapproved product links",
+);
+assert(
+  tarologistAdvertisingCreatorArticle.faq.length === 8,
+  "tarologist advertising creator article keeps the approved FAQ set",
+);
+const tarologistAdvertisingCreatorSerialized = JSON.stringify(
+  tarologistAdvertisingCreatorArticle,
+);
+assert(
+  tarologistAdvertisingCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "tarologist advertising creator article keeps the approved internal article links",
+);
+assert(
+  !tarologistAdvertisingCreatorSerialized.includes("—"),
+  "tarologist advertising creator article uses medium dash, not em dash",
+);
+const tarologistAdvertisingCreatorPageData = {
+  article: tarologistAdvertisingCreatorArticle,
+  path: "/articles/reklama-tarologa",
+  canonicalUrl: "https://audiolad.ru/articles/reklama-tarologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    tarologistAdvertisingCreatorArticle,
+  ),
+};
+const tarologistAdvertisingCreatorMetadata = buildArticleMetadata(
+  tarologistAdvertisingCreatorPageData,
+);
+assert(
+  tarologistAdvertisingCreatorMetadata.robots?.index === true &&
+    tarologistAdvertisingCreatorMetadata.robots?.follow === true,
+  "tarologist advertising creator metadata stays indexable",
+);
+assert(
+  !tarologistAdvertisingCreatorMetadata.openGraph?.images,
+  "tarologist advertising creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(tarologistAdvertisingCreatorPageData),
+  ).includes('"image"'),
+  "tarologist advertising creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7269,6 +7361,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
   ).length === 1,
   "sell services creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/reklama-tarologa",
+  ),
+  "tarologist advertising creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/reklama-tarologa",
+  ).length === 1,
+  "tarologist advertising creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
