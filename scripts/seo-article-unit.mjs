@@ -7379,6 +7379,114 @@ assert(
   ).includes('"image"'),
   "esotericist promotion creator json-ld omits practice image",
 );
+const tarologistPromotionCreatorArticle = getArticleBySlug(
+  "prodvizhenie-tarologa",
+);
+assert(
+  tarologistPromotionCreatorArticle,
+  "tarologist promotion creator article registered",
+);
+assert(
+  tarologistPromotionCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "tarologist promotion creator article uses creator continuation",
+);
+assert(
+  tarologistPromotionCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "tarologist promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in tarologistPromotionCreatorArticle),
+  "tarologist promotion creator article does not require a catalog practice",
+);
+assert(
+  tarologistPromotionCreatorArticle.title ===
+    "Продвижение таролога: как тарологу найти клиентов",
+  "tarologist promotion creator article keeps the approved H1",
+);
+assert(
+  tarologistPromotionCreatorArticle.metaTitle ===
+    "Продвижение таролога: как найти клиентов",
+  "tarologist promotion creator article keeps the approved meta title",
+);
+assert(
+  tarologistPromotionCreatorArticle.metaDescription ===
+    "Продвижение таролога: как выбрать специализацию, оформить услуги, находить клиентов через контент, поиск, рекомендации, партнёрства и рекламу.",
+  "tarologist promotion creator article keeps the approved meta description",
+);
+assert(
+  tarologistPromotionCreatorArticle.topicSlug === "articles" &&
+    tarologistPromotionCreatorArticle.topicTitle === "Статьи" &&
+    tarologistPromotionCreatorArticle.topicHref === "/articles",
+  "tarologist promotion creator article keeps the articles topic",
+);
+assert(
+  tarologistPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение таролога – это не только реклама и не попытка постоянно привлекать внимание к раскладам. Чтобы человек захотел обратиться, ему сначала должно быть понятно, с какими темами работает специалист, какие услуги предлагает, как проходит взаимодействие и чем его подход отличается от десятков похожих предложений.",
+  "tarologist promotion creator article keeps the approved lead",
+);
+assert(
+  tarologistPromotionCreatorArticle.shortAnswer === undefined,
+  "tarologist promotion creator article does not add unapproved summary copy",
+);
+assert(
+  tarologistPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "tarologist promotion creator article does not add unapproved product links",
+);
+assert(
+  tarologistPromotionCreatorArticle.faq.length === 8,
+  "tarologist promotion creator article keeps the approved FAQ set",
+);
+const tarologistPromotionCreatorSerialized = JSON.stringify(
+  tarologistPromotionCreatorArticle,
+);
+assert(
+  tarologistPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/articles/reklama-tarologa",
+  ) &&
+    tarologistPromotionCreatorSerialized.includes(
+      "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+    ),
+  "tarologist promotion creator article keeps the approved internal article links",
+);
+assert(
+  tarologistPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/studio/meditation",
+  ) &&
+    tarologistPromotionCreatorSerialized.includes("https://school.audiolad.ru"),
+  "tarologist promotion creator article keeps Studio and School product links",
+);
+assert(
+  !tarologistPromotionCreatorSerialized.includes("—"),
+  "tarologist promotion creator article uses medium dash, not em dash",
+);
+const tarologistPromotionCreatorPageData = {
+  article: tarologistPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-tarologa",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-tarologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    tarologistPromotionCreatorArticle,
+  ),
+};
+const tarologistPromotionCreatorMetadata = buildArticleMetadata(
+  tarologistPromotionCreatorPageData,
+);
+assert(
+  tarologistPromotionCreatorMetadata.robots?.index === true &&
+    tarologistPromotionCreatorMetadata.robots?.follow === true,
+  "tarologist promotion creator metadata stays indexable",
+);
+assert(
+  !tarologistPromotionCreatorMetadata.openGraph?.images,
+  "tarologist promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(tarologistPromotionCreatorPageData),
+  ).includes('"image"'),
+  "tarologist promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7732,6 +7840,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-ezoterika",
   ).length === 1,
   "esotericist promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-tarologa",
+  ),
+  "tarologist promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-tarologa",
+  ).length === 1,
+  "tarologist promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(

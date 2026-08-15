@@ -389,6 +389,19 @@ const CREATOR_ARTICLES = [
     productLinkCount: 8,
     requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
   },
+  {
+    path: "/articles/prodvizhenie-tarologa",
+    h1: "Продвижение таролога: как тарологу найти клиентов",
+    metaTitle: "Продвижение таролога: как найти клиентов",
+    metaDescription:
+      "Продвижение таролога: как выбрать специализацию, оформить услуги, находить клиентов через контент, поиск, рекомендации, партнёрства и рекламу.",
+    canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-tarologa",
+    productLinkCount: 8,
+    requiredSnippet: "https://audiolad.ru/articles/reklama-tarologa",
+    requiredSnippets: [
+      "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+    ],
+  },
 ];
 
 function assert(condition, message) {
