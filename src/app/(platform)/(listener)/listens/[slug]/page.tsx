@@ -6,7 +6,6 @@ import {
   buildListenPageMetadata,
   getListenPageBySlug,
   isValidListenPageSlug,
-  listListenPageSlugs,
   loadListenPageData,
 } from "@/lib/seo/listens";
 
@@ -15,10 +14,6 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
-
-export function generateStaticParams() {
-  return listListenPageSlugs().map((slug) => ({ slug }));
-}
 
 export async function generateMetadata({
   params,
