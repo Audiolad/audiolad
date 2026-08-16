@@ -395,7 +395,7 @@ export const loadPublicPlaylistBySlug = cache(
           storage,
           playlist.cover_path,
           {
-            userId: playlist.user_id,
+            userId: playlist.user_id ?? undefined,
             playlistId: playlist.id,
           },
         );

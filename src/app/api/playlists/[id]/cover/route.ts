@@ -9,10 +9,12 @@ import { imageProcessErrorMessage } from "@/lib/images/process-image";
 import { playlistCoverProcessErrorMessage } from "@/lib/playlists/cover-image";
 import {
   assertPlaylistCoverPathForOwner,
+  assertPlaylistCoverPathForPlaylist,
   createPlaylistCoverSignedUrl,
   PLAYLIST_COVER_MAX_BYTES,
   PLAYLIST_COVERS_BUCKET,
   removePlaylistCoverObject,
+  removeStoredPlaylistCoverObject,
   replacePlaylistCoverPathCas,
 } from "@/lib/playlists/covers";
 import {
@@ -232,12 +234,11 @@ export async function POST(request: Request, context: RouteContext) {
   if (
     confirmedOld &&
     confirmedOld !== nextPath &&
-    assertPlaylistCoverPathForOwner(confirmedOld, user.id, id)
+    assertPlaylistCoverPathForPlaylist(confirmedOld, id)
   ) {
-    const removed = await removePlaylistCoverObject(
+    const removed = await removeStoredPlaylistCoverObject(
       storage,
       confirmedOld,
-      user.id,
       id,
     );
 
@@ -352,7 +353,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (
     previousPath &&
-    !assertPlaylistCoverPathForOwner(previousPath, user.id, id)
+    !assertPlaylistCoverPathForPlaylist(previousPath, id)
   ) {
     console.error("playlist_cover_delete_invalid_stored_path");
     return NextResponse.json(
@@ -419,10 +420,9 @@ export async function DELETE(request: Request, context: RouteContext) {
         previousManifest,
       );
     } else if (cas.result.previous_path) {
-      const removed = await removePlaylistCoverObject(
+      const removed = await removeStoredPlaylistCoverObject(
         storage,
         cas.result.previous_path,
-        user.id,
         id,
       );
 
