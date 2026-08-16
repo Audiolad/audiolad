@@ -151,4 +151,58 @@ assert(
   "public /p rows do not use listen-page stay_on_source policy",
 );
 
+const renderStart = view.indexOf("export default function PublicPlaylistPageView");
+const renderView = renderStart === -1 ? "" : view.slice(renderStart);
+const playAllIdx = renderView.indexOf("<PlayAllButton");
+const itemsIdx = renderView.indexOf("<PublicPlaylistItems");
+const ctaIdx = renderView.indexOf("<PublicPlaylistLibraryCta");
+const saveCopyMatches = view.match(/Сохраняйте аудиопрактики и собирайте свои плейлисты/g) ?? [];
+
+assert(renderStart !== -1, "public playlist page view export remains");
+assert(playAllIdx !== -1 && itemsIdx !== -1 && ctaIdx !== -1, "hero, items, and CTA remain");
+assert(playAllIdx < itemsIdx, "Слушать всё stays above playlist items");
+assert(itemsIdx < ctaIdx, "auth/library CTA is after playlist items");
+assert(playAllIdx < ctaIdx, "auth/library CTA is after Слушать всё");
+assert(saveCopyMatches.length === 1, "one auth/library CTA copy instance");
+assert((view.match(/data-public-playlist-library-cta/g) ?? []).length === 1, "one CTA section");
+assert((view.match(/<PublicPlaylistLibraryCta/g) ?? []).length === 1, "CTA mounted once");
+assert(view.includes("Войти") && view.includes("Создать аккаунт"), "guest Войти / Создать аккаунт remain");
+assert(view.includes("Перейти в Аудиотеку"), "authenticated Перейти в Аудиотеку remains");
+assert(view.includes("isAuthenticated ?"), "guest and authenticated CTA stay mutually exclusive");
+assert(
+  view.includes("Перейти в Аудиотеку") &&
+    view.includes("Войти") &&
+    view.includes("Создать аккаунт"),
+  "logged-in library CTA and guest auth buttons are exclusive branches of one CTA",
+);
+
+assert(view.includes('data-public-playlist-hero'), "hero is marked for layout checks");
+assert(
+  view.includes("flex flex-col xl:grid") &&
+    view.includes("xl:grid-cols-[minmax(260px,280px)_minmax(0,1fr)]") &&
+    view.includes("xl:items-start"),
+  "desktop xl hero is cover-left / content-right, top-aligned",
+);
+assert(
+  view.includes("xl:col-start-1") && view.includes("xl:col-start-2"),
+  "desktop hero places cover in column 1 and content in column 2",
+);
+assert(
+  !view.includes("grid grid-cols") && !view.includes("sm:grid") && !view.includes("lg:grid"),
+  "mobile/tablet hero stays a vertical stack (xl only)",
+);
+assert(
+  view.includes("max-w-[280px]") && view.includes("mx-auto") && view.includes("xl:mx-0"),
+  "mobile cover stays a centered stack; desktop cover is not centered as a page hero",
+);
+
+assert(
+  items.includes('data-playlist-row-play={coverPlayback ? "cover" : "circle"}') === false,
+  "row play mode stays on PlaylistItemRow, not forked here",
+);
+assert(
+  items.includes("coverPlayback") && row.includes('data-playlist-row-play={coverPlayback ? "cover" : "circle"}'),
+  "rows still play from cover",
+);
+
 console.log("public-playlist-page-shell-unit: ok");

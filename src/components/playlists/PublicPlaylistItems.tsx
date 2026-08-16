@@ -78,7 +78,7 @@ export default function PublicPlaylistItems({
 
   return (
     <section
-      className="mt-5 space-y-1.5 pb-[calc(var(--global-mini-player-height,0px)+5.5rem)]"
+      className="mt-5 space-y-1.5"
       data-public-playlist-items
     >
       {rowError ? (
