@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
-import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
+import PublicPlaylistItems from "@/components/playlists/PublicPlaylistItems";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import type { PublicPlaylistView } from "@/lib/playlists/public-detail";
 import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
@@ -23,7 +23,7 @@ export default function PublicPlaylistPageView({
   const playlistCoverAlt = buildPlaylistCoverAlt(playlist.title);
 
   return (
-    <div className="px-5 pt-6 pb-8">
+    <div data-public-playlist-page>
       <p className="text-sm font-medium text-[#7042c5]">
         {detail.playlist.isEditorial
           ? "Плейлист АудиоЛада"
@@ -134,33 +134,11 @@ export default function PublicPlaylistPageView({
       ) : null}
 
       {items.length > 0 ? (
-        <section className="mt-5 space-y-1.5 pb-[calc(var(--global-mini-player-height,0px)+5.5rem)]">
-          {items.map((item, index) => {
-            const listenHref =
-              item.href && item.href.startsWith("/listen/") ? item.href : null;
-
-            return (
-              <PlaylistItemRow
-                key={item.practiceId}
-                index={index}
-                item={{
-                  practiceId: item.practiceId,
-                  title: item.title,
-                  authorName: item.authorName,
-                  authorSlug: item.authorSlug,
-                  coverUrl: item.coverUrl,
-                  coverImage: item.coverImage,
-                  updatedAt: item.updatedAt,
-                  formatLabel: item.formatLabel,
-                  metaLabel: item.metaLabel,
-                  available: item.available,
-                  href: item.href,
-                  listenHref,
-                }}
-              />
-            );
-          })}
-        </section>
+        <PublicPlaylistItems
+          playlistSlug={playlist.slug}
+          title={playlist.title}
+          items={items}
+        />
       ) : null}
     </div>
   );

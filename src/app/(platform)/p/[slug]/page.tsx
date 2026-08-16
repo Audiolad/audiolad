@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import BottomNav from "@/components/BottomNav";
 import PublicPlaylistPageView from "@/components/playlists/PublicPlaylistPageView";
 import JsonLd from "@/components/seo/JsonLd";
-import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { loadPublicPlaylistBySlug } from "@/lib/playlists/public-detail";
 import { isPlatformEditorialPublicPlaylist } from "@/lib/playlists/public-seo";
 import {
@@ -98,24 +96,17 @@ export default async function PublicPlaylistPage({ params }: PageProps) {
 
   if (!loaded.ok) {
     return (
-      <main className="min-h-screen bg-platform-surface text-[#25135c]">
-        <div
-          className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
-        >
-          <div className="px-5 pt-6 pb-4">
-            <h1 className="mt-2 text-[28px] font-semibold">Плейлист</h1>
-            <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-              Не удалось загрузить подборку. Попробуйте ещё раз.
-            </p>
-          </div>
-          <BottomNav />
-        </div>
-      </main>
+      <div>
+        <h1 className="mt-2 text-[28px] font-semibold">Плейлист</h1>
+        <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+          Не удалось загрузить подборку. Попробуйте ещё раз.
+        </p>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <>
       <JsonLd
         data={buildPublicPlaylistJsonLd({
           title: loaded.detail.playlist.title,
@@ -133,15 +124,10 @@ export default async function PublicPlaylistPage({ params }: PageProps) {
           })),
         })}
       />
-      <div
-        className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface ${platformMobileShellClass}`}
-      >
-        <PublicPlaylistPageView
-          detail={loaded.detail}
-          isAuthenticated={Boolean(user)}
-        />
-        <BottomNav />
-      </div>
-    </main>
+      <PublicPlaylistPageView
+        detail={loaded.detail}
+        isAuthenticated={Boolean(user)}
+      />
+    </>
   );
 }

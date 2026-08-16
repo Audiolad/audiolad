@@ -21,6 +21,8 @@ const authorDashboardPage = read("src/app/(platform)/author-dashboard/page.tsx")
 const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
 const bottomNav = read("src/lib/navigation/bottom-nav.ts");
 const listenerLayout = read("src/app/(platform)/(listener)/layout.tsx");
+const publicPlaylistLayout = read("src/app/(platform)/p/layout.tsx");
+const publicPlaylistPage = read("src/app/(platform)/p/[slug]/page.tsx");
 
 assert(
   shellConfig.includes('default:') &&
@@ -103,6 +105,18 @@ assert(
 assert(
   listenerLayout.includes('mode="default"'),
   "listener layout must keep default shell mode explicit",
+);
+
+assert(
+  publicPlaylistLayout.includes("ListenerAppShell") &&
+    publicPlaylistLayout.includes('mode="default"'),
+  "public /p layout must reuse ListenerAppShell in default mode",
+);
+
+assert(
+  !publicPlaylistPage.includes("BottomNav") &&
+    !publicPlaylistPage.includes("max-w-[430px]"),
+  "public /p page must not wrap its own mobile column or BottomNav",
 );
 
 assert(

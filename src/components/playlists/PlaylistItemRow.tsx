@@ -24,6 +24,13 @@ export type PlaylistItemRowData = {
   listenHref: string | null;
 };
 
+export type PlaylistItemCoverPlayback = {
+  isPlaying: boolean;
+  onPlayPause: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+};
+
 type PlaylistItemRowProps = {
   item: PlaylistItemRowData;
   index: number;
@@ -31,12 +38,25 @@ type PlaylistItemRowProps = {
   showMetaOnDesktop?: boolean;
   /** Owner reorder / menu controls. */
   trailingControls?: ReactNode;
+  /**
+   * Public `/p/[slug]` rows: cover is the play/pause target.
+   * Owner / editorial rows omit this and keep the separate Play circle.
+   */
+  coverPlayback?: PlaylistItemCoverPlayback;
 };
 
-function PlayIcon() {
+function PlayIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
       <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
+    </svg>
+  );
+}
+
+function PauseIcon({ className = "h-3 w-3" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M7 5.5h3.5v13H7V5.5Zm6.5 0H17v13h-3.5V5.5Z" />
     </svg>
   );
 }
@@ -51,14 +71,17 @@ export default function PlaylistItemRow({
   showPosition = true,
   showMetaOnDesktop = true,
   trailingControls,
+  coverPlayback,
 }: PlaylistItemRowProps) {
-  const playEnabled = Boolean(item.listenHref);
+  const playEnabled = Boolean(item.listenHref) && !coverPlayback?.disabled;
   const titleHref = item.href ?? item.listenHref;
+  const coverPlaybackBusy = Boolean(coverPlayback?.loading);
 
   return (
     <article
       className="playlist-item-row flex min-h-[76px] max-h-[88px] items-center gap-2 rounded-[16px] border border-[#eadff8] bg-white px-2 py-1.5 sm:gap-3 sm:px-3"
       data-practice-id={item.practiceId}
+      data-playlist-row-play={coverPlayback ? "cover" : "circle"}
     >
       {showPosition ? (
         <span
@@ -69,7 +92,7 @@ export default function PlaylistItemRow({
         </span>
       ) : null}
 
-      {playEnabled ? (
+      {coverPlayback ? null : playEnabled ? (
         <Link
           href={item.listenHref!}
           aria-label={`Слушать ${item.title}`}
@@ -88,7 +111,44 @@ export default function PlaylistItemRow({
         </button>
       )}
 
-      {titleHref ? (
+      {coverPlayback ? (
+        <button
+          type="button"
+          disabled={!playEnabled || coverPlaybackBusy}
+          onClick={coverPlayback.onPlayPause}
+          aria-label={
+            !playEnabled
+              ? `Слушать ${item.title} — недоступно`
+              : coverPlayback.isPlaying
+                ? `Пауза: ${item.title}`
+                : `Слушать ${item.title}`
+          }
+          className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[12px] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          <ProductCoverThumbnail
+            slug={item.practiceId}
+            title={item.title}
+            coverUrl={item.coverUrl}
+            coverImage={item.coverImage}
+            updatedAt={item.updatedAt}
+            authorName={item.authorName}
+            displayWidth={56}
+            className="h-full w-full rounded-[12px]"
+          />
+          {playEnabled ? (
+            <span
+              className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#7042c5] text-white"
+              aria-hidden
+            >
+              {coverPlayback.isPlaying ? (
+                <PauseIcon />
+              ) : (
+                <PlayIcon className="h-3 w-3" />
+              )}
+            </span>
+          ) : null}
+        </button>
+      ) : titleHref ? (
         <Link
           href={titleHref}
           className="h-14 w-14 shrink-0 overflow-hidden rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
