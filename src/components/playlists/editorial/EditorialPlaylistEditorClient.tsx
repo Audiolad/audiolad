@@ -461,8 +461,8 @@ export default function EditorialPlaylistEditorClient({
               value={description}
               maxLength={PLAYLIST_DESCRIPTION_MAX_LENGTH}
               onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              className="w-full rounded-[18px] border border-[#ddcfef] px-4 py-3 text-sm outline-none focus:border-[#7042c5]"
+              rows={3}
+              className="w-full min-h-[4.5rem] resize-y rounded-[18px] border border-[#ddcfef] px-4 py-2.5 text-sm outline-none focus:border-[#7042c5]"
             />
             <span className="mt-2 block text-xs text-[#7d70a2]">
               {description.length}/{PLAYLIST_DESCRIPTION_MAX_LENGTH}

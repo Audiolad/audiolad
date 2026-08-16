@@ -65,7 +65,13 @@ export async function POST(request: Request) {
   const parsed = parseCreatePlaylistBody(body);
 
   if (!parsed.ok) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "invalid_request",
+        ...(parsed.message ? { message: parsed.message } : {}),
+      },
+      { status: 400 },
+    );
   }
 
   if (parsed.isEditorial) {

@@ -57,9 +57,11 @@ export function validatePlaylistTitle(value: unknown): TitleValidationResult {
   return { ok: true, title };
 }
 
+export const PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE = `Описание не должно превышать ${PLAYLIST_DESCRIPTION_MAX_LENGTH} символов.`;
+
 export type DescriptionValidationResult =
   | { ok: true; description: string | null }
-  | { ok: false; error: "invalid_request" };
+  | { ok: false; error: "invalid_request"; message?: string };
 
 export function validatePlaylistDescription(
   value: unknown,
@@ -79,7 +81,11 @@ export function validatePlaylistDescription(
   }
 
   if (description.length > PLAYLIST_DESCRIPTION_MAX_LENGTH) {
-    return { ok: false, error: "invalid_request" };
+    return {
+      ok: false,
+      error: "invalid_request",
+      message: PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE,
+    };
   }
 
   return { ok: true, description };
@@ -133,7 +139,7 @@ export type CreatePlaylistInput =
       slug?: string;
       directionId?: string;
     }
-  | { ok: false; error: "invalid_request" };
+  | { ok: false; error: "invalid_request"; message?: string };
 
 export function parseCreatePlaylistBody(body: unknown): CreatePlaylistInput {
   const parsed = parseJsonObject(body);
@@ -245,7 +251,7 @@ export type PatchPlaylistInput =
       slug?: string;
       directionId?: string;
     }
-  | { ok: false; error: "invalid_request" };
+  | { ok: false; error: "invalid_request"; message?: string };
 
 export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
   const parsed = parseJsonObject(body);

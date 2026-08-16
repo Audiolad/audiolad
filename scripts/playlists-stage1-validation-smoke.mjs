@@ -10,6 +10,8 @@ import {
   parseCollaboratorUpsertBody,
   parseCreatePlaylistBody,
   parsePatchPlaylistBody,
+  PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE,
+  validatePlaylistDescription,
 } from "../src/lib/playlists/validation.ts";
 import {
   PLAYLIST_DESCRIPTION_MAX_LENGTH,
@@ -159,12 +161,77 @@ assert(
   }).ok === false,
   "first_published_at forbidden on create",
 );
+assert(PLAYLIST_DESCRIPTION_MAX_LENGTH === 300, "description max is 300");
+assert(
+  validatePlaylistDescription("a".repeat(299)).ok === true,
+  "299-char description accepted",
+);
+assert(
+  validatePlaylistDescription("a".repeat(300)).ok === true,
+  "300-char description accepted",
+);
+{
+  const tooLong = validatePlaylistDescription("a".repeat(301));
+  assert(tooLong.ok === false, "301-char description rejected");
+  if (!tooLong.ok) {
+    assert(
+      tooLong.message === PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE,
+      "301-char description has a clear validation message",
+    );
+  }
+}
 assert(
   parseCreatePlaylistBody({
     title: "x",
+    description: "a".repeat(PLAYLIST_DESCRIPTION_MAX_LENGTH),
+  }).ok === true,
+  "create accepts 300-char description",
+);
+{
+  const tooLongCreate = parseCreatePlaylistBody({
+    title: "x",
     description: "a".repeat(PLAYLIST_DESCRIPTION_MAX_LENGTH + 1),
-  }).ok === false,
-  "description length check",
+  });
+  assert(tooLongCreate.ok === false, "description length check");
+  if (!tooLongCreate.ok) {
+    assert(
+      tooLongCreate.message === PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE,
+      "create >300 returns a clear validation message",
+    );
+  }
+}
+{
+  const tooLongPatch = parsePatchPlaylistBody({
+    description: "a".repeat(PLAYLIST_DESCRIPTION_MAX_LENGTH + 1),
+  });
+  assert(tooLongPatch.ok === false, "patch description length check");
+  if (!tooLongPatch.ok) {
+    assert(
+      tooLongPatch.message === PLAYLIST_DESCRIPTION_TOO_LONG_MESSAGE,
+      "patch >300 returns a clear validation message",
+    );
+  }
+}
+
+const DESC_MIGRATION =
+  "supabase/migrations/20260816120000_playlist_description_max_300.sql";
+assert(existsSync(DESC_MIGRATION), "description 300 migration exists");
+const descMigration = read(DESC_MIGRATION);
+assert(
+  descMigration.includes("char_length(description) <= 300"),
+  "migration adds 300 CHECK",
+);
+assert(
+  /RAISE EXCEPTION/i.test(descMigration),
+  "migration fail-closes on existing rows >300",
+);
+assert(
+  !/substring|substr\(|left\(/i.test(descMigration),
+  "migration must not truncate text",
+);
+assert(
+  !/UPDATE\s+public\.playlists/i.test(descMigration),
+  "migration must not UPDATE playlists",
 );
 
 const draftPatch = parsePatchPlaylistBody({
@@ -225,6 +292,10 @@ assert(
   createApi.includes("countOwnedPlaylists") && createApi.includes("user.id"),
   "personal limit uses user id",
 );
+assert(
+  createApi.includes("parsed.message"),
+  "POST /api/playlists returns validation message",
+);
 
 const patchApi = read("src/app/api/playlists/[id]/route.ts");
 assert(patchApi.includes("canUserEditPlaylist"), "patch uses access helper");
@@ -237,6 +308,10 @@ assert(patchApi.includes("Keep allocated editorial slug"), "unpublish keeps slug
 assert(
   patchApi.includes("first_published_at"),
   "publish path stamps first_published_at",
+);
+assert(
+  patchApi.includes("parsed.message"),
+  "PATCH /api/playlists/[id] returns validation message",
 );
 
 const queries = read("src/lib/playlists/queries.ts");
