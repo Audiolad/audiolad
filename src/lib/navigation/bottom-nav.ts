@@ -54,6 +54,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
   return (
     pathname === "/articles" ||
     pathname.startsWith("/articles/") ||
+    pathname === "/listens" ||
+    pathname.startsWith("/listens/") ||
     pathname === "/help" ||
     pathname.startsWith("/help/") ||
     pathname === "/about" ||

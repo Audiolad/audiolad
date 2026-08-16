@@ -34,6 +34,19 @@ export type PlaylistQueueSource =
       returnHref: string;
     };
 
+/**
+ * Automatic queue progression policy.
+ * Default `follow_listen_route` keeps /p, /listen, and owner playlists
+ * replacing into the fullscreen listen player. `stay_on_source` is for
+ * /listens/[slug] only: next-item stays on the current page.
+ */
+export type PlaylistQueueNavigationPolicy =
+  | "follow_listen_route"
+  | "stay_on_source";
+
+export const DEFAULT_PLAYLIST_QUEUE_NAVIGATION_POLICY: PlaylistQueueNavigationPolicy =
+  "follow_listen_route";
+
 export type PlaylistQueue = {
   id: string;
   title: string;
@@ -44,6 +57,11 @@ export type PlaylistQueue = {
   skippedCount: number;
   /** Additional skips during runtime access re-check. */
   runtimeSkippedCount: number;
+  /**
+   * Automatic next-item navigation. Omitted / default follows /listen/...
+   * User can still open the fullscreen player from mini/desktop chrome.
+   */
+  navigationPolicy?: PlaylistQueueNavigationPolicy;
 };
 
 export type BuildPlaylistQueueResult =
@@ -92,4 +110,16 @@ export function isSafeInternalListenHref(href: string): boolean {
   const path = href.split("?")[0] ?? href;
   const parts = path.split("/").filter(Boolean);
   return parts.length >= 3 && parts[0] === "listen";
+}
+
+export function getPlaylistQueueNavigationPolicy(
+  queue: Pick<PlaylistQueue, "navigationPolicy">,
+): PlaylistQueueNavigationPolicy {
+  return queue.navigationPolicy ?? DEFAULT_PLAYLIST_QUEUE_NAVIGATION_POLICY;
+}
+
+export function shouldNavigateOnQueueAdvance(
+  queue: Pick<PlaylistQueue, "navigationPolicy">,
+): boolean {
+  return getPlaylistQueueNavigationPolicy(queue) === "follow_listen_route";
 }

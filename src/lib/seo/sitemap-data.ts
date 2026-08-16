@@ -16,6 +16,9 @@ import {
   buildArticlePath,
   listArticleDefinitions,
 } from "@/lib/seo/articles";
+import { buildListenPagePath } from "@/lib/seo/listens/paths";
+import { listIndexableListenPageDefinitions } from "@/lib/seo/listens/registry";
+import { isPlatformEditorialPublicPlaylist } from "@/lib/playlists/public-seo";
 import { helpArticlePath } from "@/lib/help/paths";
 import { listHelpArticles } from "@/lib/help/registry";
 import {
@@ -244,6 +247,8 @@ type PlaylistSitemapRow = {
   slug: string | null;
   updated_at: string | null;
   published_at: string | null;
+  is_editorial?: boolean | null;
+  owner_type?: string | null;
 };
 
 export function mapPlaylistRowsToSitemapEntries(
@@ -256,6 +261,15 @@ export function mapPlaylistRowsToSitemapEntries(
     const slug = row.slug?.trim();
 
     if (!slug || !isValidPlaylistPublicSlug(slug) || !row.published_at?.trim()) {
+      return [];
+    }
+
+    if (
+      isPlatformEditorialPublicPlaylist({
+        isEditorial: row.is_editorial,
+        ownerType: row.owner_type,
+      })
+    ) {
       return [];
     }
 
@@ -484,7 +498,7 @@ async function fetchPublicPlaylistSitemapEntries(
   try {
     const { data, error } = await supabase
       .from("playlists")
-      .select("slug, updated_at, published_at")
+      .select("slug, updated_at, published_at, is_editorial, owner_type")
       .eq("visibility", "public")
       .not("published_at", "is", null)
       .not("slug", "is", null);
@@ -554,6 +568,22 @@ export function mapTopicHubDefinitionsToSitemapEntries(
     changeFrequency: "weekly" as const,
     priority: 0.75,
   }));
+}
+
+export function mapListenPageDefinitionsToSitemapEntries(
+  pages: ReadonlyArray<{
+    slug: string;
+    indexable?: boolean;
+  }> = listIndexableListenPageDefinitions(),
+  origin: string = getAppOrigin(),
+): SitemapEntry[] {
+  return pages
+    .filter((page) => page.indexable !== false)
+    .map((page) => ({
+      url: toAbsoluteSitemapUrl(buildListenPagePath(page.slug), origin),
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
 }
 
 export function mapArticleDefinitionsToSitemapEntries(
@@ -643,6 +673,7 @@ export type SitemapBuildStats = {
   promos: number;
   topicHubs: number;
   articles: number;
+  listens: number;
   helpArticles: number;
   total: number;
 };
@@ -659,6 +690,7 @@ export async function buildSitemapEntries(): Promise<{
   let promoEntries: SitemapEntry[] = [];
   let topicHubEntries: SitemapEntry[] = [];
   const articleEntries = mapArticleDefinitionsToSitemapEntries();
+  const listenEntries = mapListenPageDefinitionsToSitemapEntries();
   const helpArticleEntries = mapHelpArticlesToSitemapEntries();
 
   try {
@@ -689,6 +721,7 @@ export async function buildSitemapEntries(): Promise<{
     promoEntries,
     topicHubEntries,
     articleEntries,
+    listenEntries,
     helpArticleEntries,
   );
 
@@ -702,6 +735,7 @@ export async function buildSitemapEntries(): Promise<{
       promos: promoEntries.length,
       topicHubs: topicHubEntries.length,
       articles: articleEntries.length,
+      listens: listenEntries.length,
       helpArticles: helpArticleEntries.length,
       total: entries.length,
     },

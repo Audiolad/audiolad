@@ -4,6 +4,7 @@ import { getDisplayFormat } from "@/lib/author-products/format";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
 import { isPracticeEligibleForPublicPlaylist } from "@/lib/playlists/public-content";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
+import { isPlatformOwnedPlaylist } from "@/lib/playlists/public-seo";
 import {
   isValidPlaylistPublicSlug,
   normalizePlaylistPublicSlug,
@@ -64,6 +65,7 @@ type PlaylistDbRow = {
   cover_path: string | null;
   cover_updated_at: string | null;
   is_editorial: boolean | null;
+  owner_type?: string | null;
   description?: string | null;
 };
 
@@ -75,6 +77,10 @@ export type PublicPlaylistItemView = ProductCoverFields & {
   authorSlug: string | null;
   formatLabel: string | null;
   metaLabel: string | null;
+  durationLabel: string | null;
+  durationSeconds: number | null;
+  productSlug: string | null;
+  productHref: string | null;
   available: boolean;
   href: string | null;
 };
@@ -88,6 +94,7 @@ export type PublicPlaylistView = {
     published_at: string;
     updated_at: string;
     isEditorial: boolean;
+    isPlatformOwned: boolean;
     description: string | null;
   };
   items: PublicPlaylistItemView[];
@@ -148,6 +155,7 @@ export const loadPublicPlaylistBySlug = cache(
       cover_path,
       cover_updated_at,
       is_editorial,
+      owner_type,
       description
     `,
       )
@@ -257,6 +265,10 @@ export const loadPublicPlaylistBySlug = cache(
           authorSlug: null,
           formatLabel: null,
           metaLabel: null,
+          durationLabel: null,
+          durationSeconds: null,
+          productSlug: null,
+          productHref: null,
           coverUrl: null,
           coverImage: null,
           updatedAt: null,
@@ -326,6 +338,19 @@ export const loadPublicPlaylistBySlug = cache(
         hasUnavailable = true;
       }
 
+      const resolvedDurationSeconds =
+        durationSeconds && durationSeconds > 0
+          ? durationSeconds
+          : typeof practice.duration_minutes === "number" &&
+              practice.duration_minutes > 0
+            ? Math.round(practice.duration_minutes * 60)
+            : null;
+      const productSlug = practice.slug?.trim() || null;
+      const productHref =
+        authorSlug && productSlug
+          ? buildPracticePublicPath(authorSlug, productSlug)
+          : null;
+
       items.push({
         practiceId: practice.id,
         position: row.position,
@@ -340,6 +365,15 @@ export const loadPublicPlaylistBySlug = cache(
               durationMinutesFallback: practice.duration_minutes,
             })
           : null,
+        durationLabel: eligible
+          ? formatProductDuration(
+              durationSeconds,
+              practice.duration_minutes,
+            )
+          : null,
+        durationSeconds: eligible ? resolvedDurationSeconds : null,
+        productSlug,
+        productHref,
         ...(eligible || practice.status === "published"
           ? coverFields
           : {
@@ -383,6 +417,10 @@ export const loadPublicPlaylistBySlug = cache(
           published_at: playlist.published_at,
           updated_at: playlist.updated_at,
           isEditorial: playlist.is_editorial === true,
+          isPlatformOwned: isPlatformOwnedPlaylist({
+            ownerType: playlist.owner_type,
+            isEditorial: playlist.is_editorial,
+          }),
           description: playlist.description?.trim() || null,
         },
         items,
