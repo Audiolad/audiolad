@@ -91,7 +91,13 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parsed = parsePatchPlaylistBody(body);
 
   if (!parsed.ok) {
-    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "invalid_request",
+        ...(parsed.message ? { message: parsed.message } : {}),
+      },
+      { status: 400 },
+    );
   }
 
   const { playlist, error: loadError } = await getOwnedPlaylistById(

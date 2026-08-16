@@ -239,6 +239,10 @@ UNIQUE `(playlist_id, practice_id)` — один продукт один раз 
 - Drift/unavailable item остаётся в позиции («Материал сейчас недоступен»); без audio signed URL / entitlement / `user_practices` / progress / `updated_at` writes.
 - Copy link в owner UI только при public + slug + `published_at`.
 
+### Description length (2026-08-16)
+
+`playlists.description` — optional text for the whole table (user and platform). New limit: `char_length(description) <= 300` (`playlists_description_length_check`). Migration `20260816120000_playlist_description_max_300.sql` is fail-closed: it errors if any existing row is longer than 300 and does not truncate text. **Not applied to production.**
+
 ### Мутации
 
 Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`, `DELETE /api/playlists/[id]/items/[practiceId]`, `POST .../items/[practiceId]/move`) и SECURITY DEFINER RPC (membership, covers CAS/mosaic, move).

@@ -132,6 +132,14 @@ assert(
   }).ok === false,
   "first_published_at still forbidden",
 );
+assert(PLAYLIST_DESCRIPTION_MAX_LENGTH === 300, "description max is 300");
+assert(
+  parseCreatePlaylistBody({
+    title: "x",
+    description: "a".repeat(PLAYLIST_DESCRIPTION_MAX_LENGTH),
+  }).ok === true,
+  "description 300 accepted",
+);
 assert(
   parseCreatePlaylistBody({
     title: "x",
@@ -188,9 +196,33 @@ const replaceApi = read(
 assert(replaceApi.includes("replace_playlist_item"), "thin replace API");
 assert(replaceApi.includes("canUserEditEditorialPlaylist"), "replace uses access helper");
 
+const createUi = read(
+  "src/components/playlists/editorial/EditorialPlaylistCreateClient.tsx",
+);
+assert(
+  createUi.includes("maxLength={PLAYLIST_DESCRIPTION_MAX_LENGTH}"),
+  "create UI maxlength 300",
+);
+assert(
+  createUi.includes("{description.length}/{PLAYLIST_DESCRIPTION_MAX_LENGTH}"),
+  "create UI counter 300",
+);
+assert(!/\b1000\b/.test(createUi), "create UI has no 1000");
+assert(createUi.includes("rows={3}"), "create description textarea is compact");
+
 const editor = read(
   "src/components/playlists/editorial/EditorialPlaylistEditorClient.tsx",
 );
+assert(
+  editor.includes("maxLength={PLAYLIST_DESCRIPTION_MAX_LENGTH}"),
+  "edit UI maxlength 300",
+);
+assert(
+  editor.includes("{description.length}/{PLAYLIST_DESCRIPTION_MAX_LENGTH}"),
+  "edit UI counter 300",
+);
+assert(!/\b1000\b/.test(editor), "edit UI has no 1000");
+assert(editor.includes("rows={3}"), "edit description textarea is compact");
 assert(!editor.includes("Удалить плейлист"), "no delete playlist button");
 assert(editor.includes("Опубликовать"), "publish button");
 assert(editor.includes("Снять с публикации"), "unpublish button");
@@ -235,6 +267,16 @@ assert(userPlaylists.includes("listOwnedPlaylists"), "user list preserved");
 assert(
   !userPlaylists.includes("includePublished: true"),
   "user page does not pull published platform into owned list",
+);
+const userListUi = read("src/components/playlists/PlaylistsClient.tsx");
+const userDetailUi = read("src/components/playlists/PlaylistDetailClient.tsx");
+assert(
+  !userListUi.includes("PLAYLIST_DESCRIPTION_MAX_LENGTH"),
+  "user playlist list UI stays without description field",
+);
+assert(
+  !userDetailUi.includes("PLAYLIST_DESCRIPTION_MAX_LENGTH"),
+  "user playlist detail UI stays without description field",
 );
 
 assert(
