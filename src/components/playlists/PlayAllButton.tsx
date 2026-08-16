@@ -8,6 +8,7 @@ import {
   buildPublicPlaylistQueue,
 } from "@/lib/playlists/build-playlist-queue";
 import type { PlaylistDetailItemView } from "@/lib/playlists/detail";
+import type { PlaylistQueueNavigationPolicy } from "@/lib/playlists/player-queue-types";
 import type { PublicPlaylistItemView } from "@/lib/playlists/public-detail";
 
 type PlayAllButtonProps =
@@ -16,12 +17,16 @@ type PlayAllButtonProps =
       playlistId: string;
       title: string;
       items: PlaylistDetailItemView[];
+      startIndex?: number;
     }
   | {
       variant: "public";
       playlistSlug: string;
       title: string;
       items: PublicPlaylistItemView[];
+      startIndex?: number;
+      returnHref?: string;
+      navigationPolicy?: PlaylistQueueNavigationPolicy;
     };
 
 export default function PlayAllButton(props: PlayAllButtonProps) {
@@ -57,11 +62,15 @@ export default function PlayAllButton(props: PlayAllButtonProps) {
             playlistId: props.playlistId,
             title: props.title,
             items: props.items,
+            startIndex: props.startIndex,
           })
         : buildPublicPlaylistQueue({
             playlistSlug: props.playlistSlug,
             title: props.title,
             items: props.items,
+            startIndex: props.startIndex,
+            returnHref: props.returnHref,
+            navigationPolicy: props.navigationPolicy,
           });
 
     if (!built.ok) {

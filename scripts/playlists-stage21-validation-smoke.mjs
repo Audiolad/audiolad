@@ -339,13 +339,13 @@ const publicView = read("src/components/playlists/PublicPlaylistPageView.tsx");
 assert(publicView.includes("PlayAllButton"), "Play All remains");
 
 assert(
-  !existsSync("src/app/(platform)/(listener)/listens"),
-  "stage 3 /listens not started",
+  existsSync("src/app/(platform)/(listener)/listens"),
+  "stage 3 /listens lives in its own family",
 );
-assert(!existsSync("src/lib/seo/listens"), "stage 3 seo listens not started");
+assert(existsSync("src/lib/seo/listens"), "stage 3 seo listens family exists");
 assert(
-  !existsSync("src/components/playlists/PublicPlaylistEmbed.tsx"),
-  "stage 3 embed not started",
+  existsSync("src/components/playlists/PublicPlaylistEmbed.tsx"),
+  "stage 3 embed exists",
 );
 
 const pkg = read("package.json");
