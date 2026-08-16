@@ -51,6 +51,7 @@ import {
 import {
   getQueueEntryListenSlugs,
   getQueueEntryPracticeId,
+  shouldNavigateOnQueueAdvance,
   type PlaylistQueue,
   type PlaylistQueueEntry,
 } from "@/lib/playlists/player-queue-types";
@@ -953,10 +954,14 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           // Remount engine state for the new product; <audio> stays persistent.
           setPlaybackInstanceId((value) => value + 1);
 
+          const stayOnSource = !shouldNavigateOnQueueAdvance(nextQueue);
+
           loadSession({
             ...loaded.session,
             requestAutoplay: options.autoplay,
             forceStartAtBeginning: options.fromStart,
+            suppressListenUrlSync:
+              stayOnSource || loaded.session.suppressListenUrlSync,
           });
 
           const path = buildSafeListenReplacePath(
@@ -964,7 +969,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             loaded.session.productSlug,
           );
 
-          if (path) {
+          if (path && !stayOnSource) {
             router.replace(path, { scroll: false });
           }
 
@@ -1021,7 +1026,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       const skipMessage =
         queue.skippedCount > 0 ? "Некоторые материалы будут пропущены." : null;
 
-      const result = await activateEntryAtIndex(queue, 0, {
+      const startIndex =
+        Number.isInteger(queue.currentIndex) && queue.currentIndex >= 0
+          ? queue.currentIndex
+          : 0;
+
+      const result = await activateEntryAtIndex(queue, startIndex, {
         autoplay: true,
         fromStart: false,
       });
@@ -1085,7 +1095,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
     if (
       returnHref &&
-      (returnHref.startsWith("/playlists/") || returnHref.startsWith("/p/"))
+      (returnHref.startsWith("/playlists/") ||
+        returnHref.startsWith("/p/") ||
+        returnHref.startsWith("/listens/"))
     ) {
       router.push(returnHref);
     }

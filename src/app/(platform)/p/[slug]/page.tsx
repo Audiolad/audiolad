@@ -6,6 +6,7 @@ import PublicPlaylistPageView from "@/components/playlists/PublicPlaylistPageVie
 import JsonLd from "@/components/seo/JsonLd";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
 import { loadPublicPlaylistBySlug } from "@/lib/playlists/public-detail";
+import { isPlatformEditorialPublicPlaylist } from "@/lib/playlists/public-seo";
 import {
   isValidPlaylistPublicSlug,
   normalizePlaylistPublicSlug,
@@ -50,6 +51,10 @@ export async function generateMetadata({
       : count === 1
         ? "Подборка из 1 практики в подарок на АудиоЛаде."
         : `Подборка из ${count} практик в подарок на АудиоЛаде.`;
+  const editorialPlatform = isPlatformEditorialPublicPlaylist({
+    isEditorial: loaded.detail.playlist.isEditorial,
+    ownerType: loaded.detail.playlist.isPlatformOwned ? "platform" : "user",
+  });
 
   return {
     title: `${title} – АудиоЛад`,
@@ -57,7 +62,9 @@ export async function generateMetadata({
     alternates: {
       canonical: buildPublicPlaylistCanonicalUrl(slug),
     },
-    robots: { index: true, follow: true },
+    robots: editorialPlatform
+      ? { index: false, follow: true }
+      : { index: true, follow: true },
     openGraph: {
       title: `${title} – АудиоЛад`,
       description: countLabel,

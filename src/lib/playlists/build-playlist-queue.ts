@@ -1,10 +1,12 @@
 import type { PlaylistDetailItemView } from "@/lib/playlists/detail";
 import type { PublicPlaylistItemView } from "@/lib/playlists/public-detail";
 import {
+  DEFAULT_PLAYLIST_QUEUE_NAVIGATION_POLICY,
   isSafeInternalListenHref,
   type BuildPlaylistQueueResult,
   type PlaylistQueue,
   type PlaylistQueueEntry,
+  type PlaylistQueueNavigationPolicy,
   type PlaylistQueueSource,
 } from "@/lib/playlists/player-queue-types";
 import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
@@ -35,7 +37,7 @@ function toProductEntry(input: {
   };
 }
 
-function isSafeInternalReturnHref(href: string): boolean {
+export function isSafeInternalReturnHref(href: string): boolean {
   if (!href.startsWith("/") || href.startsWith("//") || href.includes("\\")) {
     return false;
   }
@@ -44,7 +46,11 @@ function isSafeInternalReturnHref(href: string): boolean {
     return false;
   }
 
-  return href.startsWith("/playlists/") || href.startsWith("/p/");
+  return (
+    href.startsWith("/playlists/") ||
+    href.startsWith("/p/") ||
+    href.startsWith("/listens/")
+  );
 }
 
 function normalizeListenHref(href: string): string | null {
@@ -57,11 +63,29 @@ function normalizeListenHref(href: string): string | null {
   return path;
 }
 
+function clampStartIndex(startIndex: number | undefined, length: number): number {
+  if (length <= 0) {
+    return 0;
+  }
+
+  if (
+    typeof startIndex !== "number" ||
+    !Number.isFinite(startIndex) ||
+    !Number.isInteger(startIndex)
+  ) {
+    return 0;
+  }
+
+  return Math.min(Math.max(startIndex, 0), length - 1);
+}
+
 function finalizeQueue(input: {
   title: string;
   source: PlaylistQueueSource;
   entries: PlaylistQueueEntry[];
   skippedCount: number;
+  startIndex?: number;
+  navigationPolicy?: PlaylistQueueNavigationPolicy;
 }): BuildPlaylistQueueResult {
   if (!isSafeInternalReturnHref(input.source.returnHref)) {
     return { ok: false, reason: "invalid", skippedCount: input.skippedCount };
@@ -76,9 +100,11 @@ function finalizeQueue(input: {
     title: input.title.trim() || "Плейлист",
     source: input.source,
     entries: input.entries,
-    currentIndex: 0,
+    currentIndex: clampStartIndex(input.startIndex, input.entries.length),
     skippedCount: input.skippedCount,
     runtimeSkippedCount: 0,
+    navigationPolicy:
+      input.navigationPolicy ?? DEFAULT_PLAYLIST_QUEUE_NAVIGATION_POLICY,
   };
 
   return { ok: true, queue };
@@ -92,6 +118,7 @@ export function buildOwnerPlaylistQueue(input: {
   playlistId: string;
   title: string;
   items: PlaylistDetailItemView[];
+  startIndex?: number;
 }): BuildPlaylistQueueResult {
   const playlistId = input.playlistId.trim();
   if (!playlistId) {
@@ -143,6 +170,7 @@ export function buildOwnerPlaylistQueue(input: {
     },
     entries,
     skippedCount,
+    startIndex: input.startIndex,
   });
 }
 
@@ -154,6 +182,9 @@ export function buildPublicPlaylistQueue(input: {
   playlistSlug: string;
   title: string;
   items: PublicPlaylistItemView[];
+  startIndex?: number;
+  returnHref?: string;
+  navigationPolicy?: PlaylistQueueNavigationPolicy;
 }): BuildPlaylistQueueResult {
   const playlistSlug = input.playlistSlug.trim();
   if (!playlistSlug) {
@@ -199,10 +230,12 @@ export function buildPublicPlaylistQueue(input: {
     source: {
       kind: "public_playlist",
       playlistSlug,
-      returnHref: buildPublicPlaylistPath(playlistSlug),
+      returnHref: input.returnHref?.trim() || buildPublicPlaylistPath(playlistSlug),
     },
     entries,
     skippedCount,
+    startIndex: input.startIndex,
+    navigationPolicy: input.navigationPolicy,
   });
 }
 

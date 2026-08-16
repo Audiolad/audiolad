@@ -87,6 +87,11 @@ const owner = buildOwnerPlaylistQueue({
 assert(owner.ok, "owner ok");
 assert(owner.queue.entries.length === 3, "owner playable count");
 assert(owner.queue.skippedCount === 1, "owner skipped");
+assert(owner.queue.currentIndex === 0, "owner default startIndex 0");
+assert(
+  owner.queue.navigationPolicy === "follow_listen_route",
+  "owner default navigation follows listen route",
+);
 assert(owner.queue.entries[0].listenHref === "/listen/author/practice-a", "strip query");
 assert(isSafeInternalListenHref(owner.queue.entries[0].listenHref), "safe href");
 assert(owner.queue.entries.every(isProductQueueEntry), "all product kind");
@@ -151,6 +156,11 @@ assert(pub.ok, "public ok");
 assert(pub.queue.entries.length === 1, "public only listen hrefs");
 assert(pub.queue.skippedCount === 2, "public skipped");
 assert(pub.queue.source.returnHref === "/p/my-public", "public return");
+assert(pub.queue.currentIndex === 0, "public default startIndex 0");
+assert(
+  pub.queue.navigationPolicy === "follow_listen_route",
+  "public default navigation follows listen route",
+);
 assert(formatQueueSkipMessage(1)?.includes("Один"), "skip one msg");
 
 // --- Critical scenario simulations (pure) ---
