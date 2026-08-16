@@ -1,3 +1,6 @@
+import { buildListenPagePath } from "@/lib/seo/listens/paths";
+import { listIndexableListenPageDefinitions } from "@/lib/seo/listens/registry";
+import type { ListenPageDefinition, ListenSection } from "@/lib/seo/listens/types";
 import {
   buildTopicHubPath,
   listTopicHubDefinitions,
@@ -6,7 +9,10 @@ import {
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 
 import { buildArticlePath, isValidArticleSlug } from "./paths";
-import { estimateArticleReadingTimeMinutes } from "./reading-time";
+import {
+  estimateArticleReadingTimeMinutes,
+  estimateReadingTimeMinutesFromChunks,
+} from "./reading-time";
 import { listArticleDefinitions } from "./registry";
 import type { ArticleDefinition } from "./types";
 
@@ -38,7 +44,7 @@ export type ArticleDirectoryCard = {
   topicTitle: string | null;
   topicHref: string | null;
   readingTimeMinutes: number;
-  publishedAt: string;
+  publishedAt?: string;
 };
 
 export type ArticleDirectoryTopicHubCard = {
@@ -224,6 +230,88 @@ export function listArticleDirectoryCards(
   return cards;
 }
 
+function listenSectionBlockText(section: ListenSection): string[] {
+  return (
+    section.blocks?.flatMap((block) => {
+      switch (block.kind) {
+        case "paragraph":
+          return [block.text];
+        case "rich_paragraph":
+          return block.segments.map((segment) =>
+            "text" in segment
+              ? segment.text
+              : "strong" in segment
+                ? segment.strong
+                : segment.label,
+          );
+        case "heading":
+          return [block.title];
+        case "list":
+          return block.items;
+      }
+    }) ?? []
+  );
+}
+
+export function estimateListenDirectoryReadingTimeMinutes(
+  page: ListenPageDefinition,
+): number {
+  const chunks = [
+    ...page.intro,
+    ...page.sections.flatMap((section) => [
+      section.title,
+      ...section.paragraphs,
+      ...listenSectionBlockText(section),
+    ]),
+    ...page.faq.flatMap((item) => [item.question, item.answer]),
+  ];
+
+  return estimateReadingTimeMinutesFromChunks(chunks);
+}
+
+export function toListenDirectoryCard(
+  page: ListenPageDefinition,
+): ArticleDirectoryCard {
+  return {
+    slug: page.slug.trim().toLowerCase(),
+    title: page.title.trim(),
+    href: buildListenPagePath(page.slug),
+    description: page.description.trim(),
+    topicSlug: null,
+    topicTitle: null,
+    topicHref: null,
+    readingTimeMinutes: estimateListenDirectoryReadingTimeMinutes(page),
+  };
+}
+
+export function listListenDirectoryCards(
+  pages: readonly ListenPageDefinition[] = listIndexableListenPageDefinitions(),
+): ArticleDirectoryCard[] {
+  return [...pages]
+    .filter((page) => page.indexable !== false && page.slug.trim() && page.title.trim())
+    .sort((left, right) => left.slug.localeCompare(right.slug, "en"))
+    .map(toListenDirectoryCard);
+}
+
+function mergeDirectoryCardsByHref(
+  articleCards: readonly ArticleDirectoryCard[],
+  listenCards: readonly ArticleDirectoryCard[],
+): ArticleDirectoryCard[] {
+  const seen = new Set<string>();
+  const cards: ArticleDirectoryCard[] = [];
+
+  for (const card of [...articleCards, ...listenCards]) {
+    if (seen.has(card.href)) {
+      continue;
+    }
+
+    seen.add(card.href);
+    cards.push(card);
+  }
+
+  return cards;
+}
+
 export function isTopicHubDirectoryListed(hub: TopicHubDefinition): boolean {
   const slug = hub.slug?.trim().toLowerCase() ?? "";
 
@@ -245,6 +333,7 @@ export function listArticleDirectoryTopicHubs(
 export function loadArticleDirectoryPageData(
   articles: readonly ArticleDirectoryEligibilityInput[] = listArticleDefinitions(),
   hubs: readonly TopicHubDefinition[] = listTopicHubDefinitions(),
+  listens: readonly ListenPageDefinition[] = listIndexableListenPageDefinitions(),
 ): ArticleDirectoryPageData {
   return {
     path: ARTICLES_DIRECTORY_PATH,
@@ -252,7 +341,10 @@ export function loadArticleDirectoryPageData(
     h1: ARTICLES_DIRECTORY_H1,
     intro: ARTICLES_DIRECTORY_INTRO,
     hubs: listArticleDirectoryTopicHubs(hubs),
-    articles: listArticleDirectoryCards(articles),
+    articles: mergeDirectoryCardsByHref(
+      listArticleDirectoryCards(articles),
+      listListenDirectoryCards(listens),
+    ),
   };
 }
 

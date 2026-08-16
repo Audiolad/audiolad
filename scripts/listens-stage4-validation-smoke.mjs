@@ -236,7 +236,11 @@ function testListenPageViewOrder() {
   const faqAt = body.indexOf("definition.faq.length");
   assert(introAt > 0 && embedAt > introAt, "ListenPageView: intro → embed");
   assert(sectionsAt > embedAt, "ListenPageView: embed → sections");
+  const ctaAt = body.indexOf("ListenSignupCta");
   assert(faqAt > sectionsAt, "ListenPageView: sections → FAQ");
+  assert(ctaAt > faqAt, "ListenPageView: FAQ → ListenSignupCta");
+  assert(body.includes("{!isAuthenticated ? <ListenSignupCta /> : null}"), "guest-only CTA");
+  assert(!view.includes("Продолжайте в АудиоЛаде"), "no logged-in CTA copy");
   assert(!view.includes("primaryPractice"), "listen view has no primaryPractice");
   assert(!view.includes("ArticleAudioBlock"), "listen view has no ArticleAudioBlock");
   assert(!view.includes("CreatorPathsCta"), "listen view has no CreatorPathsCta");
@@ -328,6 +332,35 @@ function testJsonLd() {
   assert(!serialized.includes("primaryPractice"), "no primaryPractice");
 }
 
+function testSignupCta() {
+  const cta = read("src/components/listens/ListenSignupCta.tsx");
+  const page = read("src/app/(platform)/(listener)/listens/[slug]/page.tsx");
+  const css = read("src/app/globals.css");
+
+  assert(cta.includes("Создайте бесплатный аккаунт в АудиоЛаде"), "headline verbatim");
+  assert(
+    cta.includes("Сохраняйте любимые практики, слушайте медитации и музыку в одном"),
+    "supporting text verbatim",
+  );
+  assert(cta.includes("Зарегистрироваться бесплатно"), "primary label");
+  assert(cta.includes('href="/auth/sign-up"'), "primary href");
+  assert(cta.includes("Открыть аудиотеку →"), "secondary label");
+  assert(cta.includes('href="/my-practices"'), "secondary href");
+  assert(cta.includes("Сохраняйте. Слушайте. Наполняйтесь."), "chip verbatim");
+  assert(cta.includes("home-primary-cta home-primary-cta--compact"), "reuses home CTA");
+  assert(cta.includes("UserIcon"), "reuses UserIcon");
+  assert(cta.includes('aria-hidden="true"'), "decorative cluster hidden");
+  assert(!cta.includes(".gif"), "no GIF");
+  assert(!cta.includes("<video"), "no video");
+  assert(!cta.includes("loadPlaylistQueue"), "no playlist queue");
+  assert(!cta.includes("handlePlayPause"), "no play behavior");
+  assert(page.includes("createClient"), "listen page uses createClient");
+  assert(page.includes("getUser()"), "listen page uses getUser");
+  assert(page.includes("isAuthenticated={isAuthenticated}"), "passes isAuthenticated");
+  assert(css.includes("@media (prefers-reduced-motion: reduce)"), "reduced motion exists");
+  assert(css.includes(".listen-signup-cta__glow,"), "CTA animations disabled on reduce");
+}
+
 function testArticleIsolation() {
   const articleTypes = read("src/lib/seo/articles/types.ts");
   assert(!articleTypes.includes('type: "listen"'), "articles/types has no listen");
@@ -342,6 +375,7 @@ const tests = [
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
   ["JSON-LD", testJsonLd],
+  ["signup CTA", testSignupCta],
   ["article isolation", testArticleIsolation],
 ];
 

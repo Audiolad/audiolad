@@ -10,9 +10,11 @@ export {
   isTopicHubDirectoryListed,
   listArticleDirectoryCards,
   listArticleDirectoryTopicHubs,
+  listListenDirectoryCards,
   loadArticleDirectoryPageData,
   resolveArticleDirectoryDescription,
   toArticleDirectoryCard,
+  toListenDirectoryCard,
 } from "./directory";
 export type {
   ArticleDirectoryCard,

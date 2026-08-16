@@ -102,7 +102,7 @@ export default function ArticleDirectoryPageView({
           ) : (
             <ul className="mt-4 grid list-none gap-3 p-0">
               {data.articles.map((article) => (
-                <li key={article.slug}>
+                <li key={article.href}>
                   <Link
                     href={article.href}
                     className="group block rounded-[20px] border border-[#e8def5] bg-[#faf7ff] px-5 py-4 transition hover:border-[#c9b6ea] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"

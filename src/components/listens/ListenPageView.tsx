@@ -5,6 +5,7 @@ import {
   articleBodyClass,
   articleBodyStackClass,
 } from "@/components/articles/typography";
+import ListenSignupCta from "@/components/listens/ListenSignupCta";
 import PublicPlaylistEmbed from "@/components/playlists/PublicPlaylistEmbed";
 import JsonLdScript from "@/components/seo/JsonLdScript";
 import { buildListenPageJsonLdGraph } from "@/lib/seo/listens";
@@ -16,6 +17,7 @@ import type {
 
 type ListenPageViewProps = {
   data: ListenPageData;
+  isAuthenticated?: boolean;
 };
 
 const linkClassName =
@@ -103,7 +105,10 @@ function ListenSectionContent({ section }: { section: ListenSection }) {
   );
 }
 
-export default function ListenPageView({ data }: ListenPageViewProps) {
+export default function ListenPageView({
+  data,
+  isAuthenticated = false,
+}: ListenPageViewProps) {
   const { definition } = data;
   const jsonLd = buildListenPageJsonLdGraph(data);
 
@@ -203,6 +208,8 @@ export default function ListenPageView({ data }: ListenPageViewProps) {
             <ArticleFaqList items={definition.faq} />
           </section>
         ) : null}
+
+        {!isAuthenticated ? <ListenSignupCta /> : null}
       </article>
     </>
   );

@@ -21,10 +21,13 @@ import {
   listArticleDefinitions,
   listArticleDirectoryCards,
   listArticleDirectoryTopicHubs,
+  listListenDirectoryCards,
   listArticleSlugs,
   loadArticleDirectoryPageData,
   resolveArticleDirectoryDescription,
 } from "../src/lib/seo/articles/index.ts";
+import { listIndexableListenPageDefinitions } from "../src/lib/seo/listens/index.ts";
+import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -89,6 +92,10 @@ function testRegistryIsSingleSource() {
 
   assert(registry.includes("ARTICLE_DEFINITIONS"), "central registry exists");
   assert(directory.includes("listArticleDefinitions()"), "selector reads registry");
+  assert(
+    directory.includes("listIndexableListenPageDefinitions()"),
+    "selector reads listen registry",
+  );
   assert(!directory.includes("ARTICLE_DEFINITIONS ="), "selector has no second array");
   assert(!page.includes('slug: "'), "page has no hardcoded article slugs");
 
@@ -342,8 +349,95 @@ function testStructuredData() {
   );
 }
 
+function testListenPagesAppearInDirectory() {
+  const data = loadArticleDirectoryPageData();
+  const listenHref = "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno";
+  const listenCard = data.articles.find((card) => card.href === listenHref);
+
+  assert(listenCard, "indexable listen page is listed");
+  assert(
+    listenCard.title === "Медитация на деньги: слушать онлайн бесплатно",
+    "listen directory title",
+  );
+  assert(
+    listenCard.description === MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE.description,
+    "listen directory description",
+  );
+  assert(listenCard.topicTitle === null, "listen has no invented topic");
+  assert(listenCard.publishedAt == null, "listen has no invented publishedAt");
+  assert(listenCard.readingTimeMinutes >= 1, "listen reading time from content");
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+    ),
+    "no /articles duplicate for listen slug",
+  );
+
+  const graph = buildArticlesDirectoryJsonLdGraph(data);
+  const collection = graph["@graph"].find((node) => node["@type"] === "CollectionPage");
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${listenHref}`,
+    ),
+    "directory JSON-LD uses listen href",
+  );
+  assert(
+    !collection.mainEntity.itemListElement.some((item) =>
+      item.url.endsWith("/articles/meditatsiya-na-dengi-slushat-onlayn-besplatno"),
+    ),
+    "directory JSON-LD has no /articles listen duplicate",
+  );
+
+  const articleCards = listArticleDirectoryCards();
+  const articleHrefs = new Set(articleCards.map((card) => card.href));
+  for (const card of articleCards) {
+    assert(
+      data.articles.some((item) => item.href === card.href),
+      `existing article ${card.slug} remains listed`,
+    );
+  }
+
+  const noindex = {
+    ...MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+    slug: "noindex-listen-directory-fixture",
+    indexable: false,
+  };
+  const future = {
+    ...MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+    slug: "future-listen-directory-fixture",
+    title: "Будущая listen-страница",
+    description: "Описание будущей listen-страницы для каталога.",
+  };
+  const mixed = loadArticleDirectoryPageData(
+    listArticleDefinitions(),
+    listTopicHubDefinitions(),
+    [...listIndexableListenPageDefinitions(), noindex, future],
+  );
+
+  assert(
+    mixed.articles.some((card) => card.href === "/listens/future-listen-directory-fixture"),
+    "new indexable listen appears automatically",
+  );
+  assert(
+    !mixed.articles.some((card) => card.href === "/listens/noindex-listen-directory-fixture"),
+    "indexable:false listen is excluded",
+  );
+  assert(
+    mixed.articles.filter((card) => card.href === listenHref).length === 1,
+    "listen href is unique",
+  );
+  assert(
+    articleHrefs.size === articleCards.length,
+    "article href set size matches article cards",
+  );
+
+  const listenOnly = listListenDirectoryCards([future, noindex]);
+  assert(listenOnly.length === 1, "listen selector excludes noindex");
+  assert(listenOnly[0].href === "/listens/future-listen-directory-fixture", "listen href namespace");
+}
+
 function testEmptyState() {
-  const empty = loadArticleDirectoryPageData([], listTopicHubDefinitions());
+  const empty = loadArticleDirectoryPageData([], listTopicHubDefinitions(), []);
   assert(empty.articles.length === 0, "empty articles");
   assert(empty.hubs.length > 0, "hubs still available when articles empty");
 
@@ -379,6 +473,7 @@ const tests = [
   ["footer /articles once", testFooterContainsArticlesOnce],
   ["sitemap /articles", testSitemapContainsDirectory],
   ["structured data", testStructuredData],
+  ["listen pages in directory", testListenPagesAppearInDirectory],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
 ];

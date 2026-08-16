@@ -74,6 +74,12 @@ export function estimateArticleReadingTimeMinutes(
     );
   }
 
+  return estimateReadingTimeMinutesFromChunks(chunks);
+}
+
+export function estimateReadingTimeMinutesFromChunks(
+  chunks: readonly string[],
+): number {
   const words = chunks.reduce((sum, chunk) => sum + countWords(chunk), 0);
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
 }

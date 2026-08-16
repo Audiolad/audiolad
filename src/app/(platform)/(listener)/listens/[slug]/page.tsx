@@ -8,6 +8,7 @@ import {
   isValidListenPageSlug,
   loadListenPageData,
 } from "@/lib/seo/listens";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -52,5 +53,17 @@ export default async function ListenPage({ params }: PageProps) {
     notFound();
   }
 
-  return <ListenPageView data={data} />;
+  let isAuthenticated = false;
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    isAuthenticated = Boolean(user);
+  } catch {
+    isAuthenticated = false;
+  }
+
+  return <ListenPageView data={data} isAuthenticated={isAuthenticated} />;
 }
