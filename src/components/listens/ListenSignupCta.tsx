@@ -2,30 +2,20 @@ import Link from "next/link";
 
 import { UserIcon } from "@/components/home/HomeIcons";
 
-function DecorativeAudioCard({
-  title,
-  bars,
-  modifier,
-}: {
-  title: string;
-  bars: readonly number[];
-  modifier: string;
-}) {
-  return (
-    <div className={`listen-signup-cta__card listen-signup-cta__card--${modifier}`}>
-      <span className="listen-signup-cta__card-title">{title}</span>
-      <span className="listen-signup-cta__card-wave">
-        {bars.map((height, index) => (
-          <span
-            key={`${modifier}-${index}`}
-            className="listen-signup-cta__bar"
-            style={{ height: `${height}%` }}
-          />
-        ))}
-      </span>
-    </div>
-  );
-}
+const DECORATIVE_COVERS = [
+  {
+    modifier: "one",
+    src: "https://audiolad.ru/storage/v1/object/public/practice-covers/practices/b9ddb063-4dc6-4698-be16-facb25d69c39/variants/de184072-d259-450d-b304-a1589d998133/md.webp",
+  },
+  {
+    modifier: "two",
+    src: "https://audiolad.ru/storage/v1/object/public/practice-covers/practices/98f7ebb9-e574-428c-93c8-04fb6a4332a7/variants/dc81e766-c2bf-4060-bd06-f61acff62da2/md.webp",
+  },
+  {
+    modifier: "three",
+    src: "https://audiolad.ru/storage/v1/object/public/practice-covers/practices/5fb00fbb-d66b-4c95-b993-04d4344b8d0b/variants/fa98345d-45b0-44d2-95af-6e276ada2f46/md.webp",
+  },
+] as const;
 
 export default function ListenSignupCta() {
   return (
@@ -49,21 +39,16 @@ export default function ListenSignupCta() {
           <span className="listen-signup-cta__sparkle listen-signup-cta__sparkle--a" />
           <span className="listen-signup-cta__sparkle listen-signup-cta__sparkle--b" />
           <span className="listen-signup-cta__sparkle listen-signup-cta__sparkle--c" />
-          <DecorativeAudioCard
-            title="Утро"
-            bars={[36, 58, 44, 72, 40, 64, 48]}
-            modifier="one"
-          />
-          <DecorativeAudioCard
-            title="Тишина"
-            bars={[48, 34, 68, 42, 76, 50, 38]}
-            modifier="two"
-          />
-          <DecorativeAudioCard
-            title="Свет"
-            bars={[42, 70, 38, 60, 46, 74, 52]}
-            modifier="three"
-          />
+          {DECORATIVE_COVERS.map((cover) => (
+            <div
+              key={cover.modifier}
+              className={`listen-signup-cta__card listen-signup-cta__card--${cover.modifier}`}
+            >
+              {/* Decorative public covers: raw img by design, not next/image. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={cover.src} alt="" />
+            </div>
+          ))}
         </div>
 
         <div className="listen-signup-cta__copy">
