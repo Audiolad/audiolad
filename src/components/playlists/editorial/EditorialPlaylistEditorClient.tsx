@@ -15,6 +15,7 @@ import EditorialCollaboratorsSection from "@/components/playlists/editorial/Edit
 import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracticePickerSheet";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
+import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import {
   editorialAuditActionLabel,
   type EditorialWorkspaceDetail,
@@ -24,6 +25,7 @@ import {
   formatEditorialUpdatedAt,
 } from "@/lib/playlists/editorial-workspace";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
+import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
 type EditorialPlaylistEditorClientProps = {
   detail: EditorialWorkspaceDetail;
@@ -77,6 +79,21 @@ export default function EditorialPlaylistEditorClient({
   const published = detail.playlist.visibility === "public";
   const slugLocked = detail.slugLocked;
   const items = detail.items.filter((item) => !removedIds.has(item.practiceId));
+  const mosaicCoverUrls = useMemo(
+    () =>
+      takeFirstPlaylistItemCoverUrls(
+        items.map((item) =>
+          getProductCoverDisplayUrl(
+            item.coverUrl,
+            item.updatedAt,
+            item.coverImage,
+            168,
+            "sm",
+          ),
+        ),
+      ),
+    [items],
+  );
   const itemsCount = items.length;
   const uniqueAuthorCount = useMemo(() => {
     const ids = new Set(
@@ -338,14 +355,44 @@ export default function EditorialPlaylistEditorClient({
       </Link>
 
       <div className="mt-4 flex flex-col gap-5 sm:flex-row">
-        <div className="mx-auto h-[160px] w-[160px] shrink-0 overflow-hidden rounded-[24px] sm:mx-0">
-          <PlaylistCover
-            title={title || detail.playlist.title}
-            customCoverUrl={coverUrl}
-            mosaicCoverUrls={detail.mosaicCoverUrls}
-            gradientClassName={`bg-gradient-to-br ${coverGradientForId(detail.playlist.id)}`}
-            className="h-full w-full rounded-[24px]"
+        <div className="mx-auto flex w-[160px] shrink-0 flex-col items-center gap-2 sm:mx-0 sm:items-start">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={COVER_ACCEPT}
+            onChange={(event) => void uploadCover(event)}
+            className="sr-only"
+            tabIndex={-1}
           />
+          <div className="h-[160px] w-[160px] overflow-hidden rounded-[24px]">
+            <PlaylistCover
+              title={title || detail.playlist.title}
+              customCoverUrl={hasCustomCover ? coverUrl : null}
+              mosaicCoverUrls={mosaicCoverUrls}
+              gradientClassName={`bg-gradient-to-br ${coverGradientForId(detail.playlist.id)}`}
+              className="h-full w-full rounded-[24px]"
+              editable
+              onCoverClick={() => {
+                if (!submitting) {
+                  fileInputRef.current?.click();
+                }
+              }}
+              coverActionLabel="Изменить обложку"
+              coverAriaLabel={
+                hasCustomCover ? "Заменить обложку" : "Загрузить обложку"
+              }
+            />
+          </div>
+          {hasCustomCover ? (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => void deleteCover()}
+              className="text-sm font-medium text-[#7042c5] disabled:opacity-60"
+            >
+              Вернуть автообложку
+            </button>
+          ) : null}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[#7042c5]">
@@ -421,62 +468,6 @@ export default function EditorialPlaylistEditorClient({
               {description.length}/{PLAYLIST_DESCRIPTION_MAX_LENGTH}
             </span>
           </label>
-
-          <div>
-            <p className="mb-2 text-sm font-medium">Обложка</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={COVER_ACCEPT}
-              onChange={(event) => void uploadCover(event)}
-              className="sr-only"
-            />
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#f8f4fc]">
-                {hasCustomCover && coverUrl ? (
-                  <PlaylistCover
-                    title={title || detail.playlist.title}
-                    customCoverUrl={coverUrl}
-                    mosaicCoverUrls={[]}
-                    className="h-full w-full"
-                  />
-                ) : hasCustomCover ? (
-                  <div className="flex h-full w-full items-center justify-center bg-[#ece4f8] text-xs text-[#7d70a2]">
-                    Обложка
-                  </div>
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-[#d9c9ef] text-center text-xs text-[#8c79b6]">
-                    Нет обложки
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
-                  >
-                    {hasCustomCover ? "Заменить обложку" : "Загрузить обложку"}
-                  </button>
-                  {hasCustomCover ? (
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => void deleteCover()}
-                      className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#b34f63] disabled:opacity-60"
-                    >
-                      Удалить обложку
-                    </button>
-                  ) : null}
-                </div>
-                <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
-                  JPG, PNG или WebP, до 5 МБ
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {formError ? (

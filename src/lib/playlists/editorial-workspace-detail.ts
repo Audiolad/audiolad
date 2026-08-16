@@ -7,6 +7,7 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "@/lib/author-products/product-kind";
+import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
 import { getEditorialDirectionById } from "@/lib/playlists/editorial-directions";
 import { getEditorialDiversityHint } from "@/lib/playlists/editorial-diversity";
@@ -300,13 +301,15 @@ export async function loadEditorialWorkspaceDetail(
     });
   }
 
-  const mosaicCoverUrls = items.slice(0, 4).map((item) =>
-    getProductCoverDisplayUrl(
-      item.coverUrl,
-      item.updatedAt,
-      item.coverImage,
-      168,
-      "sm",
+  const mosaicCoverUrls = takeFirstPlaylistItemCoverUrls(
+    items.map((item) =>
+      getProductCoverDisplayUrl(
+        item.coverUrl,
+        item.updatedAt,
+        item.coverImage,
+        168,
+        "sm",
+      ),
     ),
   );
 

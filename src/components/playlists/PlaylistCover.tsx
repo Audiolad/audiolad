@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+import {
+  resolvePlaylistCoverPresentation,
+  type PlaylistCoverPresentation,
+} from "@/lib/playlists/cover-presentation";
 import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
 
 type PlaylistCoverProps = {
@@ -12,6 +16,10 @@ type PlaylistCoverProps = {
   gradientClassName?: string;
   decorative?: boolean;
   coverAlt?: string;
+  editable?: boolean;
+  onCoverClick?: () => void;
+  coverActionLabel?: string;
+  coverAriaLabel?: string;
 };
 
 const FALLBACK_GRADIENTS = [
@@ -60,20 +68,93 @@ function CoverImage({
   );
 }
 
+function NeutralPlaylistPlaceholder({
+  gradient,
+  className,
+  compact = false,
+}: {
+  gradient: string;
+  className?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex h-full w-full items-center justify-center text-white ${gradient} ${className ?? ""}`}
+      aria-hidden
+    >
+      <span className={compact ? "text-lg" : "text-4xl"}>♫</span>
+    </div>
+  );
+}
+
 function MosaicTile({
   url,
-  alt,
-  className,
+  gradient,
 }: {
-  url: string | null | undefined;
-  alt: string;
-  className?: string;
+  url: string | null;
+  gradient: string;
 }) {
   if (!url) {
-    return <div className={`bg-[#ece4f8] ${className ?? ""}`} aria-hidden />;
+    return <NeutralPlaylistPlaceholder gradient={gradient} compact />;
   }
 
-  return <CoverImage src={url} alt={alt} className={className} />;
+  return <CoverImage src={url} alt="" />;
+}
+
+function PlaylistCoverVisual({
+  presentation,
+  gradient,
+  className,
+  ariaHidden,
+  resolvedAlt,
+}: {
+  presentation: PlaylistCoverPresentation;
+  gradient: string;
+  className: string;
+  ariaHidden?: boolean;
+  resolvedAlt: string;
+}) {
+  if (presentation.kind === "custom") {
+    return (
+      <div
+        className={`relative aspect-square overflow-hidden ${className}`}
+        aria-hidden={ariaHidden}
+        aria-label={ariaHidden ? undefined : resolvedAlt}
+      >
+        <CoverImage
+          src={presentation.url}
+          alt={ariaHidden ? "" : resolvedAlt}
+          className="absolute inset-0"
+        />
+      </div>
+    );
+  }
+
+  if (presentation.kind === "placeholder") {
+    return (
+      <div
+        className={`relative aspect-square overflow-hidden ${className}`}
+        aria-hidden={ariaHidden}
+        aria-label={ariaHidden ? undefined : resolvedAlt}
+      >
+        <NeutralPlaylistPlaceholder gradient={gradient} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`relative grid aspect-square grid-cols-2 grid-rows-2 gap-0 overflow-hidden ${className}`}
+      aria-hidden={ariaHidden}
+      aria-label={ariaHidden ? undefined : resolvedAlt}
+    >
+      {presentation.urls.map((url, index) => (
+        <div key={index} className="h-full min-h-0 min-w-0 overflow-hidden">
+          <MosaicTile url={url} gradient={gradient} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function PlaylistCover({
@@ -84,90 +165,47 @@ export default function PlaylistCover({
   gradientClassName,
   decorative = true,
   coverAlt,
+  editable = false,
+  onCoverClick,
+  coverActionLabel = "Изменить обложку",
+  coverAriaLabel,
 }: PlaylistCoverProps) {
   const gradient =
     gradientClassName ?? `bg-gradient-to-br ${gradientForTitle(title)}`;
-  const urls = mosaicCoverUrls.filter((url): url is string => Boolean(url));
+  const presentation = resolvePlaylistCoverPresentation(
+    customCoverUrl,
+    mosaicCoverUrls,
+  );
   const resolvedAlt = coverAlt?.trim() || buildPlaylistCoverAlt(title);
   const ariaHidden = decorative ? true : undefined;
 
-  if (customCoverUrl) {
-    return (
-      <div
-        className={`relative aspect-square overflow-hidden ${className}`}
-        aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : resolvedAlt}
-      >
-        <CoverImage
-          src={customCoverUrl}
-          alt={decorative ? "" : resolvedAlt}
-          className="absolute inset-0"
-        />
-      </div>
-    );
-  }
+  const visual = (
+    <PlaylistCoverVisual
+      presentation={presentation}
+      gradient={gradient}
+      className={editable ? "h-full w-full" : className}
+      ariaHidden={editable ? true : ariaHidden}
+      resolvedAlt={resolvedAlt}
+    />
+  );
 
-  if (urls.length === 0) {
-    return (
-      <div
-        className={`relative flex aspect-square items-center justify-center overflow-hidden text-4xl text-white ${gradient} ${className}`}
-        aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : resolvedAlt}
-      >
-        ♫
-      </div>
-    );
-  }
-
-  if (urls.length === 1) {
-    return (
-      <div
-        className={`relative aspect-square overflow-hidden ${className}`}
-        aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : resolvedAlt}
-      >
-        <MosaicTile url={urls[0]} alt="" className="absolute inset-0" />
-      </div>
-    );
-  }
-
-  if (urls.length === 2) {
-    return (
-      <div
-        className={`relative grid aspect-square grid-cols-2 overflow-hidden ${className}`}
-        aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : resolvedAlt}
-      >
-        <MosaicTile url={urls[0]} alt="" />
-        <MosaicTile url={urls[1]} alt="" />
-      </div>
-    );
-  }
-
-  if (urls.length === 3) {
-    return (
-      <div
-        className={`relative grid aspect-square grid-cols-2 grid-rows-2 overflow-hidden ${className}`}
-        aria-hidden={ariaHidden}
-        aria-label={decorative ? undefined : resolvedAlt}
-      >
-        <MosaicTile url={urls[0]} alt="" className="row-span-2" />
-        <MosaicTile url={urls[1]} alt="" />
-        <MosaicTile url={urls[2]} alt="" />
-      </div>
-    );
+  if (!editable) {
+    return visual;
   }
 
   return (
-    <div
-      className={`relative grid aspect-square grid-cols-2 grid-rows-2 overflow-hidden ${className}`}
-      aria-hidden={ariaHidden}
-      aria-label={decorative ? undefined : resolvedAlt}
+    <button
+      type="button"
+      onClick={onCoverClick}
+      aria-label={coverAriaLabel ?? coverActionLabel}
+      className={`group relative block cursor-pointer overflow-hidden p-0 ${className}`}
     >
-      <MosaicTile url={urls[0]} alt="" />
-      <MosaicTile url={urls[1]} alt="" />
-      <MosaicTile url={urls[2]} alt="" />
-      <MosaicTile url={urls[3]} alt="" />
-    </div>
+      {visual}
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="px-3 text-center text-sm font-semibold text-white">
+          {coverActionLabel}
+        </span>
+      </span>
+    </button>
   );
 }

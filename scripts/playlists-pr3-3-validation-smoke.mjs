@@ -46,8 +46,10 @@ assert(deleteRoute.includes("cover_path"), "delete reads cover_path");
 assert(deleteRoute.includes("removePlaylistCoverObject"), "delete cleans storage");
 
 const coverUi = read("src/components/playlists/PlaylistCover.tsx");
-assert(coverUi.includes("urls.length === 3"), "3 mosaic");
+assert(coverUi.includes("resolvePlaylistCoverPresentation"), "shared cover model");
 assert(coverUi.includes("grid-cols-2"), "2x2 mosaic");
+assert(coverUi.includes("grid-rows-2"), "2x2 rows");
+assert(coverUi.includes("gap-0"), "no collage gaps");
 
 const detail = read("src/components/playlists/PlaylistDetailClient.tsx");
 assert(detail.includes("Изменить обложку"), "edit button");

@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
+import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
 import { isPracticeEligibleForPublicPlaylist } from "@/lib/playlists/public-content";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
@@ -250,7 +251,6 @@ export const loadPublicPlaylistBySlug = cache(
     let hasUnavailable = false;
     let totalDurationSeconds = 0;
     let hasAnyDuration = false;
-    const mosaicFromAvailable: Array<string | null> = [];
 
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
@@ -294,11 +294,6 @@ export const loadPublicPlaylistBySlug = cache(
       const durationSeconds = audioSummary?.totalDurationSeconds ?? null;
       const audioCount = audioSummary?.audioCount ?? 0;
       const coverFields = mapProductCoverFields(practice);
-      const mosaicUrl = getProductCoverDisplayUrl(
-        coverFields.coverUrl,
-        coverFields.updatedAt,
-        coverFields.coverImage,
-      );
 
       if (eligible) {
         if (durationSeconds && durationSeconds > 0) {
@@ -310,10 +305,6 @@ export const loadPublicPlaylistBySlug = cache(
         ) {
           totalDurationSeconds += Math.round(practice.duration_minutes * 60);
           hasAnyDuration = true;
-        }
-
-        if (mosaicFromAvailable.length < 4) {
-          mosaicFromAvailable.push(mosaicUrl);
         }
       } else {
         hasUnavailable = true;
@@ -432,7 +423,15 @@ export const loadPublicPlaylistBySlug = cache(
         hasUnavailable,
         allUnavailable: items.length > 0 && availableCount === 0,
         coverUrl,
-        mosaicCoverUrls: mosaicFromAvailable,
+        mosaicCoverUrls: takeFirstPlaylistItemCoverUrls(
+          items.map((item) =>
+            getProductCoverDisplayUrl(
+              item.coverUrl,
+              item.updatedAt,
+              item.coverImage,
+            ),
+          ),
+        ),
         ownerLabel: playlist.is_editorial
           ? EDITORIAL_PLAYLIST_LABEL
           : "Подборка пользователя АудиоЛада",

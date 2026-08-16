@@ -1,17 +1,22 @@
 /**
- * Editorial playlist cover wiring — upload / replace / delete.
+ * Editorial playlist cover UX — presentation fallback + editor/public wiring.
  * Run: npx --yes tsx scripts/playlists-editorial-cover-unit.mjs
  *
  * Covers:
- * - upload: editorial editor POSTs to the shared cover API
- * - replace: same POST + «Заменить обложку»
- * - delete: DELETE + «Удалить обложку»; stored path may belong to another editor
- * - /p/[slug] signs the stored cover_path (not the current editor id)
- * - user playlist cover UI/API stay on the same pipeline
+ * - auto collage is presentation-only (first four by position)
+ * - custom cover wins; clearing it returns the collage
+ * - editor header is the only cover control
+ * - /p/[slug] uses the same fallback
+ * - platform playlist signed URLs do not depend on the current editor
+ * - user playlist cover workflow stays on the same pipeline
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import {
+  resolvePlaylistCoverPresentation,
+  takeFirstPlaylistItemCoverUrls,
+} from "../src/lib/playlists/cover-presentation.ts";
 import {
   assertPlaylistCoverPathForOwner,
   assertPlaylistCoverPathForPlaylist,
@@ -27,6 +32,82 @@ function assert(condition, message) {
 function read(relPath) {
   return readFileSync(join(process.cwd(), relPath), "utf8");
 }
+
+function assertDeepEqual(actual, expected, message) {
+  assert(JSON.stringify(actual) === JSON.stringify(expected), message);
+}
+
+const itemCovers = [
+  "https://cdn.example/one.webp",
+  "https://cdn.example/two.webp",
+  "https://cdn.example/three.webp",
+  "https://cdn.example/four.webp",
+  "https://cdn.example/five.webp",
+];
+
+const noCustomFour = resolvePlaylistCoverPresentation(null, itemCovers);
+assert(noCustomFour.kind === "collage", "no custom + 4+ items → collage");
+assertDeepEqual(
+  noCustomFour.urls,
+  itemCovers.slice(0, 4),
+  "collage uses the first four item covers by position",
+);
+
+const customWins = resolvePlaylistCoverPresentation(
+  "https://cdn.example/custom.webp",
+  itemCovers,
+);
+assert(customWins.kind === "custom", "custom cover wins over collage");
+assert(
+  customWins.url === "https://cdn.example/custom.webp",
+  "custom presentation keeps the stored cover url",
+);
+
+const afterRemoveCustom = resolvePlaylistCoverPresentation(null, itemCovers);
+assert(
+  afterRemoveCustom.kind === "collage",
+  "removing custom cover returns auto collage",
+);
+assertDeepEqual(
+  afterRemoveCustom.urls,
+  itemCovers.slice(0, 4),
+  "revert uses the current first four item covers",
+);
+
+const reordered = [
+  itemCovers[4],
+  itemCovers[3],
+  itemCovers[2],
+  itemCovers[1],
+  itemCovers[0],
+];
+const afterReorder = resolvePlaylistCoverPresentation(null, reordered);
+assert(afterReorder.kind === "collage", "order change stays on auto collage");
+assertDeepEqual(
+  afterReorder.urls,
+  reordered.slice(0, 4),
+  "auto collage reflects the new first four after reorder",
+);
+
+const emptyPlaylist = resolvePlaylistCoverPresentation(null, []);
+assert(emptyPlaylist.kind === "placeholder", "empty playlist → placeholder");
+
+const shortList = resolvePlaylistCoverPresentation(null, [
+  itemCovers[0],
+  itemCovers[1],
+]);
+assert(shortList.kind === "collage", "fewer than 4 items still use collage");
+assertDeepEqual(
+  shortList.urls,
+  [itemCovers[0], itemCovers[1], null, null],
+  "remaining collage cells use the placeholder slots",
+);
+
+assertDeepEqual(
+  takeFirstPlaylistItemCoverUrls(["", "  ", itemCovers[0], null, itemCovers[1]]),
+  [null, null, itemCovers[0], null],
+  "blank item covers stay in position instead of being compacted",
+);
 
 const uploaderId = "11111111-1111-4111-8111-111111111111";
 const otherEditorId = "33333333-3333-4333-8333-333333333333";
@@ -71,21 +152,69 @@ assert(
   "cover API must not reject platform editorial playlists",
 );
 
+const presentation = read("src/lib/playlists/cover-presentation.ts");
+assert(
+  presentation.includes("presentation-only") ||
+    presentation.includes("Presentation-only"),
+  "helper documents presentation-only collage",
+);
+assert(
+  !presentation.includes("createPlaylistCoverSignedUrl") &&
+    !presentation.includes("uploadOptimizedImageSet"),
+  "auto collage helper never writes storage",
+);
+
+const coverUi = read("src/components/playlists/PlaylistCover.tsx");
+assert(
+  coverUi.includes("resolvePlaylistCoverPresentation"),
+  "shared PlaylistCover uses the presentation helper",
+);
+assert(coverUi.includes("grid-cols-2"), "collage is 2×2");
+assert(coverUi.includes("grid-rows-2"), "collage has two rows");
+assert(coverUi.includes("gap-0"), "collage has no gaps");
+assert(coverUi.includes("object-cover"), "cells use object-fit cover");
+assert(coverUi.includes("NeutralPlaylistPlaceholder"), "reuses placeholder");
+assert(coverUi.includes("editable"), "visual component accepts editable state");
+assert(coverUi.includes("Изменить обложку"), "hover/tap label");
+
 const editor = read(
   "src/components/playlists/editorial/EditorialPlaylistEditorClient.tsx",
 );
+const dataSection = editor.slice(editor.indexOf(">Данные<"));
+assert(dataSection.includes(">Данные<"), "Данные section still exists");
+assert(!dataSection.includes(">Обложка<"), "Данные no longer has Обложка label");
+assert(
+  !dataSection.includes("Выберите файл"),
+  "Данные no longer has Выберите файл",
+);
+assert(
+  !dataSection.includes('type="file"'),
+  "raw file input is gone from Данные",
+);
+assert(!editor.includes("Нет обложки"), "empty cover preview block removed");
+assert(!editor.includes("Удалить обложку"), "old delete-cover label removed");
+assert(editor.includes("Изменить обложку"), "header overlay label");
 assert(editor.includes("Загрузить обложку"), "empty-state upload label");
 assert(editor.includes("Заменить обложку"), "replace label");
-assert(editor.includes("Удалить обложку"), "delete label");
-assert(editor.includes("Нет обложки"), "empty cover state");
+assert(editor.includes("Вернуть автообложку"), "revert auto-cover label");
 assert(editor.includes('className="sr-only"'), "native file input is hidden");
+assert(editor.includes('type="file"'), "click-to-upload still uses file input");
+assert(
+  editor.includes("onCoverClick") && editor.includes("fileInputRef.current?.click()"),
+  "header cover click opens the hidden file input",
+);
 assert(
   editor.includes("setHasCustomCover(true)"),
   "upload/replace refresh local cover immediately",
 );
 assert(
   editor.includes("setHasCustomCover(false)"),
-  "delete clears local cover immediately",
+  "revert clears local cover immediately",
+);
+assert(
+  editor.includes("takeFirstPlaylistItemCoverUrls") &&
+    editor.includes("items.map"),
+  "editor collage follows current composition order",
 );
 assert(
   editor.includes('method: "POST"') &&
@@ -95,7 +224,7 @@ assert(
 assert(
   editor.includes('method: "DELETE"') &&
     editor.includes("`/api/playlists/${detail.playlist.id}/cover`"),
-  "delete reuses shared cover API",
+  "revert reuses shared cover API",
 );
 assert(!editor.includes("Удалить плейлист"), "no hard-delete playlist button");
 assert(!editor.includes("cover_url"), "no technical cover_url label");
@@ -125,6 +254,25 @@ assert(
   publicDetail.includes("playlist.user_id ?? undefined"),
   "platform playlists do not force a NULL user prefix on signed URLs",
 );
+assert(
+  publicDetail.includes("takeFirstPlaylistItemCoverUrls"),
+  "/p uses the same first-four item cover fallback",
+);
+assert(
+  !publicDetail.includes("mosaicFromAvailable"),
+  "/p no longer builds mosaic only from eligible leftovers",
+);
+
+const publicPage = read("src/components/playlists/PublicPlaylistPageView.tsx");
+assert(
+  publicPage.includes("PlaylistCover"),
+  "/p renders the shared playlist cover",
+);
+assert(
+  publicPage.includes("detail.coverUrl") &&
+    publicPage.includes("detail.mosaicCoverUrls"),
+  "/p passes custom + ordered item covers into the shared cover",
+);
 
 const editorialDetail = read("src/lib/playlists/editorial-workspace-detail.ts");
 assert(
@@ -138,6 +286,10 @@ assert(
 assert(
   !editorialDetail.includes("{ userId, playlistId }"),
   "editorial signed URL must not require the current editor prefix",
+);
+assert(
+  editorialDetail.includes("takeFirstPlaylistItemCoverUrls"),
+  "editorial detail mosaic uses first four by position",
 );
 
 const editorialList = read("src/lib/playlists/editorial-workspace-list.ts");
