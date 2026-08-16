@@ -145,7 +145,6 @@ export async function listEditorialWorkspacePlaylists(
       signedByPath = await createPlaylistCoverSignedUrlsBatch(
         storage,
         coverPaths,
-        { userId: options.userId },
       );
     } catch (signedError) {
       console.error(

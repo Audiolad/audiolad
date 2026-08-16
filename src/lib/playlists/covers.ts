@@ -102,6 +102,19 @@ export function assertPlaylistCoverPathForOwner(
   return isValidPlaylistCoverPath(coverPath, userId, playlistId);
 }
 
+/**
+ * True when the object path belongs to this playlist.
+ * Does not require the first segment to match the current actor: editorial
+ * covers are stored under the uploader's user id, while platform playlists
+ * have user_id NULL.
+ */
+export function assertPlaylistCoverPathForPlaylist(
+  coverPath: string | null | undefined,
+  playlistId: string,
+): coverPath is string {
+  return isValidPlaylistCoverPath(coverPath, undefined, playlistId);
+}
+
 export function parsePlaylistCoverPath(coverPath: string): {
   userId: string;
   playlistId: string;
@@ -365,4 +378,26 @@ export async function removePlaylistCoverObject(
   }
 
   return { ok: true };
+}
+
+export async function removeStoredPlaylistCoverObject(
+  storageClient: SupabaseClient,
+  coverPath: string,
+  expectedPlaylistId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = parsePlaylistCoverPath(coverPath);
+
+  if (
+    !parsed ||
+    parsed.playlistId.toLowerCase() !== expectedPlaylistId.toLowerCase()
+  ) {
+    return { ok: false, error: "invalid_path" };
+  }
+
+  return removePlaylistCoverObject(
+    storageClient,
+    coverPath,
+    parsed.userId,
+    expectedPlaylistId,
+  );
 }

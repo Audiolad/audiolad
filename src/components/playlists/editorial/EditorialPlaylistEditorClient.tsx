@@ -62,6 +62,9 @@ export default function EditorialPlaylistEditorClient({
   const [description, setDescription] = useState(detail.playlist.description ?? "");
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [coverUrl, setCoverUrl] = useState(detail.coverUrl);
+  const [hasCustomCover, setHasCustomCover] = useState(
+    Boolean(detail.coverUrl || detail.playlist.cover_path),
+  );
   const [page, setPage] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [replacePracticeId, setReplacePracticeId] = useState<string | null>(null);
@@ -218,9 +221,45 @@ export default function EditorialPlaylistEditorClient({
       }
 
       setCoverUrl(data.coverUrl ?? null);
+      setHasCustomCover(true);
       refresh();
     } catch {
       setFormError("Не удалось сохранить обложку.");
+    } finally {
+      setSubmitting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function deleteCover() {
+    if (submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const response = await fetch(`/api/playlists/${detail.playlist.id}/cover`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+
+      if (!response.ok && response.status !== 204) {
+        const data = (await response.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        setFormError(data.message || "Не удалось удалить обложку.");
+        return;
+      }
+
+      setCoverUrl(null);
+      setHasCustomCover(false);
+      refresh();
+    } catch {
+      setFormError("Не удалось удалить обложку.");
     } finally {
       setSubmitting(false);
       if (fileInputRef.current) {
@@ -390,8 +429,53 @@ export default function EditorialPlaylistEditorClient({
               type="file"
               accept={COVER_ACCEPT}
               onChange={(event) => void uploadCover(event)}
-              className="block w-full text-sm text-[#7d70a2]"
+              className="sr-only"
             />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#f8f4fc]">
+                {hasCustomCover && coverUrl ? (
+                  <PlaylistCover
+                    title={title || detail.playlist.title}
+                    customCoverUrl={coverUrl}
+                    mosaicCoverUrls={[]}
+                    className="h-full w-full"
+                  />
+                ) : hasCustomCover ? (
+                  <div className="flex h-full w-full items-center justify-center bg-[#ece4f8] text-xs text-[#7d70a2]">
+                    Обложка
+                  </div>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-[#d9c9ef] text-center text-xs text-[#8c79b6]">
+                    Нет обложки
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                  >
+                    {hasCustomCover ? "Заменить обложку" : "Загрузить обложку"}
+                  </button>
+                  {hasCustomCover ? (
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => void deleteCover()}
+                      className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#b34f63] disabled:opacity-60"
+                    >
+                      Удалить обложку
+                    </button>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-sm leading-5 text-[#7d70a2]">
+                  JPG, PNG или WebP, до 5 МБ
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
