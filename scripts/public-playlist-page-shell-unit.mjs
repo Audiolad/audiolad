@@ -90,9 +90,15 @@ assert(
 
 assert(view.includes("PlayAllButton"), "Слушать всё remains on /p");
 assert(view.includes("PublicPlaylistItems"), "/p rows go through public items");
+assert(view.includes("{detail.ownerLabel}"), "under-H1 owner label remains");
 assert(
-  view.includes("Плейлист АудиоЛада") && view.includes("Публичный плейлист"),
-  "user and editorial /p labels still render",
+  !view.includes("Плейлист АудиоЛада") && !view.includes("Публичный плейлист"),
+  "top eyebrow above H1 is gone",
+);
+assert(
+  view.indexOf("data-public-playlist-hero-cover") < view.indexOf("<h1") &&
+    view.indexOf("<h1") < view.indexOf("{detail.ownerLabel}"),
+  "cover then H1 then under-H1 owner label",
 );
 assert(playAll.includes("loadPlaylistQueue"), "Play All still uses the global queue");
 assert(playAll.includes("Слушать всё"), "Play All label remains");

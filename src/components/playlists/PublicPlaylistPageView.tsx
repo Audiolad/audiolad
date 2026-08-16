@@ -75,14 +75,8 @@ export default function PublicPlaylistPageView({
         className="flex flex-col xl:grid xl:grid-cols-[minmax(260px,280px)_minmax(0,1fr)] xl:items-start xl:gap-x-6"
         data-public-playlist-hero
       >
-        <p className="text-sm font-medium text-[#7042c5] xl:col-start-2 xl:row-start-1">
-          {detail.playlist.isEditorial
-            ? "Плейлист АудиоЛада"
-            : "Публичный плейлист"}
-        </p>
-
         <div
-          className="mx-auto mt-5 w-full max-w-[280px] xl:col-start-1 xl:row-span-2 xl:row-start-1 xl:mx-0 xl:mt-0 xl:w-full xl:max-w-none"
+          className="mx-auto mt-5 w-full max-w-[280px] xl:col-start-1 xl:row-start-1 xl:mx-0 xl:mt-0 xl:w-full xl:max-w-none"
           data-public-playlist-hero-cover
         >
           <PlaylistCover
@@ -96,7 +90,7 @@ export default function PublicPlaylistPageView({
         </div>
 
         <div
-          className="xl:col-start-2 xl:row-start-2 xl:min-w-0"
+          className="xl:col-start-2 xl:row-start-1 xl:min-w-0"
           data-public-playlist-hero-content
         >
           <h1 className="mt-6 text-[28px] font-semibold leading-8 text-[#25135c] xl:mt-2">
