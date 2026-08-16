@@ -5,6 +5,7 @@ import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import { formatPlaylistItemCount } from "@/lib/playlists/format-item-count";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
 import {
@@ -29,21 +30,6 @@ type PlaylistDetailClientProps = {
 
 function visibilityLabel(visibility: PlaylistVisibility): string {
   return visibility === "public" ? "Доступен всем" : "Только для меня";
-}
-
-function formatItemsCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} материал`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} материала`;
-  }
-
-  return `${count} материалов`;
 }
 
 function coverGradientForId(id: string): string {
@@ -475,7 +461,7 @@ export default function PlaylistDetailClient({
               : visibilityLabel(detail.playlist.visibility)}
           </p>
           <p className="mt-1 text-sm text-[#7d70a2]">
-            {formatItemsCount(itemsCount)}
+            {formatPlaylistItemCount(itemsCount)}
             {detail.totalDurationLabel
               ? ` · ${detail.totalDurationLabel}`
               : ""}

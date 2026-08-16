@@ -9,6 +9,7 @@ import {
   buildPublicPlaylistCanonicalUrl,
   copyTextToClipboard,
 } from "@/lib/playlists/public-url";
+import { formatPlaylistItemCount } from "@/lib/playlists/format-item-count";
 import {
   PLAYLIST_MAX_PER_USER,
   PLAYLIST_TITLE_MAX_LENGTH,
@@ -54,21 +55,6 @@ function coverGradientForId(id: string): string {
 
 function visibilityLabel(visibility: PlaylistVisibility): string {
   return visibility === "public" ? "Доступен всем" : "Только для меня";
-}
-
-function formatItemsCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} материал`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} материала`;
-  }
-
-  return `${count} материалов`;
 }
 
 async function readApiError(response: Response): Promise<string> {
@@ -485,7 +471,7 @@ export default function PlaylistsClient({
                         {EDITORIAL_PLAYLIST_LABEL}
                       </p>
                       <p className="mt-1 text-sm text-[#7d70a2]">
-                        {formatItemsCount(playlist.items_count)}
+                        {formatPlaylistItemCount(playlist.items_count)}
                       </p>
                     </Link>
                   </div>
@@ -535,7 +521,7 @@ export default function PlaylistsClient({
                           : visibilityLabel(playlist.visibility)}
                       </p>
                       <p className="mt-1 text-sm text-[#7d70a2]">
-                        {formatItemsCount(playlist.items_count)}
+                        {formatPlaylistItemCount(playlist.items_count)}
                       </p>
                     </Link>
 

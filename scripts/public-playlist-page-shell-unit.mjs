@@ -17,6 +17,8 @@ function read(path) {
 const page = read("src/app/(platform)/p/[slug]/page.tsx");
 const layout = read("src/app/(platform)/p/layout.tsx");
 const view = read("src/components/playlists/PublicPlaylistPageView.tsx");
+const itemCountFormat = read("src/lib/playlists/format-item-count.ts");
+const ownerList = read("src/components/playlists/PlaylistsClient.tsx");
 const items = read("src/components/playlists/PublicPlaylistItems.tsx");
 const row = read("src/components/playlists/PlaylistItemRow.tsx");
 const playAll = read("src/components/playlists/PlayAllButton.tsx");
@@ -32,6 +34,7 @@ const editorialEditor = read(
 const listenPage = read(
   "src/app/(platform)/(listener)/listens/[slug]/page.tsx",
 );
+const listenEmbed = read("src/components/playlists/PublicPlaylistEmbed.tsx");
 
 assert(existsSync("src/app/(platform)/p/layout.tsx"), "public /p layout exists");
 assert(
@@ -87,6 +90,54 @@ assert(
     !items.includes("DesktopRightColumn"),
   "public playlist view does not fork a right-side player",
 );
+
+assert(
+  itemCountFormat.includes("`${count} аудио`"),
+  "playlist item-count label is invariable аудио",
+);
+assert(
+  !itemCountFormat.includes("материал") &&
+    !itemCountFormat.includes("материала") &&
+    !itemCountFormat.includes("материалов"),
+  "item-count helper has no материал declension",
+);
+assert(
+  view.includes("formatPlaylistItemCount") &&
+    view.includes("{formatPlaylistItemCount(detail.itemsCount)}"),
+  "/p uses the shared invariable item-count label",
+);
+assert(
+  !view.includes("1 материал") &&
+    !view.includes("${detail.itemsCount} материалов") &&
+    !view.includes("Нет материалов"),
+  "/p count no longer declines материал",
+);
+assert(
+  ownerList.includes("formatPlaylistItemCount") &&
+    ownerDetail.includes("formatPlaylistItemCount"),
+  "owner playlist surfaces reuse the same item-count label",
+);
+assert(
+  !ownerList.includes("`${count} материал`") &&
+    !ownerList.includes("`${count} материала`") &&
+    !ownerList.includes("`${count} материалов`") &&
+    !ownerDetail.includes("`${count} материал`") &&
+    !ownerDetail.includes("`${count} материала`") &&
+    !ownerDetail.includes("`${count} материалов`"),
+  "owner playlist counts no longer decline материал",
+);
+
+function formatPlaylistItemCount(count) {
+  return `${count} аудио`;
+}
+
+assert(formatPlaylistItemCount(1) === "1 аудио", "1 → 1 аудио");
+assert(formatPlaylistItemCount(2) === "2 аудио", "2 → 2 аудио");
+assert(formatPlaylistItemCount(5) === "5 аудио", "5 → 5 аудио");
+assert(formatPlaylistItemCount(7) === "7 аудио", "7 → 7 аудио");
+assert(formatPlaylistItemCount(11) === "11 аудио", "11 → 11 аудио");
+assert(formatPlaylistItemCount(12) === "12 аудио", "12 → 12 аудио");
+assert(`${7} аудио · 47 мин` === "7 аудио · 47 мин", "/p money playlist count shape");
 
 assert(view.includes("PlayAllButton"), "Слушать всё remains on /p");
 assert(view.includes("PublicPlaylistItems"), "/p rows go through public items");
@@ -151,6 +202,12 @@ assert(
 assert(
   listenPage.includes("loadListenPageData"),
   "Stage 3 /listens page is untouched",
+);
+assert(
+  !listenEmbed.includes("formatPlaylistItemCount") &&
+    !listenEmbed.includes("itemsCount") &&
+    !listenEmbed.includes("материалов"),
+  "/listens embed still has no playlist item-count label",
 );
 assert(
   !items.includes("stay_on_source"),

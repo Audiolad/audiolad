@@ -4,6 +4,7 @@ import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PublicPlaylistItems from "@/components/playlists/PublicPlaylistItems";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
+import { formatPlaylistItemCount } from "@/lib/playlists/format-item-count";
 import type { PublicPlaylistView } from "@/lib/playlists/public-detail";
 import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
 
@@ -106,13 +107,7 @@ export default function PublicPlaylistPageView({
           ) : null}
 
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm text-[#5c4f82]">
-            <span>
-              {detail.itemsCount === 0
-                ? "Нет материалов"
-                : detail.itemsCount === 1
-                  ? "1 материал"
-                  : `${detail.itemsCount} материалов`}
-            </span>
+            <span>{formatPlaylistItemCount(detail.itemsCount)}</span>
             {detail.totalDurationLabel ? (
               <span>· {detail.totalDurationLabel}</span>
             ) : null}
