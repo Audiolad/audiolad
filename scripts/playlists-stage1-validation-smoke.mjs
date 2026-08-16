@@ -234,17 +234,6 @@ assert(
   "migration must not UPDATE playlists",
 );
 
-const createApi = read("src/app/api/playlists/route.ts");
-assert(
-  createApi.includes("parsed.message"),
-  "POST /api/playlists returns validation message",
-);
-const patchApi = read("src/app/api/playlists/[id]/route.ts");
-assert(
-  patchApi.includes("parsed.message"),
-  "PATCH /api/playlists/[id] returns validation message",
-);
-
 const draftPatch = parsePatchPlaylistBody({
   visibility: "private",
   is_editorial: true,
@@ -303,6 +292,10 @@ assert(
   createApi.includes("countOwnedPlaylists") && createApi.includes("user.id"),
   "personal limit uses user id",
 );
+assert(
+  createApi.includes("parsed.message"),
+  "POST /api/playlists returns validation message",
+);
 
 const patchApi = read("src/app/api/playlists/[id]/route.ts");
 assert(patchApi.includes("canUserEditPlaylist"), "patch uses access helper");
@@ -315,6 +308,10 @@ assert(patchApi.includes("Keep allocated editorial slug"), "unpublish keeps slug
 assert(
   patchApi.includes("first_published_at"),
   "publish path stamps first_published_at",
+);
+assert(
+  patchApi.includes("parsed.message"),
+  "PATCH /api/playlists/[id] returns validation message",
 );
 
 const queries = read("src/lib/playlists/queries.ts");
