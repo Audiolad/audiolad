@@ -450,7 +450,7 @@ assert(
 );
 assert(
   moneyFlowArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "money flow links to Денежный Поток playlist",
 );
@@ -562,7 +562,7 @@ assert(
 assert(abundanceMeditationArticle.faq.length === 3, "abundance meditation faq");
 assert(
   abundanceMeditationArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "abundance meditation links to playlist as playlist CTA",
 );
@@ -732,7 +732,7 @@ assert(
 assert(moneyAttractionArticle.faq.length === 3, "money attraction faq");
 assert(
   moneyAttractionArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "money attraction links to playlist as playlist CTA",
 );
@@ -940,7 +940,7 @@ assert(
 assert(howToAttractMoneyArticle.faq.length === 3, "how-to attract money faq");
 assert(
   howToAttractMoneyArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "how-to attract money links to playlist as playlist CTA",
 );
@@ -1171,7 +1171,7 @@ assert(
 );
 assert(
   moneyAffirmationsArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "money affirmations links to playlist as playlist CTA",
 );
@@ -1380,7 +1380,7 @@ assert(
 );
 assert(
   changeMoneyAttitudeArticle.afterFinalAudio?.some(
-    (item) => item.href === "/p/denezhnyy-potok-9288",
+    (item) => item.href === "/p/meditaciya-na-dengi",
   ),
   "change money attitude links to playlist as playlist CTA",
 );
@@ -1605,7 +1605,7 @@ assert(
 );
 assert(
   !JSON.stringify(wishMeditationArticle.afterFinalAudio).includes(
-    "/p/denezhnyy-potok-9288",
+    "/p/meditaciya-na-dengi",
   ),
   "wish meditation does not pull money playlist into CTA",
 );
@@ -1779,7 +1779,7 @@ assert(
 );
 assert(
   !JSON.stringify(wishVisualizationArticle.afterFinalAudio).includes(
-    "/p/denezhnyy-potok-9288",
+    "/p/meditaciya-na-dengi",
   ),
   "wish visualization does not pull money playlist into CTA",
 );
@@ -2203,7 +2203,7 @@ assert(
 );
 assert(
   !JSON.stringify(forgivePersonArticle.afterFinalAudio).includes(
-    "/p/denezhnyy-potok-9288",
+    "/p/meditaciya-na-dengi",
   ),
   "forgive-a-person does not pull money playlist into CTA",
 );

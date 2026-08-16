@@ -215,7 +215,7 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
         description: "Денежные медитации, энергопотоки и программы",
       },
       {
-        href: "/p/denezhnyy-potok-9288",
+        href: "/p/meditaciya-na-dengi",
         title: "Плейлист «Денежный Поток»",
         description: "Отдельная подборка денежных практик",
       },
@@ -293,7 +293,7 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
         description: "Слушать бесплатные практики онлайн без покупки",
       },
       {
-        href: "/p/denezhnyy-potok-9288",
+        href: "/p/meditaciya-na-dengi",
         title: "Плейлист «Денежный Поток»",
         description: "Отдельная лента денежных практик для последовательного слушания",
       },
@@ -372,7 +372,7 @@ export const TOPIC_HUB_DEFINITIONS: readonly TopicHubDefinition[] = [
         description: "Полный фильтр платформенной темы, включая смежные практики",
       },
       {
-        href: "/p/denezhnyy-potok-9288",
+        href: "/p/meditaciya-na-dengi",
         title: "Плейлист «Денежный Поток»",
         description: "Отдельная лента, где есть и практики изобилия",
       },

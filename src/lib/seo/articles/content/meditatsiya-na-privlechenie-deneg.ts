@@ -134,7 +134,7 @@ export const MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE = {
       before:
         "Если тема финансов особенно важна для вас, обратите внимание на подборку бесплатных практик ",
       linkLabel: "«Денежный Поток»",
-      href: "/p/denezhnyy-potok-9288",
+      href: "/p/meditaciya-na-dengi",
       after:
         " – плейлист, посвящённый более спокойному и осознанному отношению к деньгам.",
     },
@@ -201,7 +201,7 @@ export const MEDITATSIYA_NA_PRIVLECHENIE_DENEG_ARTICLE = {
       description: "Соседний угол: состояние изобилия и открытости",
     },
     {
-      href: "/p/denezhnyy-potok-9288",
+      href: "/p/meditaciya-na-dengi",
       title: "Плейлист «Денежный Поток»",
       description: "Бесплатные практики о деньгах для последовательного слушания",
     },

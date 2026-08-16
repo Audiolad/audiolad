@@ -206,7 +206,7 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       before:
         "А если хочется сразу послушать несколько близких по смыслу практик, откройте плейлист ",
       linkLabel: "«Денежный Поток»",
-      href: "/p/denezhnyy-potok-9288",
+      href: "/p/meditaciya-na-dengi",
       after:
         " – подборку бесплатных практик о деньгах, внимании, внутреннем настрое и отношении к достатку.",
     },
@@ -260,7 +260,7 @@ export const CHTO_TAKOE_DENEZHNYY_POTOK_ARTICLE = {
       description: "Соседний угол: состояние изобилия и открытости",
     },
     {
-      href: "/p/denezhnyy-potok-9288",
+      href: "/p/meditaciya-na-dengi",
       title: "Плейлист «Денежный Поток»",
       description: "Бесплатные практики о деньгах для последовательного слушания",
     },
