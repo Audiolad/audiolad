@@ -177,6 +177,12 @@ ARTICLE TYPE: practice
 ARTICLE TYPE: creator
 ```
 
+или:
+
+```text
+ARTICLE TYPE: listen
+```
+
 Если этой строки нет, исполнитель не публикует статью и запрашивает выбор
 типа. Запрещено угадывать его по H1, slug, теме, слову «медитация», CTA,
 наличию практики или содержанию текста.
@@ -185,6 +191,12 @@ ARTICLE TYPE: creator
   template с обязательной связанной практикой.
 - `creator` — использовать только `CreatorArticleDefinition` и
   `creator_paths` template со Студией и Школой.
+- `listen` — использовать только модуль `src/lib/seo/listens`, не
+  `ArticleDefinition`. Явный `playlistSlug` обязателен, угадывать нельзя.
+  Static playlist items запрещены. `primaryPractice` не нужен.
+  `ArticleAudioBlock` запрещён. `CreatorPathsCta` запрещён.
+  Studio / School continuation запрещены. Authoritative content нельзя
+  переписывать.
 
 ---
 

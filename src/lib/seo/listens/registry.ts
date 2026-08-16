@@ -1,11 +1,13 @@
+import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/meditatsiya-na-dengi-slushat-onlayn-besplatno";
 import type { ListenPageDefinition } from "./types";
 
 /**
  * Production listen pages are added only from an approved SEO TZ.
- * Stage 3 ships the framework with an empty registry — no fake
- * /listens/test-* indexable page.
+ * Composition always comes from the DB playlist named by `playlistSlug`.
  */
-const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [];
+const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
+  MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
   LISTEN_PAGE_DEFINITIONS.map((page) => [page.slug, page]),

@@ -1,3 +1,5 @@
+import PlaylistCover from "@/components/playlists/PlaylistCover";
+import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PublicPlaylistEmbedPreview from "@/components/playlists/PublicPlaylistEmbedPreview";
 import { loadPublicPlaylistBySlug } from "@/lib/playlists/public-detail";
 import type { PublicPlaylistView } from "@/lib/playlists/public-detail";
@@ -11,28 +13,9 @@ type PublicPlaylistEmbedProps = {
   | { playlistSlug: string; playlist?: never }
 );
 
-function itemsCountLabel(count: number): string {
-  if (count === 0) {
-    return "Нет материалов";
-  }
-
-  if (count === 1) {
-    return "1 материал";
-  }
-
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} материал`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} материала`;
-  }
-
-  return `${count} материалов`;
-}
+const LISTEN_EMBED_EYEBROW = "СЛУШАЙТЕ ПРЯМО СЕЙЧАС";
+const LISTEN_EMBED_SHORT_COPY =
+  "Слушайте всё сразу или начните с любой строки.";
 
 export default async function PublicPlaylistEmbed({
   playlist: playlistProp,
@@ -60,28 +43,47 @@ export default async function PublicPlaylistEmbed({
     <section
       data-public-playlist-embed
       data-playlist-slug={playlist.playlist.slug}
-      className="min-w-0 overflow-x-hidden rounded-[22px] border border-[#eadff8] bg-[#faf7ff] px-4 py-4 shadow-[0_8px_22px_rgba(91,62,145,0.05)]"
+      className="max-w-[40rem] min-w-0 overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)]"
     >
-      <header className="min-w-0">
-        <h2 className="text-lg font-semibold leading-6 text-[#25135c] sm:text-xl">
-          {playlist.playlist.title}
-        </h2>
-        {playlist.playlist.description ? (
-          <p className="mt-2 text-sm leading-6 text-[#5c4f82]">
-            {playlist.playlist.description}
+      <div className="sm:flex sm:items-start sm:gap-4 sm:p-4">
+        <div className="w-full sm:w-[152px] sm:shrink-0">
+          <PlaylistCover
+            title={playlist.playlist.title}
+            customCoverUrl={playlist.coverUrl}
+            mosaicCoverUrls={playlist.mosaicCoverUrls}
+            decorative={false}
+            className="w-full"
+          />
+        </div>
+        <header className="p-4 sm:min-w-0 sm:flex-1 sm:p-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#7042c5]">
+            {LISTEN_EMBED_EYEBROW}
           </p>
-        ) : null}
-        <p className="mt-2 text-sm text-[#5c4f82]">
-          {itemsCountLabel(playlist.itemsCount)}
-          {playlist.totalDurationLabel ? ` · ${playlist.totalDurationLabel}` : ""}
-        </p>
-      </header>
+          <h2 className="mt-2 text-lg font-semibold leading-6 text-[#25135c] sm:text-xl">
+            {playlist.playlist.title}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[#5c4f82]">
+            {LISTEN_EMBED_SHORT_COPY}
+          </p>
+          <PlayAllButton
+            variant="public"
+            playlistSlug={playlist.playlist.slug}
+            title={playlist.playlist.title}
+            items={playlist.items}
+            startIndex={0}
+            returnHref={sourcePath}
+            navigationPolicy={navigationPolicy}
+          />
+        </header>
+      </div>
 
-      <PublicPlaylistEmbedPreview
-        playlist={playlist}
-        sourcePath={sourcePath}
-        navigationPolicy={navigationPolicy}
-      />
+      <div className="px-4 pb-4">
+        <PublicPlaylistEmbedPreview
+          playlist={playlist}
+          sourcePath={sourcePath}
+          navigationPolicy={navigationPolicy}
+        />
+      </div>
     </section>
   );
 }

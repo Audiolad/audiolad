@@ -30,8 +30,6 @@ import {
   getListenPreviewExpandCount,
   getListenPreviewItems,
   isValidListenPageSlug,
-  listIndexableListenPageDefinitions,
-  listListenPageDefinitions,
   parseListenPageDefinition,
   resolveListenPageFromPlaylist,
 } from "../src/lib/seo/listens/index.ts";
@@ -188,11 +186,6 @@ function testDefinitions() {
     "item ids rejected",
   );
 
-  assert(listListenPageDefinitions().length === 0, "production registry empty");
-  assert(
-    listIndexableListenPageDefinitions().length === 0,
-    "no indexable production listens",
-  );
   assert(getListenPageBySlug("fixture-listen-page") === null, "fixture not registered");
   assert(getListenPageBySlug("test-listen") === null, "no test production page");
 }
@@ -383,7 +376,17 @@ function testSsrPreview() {
   assert(embedServer.includes("PublicPlaylistEmbed"), "named PublicPlaylistEmbed");
   assert(!embedServer.includes("ArticlePlaylist"), "not ArticlePlaylist");
   assert(embedServer.includes("playlist.playlist.title"), "playlist title SSR");
-  assert(embedServer.includes("itemsCount"), "item count SSR");
+  assert(embedServer.includes("СЛУШАЙТЕ ПРЯМО СЕЙЧАС"), "universal eyebrow");
+  assert(
+    embedServer.includes("Слушайте всё сразу или начните с любой строки."),
+    "universal short copy",
+  );
+  assert(!embedServer.includes("itemsCount"), "header has no itemsCount");
+  assert(!embedServer.includes("totalDurationLabel"), "header has no duration");
+  assert(
+    !embedServer.includes("playlist.playlist.description"),
+    "header has no playlist.description",
+  );
 }
 
 function testPlayback() {
@@ -512,8 +515,8 @@ function testSeo() {
   assert(noindexMeta.robots?.index === false, "indexable false → noindex");
   assert(noindexMeta.robots?.follow === true, "noindex still follow");
 
-  const emptySitemap = mapListenPageDefinitionsToSitemapEntries(undefined, "https://audiolad.ru");
-  assert(emptySitemap.length === 0, "empty registry means no sitemap entries");
+  const emptySitemap = mapListenPageDefinitionsToSitemapEntries([], "https://audiolad.ru");
+  assert(emptySitemap.length === 0, "empty page list means no sitemap entries");
 
   const sitemapAware = mapListenPageDefinitionsToSitemapEntries(
     [
@@ -645,10 +648,6 @@ function testRegression() {
   assert(
     seoFiles.some((file) => file.endsWith("registry.ts")),
     "listens registry exists",
-  );
-  assert(
-    !seoFiles.some((file) => file.endsWith(".ts") && file.includes("content/") && !file.includes(".gitkeep")),
-    "no production listen content files",
   );
 }
 

@@ -41,6 +41,7 @@
     "test:playlists-stage2": "npx tsx scripts/playlists-stage2-validation-smoke.mjs",
     "test:playlists-stage21": "npx tsx scripts/playlists-stage21-validation-smoke.mjs",
     "test:playlists-stage3": "npx tsx scripts/playlists-stage3-validation-smoke.mjs",
+    "test:listens-stage4": "npx tsx scripts/listens-stage4-validation-smoke.mjs",
     "test:playlists-editorial-cover": "npx tsx scripts/playlists-editorial-cover-unit.mjs",
     "test:platform-rbac:migration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/platform-rbac-migration-validation.mjs",
     "test:admin-analytics-snapshot": "node scripts/platform-analytics-unit.mjs && node scripts/admin-analytics-dashboard-snapshot-sql-unit.mjs",

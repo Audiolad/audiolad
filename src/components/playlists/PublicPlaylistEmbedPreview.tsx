@@ -8,7 +8,7 @@ import {
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import AuthorLink from "@/components/authors/AuthorLink";
-import PlayAllButton from "@/components/playlists/PlayAllButton";
+import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { buildPublicPlaylistQueue } from "@/lib/playlists/build-playlist-queue";
 import type { PlaylistQueueNavigationPolicy } from "@/lib/playlists/player-queue-types";
 import type {
@@ -105,15 +105,18 @@ export default function PublicPlaylistEmbedPreview({
 
   return (
     <div data-public-playlist-embed-preview>
-      <PlayAllButton
-        variant="public"
-        playlistSlug={playlist.playlist.slug}
-        title={playlist.playlist.title}
-        items={playlist.items}
-        returnHref={sourcePath}
-        navigationPolicy={navigationPolicy}
-      />
-
+      <style>{`
+        @media (max-width: 390px) {
+          [data-public-playlist-embed-preview] [data-preview-extra="true"][data-collapsed-extra="true"] {
+            display: none;
+          }
+          [data-public-playlist-embed-preview] [data-listen-preview-expand] {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+        }
+      `}</style>
       {rowError ? (
         <p className="mt-2 text-sm text-[#b34f63]" role="alert">
           {rowError}
@@ -121,7 +124,7 @@ export default function PublicPlaylistEmbedPreview({
       ) : null}
 
       <ol
-        className="mt-4 space-y-1.5"
+        className="space-y-1.5"
         data-preview-collapsed={expanded ? "false" : "true"}
       >
         {previewItems.map((item, index) => {
@@ -134,6 +137,7 @@ export default function PublicPlaylistEmbedPreview({
             isExtra && !expanded
               ? "max-[390px]:hidden"
               : "";
+          const coverSlug = item.productSlug ?? item.practiceId;
 
           return (
             <li
@@ -141,41 +145,58 @@ export default function PublicPlaylistEmbedPreview({
               value={item.position}
               data-listen-preview-item
               data-preview-extra={isExtra ? "true" : "false"}
+              data-collapsed-extra={isExtra && !expanded ? "true" : "false"}
               data-position={item.position}
               className={extraHiddenClass}
             >
-              <article className="flex min-h-[76px] min-w-0 items-center gap-2 rounded-[16px] border border-[#eadff8] bg-white px-2 py-1.5 sm:gap-3 sm:px-3">
-                <span
-                  className="hidden w-5 shrink-0 text-center text-[11px] font-medium text-[#8f82ad] sm:block"
-                  aria-hidden
-                >
-                  {index + 1}
-                </span>
-
-                {playable ? (
-                  <button
-                    type="button"
-                    disabled={rowLoadingId === item.practiceId}
-                    onClick={() => void playFromItem(item)}
-                    aria-label={
-                      isPlayingThis
+              <article
+                className={`flex min-w-0 items-center gap-3 rounded-[16px] border px-2 py-1.5 ${
+                  isPlayingThis
+                    ? "border-[#c9b6ea] bg-[#f3eaff]"
+                    : "border-[#eadff8] bg-white"
+                }`}
+              >
+                <button
+                  type="button"
+                  disabled={!playable || rowLoadingId === item.practiceId}
+                  onClick={() => void playFromItem(item)}
+                  aria-label={
+                    !playable
+                      ? `Слушать ${item.title} — недоступно`
+                      : isPlayingThis
                         ? `Пауза: ${item.title}`
                         : `Слушать ${item.title}`
-                    }
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                  >
-                    {isPlayingThis ? <PauseIcon /> : <PlayIcon />}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    aria-label={`Слушать ${item.title} — недоступно`}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-40"
-                  >
-                    <PlayIcon />
-                  </button>
-                )}
+                  }
+                  className={`group relative h-[52px] w-[52px] shrink-0 overflow-hidden rounded-[12px] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                    !playable ? "cursor-not-allowed" : ""
+                  }`}
+                >
+                  <span aria-hidden className="block h-[52px] w-[52px]">
+                    <ProductCoverThumbnail
+                      slug={coverSlug}
+                      title={item.title}
+                      coverUrl={item.coverUrl}
+                      coverImage={item.coverImage}
+                      updatedAt={item.updatedAt}
+                      authorName={item.authorName}
+                      displayWidth={56}
+                      className="h-[52px] w-[52px] rounded-[12px]"
+                    />
+                  </span>
+                  {playable ? (
+                    <span
+                      className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 transition-opacity ${
+                        isPlayingThis
+                          ? "opacity-100"
+                          : "opacity-0 [@media(hover:none)]:opacity-100 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100"
+                      }`}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#7042c5]">
+                        {isPlayingThis ? <PauseIcon /> : <PlayIcon />}
+                      </span>
+                    </span>
+                  ) : null}
+                </button>
 
                 <div className="min-w-0 flex-1 py-0.5">
                   {titleHref ? (
@@ -212,6 +233,7 @@ export default function PublicPlaylistEmbedPreview({
       {expandCount > 0 && !expanded ? (
         <button
           type="button"
+          data-listen-preview-expand
           className="mt-3 hidden min-h-11 w-full rounded-full border border-[#d9c9f3] bg-white px-4 text-sm font-medium text-[#7042c5] max-[390px]:inline-flex max-[390px]:items-center max-[390px]:justify-center"
           onClick={() => setExpanded(true)}
         >
@@ -224,7 +246,7 @@ export default function PublicPlaylistEmbedPreview({
           href={buildPublicPlaylistPath(playlist.playlist.slug)}
           className="inline-flex min-h-11 items-center font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
-          Открыть весь плейлист
+          Перейти в плейлист →
         </Link>
       </p>
     </div>
