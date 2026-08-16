@@ -402,6 +402,16 @@ const CREATOR_ARTICLES = [
       "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
     ],
   },
+  {
+    path: "/articles/prodvizhenie-astrologa",
+    h1: "Продвижение астролога: как астрологу найти клиентов",
+    metaTitle: "Продвижение астролога: как найти клиентов",
+    metaDescription:
+      "Продвижение астролога: как выбрать специализацию, оформить услуги, находить клиентов через контент, поиск, рекомендации, сообщества, партнёрства и рекламу.",
+    canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-astrologa",
+    productLinkCount: 8,
+    requiredSnippet: "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  },
 ];
 
 function assert(condition, message) {

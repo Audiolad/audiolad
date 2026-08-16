@@ -7487,6 +7487,111 @@ assert(
   ).includes('"image"'),
   "tarologist promotion creator json-ld omits practice image",
 );
+const astrologerPromotionCreatorArticle = getArticleBySlug(
+  "prodvizhenie-astrologa",
+);
+assert(
+  astrologerPromotionCreatorArticle,
+  "astrologer promotion creator article registered",
+);
+assert(
+  astrologerPromotionCreatorArticle.productContinuation.kind ===
+    "creator_paths",
+  "astrologer promotion creator article uses creator continuation",
+);
+assert(
+  astrologerPromotionCreatorArticle.productContinuation.emphasis ===
+    "balanced",
+  "astrologer promotion creator article uses balanced emphasis",
+);
+assert(
+  !("primaryPractice" in astrologerPromotionCreatorArticle),
+  "astrologer promotion creator article does not require a catalog practice",
+);
+assert(
+  astrologerPromotionCreatorArticle.title ===
+    "Продвижение астролога: как астрологу найти клиентов",
+  "astrologer promotion creator article keeps the approved H1",
+);
+assert(
+  astrologerPromotionCreatorArticle.metaTitle ===
+    "Продвижение астролога: как найти клиентов",
+  "astrologer promotion creator article keeps the approved meta title",
+);
+assert(
+  astrologerPromotionCreatorArticle.metaDescription ===
+    "Продвижение астролога: как выбрать специализацию, оформить услуги, находить клиентов через контент, поиск, рекомендации, сообщества, партнёрства и рекламу.",
+  "astrologer promotion creator article keeps the approved meta description",
+);
+assert(
+  astrologerPromotionCreatorArticle.topicSlug === "articles" &&
+    astrologerPromotionCreatorArticle.topicTitle === "Статьи" &&
+    astrologerPromotionCreatorArticle.topicHref === "/articles",
+  "astrologer promotion creator article keeps the articles topic",
+);
+assert(
+  astrologerPromotionCreatorArticle.leadBeforeAudio ===
+    "Продвижение астролога – это не только прогнозы в блоге и не постоянная реклама консультаций. Потенциальному клиенту сначала должно быть понятно, с какими темами работает специалист, какие форматы предлагает, как объясняет свой метод и где проходят его профессиональные границы.",
+  "astrologer promotion creator article keeps the approved lead",
+);
+assert(
+  astrologerPromotionCreatorArticle.shortAnswer === undefined,
+  "astrologer promotion creator article does not add unapproved summary copy",
+);
+assert(
+  astrologerPromotionCreatorArticle.seeAlsoLinks.length === 0,
+  "astrologer promotion creator article does not add unapproved product links",
+);
+assert(
+  astrologerPromotionCreatorArticle.faq.length === 8,
+  "astrologer promotion creator article keeps the approved FAQ set",
+);
+const astrologerPromotionCreatorSerialized = JSON.stringify(
+  astrologerPromotionCreatorArticle,
+);
+assert(
+  astrologerPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/articles/kak-prodavat-svoi-uslugi",
+  ),
+  "astrologer promotion creator article keeps the approved internal article link",
+);
+assert(
+  astrologerPromotionCreatorSerialized.includes(
+    "https://audiolad.ru/studio/meditation",
+  ) &&
+    astrologerPromotionCreatorSerialized.includes("https://school.audiolad.ru"),
+  "astrologer promotion creator article keeps Studio and School product links",
+);
+assert(
+  !astrologerPromotionCreatorSerialized.includes("—"),
+  "astrologer promotion creator article uses medium dash, not em dash",
+);
+const astrologerPromotionCreatorPageData = {
+  article: astrologerPromotionCreatorArticle,
+  path: "/articles/prodvizhenie-astrologa",
+  canonicalUrl: "https://audiolad.ru/articles/prodvizhenie-astrologa",
+  readingTimeMinutes: estimateArticleReadingTimeMinutes(
+    astrologerPromotionCreatorArticle,
+  ),
+};
+const astrologerPromotionCreatorMetadata = buildArticleMetadata(
+  astrologerPromotionCreatorPageData,
+);
+assert(
+  astrologerPromotionCreatorMetadata.robots?.index === true &&
+    astrologerPromotionCreatorMetadata.robots?.follow === true,
+  "astrologer promotion creator metadata stays indexable",
+);
+assert(
+  !astrologerPromotionCreatorMetadata.openGraph?.images,
+  "astrologer promotion creator metadata omits practice OG image",
+);
+assert(
+  !JSON.stringify(
+    buildArticleJsonLdGraph(astrologerPromotionCreatorPageData),
+  ).includes('"image"'),
+  "astrologer promotion creator json-ld omits practice image",
+);
 const creatorPageData = {
   article: creatorPathsArticle,
   path: "/articles/kak-sozdat-svoyu-meditatsiyu",
@@ -7854,6 +7959,20 @@ assert(
       entry.url === "https://audiolad.ru/articles/prodvizhenie-tarologa",
   ).length === 1,
   "tarologist promotion creator article has a single sitemap URL",
+);
+assert(
+  sitemapEntries.some(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-astrologa",
+  ),
+  "astrologer promotion creator article in sitemap mapper",
+);
+assert(
+  sitemapEntries.filter(
+    (entry) =>
+      entry.url === "https://audiolad.ru/articles/prodvizhenie-astrologa",
+  ).length === 1,
+  "astrologer promotion creator article has a single sitemap URL",
 );
 assert(
   sitemapEntries.some(
