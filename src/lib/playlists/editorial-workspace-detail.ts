@@ -318,7 +318,7 @@ export async function loadEditorialWorkspaceDetail(
       coverUrl = await createPlaylistCoverSignedUrl(
         storage,
         playlist.cover_path,
-        { userId, playlistId },
+        { playlistId },
       );
     } catch (error) {
       console.error(

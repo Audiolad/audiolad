@@ -3,6 +3,8 @@
  * Run: npx --yes tsx scripts/playlists-pr3-3-path-smoke.mjs
  */
 import {
+  assertPlaylistCoverPathForOwner,
+  assertPlaylistCoverPathForPlaylist,
   buildPlaylistCoverStoragePath,
   isValidPlaylistCoverPath,
 } from "../src/lib/playlists/covers.ts";
@@ -83,6 +85,26 @@ assert(
     playlistId,
   ),
   "variant foreign user",
+);
+
+assert(
+  assertPlaylistCoverPathForPlaylist(variantLg, playlistId),
+  "playlist-scoped helper accepts uploader prefix",
+);
+assert(
+  assertPlaylistCoverPathForPlaylist(
+    `${otherUser}/${playlistId}/variants/${versionId}/lg.webp`,
+    playlistId,
+  ),
+  "playlist-scoped helper accepts another editor prefix",
+);
+assert(
+  !assertPlaylistCoverPathForOwner(
+    `${otherUser}/${playlistId}/variants/${versionId}/lg.webp`,
+    userId,
+    playlistId,
+  ),
+  "owner-strict helper still rejects another editor",
 );
 
 console.log("PR3_3_PATH_SMOKE_PASS");
