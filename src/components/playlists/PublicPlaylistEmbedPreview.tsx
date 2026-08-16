@@ -31,9 +31,9 @@ function PlayIcon() {
   );
 }
 
-function PauseIcon() {
+function PauseIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
       <path d="M7 5.5h3.5v13H7V5.5Zm6.5 0H17v13h-3.5V5.5Z" />
     </svg>
   );
@@ -183,17 +183,19 @@ export default function PublicPlaylistEmbedPreview({
                       className="h-[52px] w-[52px] rounded-[12px]"
                     />
                   </span>
-                  {playable ? (
-                    <span
-                      className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 transition-opacity ${
-                        isPlayingThis
-                          ? "opacity-100"
-                          : "opacity-0 [@media(hover:none)]:opacity-100 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100"
-                      }`}
-                    >
+                  {playable && !isPlayingThis ? (
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#7042c5]">
-                        {isPlayingThis ? <PauseIcon /> : <PlayIcon />}
+                        <PlayIcon />
                       </span>
+                    </span>
+                  ) : null}
+                  {playable && isPlayingThis ? (
+                    <span
+                      className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#7042c5] text-white"
+                      aria-hidden
+                    >
+                      <PauseIcon className="h-3 w-3" />
                     </span>
                   ) : null}
                 </button>
