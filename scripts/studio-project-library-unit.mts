@@ -64,10 +64,15 @@ const studioProjectsPage = await readFile(
   new URL("../src/app/(studio)/studio/projects/page.tsx", import.meta.url),
   "utf8",
 );
-assert.match(studioProjectsPage, /requireStudioAuthorAccess\("\/studio\/projects"\)/);
-assert.match(studioProjectsPage, /<StudioProjectLibrary authorId=\{workspace\.id\} \/>/);
-assert.match(studioProjectsPage, /← В Studio/);
-assert.match(studioProjectsPage, /href="\/studio"/);
+assert.match(studioProjectsPage, /requireStudioEditorAccess\("\/studio\/projects"\)/);
+assert.match(studioProjectsPage, /<StudioProjectLibrary authorId=\{authorId\} accessMode=\{accessMode\} \/>/);
+assert.match(studioProjectsPage, /showStudioLauncher/);
+const chromeNav = await readFile(
+  new URL("../src/components/studio/StudioChromeNav.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(chromeNav, /← В Studio/);
+assert.match(chromeNav, /href="\/studio"/);
 
 const editor = await readFile(
   new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url),

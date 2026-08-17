@@ -72,8 +72,8 @@ function testStudioIsolation() {
   );
   assert(
     studioProjectsPage.includes("StudioProjectLibrary") &&
-      studioProjectsPage.includes("<StudioProjectLibrary authorId={workspace.id} />") &&
-      studioProjectsPage.includes('requireStudioAuthorAccess("/studio/projects")'),
+      studioProjectsPage.includes("<StudioProjectLibrary authorId={authorId} accessMode={accessMode} />") &&
+      studioProjectsPage.includes('requireStudioEditorAccess("/studio/projects")'),
     "project library is protected at its dedicated route",
   );
   assert(
@@ -109,7 +109,7 @@ function testStudioIsolation() {
   assert(
     studioPage.includes('requireStudioAuthorAccess("/studio")') &&
       editorPage.includes(
-        'requireStudioAuthorAccess("/studio/project/new")',
+        'requireStudioEditorAccess("/studio/project/new")',
       ) &&
       livePage.includes('requireStudioAuthorAccess("/studio/live")') &&
       studioAccess.includes("next=${nextPath}"),

@@ -62,14 +62,18 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     try {
-      const pathParts = reserved.storage_path.split("/");
-      await uploadReservedStudioAsset(reserved, pathParts[1] ?? "", file);
+      await uploadReservedStudioAsset(
+        reserved.asset,
+        reserved.ownerId,
+        file,
+        reserved.ownerKind,
+      );
     } catch (error) {
-      await cleanupStudioAssetReservation(reserved);
+      await cleanupStudioAssetReservation(reserved.asset);
       throw error;
     }
 
-    return noStoreJson({ asset: toStudioAssetDto(reserved) }, { status: 201 });
+    return noStoreJson({ asset: toStudioAssetDto(reserved.asset) }, { status: 201 });
   } catch (error) {
     return await handleError(error);
   }

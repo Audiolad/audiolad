@@ -1,5 +1,5 @@
 import { PersistedStudioProjectShell } from "@/components/studio/PersistedStudioProjectShell";
-import { requireStudioAuthorAccess } from "@/lib/studio/access";
+import { requireStudioEditorAccess } from "@/lib/studio/guest-access";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,11 @@ export default async function PersistedStudioProjectPage({
 }) {
   const { projectId } = await params;
   const { studioRecorderDebug, studioAudioDebug } = await searchParams;
-  await requireStudioAuthorAccess(`/studio/project/${projectId}`);
+  const actor = await requireStudioEditorAccess(`/studio/project/${projectId}`);
   return (
     <PersistedStudioProjectShell
       projectId={projectId}
+      accessMode={actor.kind}
       recorderDebug={studioRecorderDebug === "1"}
       audioDebug={studioAudioDebug === "1"}
     />

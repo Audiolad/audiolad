@@ -27,6 +27,9 @@ export type StudioPersistenceClientErrorCode =
   | "render_already_queued"
   | "no_active_tracks"
   | "invalid_project_asset"
+  | "guest_project_limit"
+  | "guest_render_entitlement"
+  | "rate_limited"
   | "server_error"
   | "network_error";
 
@@ -44,6 +47,9 @@ const ERROR_MESSAGES: Record<StudioPersistenceClientErrorCode, string> = {
   render_already_queued: "Экспорт этой версии проекта уже ожидает обработки.",
   no_active_tracks: "Добавьте незаглушённый аудиофрагмент перед экспортом.",
   invalid_project_asset: "Один из аудиофайлов проекта недоступен для экспорта.",
+  guest_project_limit: "Чтобы создавать больше проектов, войдите или зарегистрируйтесь.",
+  guest_render_entitlement: "Чтобы создавать новые MP3, войдите или зарегистрируйтесь.",
+  rate_limited: "Слишком много попыток. Подождите немного и попробуйте снова.",
   server_error: "Сервер не смог сохранить аудио. Попробуйте ещё раз.",
   network_error: "Не удалось связаться с сервером. Проверьте подключение и повторите.",
 };
@@ -93,10 +99,29 @@ export type StudioRenderJob = {
   error_message_safe: string | null;
 };
 
-export async function getStudioRender(projectId: string): Promise<{ latest: StudioRenderJob | null; previewUrl: string | null }> {
+export async function getStudioRender(projectId: string): Promise<{
+  latest: StudioRenderJob | null;
+  entitled: StudioRenderJob | null;
+  downloadable: StudioRenderJob | null;
+  guestRenderConsumed: boolean;
+  previewUrl: string | null;
+}> {
   const response = await studioFetch(`/api/studio/projects/${encodeURIComponent(projectId)}/render`, { cache: "no-store" });
   if (!response.ok) throw await toStudioFetchError(response);
-  return await response.json() as { latest: StudioRenderJob | null; previewUrl: string | null };
+  const body = await response.json() as {
+    latest?: StudioRenderJob | null;
+    entitled?: StudioRenderJob | null;
+    downloadable?: StudioRenderJob | null;
+    guestRenderConsumed?: boolean;
+    previewUrl?: string | null;
+  };
+  return {
+    latest: body.latest ?? null,
+    entitled: body.entitled ?? null,
+    downloadable: body.downloadable ?? null,
+    guestRenderConsumed: body.guestRenderConsumed === true,
+    previewUrl: body.previewUrl ?? null,
+  };
 }
 
 export async function queueStudioRender(projectId: string): Promise<StudioRenderJob> {
@@ -141,11 +166,13 @@ export async function listStudioProjects({
   authorId,
   signal,
 }: {
-  authorId: string;
+  authorId?: string;
   signal?: AbortSignal;
 }): Promise<StudioProjectListItem[]> {
   const response = await studioFetch(
-    `/api/studio/projects?authorId=${encodeURIComponent(authorId)}`,
+    authorId
+      ? `/api/studio/projects?authorId=${encodeURIComponent(authorId)}`
+      : "/api/studio/projects",
     { signal },
   );
   if (!response.ok) throw await toStudioFetchError(response);
@@ -173,14 +200,14 @@ export async function createStudioProject({
   name,
   signal,
 }: {
-  authorId: string;
+  authorId?: string;
   name: string;
   signal?: AbortSignal;
 }): Promise<StudioPersistedProject> {
   const response = await studioFetch("/api/studio/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ authorId, name }),
+    body: JSON.stringify(authorId ? { authorId, name } : { name }),
     signal,
   });
   if (!response.ok) throw await toStudioFetchError(response);
@@ -230,7 +257,10 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
       : serverCode === "render_already_queued" ||
           serverCode === "no_active_tracks" ||
           serverCode === "invalid_project_asset" ||
-          serverCode === "invalid_audio_duration"
+          serverCode === "invalid_audio_duration" ||
+          serverCode === "guest_project_limit" ||
+          serverCode === "guest_render_entitlement" ||
+          serverCode === "rate_limited"
         ? serverCode
         : getErrorCode(response.status),
     response.status,

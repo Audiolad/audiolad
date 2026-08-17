@@ -8,9 +8,10 @@ const helpRoute = read("src/app/(studio)/studio/help/page.tsx");
 const helpClient = read("src/components/studio/StudioHelpClient.tsx");
 const studioEntry = read("src/app/(studio)/studio/page.tsx");
 const projectsEntry = read("src/app/(studio)/studio/projects/page.tsx");
+const chromeNav = read("src/components/studio/StudioChromeNav.tsx");
 const editor = read("src/components/studio/StudioEditorShell.tsx");
 
-assert.match(helpRoute, /requireStudioAuthorAccess\("\/studio\/help"\)/);
+assert.match(helpRoute, /requireStudioEditorAccess\("\/studio\/help"\)/);
 assert.match(helpRoute, /index: false/);
 assert.match(helpRoute, /follow: false/);
 assert.match(helpClient, /Найти в инструкции/);
@@ -59,7 +60,8 @@ for (const term of [
   assert.match(helpText, new RegExp(term.replace(/[+/]/g, "\\$&"), "i"));
 }
 
-for (const source of [studioEntry, projectsEntry, editor]) {
+assert.match(projectsEntry, /StudioChromeNav/);
+for (const source of [studioEntry, chromeNav, editor]) {
   assert.match(source, /href="\/studio\/help"/);
   assert.match(source, /target="_blank"/);
   assert.match(source, /noopener noreferrer/);

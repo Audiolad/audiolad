@@ -183,15 +183,18 @@ export default function StudioMeditationPage() {
               и соберите свою медитацию прямо в браузере – без сложных программ
               для работы со звуком.
             </p>
+            <Link
+              href="/studio/try"
+              className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-[0_12px_28px_rgba(112,66,197,0.24)] transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              Попробовать бесплатно
+            </Link>
             <a
               href="#studio-meditation-features"
-              className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-[0_12px_28px_rgba(112,66,197,0.24)] transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              className="mt-3 inline-flex min-h-10 items-center justify-center text-sm font-medium text-[#7042c5] underline-offset-4 hover:underline"
             >
               Посмотреть возможности
             </a>
-            <p className="mt-3 text-sm leading-6 text-[#796ba0]">
-              Бесплатный режим без регистрации скоро появится.
-            </p>
           </div>
 
           <div className="mx-auto mt-8 max-w-[1024px] sm:mt-10">
@@ -318,7 +321,7 @@ export default function StudioMeditationPage() {
                 Попробуйте весь процесс сами
               </h2>
               <p className={bodyClassName}>
-                Мы готовим бесплатный гостевой режим Студии АудиоЛад.
+                Откройте Студию без регистрации и соберите свою первую медитацию.
               </p>
               <p className="mt-4 text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
                 Вы сможете открыть Студию без регистрации, записать голос,
@@ -326,14 +329,17 @@ export default function StudioMeditationPage() {
                 медитацию.
               </p>
               <p className="mt-4 text-[17px] leading-8 text-[#4c3d78] sm:text-lg">
-                После запуска бесплатного режима первый проект можно будет
-                пройти от начала до готового результата прямо в браузере.
+                Первый проект можно пройти от начала до готового результата
+                прямо в браузере.
               </p>
             </div>
             <div className="mt-8 lg:mt-0 lg:justify-self-end">
-              <span className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#cbb8e3] bg-[#f7f2fc] px-6 py-3 text-[16px] font-semibold text-[#6f519a]">
-                Бесплатный режим скоро
-              </span>
+              <Link
+                href="/studio/try"
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-[0_12px_28px_rgba(112,66,197,0.24)] transition hover:bg-[#6338b0]"
+              >
+                Попробовать бесплатно
+              </Link>
             </div>
           </div>
         </section>
@@ -379,9 +385,12 @@ export default function StudioMeditationPage() {
               Запишите голос, добавьте музыку и соберите аудиопрактику в одном
               удобном пространстве.
             </p>
-            <span className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#e9ddf7] px-6 py-3 text-[16px] font-semibold text-[#65438d]">
-              Бесплатный режим Студии скоро откроется
-            </span>
+            <Link
+              href="/studio/try"
+              className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-[0_12px_28px_rgba(112,66,197,0.24)] transition hover:bg-[#6338b0]"
+            >
+              Попробовать бесплатно
+            </Link>
           </div>
         </section>
       </div>

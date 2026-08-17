@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { resolveStudioActor } from "@/lib/studio/guest-access";
 import {
   createStudioProject,
   listStudioProjects,
+  listStudioProjectsForGuest,
 } from "@/lib/studio/server/repository";
 import {
   toStudioProjectDto,
@@ -21,11 +23,20 @@ function handleError(error: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const authorId = parseUuid(
-      new URL(request.url).searchParams.get("authorId"),
-      "invalid_author_id",
-    );
-    const projects = await listStudioProjects(authorId);
+    const authorIdParam = new URL(request.url).searchParams.get("authorId");
+    if (authorIdParam) {
+      const authorId = parseUuid(authorIdParam, "invalid_author_id");
+      const projects = await listStudioProjects(authorId);
+      return NextResponse.json({
+        projects: projects.map(toStudioProjectListItemDto),
+      });
+    }
+
+    const actor = await resolveStudioActor();
+    if (actor.kind !== "guest") {
+      throw new StudioApiError("unauthenticated", 401);
+    }
+    const projects = await listStudioProjectsForGuest(actor.session.id);
     return NextResponse.json({
       projects: projects.map(toStudioProjectListItemDto),
     });
@@ -45,8 +56,23 @@ export async function POST(request: Request) {
     ) {
       throw new StudioApiError("invalid_request", 422);
     }
+
+    if (body.authorId !== undefined) {
+      const project = await createStudioProject({
+        authorId: parseUuid(body.authorId, "invalid_author_id"),
+        name: sanitizeStudioName(body?.name),
+      });
+      return NextResponse.json(
+        { project: toStudioProjectDto(project) },
+        { status: 201 },
+      );
+    }
+
+    const actor = await resolveStudioActor();
+    if (actor.kind !== "guest") {
+      throw new StudioApiError("unauthenticated", 401);
+    }
     const project = await createStudioProject({
-      authorId: parseUuid(body?.authorId, "invalid_author_id"),
       name: sanitizeStudioName(body?.name),
     });
     return NextResponse.json(

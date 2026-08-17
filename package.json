@@ -83,7 +83,12 @@
     "test:commercial-activation-without-payout": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/commercial-activation-without-payout-unit.mjs",
     "indexnow:dry-run": "npx tsx scripts/indexnow-submit.mjs",
     "test:indexnow": "npx tsx scripts/indexnow-unit.mjs",
-    "test:indexnow-hooks": "npx tsx scripts/indexnow-hooks-unit.mjs"
+    "test:indexnow-hooks": "npx tsx scripts/indexnow-hooks-unit.mjs",
+    "test:studio-guest-security": "npx tsx scripts/studio-guest-security-unit.mts",
+    "test:studio-guest-limits": "npx tsx scripts/studio-guest-limits-unit.mts",
+    "test:studio-guest-source": "npx tsx scripts/studio-guest-source-unit.mts",
+    "test:studio-guest-session": "npx tsx scripts/studio-guest-session-unit.mts",
+    "run:studio-guest-cleanup": "npx tsx scripts/run-studio-guest-cleanup.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

@@ -287,25 +287,37 @@ export function parseDurationSeconds(value: unknown): number | null {
 }
 
 export function buildStudioAssetPath(
-  authorId: string,
+  ownerId: string,
   projectId: string,
   assetId: string,
   filename: string,
+  ownerKind: "author" | "guest" = "author",
 ): string {
-  return `studio/${authorId}/${projectId}/${assetId}/${filename}`;
+  if (ownerKind === "guest") {
+    return `studio/guest/${ownerId}/${projectId}/${assetId}/${filename}`;
+  }
+  return `studio/${ownerId}/${projectId}/${assetId}/${filename}`;
 }
 
 export function isStudioStoragePath(
   path: string,
-  authorId: string,
+  ownerId: string,
   projectId: string,
   assetId: string,
+  ownerKind: "author" | "guest" = "author",
 ): boolean {
   if (path.includes("..") || path.includes("\\")) {
     return false;
   }
+  const filename = path.split("/").at(-1);
+  if (ownerKind === "guest") {
+    return (
+      path === `studio/guest/${ownerId}/${projectId}/${assetId}/${filename}` &&
+      /^studio\/guest\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f-]+\/[A-Za-z0-9._-]+$/.test(path)
+    );
+  }
   return (
-    path ===
-    `studio/${authorId}/${projectId}/${assetId}/${path.split("/").at(-1)}`
-  ) && /^studio\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f-]+\/[A-Za-z0-9._-]+$/.test(path);
+    path === `studio/${ownerId}/${projectId}/${assetId}/${filename}` &&
+    /^studio\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f-]+\/[A-Za-z0-9._-]+$/.test(path)
+  );
 }

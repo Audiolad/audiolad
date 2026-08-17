@@ -58,7 +58,8 @@ export type StudioClipV2 = {
 
 export type StudioProjectRow = {
   id: string;
-  author_id: string;
+  author_id: string | null;
+  guest_session_id: string | null;
   name: string;
   project_data: StudioProjectDataV2;
   schema_version: number;

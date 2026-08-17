@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { StudioGuestProjectLimitGate } from "@/components/studio/StudioGuestGate";
 import {
   deleteStudioProject,
   listStudioProjects,
   StudioPersistenceClientError,
   type StudioProjectListItem,
 } from "@/lib/studio/persistence-client";
+import { STUDIO_GUEST_MAX_PROJECTS } from "@/lib/studio/guest-constants";
 
 function formatUpdatedAt(value: string): string {
   const date = new Date(value);
@@ -19,7 +21,13 @@ function formatUpdatedAt(value: string): string {
   }).format(date);
 }
 
-export function StudioProjectLibrary({ authorId }: { authorId: string }) {
+export function StudioProjectLibrary({
+  authorId,
+  accessMode = "author",
+}: {
+  authorId?: string;
+  accessMode?: "author" | "guest";
+}) {
   const [projects, setProjects] = useState<StudioProjectListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -92,12 +100,14 @@ export function StudioProjectLibrary({ authorId }: { authorId: string }) {
               Мои проекты
             </h1>
           </div>
-          <Link
-            href="/studio/project/new"
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
-          >
-            + Новый проект
-          </Link>
+          {accessMode === "guest" && (projects?.length ?? 0) >= STUDIO_GUEST_MAX_PROJECTS ? null : (
+            <Link
+              href="/studio/project/new"
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
+            >
+              + Новый проект
+            </Link>
+          )}
         </div>
 
         <div className="mt-8">
@@ -136,6 +146,12 @@ export function StudioProjectLibrary({ authorId }: { authorId: string }) {
               </Link>
             </section>
           ) : (
+            <>
+            {accessMode === "guest" && projects.length >= STUDIO_GUEST_MAX_PROJECTS ? (
+              <div className="mb-4">
+                <StudioGuestProjectLimitGate />
+              </div>
+            ) : null}
             <ul className="space-y-3">
               {projects.map((project) => (
                 <li
@@ -172,6 +188,7 @@ export function StudioProjectLibrary({ authorId }: { authorId: string }) {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </div>
       </div>

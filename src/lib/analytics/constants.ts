@@ -36,6 +36,13 @@ export const PLATFORM_ANALYTICS_EVENTS = [
   "help_support_open",
   "help_support_submit",
   "help_article_cta_click",
+  "guest_studio_open",
+  "guest_project_created",
+  "guest_render_started",
+  "guest_render_completed",
+  "guest_mp3_downloaded",
+  "guest_registration_gate_shown",
+  "guest_auth_cta_clicked",
 ] as const;
 
 export type PlatformAnalyticsEventName =

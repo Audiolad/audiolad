@@ -30,10 +30,12 @@ function LoadingShell({ message }: { message: string }) {
 
 function Hydrator({
   projectId,
+  accessMode,
   recorderDebug,
   audioDebug,
 }: {
   projectId: string;
+  accessMode: "author" | "guest";
   recorderDebug: boolean;
   audioDebug: boolean;
 }) {
@@ -120,6 +122,7 @@ function Hydrator({
   return (
     <StudioEditorShell
       persistedHydration={hydration}
+      accessMode={accessMode}
       recorderDebug={recorderDebug}
       audioDebug={audioDebug}
     />
@@ -128,10 +131,12 @@ function Hydrator({
 
 export function PersistedStudioProjectShell({
   projectId,
+  accessMode = "author",
   recorderDebug,
   audioDebug,
 }: {
   projectId: string;
+  accessMode?: "author" | "guest";
   recorderDebug: boolean;
   audioDebug: boolean;
 }) {
@@ -142,6 +147,7 @@ export function PersistedStudioProjectShell({
     >
       <Hydrator
         projectId={projectId}
+        accessMode={accessMode}
         recorderDebug={recorderDebug}
         audioDebug={audioDebug}
       />

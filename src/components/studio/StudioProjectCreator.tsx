@@ -3,18 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { StudioGuestProjectLimitGate } from "@/components/studio/StudioGuestGate";
+import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import {
   createStudioProject,
   StudioPersistenceClientError,
 } from "@/lib/studio/persistence-client";
 
-type CreationStatus = "creating" | "failed";
+type CreationStatus = "creating" | "failed" | "gated";
 
 export function StudioProjectCreator({
   authorId,
+  accessMode = "author",
   recorderDebug,
 }: {
-  authorId: string;
+  authorId?: string;
+  accessMode?: "author" | "guest";
   recorderDebug: boolean;
 }) {
   const router = useRouter();
@@ -31,11 +35,14 @@ export function StudioProjectCreator({
     setStatus("creating");
     setError(null);
     const request = createStudioProject({
-      authorId,
+      ...(authorId ? { authorId } : {}),
       name: "Новый проект",
     })
       .then((project) => {
         projectIdRef.current = project.id;
+        if (accessMode === "guest") {
+          void trackGuestStudioEvent("guest_project_created", "/studio/project/new");
+        }
         const debugQuery = recorderDebug ? "?studioRecorderDebug=1" : "";
         router.replace(
           `/studio/project/${encodeURIComponent(project.id)}${debugQuery}`,
@@ -43,6 +50,14 @@ export function StudioProjectCreator({
       })
       .catch((caught: unknown) => {
         if (projectIdRef.current) return;
+        if (
+          caught instanceof StudioPersistenceClientError &&
+          caught.code === "guest_project_limit"
+        ) {
+          setStatus("gated");
+          setError(null);
+          return;
+        }
         setStatus("failed");
         setError(
           caught instanceof StudioPersistenceClientError
@@ -55,7 +70,7 @@ export function StudioProjectCreator({
       });
     creationPromiseRef.current = request;
     return request;
-  }, [authorId, recorderDebug, router]);
+  }, [accessMode, authorId, recorderDebug, router]);
 
   useEffect(() => {
     void createProject();
@@ -73,6 +88,8 @@ export function StudioProjectCreator({
               Подготавливаем пространство для работы в Студии.
             </p>
           </>
+        ) : status === "gated" ? (
+          <StudioGuestProjectLimitGate />
         ) : (
           <>
             <p role="alert" className="text-base font-semibold text-rose-100">

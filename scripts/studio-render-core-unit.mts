@@ -85,7 +85,7 @@ function project(
   musicMuted = false,
 ) {
   return {
-    id: "project", author_id: "author", name: "Synthetic render", schema_version: 2,
+    id: "project", author_id: "author", guest_session_id: null, name: "Synthetic render", schema_version: 2,
     revision: 7, status: "active" as const, created_at: "", updated_at: "", last_opened_at: null, deleted_at: null,
     project_data: {
       schemaVersion: 2 as const, studioVersion: 1 as const, editor: { currentTime: 0 },

@@ -64,6 +64,21 @@ async function main() {
       .select("id")
       .maybeSingle();
     if (completionError || !completedJob) throw new Error("render_job_completion_state_lost");
+    if (typeof job.guest_session_id === "string" && job.guest_session_id) {
+      const consumedAt = new Date().toISOString();
+      const { error: entitlementError } = await service
+        .from("studio_guest_sessions")
+        .update({
+          free_render_consumed_at: consumedAt,
+          free_render_project_id: job.project_id,
+          free_render_job_id: job.id,
+        })
+        .eq("id", job.guest_session_id)
+        .is("free_render_consumed_at", null);
+      if (entitlementError) {
+        console.error("studio-render-worker: guest entitlement update failed", entitlementError.message);
+      }
+    }
     console.log(JSON.stringify({ jobId: job.id, status: "completed", bytes: result.sizeBytes }));
   } catch (error) {
     const { data: failedJob, error: failureUpdateError } = await service

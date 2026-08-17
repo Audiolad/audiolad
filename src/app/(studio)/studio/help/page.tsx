@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { StudioHelpClient } from "@/components/studio/StudioHelpClient";
-import { requireStudioAuthorAccess } from "@/lib/studio/access";
+import { requireStudioEditorAccess } from "@/lib/studio/guest-access";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,6 @@ export const metadata: Metadata = {
 };
 
 export default async function StudioHelpPage() {
-  await requireStudioAuthorAccess("/studio/help");
+  await requireStudioEditorAccess("/studio/help");
   return <StudioHelpClient />;
 }

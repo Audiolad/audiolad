@@ -11,17 +11,24 @@ const headers = { "Cache-Control": "private, no-store", "Referrer-Policy": "no-r
 export async function GET(_request: Request, context: Context) {
   try {
     const state = await getStudioRenderState(parseUuid((await context.params).projectId, "not_found"));
+    const downloadable = state.downloadable ?? (state.latest?.status === "completed" ? state.latest : null);
     let previewUrl: string | null = null;
-    if (state.latest?.status === "completed" && state.latest.output_storage_path) {
+    if (downloadable?.status === "completed" && downloadable.output_storage_path) {
       const { data, error } = await createServiceRoleClient().storage.from(STUDIO_RENDER_BUCKET)
-        .createSignedUrl(state.latest.output_storage_path, 600);
+        .createSignedUrl(downloadable.output_storage_path, 600);
       if (error || !data?.signedUrl) {
         console.error("studio_render_preview_url_failed", error?.message);
       } else {
         previewUrl = data.signedUrl;
       }
     }
-    return NextResponse.json({ latest: state.latest, previewUrl }, { headers });
+    return NextResponse.json({
+      latest: state.latest,
+      entitled: state.entitled,
+      downloadable,
+      guestRenderConsumed: state.guestRenderConsumed,
+      previewUrl,
+    }, { headers });
   } catch (error) { return studioRouteError(error, "studio_render_get_error"); }
 }
 

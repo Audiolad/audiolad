@@ -9,6 +9,12 @@ import {
 } from "@/lib/author-products/auth";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { resolveStudioActor, toStudioActorView } from "../guest-access";
+import {
+  canCreateGuestProject,
+  resolveStudioProjectAccess,
+} from "../guest-policy";
+import { getGuestSession } from "./guest-session";
 import {
   EMPTY_STUDIO_PROJECT_DATA,
   STUDIO_ASSETS_BUCKET,
@@ -25,15 +31,26 @@ import {
 } from "./validation";
 
 const PROJECT_SELECT =
-  "id, author_id, name, project_data, schema_version, revision, status, created_at, updated_at, last_opened_at, deleted_at";
+  "id, author_id, guest_session_id, name, project_data, schema_version, revision, status, created_at, updated_at, last_opened_at, deleted_at";
 const PROJECT_LIST_SELECT = "id, name, updated_at, last_opened_at, revision";
 const ASSET_SELECT =
   "id, project_id, storage_path, original_name, mime_type, size_bytes, duration_seconds, source_type, created_at, deleted_at";
+
+export type StudioProjectAccess = {
+  ownerKind: "author" | "guest";
+  ownerId: string;
+  authorId: string | null;
+  guestSessionId: string | null;
+  service: ReturnType<typeof createServiceRoleClient>;
+};
 
 function mapServiceError(error: { message: string }, fallback = "internal_error"): never {
   const message = error.message.toLowerCase();
   if (message.includes("project_asset_quota_exceeded")) {
     throw new StudioApiError("project_asset_quota_exceeded", 413);
+  }
+  if (message.includes("guest_project_limit")) {
+    throw new StudioApiError("guest_project_limit", 403);
   }
   if (message.includes("project_not_found")) {
     throw new StudioApiError("not_found", 404);
@@ -60,12 +77,11 @@ export async function requireStudioWorkspaceAccess(authorId: string) {
   }
 }
 
-async function requireStudioProjectAccess(projectId: string) {
-  await requireAuthenticatedUser();
+export async function requireStudioProjectAccess(projectId: string): Promise<StudioProjectAccess> {
   const service = createServiceRoleClient();
   const { data, error } = await service
     .from("studio_projects")
-    .select("id, author_id, status")
+    .select("id, author_id, guest_session_id, status")
     .eq("id", projectId)
     .eq("status", "active")
     .maybeSingle();
@@ -73,16 +89,44 @@ async function requireStudioProjectAccess(projectId: string) {
   if (error) {
     mapServiceError(error);
   }
-  if (!data?.author_id) {
+
+  const actor = await resolveStudioActor();
+  let authorIds: string[] = [];
+  if (data?.author_id) {
+    await requireAuthenticatedUser();
+    try {
+      await requireAuthorMembership(data.author_id as string);
+      authorIds = [data.author_id as string];
+    } catch (membershipError) {
+      hiddenAccessError(membershipError);
+    }
+  }
+
+  const access = resolveStudioProjectAccess({
+    project: data
+      ? {
+          id: data.id as string,
+          status: data.status as string,
+          author_id: (data.author_id as string | null) ?? null,
+          guest_session_id: (data.guest_session_id as string | null) ?? null,
+        }
+      : null,
+    actor: data?.author_id
+      ? { kind: "author", authorIds }
+      : toStudioActorView(actor),
+  });
+
+  if (!access.ok) {
     throw new StudioApiError("not_found", 404);
   }
 
-  try {
-    await requireAuthorMembership(data.author_id as string);
-  } catch (error) {
-    hiddenAccessError(error);
-  }
-  return { authorId: data.author_id as string, service };
+  return {
+    ownerKind: access.ownerKind,
+    ownerId: access.ownerId,
+    authorId: access.authorId,
+    guestSessionId: access.guestSessionId,
+    service,
+  };
 }
 
 export async function listStudioProjects(authorId: string) {
@@ -100,16 +144,73 @@ export async function listStudioProjects(authorId: string) {
   return (data ?? []) as StudioProjectListItem[];
 }
 
+export async function listStudioProjectsForGuest(guestSessionId: string) {
+  const service = createServiceRoleClient();
+  const { data, error } = await service
+    .from("studio_projects")
+    .select(PROJECT_LIST_SELECT)
+    .eq("guest_session_id", guestSessionId)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    mapServiceError(error);
+  }
+  return (data ?? []) as StudioProjectListItem[];
+}
+
+export async function countActiveGuestProjects(guestSessionId: string): Promise<number> {
+  const service = createServiceRoleClient();
+  const { count, error } = await service
+    .from("studio_projects")
+    .select("id", { count: "exact", head: true })
+    .eq("guest_session_id", guestSessionId)
+    .eq("status", "active");
+  if (error) {
+    mapServiceError(error);
+  }
+  return count ?? 0;
+}
+
 export async function createStudioProject(input: {
-  authorId: string;
+  authorId?: string;
   name: string;
 }) {
-  await requireStudioWorkspaceAccess(input.authorId);
+  if (input.authorId) {
+    await requireStudioWorkspaceAccess(input.authorId);
+    const service = createServiceRoleClient();
+    const { data, error } = await service
+      .from("studio_projects")
+      .insert({
+        author_id: input.authorId,
+        guest_session_id: null,
+        name: input.name,
+        project_data: EMPTY_STUDIO_PROJECT_DATA,
+        schema_version: 2,
+        revision: 1,
+        status: "active",
+      })
+      .select(PROJECT_SELECT)
+      .single();
+    if (error) {
+      mapServiceError(error);
+    }
+    return data as StudioProjectRow;
+  }
+
+  const session = await getGuestSession();
+  if (!session) {
+    throw new StudioApiError("unauthenticated", 401);
+  }
+  const activeCount = await countActiveGuestProjects(session.id);
+  if (!canCreateGuestProject(activeCount)) {
+    throw new StudioApiError("guest_project_limit", 403);
+  }
   const service = createServiceRoleClient();
   const { data, error } = await service
     .from("studio_projects")
     .insert({
-      author_id: input.authorId,
+      author_id: null,
+      guest_session_id: session.id,
       name: input.name,
       project_data: EMPTY_STUDIO_PROJECT_DATA,
       schema_version: 2,
@@ -173,7 +274,6 @@ export async function validateStudioProjectAssetReferences(
   }
 
   if ((data ?? []).length !== ids.length) {
-    // A missing, deleted, or foreign-project asset gets the same neutral error.
     throw new StudioApiError("invalid_project_asset", 422);
   }
 }
@@ -261,13 +361,14 @@ export async function reserveStudioAssetUpload(input: {
   sourceType: "upload" | "recording";
   durationSeconds: number | null;
 }) {
-  const { authorId, service } = await requireStudioProjectAccess(input.projectId);
+  const { ownerId, ownerKind, service } = await requireStudioProjectAccess(input.projectId);
   const assetId = randomUUID();
   const storagePath = buildStudioAssetPath(
-    authorId,
+    ownerId,
     input.projectId,
     assetId,
     input.filename,
+    ownerKind,
   );
   const { data, error } = await service.rpc("studio_reserve_project_asset", {
     p_project_id: input.projectId,
@@ -282,7 +383,7 @@ export async function reserveStudioAssetUpload(input: {
   if (error) {
     mapServiceError(error);
   }
-  return data as StudioProjectAssetRow;
+  return { asset: data as StudioProjectAssetRow, ownerId, ownerKind };
 }
 
 export async function cleanupStudioAssetReservation(asset: StudioProjectAssetRow) {
@@ -305,15 +406,17 @@ export async function cleanupStudioAssetReservation(asset: StudioProjectAssetRow
 
 export async function uploadReservedStudioAsset(
   asset: StudioProjectAssetRow,
-  authorId: string,
+  ownerId: string,
   file: File,
+  ownerKind: "author" | "guest" = "author",
 ) {
   if (
     !isStudioStoragePath(
       asset.storage_path,
-      authorId,
+      ownerId,
       asset.project_id,
       asset.id,
+      ownerKind,
     )
   ) {
     throw new StudioApiError("invalid_asset", 500);
@@ -335,7 +438,7 @@ export async function getStudioProjectAsset(
   projectId: string,
   assetId: string,
 ) {
-  const { authorId, service } = await requireStudioProjectAccess(projectId);
+  const { ownerId, ownerKind, service } = await requireStudioProjectAccess(projectId);
   const { data, error } = await service
     .from("studio_project_assets")
     .select(ASSET_SELECT)
@@ -350,7 +453,7 @@ export async function getStudioProjectAsset(
     throw new StudioApiError("not_found", 404);
   }
   const asset = data as StudioProjectAssetRow;
-  if (!isStudioStoragePath(asset.storage_path, authorId, projectId, assetId)) {
+  if (!isStudioStoragePath(asset.storage_path, ownerId, projectId, assetId, ownerKind)) {
     throw new StudioApiError("not_found", 404);
   }
   return { asset, service };

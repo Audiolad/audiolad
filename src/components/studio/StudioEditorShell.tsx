@@ -53,6 +53,8 @@ import {
   type StudioAutosaveState,
 } from "@/lib/studio/autosave";
 import { serializeStudioProjectState, validateStudioProjectDocument } from "@/lib/studio/persistence";
+import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
+import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import { getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
 
 type StudioTrackSlot = {
@@ -160,6 +162,25 @@ function TrackMuteButton({
   );
 }
 
+function FadeIcon({ kind }: { kind: "in" | "out" }) {
+  if (kind === "in") {
+    return (
+      <svg viewBox="0 0 24 18" aria-hidden="true" className="h-4 w-5">
+        <path d="M3 15H21V3Z" fill="#2a1f45" />
+        <path d="M3 15V3H21Z" fill="#a78bfa" fillOpacity="0.45" />
+        <rect x="2.25" y="2.25" width="19.5" height="13.5" rx="1.5" fill="none" stroke="#c4b5fd" strokeOpacity="0.35" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 18" aria-hidden="true" className="h-4 w-5">
+      <path d="M3 3V15H21Z" fill="#2a1f45" />
+      <path d="M3 3H21V15Z" fill="#a78bfa" fillOpacity="0.45" />
+      <rect x="2.25" y="2.25" width="19.5" height="13.5" rx="1.5" fill="none" stroke="#c4b5fd" strokeOpacity="0.35" />
+    </svg>
+  );
+}
+
 function TrackFadeButton({
   clip,
   kind,
@@ -173,30 +194,32 @@ function TrackFadeButton({
   const active = isFadeIn
     ? (clip?.fadeInDuration ?? 0) > 0
     : (clip?.fadeOutDuration ?? 0) > 0;
-  const label = isFadeIn ? "Плавное появление" : "Плавное затухание";
+  const label = isFadeIn ? "Появление" : "Затухание";
 
   return (
-    <button
-      type="button"
-      disabled={!clip}
-      onClick={onToggle}
-      aria-label={label}
-      aria-pressed={active}
-      title={
-        clip
-          ? active
-            ? `${label}: выключить`
-            : `${label}: включить`
-          : "Добавьте аудио, чтобы настроить затухание"
-      }
-      className={`h-8 rounded border px-1.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
-        active
-          ? "border-violet-300/70 bg-violet-400/20 text-violet-100"
-          : "border-white/15 bg-[#1c2433] text-[#c9d8ff]"
-      }`}
-    >
-      {isFadeIn ? "Появление" : "Затухание"}
-    </button>
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        disabled={!clip}
+        onClick={onToggle}
+        aria-label={label}
+        aria-pressed={active}
+        title={label}
+        className={`inline-flex h-9 w-11 items-center justify-center rounded border disabled:cursor-not-allowed disabled:opacity-40 ${
+          active
+            ? "border-violet-300/70 bg-violet-400/20 text-violet-100"
+            : "border-white/15 bg-[#1c2433] text-[#c9d8ff]"
+        }`}
+      >
+        <FadeIcon kind={kind} />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-[#070c14] px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 
@@ -235,10 +258,12 @@ function TrackActionButton({
 
 export default function StudioEditorShell({
   persistedHydration,
+  accessMode = "author",
   recorderDebug = false,
   audioDebug = false,
 }: {
   persistedHydration?: StudioProjectHydration | null;
+  accessMode?: "author" | "guest";
   recorderDebug?: boolean;
   audioDebug?: boolean;
 }) {
@@ -270,6 +295,10 @@ export default function StudioEditorShell({
   const assetSignatureRef = useRef<string | null>(null);
   const [autosaveState, setAutosaveState] = useState<StudioAutosaveState | null>(null);
   const [renderJob, setRenderJob] = useState<StudioRenderJob | null>(null);
+  const [entitledRenderJob, setEntitledRenderJob] = useState<StudioRenderJob | null>(null);
+  const [guestRenderConsumed, setGuestRenderConsumed] = useState(false);
+  const [showGuestRenderGate, setShowGuestRenderGate] = useState(false);
+  const guestCompletedTrackedRef = useRef(false);
   const [renderBusy, setRenderBusy] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
@@ -466,13 +495,30 @@ export default function StudioEditorShell({
     const refresh = async () => {
       try {
         const state = await getStudioRender(projectId);
-        if (!cancelled) setRenderJob(state.latest);
+        if (!cancelled) {
+          setRenderJob(state.latest);
+          setEntitledRenderJob(state.entitled ?? state.downloadable);
+          setGuestRenderConsumed(state.guestRenderConsumed);
+        }
       } catch { /* Export state does not block editing. */ }
     };
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [persistedHydration?.project.id]);
+
+  useEffect(() => {
+    if (accessMode !== "guest") return;
+    const completed =
+      renderJob?.status === "completed" || entitledRenderJob?.status === "completed";
+    if (!completed) return;
+    const projectId = persistedHydration?.project.id;
+    if (!projectId) return;
+    if (!guestCompletedTrackedRef.current) {
+      guestCompletedTrackedRef.current = true;
+      void trackGuestStudioEvent("guest_render_completed", `/studio/project/${projectId}`);
+    }
+  }, [accessMode, entitledRenderJob?.status, persistedHydration?.project.id, renderJob?.status]);
 
   const tracksById = useMemo(
     () => new Map(tracks.map((track) => [track.id, track])),
@@ -1267,7 +1313,7 @@ export default function StudioEditorShell({
                   );
                   markSavedChange();
                 }}
-                className="text-[#a9b4c7] underline underline-offset-4 disabled:opacity-40"
+                className="text-[11px] font-medium text-[#8b95a8] disabled:opacity-40"
               >
                 Удалить дорожку
               </button>
@@ -1426,8 +1472,21 @@ export default function StudioEditorShell({
       }
       const job = await queueStudioRender(projectId);
       setRenderJob(job);
+      if (accessMode === "guest") {
+        void trackGuestStudioEvent("guest_render_started", `/studio/project/${projectId}`);
+      }
     } catch (error) {
-      setRenderError(error instanceof Error ? error.message : "Не удалось поставить экспорт в очередь.");
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error as { code?: string }).code === "guest_render_entitlement"
+      ) {
+        setShowGuestRenderGate(true);
+        setGuestRenderConsumed(true);
+        setRenderError(null);
+      } else {
+        setRenderError(error instanceof Error ? error.message : "Не удалось поставить экспорт в очередь.");
+      }
     } finally {
       setRenderBusy(false);
     }
@@ -1454,6 +1513,8 @@ export default function StudioEditorShell({
             >
               Инструкция
             </Link>
+            {accessMode === "author" ? (
+              <>
             <Link
               href="/author-dashboard"
               onClick={guardNavigation}
@@ -1468,6 +1529,19 @@ export default function StudioEditorShell({
             >
               В АудиоЛад
             </Link>
+              </>
+            ) : (
+              <>
+            <Link
+              href="/"
+              onClick={guardNavigation}
+              className="inline-flex min-h-9 items-center rounded-lg border border-violet-300/50 px-3 text-sm font-medium text-[#eadfff]"
+            >
+              В АудиоЛад
+            </Link>
+            <StudioGuestAuthLinks />
+              </>
+            )}
           </nav>
         </header>
 
@@ -1684,7 +1758,8 @@ export default function StudioEditorShell({
               >
                 {saveButtonLabel}
               </button>
-              {renderJob?.status === "completed" ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-3 text-sm text-emerald-100">Скачать MP3</a> : <button type="button" disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing"} onClick={() => void queueRender()} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</button>}
+              {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-3 text-sm text-emerald-100">Скачать MP3</a> : null}
+              {renderJob?.status === "completed" && accessMode !== "guest" ? null : <button type="button" disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)} onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</button>}
             </div>
           </div>
         </div>
@@ -1727,6 +1802,11 @@ export default function StudioEditorShell({
             </p>
           ) : null}
           {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
+          {accessMode === "guest" && (showGuestRenderGate || guestRenderConsumed || renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? (
+            <div className="mb-4">
+              <StudioGuestRenderGate compact />
+            </div>
+          ) : null}
           {recordingError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {recordingError}
@@ -2030,7 +2110,7 @@ export default function StudioEditorShell({
                                   currentSlots.filter((item) => item.id !== slot.id),
                                 );
                               }}
-                              className="text-[#a9b4c7] underline underline-offset-4"
+                              className="text-[11px] font-medium text-[#8b95a8]"
                             >
                               Удалить дорожку
                             </button>

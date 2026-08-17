@@ -86,7 +86,7 @@ assert.match(provider, /assetPersistenceStatus: "saved"/);
 assert.match(shell, /controller\.abort/);
 assert.match(shell, /Загрузка аудио: \$\{progress\.completed\}\/\$\{progress\.total\}/);
 assert.match(shell, /persistenceProjectId=\{projectId\}/);
-assert.match(route, /requireStudioAuthorAccess\(`\/studio\/project\/\$\{projectId\}`\)/);
+assert.match(route, /requireStudioEditorAccess\(`\/studio\/project\/\$\{projectId\}`\)/);
 assert.match(shell, /persistedHydration=\{hydration\}/);
 
 const sharedProject = {

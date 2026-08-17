@@ -39,8 +39,9 @@ const newProjectPage = await readFile(
   new URL("../src/app/(studio)/studio/project/new/page.tsx", import.meta.url),
   "utf8",
 );
-assert.match(newProjectPage, /requireStudioAuthorAccess\("\/studio\/project\/new"\)/);
-assert.match(newProjectPage, /authorId=\{workspace\.id\}/);
+assert.match(newProjectPage, /requireStudioEditorAccess\("\/studio\/project\/new"\)/);
+assert.match(newProjectPage, /authorId=\{authorId\}/);
+assert.match(newProjectPage, /accessMode=\{accessMode\}/);
 assert.match(newProjectPage, /studioRecorderDebug === "1"/);
 
 const creator = await readFile(
