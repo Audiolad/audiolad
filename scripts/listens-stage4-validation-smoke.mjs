@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildPublicPlaylistQueue } from "../src/lib/playlists/build-playlist-queue.ts";
+import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
 import {
   buildListenPageJsonLdGraph,
@@ -140,6 +141,74 @@ const EXPECTED_FAQ = [
     question: "Помогает ли медитация привлечь деньги?",
     answer:
       "Медитация не гарантирует приток денег и не заменяет финансовые действия. Она может помочь спокойнее относиться к теме денег, замечать собственные установки, формулировать намерения и сосредоточиться на решениях, которые зависят от вас.",
+  },
+];
+
+const SECOND_PAGE_SLUG = "denezhnaya-meditatsiya-slushat-onlayn-besplatno";
+const SECOND_PAGE_H1 = "Денежная медитация: слушать онлайн бесплатно";
+const SECOND_PAGE_DESCRIPTION =
+  "Слушайте денежные медитации онлайн бесплатно на АудиоЛаде. Выберите подходящую практику по теме, голосу и темпу и начните прослушивание.";
+
+const SECOND_EXPECTED_INTRO = [
+  "На этой странице можно бесплатно слушать денежные медитации онлайн. Выберите практику, которая подходит вам по теме, голосу и темпу, и включите её прямо на АудиоЛаде.",
+  "Денежная медитация может помочь внимательнее посмотреть на своё отношение к деньгам, снизить напряжение вокруг финансовой темы и сосредоточиться на собственных решениях.",
+  "Выберите подходящую практику и начните слушать.",
+];
+
+const SECOND_EXPECTED_SECTION_TITLES = [
+  "Что такое денежная медитация",
+  "Чем денежные медитации могут отличаться друг от друга",
+  "Как выбрать денежную медитацию",
+  "Как слушать денежную медитацию онлайн",
+  "Нужно ли слушать денежную медитацию каждый день",
+  "Когда лучше слушать денежную медитацию",
+  "Денежная медитация и финансовые установки",
+  "Денежная медитация не заменяет реальные действия",
+  "Можно ли слушать денежные медитации бесплатно",
+  "Как понять, что практика вам подходит",
+  "Итог",
+];
+
+const SECOND_EXPECTED_FAQ = [
+  {
+    question: "Что такое денежная медитация?",
+    answer:
+      "Это аудиопрактика, направленная на внимание к теме денег, финансовым решениям, внутреннему состоянию и привычным установкам. Она не гарантирует получение денег или рост дохода.",
+  },
+  {
+    question: "Можно ли слушать денежную медитацию бесплатно?",
+    answer:
+      "Да. На этой странице доступны денежные медитации для бесплатного онлайн-прослушивания. Выберите подходящую практику в плейлисте и включите её.",
+  },
+  {
+    question: "Как часто нужно слушать денежные медитации?",
+    answer:
+      "Строгого правила нет. Можно повторять одну практику несколько дней, слушать периодически или менять медитации в зависимости от текущей задачи.",
+  },
+  {
+    question: "Когда лучше слушать денежную медитацию?",
+    answer:
+      "Утром, вечером, перед финансовым планированием или в любой другой спокойный момент. Важнее возможность сосредоточиться, а не определённое время суток.",
+  },
+  {
+    question: "Нужно ли слушать денежную медитацию в наушниках?",
+    answer:
+      "Нет. Наушники могут помочь меньше отвлекаться и лучше слышать голос, но использовать их необязательно.",
+  },
+  {
+    question: "Можно ли слушать несколько денежных медитаций?",
+    answer:
+      "Можно, если это комфортно. Но необходимости слушать много практик подряд нет. Иногда полезнее выбрать одну и дать себе время осмыслить её.",
+  },
+  {
+    question: "Можно ли слушать денежную медитацию перед сном?",
+    answer:
+      "Можно, если конкретная практика спокойная и не требует активной концентрации или планирования. Если она настраивает на действия, удобнее выбрать другое время.",
+  },
+  {
+    question: "Действительно ли денежная медитация помогает привлечь деньги?",
+    answer:
+      "Медитация не гарантирует прямого привлечения денег. Она может помочь внимательнее относиться к финансовой теме, замечать свои установки, снизить напряжение и яснее формулировать решения. Финансовые результаты зависят от последующих действий, навыков, планирования и управления деньгами.",
   },
 ];
 
@@ -368,9 +437,119 @@ function testArticleIsolation() {
   assert(!articleView.includes("PublicPlaylistEmbed"), "ArticlePageView has no embed");
 }
 
+function testSecondPage() {
+  const parsed = parseListenPageDefinition(
+    DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+  );
+  assert(parsed.ok, "second production definition valid");
+  assert(parsed.definition.slug === SECOND_PAGE_SLUG, "second page slug");
+  assert(parsed.definition.playlistSlug === PLAYLIST_SLUG, "second playlistSlug");
+  assert(
+    parsed.definition.playlistSlug !== "meditatsiya-na-dengi",
+    "second playlistSlug is not slugifyTitle form",
+  );
+  assert(parsed.definition.h1 === SECOND_PAGE_H1, "second h1 exact");
+  assert(parsed.definition.title === parsed.definition.h1, "second title equals H1");
+  assert(
+    parsed.definition.description === SECOND_PAGE_DESCRIPTION,
+    "second description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 3, "second page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === SECOND_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === SECOND_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === SECOND_EXPECTED_INTRO[2],
+    "second intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 11, "second page has 11 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      SECOND_EXPECTED_SECTION_TITLES.join("\n"),
+    "second page 11 section titles verbatim",
+  );
+  assert(parsed.definition.faq.length === 8, "second page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === SECOND_EXPECTED_FAQ[index].question &&
+        item.answer === SECOND_EXPECTED_FAQ[index].answer,
+    ),
+    "second page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "second page has no internalLinks");
+  assert(!("cta" in parsed.definition), "second page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `second page has no static ${key}`);
+  }
+
+  const firstSection = parsed.definition.sections[0];
+  const rich = (firstSection.blocks ?? []).find((block) => block.kind === "rich_paragraph");
+  assert(rich, "first section contains a rich_paragraph");
+  const link = rich.segments.find((segment) => "href" in segment);
+  assert(
+    link?.href === "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+    "rich_paragraph href is first listen path",
+  );
+  assert(
+    link?.label ===
+      "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+    "rich_paragraph label is full first listen URL",
+  );
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(
+    MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug ===
+      DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug,
+    "two listen pages may share the same playlistSlug",
+  );
+  assert(
+    MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE.slug !==
+      DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.slug,
+    "shared playlistSlug still uses distinct page slugs",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.includes(
+      "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+    ),
+    "sitemap contains first listen canonical",
+  );
+  assert(
+    sitemapUrls.includes(
+      "https://audiolad.ru/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno",
+    ),
+    "sitemap contains second listen canonical",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+    loaded: { ok: true, detail: makePlaylist() },
+  });
+  assert(data, "second page resolves against the same editorial playlist");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "second JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "second JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "second JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "second JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "second JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "second JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "second JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "second JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "second JSON-LD no primaryPractice");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
+  ["second listen page", testSecondPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],

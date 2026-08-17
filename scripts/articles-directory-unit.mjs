@@ -27,6 +27,7 @@ import {
   resolveArticleDirectoryDescription,
 } from "../src/lib/seo/articles/index.ts";
 import { listIndexableListenPageDefinitions } from "../src/lib/seo/listens/index.ts";
+import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
@@ -386,6 +387,30 @@ function testListenPagesAppearInDirectory() {
       item.url.endsWith("/articles/meditatsiya-na-dengi-slushat-onlayn-besplatno"),
     ),
     "directory JSON-LD has no /articles listen duplicate",
+  );
+
+  const secondListenHref = "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno";
+  const secondListenCard = data.articles.find((card) => card.href === secondListenHref);
+  assert(secondListenCard, "second indexable listen page is listed");
+  assert(
+    secondListenCard.title === "Денежная медитация: слушать онлайн бесплатно",
+    "second listen directory title",
+  );
+  assert(
+    secondListenCard.description === DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.description,
+    "second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/denezhnaya-meditatsiya-slushat-onlayn-besplatno",
+    ),
+    "no /articles duplicate for second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${secondListenHref}`,
+    ),
+    "directory JSON-LD includes second listen href",
   );
 
   const articleCards = listArticleDirectoryCards();

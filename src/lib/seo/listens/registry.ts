@@ -1,3 +1,4 @@
+import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/denezhnaya-meditatsiya-slushat-onlayn-besplatno";
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/meditatsiya-na-dengi-slushat-onlayn-besplatno";
 import type { ListenPageDefinition } from "./types";
 
@@ -7,6 +8,7 @@ import type { ListenPageDefinition } from "./types";
  */
 const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
+  DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
