@@ -84,6 +84,48 @@ function isLoopbackHost(hostname: string): boolean {
   return LOOPBACK_HOSTS.has(hostname);
 }
 
+function listenProtocol(request: Request): "http" | "https" | null {
+  try {
+    const proto = new URL(request.url).protocol.replace(":", "");
+    if (proto === "http" || proto === "https") {
+      return proto;
+    }
+  } catch {
+    // ignore malformed request.url
+  }
+  return null;
+}
+
+/**
+ * Client proto for an allowlisted host.
+ *
+ * Next 16 fills x-forwarded-proto=http from the unencrypted loopback socket
+ * when nginx omitted X-Forwarded-Proto $scheme (base-server.js ??= hop proto).
+ * That hop proto is not the browser proto. Trust https as a real TLS signal.
+ * For a public host, hop-http that matches the listen URL stays https.
+ * Loopback keeps http so local next dev still works.
+ */
+function resolveClientProtocol(
+  hostname: string,
+  forwardedProto: "http" | "https" | null,
+  request: Request,
+): "http" | "https" {
+  if (forwardedProto === "https") {
+    return "https";
+  }
+
+  if (isLoopbackHost(hostname)) {
+    return forwardedProto ?? "http";
+  }
+
+  const listen = listenProtocol(request);
+  if (forwardedProto === "http" && listen === "http") {
+    return "https";
+  }
+
+  return forwardedProto ?? "https";
+}
+
 function originFromHostAndProto(
   hostname: string,
   port: string | null,
@@ -113,9 +155,11 @@ export function getPublicRequestOrigin(request: Request): string {
   if (forwardedHost) {
     const { hostname, port } = parseHostHeader(forwardedHost);
     if (isAllowedPublicHost(hostname)) {
-      const proto =
-        forwardedProto ?? (isLoopbackHost(hostname) ? "http" : "https");
-      return originFromHostAndProto(hostname, port, proto);
+      return originFromHostAndProto(
+        hostname,
+        port,
+        resolveClientProtocol(hostname, forwardedProto, request),
+      );
     }
   }
 
@@ -123,8 +167,11 @@ export function getPublicRequestOrigin(request: Request): string {
   if (host) {
     const { hostname, port } = parseHostHeader(host);
     if (isAllowedPublicHost(hostname) && !isLoopbackHost(hostname)) {
-      const proto = forwardedProto ?? "https";
-      return originFromHostAndProto(hostname, port, proto);
+      return originFromHostAndProto(
+        hostname,
+        port,
+        resolveClientProtocol(hostname, forwardedProto, request),
+      );
     }
   }
 

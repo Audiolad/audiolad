@@ -73,6 +73,30 @@ function runTests() {
   });
   assert.equal(getPublicRequestOrigin(publicHost), "https://audiolad.ru");
 
+  // Next 16 hop: nginx Host=audiolad.ru, no X-Forwarded-Proto $scheme,
+  // base-server.js fills x-forwarded-proto=http and x-forwarded-host=Host.
+  const hopHttpForwarded = requestAt("http://localhost:3000/auth/callback", {
+    host: "audiolad.ru",
+    "x-forwarded-host": "audiolad.ru",
+    "x-forwarded-proto": "http",
+  });
+  assert.equal(getPublicRequestOrigin(hopHttpForwarded), "https://audiolad.ru");
+  assert.equal(
+    buildPublicRedirectUrl("/auth/sign-in?error=auth_callback", hopHttpForwarded)
+      .href,
+    "https://audiolad.ru/auth/sign-in?error=auth_callback",
+  );
+  assert.equal(
+    buildPublicRedirectUrl("/studio/try?started=1", hopHttpForwarded).href,
+    "https://audiolad.ru/studio/try?started=1",
+  );
+
+  const hopHttpHostOnly = requestAt("http://localhost:3001/studio/try/start", {
+    host: "audiolad.ru",
+    "x-forwarded-proto": "http",
+  });
+  assert.equal(getPublicRequestOrigin(hopHttpHostOnly), "https://audiolad.ru");
+
   const evilForwarded = requestAt("https://audiolad.ru/auth/callback", {
     host: "audiolad.ru",
     "x-forwarded-host": "evil.example",
