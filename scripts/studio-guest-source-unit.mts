@@ -13,10 +13,20 @@ assert.doesNotMatch(landing, /Бесплатный режим скоро/);
 
 const tryPage = await read("src/app/(studio)/studio/try/page.tsx");
 assert.match(tryPage, /force-dynamic/);
-assert.match(tryPage, /ensureGuestSession/);
+assert.match(tryPage, /resolveStudioActor/);
+assert.match(tryPage, /decideGuestTryPageFlow/);
+assert.match(tryPage, /STUDIO_GUEST_TRY_START_PATH/);
+assert.doesNotMatch(tryPage, /ensureGuestSession/);
+assert.doesNotMatch(tryPage, /writeGuestCookie/);
 assert.match(tryPage, /redirect\("\/studio\/projects"\)/);
 assert.match(tryPage, /redirect\("\/studio\/project\/new\?from=try"\)/);
 assert.doesNotMatch(tryPage, /\/studio\/live/);
+
+const tryStart = await read("src/app/(studio)/studio/try/start/route.ts");
+assert.match(tryStart, /export async function GET/);
+assert.match(tryStart, /ensureGuestSessionRecord/);
+assert.match(tryStart, /response.cookies.set/);
+assert.match(tryStart, /NextResponse\.redirect/);
 
 const projectsPage = await read("src/app/(studio)/studio/projects/page.tsx");
 assert.match(projectsPage, /requireStudioEditorAccess\("\/studio\/projects"\)/);

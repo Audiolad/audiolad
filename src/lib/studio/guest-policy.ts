@@ -6,6 +6,8 @@ import {
   STUDIO_GUEST_MAX_PROJECTS,
   STUDIO_GUEST_RENDER_RATE_LIMIT,
   STUDIO_GUEST_RENDER_RATE_WINDOW_MS,
+  STUDIO_GUEST_TRY_PATH,
+  STUDIO_GUEST_TRY_START_PATH,
   getStudioGuestTtlDays,
 } from "./guest-constants";
 
@@ -15,6 +17,8 @@ export {
   STUDIO_GUEST_MAX_PROJECTS,
   STUDIO_GUEST_RENDER_RATE_LIMIT,
   STUDIO_GUEST_RENDER_RATE_WINDOW_MS,
+  STUDIO_GUEST_TRY_PATH,
+  STUDIO_GUEST_TRY_START_PATH,
   getStudioGuestTtlDays,
 };
 
@@ -271,4 +275,33 @@ export function buildStudioGuestCookieOptions(input: {
     secure: input.secure ?? process.env.NODE_ENV === "production",
     maxAge: ttlDays * 24 * 60 * 60,
   };
+}
+
+
+export type GuestTryPageFlow =
+  | "author_studio"
+  | "continue_guest"
+  | "bootstrap"
+  | "bootstrap_failed";
+
+export function decideGuestTryPageFlow(input: {
+  actorKind: "author" | "guest" | "none";
+  returnedFromStart: boolean;
+}): GuestTryPageFlow {
+  if (input.actorKind === "author") {
+    return "author_studio";
+  }
+  if (input.actorKind === "guest") {
+    return "continue_guest";
+  }
+  if (input.returnedFromStart) {
+    return "bootstrap_failed";
+  }
+  return "bootstrap";
+}
+
+export function decideGuestTryStartFlow(
+  actorKind: "author" | "guest" | "none",
+): "author_studio" | "ensure_session" {
+  return actorKind === "author" ? "author_studio" : "ensure_session";
 }

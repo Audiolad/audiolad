@@ -52,6 +52,7 @@ export async function readGuestCookie(): Promise<string | null> {
   return value && value.trim() ? value : null;
 }
 
+/** Cookie mutation. Call only from a Route Handler or Server Action. */
 export async function writeGuestCookie(token: string): Promise<void> {
   const store = await cookies();
   const options = buildStudioGuestCookieOptions();
@@ -129,17 +130,24 @@ export async function touchGuestSession(id: string): Promise<void> {
   }
 }
 
-export async function ensureGuestSession(): Promise<StudioGuestSession> {
+export async function ensureGuestSessionRecord(): Promise<{
+  session: StudioGuestSession;
+  token: string;
+  created: boolean;
+}> {
   const existingToken = await readGuestCookie();
   if (existingToken) {
     const existing = await lookupGuestSessionByToken(existingToken);
     if (existing) {
       await touchGuestSession(existing.id);
-      await writeGuestCookie(existingToken);
       return {
-        ...existing,
-        last_seen_at: new Date().toISOString(),
-        expires_at: expiresAtFromNow(),
+        session: {
+          ...existing,
+          last_seen_at: new Date().toISOString(),
+          expires_at: expiresAtFromNow(),
+        },
+        token: existingToken,
+        created: false,
       };
     }
   }
@@ -164,6 +172,16 @@ export async function ensureGuestSession(): Promise<StudioGuestSession> {
     throw new Error("studio_guest_session_create_failed");
   }
 
+  return {
+    session: data as StudioGuestSession,
+    token,
+    created: true,
+  };
+}
+
+/** Cookie mutation. Call only from a Route Handler or Server Action. */
+export async function ensureGuestSession(): Promise<StudioGuestSession> {
+  const { session, token } = await ensureGuestSessionRecord();
   await writeGuestCookie(token);
-  return data as StudioGuestSession;
+  return session;
 }
