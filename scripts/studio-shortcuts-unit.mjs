@@ -48,6 +48,18 @@ assert.doesNotMatch(
   /if \(!clipboard \|\| !selectedTrackAndClip\) return/,
 );
 assert.match(shell, /STUDIO_CLIP_OVERLAP_ERROR/);
+assert.match(shell, /Нельзя вставить: место занято/);
+assert.match(shell, /event\.key\.toLowerCase\(\) === "d"/);
+assert.match(shell, /if \(duplicateSelectedClip\(\)\) \{\s*event\.preventDefault\(\)/);
+assert.match(shell, /label="Дублировать \(⌘\/Ctrl\+D\)"/);
+assert.match(shell, /aria-label="Дублировать дорожку"/);
+assert.match(shell, /title=\{[\s\S]*Дублировать дорожку/);
+assert.match(shell, /grid grid-cols-2 gap-1/);
+assert.doesNotMatch(shell, /mt-2 flex flex-wrap gap-1/);
+assert.match(shell, /Фрагмент скопирован/);
+assert.match(shell, /Фрагмент вставлен/);
+assert.match(shell, /Фрагмент дублирован/);
+assert.match(shell, /Дорожка дублирована/);
 assert.match(shell, /Отменить последнее действие/);
 assert.match(shell, /Повторить отменённое действие/);
 assert.match(shell, /onClipGestureBegin/);

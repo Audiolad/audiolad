@@ -314,13 +314,10 @@ function validateRelationships(
   tracks: readonly StudioPersistedTrack[],
 ): void {
   const trackIds = new Set<string>();
-  const assetIds = new Set<string>();
   const clipIds = new Set<string>();
   for (const track of tracks) {
     if (trackIds.has(track.id)) fail("duplicate_track_id", `tracks.${track.id}`);
-    if (assetIds.has(track.assetId)) fail("duplicate_asset_id", `tracks.${track.id}`);
     trackIds.add(track.id);
-    assetIds.add(track.assetId);
 
     for (let index = 0; index < track.clips.length; index += 1) {
       const clip = track.clips[index];

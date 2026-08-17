@@ -144,21 +144,20 @@ assert.throws(
   }),
   (error: unknown) => error instanceof StudioApiError && error.code === "invalid_clip",
 );
-assert.throws(
-  () => parseStudioProjectData({
-    ...validProjectData,
-    tracks: [
-      validProjectData.tracks[0],
-      {
-        ...validProjectData.tracks[0],
-        id: "track-2",
-        clips: [],
-      },
-    ],
-  }),
-  (error: unknown) =>
-    error instanceof StudioApiError && error.code === "duplicate_track_asset",
-);
+const sharedAssetDocument = parseStudioProjectData({
+  ...validProjectData,
+  tracks: [
+    validProjectData.tracks[0],
+    {
+      ...validProjectData.tracks[0],
+      id: "track-2",
+      clips: [],
+    },
+  ],
+});
+assert.equal(sharedAssetDocument.tracks.length, 2);
+assert.equal(sharedAssetDocument.tracks[0].assetId, sharedAssetDocument.tracks[1].assetId);
+assert.equal(sharedAssetDocument.tracks[1].id, "track-2");
 assert.throws(
   () => parseStudioProjectData({
     ...validProjectData,

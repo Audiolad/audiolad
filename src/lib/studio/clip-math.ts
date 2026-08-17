@@ -43,6 +43,23 @@ export function getStudioClipEnd(layout: StudioClipLayout): number {
   return layout.startTime + layout.duration;
 }
 
+export function studioClipRangesOverlap(
+  left: StudioClipLayout,
+  right: StudioClipLayout,
+): boolean {
+  return left.startTime < getStudioClipEnd(right) && getStudioClipEnd(left) > right.startTime;
+}
+
+export function studioClipOverlapsAny(
+  candidate: StudioClipLayout,
+  clips: Iterable<StudioClipLayout>,
+): boolean {
+  for (const clip of clips) {
+    if (studioClipRangesOverlap(candidate, clip)) return true;
+  }
+  return false;
+}
+
 export function getStudioProjectDurationFromClips(
   tracks: Iterable<{ clips: Iterable<StudioClipLayout> }>,
 ): number {

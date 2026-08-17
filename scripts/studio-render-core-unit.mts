@@ -654,6 +654,54 @@ async function main() {
     );
     assert.deepEqual(workspacesAfterFailure, workspacesBeforeFailure, "failed FFmpeg render must clean its workspace");
 
+    const sharedMusicProject = project("none", 1, false);
+    sharedMusicProject.project_data.tracks = [
+      {
+        id: "music-a",
+        assetId: ASSET_MUSIC,
+        name: "Музыка 1",
+        volume: 0.5,
+        muted: false,
+        trackKind: "music" as const,
+        voicePreset: "none" as const,
+        clips: [
+          { id: "music-a-1", startTime: 0, offset: 0, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
+          { id: "music-a-2", startTime: 1, offset: 0, duration: 1, fadeInDuration: 0, fadeOutDuration: 0 },
+        ],
+      },
+      {
+        id: "music-b",
+        assetId: ASSET_MUSIC,
+        name: "Музыка 2",
+        volume: 0.4,
+        muted: false,
+        trackKind: "music" as const,
+        voicePreset: "none" as const,
+        clips: [
+          { id: "music-b-1", startTime: 0.5, offset: 0, duration: 1.5, fadeInDuration: 0.1, fadeOutDuration: 0.1 },
+        ],
+      },
+    ];
+    sharedMusicProject.project_data.slots = [
+      { id: "slot-music-1", name: "Музыка 1", audioTrackId: "music-a", trackKind: "music" as const },
+      { id: "slot-music-2", name: "Музыка 2", audioTrackId: "music-b", trackKind: "music" as const },
+    ];
+    const sharedSnapshot = createStudioRenderSnapshot({
+      project: sharedMusicProject,
+      expectedRevision: 7,
+      assets: [asset(ASSET_MUSIC, musicPath, 3)],
+    });
+    assert.equal(sharedSnapshot.tracks.length, 2);
+    assert.equal(sharedSnapshot.tracks[0].assetId, ASSET_MUSIC);
+    assert.equal(sharedSnapshot.tracks[1].assetId, ASSET_MUSIC);
+    assert.equal(sharedSnapshot.assets.length, 1);
+    assert.equal(sharedSnapshot.tracks[0].clips.length, 2);
+    assert.equal(sharedSnapshot.tracks[0].clips[1].startTime, 1);
+    const sharedTimeline = buildStudioRenderTimeline(sharedSnapshot);
+    assert.equal(sharedTimeline.tracks.length, 2);
+    assert.equal(sharedTimeline.durationSeconds, 2);
+    validateStudioProjectDocument(sharedMusicProject.project_data);
+
     const invalidDocument = fixtureProject([
       { id: "valid", startTime: 0, offset: 0, duration: 0.25, fadeInDuration: 0, fadeOutDuration: 0 },
     ]).project_data;
@@ -683,7 +731,6 @@ async function main() {
       { name: "excess-fades", mutate: (document) => { invalidTracks(document)[0].clips[0].fadeInDuration = 0.2; invalidTracks(document)[0].clips[0].fadeOutDuration = 0.2; }, code: "invalid_clip" },
       { name: "bad-volume", mutate: (document) => { invalidTracks(document)[0].volume = 5; }, code: "invalid_track" },
       { name: "duplicate-track", mutate: (document) => { invalidTracks(document).push(clone(invalidTracks(document)[0])); }, code: "duplicate_track_id" },
-      { name: "duplicate-asset", mutate: (document) => { invalidTracks(document).push({ ...clone(invalidTracks(document)[0]), id: "another-track" }); }, code: "duplicate_asset_id" },
       { name: "duplicate-clip", mutate: (document) => { invalidTracks(document)[0].clips.push({ ...invalidTracks(document)[0].clips[0], startTime: 0.25 }); }, code: "duplicate_clip_id" },
       { name: "duplicate-slot", mutate: (document) => { invalidSlots(document).push({ ...clone(invalidSlots(document)[0]), audioTrackId: null }); }, code: "duplicate_slot_id" },
       { name: "duplicate-slot-track", mutate: (document) => { invalidSlots(document).push({ ...clone(invalidSlots(document)[0]), id: "other-slot", audioTrackId: invalidTracks(document)[0].id }); }, code: "duplicate_slot_track" },

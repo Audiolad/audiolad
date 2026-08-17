@@ -89,4 +89,41 @@ assert.match(shell, /persistenceProjectId=\{projectId\}/);
 assert.match(route, /requireStudioAuthorAccess\(`\/studio\/project\/\$\{projectId\}`\)/);
 assert.match(shell, /persistedHydration=\{hydration\}/);
 
+const sharedProject = {
+  ...project,
+  projectData: {
+    ...project.projectData,
+    slots: [
+      { id: "slot-1", name: "Музыка 1", audioTrackId: "track-1", trackKind: "music" as const },
+      { id: "slot-2", name: "Музыка 2", audioTrackId: "track-2", trackKind: "music" as const },
+    ],
+    tracks: [
+      project.projectData.tracks[0],
+      {
+        ...project.projectData.tracks[0],
+        id: "track-2",
+        name: "Музыка 2",
+        clips: [
+          { id: "clip-3", startTime: 0, offset: 0, duration: 2, fadeInDuration: 0, fadeOutDuration: 0 },
+        ],
+      },
+    ],
+  },
+};
+let sharedDownloads = 0;
+const sharedHydration = await hydrateStudioProject({
+  project: sharedProject,
+  assets: [metadata],
+  download: async () => {
+    sharedDownloads += 1;
+    return new Blob(["audio"], { type: "audio/webm" });
+  },
+  decode: async () => ({ duration: 8 } as AudioBuffer),
+});
+assert.equal(sharedHydration.state.tracks.length, 2);
+assert.equal(sharedHydration.state.tracks[0].assetId, assetId);
+assert.equal(sharedHydration.state.tracks[1].assetId, assetId);
+assert.equal(sharedDownloads, 1);
+assert.equal(sharedHydration.assets.size, 1);
+
 console.log("studio project hydration checks passed");

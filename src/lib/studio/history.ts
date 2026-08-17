@@ -1,4 +1,5 @@
 import {
+  getStudioClipEnd,
   getStudioClipLayout,
   type StudioClip,
 } from "@/lib/studio/clip-math";
@@ -189,4 +190,67 @@ export function getStudioPasteClips({
       ...clampStudioClipFades(clip, layout.duration),
     }];
   });
+}
+
+export function getStudioDuplicateClipStartTime(clip: StudioClip): number {
+  return getStudioClipEnd(clip);
+}
+
+export function isStudioAssetStillReferenced(
+  assetId: string | null | undefined,
+  tracks: Iterable<{ assetId?: string | null }>,
+): boolean {
+  if (!assetId) return false;
+  for (const track of tracks) {
+    if (track.assetId === assetId) return true;
+  }
+  return false;
+}
+
+export function getNextStudioSlotName(
+  slots: readonly { name: string; trackKind?: StudioTrackKind }[],
+  trackKind: StudioTrackKind,
+): string {
+  const prefix = trackKind === "voice" ? "Голос" : "Музыка";
+  const used = new Set<number>();
+  for (const slot of slots) {
+    if ((slot.trackKind ?? "voice") !== trackKind) continue;
+    const match = slot.name.match(new RegExp(`^${prefix} (\\d+)$`));
+    if (match) used.add(Number(match[1]));
+  }
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return `${prefix} ${next}`;
+}
+
+export function insertStudioTrackSlot<T extends { trackKind?: StudioTrackKind }>(
+  slots: readonly T[],
+  nextSlot: T,
+): T[] {
+  const insertAt = nextSlot.trackKind === "voice"
+    ? slots.findIndex((slot) => slot.trackKind === "music")
+    : slots.length;
+  return insertAt < 0
+    ? [...slots, nextSlot]
+    : [...slots.slice(0, insertAt), nextSlot, ...slots.slice(insertAt)];
+}
+
+export function createStudioDuplicatedTrackSnapshot(
+  track: StudioTrackSnapshot,
+  {
+    trackId,
+    createClipId,
+  }: {
+    trackId: string;
+    createClipId: () => string;
+  },
+): StudioTrackSnapshot {
+  return {
+    ...cloneStudioTrackSnapshot(track),
+    id: trackId,
+    clips: track.clips.map((clip) => ({
+      ...clip,
+      id: createClipId(),
+    })),
+  };
 }

@@ -275,6 +275,11 @@ function testProviderEngineLifecycle() {
   assert.match(provider, /pruneRetainedAssets/);
   assert.match(provider, /updateRetainedAssets/);
   assert.match(provider, /pasteClips/);
+  assert.match(provider, /duplicateTrack/);
+  assert.match(provider, /assetVaultRef\.current\.set\(snapshot\.id, asset\)/);
+  assert.match(provider, /getSharedAssetTrackIds/);
+  assert.match(provider, /bindSharedAssetState/);
+  assert.match(provider, /sharedWithLiveTrack/);
   assert.match(provider, /createTrackRuntime/);
   assert.match(provider, /stopSources\(\);[\s\S]*trackRuntimesRef\.current\.clear\(\)/);
   assert.match(provider, /position: getPlaybackPosition\(\)/);
@@ -381,9 +386,11 @@ function testStudioBoundariesAndCrossTabStop() {
   assert.doesNotMatch(studioWorkspace, /MAX_VOICE_TRACKS|MAX_MUSIC_TRACKS/);
   assert.match(studioWorkspace, /Голос 1/);
   assert.match(studioWorkspace, /Музыка 1/);
-  assert.match(studioWorkspace, /"Голос" : "Музыка"/);
+  assert.match(studioWorkspace, /getNextStudioSlotName/);
+  assert.match(studioWorkspace, /insertStudioTrackSlot/);
   assert.match(studioWorkspace, /trackKind === "voice"/);
-  assert.match(studioWorkspace, /currentSlots\.slice\(0, insertAt\)/);
+  assert.match(readSource("src/lib/studio/history.ts"), /"Голос" : "Музыка"/);
+  assert.match(readSource("src/lib/studio/history.ts"), /slots\.slice\(0, insertAt\)/);
   assert.match(studioWorkspace, /\+ Голос/);
   assert.match(studioWorkspace, /\+ Музыка/);
   assert.doesNotMatch(studioWorkspace, /\+ Добавить дорожку/);
@@ -441,7 +448,7 @@ function testStudioBoundariesAndCrossTabStop() {
   );
   assert.match(
     studioWorkspace,
-    /name: `\$\{trackKind === "voice" \? "Голос" : "Музыка"\} \$\{nextNumber\}`,[\s\S]*audioTrackId: null,[\s\S]*trackKind/,
+    /name: getNextStudioSlotName\(currentSlots, trackKind\),[\s\S]*audioTrackId: null,[\s\S]*trackKind/,
   );
   assert.match(
     studioWorkspace,

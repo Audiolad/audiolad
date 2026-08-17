@@ -403,6 +403,48 @@ function historyDocument(snapshot: {
   assert.equal(store.putCount, 1);
 }
 
+// Duplicated music track reuses one asset, persists, and reloads without a second download.
+{
+  const store = new FakeStudioStore();
+  const metadata = store.upload(assetIds[0], "music.wav", "upload");
+  const original = track("music-1", metadata.id, {
+    trackKind: "music",
+    clips: [clip("orig", 0, { duration: 3 }), clip("copy", 3, { duration: 3 })],
+  });
+  const duplicated = track("music-2", metadata.id, {
+    trackKind: "music",
+    clips: [clip("dup-orig", 0, { duration: 3 }), clip("dup-copy", 3, { duration: 3 })],
+  });
+  const saved = document(4, [original, duplicated], [
+    { id: "slot-music-1", name: "Музыка 1", audioTrackId: "music-1", trackKind: "music" },
+    { id: "slot-music-2", name: "Музыка 2", audioTrackId: "music-2", trackKind: "music" },
+  ]);
+  assert.equal(saved.tracks[0].assetId, saved.tracks[1].assetId);
+  assert.equal(saved.tracks[0].clips[1].startTime, 3);
+  const snapshot: StudioAutosaveSnapshot = { name: "Дубли", document: saved };
+  const { controller, clock } = createController(store, () => snapshot);
+  controller.markDirty();
+  clock.advance(1);
+  await tick();
+  assert.equal(store.putCount, 1);
+  const persisted = store.project.projectData as StudioProjectDocumentV2;
+  assert.equal(persisted.tracks.length, 2);
+  assert.equal(persisted.tracks[0].assetId, metadata.id);
+  assert.equal(persisted.tracks[1].assetId, metadata.id);
+  const hydrated = await hydrateStudioProject({
+    project: store.project,
+    assets: [metadata],
+    download: (asset) => store.download(asset),
+    decode: (blob, asset) => store.decode(blob, asset),
+  });
+  assert.equal(hydrated.state.tracks.length, 2);
+  assert.equal(hydrated.state.tracks[0].assetId, hydrated.state.tracks[1].assetId);
+  assert.equal(store.downloadCount, 1);
+  assert.equal(store.decodeCount, 1);
+  assert.equal(store.deleteCount, 0);
+  assert.equal(store.assets.size, 1);
+}
+
 // Clearing a track only changes the document; no orphan asset deletion is issued.
 {
   const store = new FakeStudioStore(document(0, [track("clear", assetIds[0])]));

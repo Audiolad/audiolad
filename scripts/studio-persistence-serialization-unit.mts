@@ -281,13 +281,24 @@ errorCode(
   }),
   "dangling_slot_track",
 );
-errorCode(
-  () => deserializeStudioProjectDocument({
-    ...document,
-    tracks: [document.tracks[0], { ...document.tracks[0], id: "other-track" }],
-  }),
-  "duplicate_asset_id",
-);
+const sharedAsset = deserializeStudioProjectDocument({
+  ...document,
+  tracks: [
+    document.tracks[0],
+    {
+      ...document.tracks[0],
+      id: "other-track",
+      clips: document.tracks[0].clips.map((item, index) => ({
+        ...item,
+        id: `other-clip-${index}`,
+      })),
+    },
+  ],
+});
+assert.equal(sharedAsset.tracks.length, 2);
+assert.equal(sharedAsset.tracks[0].assetId, sharedAsset.tracks[1].assetId);
+assert.equal(sharedAsset.tracks[0].id, document.tracks[0].id);
+assert.equal(sharedAsset.tracks[1].id, "other-track");
 errorCode(
   () => deserializeStudioProjectDocument({
     ...document,

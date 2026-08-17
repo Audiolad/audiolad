@@ -45,6 +45,7 @@ import {
 } from "@/lib/studio/local-file-validation";
 import { validateStudioRecordedFile } from "@/lib/studio/recorder";
 import {
+  createStudioDuplicatedTrackSnapshot,
   createStudioEditingSnapshot,
   getStudioPasteClips,
   type StudioClipClipboard,
@@ -155,6 +156,7 @@ type StudioAudioContextValue = {
     clipboard: StudioClipClipboard,
     startTime: number,
   ) => string[];
+  duplicateTrack: (trackId: string) => StudioLocalTrack | null;
   getTrackBuffer: (trackId: string) => AudioBuffer | null;
   exportEditingState: () => StudioEditingSnapshot;
   restoreEditingState: (
@@ -628,6 +630,49 @@ export function StudioAudioProvider({
     assetUploadControllersRef.current.delete(trackId);
   }, []);
 
+  const getTrackAsset = useCallback((trackId: string): TrackAsset | null => {
+    const vault = assetVaultRef.current.get(trackId);
+    if (vault) return vault;
+    const runtime = trackRuntimesRef.current.get(trackId);
+    return runtime
+      ? {
+          file: runtime.file,
+          buffer: runtime.buffer,
+          sourceType: runtime.sourceType,
+        }
+      : null;
+  }, []);
+
+  const getSharedAssetTrackIds = useCallback((trackId: string): string[] => {
+    const asset = getTrackAsset(trackId);
+    const ids = new Set<string>([trackId]);
+    if (!asset) return [...ids];
+    for (const [id, candidate] of assetVaultRef.current) {
+      if (candidate.file === asset.file && candidate.buffer === asset.buffer) {
+        ids.add(id);
+      }
+    }
+    for (const [id, runtime] of trackRuntimesRef.current) {
+      if (runtime.file === asset.file && runtime.buffer === asset.buffer) {
+        ids.add(id);
+      }
+    }
+    return [...ids];
+  }, [getTrackAsset]);
+
+  const bindSharedAssetState = useCallback((
+    trackId: string,
+    update: (track: StudioLocalTrack) => StudioLocalTrack,
+  ) => {
+    const sharedIds = new Set(getSharedAssetTrackIds(trackId));
+    replaceTracks(
+      tracksRef.current.map((track) =>
+        sharedIds.has(track.id) ? update(track) : track,
+      ),
+    );
+    applyTrackGains();
+  }, [applyTrackGains, getSharedAssetTrackIds, replaceTracks]);
+
   const reset = useCallback(() => {
     loadGenerationRef.current += 1;
     for (const trackId of assetUploadControllersRef.current.keys()) {
@@ -671,7 +716,7 @@ export function StudioAudioProvider({
     const generation = assetUploadGenerationRef.current.get(trackId) ?? 0;
     const controller = new AbortController();
     assetUploadControllersRef.current.set(trackId, controller);
-    updateTrack(trackId, (item) => ({
+    bindSharedAssetState(trackId, (item) => ({
       ...item,
       assetPersistenceStatus: "uploading",
     }));
@@ -690,7 +735,7 @@ export function StudioAudioProvider({
           return;
         }
         assetUploadControllersRef.current.delete(trackId);
-        updateTrack(trackId, (item) => ({
+        bindSharedAssetState(trackId, (item) => ({
           ...item,
           assetId: uploadedAsset.id,
           assetPersistenceStatus: "saved",
@@ -705,13 +750,13 @@ export function StudioAudioProvider({
           return;
         }
         assetUploadControllersRef.current.delete(trackId);
-        updateTrack(trackId, (item) => ({
+        bindSharedAssetState(trackId, (item) => ({
           ...item,
           assetPersistenceStatus: "error",
         }));
       },
     );
-  }, [cancelTrackAssetUpload, persistenceProjectId, updateTrack]);
+  }, [bindSharedAssetState, cancelTrackAssetUpload, persistenceProjectId]);
 
   const retryTrackAssetUpload = useCallback((trackId: string) => {
     const track = tracksRef.current.find((item) => item.id === trackId);
@@ -1513,6 +1558,64 @@ export function StudioAudioProvider({
     [pause, updateTrack],
   );
 
+  const duplicateTrack = useCallback((trackId: string): StudioLocalTrack | null => {
+    const source = tracksRef.current.find((track) => track.id === trackId);
+    if (!source || tracksRef.current.length >= MAX_LOCAL_TRACKS) {
+      return null;
+    }
+    const asset = getTrackAsset(trackId);
+    if (!asset) {
+      return null;
+    }
+
+    const snapshot = createStudioDuplicatedTrackSnapshot(
+      {
+        id: source.id,
+        fileName: source.fileName,
+        fileSize: source.fileSize,
+        assetId: source.assetId,
+        assetPersistenceStatus: source.assetPersistenceStatus,
+        clips: source.clips,
+        volume: source.volume,
+        muted: source.muted,
+        trackKind: source.trackKind,
+        voicePreset: source.voicePreset,
+      },
+      {
+        trackId: crypto.randomUUID(),
+        createClipId: () => crypto.randomUUID(),
+      },
+    );
+    assetVaultRef.current.set(snapshot.id, asset);
+    const runtime = createTrackRuntime(asset);
+    applyVoicePreset(
+      runtime,
+      snapshot.voicePreset ?? "none",
+      (snapshot.trackKind ?? source.trackKind) === "voice",
+    );
+    trackRuntimesRef.current.set(snapshot.id, runtime);
+
+    const created: StudioLocalTrack = {
+      id: snapshot.id,
+      fileName: snapshot.fileName,
+      fileSize: snapshot.fileSize,
+      assetId: snapshot.assetId,
+      assetPersistenceStatus: snapshot.assetPersistenceStatus,
+      clips: snapshot.clips,
+      volume: snapshot.volume,
+      muted: snapshot.muted,
+      trackKind: snapshot.trackKind ?? source.trackKind,
+      voicePreset: snapshot.voicePreset ?? source.voicePreset,
+      status: "ready",
+      isReplacing: false,
+      replacementError: null,
+    };
+    pause();
+    replaceTracks([...tracksRef.current, created]);
+    applyTrackGains();
+    return created;
+  }, [applyTrackGains, applyVoicePreset, createTrackRuntime, getTrackAsset, pause, replaceTracks]);
+
   const getTrackBuffer = useCallback((trackId: string): AudioBuffer | null => {
     return trackRuntimesRef.current.get(trackId)?.buffer ?? null;
   }, []);
@@ -1528,7 +1631,17 @@ export function StudioAudioProvider({
       cancelProgressLoop();
       stopSources();
       const runtime = trackRuntimesRef.current.get(trackId);
-      cancelTrackAssetUpload(trackId);
+      const sharedWithLiveTrack = tracksRef.current.some((track) => {
+        if (track.id === trackId) return false;
+        const other = getTrackAsset(track.id);
+        const mine = getTrackAsset(trackId);
+        return Boolean(
+          other && mine && other.file === mine.file && other.buffer === mine.buffer,
+        );
+      });
+      if (!sharedWithLiveTrack) {
+        cancelTrackAssetUpload(trackId);
+      }
       if (runtime) {
         assetVaultRef.current.set(trackId, {
           file: runtime.file,
@@ -1566,6 +1679,7 @@ export function StudioAudioProvider({
       cancelProgressLoop,
       cancelTrackAssetUpload,
       getPlaybackPosition,
+      getTrackAsset,
       replaceTracks,
       setStatusValue,
       startSourcesAtPosition,
@@ -1738,6 +1852,7 @@ export function StudioAudioProvider({
       removeClip,
       rippleDeleteClip,
       pasteClips,
+      duplicateTrack,
       getTrackBuffer,
       removeTrack,
       exportEditingState,
@@ -1778,6 +1893,7 @@ export function StudioAudioProvider({
       removeClip,
       rippleDeleteClip,
       pasteClips,
+      duplicateTrack,
       pruneRetainedAssets,
       restoreEditingState,
       restoreTracks,

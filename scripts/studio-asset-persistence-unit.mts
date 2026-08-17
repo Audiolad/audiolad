@@ -156,6 +156,9 @@ assert.match(provider, /assetId: track\.assetId/);
 assert.match(history, /assetPersistenceStatus/);
 assert.match(editor, /hasPersistenceProject && track/);
 assert.match(editor, /Повторить/);
+assert.match(provider, /bindSharedAssetState/);
+assert.match(provider, /duplicateTrack/);
+assert.match(history, /isStudioAssetStillReferenced/);
 const assetRoute = await readFile(
   new URL("../src/app/api/studio/projects/[projectId]/assets/route.ts", import.meta.url),
   "utf8",

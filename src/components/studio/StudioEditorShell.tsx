@@ -22,6 +22,7 @@ import {
 import { getStudioDefaultFadeDuration } from "@/lib/studio/fade-math";
 import {
   MIN_STUDIO_CLIP_DURATION,
+  studioClipOverlapsAny,
   type StudioClip,
 } from "@/lib/studio/clip-math";
 import {
@@ -34,7 +35,10 @@ import {
   createStudioClipClipboard,
   createStudioEditingSnapshot,
   createStudioHistory,
+  getNextStudioSlotName,
+  getStudioDuplicateClipStartTime,
   getStudioPasteClips,
+  insertStudioTrackSlot,
   recordStudioHistory,
   redoStudioHistory,
   undoStudioHistory,
@@ -67,8 +71,7 @@ const TRACK_ACCENTS = [
   "border-emerald-400/70 bg-emerald-400/15 text-emerald-200",
 ];
 const TIMELINE_ACCENTS = ["#a78bfa", "#38bdf8", "#2dd4bf", "#fbbf24", "#34d399"];
-const STUDIO_CLIP_OVERLAP_ERROR =
-  "Здесь недостаточно свободного места для вставки фрагмента.";
+const STUDIO_CLIP_OVERLAP_ERROR = "Нельзя вставить: место занято";
 
 function isDefaultStudioTrackSlot(slot: StudioTrackSlot): boolean {
   return slot.id === "slot-voice-1" || slot.id === "slot-music-1";
@@ -186,7 +189,7 @@ function TrackFadeButton({
             : `${label}: включить`
           : "Добавьте аудио, чтобы настроить затухание"
       }
-      className={`h-8 rounded border px-2 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`h-8 rounded border px-1.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? "border-violet-300/70 bg-violet-400/20 text-violet-100"
           : "border-white/15 bg-[#1c2433] text-[#c9d8ff]"
@@ -255,6 +258,7 @@ export default function StudioEditorShell({
   const [history, setHistory] = useState<StudioHistory | null>(null);
   const [clipboard, setClipboard] = useState<StudioClipClipboard | null>(null);
   const [editingError, setEditingError] = useState<string | null>(null);
+  const [editingNotice, setEditingNotice] = useState<string | null>(null);
   const historyRef = useRef<StudioHistory | null>(null);
   const hydratedProjectIdRef = useRef<string | null>(null);
   const gestureSnapshotRef = useRef<StudioEditingSnapshot | null>(null);
@@ -284,6 +288,7 @@ export default function StudioEditorShell({
     loadLocalFiles,
     pause,
     pasteClips,
+    duplicateTrack,
     play,
     projectDuration,
     projectError,
@@ -312,6 +317,12 @@ export default function StudioEditorShell({
     slotsRef.current = slots;
     tracksRef.current = tracks;
   }, [projectName, slots, tracks]);
+
+  useEffect(() => {
+    if (!editingNotice) return;
+    const timer = window.setTimeout(() => setEditingNotice(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [editingNotice]);
 
   useEffect(() => {
     if (controllerRef.current) return;
@@ -470,10 +481,10 @@ export default function StudioEditorShell({
   const captureEditingSnapshot = useCallback(
     (): StudioEditingSnapshot => ({
       ...exportEditingState(),
-      slots: slots.map((slot) => ({ ...slot })),
+      slots: slotsRef.current.map((slot) => ({ ...slot })),
       selectedClipId,
     }),
-    [exportEditingState, selectedClipId, slots],
+    [exportEditingState, selectedClipId],
   );
   const updateHistory = useCallback((nextHistory: StudioHistory) => {
     historyRef.current = nextHistory;
@@ -515,22 +526,23 @@ export default function StudioEditorShell({
         snapshot.tracks.flatMap((track) => track.clips.map((clip) => clip.id)),
       );
       const trackIds = new Set(snapshot.tracks.map((track) => track.id));
-      setSlots(
-        snapshot.slots.map((slot) => ({
-          ...slot,
-          audioTrackId:
-            slot.audioTrackId && trackIds.has(slot.audioTrackId)
-              ? slot.audioTrackId
-              : null,
-          trackKind: slot.trackKind ?? "voice",
-        })),
-      );
+      const nextSlots = snapshot.slots.map((slot) => ({
+        ...slot,
+        audioTrackId:
+          slot.audioTrackId && trackIds.has(slot.audioTrackId)
+            ? slot.audioTrackId
+            : null,
+        trackKind: slot.trackKind ?? "voice",
+      }));
+      slotsRef.current = nextSlots;
+      setSlots(nextSlots);
       setSelectedClipId(
         snapshot.selectedClipId && validClipIds.has(snapshot.selectedClipId)
           ? snapshot.selectedClipId
           : null,
       );
       setEditingError(null);
+      setEditingNotice(null);
     },
     [restoreEditingState, setSlots],
   );
@@ -593,12 +605,14 @@ export default function StudioEditorShell({
     splitClip,
   ]);
   const detachTrackFromSlots = useCallback((trackId: string) => {
-    setSlots((currentSlots) =>
-      currentSlots.map((slot) =>
+    setSlots((currentSlots) => {
+      const next = currentSlots.map((slot) =>
         slot.audioTrackId === trackId ? { ...slot, audioTrackId: null } : slot,
-      ),
-    );
-  }, [setSlots]);
+      );
+      slotsRef.current = next;
+      return next;
+    });
+  }, []);
   const deleteSelectedClip = useCallback(() => {
     if (!selectedTrackAndClip) return;
     runEditingAction(() => {
@@ -630,6 +644,7 @@ export default function StudioEditorShell({
       ),
     );
     setEditingError(null);
+    setEditingNotice("Фрагмент скопирован");
   }, [selectedTrackAndClip]);
   const pasteClipboard = useCallback(() => {
     if (!clipboard) return;
@@ -648,13 +663,10 @@ export default function StudioEditorShell({
       createClipId: () => crypto.randomUUID(),
     });
     const overlaps = pastedPreview.some((candidate) =>
-      targetTrack.clips.some(
-        (clip) =>
-          candidate.startTime < clip.startTime + clip.duration &&
-          candidate.startTime + candidate.duration > clip.startTime,
-      ),
+      studioClipOverlapsAny(candidate, targetTrack.clips),
     );
     if (overlaps) {
+      setEditingNotice(null);
       setEditingError(STUDIO_CLIP_OVERLAP_ERROR);
       return;
     }
@@ -665,6 +677,7 @@ export default function StudioEditorShell({
       setSelectedClipId(pastedIds[0]);
     }
     setEditingError(null);
+    setEditingNotice("Фрагмент вставлен");
   }, [
     clipboard,
     currentTime,
@@ -673,6 +686,62 @@ export default function StudioEditorShell({
     runEditingAction,
     tracks,
   ]);
+  const duplicateSelectedClip = useCallback(() => {
+    if (!selectedTrackAndClip) return false;
+    const buffer = getTrackBuffer(selectedTrackAndClip.track.id);
+    if (!buffer) return false;
+    const clipClipboard = createStudioClipClipboard(
+      selectedTrackAndClip.track.id,
+      [selectedTrackAndClip.clip],
+    );
+    const startTime = getStudioDuplicateClipStartTime(selectedTrackAndClip.clip);
+    const preview = getStudioPasteClips({
+      clipboard: clipClipboard,
+      targetStartTime: startTime,
+      targetBufferDuration: buffer.duration,
+      createClipId: () => crypto.randomUUID(),
+    });
+    const overlaps = preview.some((candidate) =>
+      studioClipOverlapsAny(candidate, selectedTrackAndClip.track.clips),
+    );
+    if (overlaps || preview.length === 0) {
+      setEditingNotice(null);
+      setEditingError(STUDIO_CLIP_OVERLAP_ERROR);
+      return true;
+    }
+    const pastedIds = runEditingAction(() =>
+      pasteClips(selectedTrackAndClip.track.id, clipClipboard, startTime),
+    );
+    if (pastedIds[0]) {
+      setSelectedClipId(pastedIds[0]);
+    }
+    setEditingError(null);
+    setEditingNotice("Фрагмент дублирован");
+    return true;
+  }, [getTrackBuffer, pasteClips, runEditingAction, selectedTrackAndClip]);
+  const duplicateCurrentTrack = useCallback((trackId: string) => {
+    if (slotsRef.current.length >= MAX_TRACK_SLOTS) return false;
+    const sourceSlot = slotsRef.current.find((slot) => slot.audioTrackId === trackId);
+    if (!sourceSlot) return false;
+    const created = runEditingAction(() => {
+      const duplicated = duplicateTrack(trackId);
+      if (!duplicated) return null;
+      const nextSlot = {
+        id: `slot-${crypto.randomUUID()}`,
+        name: getNextStudioSlotName(slotsRef.current, sourceSlot.trackKind),
+        audioTrackId: duplicated.id,
+        trackKind: sourceSlot.trackKind,
+      };
+      const nextSlots = insertStudioTrackSlot(slotsRef.current, nextSlot);
+      slotsRef.current = nextSlots;
+      setSlots(nextSlots);
+      return duplicated;
+    });
+    if (!created) return false;
+    setEditingError(null);
+    setEditingNotice("Дорожка дублирована");
+    return true;
+  }, [duplicateTrack, runEditingAction]);
   const isLoading = status === "loading";
   const isPlaying = status === "playing";
   const canControlTransport = tracks.length > 0 && !isLoading;
@@ -758,6 +827,18 @@ export default function StudioEditorShell({
         modifier &&
         !event.altKey &&
         !event.repeat &&
+        event.key.toLowerCase() === "d"
+      ) {
+        if (!selectedTrackAndClip) return;
+        if (duplicateSelectedClip()) {
+          event.preventDefault();
+        }
+        return;
+      }
+      if (
+        modifier &&
+        !event.altKey &&
+        !event.repeat &&
         event.key.toLowerCase() === "b" &&
         canSplitSelectedClip
       ) {
@@ -799,6 +880,7 @@ export default function StudioEditorShell({
     clipboard,
     copySelectedClip,
     deleteSelectedClip,
+    duplicateSelectedClip,
     isPlaying,
     pasteClipboard,
     pause,
@@ -855,11 +937,13 @@ export default function StudioEditorShell({
   const saveSlotRename = (slotId: string) => {
     const name = slotNameDraft.trim();
     if (name) {
-      setSlots((currentSlots) =>
-        currentSlots.map((slot) =>
+      setSlots((currentSlots) => {
+        const next = currentSlots.map((slot) =>
           slot.id === slotId ? { ...slot, name } : slot,
-        ),
-      );
+        );
+        slotsRef.current = next;
+        return next;
+      });
       markSavedChange();
     }
     setEditingSlotId(null);
@@ -872,24 +956,18 @@ export default function StudioEditorShell({
 
   const addSlot = (trackKind: StudioTrackKind) => {
     setSlots((currentSlots) => {
-      const sameKind = currentSlots.filter((slot) => slot.trackKind === trackKind).length;
       if (currentSlots.length >= MAX_TRACK_SLOTS) {
         return currentSlots;
       }
-
-      const nextNumber = sameKind + 1;
       const nextSlot = {
         id: `slot-${crypto.randomUUID()}`,
-        name: `${trackKind === "voice" ? "Голос" : "Музыка"} ${nextNumber}`,
+        name: getNextStudioSlotName(currentSlots, trackKind),
         audioTrackId: null,
         trackKind,
       };
-      const insertAt = trackKind === "voice"
-        ? currentSlots.findIndex((slot) => slot.trackKind === "music")
-        : currentSlots.length;
-      return insertAt < 0
-        ? [...currentSlots, nextSlot]
-        : [...currentSlots.slice(0, insertAt), nextSlot, ...currentSlots.slice(insertAt)];
+      const next = insertStudioTrackSlot(currentSlots, nextSlot);
+      slotsRef.current = next;
+      return next;
     });
     markSavedChange();
   };
@@ -982,6 +1060,28 @@ export default function StudioEditorShell({
                   className="shrink-0 text-[#bda8e8]"
                 >
                   ✎
+                </button>
+                <button
+                  type="button"
+                  disabled={!track || slots.length >= MAX_TRACK_SLOTS}
+                  onClick={() => {
+                    if (track) duplicateCurrentTrack(track.id);
+                  }}
+                  aria-label="Дублировать дорожку"
+                  title={
+                    slots.length >= MAX_TRACK_SLOTS
+                      ? "Можно добавить не больше 5 дорожек"
+                      : track
+                        ? "Дублировать дорожку"
+                        : "Добавьте аудио, чтобы дублировать дорожку"
+                  }
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#9ec5ff] hover:border-sky-300/60 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7h13M4 12h13" />
+                    <path d="M4 17h8" />
+                    <path d="M16 15v6M13 18h6" />
+                  </svg>
                 </button>
               </>
             )}
@@ -1078,8 +1178,17 @@ export default function StudioEditorShell({
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v11M8 14h8l2 7H6l2-7ZM9 17v2m3-2v2m3-2v2" /></svg>
                   </TrackActionButton>
+                  <TrackActionButton
+                    label="Дублировать (⌘/Ctrl+D)"
+                    disabled={!selectedClip}
+                    onClick={() => {
+                      duplicateSelectedClip();
+                    }}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="11" height="11" rx="1.5" /><rect x="4" y="4" width="11" height="11" rx="1.5" /></svg>
+                  </TrackActionButton>
                 </div>
-                {trackKind === "music" ? <div className="mt-2 flex flex-wrap gap-1">
+                {trackKind === "music" ? <div className="mt-2 grid grid-cols-2 gap-1">
                   <TrackFadeButton
                     clip={selectedClip}
                     kind="in"
@@ -1609,6 +1718,11 @@ export default function StudioEditorShell({
           {editingError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {editingError}
+            </p>
+          ) : null}
+          {editingNotice ? (
+            <p role="status" className="mb-4 rounded-lg border border-white/10 bg-[#131b28] px-4 py-3 text-sm text-[#c9d8ff]">
+              {editingNotice}
             </p>
           ) : null}
           {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}

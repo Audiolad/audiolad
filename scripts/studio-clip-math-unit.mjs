@@ -15,6 +15,8 @@ import {
   getStudioClipTrimEndLayout,
   getStudioClipTrimStartLayout,
   splitStudioClip,
+  studioClipOverlapsAny,
+  studioClipRangesOverlap,
 } from "../src/lib/studio/clip-math.ts";
 
 assert.deepEqual(getStudioClipLayout({}, 12), {
@@ -176,6 +178,35 @@ assert.equal(
     { clips: [{ id: "two", startTime: 8, offset: 0, duration: 4 }] },
   ]),
   12,
+);
+
+assert.equal(
+  studioClipRangesOverlap(
+    { startTime: 0, offset: 0, duration: 3 },
+    { startTime: 3, offset: 0, duration: 3 },
+  ),
+  false,
+);
+assert.equal(
+  studioClipRangesOverlap(
+    { startTime: 0, offset: 0, duration: 3 },
+    { startTime: 2.9, offset: 0, duration: 3 },
+  ),
+  true,
+);
+assert.equal(
+  studioClipOverlapsAny(
+    { startTime: 3, offset: 0, duration: 3 },
+    [{ startTime: 0, offset: 0, duration: 3 }, { startTime: 6, offset: 0, duration: 3 }],
+  ),
+  false,
+);
+assert.equal(
+  studioClipOverlapsAny(
+    { startTime: 3, offset: 0, duration: 3 },
+    [{ startTime: 0, offset: 0, duration: 3 }, { startTime: 5, offset: 0, duration: 3 }],
+  ),
+  true,
 );
 
 console.log("studio-clip-math-unit: ok");

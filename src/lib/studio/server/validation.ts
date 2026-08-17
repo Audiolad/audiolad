@@ -150,7 +150,6 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
   void slotIds;
 
   const clipIds = new Set<string>();
-  const assetIds = new Set<string>();
   for (const track of value.tracks) {
     const voicePreset = track && isRecord(track)
       ? (track.voicePreset === undefined ? "none" : parseStudioVoicePreset(track.voicePreset))
@@ -173,11 +172,6 @@ export function parseStudioProjectData(value: unknown): StudioProjectDataV2 {
     ) {
       throw new StudioApiError("invalid_track", 422);
     }
-
-    if (assetIds.has(track.assetId)) {
-      throw new StudioApiError("duplicate_track_asset", 422);
-    }
-    assetIds.add(track.assetId);
 
     const clips: Array<Record<string, unknown>> = [];
     for (const clip of track.clips) {
