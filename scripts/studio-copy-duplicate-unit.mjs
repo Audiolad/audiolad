@@ -265,6 +265,7 @@ assert.match(shell, /track\.id === clipboard\.sourceTrackId/);
 assert.match(shell, /getStudioDuplicateClipStartTime/);
 assert.match(shell, /label="Дублировать \(⌘\/Ctrl\+D\)"/);
 assert.match(shell, /aria-label="Дублировать дорожку"/);
+assert.match(shell, /title="Дублировать дорожку"/);
 assert.match(shell, /slotsRef\.current\.length >= MAX_TRACK_SLOTS/);
 assert.match(shell, /grid grid-cols-2 gap-1/);
 assert.match(shell, /Фрагмент скопирован/);

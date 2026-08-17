@@ -1061,28 +1061,29 @@ export default function StudioEditorShell({
                 >
                   ✎
                 </button>
-                <button
-                  type="button"
-                  disabled={!track || slots.length >= MAX_TRACK_SLOTS}
-                  onClick={() => {
-                    if (track) duplicateCurrentTrack(track.id);
-                  }}
-                  aria-label="Дублировать дорожку"
-                  title={
-                    slots.length >= MAX_TRACK_SLOTS
-                      ? "Можно добавить не больше 5 дорожек"
-                      : track
-                        ? "Дублировать дорожку"
-                        : "Добавьте аудио, чтобы дублировать дорожку"
-                  }
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#9ec5ff] hover:border-sky-300/60 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 7h13M4 12h13" />
-                    <path d="M4 17h8" />
-                    <path d="M16 15v6M13 18h6" />
-                  </svg>
-                </button>
+                <span className="group relative inline-flex shrink-0">
+                  <button
+                    type="button"
+                    disabled={!track || slots.length >= MAX_TRACK_SLOTS}
+                    onClick={() => {
+                      if (track) duplicateCurrentTrack(track.id);
+                    }}
+                    title="Дублировать дорожку"
+                    aria-label="Дублировать дорожку"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/15 bg-[#1c2433] text-[#d8c8fb] hover:border-violet-300/60 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="8" y="8" width="11" height="11" rx="1.5" />
+                      <rect x="4" y="4" width="11" height="11" rx="1.5" />
+                    </svg>
+                  </button>
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-[#070c14] px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    Дублировать дорожку
+                  </span>
+                </span>
               </>
             )}
           </div>
