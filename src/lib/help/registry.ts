@@ -159,12 +159,31 @@ export function validateHelpRegistry(): HelpRegistryValidationResult {
         section.notes,
         errors,
       );
+      validateRichTextField(
+        article.id,
+        `${section.id}.faq`,
+        section.faq?.map((item) => item.answer),
+        errors,
+      );
+
+      for (const figure of section.figures ?? []) {
+        if (!figure.id?.trim() || !figure.alt?.trim() || !figure.caption?.trim()) {
+          errors.push(`invalid_figure:${article.id}:${section.id}:${figure.id ?? "?"}`);
+        }
+      }
+
+      for (const item of section.faq ?? []) {
+        if (!item.question?.trim()) {
+          errors.push(`invalid_faq_question:${article.id}:${section.id}`);
+        }
+      }
 
       // Ensure search can flatten every rich block.
       for (const value of [
         ...(section.paragraphs ?? []),
         ...(section.steps ?? []),
         ...(section.notes ?? []),
+        ...(section.faq?.map((item) => item.answer) ?? []),
       ]) {
         flattenHelpRichText(value);
       }

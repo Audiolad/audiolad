@@ -36,12 +36,29 @@ export type HelpInlineNode = HelpInlineText | HelpInlineLink;
  */
 export type HelpRichText = string | HelpInlineNode[];
 
+export type HelpArticleFigure = {
+  id: string;
+  /** Public path under /public. Renderer skips the image if the file is absent. */
+  src?: string;
+  alt: string;
+  caption: string;
+};
+
+export type HelpFaqItem = {
+  question: string;
+  answer: HelpRichText;
+};
+
 export type HelpArticleSection = {
   id: string;
   title?: string;
+  /** Defaults to 2. Use 3 for subsections (Edge/Chrome, FAQ answers stay as H3). */
+  headingLevel?: 2 | 3;
   paragraphs?: HelpRichText[];
   steps?: HelpRichText[];
   notes?: HelpRichText[];
+  figures?: HelpArticleFigure[];
+  faq?: HelpFaqItem[];
 };
 
 export type HelpArticleCta = {
@@ -53,8 +70,16 @@ export type HelpArticle = {
   /** Stable knowledge-base ID for future retrieval / AI. */
   id: string;
   slug: string;
+  /** Card, breadcrumb and search title. */
   title: string;
+  /** Optional H1 override. Defaults to `title`. */
+  heading?: string;
+  /** Card and hub description. */
   description: string;
+  /** Optional document title. Defaults to `${title} – Справочный центр АудиоЛад`. */
+  seoTitle?: string;
+  /** Optional meta description. Defaults to `description`. */
+  seoDescription?: string;
   category: HelpCategoryId;
   audience: HelpAudience;
   order: number;

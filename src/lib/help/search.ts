@@ -45,6 +45,13 @@ function collectSectionText(article: HelpArticle): {
     body.push(...collectHelpRichTexts(section.paragraphs));
     body.push(...collectHelpRichTexts(section.steps));
     body.push(...collectHelpRichTexts(section.notes));
+    for (const figure of section.figures ?? []) {
+      body.push(figure.alt, figure.caption);
+    }
+    for (const item of section.faq ?? []) {
+      sectionTitles.push(item.question);
+      body.push(item.question, ...collectHelpRichTexts([item.answer]));
+    }
   }
 
   return { sectionTitles, body };
@@ -59,7 +66,15 @@ export function buildHelpSearchDocument(article: HelpArticle): HelpSearchDocumen
     title: article.title,
     description: article.description,
     titleTokens: tokenizeHelpSearchText(
-      [article.title, article.description].join(" "),
+      [
+        article.title,
+        article.heading,
+        article.description,
+        article.seoTitle,
+        article.seoDescription,
+      ]
+        .filter(Boolean)
+        .join(" "),
     ),
     keywordTokens: tokenizeHelpSearchText(article.keywords.join(" ")),
     sectionTitleTokens: tokenizeHelpSearchText(sectionTitles.join(" ")),

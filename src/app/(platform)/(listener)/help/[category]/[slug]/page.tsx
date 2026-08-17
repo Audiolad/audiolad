@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import HelpArticleView from "@/components/help/HelpArticleView";
 import { isHelpCategoryId } from "@/lib/help/categories";
+import { resolveHelpArticleFigures } from "@/lib/help/figures";
 import { buildHelpArticleMetadata } from "@/lib/help/metadata";
 import {
   getHelpArticleById,
@@ -55,7 +56,7 @@ export default async function HelpArticlePage({
 
   return (
     <HelpArticleView
-      article={article}
+      article={resolveHelpArticleFigures(article)}
       related={related}
       authorSlug={authorSlug}
     />

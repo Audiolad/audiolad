@@ -87,8 +87,9 @@ for (const article of articles) {
   assert.ok(article.keywords.length > 0, `${article.id} needs keywords`);
 
   for (const section of article.sections) {
-    for (const field of ["paragraphs", "steps", "notes"]) {
-      const values = section[field] ?? [];
+    const faqAnswers = (section.faq ?? []).map((item) => item.answer);
+    for (const field of ["paragraphs", "steps", "notes", "faq"]) {
+      const values = field === "faq" ? faqAnswers : section[field] ?? [];
       for (const value of values) {
         if (isHelpRichNodes(value)) {
           for (const node of value) {
@@ -202,9 +203,78 @@ assert.doesNotMatch(
   /replace\(.*\/auth/,
   "no regex rewriting of routes in article view",
 );
+assert.match(articleView, /headingLevel === 3/);
+assert.match(articleView, /section\.faq/);
+assert.match(articleView, /figure\.src/);
+assert.match(articleView, /article\.heading \?\? article\.title/);
+
+const installOnPhone = articles.find(
+  (article) => article.id === "help.listeners.install-on-phone",
+);
+assert.ok(installOnPhone, "install-on-phone article remains registered");
+assert.equal(installOnPhone.slug, "install-on-phone");
+assert.equal(installOnPhone.category, "getting-started");
+assert.equal(
+  installOnPhone.title,
+  "Как скачать и установить АудиоЛад",
+  "install card/breadcrumb title",
+);
+assert.equal(
+  installOnPhone.heading,
+  "Как скачать и установить АудиоЛад на телефон и компьютер",
+);
+assert.match(installOnPhone.seoTitle, /АудиоЛад скачать/);
+assert.match(installOnPhone.seoTitle, /Виндовс/);
+assert.match(installOnPhone.seoDescription, /Виндовс \("Windows"\)|Виндовс \(«Windows»\)/);
+assert.equal(
+  `/help/${installOnPhone.category}/${installOnPhone.slug}`,
+  "/help/getting-started/install-on-phone",
+);
+assert.equal(
+  articles.filter((article) => /скачать/i.test(article.slug)).length,
+  0,
+  "no extra download slug besides install-on-phone URL",
+);
+
+const {
+  buildHelpArticleMetadata,
+  helpArticleDocumentTitle,
+} = await import("../src/lib/help/metadata.ts");
+assert.equal(
+  helpArticleDocumentTitle(installOnPhone),
+  "АудиоЛад скачать на Виндовс, Андроид и Айфон — как установить",
+);
+const installMetadata = buildHelpArticleMetadata(installOnPhone);
+assert.equal(
+  installMetadata.title,
+  "АудиоЛад скачать на Виндовс, Андроид и Айфон — как установить",
+);
+assert.equal(installMetadata.robots?.index, true);
+assert.equal(installMetadata.robots?.follow, true);
+assert.equal(
+  installMetadata.alternates?.canonical,
+  "https://audiolad.ru/help/getting-started/install-on-phone",
+);
+
+const { resolveHelpFigureSrc } = await import("../src/lib/help/figures.ts");
+assert.equal(
+  resolveHelpFigureSrc("/help/install-on-phone/android-chrome-open.png"),
+  undefined,
+  "missing illustration files must not resolve to a src",
+);
+assert.equal(resolveHelpFigureSrc("../secret.png"), undefined);
+assert.equal(resolveHelpFigureSrc("//cdn.example/x.png"), undefined);
 
 const index = getHelpSearchIndex();
 assert.equal(index.length, articles.length);
+
+for (const query of ["скачать", "установить", "виндовс", "андроид", "айфон", "приложение"]) {
+  const hits = searchHelpArticles(index, query);
+  assert.ok(
+    hits.some((hit) => hit.articleId === "help.listeners.install-on-phone"),
+    `help search "${query}" should find install-on-phone`,
+  );
+}
 
 const titleHits = searchHelpArticles(index, "создать первый аудиопродукт");
 assert.ok(titleHits.length > 0, "title search should hit");

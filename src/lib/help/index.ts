@@ -1,10 +1,12 @@
 export type {
   HelpArticle,
   HelpArticleCta,
+  HelpArticleFigure,
   HelpArticleSection,
   HelpAudience,
   HelpCategory,
   HelpCategoryId,
+  HelpFaqItem,
   HelpInlineLink,
   HelpInlineNode,
   HelpInlineText,
@@ -46,6 +48,12 @@ export {
   searchHelpArticles,
   tokenizeHelpSearchText,
 } from "@/lib/help/search";
+
+export {
+  helpArticleDocumentTitle,
+  helpArticleHeading,
+  helpArticleMetaDescription,
+} from "@/lib/help/metadata";
 
 export type { HelpSearchDocument } from "@/lib/help/search";
 

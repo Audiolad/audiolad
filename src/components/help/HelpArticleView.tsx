@@ -74,7 +74,7 @@ export default function HelpArticleView({
       <header className="mt-6 max-w-3xl">
         <p className="text-sm font-medium text-[#8c7dab]">{category.title}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#25135c] sm:text-4xl">
-          {article.title}
+          {article.heading ?? article.title}
         </h1>
         <p className="mt-4 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
           {article.description}
@@ -90,12 +90,21 @@ export default function HelpArticleView({
             }
           >
             {section.title ? (
-              <h2
-                id={`help-section-${section.id}`}
-                className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl"
-              >
-                {section.title}
-              </h2>
+              section.headingLevel === 3 ? (
+                <h3
+                  id={`help-section-${section.id}`}
+                  className="text-lg font-semibold tracking-tight text-[#25135c] sm:text-xl"
+                >
+                  {section.title}
+                </h3>
+              ) : (
+                <h2
+                  id={`help-section-${section.id}`}
+                  className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl"
+                >
+                  {section.title}
+                </h2>
+              )
             ) : null}
 
             {section.paragraphs?.map((paragraph, index) => (
@@ -120,6 +129,25 @@ export default function HelpArticleView({
               </ol>
             ) : null}
 
+            {section.figures?.map((figure) =>
+              figure.src ? (
+                <figure
+                  key={figure.id}
+                  className="mt-4 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={figure.src}
+                    alt={figure.alt}
+                    className="h-auto w-full"
+                  />
+                  <figcaption className="px-4 py-3 text-sm leading-6 text-[#5f5484]">
+                    {figure.caption}
+                  </figcaption>
+                </figure>
+              ) : null,
+            )}
+
             {section.notes && section.notes.length > 0 ? (
               <ul className="mt-4 space-y-2 rounded-[20px] border border-[#eadff8] bg-[#fcfbfe] px-4 py-4">
                 {section.notes.map((note, index) => (
@@ -131,6 +159,27 @@ export default function HelpArticleView({
                   </li>
                 ))}
               </ul>
+            ) : null}
+
+            {section.faq && section.faq.length > 0 ? (
+              <dl className="mt-4 space-y-5">
+                {section.faq.map((item, index) => (
+                  <div key={`${section.id}-faq-${index}`}>
+                    <dt>
+                      <h3 className="text-lg font-semibold tracking-tight text-[#25135c]">
+                        {item.question}
+                      </h3>
+                    </dt>
+                    <dd>
+                      <HelpRichText
+                        as="p"
+                        value={item.answer}
+                        className="mt-2 text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8"
+                      />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             ) : null}
           </section>
         ))}

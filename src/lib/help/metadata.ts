@@ -27,14 +27,33 @@ export function buildHelpHubMetadata(): Metadata {
   };
 }
 
+export function helpArticleHeading(article: HelpArticle): string {
+  return article.heading ?? article.title;
+}
+
+export function helpArticleDocumentTitle(article: HelpArticle): string {
+  if (article.seoTitle?.trim()) {
+    return article.seoTitle.trim();
+  }
+  return `${article.title} – Справочный центр АудиоЛад`;
+}
+
+export function helpArticleMetaDescription(article: HelpArticle): string {
+  return article.seoDescription?.trim() || article.description;
+}
+
 export function buildHelpArticleMetadata(article: HelpArticle): Metadata {
-  const title = `${article.title} – Справочный центр АудиоЛад`;
-  const description = article.description;
+  const title = helpArticleDocumentTitle(article);
+  const description = helpArticleMetaDescription(article);
   const url = absoluteUrl(helpArticlePath(article));
 
   return {
     title,
     description,
+    robots: {
+      index: true,
+      follow: true,
+    },
     alternates: { canonical: url },
     openGraph: {
       title,
