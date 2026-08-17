@@ -12,6 +12,7 @@ import type {
   HelpRichText,
   HelpSearchHit,
 } from "@/lib/help/types";
+import { getHelpStepFigure, getHelpStepText } from "@/lib/help/types";
 import type { HelpSearchDocument } from "@/lib/help/search";
 
 function validateRichTextField(
@@ -150,7 +151,7 @@ export function validateHelpRegistry(): HelpRegistryValidationResult {
       validateRichTextField(
         article.id,
         `${section.id}.steps`,
-        section.steps,
+        section.steps?.map((step) => getHelpStepText(step)),
         errors,
       );
       validateRichTextField(
@@ -166,7 +167,13 @@ export function validateHelpRegistry(): HelpRegistryValidationResult {
         errors,
       );
 
-      for (const figure of section.figures ?? []) {
+      const figures = [
+        ...(section.figures ?? []),
+        ...(section.steps ?? [])
+          .map((step) => getHelpStepFigure(step))
+          .filter((figure): figure is NonNullable<typeof figure> => figure != null),
+      ];
+      for (const figure of figures) {
         if (!figure.id?.trim() || !figure.alt?.trim() || !figure.caption?.trim()) {
           errors.push(`invalid_figure:${article.id}:${section.id}:${figure.id ?? "?"}`);
         }
@@ -181,7 +188,7 @@ export function validateHelpRegistry(): HelpRegistryValidationResult {
       // Ensure search can flatten every rich block.
       for (const value of [
         ...(section.paragraphs ?? []),
-        ...(section.steps ?? []),
+        ...(section.steps?.map((step) => getHelpStepText(step)) ?? []),
         ...(section.notes ?? []),
         ...(section.faq?.map((item) => item.answer) ?? []),
       ]) {

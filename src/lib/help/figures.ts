@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import type { HelpArticle, HelpArticleFigure } from "@/lib/help/types";
+import { getHelpStepFigure, isHelpStepRecord } from "@/lib/help/types";
 
 /** Return the public src only when the file exists under /public. */
 export function resolveHelpFigureSrc(src: string | undefined): string | undefined {
@@ -39,6 +40,15 @@ export function resolveHelpArticleFigures(article: HelpArticle): HelpArticle {
     sections: article.sections.map((section) => ({
       ...section,
       figures: section.figures?.map(resolveHelpFigure),
+      steps: section.steps?.map((step) => {
+        if (!isHelpStepRecord(step)) return step;
+        const figure = getHelpStepFigure(step);
+        if (!figure) return step;
+        return {
+          ...step,
+          figure: resolveHelpFigure(figure),
+        };
+      }),
     })),
   };
 }

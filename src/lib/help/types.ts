@@ -49,13 +49,42 @@ export type HelpFaqItem = {
   answer: HelpRichText;
 };
 
+export type HelpArticleStepRecord = {
+  text: HelpRichText;
+  figure?: HelpArticleFigure;
+};
+
+/** Plain rich text, or a step with an optional illustration after the text. */
+export type HelpArticleStep = HelpRichText | HelpArticleStepRecord;
+
+export function isHelpStepRecord(
+  value: HelpArticleStep,
+): value is HelpArticleStepRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "text" in value
+  );
+}
+
+export function getHelpStepText(step: HelpArticleStep): HelpRichText {
+  return isHelpStepRecord(step) ? step.text : step;
+}
+
+export function getHelpStepFigure(
+  step: HelpArticleStep,
+): HelpArticleFigure | undefined {
+  return isHelpStepRecord(step) ? step.figure : undefined;
+}
+
 export type HelpArticleSection = {
   id: string;
   title?: string;
   /** Defaults to 2. Use 3 for subsections (Edge/Chrome, FAQ answers stay as H3). */
   headingLevel?: 2 | 3;
   paragraphs?: HelpRichText[];
-  steps?: HelpRichText[];
+  steps?: HelpArticleStep[];
   notes?: HelpRichText[];
   figures?: HelpArticleFigure[];
   faq?: HelpFaqItem[];

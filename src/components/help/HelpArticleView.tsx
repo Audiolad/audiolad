@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -10,7 +11,8 @@ import {
 } from "@/lib/help/analytics";
 import { getHelpCategory } from "@/lib/help/categories";
 import { helpArticlePath, helpHubHref, helpSupportHref } from "@/lib/help/paths";
-import type { HelpArticle } from "@/lib/help/types";
+import type { HelpArticle, HelpArticleFigure } from "@/lib/help/types";
+import { getHelpStepFigure, getHelpStepText } from "@/lib/help/types";
 
 type HelpArticleViewProps = {
   article: HelpArticle;
@@ -18,6 +20,29 @@ type HelpArticleViewProps = {
   /** Author workspace slug for return links (`?author=`). */
   authorSlug?: string | null;
 };
+
+const INSTALL_FIGURE_WIDTH = 1122;
+const INSTALL_FIGURE_HEIGHT = 1402;
+
+function HelpStepFigure({ figure }: { figure: HelpArticleFigure }) {
+  if (!figure.src) return null;
+
+  return (
+    <figure className="mt-3 w-full max-w-[min(100%,22.5rem)] overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]">
+      <Image
+        src={figure.src}
+        alt={figure.alt}
+        width={INSTALL_FIGURE_WIDTH}
+        height={INSTALL_FIGURE_HEIGHT}
+        className="h-auto w-full object-contain"
+        sizes="(max-width: 640px) 100vw, 22.5rem"
+      />
+      <figcaption className="px-4 py-3 text-sm leading-6 text-[#5f5484]">
+        {figure.caption}
+      </figcaption>
+    </figure>
+  );
+}
 
 function withOptionalAuthor(href: string, authorSlug?: string | null): string {
   if (!authorSlug || !href.startsWith("/author-dashboard")) return href;
@@ -118,35 +143,20 @@ export default function HelpArticleView({
 
             {section.steps && section.steps.length > 0 ? (
               <ol className="mt-4 list-decimal space-y-3 pl-5 marker:font-semibold marker:text-[#7042c5]">
-                {section.steps.map((step, index) => (
-                  <li
-                    key={`${section.id}-s-${index}`}
-                    className="text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8"
-                  >
-                    <HelpRichText value={step} />
-                  </li>
-                ))}
+                {section.steps.map((step, index) => {
+                  const figure = getHelpStepFigure(step);
+                  return (
+                    <li
+                      key={`${section.id}-s-${index}`}
+                      className="text-[15px] leading-7 text-[#4c3d78] sm:text-base sm:leading-8"
+                    >
+                      <HelpRichText value={getHelpStepText(step)} />
+                      {figure ? <HelpStepFigure figure={figure} /> : null}
+                    </li>
+                  );
+                })}
               </ol>
             ) : null}
-
-            {section.figures?.map((figure) =>
-              figure.src ? (
-                <figure
-                  key={figure.id}
-                  className="mt-4 overflow-hidden rounded-[20px] border border-[#eadff8] bg-[#fcfbfe]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={figure.src}
-                    alt={figure.alt}
-                    className="h-auto w-full"
-                  />
-                  <figcaption className="px-4 py-3 text-sm leading-6 text-[#5f5484]">
-                    {figure.caption}
-                  </figcaption>
-                </figure>
-              ) : null,
-            )}
 
             {section.notes && section.notes.length > 0 ? (
               <ul className="mt-4 space-y-2 rounded-[20px] border border-[#eadff8] bg-[#fcfbfe] px-4 py-4">

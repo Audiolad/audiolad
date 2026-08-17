@@ -3,13 +3,13 @@ import type { HelpArticle, HelpArticleFigure } from "@/lib/help/types";
 const INSTALL_FIGURE_DIR = "/help/install-on-phone";
 
 function installFigure(
-  id: string,
+  filename: string,
   alt: string,
   caption: string,
 ): HelpArticleFigure {
   return {
-    id,
-    src: `${INSTALL_FIGURE_DIR}/${id}.png`,
+    id: filename.replace(/\.png$/, ""),
+    src: `${INSTALL_FIGURE_DIR}/${filename}`,
     alt,
     caption,
   };
@@ -82,28 +82,6 @@ export const installOnPhoneArticle: HelpArticle = {
         "Откройте раздел приложений и выберите команду установки этого сайта как приложения.",
         "Подтвердите установку.",
       ],
-      figures: [
-        installFigure(
-          "edge-open",
-          "Открыть audiolad.ru в Microsoft Edge на Виндовс.",
-          "Открыть audiolad.ru в Microsoft Edge на Виндовс.",
-        ),
-        installFigure(
-          "edge-menu-apps",
-          "Меню Microsoft Edge и раздел приложений на Виндовс.",
-          "Меню Microsoft Edge и раздел приложений на Виндовс.",
-        ),
-        installFigure(
-          "edge-install-confirm",
-          "Подтверждение установки АудиоЛада в Microsoft Edge.",
-          "Подтверждение установки АудиоЛада в Microsoft Edge.",
-        ),
-        installFigure(
-          "windows-desktop-icon",
-          "Иконка АудиоЛада на рабочем столе Виндовс после установки через Microsoft Edge.",
-          "Иконка АудиоЛада на рабочем столе Виндовс после установки через Microsoft Edge.",
-        ),
-      ],
     },
     {
       id: "windows-edge-after",
@@ -117,27 +95,38 @@ export const installOnPhoneArticle: HelpArticle = {
       title: "Через Google Chrome",
       headingLevel: 3,
       steps: [
-        "Откройте audiolad.ru в Google Chrome.",
-        "Нажмите меню ⋮ в правом верхнем углу.",
-        "Выберите команду установки страницы как приложения.",
-        "Подтвердите установку.",
-      ],
-      figures: [
-        installFigure(
-          "chrome-open",
-          "Открыть audiolad.ru в Google Chrome на Виндовс.",
-          "Открыть audiolad.ru в Google Chrome на Виндовс.",
-        ),
-        installFigure(
-          "chrome-install",
-          "Пункт установки страницы как приложения в Google Chrome на Виндовс.",
-          "Пункт установки страницы как приложения в Google Chrome на Виндовс.",
-        ),
-        installFigure(
-          "windows-desktop-icon-chrome",
-          "Иконка АудиоЛада на рабочем столе Виндовс после установки через Google Chrome.",
-          "Иконка АудиоЛада на рабочем столе Виндовс после установки через Google Chrome.",
-        ),
+        {
+          text: "Откройте audiolad.ru в Google Chrome.",
+          figure: installFigure(
+            "windows-01-open-audiolad-chrome.png",
+            "Как открыть АудиоЛад в Chrome на Виндовс",
+            "Откройте audiolad.ru в Google Chrome.",
+          ),
+        },
+        {
+          text: "Нажмите меню ⋮ в правом верхнем углу.",
+          figure: installFigure(
+            "windows-02-menu.png",
+            "Меню Google Chrome на Виндовс",
+            "Нажмите меню браузера.",
+          ),
+        },
+        {
+          text: "Выберите команду установки страницы как приложения.",
+          figure: installFigure(
+            "windows-03-install-app.png",
+            "Установить приложение АудиоЛад на Виндовс",
+            "Выберите установку как приложения.",
+          ),
+        },
+        {
+          text: "Подтвердите установку.",
+          figure: installFigure(
+            "windows-04-confirm-install.png",
+            "АудиоЛад установлен как приложение на Виндовс",
+            "Подтвердите установку.",
+          ),
+        },
       ],
     },
     {
@@ -154,37 +143,38 @@ export const installOnPhoneArticle: HelpArticle = {
         "Чтобы установить АудиоЛад на телефон с Андроид:",
       ],
       steps: [
-        "Откройте audiolad.ru в Google Chrome.",
-        "Нажмите меню браузера.",
-        "Выберите «Добавить на главный экран», «Установить приложение» или аналогичный пункт.",
-        "Подтвердите добавление.",
-      ],
-      figures: [
-        installFigure(
-          "android-chrome-open",
-          "Открыть audiolad.ru в Google Chrome на Андроид.",
-          "Открыть audiolad.ru в Google Chrome на Андроид.",
-        ),
-        installFigure(
-          "android-chrome-menu",
-          "Меню Google Chrome на Андроид.",
-          "Меню Google Chrome на Андроид.",
-        ),
-        installFigure(
-          "android-chrome-add-home",
-          "Пункт установки АудиоЛада в меню Chrome.",
-          "Пункт установки АудиоЛада в меню Chrome.",
-        ),
-        installFigure(
-          "android-chrome-confirm",
-          "Подтверждение установки АудиоЛада на Андроид.",
-          "Подтверждение установки АудиоЛада на Андроид.",
-        ),
-        installFigure(
-          "android-home-icon",
-          "Иконка АудиоЛада на главном экране Андроид.",
-          "Иконка АудиоЛада на главном экране Андроид.",
-        ),
+        {
+          text: "Откройте audiolad.ru в Google Chrome.",
+          figure: installFigure(
+            "android-01-open-audiolad-chrome.png",
+            "Как открыть АудиоЛад в Chrome на Андроид",
+            "Откройте audiolad.ru в Google Chrome.",
+          ),
+        },
+        {
+          text: "Нажмите меню браузера.",
+          figure: installFigure(
+            "android-02-menu.png",
+            "Меню Google Chrome на Андроид",
+            "Нажмите меню браузера.",
+          ),
+        },
+        {
+          text: "Выберите «Добавить на главный экран», «Установить приложение» или аналогичный пункт.",
+          figure: installFigure(
+            "android-03-install.png",
+            "Установить приложение АудиоЛад на Андроид",
+            "Выберите установку на главный экран.",
+          ),
+        },
+        {
+          text: "Подтвердите добавление.",
+          figure: installFigure(
+            "android-04-confirm-install.png",
+            "Подтверждение установки АудиоЛада на Андроид",
+            "Подтвердите добавление.",
+          ),
+        },
       ],
     },
     {
@@ -202,38 +192,39 @@ export const installOnPhoneArticle: HelpArticle = {
         "Чтобы добавить АудиоЛад на Айфон:",
       ],
       steps: [
-        "Откройте audiolad.ru в Safari.",
-        "Нажмите кнопку «Поделиться».",
-        "Выберите «На экран Домой».",
+        {
+          text: "Откройте audiolad.ru в Safari.",
+          figure: installFigure(
+            "iphone-01-open-audiolad-safari.png",
+            "Как открыть АудиоЛад в Safari на Айфоне",
+            "Откройте audiolad.ru в Safari.",
+          ),
+        },
+        {
+          text: "Нажмите кнопку «Поделиться».",
+          figure: installFigure(
+            "iphone-02-share.png",
+            "Кнопка Поделиться в Safari для установки АудиоЛада",
+            "Нажмите «Поделиться».",
+          ),
+        },
+        {
+          text: "Выберите «На экран Домой».",
+          figure: installFigure(
+            "iphone-03-add-to-home-screen.png",
+            "На экран Домой — установка АудиоЛада на Айфон",
+            "Выберите «На экран Домой».",
+          ),
+        },
         "При необходимости оставьте название «АудиоЛад».",
-        "Нажмите «Добавить».",
-      ],
-      figures: [
-        installFigure(
-          "iphone-safari-open",
-          "Открыть audiolad.ru в Safari на Айфоне.",
-          "Открыть audiolad.ru в Safari на Айфоне.",
-        ),
-        installFigure(
-          "iphone-safari-share",
-          "Кнопка «Поделиться» в Safari.",
-          "Кнопка «Поделиться» в Safari.",
-        ),
-        installFigure(
-          "iphone-safari-add-home",
-          "Пункт «На экран Домой» в меню «Поделиться».",
-          "Пункт «На экран Домой» в меню «Поделиться».",
-        ),
-        installFigure(
-          "iphone-safari-add-confirm",
-          "Подтверждение «Добавить» на экран Домой.",
-          "Подтверждение «Добавить» на экран Домой.",
-        ),
-        installFigure(
-          "iphone-home-icon",
-          "Иконка АудиоЛада на домашнем экране Айфона.",
-          "Иконка АудиоЛада на домашнем экране Айфона.",
-        ),
+        {
+          text: "Нажмите «Добавить».",
+          figure: installFigure(
+            "iphone-04-add.png",
+            "Добавление иконки АудиоЛада на экран Айфона",
+            "Нажмите «Добавить».",
+          ),
+        },
       ],
     },
     {

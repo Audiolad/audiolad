@@ -21,6 +21,7 @@ import {
   searchHelpArticles,
   tokenizeHelpSearchText,
 } from "../src/lib/help/search.ts";
+import { getHelpStepFigure, getHelpStepText } from "../src/lib/help/types.ts";
 import { sanitizeSupportSourceUrl } from "../src/lib/help/source-url.ts";
 import {
   validateSupportFormInput,
@@ -88,8 +89,14 @@ for (const article of articles) {
 
   for (const section of article.sections) {
     const faqAnswers = (section.faq ?? []).map((item) => item.answer);
+    const stepTexts = (section.steps ?? []).map((step) => getHelpStepText(step));
     for (const field of ["paragraphs", "steps", "notes", "faq"]) {
-      const values = field === "faq" ? faqAnswers : section[field] ?? [];
+      const values =
+        field === "faq"
+          ? faqAnswers
+          : field === "steps"
+            ? stepTexts
+            : section[field] ?? [];
       for (const value of values) {
         if (isHelpRichNodes(value)) {
           for (const node of value) {
@@ -205,7 +212,8 @@ assert.doesNotMatch(
 );
 assert.match(articleView, /headingLevel === 3/);
 assert.match(articleView, /section\.faq/);
-assert.match(articleView, /figure\.src/);
+assert.match(articleView, /from "next\/image"/);
+assert.match(articleView, /getHelpStepFigure/);
 assert.match(articleView, /article\.heading \?\? article\.title/);
 
 const installOnPhone = articles.find(
@@ -256,14 +264,115 @@ assert.equal(
   "https://audiolad.ru/help/getting-started/install-on-phone",
 );
 
-const { resolveHelpFigureSrc } = await import("../src/lib/help/figures.ts");
-assert.equal(
-  resolveHelpFigureSrc("/help/install-on-phone/android-chrome-open.png"),
-  undefined,
-  "missing illustration files must not resolve to a src",
+const { resolveHelpArticleFigures, resolveHelpFigureSrc } = await import(
+  "../src/lib/help/figures.ts"
 );
 assert.equal(resolveHelpFigureSrc("../secret.png"), undefined);
 assert.equal(resolveHelpFigureSrc("//cdn.example/x.png"), undefined);
+
+const INSTALL_FIGURES = [
+  {
+    id: "windows-01-open-audiolad-chrome",
+    src: "/help/install-on-phone/windows-01-open-audiolad-chrome.png",
+    sectionId: "windows-chrome",
+    step: 0,
+  },
+  {
+    id: "windows-02-menu",
+    src: "/help/install-on-phone/windows-02-menu.png",
+    sectionId: "windows-chrome",
+    step: 1,
+  },
+  {
+    id: "windows-03-install-app",
+    src: "/help/install-on-phone/windows-03-install-app.png",
+    sectionId: "windows-chrome",
+    step: 2,
+  },
+  {
+    id: "windows-04-confirm-install",
+    src: "/help/install-on-phone/windows-04-confirm-install.png",
+    sectionId: "windows-chrome",
+    step: 3,
+  },
+  {
+    id: "android-01-open-audiolad-chrome",
+    src: "/help/install-on-phone/android-01-open-audiolad-chrome.png",
+    sectionId: "android",
+    step: 0,
+  },
+  {
+    id: "android-02-menu",
+    src: "/help/install-on-phone/android-02-menu.png",
+    sectionId: "android",
+    step: 1,
+  },
+  {
+    id: "android-03-install",
+    src: "/help/install-on-phone/android-03-install.png",
+    sectionId: "android",
+    step: 2,
+  },
+  {
+    id: "android-04-confirm-install",
+    src: "/help/install-on-phone/android-04-confirm-install.png",
+    sectionId: "android",
+    step: 3,
+  },
+  {
+    id: "iphone-01-open-audiolad-safari",
+    src: "/help/install-on-phone/iphone-01-open-audiolad-safari.png",
+    sectionId: "iphone",
+    step: 0,
+  },
+  {
+    id: "iphone-02-share",
+    src: "/help/install-on-phone/iphone-02-share.png",
+    sectionId: "iphone",
+    step: 1,
+  },
+  {
+    id: "iphone-03-add-to-home-screen",
+    src: "/help/install-on-phone/iphone-03-add-to-home-screen.png",
+    sectionId: "iphone",
+    step: 2,
+  },
+  {
+    id: "iphone-04-add",
+    src: "/help/install-on-phone/iphone-04-add.png",
+    sectionId: "iphone",
+    step: 4,
+  },
+];
+
+for (const item of INSTALL_FIGURES) {
+  assert.equal(
+    resolveHelpFigureSrc(item.src),
+    item.src,
+    `${item.src} must resolve on disk`,
+  );
+}
+
+const resolvedInstall = resolveHelpArticleFigures(installOnPhone);
+const installSource = read("src/lib/help/articles/listeners/install-on-phone.ts");
+assert.doesNotMatch(installSource, /edge-open|android-chrome-open|iphone-safari-open|android-home-icon|iphone-home-icon/);
+assert.equal(
+  resolvedInstall.sections.find((section) => section.id === "windows-edge")?.figures,
+  undefined,
+);
+
+const resolvedFigureIds = [];
+for (const item of INSTALL_FIGURES) {
+  const section = resolvedInstall.sections.find((entry) => entry.id === item.sectionId);
+  assert.ok(section, `section ${item.sectionId} exists`);
+  const figure = getHelpStepFigure(section.steps[item.step]);
+  assert.ok(figure, `${item.id} is bound to step ${item.step}`);
+  assert.equal(figure.id, item.id);
+  assert.equal(figure.src, item.src);
+  resolvedFigureIds.push(figure.id);
+}
+assert.equal(resolvedFigureIds.length, 12);
+assert.equal(new Set(resolvedFigureIds).size, 12);
 
 const index = getHelpSearchIndex();
 assert.equal(index.length, articles.length);

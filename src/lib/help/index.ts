@@ -3,6 +3,8 @@ export type {
   HelpArticleCta,
   HelpArticleFigure,
   HelpArticleSection,
+  HelpArticleStep,
+  HelpArticleStepRecord,
   HelpAudience,
   HelpCategory,
   HelpCategoryId,
@@ -22,6 +24,9 @@ export {
   SUPPORT_CATEGORY_LABELS,
   SUPPORT_REQUEST_CATEGORIES,
   SUPPORT_REQUEST_STATUSES,
+  getHelpStepFigure,
+  getHelpStepText,
+  isHelpStepRecord,
 } from "@/lib/help/types";
 
 export {
