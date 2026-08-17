@@ -332,7 +332,7 @@ export const installOnPhoneArticle: HelpArticle = {
     },
   ],
   cta: {
-    label: "Открыть АудиоЛад",
-    href: "/listen",
+    label: "Открыть каталог",
+    href: "/catalog",
   },
 };
