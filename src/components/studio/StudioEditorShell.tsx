@@ -1759,7 +1759,20 @@ export default function StudioEditorShell({
                 {saveButtonLabel}
               </button>
               {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-3 text-sm text-emerald-100">Скачать MP3</a> : null}
-              {renderJob?.status === "completed" && accessMode !== "guest" ? null : <button type="button" disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)} onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }} title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь" className="h-10 rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</button>}
+              {renderJob?.status === "completed" && accessMode !== "guest" ? null : (
+                <button
+                  type="button"
+                  disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
+                  onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }}
+                  title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"
+                  className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45"
+                >
+                  {renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? (
+                    <span aria-hidden className="studio-mp3-render-sweep pointer-events-none absolute inset-0" />
+                  ) : null}
+                  <span className="relative z-10">{renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? "Создаём MP3..." : "Создать MP3"}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
