@@ -1,4 +1,5 @@
 import { getSafeNextPath } from "@/lib/auth/routes";
+import { buildPublicRedirectUrl } from "@/lib/seo/app-origin";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -8,7 +9,9 @@ export async function GET(request: Request) {
   const next = getSafeNextPath(url.searchParams.get("next"), "/profile");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/auth/sign-in?error=auth_callback", url.origin));
+    return NextResponse.redirect(
+      buildPublicRedirectUrl("/auth/sign-in?error=auth_callback", request),
+    );
   }
 
   const supabase = await createClient();
@@ -17,9 +20,9 @@ export async function GET(request: Request) {
   if (error) {
     console.error("auth_callback_exchange_error", error.message);
     return NextResponse.redirect(
-      new URL("/auth/reset-password?error=expired", url.origin),
+      buildPublicRedirectUrl("/auth/reset-password?error=expired", request),
     );
   }
 
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(buildPublicRedirectUrl(next, request));
 }

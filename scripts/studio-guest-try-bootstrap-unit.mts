@@ -58,6 +58,8 @@ assert.match(startRoute, /response\.cookies\.set/);
 assert.match(startRoute, /NextResponse\.redirect/);
 assert.match(startRoute, /started/);
 assert.match(startRoute, /decideGuestTryStartFlow/);
+assert.match(startRoute, /buildPublicRedirectUrl/);
+assert.doesNotMatch(startRoute, /new URL\([^\n]+,\s*request\.url\)/);
 assert.doesNotMatch(startRoute, /export default async function/);
 
 const guestSession = await read("src/lib/studio/server/guest-session.ts");

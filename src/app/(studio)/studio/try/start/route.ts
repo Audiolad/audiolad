@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { buildPublicRedirectUrl } from "@/lib/seo/app-origin";
 import { resolveStudioActor } from "@/lib/studio/guest-access";
 import {
   STUDIO_GUEST_TRY_PATH,
@@ -14,11 +15,11 @@ export async function GET(request: Request) {
   const actor = await resolveStudioActor();
   const flow = decideGuestTryStartFlow(actor.kind);
   if (flow === "author_studio") {
-    return NextResponse.redirect(new URL("/studio/projects", request.url));
+    return NextResponse.redirect(buildPublicRedirectUrl("/studio/projects", request));
   }
 
   const { token } = await ensureGuestSessionRecord();
-  const next = new URL(STUDIO_GUEST_TRY_PATH, request.url);
+  const next = buildPublicRedirectUrl(STUDIO_GUEST_TRY_PATH, request);
   next.searchParams.set("started", "1");
   const response = NextResponse.redirect(next);
   const options = buildStudioGuestCookieOptions();
