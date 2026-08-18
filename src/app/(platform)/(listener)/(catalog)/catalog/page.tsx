@@ -42,13 +42,20 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const supabase = await createClient();
   const searchQuery = normalizeCatalogSearchQuery(params.q);
   const isSearchActive = searchQuery.length > 0;
+  const topicSearchParam = resolveCatalogTopicSearchParam(params);
+  const canLoadDefaultSectionsInParallel = !isSearchActive && !topicSearchParam;
 
-  const topicsWithCounts = await listTopicsWithCatalogCounts(supabase);
+  const [topicsWithCounts, defaultSections] = await Promise.all([
+    listTopicsWithCatalogCounts(supabase),
+    canLoadDefaultSectionsInParallel
+      ? getPublishedCatalogSections(supabase, { topicKey: null })
+      : Promise.resolve(null),
+  ]);
   const filterableTopics = topicsWithCounts.filter(
     (topic) => topic.catalogProductCount > 0,
   );
   const activeTopicKey = parseCatalogTopicFilter(
-    resolveCatalogTopicSearchParam(params),
+    topicSearchParam,
     filterableTopics.map((topic) => topic.key),
   );
   const activeTopicTitle = getCatalogTopicFilterLabel(
@@ -71,7 +78,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   const { freeProducts, paidProducts } = isSearchActive
     ? { freeProducts: [], paidProducts: [] }
-    : await getPublishedCatalogSections(supabase, { topicKey: activeTopicKey });
+    : (defaultSections ??
+      (await getPublishedCatalogSections(supabase, { topicKey: activeTopicKey })));
 
   const hasAnyProducts = freeProducts.length > 0 || paidProducts.length > 0;
   const isTopicFiltered = activeTopicKey !== null;
