@@ -2,17 +2,19 @@
 set -Eeuo pipefail
 
 # Reusable Timeweb release for SEO articles and listen pages.
-# Usage: release-article.sh <commit-sha> <production-url>
+# Usage: UTILITY_SHA=<40-char> release-article.sh <article-sha> <production-url>
 # Stages: ancestry → immutable deploy/skip → health → page smoke → sitemap → report
 # Does not edit application code, DB, Nginx, env, or playlists.
+# Utility code is loaded only from UTILITY_SHA, never from floating origin/main.
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 2 ]]; then
-  printf '%s\n' "Usage: release-article.sh <commit-sha> <production-url>"
+  printf '%s\n' "Usage: UTILITY_SHA=<40-char> release-article.sh <article-sha> <production-url>"
   exit 2
 fi
 
 SHA="$1"
 URL="$2"
+UTILITY_SHA="${UTILITY_SHA:-}"
 DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/audiolad-deploy}"
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/audiolad-deploy.lock}"
 HEALTH_URL="${HEALTH_URL:-https://audiolad.ru/api/health/build}"
@@ -20,6 +22,7 @@ SITEMAP_URL="${SITEMAP_URL:-https://audiolad.ru/sitemap.xml}"
 
 STAGE="init"
 ANCESTRY_ORIGIN_MAIN="NOT_AVAILABLE"
+UTILITY_ANCESTRY_ORIGIN_MAIN="NOT_AVAILABLE"
 DEPLOY_ACTION="NOT_AVAILABLE"
 DEPLOYED_SHA="NOT_AVAILABLE"
 RELEASE_ID="NOT_AVAILABLE"
@@ -48,7 +51,7 @@ DESKTOP_MOBILE_REASON="No side-effect-free desktop/mobile browser smoke is invok
 
 fail() {
   local code=$?
-  printf '\nBLOCKED stage=%s sha=%s url=%s exit=%s\n' "${STAGE}" "${SHA}" "${URL}" "${code}"
+  printf '\nBLOCKED stage=%s article_sha=%s utility_sha=%s url=%s exit=%s\n' "${STAGE}" "${SHA}" "${UTILITY_SHA:-empty}" "${URL}" "${code}"
   printf 'DEPLOYED_SHA=%s RELEASE_ID=%s BUILD_ID=%s\n' "${DEPLOYED_SHA}" "${RELEASE_ID}" "${BUILD_ID}"
   exit "${code}"
 }
@@ -84,19 +87,17 @@ resolve_git_and_deploy() {
   export GIT_WORKDIR
 }
 
+require_full_sha() {
+  local name="$1"
+  local value="$2"
+  if [[ ! "${value}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "BLOCKED: ${name} must be a full 40-char lowercase hex SHA"
+    exit 1
+  fi
+}
+
 resolve_lib() {
-  local candidates=(
-    "${SCRIPT_DIR}/../../scripts/release-article-lib.mjs"
-    "${GIT_WORKDIR}/scripts/release-article-lib.mjs"
-  )
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "${candidate}" ]]; then
-      LIB_JS="${candidate}"
-      return 0
-    fi
-  done
-  git -C "${GIT_WORKDIR}" show origin/main:scripts/release-article-lib.mjs > /tmp/release-article-lib.mjs
+  git -C "${GIT_WORKDIR}" show "${UTILITY_SHA}:scripts/release-article-lib.mjs" > /tmp/release-article-lib.mjs
   LIB_JS="/tmp/release-article-lib.mjs"
 }
 
@@ -130,19 +131,31 @@ refresh_release_metadata() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 STAGE="resolve_paths"
+require_full_sha UTILITY_SHA "${UTILITY_SHA}"
+require_full_sha SHA "${SHA}"
 resolve_git_and_deploy
-resolve_lib
 
 STAGE="canonical_preflight"
 git -C "${GIT_WORKDIR}" fetch origin main
+git -C "${GIT_WORKDIR}" cat-file -e "${UTILITY_SHA}^{commit}"
+if git -C "${GIT_WORKDIR}" merge-base --is-ancestor "${UTILITY_SHA}" origin/main; then
+  UTILITY_ANCESTRY_ORIGIN_MAIN="OK"
+else
+  UTILITY_ANCESTRY_ORIGIN_MAIN="FAILED"
+  printf '%s\n' "BLOCKED: UTILITY_SHA ${UTILITY_SHA} is not in origin/main ancestry"
+  exit 1
+fi
 git -C "${GIT_WORKDIR}" cat-file -e "${SHA}^{commit}"
 if git -C "${GIT_WORKDIR}" merge-base --is-ancestor "${SHA}" origin/main; then
   ANCESTRY_ORIGIN_MAIN="OK"
 else
   ANCESTRY_ORIGIN_MAIN="FAILED"
-  printf '%s\n' "BLOCKED: ${SHA} is not in origin/main ancestry"
+  printf '%s\n' "BLOCKED: article SHA ${SHA} is not in origin/main ancestry"
   exit 1
 fi
+
+STAGE="resolve_lib"
+resolve_lib
 
 STAGE="expect"
 EXPECT_FILE="$(mktemp)"
@@ -237,7 +250,9 @@ fi
 STAGE="report"
 printf '\n===== TIMEWEB RELEASE REPORT =====\n'
 printf 'SHA=%s\n' "${SHA}"
+printf 'UTILITY_SHA=%s\n' "${UTILITY_SHA}"
 printf 'ANCESTRY_ORIGIN_MAIN=%s\n' "${ANCESTRY_ORIGIN_MAIN}"
+printf 'UTILITY_ANCESTRY_ORIGIN_MAIN=%s\n' "${UTILITY_ANCESTRY_ORIGIN_MAIN}"
 printf 'DEPLOY_ACTION=%s\n' "${DEPLOY_ACTION}"
 printf 'DEPLOYED_SHA=%s\n' "${DEPLOYED_SHA}"
 printf 'RELEASE_ID=%s\n' "${RELEASE_ID}"
