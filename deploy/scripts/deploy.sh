@@ -132,6 +132,13 @@ main() {
   EXPECTED_BUILD_ID="$(read_build_id "$RELEASE_DIR")"
   log_info "candidate_build_passed release=${RELEASE_NAME} buildId=${EXPECTED_BUILD_ID}"
   publish_next_static_overlay "$RELEASE_DIR"
+  # Worktree deploy scripts are not checked out by canonical_fetch_main.
+  # Always run the archived candidate hook so .gz siblings match this SHA.
+  run_candidate_overlay_precompress "$RELEASE_DIR"
+  if ! assert_overlay_has_gzip_siblings; then
+    log_error "overlay gzip siblings missing after candidate hook"
+    exit 1
+  fi
   log_info "Active production remains on port ${OLD_ACTIVE_PORT} app=${OLD_ACTIVE_PM2_APP}"
   # Leave release tree before any destructive cleanup/rollback paths.
   cd "$DEPLOY_ROOT"

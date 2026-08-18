@@ -349,27 +349,49 @@ publish_next_static_overlay() {
 }
 
 # Text static only. Never write .gz into the release tree — overlay siblings only.
+# Implementation lives in the standalone hook so deploy.sh can run the
+# CANDIDATE copy after git archive (GIT_WORKDIR scripts may be stale).
 precompress_next_static_overlay() {
-  if ! command -v gzip >/dev/null 2>&1; then
-    log_warn "gzip not found; skip overlay precompress"
+  local hook="${_AUDIOLAD_SCRIPTS_DIR}/precompress-next-static-overlay.sh"
+  if [[ ! -f "$hook" ]]; then
+    log_warn "overlay precompress hook missing: $hook"
     return 0
   fi
-  [[ -d "$NEXT_STATIC_OVERLAY_DIR" ]] || return 0
+  NEXT_STATIC_OVERLAY_DIR="$NEXT_STATIC_OVERLAY_DIR" bash "$hook"
+}
 
-  local file gz tmp
-  while IFS= read -r -d '' file; do
-    gz="${file}.gz"
-    if [[ -f "$gz" && ! "$file" -nt "$gz" ]]; then
-      continue
-    fi
-    tmp="${gz}.tmp.$$"
-    if gzip -9 -n -c "$file" >"$tmp"; then
-      mv -f "$tmp" "$gz"
-    else
-      rm -f "$tmp"
-      log_warn "gzip failed for $file"
-    fi
-  done < <(find "$NEXT_STATIC_OVERLAY_DIR" -type f \(     -name '*.js' -o -name '*.css' -o -name '*.svg' -o     -name '*.json' -o -name '*.txt' -o -name '*.map' \) -print0)
+# Prefer the hook from the archived candidate, not the invoking worktree.
+run_candidate_overlay_precompress() {
+  local release_dir="$1"
+  local hook="$release_dir/deploy/scripts/precompress-next-static-overlay.sh"
+  if [[ -f "$hook" ]]; then
+    log_info "Candidate overlay precompress: $hook"
+    NEXT_STATIC_OVERLAY_DIR="$NEXT_STATIC_OVERLAY_DIR" bash "$hook"
+  else
+    log_info "Candidate has no overlay precompress hook; skip"
+  fi
+}
+
+assert_overlay_has_gzip_siblings() {
+  if [[ ! -d "$NEXT_STATIC_OVERLAY_DIR" ]]; then
+    log_error "overlay dir missing after publish: $NEXT_STATIC_OVERLAY_DIR"
+    return 1
+  fi
+
+  local sample
+  sample="$(find "$NEXT_STATIC_OVERLAY_DIR" -type f \( -name '*.js' -o -name '*.css' \) -print -quit)"
+  if [[ -z "$sample" ]]; then
+    log_error "overlay has no js/css after publish: $NEXT_STATIC_OVERLAY_DIR"
+    return 1
+  fi
+  if [[ ! -f "${sample}.gz" ]]; then
+    log_error "overlay precompress produced no .gz (example: $sample)"
+    return 1
+  fi
+
+  local gz_count
+  gz_count="$(find "$NEXT_STATIC_OVERLAY_DIR" -type f -name '*.gz' | wc -l)"
+  log_info "overlay gzip siblings ready count=${gz_count}"
 }
 
 prune_next_static_overlay() {

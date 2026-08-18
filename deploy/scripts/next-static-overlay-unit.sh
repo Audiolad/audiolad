@@ -76,4 +76,40 @@ if [[ -f "$NEXT_STATIC_OVERLAY_DIR/chunks/orphan.css.gz" ]]; then
   exit 1
 fi
 
+# Stale GIT_WORKDIR: old publish is copy-only. Candidate hook still creates .gz.
+STALE="$ROOT/stale-overlay"
+CAND="$ROOT/releases/candidate-with-hook"
+mkdir -p "$STALE/chunks" "$CAND/.next/static/chunks" "$CAND/deploy/scripts"
+echo "stale-js" >"$CAND/.next/static/chunks/app.js"
+echo "stale-css" >"$CAND/.next/static/chunks/app.css"
+cp -a "$CAND/.next/static/." "$STALE/"
+cp "$SCRIPT_DIR/precompress-next-static-overlay.sh" "$CAND/deploy/scripts/"
+if [[ -f "$STALE/chunks/app.js.gz" ]]; then
+  echo "FAIL: stale copy-only publish already had .gz"
+  exit 1
+fi
+NEXT_STATIC_OVERLAY_DIR="$STALE" run_candidate_overlay_precompress "$CAND"
+if [[ ! -f "$STALE/chunks/app.js.gz" || ! -f "$STALE/chunks/app.css.gz" ]]; then
+  echo "FAIL: candidate hook did not create .gz on stale overlay"
+  exit 1
+fi
+if [[ -f "$CAND/.next/static/chunks/app.js.gz" ]]; then
+  echo "FAIL: candidate hook wrote .gz into release tree"
+  exit 1
+fi
+NEXT_STATIC_OVERLAY_DIR="$STALE"
+if ! assert_overlay_has_gzip_siblings; then
+  echo "FAIL: assert_overlay_has_gzip_siblings rejected a good overlay"
+  exit 1
+fi
+
+if ! grep -q 'run_candidate_overlay_precompress "$RELEASE_DIR"' "$SCRIPT_DIR/deploy.sh"; then
+  echo "FAIL: deploy.sh does not invoke candidate overlay precompress"
+  exit 1
+fi
+if ! grep -q 'assert_overlay_has_gzip_siblings' "$SCRIPT_DIR/deploy.sh"; then
+  echo "FAIL: deploy.sh does not fail-closed on missing overlay .gz"
+  exit 1
+fi
+
 echo "next-static-overlay-unit: ok"

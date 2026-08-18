@@ -221,6 +221,10 @@ assert_false "rollback.sh must not call sync_pm2_audiolad" \
   grep -q 'sync_pm2_audiolad' "$SCRIPT_DIR/rollback.sh"
 assert_true "deploy.sh uses cutover_nginx_to_port" \
   grep -q 'cutover_nginx_to_port' "$SCRIPT_DIR/deploy.sh"
+assert_true "deploy.sh runs candidate overlay precompress" \
+  grep -q 'run_candidate_overlay_precompress "$RELEASE_DIR"' "$SCRIPT_DIR/deploy.sh"
+assert_true "deploy.sh fail-closes without overlay .gz" \
+  grep -q 'assert_overlay_has_gzip_siblings' "$SCRIPT_DIR/deploy.sh"
 assert_true "rollback.sh uses cutover_nginx_to_port" \
   grep -q 'cutover_nginx_to_port' "$SCRIPT_DIR/rollback.sh"
 assert_true "deploy keeps old process until after smoke" \
