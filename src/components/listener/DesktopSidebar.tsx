@@ -4,12 +4,8 @@ import Link from "next/link";
 import DesktopSidebarNav from "@/components/listener/DesktopSidebarNav";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
 
-const SIDEBAR_LOGO_WIDTH = 1796;
-const SIDEBAR_LOGO_HEIGHT = 402;
-const SIDEBAR_BANNER_WIDTH = 1254;
-const SIDEBAR_BANNER_HEIGHT = 1254;
-
-const BECOME_AUTHOR_BANNER_SRC = "/images/sidebar/become-author-banner.png";
+import sidebarLogo from "../../../public/brand/audiolad-logo-sidebar-v2.webp";
+import becomeAuthorBanner from "../../../public/images/sidebar/become-author-banner-v2.webp";
 
 type DesktopSidebarProps = {
   shellData: ListenerShellData;
@@ -27,10 +23,8 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
           className="inline-flex max-w-full rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
           <Image
-            src="/brand/audiolad-logo-sidebar.png"
+            src={sidebarLogo}
             alt="АудиоЛад"
-            width={SIDEBAR_LOGO_WIDTH}
-            height={SIDEBAR_LOGO_HEIGHT}
             className="h-10 w-auto max-w-full object-contain object-left"
             sizes="280px"
           />
@@ -59,10 +53,9 @@ export default function DesktopSidebar({ shellData }: DesktopSidebarProps) {
           className="mx-3 mb-3 block shrink-0 transition-[transform,filter,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:brightness-[1.03] hover:shadow-[0_6px_16px_rgba(90,60,145,0.14)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
           <Image
-            src={BECOME_AUTHOR_BANNER_SRC}
+            src={becomeAuthorBanner}
             alt=""
-            width={SIDEBAR_BANNER_WIDTH}
-            height={SIDEBAR_BANNER_HEIGHT}
+            sizes="216px"
             className="h-auto w-full"
           />
         </Link>

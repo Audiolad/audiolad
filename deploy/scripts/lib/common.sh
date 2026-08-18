@@ -343,13 +343,50 @@ publish_next_static_overlay() {
   mkdir -p "$NEXT_STATIC_OVERLAY_DIR"
   cp -a "$src/." "$NEXT_STATIC_OVERLAY_DIR/"
   log_info "Published hashed static overlay from $release_dir to $NEXT_STATIC_OVERLAY_DIR"
+  precompress_next_static_overlay
   prune_next_static_overlay
+  prune_orphan_gzip_siblings
+}
+
+# Text static only. Never write .gz into the release tree — overlay siblings only.
+precompress_next_static_overlay() {
+  if ! command -v gzip >/dev/null 2>&1; then
+    log_warn "gzip not found; skip overlay precompress"
+    return 0
+  fi
+  [[ -d "$NEXT_STATIC_OVERLAY_DIR" ]] || return 0
+
+  local file gz tmp
+  while IFS= read -r -d '' file; do
+    gz="${file}.gz"
+    if [[ -f "$gz" && ! "$file" -nt "$gz" ]]; then
+      continue
+    fi
+    tmp="${gz}.tmp.$$"
+    if gzip -9 -n -c "$file" >"$tmp"; then
+      mv -f "$tmp" "$gz"
+    else
+      rm -f "$tmp"
+      log_warn "gzip failed for $file"
+    fi
+  done < <(find "$NEXT_STATIC_OVERLAY_DIR" -type f \(     -name '*.js' -o -name '*.css' -o -name '*.svg' -o     -name '*.json' -o -name '*.txt' -o -name '*.map' \) -print0)
 }
 
 prune_next_static_overlay() {
   [[ -d "$NEXT_STATIC_OVERLAY_DIR" ]] || return 0
   find "$NEXT_STATIC_OVERLAY_DIR" -type f -mtime +"$NEXT_STATIC_OVERLAY_MAX_AGE_DAYS" -delete
   find "$NEXT_STATIC_OVERLAY_DIR" -type d -empty -delete 2>/dev/null || true
+}
+
+prune_orphan_gzip_siblings() {
+  [[ -d "$NEXT_STATIC_OVERLAY_DIR" ]] || return 0
+  local gz orig
+  while IFS= read -r -d '' gz; do
+    orig="${gz%.gz}"
+    if [[ ! -f "$orig" ]]; then
+      rm -f "$gz"
+    fi
+  done < <(find "$NEXT_STATIC_OVERLAY_DIR" -type f -name '*.gz' -print0)
 }
 
 # shellcheck source=release-retention.sh
