@@ -8,7 +8,11 @@ import {
   canUserEditEditorialPlaylist,
   loadPlaylistForAccessCheck,
 } from "@/lib/playlists/playlist-access";
-import { isUuid, parseReplacePlaylistItemBody } from "@/lib/playlists/validation";
+import {
+  isUuid,
+  parseOptionalUuidQueryValue,
+  parseReplacePlaylistItemBody,
+} from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 type RouteContext = {
@@ -76,10 +80,20 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const oldAudioItemIdResult = parseOptionalUuidQueryValue(
+    new URL(request.url).searchParams.get("audioItemId"),
+  );
+
+  if (!oldAudioItemIdResult.ok) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
   const { data, error } = await supabase.rpc("replace_playlist_item", {
     p_playlist_id: id,
     p_old_practice_id: practiceId,
     p_new_practice_id: parsed.practiceId,
+    p_old_audio_item_id: oldAudioItemIdResult.id,
+    p_new_audio_item_id: parsed.audioItemId,
   });
 
   if (error) {

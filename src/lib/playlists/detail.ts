@@ -11,15 +11,15 @@ import {
   isPracticePublished,
   type ProductAccessInput,
 } from "@/lib/products/access";
-import { mapProductCoverFields, getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
-import {
-  formatProductDuration,
-  formatCatalogProductStats,
-} from "@/lib/products/duration";
+import { getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
+import { playlistItemAudioMap, resolvePlaylistItemPresentation } from "@/lib/playlists/playlist-item-audio";
+import { formatProductDuration } from "@/lib/products/duration";
 import { buildListenPath } from "@/lib/products/paths";
 import {
   groupAudioSummariesByPractice,
+  loadPublishedAudioItemsByIds,
   loadPublishedAudioSummaries,
+  type PublishedAudioItemDetail,
 } from "@/lib/products/public-audio-items";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -54,12 +54,14 @@ type PracticeEmbed = {
 
 type ItemRow = {
   practice_id: string;
+  audio_item_id?: string | null;
   position: number;
   practices: PracticeEmbed | PracticeEmbed[] | null;
 };
 
 export type PlaylistDetailItemView = ProductCoverFields & {
   practiceId: string;
+  audioItemId: string | null;
   position: number;
   title: string;
   authorName: string | null;
@@ -270,6 +272,7 @@ export async function loadOwnedPlaylistDetail(
     .select(
       `
       practice_id,
+      audio_item_id,
       position,
       practices (
         id,
@@ -305,6 +308,7 @@ export async function loadOwnedPlaylistDetail(
   const rows = (itemRows as ItemRow[] | null) ?? [];
   const practicesForAccess: ProductAccessInput[] = [];
   const practiceIds: string[] = [];
+  const audioItemIds: string[] = [];
 
   for (const row of rows) {
     const practice = normalizeOne(row.practices);
@@ -319,6 +323,10 @@ export async function loadOwnedPlaylistDetail(
         is_catalog_listed: practice.is_catalog_listed,
       });
     }
+
+    if (typeof row.audio_item_id === "string") {
+      audioItemIds.push(row.audio_item_id);
+    }
   }
 
   let canListenById = new Map<string, boolean>();
@@ -326,6 +334,7 @@ export async function loadOwnedPlaylistDetail(
     string,
     { audioCount: number; totalDurationSeconds: number }
   >();
+  let audioById = new Map<string, PublishedAudioItemDetail>();
 
   try {
     canListenById = await batchCanListen(supabase, userId, practicesForAccess);
@@ -338,8 +347,12 @@ export async function loadOwnedPlaylistDetail(
   }
 
   try {
-    const summaries = await loadPublishedAudioSummaries(supabase, practiceIds);
+    const [summaries, audioItems] = await Promise.all([
+      loadPublishedAudioSummaries(supabase, practiceIds),
+      loadPublishedAudioItemsByIds(supabase, audioItemIds),
+    ]);
     audioByPractice = groupAudioSummariesByPractice(summaries);
+    audioById = playlistItemAudioMap(audioItems);
   } catch (error) {
     console.error(
       "playlist_detail_audio_summaries_error",
@@ -359,6 +372,7 @@ export async function loadOwnedPlaylistDetail(
       hasUnavailable = true;
       items.push({
         practiceId: row.practice_id,
+        audioItemId: row.audio_item_id ?? null,
         position: row.position,
         title: "Практика временно недоступна",
         authorName: null,
@@ -379,22 +393,28 @@ export async function loadOwnedPlaylistDetail(
     const authorName = author?.name?.trim() || null;
     const authorSlug = author?.slug?.trim() || null;
     const audioSummary = audioByPractice.get(practice.id);
-    const durationSeconds = audioSummary?.totalDurationSeconds ?? null;
-    const audioCount = audioSummary?.audioCount ?? 0;
+    const audioItem =
+      typeof row.audio_item_id === "string"
+        ? audioById.get(row.audio_item_id) ?? null
+        : null;
+    const presentation = resolvePlaylistItemPresentation({
+      practice,
+      audioItem,
+      audioCount: audioSummary?.audioCount ?? 0,
+      totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
+    });
+    const durationSeconds = presentation.durationSeconds;
+    const audioCount = audioItem ? 1 : audioSummary?.audioCount ?? 0;
 
     if (durationSeconds && durationSeconds > 0) {
       totalDurationSeconds += durationSeconds;
       hasAnyDuration = true;
-    } else if (
-      typeof practice.duration_minutes === "number" &&
-      practice.duration_minutes > 0
-    ) {
-      totalDurationSeconds += Math.round(practice.duration_minutes * 60);
-      hasAnyDuration = true;
     }
 
     const canListen = canListenById.get(practice.id) === true;
-    const audioReady = hasAudioReady(practice.audio_url) || audioCount > 0;
+    const audioReady = row.audio_item_id
+      ? Boolean(audioItem)
+      : hasAudioReady(practice.audio_url) || audioCount > 0;
     const canOpen = canListen && audioReady && Boolean(practice.slug);
     const listenHref =
       canOpen && authorSlug
@@ -409,17 +429,14 @@ export async function loadOwnedPlaylistDetail(
 
     items.push({
       practiceId: practice.id,
+      audioItemId: row.audio_item_id ?? null,
       position: row.position,
-      title: practice.title.trim() || "Без названия",
+      title: presentation.title,
       authorName,
       authorSlug,
       formatLabel: getDisplayFormat(practice.format),
-      metaLabel: formatCatalogProductStats({
-        audioCount,
-        totalDurationSeconds: durationSeconds,
-        durationMinutesFallback: practice.duration_minutes,
-      }),
-      ...mapProductCoverFields(practice),
+      metaLabel: presentation.metaLabel,
+      ...presentation.cover,
       available: Boolean(listenHref),
       unavailableReason: listenHref ? null : "Материал сейчас недоступен",
       listenHref,

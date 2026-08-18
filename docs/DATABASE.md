@@ -134,8 +134,8 @@ values (new.id, new.email, 'listener');
 
 ### Модель
 
-- Элемент плейлиста ссылается на **`practice_id`** (целый аудиопродукт), не на `audio_item_id`.
-- Программа из нескольких `audio_items` остаётся одной строкой в плейлисте.
+- Элемент плейлиста всегда имеет **`practice_id`** (аудиопродукт). С 2026-08-18 музыкальный трек дополнительно хранит **`audio_item_id`**.
+- Программа из нескольких `audio_items` по-прежнему может быть одной строкой (`audio_item_id IS NULL`).
 - Наличие строки в `playlist_items` **не является entitlement** и не открывает доступ к продукту.
 - `visibility`: только `private` | `public` (CHECK). Режим `unlisted` (доступ по ссылке без каталога) **зарезервирован на будущее**, в SQL/MVP не реализован.
 - Приватный плейлист видит только владелец.
@@ -175,10 +175,18 @@ CHECK согласованности:
 | `id` | uuid PK | |
 | `playlist_id` | uuid NOT NULL | → `playlists(id)` ON DELETE CASCADE |
 | `practice_id` | uuid NOT NULL | → `practices(id)` ON DELETE CASCADE |
+| `audio_item_id` | uuid NULL | → `audio_items(id)` ON DELETE CASCADE; 2026-08-18 |
 | `position` | integer NOT NULL | `>= 1`; UNIQUE `(playlist_id, position)` |
 | `added_at` | timestamptz NOT NULL | DEFAULT `now()` |
 
-UNIQUE `(playlist_id, practice_id)` — один продукт один раз в плейлисте.
+UNIQUE `(playlist_id, practice_id)` originally meant one product once.  
+Since `20260818180000_playlist_item_audio_track.sql`:
+
+- `audio_item_id IS NULL` — legacy whole-product row; unique `(playlist_id, practice_id)` among those rows.
+- `audio_item_id IS NOT NULL` — concrete published track; unique `(playlist_id, audio_item_id)`.
+- Trigger `playlist_items_audio_matches_practice` requires the track to belong to `practice_id`.
+- Music editorial adds store the track id. Old rows stay NULL and keep playing as the whole product.
+- Practices / programs with several `audio_items` can still be stored as one product row.
 
 ### Лимиты MVP (API + RPC)
 

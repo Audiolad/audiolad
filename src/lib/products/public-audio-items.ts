@@ -102,6 +102,115 @@ export async function loadPublishedAudioSummaries(
   }));
 }
 
+export type PublishedAudioItemDetail = {
+  id: string;
+  practiceId: string;
+  title: string;
+  position: number;
+  durationSeconds: number | null;
+  coverUrl: string | null;
+  coverImage: unknown;
+  updatedAt: string | null;
+};
+
+type PublishedAudioItemDetailRow = {
+  id: string;
+  practice_id: string;
+  title: string;
+  position: number;
+  duration_seconds: number | null;
+  cover_url: string | null;
+  cover_image: unknown;
+  updated_at: string | null;
+};
+
+function mapPublishedAudioItemDetail(
+  row: PublishedAudioItemDetailRow,
+): PublishedAudioItemDetail {
+  return {
+    id: row.id,
+    practiceId: row.practice_id,
+    title: row.title.trim() || "Без названия",
+    position: row.position,
+    durationSeconds: row.duration_seconds,
+    coverUrl: row.cover_url?.trim() || null,
+    coverImage: row.cover_image ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+export async function loadPublishedAudioItemsByPracticeIds(
+  supabase: SupabaseClient,
+  practiceIds: string[],
+): Promise<PublishedAudioItemDetail[]> {
+  if (practiceIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("audio_items")
+    .select(
+      "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
+    )
+    .in("practice_id", practiceIds)
+    .eq("status", "published")
+    .order("position", { ascending: true });
+
+  if (error) {
+    throw new Error("published_audio_items_by_practice_lookup_failed");
+  }
+
+  return ((data ?? []) as PublishedAudioItemDetailRow[]).map(
+    mapPublishedAudioItemDetail,
+  );
+}
+
+export async function loadPublishedAudioItemsByIds(
+  supabase: SupabaseClient,
+  audioItemIds: string[],
+): Promise<PublishedAudioItemDetail[]> {
+  if (audioItemIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("audio_items")
+    .select(
+      "id, practice_id, title, position, duration_seconds, cover_url, cover_image, updated_at",
+    )
+    .in("id", audioItemIds)
+    .eq("status", "published");
+
+  if (error) {
+    throw new Error("published_audio_items_by_id_lookup_failed");
+  }
+
+  return ((data ?? []) as PublishedAudioItemDetailRow[]).map(
+    mapPublishedAudioItemDetail,
+  );
+}
+
+export function groupPublishedAudioItemsByPractice(
+  items: ReadonlyArray<PublishedAudioItemDetail>,
+): Map<string, PublishedAudioItemDetail[]> {
+  const grouped = new Map<string, PublishedAudioItemDetail[]>();
+
+  for (const item of items) {
+    const current = grouped.get(item.practiceId) ?? [];
+    current.push(item);
+    grouped.set(item.practiceId, current);
+  }
+
+  for (const [practiceId, tracks] of grouped) {
+    grouped.set(
+      practiceId,
+      [...tracks].sort((left, right) => left.position - right.position),
+    );
+  }
+
+  return grouped;
+}
+
 export function groupAudioSummariesByPractice(
   summaries: ReadonlyArray<{
     practiceId: string;

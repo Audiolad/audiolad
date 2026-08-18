@@ -11,18 +11,18 @@ import {
   normalizePlaylistPublicSlug,
 } from "@/lib/playlists/public-slug";
 import type { PlaylistVisibility } from "@/lib/playlists/types";
-import { mapProductCoverFields, getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
-import {
-  formatProductDuration,
-  formatCatalogProductStats,
-} from "@/lib/products/duration";
+import { getProductCoverDisplayUrl, type ProductCoverFields } from "@/lib/products/cover-display";
+import { formatProductDuration } from "@/lib/products/duration";
 import {
   buildListenPath,
   buildPracticePublicPath,
 } from "@/lib/products/paths";
+import { playlistItemAudioMap, resolvePlaylistItemPresentation } from "@/lib/playlists/playlist-item-audio";
 import {
   groupAudioSummariesByPractice,
+  loadPublishedAudioItemsByIds,
   loadPublishedAudioSummaries,
+  type PublishedAudioItemDetail,
 } from "@/lib/products/public-audio-items";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -49,7 +49,9 @@ type PracticeEmbed = {
 };
 
 type ItemRow = {
+  id?: string;
   practice_id: string;
+  audio_item_id?: string | null;
   position: number;
   practices: PracticeEmbed | PracticeEmbed[] | null;
 };
@@ -72,6 +74,7 @@ type PlaylistDbRow = {
 
 export type PublicPlaylistItemView = ProductCoverFields & {
   practiceId: string;
+  audioItemId: string | null;
   position: number;
   title: string;
   authorName: string | null;
@@ -188,7 +191,9 @@ export const loadPublicPlaylistBySlug = cache(
       .from("playlist_items")
       .select(
         `
+      id,
       practice_id,
+      audio_item_id,
       position,
       practices (
         id,
@@ -220,11 +225,15 @@ export const loadPublicPlaylistBySlug = cache(
 
     const rows = (itemRows as ItemRow[] | null) ?? [];
     const practiceIdsForAudio: string[] = [];
+    const audioItemIds: string[] = [];
 
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
       if (practice?.id) {
         practiceIdsForAudio.push(practice.id);
+      }
+      if (typeof row.audio_item_id === "string") {
+        audioItemIds.push(row.audio_item_id);
       }
     }
 
@@ -232,13 +241,15 @@ export const loadPublicPlaylistBySlug = cache(
       string,
       { audioCount: number; totalDurationSeconds: number }
     >();
+    let audioById = new Map<string, PublishedAudioItemDetail>();
 
     try {
-      const summaries = await loadPublishedAudioSummaries(
-        supabase,
-        practiceIdsForAudio,
-      );
+      const [summaries, audioItems] = await Promise.all([
+        loadPublishedAudioSummaries(supabase, practiceIdsForAudio),
+        loadPublishedAudioItemsByIds(supabase, audioItemIds),
+      ]);
       audioByPractice = groupAudioSummariesByPractice(summaries);
+      audioById = playlistItemAudioMap(audioItems);
     } catch (error) {
       console.error(
         "public_playlist_audio_summaries_error",
@@ -259,6 +270,7 @@ export const loadPublicPlaylistBySlug = cache(
         hasUnavailable = true;
         items.push({
           practiceId: row.practice_id,
+          audioItemId: row.audio_item_id ?? null,
           position: row.position,
           title: "Практика временно недоступна",
           authorName: null,
@@ -291,19 +303,23 @@ export const loadPublicPlaylistBySlug = cache(
       const authorName = author?.name?.trim() || null;
       const authorSlug = author?.slug?.trim() || null;
       const audioSummary = audioByPractice.get(practice.id);
-      const durationSeconds = audioSummary?.totalDurationSeconds ?? null;
-      const audioCount = audioSummary?.audioCount ?? 0;
-      const coverFields = mapProductCoverFields(practice);
+      const audioItem =
+        typeof row.audio_item_id === "string"
+          ? audioById.get(row.audio_item_id) ?? null
+          : null;
+      const presentation = resolvePlaylistItemPresentation({
+        practice,
+        audioItem,
+        audioCount: audioSummary?.audioCount ?? 0,
+        totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
+      });
+      const durationSeconds = presentation.durationSeconds;
+      const audioCount = audioItem ? 1 : audioSummary?.audioCount ?? 0;
+      const coverFields = presentation.cover;
 
       if (eligible) {
         if (durationSeconds && durationSeconds > 0) {
           totalDurationSeconds += durationSeconds;
-          hasAnyDuration = true;
-        } else if (
-          typeof practice.duration_minutes === "number" &&
-          practice.duration_minutes > 0
-        ) {
-          totalDurationSeconds += Math.round(practice.duration_minutes * 60);
           hasAnyDuration = true;
         }
       } else {
@@ -311,7 +327,9 @@ export const loadPublicPlaylistBySlug = cache(
       }
 
       // Audio readiness from published audio_items summaries only.
-      const audioReady = audioCount > 0;
+      const audioReady = row.audio_item_id
+        ? Boolean(audioItem)
+        : audioCount > 0;
       const canOpen =
         eligible && audioReady && Boolean(practice.slug) && Boolean(authorSlug);
 
@@ -344,24 +362,14 @@ export const loadPublicPlaylistBySlug = cache(
 
       items.push({
         practiceId: practice.id,
+        audioItemId: row.audio_item_id ?? null,
         position: row.position,
-        title: practice.title.trim() || "Без названия",
+        title: presentation.title,
         authorName,
         authorSlug,
         formatLabel: getDisplayFormat(practice.format),
-        metaLabel: eligible
-          ? formatCatalogProductStats({
-              audioCount,
-              totalDurationSeconds: durationSeconds,
-              durationMinutesFallback: practice.duration_minutes,
-            })
-          : null,
-        durationLabel: eligible
-          ? formatProductDuration(
-              durationSeconds,
-              practice.duration_minutes,
-            )
-          : null,
+        metaLabel: eligible ? presentation.metaLabel : null,
+        durationLabel: eligible ? presentation.durationLabel : null,
         durationSeconds: eligible ? resolvedDurationSeconds : null,
         productSlug,
         productHref,

@@ -8,6 +8,10 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import { buildPublicPlaylistQueue } from "@/lib/playlists/build-playlist-queue";
+import {
+  matchesPlaylistQueueEntry,
+  playlistItemKey,
+} from "@/lib/playlists/playlist-item-identity";
 import type { PublicPlaylistItemView } from "@/lib/playlists/public-detail";
 import { isPlayablePublicPlaylistItem } from "@/lib/playlists/public-seo";
 
@@ -38,14 +42,17 @@ export default function PublicPlaylistItems({
     }
 
     const isCurrent =
-      isThisPlaylistQueue && currentQueueEntry?.practiceId === item.practiceId;
+      isThisPlaylistQueue &&
+      currentQueueEntry != null &&
+      matchesPlaylistQueueEntry(currentQueueEntry, item);
 
     if (isCurrent && engine) {
       await engine.handlePlayPause();
       return;
     }
 
-    setRowLoadingId(item.practiceId);
+    const rowId = playlistItemKey(item.practiceId, item.audioItemId);
+    setRowLoadingId(rowId);
     setRowError(null);
 
     const built = buildPublicPlaylistQueue({
@@ -60,8 +67,8 @@ export default function PublicPlaylistItems({
       return;
     }
 
-    const startIndex = built.queue.entries.findIndex(
-      (entry) => entry.practiceId === item.practiceId,
+    const startIndex = built.queue.entries.findIndex((entry) =>
+      matchesPlaylistQueueEntry(entry, item),
     );
 
     const result = await loadPlaylistQueue({
@@ -93,15 +100,18 @@ export default function PublicPlaylistItems({
         const playable = isPlayablePublicPlaylistItem(item);
         const isCurrent =
           isThisPlaylistQueue &&
-          currentQueueEntry?.practiceId === item.practiceId;
+          currentQueueEntry != null &&
+          matchesPlaylistQueueEntry(currentQueueEntry, item);
         const isPlayingThis = Boolean(isCurrent && engine?.isPlaying);
+        const rowId = playlistItemKey(item.practiceId, item.audioItemId);
 
         return (
           <PlaylistItemRow
-            key={item.practiceId}
+            key={rowId}
             index={index}
             item={{
               practiceId: item.practiceId,
+              audioItemId: item.audioItemId,
               title: item.title,
               authorName: item.authorName,
               authorSlug: item.authorSlug,
@@ -116,7 +126,7 @@ export default function PublicPlaylistItems({
             }}
             coverPlayback={{
               isPlaying: isPlayingThis,
-              loading: rowLoadingId === item.practiceId,
+              loading: rowLoadingId === rowId,
               disabled: !playable,
               onPlayPause: () => void playFromItem(item),
             }}

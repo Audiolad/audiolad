@@ -20,15 +20,16 @@ import { loadProfileSummaries } from "@/lib/playlists/profile-summaries";
 import { getOwnedPlaylistById } from "@/lib/playlists/queries";
 import type { PlaylistRow } from "@/lib/playlists/types";
 import {
-  mapProductCoverFields,
   getProductCoverDisplayUrl,
   type ProductCoverFields,
 } from "@/lib/products/cover-display";
-import { formatCatalogProductStats } from "@/lib/products/duration";
+import { playlistItemAudioMap, resolvePlaylistItemPresentation } from "@/lib/playlists/playlist-item-audio";
 import { buildListenPath } from "@/lib/products/paths";
 import {
   groupAudioSummariesByPractice,
+  loadPublishedAudioItemsByIds,
   loadPublishedAudioSummaries,
+  type PublishedAudioItemDetail,
 } from "@/lib/products/public-audio-items";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -57,12 +58,14 @@ type PracticeEmbed = {
 
 type ItemRow = {
   practice_id: string;
+  audio_item_id?: string | null;
   position: number;
   practices: PracticeEmbed | PracticeEmbed[] | null;
 };
 
 export type EditorialWorkspaceItemView = ProductCoverFields & {
   practiceId: string;
+  audioItemId: string | null;
   position: number;
   title: string;
   authorId: string | null;
@@ -187,6 +190,7 @@ export async function loadEditorialWorkspaceDetail(
     .select(
       `
       practice_id,
+      audio_item_id,
       position,
       practices (
         id,
@@ -220,14 +224,22 @@ export async function loadEditorialWorkspaceDetail(
 
   const rows = (itemRows as ItemRow[] | null) ?? [];
   const practiceIds = rows.map((row) => row.practice_id);
+  const audioItemIds = rows
+    .map((row) => row.audio_item_id)
+    .filter((id): id is string => typeof id === "string");
   let audioByPractice = new Map<
     string,
     { audioCount: number; totalDurationSeconds: number }
   >();
+  let audioById = new Map<string, PublishedAudioItemDetail>();
 
   try {
-    const summaries = await loadPublishedAudioSummaries(supabase, practiceIds);
+    const [summaries, audioItems] = await Promise.all([
+      loadPublishedAudioSummaries(supabase, practiceIds),
+      loadPublishedAudioItemsByIds(supabase, audioItemIds),
+    ]);
     audioByPractice = groupAudioSummariesByPractice(summaries);
+    audioById = playlistItemAudioMap(audioItems);
   } catch (error) {
     console.error(
       "editorial_workspace_detail_audio_error",
@@ -244,6 +256,7 @@ export async function loadEditorialWorkspaceDetail(
     if (!practice) {
       items.push({
         practiceId: row.practice_id,
+        audioItemId: row.audio_item_id ?? null,
         position: row.position,
         title: "Материал сейчас недоступен",
         authorId: null,
@@ -267,10 +280,23 @@ export async function loadEditorialWorkspaceDetail(
     const authorName = author?.name?.trim() || null;
     const authorSlug = author?.slug?.trim() || null;
     const audioSummary = audioByPractice.get(practice.id);
-    const audioCount = audioSummary?.audioCount ?? 0;
+    const audioItem =
+      typeof row.audio_item_id === "string"
+        ? audioById.get(row.audio_item_id) ?? null
+        : null;
+    const presentation = resolvePlaylistItemPresentation({
+      practice,
+      audioItem,
+      audioCount: audioSummary?.audioCount ?? 0,
+      totalDurationSeconds: audioSummary?.totalDurationSeconds ?? null,
+    });
+    const audioCount = audioItem ? 1 : audioSummary?.audioCount ?? 0;
     const productKind = normalizeProductKind(practice.product_kind);
+    const audioReady = row.audio_item_id
+      ? Boolean(audioItem)
+      : hasAudioReady(practice.audio_url, audioCount);
     const listenHref =
-      hasAudioReady(practice.audio_url, audioCount) && practice.slug
+      audioReady && practice.slug
         ? authorSlug
           ? buildListenPath(authorSlug, practice.slug, { autoplay: true })
           : `/listen/${practice.slug}`
@@ -282,20 +308,17 @@ export async function loadEditorialWorkspaceDetail(
 
     items.push({
       practiceId: practice.id,
+      audioItemId: row.audio_item_id ?? null,
       position: row.position,
-      title: practice.title.trim() || "Без названия",
+      title: presentation.title,
       authorId,
       authorName,
       authorSlug,
       productKind,
       productKindLabel: isMusicProductKind(productKind) ? "Музыка" : "Практика",
       formatLabel: getDisplayFormat(practice.format) ?? getProductKindLabel(productKind),
-      metaLabel: formatCatalogProductStats({
-        audioCount,
-        totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
-        durationMinutesFallback: practice.duration_minutes,
-      }),
-      ...mapProductCoverFields(practice),
+      metaLabel: presentation.metaLabel,
+      ...presentation.cover,
       available: Boolean(listenHref),
       listenHref,
     });

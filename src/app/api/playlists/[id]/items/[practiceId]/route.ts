@@ -6,7 +6,7 @@ import {
   loadPlaylistForAccessCheck,
   logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
-import { isUuid } from "@/lib/playlists/validation";
+import { isUuid, parseOptionalUuidQueryValue } from "@/lib/playlists/validation";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 type RouteContext = {
@@ -67,12 +67,25 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const { data: existing, error: existingError } = await supabase
+  const audioItemIdResult = parseOptionalUuidQueryValue(
+    new URL(request.url).searchParams.get("audioItemId"),
+  );
+
+  if (!audioItemIdResult.ok) {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+
+  let existingQuery = supabase
     .from("playlist_items")
     .select("id")
     .eq("playlist_id", id)
-    .eq("practice_id", practiceId)
-    .maybeSingle();
+    .eq("practice_id", practiceId);
+
+  existingQuery = audioItemIdResult.id
+    ? existingQuery.eq("audio_item_id", audioItemIdResult.id)
+    : existingQuery.is("audio_item_id", null);
+
+  const { data: existing, error: existingError } = await existingQuery.maybeSingle();
 
   if (existingError) {
     console.error("playlist_item_delete_lookup_error", existingError.message);
@@ -83,11 +96,17 @@ export async function DELETE(request: Request, context: RouteContext) {
     return notFoundResponse();
   }
 
-  const { error: deleteError } = await supabase
+  let deleteQuery = supabase
     .from("playlist_items")
     .delete()
     .eq("playlist_id", id)
     .eq("practice_id", practiceId);
+
+  deleteQuery = audioItemIdResult.id
+    ? deleteQuery.eq("audio_item_id", audioItemIdResult.id)
+    : deleteQuery.is("audio_item_id", null);
+
+  const { error: deleteError } = await deleteQuery;
 
   if (deleteError) {
     console.error("playlist_item_delete_error", deleteError.message);
@@ -106,6 +125,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   await logPlaylistAudit(supabase, id, "item_removed", {
     practice_id: practiceId,
+    audio_item_id: audioItemIdResult.id,
   });
 
   return new NextResponse(null, { status: 204 });

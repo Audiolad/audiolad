@@ -37,6 +37,25 @@ function toProductEntry(input: {
   };
 }
 
+function toAudioItemEntry(input: {
+  practiceId: string;
+  audioItemId: string;
+  authorSlug: string;
+  productSlug: string;
+  title: string;
+  listenHref: string;
+}): PlaylistQueueEntry {
+  return {
+    kind: "audio_item",
+    practiceId: input.practiceId,
+    audioItemId: input.audioItemId,
+    authorSlug: input.authorSlug,
+    productSlug: input.productSlug,
+    title: input.title,
+    listenHref: input.listenHref,
+  };
+}
+
 export function isSafeInternalReturnHref(href: string): boolean {
   if (!href.startsWith("/") || href.startsWith("//") || href.includes("\\")) {
     return false;
@@ -144,17 +163,32 @@ export function buildOwnerPlaylistQueue(input: {
       productSlug &&
       item.practiceId
     ) {
-      entries.push(
-        toProductEntry({
-          practiceId: item.practiceId,
-          authorSlug,
-          productSlug,
-          title: item.title,
-          listenHref:
-            normalizeListenHref(buildListenPath(authorSlug, productSlug)) ??
-            listenHref,
-        }),
-      );
+      const normalizedListenHref =
+        normalizeListenHref(buildListenPath(authorSlug, productSlug)) ??
+        listenHref;
+
+      if (item.audioItemId) {
+        entries.push(
+          toAudioItemEntry({
+            practiceId: item.practiceId,
+            audioItemId: item.audioItemId,
+            authorSlug,
+            productSlug,
+            title: item.title,
+            listenHref: normalizedListenHref,
+          }),
+        );
+      } else {
+        entries.push(
+          toProductEntry({
+            practiceId: item.practiceId,
+            authorSlug,
+            productSlug,
+            title: item.title,
+            listenHref: normalizedListenHref,
+          }),
+        );
+      }
       continue;
     }
 
@@ -208,17 +242,32 @@ export function buildPublicPlaylistQueue(input: {
       productSlug &&
       item.practiceId
     ) {
-      entries.push(
-        toProductEntry({
-          practiceId: item.practiceId,
-          authorSlug,
-          productSlug,
-          title: item.title,
-          listenHref:
-            normalizeListenHref(buildListenPath(authorSlug, productSlug)) ??
-            listenHref,
-        }),
-      );
+      const normalizedListenHref =
+        normalizeListenHref(buildListenPath(authorSlug, productSlug)) ??
+        listenHref;
+
+      if (item.audioItemId) {
+        entries.push(
+          toAudioItemEntry({
+            practiceId: item.practiceId,
+            audioItemId: item.audioItemId,
+            authorSlug,
+            productSlug,
+            title: item.title,
+            listenHref: normalizedListenHref,
+          }),
+        );
+      } else {
+        entries.push(
+          toProductEntry({
+            practiceId: item.practiceId,
+            authorSlug,
+            productSlug,
+            title: item.title,
+            listenHref: normalizedListenHref,
+          }),
+        );
+      }
       continue;
     }
 
