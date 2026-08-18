@@ -29,6 +29,7 @@ import {
 import { listIndexableListenPageDefinitions } from "../src/lib/seo/listens/index.ts";
 import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
+import { MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-izobilie-slushat-onlayn-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -411,6 +412,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${secondListenHref}`,
     ),
     "directory JSON-LD includes second listen href",
+  );
+
+  const thirdListenHref = "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno";
+  const thirdListenCard = data.articles.find((card) => card.href === thirdListenHref);
+  assert(thirdListenCard, "third indexable listen page is listed");
+  assert(
+    thirdListenCard.title === "Медитация на изобилие: слушать онлайн бесплатно",
+    "third listen directory title",
+  );
+  assert(
+    thirdListenCard.description === MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE.description,
+    "third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-izobilie-slushat-onlayn-besplatno",
+    ),
+    "no /articles duplicate for third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirdListenHref}`,
+    ),
+    "directory JSON-LD includes third listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
