@@ -29,3 +29,47 @@ export function isStudioPersistableRecordingMimeType(value: string): boolean {
     normalizeStudioMimeType(value) as (typeof STUDIO_PERSISTABLE_RECORDING_MIME_TYPES)[number],
   );
 }
+
+const STUDIO_UPLOAD_MIME_ALIASES: Record<string, string> = {
+  "audio/mp3": "audio/mpeg",
+  "audio/x-mp3": "audio/mpeg",
+  "audio/x-mpeg": "audio/mpeg",
+  "audio/m4a": "audio/mp4",
+  "audio/x-m4a": "audio/mp4",
+  "audio/x-aac": "audio/aac",
+};
+
+const STUDIO_UPLOAD_EXTENSION_MIME_TYPES: Record<string, string> = {
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".webm": "audio/webm",
+};
+
+function getStudioFilenameExtension(name: string): string {
+  const base = name.replace(/\\/g, "/").split("/").pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0 || dot === base.length - 1) {
+    return "";
+  }
+  return base.slice(dot).toLowerCase();
+}
+
+export function canonicalizeStudioUploadMimeType(input: {
+  name: string;
+  type: string;
+}): string {
+  const normalized = normalizeStudioMimeType(input.type);
+  const aliased = STUDIO_UPLOAD_MIME_ALIASES[normalized];
+  if (aliased) {
+    return aliased;
+  }
+  if (normalized === "" || normalized === "application/octet-stream") {
+    const inferred = STUDIO_UPLOAD_EXTENSION_MIME_TYPES[getStudioFilenameExtension(input.name)];
+    if (inferred) {
+      return inferred;
+    }
+  }
+  return normalized;
+}

@@ -254,7 +254,9 @@ async function toStudioFetchError(response: Response): Promise<StudioPersistence
   return new StudioPersistenceClientError(
     serverCode === "invalid_persisted_project_data"
       ? "invalid_project_document"
-      : serverCode === "render_already_queued" ||
+      : serverCode === "unsupported_mime_type"
+        ? "invalid_upload"
+        : serverCode === "render_already_queued" ||
           serverCode === "no_active_tracks" ||
           serverCode === "invalid_project_asset" ||
           serverCode === "invalid_audio_duration" ||

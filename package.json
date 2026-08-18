@@ -23,6 +23,7 @@
     "run:studio-render-worker": "npx tsx scripts/run-studio-render-worker.mts",
     "test:studio-waveform-peaks": "npx tsx scripts/studio-waveform-peaks-unit.mjs",
     "test:studio-persistence-foundation": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-persistence-foundation-unit.mts",
+    "test:studio-music-persist-mime": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/studio-music-persist-mime-unit.mts",
     "test:studio-persistence-serialization": "npx tsx scripts/studio-persistence-serialization-unit.mts",
     "test:studio-asset-persistence": "npx tsx scripts/studio-asset-persistence-unit.mts",
     "test:studio-project-hydration": "npx tsx scripts/studio-project-hydration-unit.mts",

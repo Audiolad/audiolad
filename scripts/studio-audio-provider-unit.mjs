@@ -172,6 +172,17 @@ function testLocalFileValidation() {
     }),
     null,
   );
+  for (const file of [
+    { name: "voice.mp3", type: "audio/mp3", size: 1 },
+    { name: "music.mp3", type: "audio/x-mp3", size: 1 },
+    { name: "music.mp3", type: "", size: 1 },
+    { name: "music.mp3", type: "application/octet-stream", size: 1 },
+    { name: "song.m4a", type: "audio/x-m4a", size: 1 },
+    { name: "voice.wav", type: "audio/wav", size: 1 },
+    { name: "voice.webm", type: "audio/webm", size: 1 },
+  ]) {
+    assert.equal(validateStudioLocalFile(file), null, file.name + " " + file.type);
+  }
   assert.match(
     validateStudioLocalFile({ name: "notes.txt", type: "text/plain", size: 100 }),
     /аудиофайл/i,

@@ -6,7 +6,7 @@ import {
   STUDIO_TECHNICAL_VERSION,
   type StudioProjectDataV2,
 } from "./model";
-import { normalizeStudioMimeType } from "../recording-mime";
+import { canonicalizeStudioUploadMimeType } from "../recording-mime";
 import { parseStudioVoicePreset } from "../voice-preset-dsp";
 
 export class StudioApiError extends Error {
@@ -262,7 +262,10 @@ export function validateStudioUpload(file: File): {
   byteSize: number;
 } {
   const filename = sanitizeStudioFilename(file.name);
-  const mimeType = normalizeStudioMimeType(file.type);
+  const mimeType = canonicalizeStudioUploadMimeType({
+    name: file.name,
+    type: file.type,
+  });
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new StudioApiError("unsupported_mime_type", 422);
   }

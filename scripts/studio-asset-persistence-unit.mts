@@ -121,6 +121,30 @@ for (const [status, code] of [
   );
 }
 
+await withFetch(
+  async () => Response.json({ error: "unsupported_mime_type" }, { status: 422 }),
+  async () => {
+    await assert.rejects(
+      uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "invalid_upload",
+    );
+  },
+);
+
+await withFetch(
+  async () => Response.json({ error: "invalid_audio_duration" }, { status: 422 }),
+  async () => {
+    await assert.rejects(
+      uploadStudioProjectAsset({ projectId, file, sourceType: "upload" }),
+      (error: unknown) =>
+        error instanceof StudioPersistenceClientError &&
+        error.code === "invalid_audio_duration",
+    );
+  },
+);
+
 await withFetch(async () => {
   throw new TypeError("offline");
 }, async () => {
@@ -151,6 +175,16 @@ assert.match(provider, /assetId: uploadedAsset\.id/);
 assert.match(provider, /assetPersistenceStatus: "saved"/);
 assert.match(provider, /assetId: null,\s+assetPersistenceStatus: "pending"/);
 assert.match(provider, /retryTrackAssetUpload/);
+assert.match(provider, /assetPersistenceStatus: "error"/);
+assert.match(
+  provider,
+  /\)\s*=>\s*\{[\s\S]*assetPersistenceStatus: "error"[\s\S]*replacementError:/,
+);
+assert.doesNotMatch(
+  provider,
+  /assetPersistenceStatus: "uploading"[\s\S]{0,80}assetUploadControllersRef\.current\.delete\(trackId\);/,
+);
+assert.match(provider, /if \(track\?\.assetPersistenceStatus === "error"\) \{\s+startTrackAssetUpload\(trackId\);/);
 assert.match(provider, /sourceType: "upload"/);
 assert.match(provider, /assetId: track\.assetId/);
 assert.match(history, /assetPersistenceStatus/);

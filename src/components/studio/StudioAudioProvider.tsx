@@ -53,6 +53,7 @@ import {
   type StudioTrackSnapshot,
 } from "@/lib/studio/history";
 import {
+  StudioPersistenceClientError,
   uploadStudioProjectAsset,
   type StudioAssetSourceType,
 } from "@/lib/studio/persistence-client";
@@ -719,6 +720,7 @@ export function StudioAudioProvider({
     bindSharedAssetState(trackId, (item) => ({
       ...item,
       assetPersistenceStatus: "uploading",
+      replacementError: null,
     }));
 
     void uploadStudioProjectAsset({
@@ -739,9 +741,10 @@ export function StudioAudioProvider({
           ...item,
           assetId: uploadedAsset.id,
           assetPersistenceStatus: "saved",
+          replacementError: null,
         }));
       },
-      () => {
+      (error) => {
         if (
           controller.signal.aborted ||
           assetUploadGenerationRef.current.get(trackId) !== generation ||
@@ -750,9 +753,13 @@ export function StudioAudioProvider({
           return;
         }
         assetUploadControllersRef.current.delete(trackId);
+        const message = error instanceof StudioPersistenceClientError
+          ? error.message
+          : null;
         bindSharedAssetState(trackId, (item) => ({
           ...item,
           assetPersistenceStatus: "error",
+          replacementError: message,
         }));
       },
     );

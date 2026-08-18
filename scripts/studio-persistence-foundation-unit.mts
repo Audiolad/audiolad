@@ -9,6 +9,7 @@ import {
   StudioApiError,
   validateStudioUpload,
 } from "../src/lib/studio/server/validation";
+import { validateStudioLocalFile } from "../src/lib/studio/local-file-validation";
 import { EMPTY_STUDIO_PROJECT_DATA } from "../src/lib/studio/server/model";
 import { studioRouteError } from "../src/lib/studio/server/route-errors";
 import { AuthorAccessError } from "../src/lib/author-products/auth";
@@ -190,6 +191,26 @@ for (const [name, mimeType] of [
     validateStudioUpload({ name, type: mimeType, size: 1 } as File).mimeType,
     mimeType,
   );
+}
+for (const [name, type, expectedMime] of [
+  ["voice.mp3", "audio/mp3", "audio/mpeg"],
+  ["music.mp3", "audio/x-mp3", "audio/mpeg"],
+  ["music.mp3", "", "audio/mpeg"],
+  ["music.mp3", "application/octet-stream", "audio/mpeg"],
+  ["song.m4a", "audio/x-m4a", "audio/mp4"],
+] as const) {
+  assert.equal(
+    validateStudioUpload({ name, type, size: 1 } as File).mimeType,
+    expectedMime,
+  );
+  assert.equal(validateStudioLocalFile({ name, type, size: 1 }), null);
+}
+for (const [name, mimeType] of [
+  ["voice.mp3", "audio/mpeg"],
+  ["voice.wav", "audio/wav"],
+  ["voice.webm", "audio/webm"],
+] as const) {
+  assert.equal(validateStudioLocalFile({ name, type: mimeType, size: 1 }), null);
 }
 assert.throws(
   () => validateStudioUpload({ name: "voice.ogg", type: "audio/ogg", size: 1 } as File),
