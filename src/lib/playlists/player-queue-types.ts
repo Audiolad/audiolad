@@ -1,6 +1,7 @@
 /**
  * Playlist Play All queue model.
- * MVP uses only kind: "product". kind: "audio_item" is reserved for later.
+ * kind: "product" is a whole catalog product (legacy / non-music).
+ * kind: "audio_item" is one concrete published track from a music album.
  */
 
 export type PlaylistQueueEntry =
@@ -79,6 +80,12 @@ export function isProductQueueEntry(
   entry: PlaylistQueueEntry,
 ): entry is Extract<PlaylistQueueEntry, { kind: "product" }> {
   return entry.kind === "product";
+}
+
+export function isAudioItemQueueEntry(
+  entry: PlaylistQueueEntry,
+): entry is Extract<PlaylistQueueEntry, { kind: "audio_item" }> {
+  return entry.kind === "audio_item";
 }
 
 export function getQueueEntryPracticeId(entry: PlaylistQueueEntry): string {

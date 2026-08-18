@@ -67,6 +67,7 @@ export async function POST(request: Request, context: RouteContext) {
     p_playlist_id: id,
     p_practice_id: practiceId,
     p_direction: parsed.direction,
+    p_audio_item_id: parsed.audioItemId,
   });
 
   if (error) {

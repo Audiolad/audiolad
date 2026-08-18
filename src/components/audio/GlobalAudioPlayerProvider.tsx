@@ -48,6 +48,7 @@ import {
   buildSafeListenReplacePath,
   fetchListenSessionPayload,
 } from "@/lib/playlists/fetch-listen-session";
+import { queueEntryIdentityKey } from "@/lib/playlists/playlist-item-identity";
 import {
   getQueueEntryListenSlugs,
   getQueueEntryPracticeId,
@@ -905,7 +906,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           const entry = queue.entries[index];
           const slugs = getQueueEntryListenSlugs(entry);
 
-          if (!slugs || entry.kind !== "product") {
+          if (
+            !slugs ||
+            (entry.kind !== "product" && entry.kind !== "audio_item")
+          ) {
             runtimeSkipped += 1;
             index += direction === "forward" ? 1 : -1;
             continue;
@@ -921,6 +925,26 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
             runtimeSkipped += 1;
             index += direction === "forward" ? 1 : -1;
             continue;
+          }
+
+          let session = loaded.session;
+
+          if (entry.kind === "audio_item") {
+            const track = session.tracks.find(
+              (item) => item.id === entry.audioItemId,
+            );
+
+            if (!track) {
+              runtimeSkipped += 1;
+              index += direction === "forward" ? 1 : -1;
+              continue;
+            }
+
+            session = {
+              ...session,
+              tracks: [track],
+              initialTrackId: track.id,
+            };
           }
 
           const nextQueue: PlaylistQueue = {
@@ -958,11 +982,11 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           const stayOnSource = !shouldNavigateOnQueueAdvance(nextQueue);
 
           loadSession({
-            ...loaded.session,
+            ...session,
             requestAutoplay: options.autoplay,
             forceStartAtBeginning: options.fromStart,
             suppressListenUrlSync:
-              stayOnSource || loaded.session.suppressListenUrlSync,
+              stayOnSource || session.suppressListenUrlSync,
           });
 
           const path = buildSafeListenReplacePath(
@@ -976,7 +1000,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
           // Returning to a previously exhausted product must allow a new exhaust.
           if (
-            lastExhaustedPracticeIdRef.current === loaded.session.practiceId
+            lastExhaustedPracticeIdRef.current === queueEntryIdentityKey(entry)
           ) {
             lastExhaustedPracticeIdRef.current = null;
           }
@@ -1116,7 +1140,12 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       }
 
       // Deduplicate ended + manual/MediaSession Next for the same product.
-      if (lastExhaustedPracticeIdRef.current === fromPracticeId) {
+      const currentEntry = queue.entries[queue.currentIndex];
+      const exhaustKey = currentEntry
+        ? queueEntryIdentityKey(currentEntry)
+        : fromPracticeId;
+
+      if (lastExhaustedPracticeIdRef.current === exhaustKey) {
         return "none";
       }
 
@@ -1127,7 +1156,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         return "none";
       }
 
-      const currentEntry = queue.entries[queue.currentIndex];
       if (
         !currentEntry ||
         getQueueEntryPracticeId(currentEntry) !== fromPracticeId
@@ -1135,7 +1163,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         return "none";
       }
 
-      lastExhaustedPracticeIdRef.current = fromPracticeId;
+      lastExhaustedPracticeIdRef.current = exhaustKey;
 
       const result = await activateEntryAtIndex(queue, queue.currentIndex + 1, {
         autoplay: true,

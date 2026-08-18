@@ -146,7 +146,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data, error } = await supabase.rpc("add_editorial_playlist_practices", {
     p_playlist_id: id,
-    p_practice_ids: parsed.practiceIds,
+    p_practice_ids: parsed.items.map((item) => item.practiceId),
+    p_audio_item_ids: parsed.items.map((item) => item.audioItemId),
   });
 
   if (error) {

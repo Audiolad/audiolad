@@ -9,6 +9,7 @@ import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 
 export type PlaylistItemRowData = {
   practiceId: string;
+  audioItemId?: string | null;
   title: string;
   authorName: string | null;
   authorSlug?: string | null;
@@ -81,6 +82,7 @@ export default function PlaylistItemRow({
     <article
       className="playlist-item-row flex min-h-[76px] max-h-[88px] items-center gap-2 rounded-[16px] border border-[#eadff8] bg-white px-2 py-1.5 sm:gap-3 sm:px-3"
       data-practice-id={item.practiceId}
+      data-audio-item-id={item.audioItemId ?? undefined}
       data-playlist-row-play={coverPlayback ? "cover" : "circle"}
     >
       {showPosition ? (

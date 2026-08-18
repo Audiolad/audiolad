@@ -10,6 +10,10 @@ import {
 import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { buildPublicPlaylistQueue } from "@/lib/playlists/build-playlist-queue";
+import {
+  matchesPlaylistQueueEntry,
+  playlistItemKey,
+} from "@/lib/playlists/playlist-item-identity";
 import type { PlaylistQueueNavigationPolicy } from "@/lib/playlists/player-queue-types";
 import type {
   PublicPlaylistItemView,
@@ -63,14 +67,16 @@ export default function PublicPlaylistEmbedPreview({
       return;
     }
 
-    const isCurrent = currentQueueEntry?.practiceId === item.practiceId;
+    const isCurrent =
+      currentQueueEntry != null &&
+      matchesPlaylistQueueEntry(currentQueueEntry, item);
 
     if (isCurrent && engine) {
       await engine.handlePlayPause();
       return;
     }
 
-    setRowLoadingId(item.practiceId);
+    setRowLoadingId(playlistItemKey(item.practiceId, item.audioItemId));
     setRowError(null);
 
     const built = buildPublicPlaylistQueue({
@@ -87,8 +93,8 @@ export default function PublicPlaylistEmbedPreview({
       return;
     }
 
-    const startIndex = built.queue.entries.findIndex(
-      (entry) => entry.practiceId === item.practiceId,
+    const startIndex = built.queue.entries.findIndex((entry) =>
+      matchesPlaylistQueueEntry(entry, item),
     );
 
     const result = await loadPlaylistQueue({
@@ -129,7 +135,9 @@ export default function PublicPlaylistEmbedPreview({
       >
         {previewItems.map((item, index) => {
           const playable = isPlayablePublicPlaylistItem(item);
-          const isCurrent = currentQueueEntry?.practiceId === item.practiceId;
+          const isCurrent =
+            currentQueueEntry != null &&
+            matchesPlaylistQueueEntry(currentQueueEntry, item);
           const isPlayingThis = Boolean(isCurrent && engine?.isPlaying);
           const isExtra = index >= 5;
           const titleHref = item.productHref;
@@ -141,7 +149,7 @@ export default function PublicPlaylistEmbedPreview({
 
           return (
             <li
-              key={`${item.practiceId}:${item.position}`}
+              key={playlistItemKey(item.practiceId, item.audioItemId)}
               value={item.position}
               data-listen-preview-item
               data-preview-extra={isExtra ? "true" : "false"}
@@ -158,7 +166,11 @@ export default function PublicPlaylistEmbedPreview({
               >
                 <button
                   type="button"
-                  disabled={!playable || rowLoadingId === item.practiceId}
+                  disabled={
+                    !playable ||
+                    rowLoadingId ===
+                      playlistItemKey(item.practiceId, item.audioItemId)
+                  }
                   onClick={() => void playFromItem(item)}
                   aria-label={
                     !playable

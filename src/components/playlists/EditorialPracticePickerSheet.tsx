@@ -12,6 +12,10 @@ import { useRouter } from "next/navigation";
 
 import PlaybackCoverImage from "@/components/images/PlaybackCoverImage";
 import type { EditorialPracticeOption } from "@/lib/playlists/editorial-practices";
+import {
+  playlistItemKey,
+  playlistItemQuery,
+} from "@/lib/playlists/playlist-item-identity";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
 type EditorialPracticePickerSheetProps = {
@@ -22,6 +26,7 @@ type EditorialPracticePickerSheetProps = {
   onReplaced?: () => void;
   mode?: "add" | "replace";
   replacePracticeId?: string | null;
+  replaceAudioItemId?: string | null;
 };
 
 type LoadState =
@@ -32,6 +37,22 @@ type LoadState =
 
 type PriceFilter = "all" | "free" | "paid";
 type KindFilter = "all" | "practice" | "music";
+
+function parseSelectedKey(key: string): {
+  practiceId: string;
+  audioItemId: string | null;
+} {
+  const separator = key.indexOf(":");
+
+  if (separator === -1) {
+    return { practiceId: key, audioItemId: null };
+  }
+
+  return {
+    practiceId: key.slice(0, separator),
+    audioItemId: key.slice(separator + 1) || null,
+  };
+}
 
 function CheckIcon() {
   return (
@@ -55,6 +76,7 @@ export default function EditorialPracticePickerSheet({
   onReplaced,
   mode = "add",
   replacePracticeId = null,
+  replaceAudioItemId = null,
 }: EditorialPracticePickerSheetProps) {
   const router = useRouter();
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
@@ -63,6 +85,9 @@ export default function EditorialPracticePickerSheet({
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedAlbumIds, setExpandedAlbumIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -84,6 +109,7 @@ export default function EditorialPracticePickerSheet({
       setPriceFilter("all");
       setKindFilter("all");
       setSelectedIds(new Set());
+      setExpandedAlbumIds(new Set());
       setFormError(null);
 
       try {
@@ -202,24 +228,21 @@ export default function EditorialPracticePickerSheet({
         return true;
       }
 
-      return (
+      if (
         practice.title.toLowerCase().includes(normalizedQuery) ||
         practice.authorName.toLowerCase().includes(normalizedQuery)
+      ) {
+        return true;
+      }
+
+      return practice.tracks.some((track) =>
+        track.title.toLowerCase().includes(normalizedQuery),
       );
     });
   }, [authorFilter, kindFilter, loadState, priceFilter, query]);
 
-  function toggleSelection(practiceId: string, alreadyAdded: boolean) {
-    if (alreadyAdded || submitting) {
-      return;
-    }
-
-    if (mode === "replace") {
-      setSelectedIds(new Set([practiceId]));
-      return;
-    }
-
-    setSelectedIds((current) => {
+  function toggleExpanded(practiceId: string) {
+    setExpandedAlbumIds((current) => {
       const next = new Set(current);
 
       if (next.has(practiceId)) {
@@ -230,6 +253,63 @@ export default function EditorialPracticePickerSheet({
 
       return next;
     });
+  }
+
+  function toggleSelection(
+    practiceId: string,
+    alreadyAdded: boolean,
+    audioItemId: string | null = null,
+  ) {
+    if (alreadyAdded || submitting) {
+      return;
+    }
+
+    const key = playlistItemKey(practiceId, audioItemId);
+
+    if (mode === "replace") {
+      setSelectedIds(new Set([key]));
+      return;
+    }
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+
+      return next;
+    });
+  }
+
+  function addAllAlbumTracks(practice: EditorialPracticeOption) {
+    if (submitting) {
+      return;
+    }
+
+    const addable = practice.tracks.filter((track) => !track.alreadyAdded);
+
+    if (addable.length === 0) {
+      return;
+    }
+
+    if (mode === "replace") {
+      setSelectedIds(new Set([playlistItemKey(practice.id, addable[0].id)]));
+      return;
+    }
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      for (const track of addable) {
+        next.add(playlistItemKey(practice.id, track.id));
+      }
+
+      return next;
+    });
+    setExpandedAlbumIds((current) => new Set(current).add(practice.id));
   }
 
   async function submitSelection() {
@@ -244,7 +324,7 @@ export default function EditorialPracticePickerSheet({
       const isReplace = mode === "replace" && replacePracticeId;
       const response = await fetch(
         isReplace
-          ? `/api/playlists/${playlistId}/items/${replacePracticeId}/replace`
+          ? `/api/playlists/${playlistId}/items/${replacePracticeId}/replace${playlistItemQuery(replaceAudioItemId)}`
           : `/api/playlists/${playlistId}/editorial-practices`,
         {
           method: "POST",
@@ -252,8 +332,16 @@ export default function EditorialPracticePickerSheet({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             isReplace
-              ? { practiceId: Array.from(selectedIds)[0] }
-              : { practiceIds: Array.from(selectedIds) },
+              ? (() => {
+                  const selected = parseSelectedKey(Array.from(selectedIds)[0]);
+                  return {
+                    practiceId: selected.practiceId,
+                    audioItemId: selected.audioItemId,
+                  };
+                })()
+              : {
+                  items: Array.from(selectedIds).map(parseSelectedKey),
+                },
           ),
         },
       );
@@ -411,88 +499,211 @@ export default function EditorialPracticePickerSheet({
           {loadState.status === "ready" && filteredPractices.length > 0 ? (
             <ul className="space-y-3">
               {filteredPractices.map((practice) => {
+                const trackSelectable = practice.tracks.length > 0;
+                const queryMatchesTrack =
+                  Boolean(query.trim()) &&
+                  practice.tracks.some((track) =>
+                    track.title
+                      .toLowerCase()
+                      .includes(query.trim().toLowerCase()),
+                  );
+                const expanded =
+                  trackSelectable &&
+                  (expandedAlbumIds.has(practice.id) || queryMatchesTrack);
                 const selected = selectedIds.has(practice.id);
-                const disabled = practice.alreadyAdded || submitting;
+                const disabled = trackSelectable
+                  ? submitting
+                  : practice.alreadyAdded || submitting;
+                const addableTrackCount = practice.tracks.filter(
+                  (track) => !track.alreadyAdded,
+                ).length;
 
                 return (
                   <li key={practice.id}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      aria-pressed={selected}
-                      aria-label={
-                        practice.alreadyAdded
-                          ? `${practice.title} уже добавлена`
-                          : selected
-                            ? `Убрать ${practice.title} из выбора`
-                            : `Выбрать ${practice.title}`
-                      }
-                      onClick={() =>
-                        toggleSelection(practice.id, practice.alreadyAdded)
-                      }
-                      className={`flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition ${
-                        practice.alreadyAdded
+                    <div
+                      className={`rounded-[20px] border ${
+                        practice.alreadyAdded && !trackSelectable
                           ? "border-[#eadff8] bg-[#faf6ff] opacity-70"
                           : selected
                             ? "border-[#7042c5] bg-[#faf6ff]"
                             : "border-[#eadff8] bg-white"
-                      } disabled:cursor-not-allowed`}
+                      }`}
                     >
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[16px] bg-[#efe4fb]">
-                        {getProductCoverDisplayUrl(
-                          practice.coverUrl,
-                          practice.updatedAt,
-                          practice.coverImage,
-                          56,
-                        ) ? (
-                          <PlaybackCoverImage
-                            coverUrl={practice.coverUrl}
-                            coverImage={practice.coverImage}
-                            updatedAt={practice.updatedAt}
-                            displayWidth={56}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">
-                          {practice.title}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-[#7d70a2]">
-                          {practice.authorName}
-                          {practice.productKindLabel
-                            ? ` · ${practice.productKindLabel}`
-                            : practice.formatLabel
-                              ? ` · ${practice.formatLabel}`
-                              : ""}
-                        </p>
-                        <p className="mt-1 text-xs text-[#8a7ca9]">
-                          {!practice.isFree && practice.priceLabel
-                            ? practice.priceLabel
-                            : null}
-                          {practice.metaLabel
-                            ? `${!practice.isFree && practice.priceLabel ? " · " : ""}${practice.metaLabel}`
-                            : ""}
-                        </p>
-                        {practice.alreadyAdded ? (
-                          <p className="mt-1 text-xs font-medium text-[#7042c5]">
-                            Уже в плейлисте
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
-                          practice.alreadyAdded || selected
-                            ? "border-[#7042c5] bg-[#7042c5] text-white"
-                            : "border-[#cfc0e8] bg-white text-transparent"
-                        }`}
-                        aria-hidden
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        aria-pressed={trackSelectable ? expanded : selected}
+                        aria-expanded={trackSelectable ? expanded : undefined}
+                        aria-label={
+                          trackSelectable
+                            ? expanded
+                              ? `Свернуть треки альбома ${practice.title}`
+                              : `Показать треки альбома ${practice.title}`
+                            : practice.alreadyAdded
+                              ? `${practice.title} уже добавлена`
+                              : selected
+                                ? `Убрать ${practice.title} из выбора`
+                                : `Выбрать ${practice.title}`
+                        }
+                        onClick={() =>
+                          trackSelectable
+                            ? toggleExpanded(practice.id)
+                            : toggleSelection(
+                                practice.id,
+                                practice.alreadyAdded,
+                              )
+                        }
+                        className="flex w-full items-center gap-3 px-3 py-3 text-left disabled:cursor-not-allowed"
                       >
-                        <CheckIcon />
-                      </span>
-                    </button>
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[16px] bg-[#efe4fb]">
+                          {getProductCoverDisplayUrl(
+                            practice.coverUrl,
+                            practice.updatedAt,
+                            practice.coverImage,
+                            56,
+                          ) ? (
+                            <PlaybackCoverImage
+                              coverUrl={practice.coverUrl}
+                              coverImage={practice.coverImage}
+                              updatedAt={practice.updatedAt}
+                              displayWidth={56}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">
+                            {practice.title}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-[#7d70a2]">
+                            {practice.authorName}
+                            {practice.productKindLabel
+                              ? ` · ${practice.productKindLabel}`
+                              : practice.formatLabel
+                                ? ` · ${practice.formatLabel}`
+                                : ""}
+                          </p>
+                          <p className="mt-1 text-xs text-[#8a7ca9]">
+                            {!practice.isFree && practice.priceLabel
+                              ? practice.priceLabel
+                              : null}
+                            {practice.metaLabel
+                              ? `${!practice.isFree && practice.priceLabel ? " · " : ""}${practice.metaLabel}`
+                              : ""}
+                          </p>
+                          {practice.alreadyAdded ? (
+                            <p className="mt-1 text-xs font-medium text-[#7042c5]">
+                              Уже в плейлисте
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {trackSelectable ? (
+                          <span
+                            className="shrink-0 text-xs font-medium text-[#7042c5]"
+                            aria-hidden
+                          >
+                            {expanded ? "▲" : "▼"}
+                          </span>
+                        ) : (
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                              practice.alreadyAdded || selected
+                                ? "border-[#7042c5] bg-[#7042c5] text-white"
+                                : "border-[#cfc0e8] bg-white text-transparent"
+                            }`}
+                            aria-hidden
+                          >
+                            <CheckIcon />
+                          </span>
+                        )}
+                      </button>
+
+                      {trackSelectable && expanded ? (
+                        <div className="border-t border-[#f0e8fb] px-3 pb-3">
+                          {addableTrackCount > 0 && mode === "add" ? (
+                            <button
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => addAllAlbumTracks(practice)}
+                              className="mt-3 text-xs font-medium text-[#7042c5]"
+                            >
+                              Добавить весь альбом
+                            </button>
+                          ) : null}
+                          <ul className="mt-2 space-y-2">
+                            {practice.tracks.map((track) => {
+                              const trackKey = playlistItemKey(
+                                practice.id,
+                                track.id,
+                              );
+                              const trackSelected = selectedIds.has(trackKey);
+                              const trackDisabled =
+                                track.alreadyAdded || submitting;
+
+                              return (
+                                <li key={track.id}>
+                                  <button
+                                    type="button"
+                                    disabled={trackDisabled}
+                                    aria-pressed={trackSelected}
+                                    aria-label={
+                                      track.alreadyAdded
+                                        ? `${track.title} уже добавлен`
+                                        : trackSelected
+                                          ? `Убрать ${track.title} из выбора`
+                                          : `Выбрать ${track.title}`
+                                    }
+                                    onClick={() =>
+                                      toggleSelection(
+                                        practice.id,
+                                        track.alreadyAdded,
+                                        track.id,
+                                      )
+                                    }
+                                    className={`flex w-full items-center gap-3 rounded-[16px] border px-3 py-2.5 text-left ${
+                                      track.alreadyAdded
+                                        ? "border-[#eadff8] bg-[#faf6ff] opacity-70"
+                                        : trackSelected
+                                          ? "border-[#7042c5] bg-[#faf6ff]"
+                                          : "border-[#eadff8] bg-white"
+                                    } disabled:cursor-not-allowed`}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium">
+                                        {track.title}
+                                      </p>
+                                      <p className="mt-0.5 truncate text-xs text-[#7d70a2]">
+                                        {practice.authorName}
+                                        {track.durationLabel
+                                          ? ` · ${track.durationLabel}`
+                                          : ""}
+                                      </p>
+                                      {track.alreadyAdded ? (
+                                        <p className="mt-1 text-xs font-medium text-[#7042c5]">
+                                          Уже в плейлисте
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                    <span
+                                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                                        track.alreadyAdded || trackSelected
+                                          ? "border-[#7042c5] bg-[#7042c5] text-white"
+                                          : "border-[#cfc0e8] bg-white text-transparent"
+                                      }`}
+                                      aria-hidden
+                                    >
+                                      <CheckIcon />
+                                    </span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}

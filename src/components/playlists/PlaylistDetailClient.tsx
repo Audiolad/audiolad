@@ -5,6 +5,10 @@ import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import {
+  playlistItemKey,
+  playlistItemQuery,
+} from "@/lib/playlists/playlist-item-identity";
 import { formatPlaylistItemCount } from "@/lib/playlists/format-item-count";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
@@ -63,6 +67,7 @@ export default function PlaylistDetailClient({
   const [menuId, setMenuId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{
     practiceId: string;
+    audioItemId: string | null;
     title: string;
   } | null>(null);
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
@@ -346,7 +351,7 @@ export default function PlaylistDetailClient({
 
     try {
       const response = await fetch(
-        `/api/playlists/${detail.playlist.id}/items/${pendingDelete.practiceId}`,
+        `/api/playlists/${detail.playlist.id}/items/${pendingDelete.practiceId}${playlistItemQuery(pendingDelete.audioItemId)}`,
         { method: "DELETE", credentials: "same-origin" },
       );
 
@@ -356,7 +361,14 @@ export default function PlaylistDetailClient({
       }
 
       setItems((current) =>
-        current.filter((item) => item.practiceId !== pendingDelete.practiceId),
+        current.filter(
+          (item) =>
+            playlistItemKey(item.practiceId, item.audioItemId) !==
+            playlistItemKey(
+              pendingDelete.practiceId,
+              pendingDelete.audioItemId,
+            ),
+        ),
       );
       setPendingDelete(null);
       setMenuId(null);
@@ -373,6 +385,7 @@ export default function PlaylistDetailClient({
 
   async function moveItem(
     practiceId: string,
+    audioItemId: string | null,
     direction: "up" | "down",
   ) {
     if (moveInFlightRef.current || submitting) {
@@ -380,7 +393,7 @@ export default function PlaylistDetailClient({
     }
 
     moveInFlightRef.current = true;
-    setMovingPracticeId(practiceId);
+    setMovingPracticeId(playlistItemKey(practiceId, audioItemId));
     setListError(null);
     setMenuId(null);
 
@@ -391,7 +404,7 @@ export default function PlaylistDetailClient({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction }),
+          body: JSON.stringify({ direction, audioItemId }),
         },
       );
 
@@ -559,14 +572,16 @@ export default function PlaylistDetailClient({
           {items.map((item, index) => {
             const isFirst = index === 0;
             const isLast = index === items.length - 1;
-            const rowMoving = movingPracticeId === item.practiceId;
+            const itemKey = playlistItemKey(item.practiceId, item.audioItemId);
+            const rowMoving = movingPracticeId === itemKey;
 
             return (
               <PlaylistItemRow
-                key={item.practiceId}
+                key={itemKey}
                 index={index}
                 item={{
                   practiceId: item.practiceId,
+                  audioItemId: item.audioItemId,
                   title: item.title,
                   authorName: item.authorName,
                   authorSlug: item.authorSlug,
@@ -587,7 +602,9 @@ export default function PlaylistDetailClient({
                         aria-label="Переместить выше"
                         disabled={isFirst || reorderBusy}
                         className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        onClick={() => void moveItem(item.practiceId, "up")}
+                        onClick={() =>
+                          void moveItem(item.practiceId, item.audioItemId, "up")
+                        }
                       >
                         <span aria-hidden>{rowMoving ? "…" : "↑"}</span>
                       </button>
@@ -596,7 +613,13 @@ export default function PlaylistDetailClient({
                         aria-label="Переместить ниже"
                         disabled={isLast || reorderBusy}
                         className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        onClick={() => void moveItem(item.practiceId, "down")}
+                        onClick={() =>
+                          void moveItem(
+                            item.practiceId,
+                            item.audioItemId,
+                            "down",
+                          )
+                        }
                       >
                         <span aria-hidden>↓</span>
                       </button>
@@ -604,25 +627,25 @@ export default function PlaylistDetailClient({
 
                     <div
                       className="relative"
-                      ref={menuId === item.practiceId ? menuRef : null}
+                      ref={menuId === itemKey ? menuRef : null}
                     >
                       <button
                         type="button"
                         aria-label="Действия с материалом"
-                        aria-expanded={menuId === item.practiceId}
+                        aria-expanded={menuId === itemKey}
                         aria-haspopup="menu"
                         disabled={reorderBusy}
                         className="flex h-10 w-10 items-center justify-center text-xl leading-none text-[#8f82ad] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                         onClick={() =>
                           setMenuId((current) =>
-                            current === item.practiceId ? null : item.practiceId,
+                            current === itemKey ? null : itemKey,
                           )
                         }
                       >
                         <span aria-hidden>···</span>
                       </button>
 
-                      {menuId === item.practiceId ? (
+                      {menuId === itemKey ? (
                         <div
                           role="menu"
                           className="absolute bottom-full right-0 z-20 mb-2 min-w-[200px] overflow-hidden rounded-[16px] border border-[#eadff8] bg-white shadow-[0_12px_28px_rgba(91,62,145,0.16)]"
@@ -636,6 +659,7 @@ export default function PlaylistDetailClient({
                               setFormError(null);
                               setPendingDelete({
                                 practiceId: item.practiceId,
+                                audioItemId: item.audioItemId,
                                 title: item.title,
                               });
                             }}

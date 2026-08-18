@@ -24,6 +24,10 @@ import {
   formatEditorialDateTime,
   formatEditorialUpdatedAt,
 } from "@/lib/playlists/editorial-workspace";
+import {
+  playlistItemKey,
+  playlistItemQuery,
+} from "@/lib/playlists/playlist-item-identity";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
@@ -70,6 +74,9 @@ export default function EditorialPlaylistEditorClient({
   const [page, setPage] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [replacePracticeId, setReplacePracticeId] = useState<string | null>(null);
+  const [replaceAudioItemId, setReplaceAudioItemId] = useState<string | null>(
+    null,
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -78,7 +85,9 @@ export default function EditorialPlaylistEditorClient({
 
   const published = detail.playlist.visibility === "public";
   const slugLocked = detail.slugLocked;
-  const items = detail.items.filter((item) => !removedIds.has(item.practiceId));
+  const items = detail.items.filter(
+    (item) => !removedIds.has(playlistItemKey(item.practiceId, item.audioItemId)),
+  );
   const mosaicCoverUrls = useMemo(
     () =>
       takeFirstPlaylistItemCoverUrls(
@@ -285,12 +294,16 @@ export default function EditorialPlaylistEditorClient({
     }
   }
 
-  async function moveItem(practiceId: string, direction: "up" | "down") {
+  async function moveItem(
+    practiceId: string,
+    audioItemId: string | null,
+    direction: "up" | "down",
+  ) {
     if (movingPracticeId) {
       return;
     }
 
-    setMovingPracticeId(practiceId);
+    setMovingPracticeId(playlistItemKey(practiceId, audioItemId));
     setListError(null);
 
     try {
@@ -300,7 +313,7 @@ export default function EditorialPlaylistEditorClient({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction }),
+          body: JSON.stringify({ direction, audioItemId }),
         },
       );
 
@@ -317,12 +330,12 @@ export default function EditorialPlaylistEditorClient({
     }
   }
 
-  async function removeItem(practiceId: string) {
+  async function removeItem(practiceId: string, audioItemId: string | null) {
     setListError(null);
 
     try {
       const response = await fetch(
-        `/api/playlists/${detail.playlist.id}/items/${practiceId}`,
+        `/api/playlists/${detail.playlist.id}/items/${practiceId}${playlistItemQuery(audioItemId)}`,
         {
           method: "DELETE",
           credentials: "same-origin",
@@ -336,7 +349,7 @@ export default function EditorialPlaylistEditorClient({
 
       setRemovedIds((current) => {
         const next = new Set(current);
-        next.add(practiceId);
+        next.add(playlistItemKey(practiceId, audioItemId));
         return next;
       });
       refresh();
@@ -541,9 +554,10 @@ export default function EditorialPlaylistEditorClient({
 
             return (
               <PlaylistItemRow
-                key={item.practiceId}
+                key={playlistItemKey(item.practiceId, item.audioItemId)}
                 item={{
                   practiceId: item.practiceId,
+                  audioItemId: item.audioItemId,
                   title: item.title,
                   authorName: item.authorName,
                   authorSlug: item.authorSlug,
@@ -563,6 +577,7 @@ export default function EditorialPlaylistEditorClient({
                       type="button"
                       onClick={() => {
                         setReplacePracticeId(item.practiceId);
+                        setReplaceAudioItemId(item.audioItemId);
                         setPickerOpen(true);
                       }}
                       className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5]"
@@ -572,7 +587,9 @@ export default function EditorialPlaylistEditorClient({
                     <button
                       type="button"
                       disabled={absoluteIndex === 0 || movingPracticeId !== null}
-                      onClick={() => void moveItem(item.practiceId, "up")}
+                      onClick={() =>
+                        void moveItem(item.practiceId, item.audioItemId, "up")
+                      }
                       className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
                       aria-label="Выше"
                     >
@@ -584,7 +601,9 @@ export default function EditorialPlaylistEditorClient({
                         absoluteIndex === items.length - 1 ||
                         movingPracticeId !== null
                       }
-                      onClick={() => void moveItem(item.practiceId, "down")}
+                      onClick={() =>
+                        void moveItem(item.practiceId, item.audioItemId, "down")
+                      }
                       className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
                       aria-label="Ниже"
                     >
@@ -592,7 +611,9 @@ export default function EditorialPlaylistEditorClient({
                     </button>
                     <button
                       type="button"
-                      onClick={() => void removeItem(item.practiceId)}
+                      onClick={() =>
+                        void removeItem(item.practiceId, item.audioItemId)
+                      }
                       className="rounded-full px-2 py-1 text-[11px] font-medium text-[#b34f63]"
                     >
                       Удалить
@@ -661,9 +682,11 @@ export default function EditorialPlaylistEditorClient({
         open={pickerOpen}
         mode={replacePracticeId ? "replace" : "add"}
         replacePracticeId={replacePracticeId}
+        replaceAudioItemId={replaceAudioItemId}
         onClose={() => {
           setPickerOpen(false);
           setReplacePracticeId(null);
+          setReplaceAudioItemId(null);
         }}
         onAdded={refresh}
         onReplaced={refresh}

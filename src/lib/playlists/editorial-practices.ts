@@ -9,11 +9,17 @@ import {
 } from "@/lib/author-products/product-kind";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
-import { formatCatalogProductStats } from "@/lib/products/duration";
+import {
+  formatAudioDuration,
+  formatCatalogProductStats,
+} from "@/lib/products/duration";
 import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
 import {
   groupAudioSummariesByPractice,
+  groupPublishedAudioItemsByPractice,
+  loadPublishedAudioItemsByPracticeIds,
   loadPublishedAudioSummaries,
+  type PublishedAudioItemDetail,
 } from "@/lib/products/public-audio-items";
 
 type EditorialPracticeRow = {
@@ -38,6 +44,14 @@ type EditorialPracticeRow = {
     | null;
 };
 
+export type EditorialPracticeTrackOption = {
+  id: string;
+  title: string;
+  position: number;
+  durationLabel: string | null;
+  alreadyAdded: boolean;
+};
+
 export type EditorialPracticeOption = ProductCoverFields & {
   id: string;
   title: string;
@@ -51,6 +65,7 @@ export type EditorialPracticeOption = ProductCoverFields & {
   isFree: boolean;
   priceLabel: string;
   alreadyAdded: boolean;
+  tracks: EditorialPracticeTrackOption[];
 };
 
 function normalizeAuthor(
@@ -114,18 +129,24 @@ export async function listEditorialPracticeOptions(
 
   const { data: existingItems, error: itemsError } = await supabase
     .from("playlist_items")
-    .select("practice_id")
+    .select("practice_id, audio_item_id")
     .eq("playlist_id", playlistId);
 
   if (itemsError) {
     return { practices: [], error: itemsError.message };
   }
 
-  const addedSet = new Set<string>();
+  const addedProductSet = new Set<string>();
+  const addedTrackSet = new Set<string>();
 
   for (const row of existingItems ?? []) {
+    if (typeof row.audio_item_id === "string") {
+      addedTrackSet.add(row.audio_item_id);
+      continue;
+    }
+
     if (typeof row.practice_id === "string") {
-      addedSet.add(row.practice_id);
+      addedProductSet.add(row.practice_id);
     }
   }
 
@@ -133,15 +154,19 @@ export async function listEditorialPracticeOptions(
     string,
     { audioCount: number; totalDurationSeconds: number }
   >();
+  let tracksByPractice = new Map<string, PublishedAudioItemDetail[]>();
 
   try {
-    const summaries = await loadPublishedAudioSummaries(
-      supabase,
-      rows.map((row) => row.id),
-    );
+    const practiceIds = rows.map((row) => row.id);
+    const [summaries, trackRows] = await Promise.all([
+      loadPublishedAudioSummaries(supabase, practiceIds),
+      loadPublishedAudioItemsByPracticeIds(supabase, practiceIds),
+    ]);
     audioSummaryMap = groupAudioSummariesByPractice(summaries);
+    tracksByPractice = groupPublishedAudioItemsByPractice(trackRows);
   } catch {
     audioSummaryMap = new Map();
+    tracksByPractice = new Map();
   }
 
   const practices: EditorialPracticeOption[] = [];
@@ -172,6 +197,16 @@ export async function listEditorialPracticeOptions(
     }
 
     const productKind = normalizeProductKind(row.product_kind);
+    const isMusic = isMusicProductKind(productKind);
+    const tracks = isMusic
+      ? (tracksByPractice.get(row.id) ?? []).map((track) => ({
+          id: track.id,
+          title: track.title,
+          position: track.position,
+          durationLabel: formatAudioDuration(track.durationSeconds),
+          alreadyAdded: addedTrackSet.has(track.id),
+        }))
+      : [];
 
     practices.push({
       id: row.id,
@@ -181,7 +216,7 @@ export async function listEditorialPracticeOptions(
       authorSlug: author.slug,
       formatLabel: getDisplayFormat(row.format),
       productKind,
-      productKindLabel: isMusicProductKind(productKind) ? "Музыка" : "Практика",
+      productKindLabel: isMusic ? "Музыка" : "Практика",
       metaLabel: formatCatalogProductStats({
         audioCount,
         totalDurationSeconds: audioSummary?.totalDurationSeconds ?? 0,
@@ -190,7 +225,10 @@ export async function listEditorialPracticeOptions(
       ...mapProductCoverFields(row),
       isFree: isProductFree(row.is_free, row.price),
       priceLabel: getProductPriceLabel(row.price, row.is_free),
-      alreadyAdded: addedSet.has(row.id),
+      alreadyAdded: isMusic
+        ? tracks.length > 0 && tracks.every((track) => track.alreadyAdded)
+        : addedProductSet.has(row.id),
+      tracks,
     });
   }
 
@@ -245,6 +283,9 @@ export function mapEditorialAddRpcError(message: string): {
     normalized.includes("practice_ids_required") ||
     normalized.includes("practice_ids_limit") ||
     normalized.includes("duplicate_practice_ids") ||
+    normalized.includes("duplicate_audio_item_ids") ||
+    normalized.includes("audio_item_ids_required") ||
+    normalized.includes("audio_item_practice_mismatch") ||
     normalized.includes("invalid input")
   ) {
     return { status: 400, error: "invalid_request" };
@@ -252,7 +293,8 @@ export function mapEditorialAddRpcError(message: string): {
 
   if (
     normalized.includes("playlist_not_found") ||
-    normalized.includes("practice_not_found")
+    normalized.includes("practice_not_found") ||
+    normalized.includes("audio_item_not_found")
   ) {
     return { status: 404, error: "not_found" };
   }
@@ -331,6 +373,7 @@ export function mapEditorialReplaceRpcError(message: string): {
   if (
     normalized.includes("playlist_id_required") ||
     normalized.includes("practice_id_required") ||
+    normalized.includes("audio_item_practice_mismatch") ||
     normalized.includes("invalid input")
   ) {
     return { status: 400, error: "invalid_request" };
@@ -339,6 +382,7 @@ export function mapEditorialReplaceRpcError(message: string): {
   if (
     normalized.includes("playlist_not_found") ||
     normalized.includes("practice_not_found") ||
+    normalized.includes("audio_item_not_found") ||
     normalized.includes("item_not_found")
   ) {
     return { status: 404, error: "not_found" };

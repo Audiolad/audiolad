@@ -363,9 +363,51 @@ export function parsePatchPlaylistBody(body: unknown): PatchPlaylistInput {
   return { ok: true, ...result };
 }
 
+export type EditorialPlaylistItemInput = {
+  practiceId: string;
+  audioItemId: string | null;
+};
+
 export type EditorialPracticesPostInput =
-  | { ok: true; practiceIds: string[] }
+  | { ok: true; items: EditorialPlaylistItemInput[] }
   | { ok: false; error: "invalid_request" };
+
+function parseEditorialItemValue(
+  value: unknown,
+): EditorialPlaylistItemInput | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  const allowedKeys = new Set(["practiceId", "audioItemId"]);
+
+  for (const key of Object.keys(row)) {
+    if (!allowedKeys.has(key)) {
+      return null;
+    }
+  }
+
+  if (typeof row.practiceId !== "string" || !isUuid(row.practiceId)) {
+    return null;
+  }
+
+  if (row.audioItemId == null) {
+    return { practiceId: row.practiceId, audioItemId: null };
+  }
+
+  if (typeof row.audioItemId !== "string" || !isUuid(row.audioItemId)) {
+    return null;
+  }
+
+  return { practiceId: row.practiceId, audioItemId: row.audioItemId };
+}
+
+function editorialItemIdentity(item: EditorialPlaylistItemInput): string {
+  return item.audioItemId
+    ? `${item.practiceId}:${item.audioItemId}`
+    : item.practiceId;
+}
 
 export function parseEditorialPracticesPostBody(
   body: unknown,
@@ -376,7 +418,7 @@ export function parseEditorialPracticesPostBody(
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["practiceIds"]);
+  const allowedKeys = new Set(["practiceIds", "items"]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -384,37 +426,87 @@ export function parseEditorialPracticesPostBody(
     }
   }
 
-  if (!("practiceIds" in parsed) || !Array.isArray(parsed.practiceIds)) {
+  const hasPracticeIds = "practiceIds" in parsed;
+  const hasItems = "items" in parsed;
+
+  if (hasPracticeIds === hasItems) {
     return { ok: false, error: "invalid_request" };
   }
 
-  if (parsed.practiceIds.length === 0 || parsed.practiceIds.length > 50) {
-    return { ok: false, error: "invalid_request" };
-  }
-
-  const practiceIds: string[] = [];
+  const items: EditorialPlaylistItemInput[] = [];
   const seen = new Set<string>();
 
-  for (const value of parsed.practiceIds) {
-    if (typeof value !== "string" || !isUuid(value)) {
+  if (hasPracticeIds) {
+    if (!Array.isArray(parsed.practiceIds)) {
       return { ok: false, error: "invalid_request" };
     }
 
-    if (seen.has(value)) {
+    if (parsed.practiceIds.length === 0 || parsed.practiceIds.length > 50) {
       return { ok: false, error: "invalid_request" };
     }
 
-    seen.add(value);
-    practiceIds.push(value);
+    for (const value of parsed.practiceIds) {
+      if (typeof value !== "string" || !isUuid(value)) {
+        return { ok: false, error: "invalid_request" };
+      }
+
+      if (seen.has(value)) {
+        return { ok: false, error: "invalid_request" };
+      }
+
+      seen.add(value);
+      items.push({ practiceId: value, audioItemId: null });
+    }
+
+    return { ok: true, items };
   }
 
-  return { ok: true, practiceIds };
+  if (!Array.isArray(parsed.items)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  if (parsed.items.length === 0 || parsed.items.length > 50) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  for (const value of parsed.items) {
+    const item = parseEditorialItemValue(value);
+
+    if (!item) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    const identity = editorialItemIdentity(item);
+
+    if (seen.has(identity)) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    seen.add(identity);
+    items.push(item);
+  }
+
+  return { ok: true, items };
 }
 
 export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+export function parseOptionalUuidQueryValue(
+  value: string | null,
+): { ok: true; id: string | null } | { ok: false } {
+  if (value == null || value.trim() === "") {
+    return { ok: true, id: null };
+  }
+
+  if (!isUuid(value)) {
+    return { ok: false };
+  }
+
+  return { ok: true, id: value };
 }
 
 export type MembershipPutInput =
@@ -486,12 +578,16 @@ export function parseMembershipPutBody(body: unknown): MembershipPutInput {
 export type MovePlaylistItemDirection = "up" | "down";
 
 export type MovePlaylistItemInput =
-  | { ok: true; direction: MovePlaylistItemDirection }
+  | {
+      ok: true;
+      direction: MovePlaylistItemDirection;
+      audioItemId: string | null;
+    }
   | { ok: false; error: "invalid_request" };
 
 /**
  * POST /api/playlists/[id]/items/[practiceId]/move body:
- * { direction: "up" | "down" } — no unknown keys.
+ * { direction: "up" | "down", audioItemId?: uuid | null } — no unknown keys.
  */
 export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput {
   const parsed = parseJsonObject(body);
@@ -500,7 +596,7 @@ export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput 
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["direction"]);
+  const allowedKeys = new Set(["direction", "audioItemId"]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -518,7 +614,15 @@ export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput 
     return { ok: false, error: "invalid_request" };
   }
 
-  return { ok: true, direction };
+  if (!("audioItemId" in parsed) || parsed.audioItemId == null) {
+    return { ok: true, direction, audioItemId: null };
+  }
+
+  if (typeof parsed.audioItemId !== "string" || !isUuid(parsed.audioItemId)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return { ok: true, direction, audioItemId: parsed.audioItemId };
 }
 
 export type CollaboratorMutationInput =
@@ -567,12 +671,12 @@ export function parseCollaboratorUpsertBody(
 }
 
 export type ReplacePlaylistItemInput =
-  | { ok: true; practiceId: string }
+  | { ok: true; practiceId: string; audioItemId: string | null }
   | { ok: false; error: "invalid_request" };
 
 /**
  * POST /api/playlists/[id]/items/[practiceId]/replace body:
- * { practiceId: uuid } — replacement product, no unknown keys.
+ * { practiceId: uuid, audioItemId?: uuid | null } — replacement product or track.
  */
 export function parseReplacePlaylistItemBody(
   body: unknown,
@@ -583,7 +687,7 @@ export function parseReplacePlaylistItemBody(
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["practiceId"]);
+  const allowedKeys = new Set(["practiceId", "audioItemId"]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -595,7 +699,19 @@ export function parseReplacePlaylistItemBody(
     return { ok: false, error: "invalid_request" };
   }
 
-  return { ok: true, practiceId: parsed.practiceId };
+  if (!("audioItemId" in parsed) || parsed.audioItemId == null) {
+    return { ok: true, practiceId: parsed.practiceId, audioItemId: null };
+  }
+
+  if (typeof parsed.audioItemId !== "string" || !isUuid(parsed.audioItemId)) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  return {
+    ok: true,
+    practiceId: parsed.practiceId,
+    audioItemId: parsed.audioItemId,
+  };
 }
 
 export type CollaboratorDeleteInput =
