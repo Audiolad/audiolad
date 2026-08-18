@@ -55,6 +55,7 @@ import {
   type PlaylistQueue,
   type PlaylistQueueEntry,
 } from "@/lib/playlists/player-queue-types";
+import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 import { createClient } from "@/lib/supabase/client";
 
 export const GLOBAL_MINI_PLAYER_HEIGHT_PX = 72;
@@ -1278,6 +1279,19 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         }
 
         clearDesktopPlayerLastSession();
+      }
+
+      const cookieHeader = typeof document === "undefined" ? "" : document.cookie;
+      if (
+        !hasSupabaseAuthCookie(
+          cookieHeader,
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+        )
+      ) {
+        if (!cancelled) {
+          setDesktopPlayerRestoreState("ready");
+        }
+        return;
       }
 
       try {
