@@ -6,7 +6,7 @@
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#f7f2fc",
   "theme_color": "#f7f2fc",
   "lang": "ru",

@@ -95,4 +95,12 @@ assert.match(cookie, /timingSafeEqual/);
 assert.match(cookie, /createGuestToken/);
 assert.match(cookie, /hashGuestToken/);
 
+const persisted = await read("src/components/studio/PersistedStudioProjectShell.tsx");
+assert.match(persisted, /accessMode = "author"/);
+assert.match(persisted, /<StudioEditorShell/);
+assert.match(editor, /fixed inset-0 z-30 hidden flex-col/);
+assert.doesNotMatch(editor, /screen\.orientation/);
+const manifest = JSON.parse(await read("public/manifest.webmanifest"));
+assert.equal(manifest.orientation, "any");
+
 console.log("studio-guest-source-unit: ok");

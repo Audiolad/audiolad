@@ -101,10 +101,27 @@ assert.ok(
 assert.equal(stepPixelsPerSecond(400, 1), 400);
 assert.equal(stepPixelsPerSecond(0.001, -1), 0.001);
 
+const portrait = { width: 390, height: 844 };
+const landscape = { width: 844, height: 390 };
+assert.notEqual(portrait.width, landscape.width);
+assert.equal(landscape.width, 844);
+assert.equal(landscape.height, 390);
+
 const editorSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../src/components/studio/StudioEditorShell.tsx"),
   "utf8",
 );
+const timelineSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "../src/components/studio/StudioTimeline.tsx"),
+  "utf8",
+);
+assert.match(timelineSource, /ResizeObserver/);
+assert.match(timelineSource, /setViewportWidth\(viewport\.clientWidth\)/);
+assert.doesNotMatch(timelineSource, /innerWidth/);
+assert.doesNotMatch(timelineSource, /orientationchange/);
+assert.doesNotMatch(editorSource, /screen\.orientation/);
+assert.doesNotMatch(editorSource, /innerWidth/);
+assert.match(editorSource, /fixed inset-0 z-30 hidden flex-col/);
 assert.match(editorSource, /stepPixelsPerSecond/);
 assert.match(editorSource, /TIMELINE_ZOOM_STEP|stepPixelsPerSecond\(current, 1\)/);
 assert.doesNotMatch(editorSource, /1\.25/);

@@ -13,7 +13,7 @@
  * - manifest, icons, favicons
  */
 
-const CACHE_VERSION = "audiolad-pwa-v3";
+const CACHE_VERSION = "audiolad-pwa-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-public`;
 
 const NEVER_CACHE_PREFIXES = [

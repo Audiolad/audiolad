@@ -380,9 +380,9 @@ function testServiceWorkerCacheVersionBumped() {
   const sw = readRoot("public/sw.js");
   const constants = readRoot("src/lib/pwa/constants.ts");
 
-  assert(sw.includes("audiolad-pwa-v3"), "service worker cache version bumped");
+  assert(sw.includes("audiolad-pwa-v4"), "service worker cache version bumped");
   assert(
-    constants.includes("audiolad-pwa-v3"),
+    constants.includes("audiolad-pwa-v4"),
     "constants track service worker cache version",
   );
 }
@@ -546,6 +546,7 @@ function testManifestContract() {
     parsed.icons.some((icon) => icon.purpose === "maskable"),
     "maskable icon entry",
   );
+  assert(parsed.orientation === "any", "manifest allows any orientation");
 }
 
 function testAcceptedDoesNotConfirmInstall() {
