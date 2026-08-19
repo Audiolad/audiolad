@@ -200,13 +200,13 @@ export default function StudioMeditationPage() {
           <div className="mx-auto mt-8 max-w-[1024px] sm:mt-10">
             <div className="aspect-[1.35] overflow-hidden rounded-[18px] shadow-[0_18px_42px_rgba(28,14,61,0.16)] sm:rounded-[22px] md:aspect-auto">
               <Image
-                src="/images/studio/studio-interface.png"
+                src="/images/studio/studio-interface.jpg"
                 alt="Интерфейс Студии АудиоЛад для записи медитаций"
-                width={1024}
-                height={547}
+                width={2870}
+                height={1538}
                 priority
                 sizes="(max-width: 767px) calc(100vw - 40px), (max-width: 1099px) calc(100vw - 80px), 1024px"
-                className="h-full w-full object-cover object-[54%_50%] md:h-auto"
+                className="h-full w-full object-cover object-left md:h-auto"
               />
             </div>
           </div>
