@@ -34,6 +34,7 @@ import { MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/li
 import { MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya.ts";
 import { MEDITATSIYA_NA_DENEZHNYY_POTOK_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_DLYA_DENEG_I_IZOBILIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn.ts";
+import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -536,6 +537,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventhListenHref}`,
     ),
     "directory JSON-LD includes seventh listen href",
+  );
+
+  const eighthListenHref = "/listens/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin";
+  const eighthListenCard = data.articles.find((card) => card.href === eighthListenHref);
+  assert(eighthListenCard, "eighth indexable listen page is listed");
+  assert(
+    eighthListenCard.title === "Медитация на деньги и изобилие для женщин | АудиоЛад",
+    "eighth listen directory title",
+  );
+  assert(
+    eighthListenCard.description === MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE.description,
+    "eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin",
+    ),
+    "no /articles duplicate for eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eighthListenHref}`,
+    ),
+    "directory JSON-LD includes eighth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
