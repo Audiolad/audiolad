@@ -63,6 +63,7 @@
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_CDN_ASSET_PREFIX`
 
 Пароли, токены, приватные ключи и значения секретных переменных **не помещать** в этот документ, отчёты и коммиты.
 

@@ -3,12 +3,15 @@ import { fileURLToPath } from "node:url";
 
 import type { NextConfig } from "next";
 
+import { resolveCdnAssetPrefix } from "./src/lib/cdn-asset-prefix";
+
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   // Keep tracing rooted at this checkout so nested git worktrees are not
   // confused by a parent package-lock.json outside the worktree.
   outputFileTracingRoot: projectRoot,
+  assetPrefix: resolveCdnAssetPrefix(process.env.NEXT_PUBLIC_CDN_ASSET_PREFIX),
   turbopack: {
     root: projectRoot,
   },
