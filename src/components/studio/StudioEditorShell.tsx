@@ -307,6 +307,8 @@ export default function StudioEditorShell({
   const [renderError, setRenderError] = useState<string | null>(null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
   const navigationInProgressRef = useRef(false);
+  const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
+  const mobileOverflowRef = useRef<HTMLDivElement | null>(null);
   const [slots, setSlots] = useState<StudioTrackSlot[]>([
     { id: "slot-voice-1", name: "Голос 1", audioTrackId: null, trackKind: "voice" },
     { id: "slot-music-1", name: "Музыка 1", audioTrackId: null, trackKind: "music" },
@@ -1403,6 +1405,28 @@ export default function StudioEditorShell({
     }
   }, [autosaveState?.canWarnBeforeUnload]);
 
+  useEffect(() => {
+    if (!mobileOverflowOpen) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!mobileOverflowRef.current?.contains(event.target as Node)) {
+        setMobileOverflowOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOverflowOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileOverflowOpen]);
+
   const navigateToMyProjects = useCallback(async (
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -1499,7 +1523,7 @@ export default function StudioEditorShell({
   return (
     <section className="relative min-h-dvh bg-[#0b1019] text-[#edf0f7]">
       <div className="mx-auto flex min-h-dvh max-w-[1920px] flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#0f1520] px-4 py-3 lg:px-6">
+        <header data-studio-desktop-nav className="hidden flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#0f1520] px-4 py-3 lg:flex lg:px-6">
           <StudioBrand />
           <nav className="flex flex-wrap items-center gap-2">
             <Link
@@ -1549,9 +1573,136 @@ export default function StudioEditorShell({
           </nav>
         </header>
 
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-[#131b28]/95 px-4 py-3 backdrop-blur lg:px-6">
-          <div className="flex flex-wrap items-center gap-3 xl:flex-nowrap">
-            <div className="min-w-[220px] rounded-lg border border-white/10 bg-[#0d131d] px-3 py-2">
+        <div
+          data-studio-sticky-chrome
+          className="sticky top-0 z-20 overflow-x-hidden border-b border-white/10 bg-[#0b1019] lg:z-10 lg:bg-[#131b28]/95 lg:px-6 lg:py-3 lg:backdrop-blur"
+        >
+          <div
+            data-studio-mobile-header
+            className="flex h-11 items-center gap-1.5 border-b border-white/10 px-2 lg:hidden"
+          >
+            <StudioBrand compact />
+            <div data-studio-project-title="mobile" className="min-w-0 flex-1">
+              {isEditingProjectName ? (
+                <input
+                  autoFocus
+                  value={projectName}
+                  onChange={(event) => setProjectName(event.target.value)}
+                  onBlur={() => {
+                    setIsEditingProjectName(false);
+                    markSavedChange();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      setIsEditingProjectName(false);
+                      markSavedChange();
+                    }
+                  }}
+                  aria-label="Название проекта"
+                  className="h-10 w-full truncate bg-transparent text-sm font-semibold text-white outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProjectName(true)}
+                  title={`Проект: ${projectName}`}
+                  aria-label="Изменить название проекта"
+                  className="flex h-10 w-full min-w-0 items-center gap-1 text-left"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-white">
+                    <span className="text-[#99a4b8]">Проект: </span>
+                    <span className="font-semibold">{projectName}</span>
+                  </span>
+                  <span aria-hidden className="shrink-0 text-[#bda8e8]">✎</span>
+                </button>
+              )}
+            </div>
+            <Link
+              href="/studio/projects"
+              onClick={(event) => void navigateToMyProjects(event)}
+              className="inline-flex h-10 shrink-0 items-center rounded-lg px-2 text-sm text-[#bfc9da] hover:bg-white/5"
+            >
+              Мои проекты
+            </Link>
+            <div ref={mobileOverflowRef} className="relative shrink-0" data-studio-overflow-menu>
+              <button
+                type="button"
+                aria-label="Ещё"
+                aria-haspopup="menu"
+                aria-expanded={mobileOverflowOpen}
+                onClick={() => setMobileOverflowOpen((open) => !open)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-lg leading-none"
+              >
+                ⋯
+              </button>
+              {mobileOverflowOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-30 mt-1 min-w-[220px] rounded-lg border border-white/10 bg-[#131b28] py-1 shadow-lg"
+                >
+                  <Link
+                    href="/studio/help"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    role="menuitem"
+                    onClick={() => setMobileOverflowOpen(false)}
+                    className="flex min-h-10 items-center px-3 text-sm text-[#d9c9f7] hover:bg-white/5"
+                  >
+                    Инструкция
+                  </Link>
+                  {accessMode === "author" ? (
+                    <>
+                      <Link
+                        href="/author-dashboard"
+                        role="menuitem"
+                        onClick={(event) => {
+                          setMobileOverflowOpen(false);
+                          guardNavigation(event);
+                        }}
+                        className="flex min-h-10 items-center px-3 text-sm font-medium text-white hover:bg-white/5"
+                      >
+                        В кабинет автора
+                      </Link>
+                      <Link
+                        href="/profile"
+                        role="menuitem"
+                        onClick={(event) => {
+                          setMobileOverflowOpen(false);
+                          guardNavigation(event);
+                        }}
+                        className="flex min-h-10 items-center px-3 text-sm font-medium text-[#eadfff] hover:bg-white/5"
+                      >
+                        В АудиоЛад
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/"
+                        role="menuitem"
+                        onClick={(event) => {
+                          setMobileOverflowOpen(false);
+                          guardNavigation(event);
+                        }}
+                        className="flex min-h-10 items-center px-3 text-sm font-medium text-[#eadfff] hover:bg-white/5"
+                      >
+                        В АудиоЛад
+                      </Link>
+                      <div className="border-t border-white/10 px-3 py-2">
+                        <StudioGuestAuthLinks />
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div
+            data-studio-toolbar
+            className="flex flex-wrap items-center gap-1 px-2 py-1 lg:gap-3 lg:px-0 lg:py-0 xl:flex-nowrap"
+          >
+            <div data-studio-project-title="desktop" className="hidden min-w-[220px] rounded-lg border border-white/10 bg-[#0d131d] px-3 py-2 lg:block">
               <p className="text-xs text-[#99a4b8]">Проект</p>
               {isEditingProjectName ? (
                 <input
@@ -1589,7 +1740,7 @@ export default function StudioEditorShell({
               )}
             </div>
 
-            <section aria-label="Транспорт Studio" className="flex flex-1 flex-wrap items-center justify-center gap-2">
+            <section aria-label="Транспорт Studio" className="flex flex-1 flex-wrap items-center justify-center gap-1 lg:gap-2">
               <button
                 type="button"
                 disabled={!canControlTransport}
@@ -1598,7 +1749,7 @@ export default function StudioEditorShell({
                   timelineRef.current?.scrollToStart();
                 }}
                 title="Перейти в начало"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-10 rounded-lg border border-white/15 px-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:px-3"
               >
                 |◀
               </button>
@@ -1607,7 +1758,7 @@ export default function StudioEditorShell({
                 disabled={!canControlTransport}
                 onClick={() => seekRelative(-15)}
                 aria-label="Перемотать назад на 15 секунд"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-10 rounded-lg border border-white/15 px-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:px-3"
               >
                 −15
               </button>
@@ -1638,7 +1789,7 @@ export default function StudioEditorShell({
                 disabled={!canControlTransport}
                 onClick={() => seekRelative(15)}
                 aria-label="Перемотать вперёд на 15 секунд"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-10 rounded-lg border border-white/15 px-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:px-3"
               >
                 +15
               </button>
@@ -1651,11 +1802,11 @@ export default function StudioEditorShell({
                 }}
                 aria-label="Перейти в конец"
                 title="Перейти в конец проекта"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-10 rounded-lg border border-white/15 px-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:px-3"
               >
                 ▶|
               </button>
-              <p className="min-w-[116px] text-center text-sm tabular-nums text-[#dfe5f2]">
+              <p className="min-w-[5.5rem] text-center text-xs tabular-nums text-[#dfe5f2] lg:min-w-[116px] lg:text-sm">
                 {formatTime(currentTime)} / {formatTime(projectDuration)}
               </p>
               <input
@@ -1667,7 +1818,7 @@ export default function StudioEditorShell({
                 value={Math.min(currentTime, projectDuration)}
                 disabled={!canControlTransport}
                 onChange={(event) => seek(Number(event.target.value))}
-                className="min-w-[120px] flex-1 accent-[#9f7aea] disabled:cursor-not-allowed"
+                className="hidden min-w-[120px] flex-1 accent-[#9f7aea] disabled:cursor-not-allowed lg:block"
               />
             </section>
             {isRecording ? (
@@ -1685,7 +1836,7 @@ export default function StudioEditorShell({
             ) : null}
 
             <div className="flex items-center gap-1">
-              <span className="mr-1 text-xs uppercase tracking-wide text-[#99a4b8]">
+              <span className="mr-1 hidden text-xs uppercase tracking-wide text-[#99a4b8] lg:inline">
                 Масштаб
               </span>
               <button
@@ -1695,7 +1846,7 @@ export default function StudioEditorShell({
                     stepPixelsPerSecond(current, -1),
                   )
                 }
-                className="h-9 w-9 rounded border border-white/10"
+                className="h-10 w-10 rounded border border-white/10 lg:h-9 lg:w-9"
                 aria-label="Уменьшить масштаб временной шкалы"
               >
                 −
@@ -1712,7 +1863,7 @@ export default function StudioEditorShell({
                     sliderValueToPixelsPerSecond(Number(event.target.value)),
                   )
                 }
-                className="w-16 accent-[#9f7aea]"
+                className="w-14 accent-[#9f7aea] lg:w-16"
               />
               <button
                 type="button"
@@ -1721,7 +1872,7 @@ export default function StudioEditorShell({
                     stepPixelsPerSecond(current, 1),
                   )
                 }
-                className="h-9 w-9 rounded border border-white/10"
+                className="h-10 w-10 rounded border border-white/10 lg:h-9 lg:w-9"
                 aria-label="Увеличить масштаб временной шкалы"
               >
                 +
@@ -1733,47 +1884,51 @@ export default function StudioEditorShell({
                     getFitPixelsPerSecond(projectDuration, timelineViewportWidth),
                   )
                 }
-                className="h-9 rounded border border-white/10 px-2 text-xs"
+                className="h-10 rounded border border-white/10 px-2 text-xs lg:h-9"
               >
                 По ширине
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 lg:gap-2">
               <button
                 type="button"
                 disabled={!history || history.past.length < 2}
                 onClick={undo}
                 title="Отменить последнее действие (Ctrl/Cmd+Z)"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Отменить последнее действие"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto lg:px-3"
               >
-                Отменить
+                <span className="lg:hidden" aria-hidden>↶</span>
+                <span className="hidden lg:inline">Отменить</span>
               </button>
               <button
                 type="button"
                 disabled={!history || history.future.length === 0}
                 onClick={redo}
                 title="Повторить отменённое действие (Ctrl/Cmd+Shift+Z или Ctrl+Y)"
-                className="h-10 rounded-lg border border-white/15 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Повторить отменённое действие"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto lg:px-3"
               >
-                Повторить
+                <span className="lg:hidden" aria-hidden>↷</span>
+                <span className="hidden lg:inline">Повторить</span>
               </button>
               <button
                 type="button"
                 disabled={saveButtonDisabled}
                 onClick={() => controllerRef.current?.retry()}
-                className={`h-10 rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-45 ${saveButtonLabel === "Сохранено" ? "border-emerald-300/35 text-emerald-100" : saveButtonLabel === "Ошибка" ? "border-rose-300/45 text-rose-100" : "border-white/15"}`}
+                className={`h-10 rounded-lg border px-2 text-sm disabled:cursor-not-allowed disabled:opacity-45 lg:px-3 ${saveButtonLabel === "Сохранено" ? "border-emerald-300/35 text-emerald-100" : saveButtonLabel === "Ошибка" ? "border-rose-300/45 text-rose-100" : "border-white/15"}`}
               >
                 {saveButtonLabel}
               </button>
-              {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-3 text-sm text-emerald-100">Скачать MP3</a> : null}
+              {(renderJob?.status === "completed" || entitledRenderJob?.status === "completed") ? <a href={`/api/studio/projects/${encodeURIComponent(persistedHydration?.project.id ?? "")}/render/download`} onClick={() => { if (accessMode === "guest") void trackGuestStudioEvent("guest_mp3_downloaded", `/studio/project/${persistedHydration?.project.id ?? ""}`); }} className="inline-flex h-10 items-center rounded-lg border border-emerald-300/40 px-2 text-sm text-emerald-100 lg:px-3">Скачать MP3</a> : null}
               {renderJob?.status === "completed" && accessMode !== "guest" ? null : (
                 <button
                   type="button"
                   disabled={saveIsUnavailable || renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" || (accessMode === "guest" && guestRenderConsumed)}
                   onClick={() => { if (accessMode === "guest" && guestRenderConsumed) { setShowGuestRenderGate(true); return; } void queueRender(); }}
                   title="Сохраняет текущую ревизию и ставит приватный MP3-экспорт в очередь"
-                  className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-3 text-sm text-[#eadfff] disabled:opacity-45"
+                  className="relative h-10 overflow-hidden rounded-lg border border-violet-300/40 px-2 text-sm text-[#eadfff] disabled:opacity-45 lg:px-3"
                 >
                   {renderBusy || renderJob?.status === "queued" || renderJob?.status === "processing" ? (
                     <span aria-hidden className="studio-mp3-render-sweep pointer-events-none absolute inset-0" />
@@ -1785,7 +1940,8 @@ export default function StudioEditorShell({
           </div>
         </div>
 
-        <main className="flex-1 px-4 py-5 lg:px-6">
+        <main className="relative z-0 flex-1 px-3 py-2 lg:px-6 lg:py-5">
+
           {projectError ? (
             <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {projectError}
