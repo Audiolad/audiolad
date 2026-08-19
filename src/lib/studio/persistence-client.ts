@@ -229,6 +229,39 @@ export async function createStudioProject({
   return body.project;
 }
 
+export async function createStudioGuestHandoff({
+  projectId,
+  signal,
+}: {
+  projectId: string;
+  signal?: AbortSignal;
+}): Promise<{ url: string }> {
+  const response = await studioFetch("/api/studio/guest/handoff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId }),
+    signal,
+  });
+  if (!response.ok) throw await toStudioFetchError(response);
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("url" in body) ||
+    typeof body.url !== "string" ||
+    !body.url.includes("/studio/try/handoff?t=")
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return { url: body.url };
+}
+
 async function studioFetch(
   input: RequestInfo | URL,
   init?: RequestInit,

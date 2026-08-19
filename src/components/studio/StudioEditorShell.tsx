@@ -59,7 +59,8 @@ import {
 import { serializeStudioProjectState, validateStudioProjectDocument } from "@/lib/studio/persistence";
 import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
-import { getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
+import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
+import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
   isDesktopEnvironment,
   isInAppBrowser,
@@ -292,12 +293,18 @@ type StudioBrowserDebugSnapshot = {
   showExternalBrowserHint: boolean;
 };
 
-function StudioInAppRotateHintBanner() {
+function StudioInAppRotateHintBanner({
+  accessMode = "author",
+  projectId,
+}: {
+  accessMode?: "author" | "guest";
+  projectId?: string;
+}) {
   const [visible, setVisible] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<StudioBrowserDebugSnapshot | null>(
     null,
   );
-  const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "manual">("idle");
+  const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "manual" | "error">("idle");
   const [manualShareUrl, setManualShareUrl] = useState("");
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
 
@@ -447,30 +454,52 @@ function StudioInAppRotateHintBanner() {
                 typeof navigator !== "undefined" && navigator.clipboard?.writeText
                   ? (value: string) => navigator.clipboard.writeText(value)
                   : undefined;
-              void copyStudioShareUrl({
-                href: window.location.href,
-                writeText,
-                execCopy: copyTextWithVisibleExecCommand,
-              }).then(({ url, result }) => {
-                setManualShareUrl(url);
-                setCopyFeedback(result);
-                if (copyFeedbackTimeoutRef.current !== null) {
-                  window.clearTimeout(copyFeedbackTimeoutRef.current);
-                  copyFeedbackTimeoutRef.current = null;
-                }
-                if (result === "copied") {
-                  copyFeedbackTimeoutRef.current = window.setTimeout(() => {
-                    setCopyFeedback((current) => (current === "copied" ? "idle" : current));
+              const copyPreparedShareUrl = (href: string) =>
+                copyStudioShareUrl({
+                  href,
+                  writeText,
+                  execCopy: copyTextWithVisibleExecCommand,
+                }).then(({ url, result }) => {
+                  setManualShareUrl(url);
+                  setCopyFeedback(result);
+                  if (copyFeedbackTimeoutRef.current !== null) {
+                    window.clearTimeout(copyFeedbackTimeoutRef.current);
                     copyFeedbackTimeoutRef.current = null;
-                  }, 2000);
-                }
-              });
+                  }
+                  if (result === "copied") {
+                    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+                      setCopyFeedback((current) => (current === "copied" ? "idle" : current));
+                      copyFeedbackTimeoutRef.current = null;
+                    }, 2000);
+                  }
+                });
+              if (accessMode === "guest") {
+                void (async () => {
+                  try {
+                    if (!projectId) {
+                      throw new Error("missing_project");
+                    }
+                    const { url } = await createStudioGuestHandoff({ projectId });
+                    await copyPreparedShareUrl(url);
+                  } catch {
+                    setManualShareUrl("");
+                    setCopyFeedback("error");
+                  }
+                })();
+                return;
+              }
+              void copyPreparedShareUrl(window.location.href);
             }}
             className="h-9 rounded-lg border border-white/15 px-3 text-sm font-medium text-[#c9d8ff]"
           >
             {copyFeedback === "copied" ? "Ссылка скопирована" : "Скопировать ссылку"}
           </button>
         </div>
+        {copyFeedback === "error" ? (
+          <p className="mt-2 text-xs text-[#f3c6c6]">
+            {STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE}
+          </p>
+        ) : null}
         {copyFeedback === "manual" ? (
           <div className="mt-2">
             <input
@@ -2607,7 +2636,10 @@ export default function StudioEditorShell({
         </main>
       </div>
 
-      <StudioInAppRotateHintBanner />
+      <StudioInAppRotateHintBanner
+        accessMode={accessMode}
+        projectId={persistedHydration?.project.id}
+      />
 
       {(editingError || editingNotice) ? (
         <div className="studio-editor-feedback pointer-events-none absolute left-1/2 top-20 z-20 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2">

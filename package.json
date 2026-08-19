@@ -92,6 +92,7 @@
     "test:studio-mobile-header": "node scripts/studio-mobile-header-unit.mjs",
     "test:studio-in-app-rotate-hint": "npx tsx scripts/studio-in-app-rotate-hint-unit.mjs",
     "test:studio-guest-session": "npx tsx scripts/studio-guest-session-unit.mts",
+    "test:studio-guest-handoff": "npx tsx scripts/studio-guest-handoff-unit.mts",
     "test:studio-guest-try-bootstrap": "npx tsx scripts/studio-guest-try-bootstrap-unit.mts",
     "test:public-request-origin": "npx tsx scripts/public-request-origin-unit.ts",
     "test:next-static-overlay": "bash deploy/scripts/next-static-overlay-unit.sh",

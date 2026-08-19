@@ -294,7 +294,7 @@ assert.match(editor, /isDesktopEnvironment/);
 assert.match(editor, /copyStudioShareUrl/);
 assert.match(editor, /copyTextWithVisibleExecCommand/);
 assert.match(editor, /studioShareUrlFromHref|copyStudioShareUrl\(\{/);
-assert.match(editor, /href: window\.location\.href/);
+assert.match(editor, /copyPreparedShareUrl\(window\.location\.href\)|href: window\.location\.href/);
 assert.doesNotMatch(editor, /copyTextToClipboard\(window\.location\.href\)/);
 assert.match(editor, /sessionStorage/);
 assert.match(editor, /matchMedia\("\(orientation: portrait\)"\)/);
@@ -345,7 +345,7 @@ assert.doesNotMatch(
   /data-studio-in-app-rotate-hint|Для удобной работы в Студии/,
 );
 
-const overlayIndex = editor.indexOf("<StudioInAppRotateHintBanner />");
+const overlayIndex = editor.indexOf("<StudioInAppRotateHintBanner");
 const feedbackIndex = editor.indexOf("studio-editor-feedback");
 assert.ok(overlayIndex > mainStart, "hint is not inside sticky chrome / before main");
 assert.ok(feedbackIndex > overlayIndex, "hint sits in the same overlay band as editing notices");
