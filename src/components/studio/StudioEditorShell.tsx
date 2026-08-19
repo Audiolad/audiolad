@@ -67,8 +67,12 @@ import {
   isStandaloneMode,
 } from "@/lib/pwa/platform";
 import {
+  isIosWebViewUserAgent,
+  isProbableIosEmbeddedBrowser,
+  resolveStudioInApp,
   shouldShowStudioInAppRotateHint,
   STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
+  truncateStudioBrowserDebugUserAgent,
 } from "@/lib/studio/in-app-rotate-hint";
 
 type StudioTrackSlot = {
@@ -271,8 +275,27 @@ function TrackActionButton({
 }
 
 
+type SafariAwareWindow = Window & {
+  safari?: unknown;
+};
+
+type StudioBrowserDebugSnapshot = {
+  userAgent: string;
+  isInAppBrowser: boolean;
+  isMobileViewport: boolean;
+  isPortrait: boolean;
+  isStandalone: boolean;
+  hasSafariGlobal: boolean;
+  isIosWebViewUserAgent: boolean;
+  isProbableIosEmbedded: boolean;
+  showExternalBrowserHint: boolean;
+};
+
 function StudioInAppRotateHintBanner() {
   const [visible, setVisible] = useState(false);
+  const [debugSnapshot, setDebugSnapshot] = useState<StudioBrowserDebugSnapshot | null>(
+    null,
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -293,19 +316,46 @@ function StudioInAppRotateHintBanner() {
       }
 
       const userAgent = window.navigator.userAgent;
+      const hasSafariGlobal = typeof (window as SafariAwareWindow).safari !== "undefined";
+      const isStandalone = isStandaloneMode();
       const isPortrait = portraitQuery.matches;
       const isMobileViewport =
         mobileQuery.matches && !isDesktopEnvironment(userAgent);
+      const isInApp = resolveStudioInApp({
+        userAgent,
+        hasSafariGlobal,
+        isStandalone,
+      });
+      const showExternalBrowserHint = shouldShowStudioInAppRotateHint({
+        isInApp,
+        isStandalone,
+        isPortrait,
+        isMobileViewport,
+        dismissed,
+      });
 
-      setVisible(
-        shouldShowStudioInAppRotateHint({
-          isInApp: isInAppBrowser(userAgent),
-          isStandalone: isStandaloneMode(),
-          isPortrait,
+      setVisible(showExternalBrowserHint);
+
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("studioBrowserDebug") === "1") {
+        setDebugSnapshot({
+          userAgent: truncateStudioBrowserDebugUserAgent(userAgent),
+          isInAppBrowser: isInAppBrowser(userAgent),
           isMobileViewport,
-          dismissed,
-        }),
-      );
+          isPortrait,
+          isStandalone,
+          hasSafariGlobal,
+          isIosWebViewUserAgent: isIosWebViewUserAgent(userAgent),
+          isProbableIosEmbedded: isProbableIosEmbeddedBrowser({
+            userAgent,
+            hasSafariGlobal,
+            isStandalone,
+          }),
+          showExternalBrowserHint,
+        });
+      } else {
+        setDebugSnapshot(null);
+      }
     };
 
     sync();
@@ -322,11 +372,29 @@ function StudioInAppRotateHintBanner() {
     };
   }, []);
 
-  if (!visible) {
+  if (!visible && !debugSnapshot) {
     return null;
   }
 
   return (
+    <>
+      {debugSnapshot ? (
+        <div
+          data-studio-browser-debug
+          className="pointer-events-none absolute left-2 top-2 z-20 max-w-[min(calc(100%-1rem),22rem)] rounded border border-white/10 bg-black/75 px-2 py-1 font-mono text-[10px] leading-snug text-[#c9d8ff]"
+        >
+          <div>UA: {debugSnapshot.userAgent}</div>
+          <div>isInAppBrowser: {String(debugSnapshot.isInAppBrowser)}</div>
+          <div>isMobileViewport: {String(debugSnapshot.isMobileViewport)}</div>
+          <div>isPortrait: {String(debugSnapshot.isPortrait)}</div>
+          <div>isStandalone: {String(debugSnapshot.isStandalone)}</div>
+          <div>hasSafariGlobal: {String(debugSnapshot.hasSafariGlobal)}</div>
+          <div>isIosWebViewUserAgent: {String(debugSnapshot.isIosWebViewUserAgent)}</div>
+          <div>isProbableIosEmbedded: {String(debugSnapshot.isProbableIosEmbedded)}</div>
+          <div>showExternalBrowserHint: {String(debugSnapshot.showExternalBrowserHint)}</div>
+        </div>
+      ) : null}
+    {visible ? (
     <div
       data-studio-in-app-rotate-hint
       className="pointer-events-none absolute left-1/2 top-20 z-20 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2"
@@ -372,6 +440,8 @@ function StudioInAppRotateHintBanner() {
         </div>
       </div>
     </div>
+    ) : null}
+    </>
   );
 }
 

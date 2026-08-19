@@ -10,8 +10,15 @@ import {
   isInAppBrowser,
 } from "../src/lib/pwa/platform.ts";
 import {
+  isIosSafariUserAgent,
+  isIosWebViewUserAgent,
+  isNamedInAppUserAgent,
+  isProbableIosEmbeddedBrowser,
+  isStudioBrowserDebugQuery,
+  resolveStudioInApp,
   shouldShowStudioInAppRotateHint,
   STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
+  truncateStudioBrowserDebugUserAgent,
 } from "../src/lib/studio/in-app-rotate-hint.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -30,6 +37,10 @@ const UA = {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/10.0.0.0.0;]",
   safariIphone:
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  iosWkWebView:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+  chromeIos:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.108 Mobile/15E148 Safari/604.1",
   chromeAndroid:
     "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36",
   desktopChrome:
@@ -45,19 +56,29 @@ const UA = {
 };
 
 function shownFor(userAgent, overrides = {}) {
+  const hasSafariGlobal = overrides.hasSafariGlobal;
+  const isStandalone = overrides.isStandalone === true;
+  const hintOverrides = { ...overrides };
+  delete hintOverrides.hasSafariGlobal;
+
   return shouldShowStudioInAppRotateHint({
-    isInApp: isInAppBrowser(userAgent),
-    isStandalone: false,
+    isInApp: resolveStudioInApp({
+      userAgent,
+      hasSafariGlobal,
+      isStandalone,
+    }),
+    isStandalone,
     isPortrait: true,
     isMobileViewport: !isDesktopEnvironment(userAgent),
     dismissed: false,
-    ...overrides,
+    ...hintOverrides,
   });
 }
 
 assert.equal(shouldShowStudioInAppRotateHint(), false, "default call is hidden");
 assert.equal(shouldShowStudioInAppRotateHint({}), false, "empty input is hidden");
 assert.equal(isInAppBrowser(""), false, "empty UA is not in-app");
+assert.equal(isNamedInAppUserAgent(""), false, "empty UA is not named in-app");
 assert.equal(shownFor(""), false, "empty UA does not show");
 
 for (const [name, ua] of Object.entries({
@@ -68,14 +89,116 @@ for (const [name, ua] of Object.entries({
   fbanIos: UA.fbanIos,
 })) {
   assert.equal(isInAppBrowser(ua), true, `${name} is in-app`);
+  assert.equal(isNamedInAppUserAgent(ua), true, `${name} is named in-app`);
   assert.equal(isDesktopEnvironment(ua), false, `${name} is not desktop`);
+  assert.equal(
+    resolveStudioInApp({ userAgent: ua }),
+    true,
+    `${name} resolves as Studio in-app`,
+  );
   assert.equal(shownFor(ua), true, `${name} + mobile + portrait shows hint`);
 }
 
 assert.equal(isInAppBrowser(UA.safariIphone), false, "Safari iPhone is not in-app");
-assert.equal(shownFor(UA.safariIphone), false, "Safari iPhone stays hidden in portrait");
+assert.equal(isIosSafariUserAgent(UA.safariIphone), true, "Safari iPhone UA is Safari-shaped");
+assert.equal(isIosWebViewUserAgent(UA.safariIphone), false, "Safari iPhone is not stock WKWebView");
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.safariIphone, hasSafariGlobal: true }),
+  false,
+  "Safari iPhone + window.safari is not embedded",
+);
+assert.equal(
+  isProbableIosEmbeddedBrowser({ userAgent: UA.safariIphone, hasSafariGlobal: true }),
+  false,
+  "Safari iPhone + window.safari is not probable embedded",
+);
+assert.equal(
+  shownFor(UA.safariIphone, { hasSafariGlobal: true }),
+  false,
+  "Safari iPhone + hasSafariGlobal true stays hidden in portrait",
+);
+
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.safariIphone }),
+  false,
+  "Safari iPhone without hasSafariGlobal is not embedded (UA shape)",
+);
+assert.equal(
+  isProbableIosEmbeddedBrowser({ userAgent: UA.safariIphone }),
+  false,
+  "Safari-shaped UA-only fallback is not embedded",
+);
+assert.equal(
+  shownFor(UA.safariIphone),
+  false,
+  "Safari iPhone with omitted hasSafariGlobal stays hidden",
+);
+
+assert.equal(isInAppBrowser(UA.iosWkWebView), false, "stock WKWebView is not a named in-app UA");
+assert.equal(isIosSafariUserAgent(UA.iosWkWebView), false, "stock WKWebView is not Safari UA");
+assert.equal(isIosWebViewUserAgent(UA.iosWkWebView), true, "stock WKWebView UA matches");
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.iosWkWebView, hasSafariGlobal: false }),
+  true,
+  "stock WKWebView + no window.safari is embedded",
+);
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.iosWkWebView }),
+  true,
+  "stock WKWebView with omitted hasSafariGlobal is embedded",
+);
+assert.equal(
+  shownFor(UA.iosWkWebView, { hasSafariGlobal: false }),
+  true,
+  "stock WKWebView shows hint in portrait",
+);
+assert.equal(
+  shownFor(UA.iosWkWebView),
+  true,
+  "stock WKWebView with omitted hasSafariGlobal shows hint in portrait",
+);
+assert.equal(
+  shownFor(UA.iosWkWebView, { hasSafariGlobal: false, isPortrait: false }),
+  false,
+  "stock WKWebView stays hidden in landscape",
+);
+
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.safariIphone, hasSafariGlobal: false }),
+  true,
+  "Safari-shaped UA without window.safari is embedded (MAX iOS)",
+);
+assert.equal(
+  isProbableIosEmbeddedBrowser({
+    userAgent: UA.safariIphone,
+    hasSafariGlobal: false,
+  }),
+  true,
+  "MAX iOS spoofing Safari UA is probable embedded",
+);
+assert.equal(
+  shownFor(UA.safariIphone, { hasSafariGlobal: false }),
+  true,
+  "MAX iOS Safari-shaped UA shows hint in portrait",
+);
+
+assert.equal(isInAppBrowser(UA.chromeIos), false, "Chrome iOS is not named in-app");
+assert.equal(isIosSafariUserAgent(UA.chromeIos), false, "CriOS is not Safari");
+assert.equal(isIosWebViewUserAgent(UA.chromeIos), false, "CriOS is not stock WKWebView");
+assert.equal(
+  resolveStudioInApp({ userAgent: UA.chromeIos, hasSafariGlobal: false }),
+  false,
+  "CriOS is not treated as embedded",
+);
+assert.equal(
+  shownFor(UA.chromeIos, { hasSafariGlobal: false }),
+  false,
+  "CriOS stays hidden",
+);
+
 assert.equal(isInAppBrowser(UA.chromeAndroid), false, "Chrome Android is not in-app");
 assert.equal(shownFor(UA.chromeAndroid), false, "Chrome Android stays hidden in portrait");
+assert.equal(shownFor(UA.chromeAndroid, { hasSafariGlobal: false }), false);
 
 assert.equal(isDesktopEnvironment(UA.desktopChrome), true, "desktop UA is desktop");
 assert.equal(isInAppBrowser(UA.desktopChrome), false, "desktop UA is not in-app");
@@ -87,9 +210,13 @@ assert.equal(
 );
 
 assert.equal(isInAppBrowser(UA.yandexAndroid), false, "Yandex Browser is not in-app");
+assert.equal(shownFor(UA.yandexAndroid), false, "Yandex stays hidden");
 assert.equal(isInAppBrowser(UA.samsungInternet), false, "Samsung Internet is not in-app");
+assert.equal(shownFor(UA.samsungInternet), false, "Samsung stays hidden");
 assert.equal(isInAppBrowser(UA.androidWebView), false, "wv alone is not in-app");
+assert.equal(shownFor(UA.androidWebView), false, "wv alone stays hidden");
 assert.equal(isInAppBrowser(UA.genericVk), false, "generic VK is not in-app");
+assert.equal(shownFor(UA.genericVk), false, "generic VK stays hidden");
 
 assert.equal(
   shownFor(UA.telegramIos, { isPortrait: false }),
@@ -102,6 +229,20 @@ assert.equal(
   "standalone PWA hides the hint",
 );
 assert.equal(
+  shownFor(UA.iosWkWebView, { hasSafariGlobal: false, isStandalone: true }),
+  false,
+  "standalone + WKWebView hides the hint",
+);
+assert.equal(
+  resolveStudioInApp({
+    userAgent: UA.iosWkWebView,
+    hasSafariGlobal: false,
+    isStandalone: true,
+  }),
+  false,
+  "standalone + WKWebView is not Studio in-app",
+);
+assert.equal(
   shownFor(UA.telegramIos, { dismissed: true }),
   false,
   "dismissed session hides the hint",
@@ -110,6 +251,16 @@ assert.equal(
   shownFor(UA.telegramIos, { isMobileViewport: false }),
   false,
   "non-mobile viewport hides the hint",
+);
+
+assert.equal(isStudioBrowserDebugQuery("?studioBrowserDebug=1"), true);
+assert.equal(isStudioBrowserDebugQuery("studioBrowserDebug=1"), true);
+assert.equal(isStudioBrowserDebugQuery("?foo=1&studioBrowserDebug=1"), true);
+assert.equal(isStudioBrowserDebugQuery("?studioBrowserDebug=0"), false);
+assert.equal(isStudioBrowserDebugQuery(""), false);
+assert.equal(
+  truncateStudioBrowserDebugUserAgent("a".repeat(12), 8),
+  `${"a".repeat(8)}…`,
 );
 
 assert.equal(
@@ -123,8 +274,18 @@ const platform = read("src/lib/pwa/platform.ts");
 const helper = read("src/lib/studio/in-app-rotate-hint.ts");
 
 assert.match(helper, /export function shouldShowStudioInAppRotateHint/);
+assert.match(helper, /export function resolveStudioInApp/);
+assert.match(helper, /export function isProbableIosEmbeddedBrowser/);
+assert.match(helper, /export function isIosWebViewUserAgent/);
+assert.match(helper, /export function isIosSafariUserAgent/);
+assert.match(helper, /export function isNamedInAppUserAgent/);
 assert.match(platform, /VKAndroidApp\|VKiOS/);
 assert.match(editor, /shouldShowStudioInAppRotateHint/);
+assert.match(editor, /resolveStudioInApp/);
+assert.match(editor, /hasSafariGlobal/);
+assert.match(editor, /typeof \(window as SafariAwareWindow\)\.safari/);
+assert.match(editor, /studioBrowserDebug/);
+assert.match(editor, /data-studio-browser-debug/);
 assert.match(editor, /isInAppBrowser/);
 assert.match(editor, /isStandaloneMode/);
 assert.match(editor, /isDesktopEnvironment/);
