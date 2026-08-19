@@ -885,10 +885,9 @@ function testFourthPage() {
     abundanceLinks.some(
       (link) =>
         link.href === "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno" &&
-        link.label ===
-          "https://audiolad.ru/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno",
+        link.label === "Медитация на изобилие: слушать онлайн бесплатно",
     ),
-    "abundance section links izobilie listen",
+    "abundance section links izobilie listen by page title",
   );
 
   const moneySection = parsed.definition.sections.find(
@@ -902,19 +901,17 @@ function testFourthPage() {
     moneyLinks.some(
       (link) =>
         link.href === "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" &&
-        link.label ===
-          "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+        link.label === "Медитация на деньги: слушать онлайн бесплатно",
     ),
-    "money section links first listen",
+    "money section links first listen by page title",
   );
   assert(
     moneyLinks.some(
       (link) =>
         link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" &&
-        link.label ===
-          "https://audiolad.ru/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno",
+        link.label === "Денежная медитация: слушать онлайн бесплатно",
     ),
-    "money section links second listen",
+    "money section links second listen by page title",
   );
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);

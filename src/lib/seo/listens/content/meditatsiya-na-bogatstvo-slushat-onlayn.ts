@@ -109,9 +109,9 @@ export const MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если вам ближе более широкий смысл достаточности и ресурсов, можно открыть отдельную страницу «Медитация на изобилие: слушать онлайн бесплатно» (" },
-              { href: "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno" },
-              { text: ")." },
+              { text: "Если вам ближе более широкий смысл достаточности и ресурсов, можно открыть отдельную страницу «" },
+              { href: "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno", label: "Медитация на изобилие: слушать онлайн бесплатно" },
+              { text: "»." },
             ],
           },
         ],
@@ -183,17 +183,17 @@ export const MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если вас интересует именно более прямой фокус на теме денег, есть отдельная страница «Медитация на деньги: слушать онлайн бесплатно» (" },
-              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" },
-              { text: ")." },
+              { text: "Если вас интересует именно более прямой фокус на теме денег, есть отдельная страница «" },
+              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "Медитация на деньги: слушать онлайн бесплатно" },
+              { text: "»." },
             ],
           },
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Для формулировки «денежная медитация» также существует отдельная подборка – «Денежная медитация: слушать онлайн бесплатно» (" },
-              { href: "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" },
-              { text: ")." },
+              { text: "Для формулировки «денежная медитация» также существует отдельная подборка – «" },
+              { href: "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno", label: "Денежная медитация: слушать онлайн бесплатно" },
+              { text: "»." },
             ],
           },
           { kind: "paragraph", text: "Практика может поддерживать внимание и внутреннее состояние, но реальные финансовые изменения требуют действий." },
