@@ -189,12 +189,6 @@ export default function StudioMeditationPage() {
             >
               Попробовать бесплатно
             </Link>
-            <a
-              href="#studio-meditation-features"
-              className="mt-3 inline-flex min-h-10 items-center justify-center text-sm font-medium text-[#7042c5] underline-offset-4 hover:underline"
-            >
-              Посмотреть возможности
-            </a>
           </div>
 
           <div className="mx-auto mt-8 max-w-[1024px] sm:mt-10">
