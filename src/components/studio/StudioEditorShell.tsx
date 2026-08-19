@@ -1497,7 +1497,7 @@ export default function StudioEditorShell({
   };
 
   return (
-    <section className="min-h-dvh bg-[#0b1019] text-[#edf0f7]">
+    <section className="relative min-h-dvh bg-[#0b1019] text-[#edf0f7]">
       <div className="mx-auto flex min-h-dvh max-w-[1920px] flex-col">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#0f1520] px-4 py-3 lg:px-6">
           <StudioBrand />
@@ -1810,16 +1810,6 @@ export default function StudioEditorShell({
                   Обновить страницу
                 </button>
               ) : null}
-            </p>
-          ) : null}
-          {editingError ? (
-            <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-              {editingError}
-            </p>
-          ) : null}
-          {editingNotice ? (
-            <p role="status" className="mb-4 rounded-lg border border-white/10 bg-[#131b28] px-4 py-3 text-sm text-[#c9d8ff]">
-              {editingNotice}
             </p>
           ) : null}
           {renderError ? <p role="alert" className="mb-4 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{renderError}</p> : null}
@@ -2229,6 +2219,20 @@ export default function StudioEditorShell({
           />
         </main>
       </div>
+
+      {(editingError || editingNotice) ? (
+        <div className="studio-editor-feedback pointer-events-none absolute left-1/2 top-20 z-20 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2">
+          {editingError ? (
+            <p role="alert" className="rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-2 text-sm text-rose-100 shadow-lg">
+              {editingError}
+            </p>
+          ) : (
+            <p role="status" aria-live="polite" className="rounded-lg border border-white/10 bg-[#131b28] px-4 py-2 text-sm text-[#c9d8ff] shadow-lg">
+              {editingNotice}
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="fixed inset-0 z-30 hidden flex-col items-center justify-center bg-[#0b1019] p-8 text-center md:hidden">
         <StudioBrand />
