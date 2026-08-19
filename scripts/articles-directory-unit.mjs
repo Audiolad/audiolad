@@ -29,6 +29,7 @@ import {
 import { listIndexableListenPageDefinitions } from "../src/lib/seo/listens/index.ts";
 import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
+import { MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-bogatstvo-slushat-onlayn.ts";
 import { MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-izobilie-slushat-onlayn-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
@@ -436,6 +437,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirdListenHref}`,
     ),
     "directory JSON-LD includes third listen href",
+  );
+
+  const fourthListenHref = "/listens/meditatsiya-na-bogatstvo-slushat-onlayn";
+  const fourthListenCard = data.articles.find((card) => card.href === fourthListenHref);
+  assert(fourthListenCard, "fourth indexable listen page is listed");
+  assert(
+    fourthListenCard.title === "Медитация на богатство: слушать онлайн | АудиоЛад",
+    "fourth listen directory title",
+  );
+  assert(
+    fourthListenCard.description === MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE.description,
+    "fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-bogatstvo-slushat-onlayn",
+    ),
+    "no /articles duplicate for fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fourthListenHref}`,
+    ),
+    "directory JSON-LD includes fourth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
