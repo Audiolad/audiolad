@@ -11,6 +11,7 @@ import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-bogatstvo-slushat-onlayn.ts";
 import { MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-izobilie-slushat-onlayn-besplatno.ts";
+import { MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -351,6 +352,77 @@ const FOURTH_EXPECTED_FAQ = [
     question: "Помогает ли медитация стать богаче?",
     answer:
       "Медитация сама по себе не увеличивает доход и не гарантирует богатство. Она может помочь яснее сформулировать финансовые цели, заметить собственные установки и сосредоточиться на действиях, которые действительно зависят от вас.",
+  },
+];
+
+const FIFTH_PAGE_SLUG = "meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya";
+const FIFTH_PAGE_H1 = "Медитация для привлечения денег, богатства и изобилия";
+const FIFTH_PAGE_TITLE = "Медитация для привлечения денег, богатства и изобилия | АудиоЛад";
+const FIFTH_PAGE_DESCRIPTION =
+  "Слушайте медитации для привлечения денег, богатства и изобилия онлайн на АудиоЛаде. Выберите подходящую практику и начните прослушивание.";
+
+const FIFTH_EXPECTED_INTRO = [
+  "На этой странице можно выбрать медитацию для привлечения денег, богатства и изобилия и начать слушать её онлайн прямо на АудиоЛаде.",
+  "Такие практики могут использовать визуализацию, работу с вниманием, намерением и отношением к финансовой теме. При этом медитация сама по себе не гарантирует появления денег или определённого материального результата.",
+  "Выберите подходящую практику и начните слушать.",
+];
+
+const FIFTH_EXPECTED_SECTION_TITLES = [
+  "Что такое медитация для привлечения денег и изобилия",
+  "Что в такой медитации означает «привлечение»",
+  "Медитация для привлечения денег",
+  "Медитация для привлечения богатства",
+  "Медитация для привлечения изобилия",
+  "Нужно ли верить в закон притяжения",
+  "Как выбрать медитацию для привлечения денег, богатства или изобилия",
+  "Как правильно слушать такую медитацию",
+  "Как часто слушать медитацию для привлечения",
+  "Медитация и реальные действия",
+  "Можно ли слушать медитацию для привлечения денег бесплатно",
+  "Как понять, что практика подходит именно вам",
+  "Итог",
+];
+
+const FIFTH_EXPECTED_FAQ = [
+  {
+    question: "Что такое медитация для привлечения денег и изобилия?",
+    answer:
+      "Это аудиопрактика, в которой внимание направляется на желаемое состояние, отношение к деньгам, ресурсы, возможности и собственные действия.",
+  },
+  {
+    question: "Действительно ли медитация может привлечь деньги?",
+    answer:
+      "Медитация сама по себе не гарантирует появления денег. Она может помочь яснее сформулировать цели, заметить собственные установки и сосредоточиться на возможностях и действиях.",
+  },
+  {
+    question: "Чем медитация на деньги отличается от медитации на изобилие?",
+    answer:
+      "Медитация на деньги сильнее сосредоточена на финансовой теме. Изобилие может включать более широкий круг ресурсов – время, отношения, знания, поддержку, энергию и возможности.",
+  },
+  {
+    question: "Как часто нужно слушать медитацию для привлечения богатства?",
+    answer:
+      "Универсального правила нет. Можно слушать одну практику несколько дней, возвращаться к ней периодически или менять медитации в зависимости от задачи.",
+  },
+  {
+    question: "Нужно ли верить в закон притяжения?",
+    answer:
+      "Нет. Медитацию можно использовать как практику внимания, визуализации, намерения и подготовки к действиям без принятия какой-либо эзотерической концепции.",
+  },
+  {
+    question: "Когда лучше слушать такую медитацию?",
+    answer:
+      "В любое спокойное время, когда вас меньше отвлекают. Это может быть утро, вечер, время перед планированием или перед конкретными действиями.",
+  },
+  {
+    question: "Можно ли слушать медитацию для привлечения денег перед сном?",
+    answer:
+      "Можно, если выбранная практика спокойная и не требует активного планирования. Если после неё хочется записывать цели или принимать решения, удобнее выбрать другое время.",
+  },
+  {
+    question: "Можно ли слушать такие медитации бесплатно?",
+    answer:
+      "Да. На этой странице можно выбрать практику из плейлиста и начать слушать её онлайн.",
   },
 ];
 
@@ -964,12 +1036,154 @@ function testFourthPage() {
   assert(!serialized.includes("primaryPractice"), "fourth JSON-LD no primaryPractice");
 }
 
+
+function testFifthPage() {
+  const parsed = parseListenPageDefinition(
+    MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE,
+  );
+  assert(parsed.ok, "fifth production definition valid");
+  assert(parsed.definition.slug === FIFTH_PAGE_SLUG, "fifth page slug");
+  assert(parsed.definition.playlistSlug === PLAYLIST_SLUG, "fifth playlistSlug");
+  assert(
+    parsed.definition.playlistSlug !== "meditatsiya-na-dengi",
+    "fifth playlistSlug is not slugifyTitle form",
+  );
+  assert(
+    parsed.definition.playlistSlug !== "denezhnyy-potok-9288",
+    "fifth playlistSlug is not denezhnyy-potok-9288",
+  );
+  assert(parsed.definition.h1 === FIFTH_PAGE_H1, "fifth h1 exact");
+  assert(parsed.definition.title === FIFTH_PAGE_TITLE, "fifth title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "fifth title keeps brand suffix");
+  assert(
+    parsed.definition.description === FIFTH_PAGE_DESCRIPTION,
+    "fifth description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 3, "fifth page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === FIFTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === FIFTH_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === FIFTH_EXPECTED_INTRO[2],
+    "fifth intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 13, "fifth page has 13 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      FIFTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "fifth page 13 section titles verbatim",
+  );
+  assert(parsed.definition.faq.length === 8, "fifth page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === FIFTH_EXPECTED_FAQ[index].question &&
+        item.answer === FIFTH_EXPECTED_FAQ[index].answer,
+    ),
+    "fifth page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "fifth page has no internalLinks");
+  assert(!("cta" in parsed.definition), "fifth page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `fifth page has no static ${key}`);
+  }
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 4, "fifth page has four title-anchor links");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `fifth link label is not a URL: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `fifth href is site-relative: ${link.href}`);
+  }
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" &&
+        link.label === "Медитация на деньги: слушать онлайн бесплатно",
+    ),
+    "fifth page links dengi listen by page title",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" &&
+        link.label === "Денежная медитация: слушать онлайн бесплатно",
+    ),
+    "fifth page links denezhnaya listen by page title",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-na-bogatstvo-slushat-onlayn" &&
+        link.label === "Медитация на богатство: слушать онлайн",
+    ),
+    "fifth page links bogatstvo listen by page title",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno" &&
+        link.label === "Медитация на изобилие: слушать онлайн бесплатно",
+    ),
+    "fifth page links izobilie listen by page title",
+  );
+
+  const contentSource = read(
+    "src/lib/seo/listens/content/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya.ts",
+  );
+  assert(
+    !contentSource.includes("https://audiolad.ru/listens/"),
+    "fifth content file has no visible production listen URLs",
+  );
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(slugs.includes(THIRD_PAGE_SLUG), "registry contains third listen slug");
+  assert(slugs.includes(FOURTH_PAGE_SLUG), "registry contains fourth listen slug");
+  assert(slugs.includes(FIFTH_PAGE_SLUG), "registry contains fifth listen slug");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE.playlistSlug === PLAYLIST_SLUG,
+    "fifth page reuses playlistSlug meditaciya-na-dengi",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${FIFTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains fifth listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE,
+    loaded: { ok: true, detail: makePlaylist() },
+  });
+  assert(data, "fifth page resolves against the same editorial playlist");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "fifth JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "fifth JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "fifth JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "fifth JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "fifth JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "fifth JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "fifth JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "fifth JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "fifth JSON-LD no primaryPractice");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
   ["second listen page", testSecondPage],
   ["third listen page", testThirdPage],
   ["fourth listen page", testFourthPage],
+  ["fifth listen page", testFifthPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],

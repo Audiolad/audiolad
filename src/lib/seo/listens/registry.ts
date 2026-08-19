@@ -2,6 +2,7 @@ import { DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/
 import { MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/meditatsiya-na-dengi-slushat-onlayn-besplatno";
 import { MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE } from "./content/meditatsiya-na-bogatstvo-slushat-onlayn";
 import { MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "./content/meditatsiya-na-izobilie-slushat-onlayn-besplatno";
+import { MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE } from "./content/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -13,6 +14,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
   MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
   MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE,
+  MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
