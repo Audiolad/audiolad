@@ -16,8 +16,13 @@ import {
   isNamedInAppUserAgent,
   isProbableIosEmbeddedBrowser,
   isStudioBrowserDebugQuery,
+  isStudioGuestHandoffShareUrl,
+  performStudioBannerShareCopy,
+  resolveStudioBannerShareCopy,
   resolveStudioInApp,
+  resolveStudioShareProjectId,
   shouldShowStudioInAppRotateHint,
+  studioProjectIdFromPathname,
   studioShareUrlFromHref,
   STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
   truncateStudioBrowserDebugUserAgent,
@@ -455,5 +460,135 @@ assert.match(helper, /opacity = "0"/);
 assert.match(helper, /setSelectionRange/);
 assert.doesNotMatch(helper, /left = "-9999px"/);
 assert.doesNotMatch(helper, /setAttribute\("readonly"/);
+
+const projectId = "55555555-5555-4555-8555-555555555555";
+const projectHref = `https://audiolad.ru/studio/project/${projectId}`;
+const handoffUrl = "https://audiolad.ru/studio/try/handoff?t=opaque-token";
+
+assert.equal(studioProjectIdFromPathname(`/studio/project/${projectId}`), projectId);
+assert.equal(resolveStudioShareProjectId(undefined, `/studio/project/${projectId}`), projectId);
+assert.equal(isStudioGuestHandoffShareUrl(handoffUrl), true);
+assert.equal(isStudioGuestHandoffShareUrl(projectHref), false);
+
+assert.deepEqual(
+  resolveStudioBannerShareCopy({
+    accessMode: "guest",
+    projectId,
+    href: projectHref,
+  }),
+  { action: "handoff", projectId },
+);
+assert.deepEqual(
+  resolveStudioBannerShareCopy({
+    accessMode: "guest",
+    pathname: `/studio/project/${projectId}`,
+    href: projectHref,
+  }),
+  { action: "handoff", projectId },
+);
+assert.deepEqual(
+  resolveStudioBannerShareCopy({
+    accessMode: "guest",
+    href: projectHref,
+  }),
+  { action: "error" },
+);
+assert.deepEqual(
+  resolveStudioBannerShareCopy({
+    accessMode: undefined,
+    projectId,
+    href: projectHref,
+  }),
+  { action: "handoff", projectId },
+  "missing accessMode must not copy the project URL",
+);
+assert.deepEqual(
+  resolveStudioBannerShareCopy({
+    accessMode: "author",
+    projectId,
+    href: `${projectHref}?studioBrowserDebug=1`,
+  }),
+  { action: "href", href: projectHref },
+);
+
+{
+  const copied = [];
+  const created = [];
+  const outcome = await performStudioBannerShareCopy({
+    accessMode: "guest",
+    projectId,
+    href: projectHref,
+    createHandoff: async (id) => {
+      created.push(id);
+      return { url: handoffUrl };
+    },
+    copyShareUrl: async (href) => {
+      copied.push(href);
+      return { url: href, result: "copied" };
+    },
+  });
+  assert.deepEqual(created, [projectId]);
+  assert.deepEqual(copied, [handoffUrl]);
+  assert.deepEqual(outcome, { status: "copied", url: handoffUrl });
+}
+
+{
+  const copied = [];
+  const outcome = await performStudioBannerShareCopy({
+    accessMode: "guest",
+    projectId,
+    href: projectHref,
+    createHandoff: async () => {
+      throw new Error("handoff failed");
+    },
+    copyShareUrl: async (href) => {
+      copied.push(href);
+      return { url: href, result: "copied" };
+    },
+  });
+  assert.deepEqual(copied, []);
+  assert.deepEqual(outcome, { status: "error" });
+}
+
+{
+  const copied = [];
+  const outcome = await performStudioBannerShareCopy({
+    accessMode: "guest",
+    projectId,
+    href: projectHref,
+    createHandoff: async () => ({ url: projectHref }),
+    copyShareUrl: async (href) => {
+      copied.push(href);
+      return { url: href, result: "copied" };
+    },
+  });
+  assert.deepEqual(copied, []);
+  assert.deepEqual(outcome, { status: "error" });
+}
+
+{
+  const created = [];
+  const copied = [];
+  const outcome = await performStudioBannerShareCopy({
+    accessMode: "author",
+    projectId,
+    href: `${projectHref}?studioBrowserDebug=1`,
+    createHandoff: async (id) => {
+      created.push(id);
+      return { url: handoffUrl };
+    },
+    copyShareUrl: async (href) => {
+      copied.push(href);
+      return { url: href, result: "copied" };
+    },
+  });
+  assert.deepEqual(created, []);
+  assert.deepEqual(copied, [projectHref]);
+  assert.deepEqual(outcome, { status: "copied", url: projectHref });
+}
+
+assert.match(editor, /performStudioBannerShareCopy/);
+assert.match(editor, /createHandoff: \(id\) => createStudioGuestHandoff/);
+assert.doesNotMatch(editor, /copyPreparedShareUrl\(window\.location\.href\)/);
 
 console.log("studio-in-app-rotate-hint-unit: ok");

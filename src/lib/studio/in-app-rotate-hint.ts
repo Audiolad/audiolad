@@ -165,6 +165,94 @@ export function studioShareUrlFromHref(href: string): string {
   }
 }
 
+const STUDIO_PROJECT_PATH =
+  /^\/studio\/project\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+
+const STUDIO_GUEST_HANDOFF_URL_MARK = "/studio/try/handoff?t=";
+
+export function studioProjectIdFromPathname(pathname: string): string | undefined {
+  const match = pathname.match(STUDIO_PROJECT_PATH);
+  return match?.[1];
+}
+
+export function resolveStudioShareProjectId(
+  projectId?: string | null,
+  pathname?: string,
+): string | undefined {
+  if (typeof projectId === "string" && projectId.length > 0) {
+    const fromId = studioProjectIdFromPathname(`/studio/project/${projectId}`);
+    if (fromId) {
+      return fromId;
+    }
+  }
+  if (typeof pathname === "string" && pathname.length > 0) {
+    return studioProjectIdFromPathname(pathname);
+  }
+  return undefined;
+}
+
+export function isStudioGuestHandoffShareUrl(url: string): boolean {
+  return typeof url === "string" && url.includes(STUDIO_GUEST_HANDOFF_URL_MARK);
+}
+
+export type StudioBannerShareCopyPlan =
+  | { action: "handoff"; projectId: string }
+  | { action: "href"; href: string }
+  | { action: "error" };
+
+/**
+ * Banner «Скопировать ссылку» plan.
+ * Only authenticated author copies the current project URL.
+ * Guest (or missing mode) never falls back to /studio/project/:id.
+ */
+export function resolveStudioBannerShareCopy(input: {
+  accessMode?: "author" | "guest" | null;
+  projectId?: string | null;
+  pathname?: string;
+  href: string;
+}): StudioBannerShareCopyPlan {
+  const projectId = resolveStudioShareProjectId(input.projectId, input.pathname);
+  if (input.accessMode !== "author") {
+    if (!projectId) {
+      return { action: "error" };
+    }
+    return { action: "handoff", projectId };
+  }
+  return { action: "href", href: studioShareUrlFromHref(input.href) };
+}
+
+export type StudioBannerShareCopyOutcome =
+  | { status: "copied" | "manual"; url: string }
+  | { status: "error" };
+
+export async function performStudioBannerShareCopy(input: {
+  accessMode?: "author" | "guest" | null;
+  projectId?: string | null;
+  pathname?: string;
+  href: string;
+  createHandoff: (projectId: string) => Promise<{ url: string }>;
+  copyShareUrl: (href: string) => Promise<CopyStudioShareUrlResult>;
+}): Promise<StudioBannerShareCopyOutcome> {
+  const plan = resolveStudioBannerShareCopy(input);
+  if (plan.action === "error") {
+    return { status: "error" };
+  }
+  if (plan.action === "href") {
+    const copied = await input.copyShareUrl(plan.href);
+    return { status: copied.result, url: copied.url };
+  }
+  try {
+    const { url } = await input.createHandoff(plan.projectId);
+    if (!isStudioGuestHandoffShareUrl(url)) {
+      return { status: "error" };
+    }
+    const copied = await input.copyShareUrl(url);
+    return { status: copied.result, url: copied.url };
+  } catch {
+    return { status: "error" };
+  }
+}
+
 export type CopyStudioShareUrlAdapters = {
   href: string;
   writeText?: ((text: string) => Promise<void> | void) | null;

@@ -71,6 +71,7 @@ import {
   copyTextWithVisibleExecCommand,
   isIosWebViewUserAgent,
   isProbableIosEmbeddedBrowser,
+  performStudioBannerShareCopy,
   resolveStudioInApp,
   shouldShowStudioInAppRotateHint,
   STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
@@ -294,10 +295,10 @@ type StudioBrowserDebugSnapshot = {
 };
 
 function StudioInAppRotateHintBanner({
-  accessMode = "author",
+  accessMode,
   projectId,
 }: {
-  accessMode?: "author" | "guest";
+  accessMode: "author" | "guest";
   projectId?: string;
 }) {
   const [visible, setVisible] = useState(false);
@@ -454,41 +455,37 @@ function StudioInAppRotateHintBanner({
                 typeof navigator !== "undefined" && navigator.clipboard?.writeText
                   ? (value: string) => navigator.clipboard.writeText(value)
                   : undefined;
-              const copyPreparedShareUrl = (href: string) =>
-                copyStudioShareUrl({
-                  href,
-                  writeText,
-                  execCopy: copyTextWithVisibleExecCommand,
-                }).then(({ url, result }) => {
-                  setManualShareUrl(url);
-                  setCopyFeedback(result);
-                  if (copyFeedbackTimeoutRef.current !== null) {
-                    window.clearTimeout(copyFeedbackTimeoutRef.current);
+              void performStudioBannerShareCopy({
+                accessMode,
+                projectId,
+                pathname: window.location.pathname,
+                href: window.location.href,
+                createHandoff: (id) => createStudioGuestHandoff({ projectId: id }),
+                copyShareUrl: (href) =>
+                  copyStudioShareUrl({
+                    href,
+                    writeText,
+                    execCopy: copyTextWithVisibleExecCommand,
+                  }),
+              }).then((outcome) => {
+                if (outcome.status === "error") {
+                  setManualShareUrl("");
+                  setCopyFeedback("error");
+                  return;
+                }
+                setManualShareUrl(outcome.url);
+                setCopyFeedback(outcome.status);
+                if (copyFeedbackTimeoutRef.current !== null) {
+                  window.clearTimeout(copyFeedbackTimeoutRef.current);
+                  copyFeedbackTimeoutRef.current = null;
+                }
+                if (outcome.status === "copied") {
+                  copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+                    setCopyFeedback((current) => (current === "copied" ? "idle" : current));
                     copyFeedbackTimeoutRef.current = null;
-                  }
-                  if (result === "copied") {
-                    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
-                      setCopyFeedback((current) => (current === "copied" ? "idle" : current));
-                      copyFeedbackTimeoutRef.current = null;
-                    }, 2000);
-                  }
-                });
-              if (accessMode === "guest") {
-                void (async () => {
-                  try {
-                    if (!projectId) {
-                      throw new Error("missing_project");
-                    }
-                    const { url } = await createStudioGuestHandoff({ projectId });
-                    await copyPreparedShareUrl(url);
-                  } catch {
-                    setManualShareUrl("");
-                    setCopyFeedback("error");
-                  }
-                })();
-                return;
-              }
-              void copyPreparedShareUrl(window.location.href);
+                  }, 2000);
+                }
+              });
             }}
             className="h-9 rounded-lg border border-white/15 px-3 text-sm font-medium text-[#c9d8ff]"
           >

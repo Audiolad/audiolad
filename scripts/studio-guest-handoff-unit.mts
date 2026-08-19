@@ -265,26 +265,14 @@ const bannerStart = editor.indexOf("function StudioInAppRotateHintBanner");
 const bannerEnd = editor.indexOf("export default function StudioEditorShell");
 assert.ok(bannerStart !== -1 && bannerEnd > bannerStart);
 const banner = editor.slice(bannerStart, bannerEnd);
-assert.match(banner, /accessMode === "guest"/);
+assert.match(banner, /performStudioBannerShareCopy/);
 assert.match(banner, /createStudioGuestHandoff/);
 assert.match(banner, /setCopyFeedback\("error"\)/);
-assert.match(banner, /copyPreparedShareUrl\(window\.location\.href\)/);
+assert.match(banner, /createHandoff: \(id\) => createStudioGuestHandoff\(\{ projectId: id \}\)/);
+assert.doesNotMatch(banner, /copyPreparedShareUrl\(window\.location\.href\)/);
 assert.doesNotMatch(banner, /Проект для сохранения не найден/);
-
-const guestBranchStart = banner.indexOf('if (accessMode === "guest")');
-assert.notEqual(guestBranchStart, -1, "guest banner branch exists");
-const guestBranch = banner.slice(
-  guestBranchStart,
-  banner.indexOf("void copyPreparedShareUrl(window.location.href)"),
-);
-assert.match(guestBranch, /createStudioGuestHandoff/);
-assert.match(guestBranch, /setCopyFeedback\("error"\)/);
-assert.doesNotMatch(guestBranch, /window\.location\.href/);
-assert.doesNotMatch(guestBranch, /copyPreparedShareUrl\(window\.location\.href\)/);
-
-const authorCopy = banner.slice(banner.indexOf("void copyPreparedShareUrl(window.location.href)"));
-assert.match(authorCopy, /window\.location\.href/);
-assert.doesNotMatch(authorCopy, /createStudioGuestHandoff/);
+assert.match(banner, /pathname: window\.location\.pathname/);
+assert.match(banner, /href: window\.location\.href/);
 
 const guestMode = await read("src/lib/studio/server/repository.ts");
 assert.match(guestMode, /resolveStudioProjectAccess/);
