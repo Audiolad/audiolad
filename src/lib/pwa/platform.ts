@@ -65,7 +65,8 @@ export function isInAppBrowser(userAgent: string): boolean {
     /\bMAX\b/i.test(userAgent) ||
     /Instagram|FBAN|FBAV|Line\/|MicroMessenger|Twitter|LinkedInApp/i.test(
       userAgent,
-    )
+    ) ||
+    /VKAndroidApp|VKiOS/i.test(userAgent)
   );
 }
 

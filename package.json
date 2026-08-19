@@ -90,6 +90,7 @@
     "test:studio-guest-limits": "npx tsx scripts/studio-guest-limits-unit.mts",
     "test:studio-guest-source": "npx tsx scripts/studio-guest-source-unit.mts",
     "test:studio-mobile-header": "node scripts/studio-mobile-header-unit.mjs",
+    "test:studio-in-app-rotate-hint": "npx tsx scripts/studio-in-app-rotate-hint-unit.mjs",
     "test:studio-guest-session": "npx tsx scripts/studio-guest-session-unit.mts",
     "test:studio-guest-try-bootstrap": "npx tsx scripts/studio-guest-try-bootstrap-unit.mts",
     "test:public-request-origin": "npx tsx scripts/public-request-origin-unit.ts",

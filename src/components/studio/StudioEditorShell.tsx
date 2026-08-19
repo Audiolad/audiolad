@@ -60,6 +60,16 @@ import { serializeStudioProjectState, validateStudioProjectDocument } from "@/li
 import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import { getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
+import { copyTextToClipboard } from "@/lib/personal-materials/client/clipboard";
+import {
+  isDesktopEnvironment,
+  isInAppBrowser,
+  isStandaloneMode,
+} from "@/lib/pwa/platform";
+import {
+  shouldShowStudioInAppRotateHint,
+  STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
+} from "@/lib/studio/in-app-rotate-hint";
 
 type StudioTrackSlot = {
   id: string;
@@ -257,6 +267,111 @@ function TrackActionButton({
         {label}
       </span>
     </span>
+  );
+}
+
+
+function StudioInAppRotateHintBanner() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const portraitQuery = window.matchMedia("(orientation: portrait)");
+    const mobileQuery = window.matchMedia("(max-width: 1023px)");
+
+    const sync = () => {
+      let dismissed = false;
+      try {
+        dismissed =
+          window.sessionStorage.getItem(STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY) ===
+          "1";
+      } catch {
+        dismissed = false;
+      }
+
+      const userAgent = window.navigator.userAgent;
+      const isPortrait = portraitQuery.matches;
+      const isMobileViewport =
+        mobileQuery.matches && !isDesktopEnvironment(userAgent);
+
+      setVisible(
+        shouldShowStudioInAppRotateHint({
+          isInApp: isInAppBrowser(userAgent),
+          isStandalone: isStandaloneMode(),
+          isPortrait,
+          isMobileViewport,
+          dismissed,
+        }),
+      );
+    };
+
+    sync();
+    portraitQuery.addEventListener("change", sync);
+    mobileQuery.addEventListener("change", sync);
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+
+    return () => {
+      portraitQuery.removeEventListener("change", sync);
+      mobileQuery.removeEventListener("change", sync);
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, []);
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <div
+      data-studio-in-app-rotate-hint
+      className="pointer-events-none absolute left-1/2 top-20 z-20 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2"
+    >
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-auto rounded-lg border border-white/10 bg-[#131b28] px-4 py-3 text-sm text-[#e2e8f5] shadow-lg"
+      >
+        <p className="font-medium">
+          Для удобной работы в Студии откройте страницу во внешнем браузере и поверните телефон горизонтально.
+        </p>
+        <p className="mt-1 text-xs text-[#99a4b8]">
+          Во встроенных браузерах некоторых приложений поворот экрана может быть недоступен.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                window.sessionStorage.setItem(
+                  STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
+                  "1",
+                );
+              } catch {
+                // sessionStorage may be unavailable in embedded browsers
+              }
+              setVisible(false);
+            }}
+            className="h-9 rounded-lg bg-white/10 px-3 text-sm font-medium text-white"
+          >
+            Понятно
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void copyTextToClipboard(window.location.href);
+            }}
+            className="h-9 rounded-lg border border-white/15 px-3 text-sm font-medium text-[#c9d8ff]"
+          >
+            Скопировать ссылку
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2375,6 +2490,8 @@ export default function StudioEditorShell({
           />
         </main>
       </div>
+
+      <StudioInAppRotateHintBanner />
 
       {(editingError || editingNotice) ? (
         <div className="studio-editor-feedback pointer-events-none absolute left-1/2 top-20 z-20 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2">
