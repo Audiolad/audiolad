@@ -10,6 +10,7 @@ import {
   isInAppBrowser,
 } from "../src/lib/pwa/platform.ts";
 import {
+  copyStudioShareUrl,
   isIosSafariUserAgent,
   isIosWebViewUserAgent,
   isNamedInAppUserAgent,
@@ -17,6 +18,7 @@ import {
   isStudioBrowserDebugQuery,
   resolveStudioInApp,
   shouldShowStudioInAppRotateHint,
+  studioShareUrlFromHref,
   STUDIO_IN_APP_ROTATE_HINT_DISMISSED_KEY,
   truncateStudioBrowserDebugUserAgent,
 } from "../src/lib/studio/in-app-rotate-hint.ts";
@@ -289,8 +291,11 @@ assert.match(editor, /data-studio-browser-debug/);
 assert.match(editor, /isInAppBrowser/);
 assert.match(editor, /isStandaloneMode/);
 assert.match(editor, /isDesktopEnvironment/);
-assert.match(editor, /copyTextToClipboard/);
-assert.match(editor, /copyTextToClipboard\(window\.location\.href\)/);
+assert.match(editor, /copyStudioShareUrl/);
+assert.match(editor, /copyTextWithVisibleExecCommand/);
+assert.match(editor, /studioShareUrlFromHref|copyStudioShareUrl\(\{/);
+assert.match(editor, /href: window\.location\.href/);
+assert.doesNotMatch(editor, /copyTextToClipboard\(window\.location\.href\)/);
 assert.match(editor, /sessionStorage/);
 assert.match(editor, /matchMedia\("\(orientation: portrait\)"\)/);
 assert.match(editor, /matchMedia\("\(max-width: 1023px\)"\)/);
@@ -307,8 +312,19 @@ assert.match(
   hintBlock,
   /Во встроенных браузерах некоторых приложений поворот экрана может быть недоступен\./,
 );
-assert.match(hintBlock, /Понятно/);
+assert.match(hintBlock, /Да, хорошо/);
+assert.doesNotMatch(hintBlock, /Понятно/);
 assert.match(hintBlock, /Скопировать ссылку/);
+assert.match(hintBlock, /Ссылка скопирована/);
+assert.match(
+  hintBlock,
+  /Не удалось скопировать автоматически\. Нажмите и удерживайте ссылку, чтобы скопировать её\./,
+);
+assert.match(hintBlock, /<input/);
+assert.match(hintBlock, /readOnly/);
+assert.doesNotMatch(hintBlock, /window\.open/);
+assert.doesNotMatch(hintBlock, /openExternalUrl/);
+assert.doesNotMatch(hintBlock, /copyTextToClipboard/);
 assert.match(hintBlock, /pointer-events-none/);
 assert.match(hintBlock, /pointer-events-auto/);
 assert.match(hintBlock, /\babsolute\b/);
@@ -347,5 +363,97 @@ assert.doesNotMatch(
   editor,
   /GuestStudioEditor|AuthorStudioEditor|accessMode === "guest" \? \s*<header/,
 );
+
+
+assert.equal(
+  studioShareUrlFromHref("https://audiolad.ru/studio?studioBrowserDebug=1"),
+  "https://audiolad.ru/studio",
+);
+assert.equal(
+  studioShareUrlFromHref("https://audiolad.ru/studio?studioBrowserDebug=1&from=try"),
+  "https://audiolad.ru/studio?from=try",
+);
+assert.equal(
+  studioShareUrlFromHref("https://audiolad.ru/studio?from=try&studioBrowserDebug=1&foo=bar"),
+  "https://audiolad.ru/studio?from=try&foo=bar",
+);
+assert.equal(
+  studioShareUrlFromHref("https://audiolad.ru/studio?from=try"),
+  "https://audiolad.ru/studio?from=try",
+);
+assert.equal(
+  studioShareUrlFromHref("https://audiolad.ru/studio?from=try#clip"),
+  "https://audiolad.ru/studio?from=try#clip",
+);
+assert.equal(studioShareUrlFromHref("not a url"), "not a url");
+assert.equal(studioShareUrlFromHref(""), "");
+
+{
+  const copied = await copyStudioShareUrl({
+    href: "https://audiolad.ru/studio?studioBrowserDebug=1&from=try",
+    writeText: async (value) => {
+      assert.equal(value, "https://audiolad.ru/studio?from=try");
+    },
+    execCopy: () => {
+      throw new Error("execCopy should not run when writeText succeeds");
+    },
+  });
+  assert.deepEqual(copied, {
+    url: "https://audiolad.ru/studio?from=try",
+    result: "copied",
+  });
+}
+
+{
+  const copied = await copyStudioShareUrl({
+    href: "https://audiolad.ru/studio?from=try",
+    writeText: async () => {
+      throw new Error("denied");
+    },
+    execCopy: () => true,
+  });
+  assert.deepEqual(copied, {
+    url: "https://audiolad.ru/studio?from=try",
+    result: "copied",
+  });
+}
+
+{
+  const manual = await copyStudioShareUrl({
+    href: "https://audiolad.ru/studio",
+    writeText: async () => {
+      throw new Error("denied");
+    },
+    execCopy: () => false,
+  });
+  assert.deepEqual(manual, {
+    url: "https://audiolad.ru/studio",
+    result: "manual",
+  });
+}
+
+{
+  const manual = await copyStudioShareUrl({
+    href: "https://audiolad.ru/studio",
+    writeText: async () => {
+      throw new Error("denied");
+    },
+    execCopy: () => {
+      throw new Error("exec failed");
+    },
+  });
+  assert.equal(manual.result, "manual");
+}
+
+assert.match(helper, /export function studioShareUrlFromHref/);
+assert.match(helper, /export async function copyStudioShareUrl/);
+assert.match(helper, /export function copyTextWithVisibleExecCommand/);
+assert.match(helper, /position = "fixed"/);
+assert.match(helper, /top = "0"/);
+assert.match(helper, /left = "0"/);
+assert.match(helper, /opacity = "0"/);
+assert.match(helper, /setSelectionRange/);
+assert.doesNotMatch(helper, /left = "-9999px"/);
+assert.doesNotMatch(helper, /setAttribute\("readonly"/);
 
 console.log("studio-in-app-rotate-hint-unit: ok");

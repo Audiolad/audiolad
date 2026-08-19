@@ -60,13 +60,14 @@ import { serializeStudioProjectState, validateStudioProjectDocument } from "@/li
 import { StudioGuestAuthLinks, StudioGuestRenderGate } from "@/components/studio/StudioGuestGate";
 import { trackGuestStudioEvent } from "@/lib/studio/guest-analytics";
 import { getStudioRender, queueStudioRender, updateStudioProject, type StudioRenderJob } from "@/lib/studio/persistence-client";
-import { copyTextToClipboard } from "@/lib/personal-materials/client/clipboard";
 import {
   isDesktopEnvironment,
   isInAppBrowser,
   isStandaloneMode,
 } from "@/lib/pwa/platform";
 import {
+  copyStudioShareUrl,
+  copyTextWithVisibleExecCommand,
   isIosWebViewUserAgent,
   isProbableIosEmbeddedBrowser,
   resolveStudioInApp,
@@ -296,6 +297,17 @@ function StudioInAppRotateHintBanner() {
   const [debugSnapshot, setDebugSnapshot] = useState<StudioBrowserDebugSnapshot | null>(
     null,
   );
+  const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "manual">("idle");
+  const [manualShareUrl, setManualShareUrl] = useState("");
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -426,18 +438,52 @@ function StudioInAppRotateHintBanner() {
             }}
             className="h-9 rounded-lg bg-white/10 px-3 text-sm font-medium text-white"
           >
-            Понятно
+            Да, хорошо
           </button>
           <button
             type="button"
             onClick={() => {
-              void copyTextToClipboard(window.location.href);
+              const writeText =
+                typeof navigator !== "undefined" && navigator.clipboard?.writeText
+                  ? (value: string) => navigator.clipboard.writeText(value)
+                  : undefined;
+              void copyStudioShareUrl({
+                href: window.location.href,
+                writeText,
+                execCopy: copyTextWithVisibleExecCommand,
+              }).then(({ url, result }) => {
+                setManualShareUrl(url);
+                setCopyFeedback(result);
+                if (copyFeedbackTimeoutRef.current !== null) {
+                  window.clearTimeout(copyFeedbackTimeoutRef.current);
+                  copyFeedbackTimeoutRef.current = null;
+                }
+                if (result === "copied") {
+                  copyFeedbackTimeoutRef.current = window.setTimeout(() => {
+                    setCopyFeedback((current) => (current === "copied" ? "idle" : current));
+                    copyFeedbackTimeoutRef.current = null;
+                  }, 2000);
+                }
+              });
             }}
             className="h-9 rounded-lg border border-white/15 px-3 text-sm font-medium text-[#c9d8ff]"
           >
-            Скопировать ссылку
+            {copyFeedback === "copied" ? "Ссылка скопирована" : "Скопировать ссылку"}
           </button>
         </div>
+        {copyFeedback === "manual" ? (
+          <div className="mt-2">
+            <input
+              readOnly
+              value={manualShareUrl}
+              className="w-full rounded border border-white/15 bg-black/30 px-2 py-1 text-xs text-[#c9d8ff]"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <p className="mt-1 text-xs text-[#99a4b8]">
+              Не удалось скопировать автоматически. Нажмите и удерживайте ссылку, чтобы скопировать её.
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
     ) : null}

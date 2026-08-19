@@ -154,3 +154,94 @@ export function truncateStudioBrowserDebugUserAgent(
 
   return `${userAgent.slice(0, maxLength)}…`;
 }
+
+export function studioShareUrlFromHref(href: string): string {
+  try {
+    const parsed = new URL(href);
+    parsed.searchParams.delete("studioBrowserDebug");
+    return parsed.href;
+  } catch {
+    return href;
+  }
+}
+
+export type CopyStudioShareUrlAdapters = {
+  href: string;
+  writeText?: ((text: string) => Promise<void> | void) | null;
+  execCopy?: ((text: string) => boolean | Promise<boolean>) | null;
+};
+
+export type CopyStudioShareUrlResult = {
+  url: string;
+  result: "copied" | "manual";
+};
+
+/**
+ * iOS/WebView-safe execCommand("copy").
+ * Offscreen (`left: -9999px`) + readonly-only fields fail in MAX iOS WKWebView
+ * because iOS cannot select those nodes.
+ */
+export function copyTextWithVisibleExecCommand(text: string): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("aria-hidden", "true");
+  field.tabIndex = -1;
+  field.style.position = "fixed";
+  field.style.top = "0";
+  field.style.left = "0";
+  field.style.opacity = "0";
+  field.style.width = "1px";
+  field.style.height = "1px";
+  field.style.padding = "0";
+  field.style.margin = "0";
+  field.style.border = "0";
+  field.style.outline = "none";
+  field.style.overflow = "hidden";
+  field.style.fontSize = "16px";
+  document.body.appendChild(field);
+  field.focus();
+  field.select();
+  field.setSelectionRange(0, text.length);
+
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    field.remove();
+  }
+}
+
+export async function copyStudioShareUrl({
+  href,
+  writeText,
+  execCopy,
+}: CopyStudioShareUrlAdapters): Promise<CopyStudioShareUrlResult> {
+  const url = studioShareUrlFromHref(href);
+
+  if (typeof writeText === "function") {
+    try {
+      await writeText(url);
+      return { url, result: "copied" };
+    } catch {
+      // Clipboard API rejected or unavailable after a probe — continue.
+    }
+  }
+
+  if (typeof execCopy === "function") {
+    try {
+      const ok = await execCopy(url);
+      if (ok) {
+        return { url, result: "copied" };
+      }
+    } catch {
+      // execCommand returned false or threw — continue to manual.
+    }
+  }
+
+  return { url, result: "manual" };
+}
