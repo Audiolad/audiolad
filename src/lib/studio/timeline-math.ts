@@ -1,11 +1,13 @@
 export const DEFAULT_PIXELS_PER_SECOND = 80;
-export const MIN_PIXELS_PER_SECOND = 20;
+export const MIN_PIXELS_PER_SECOND = 0.001;
 export const MAX_PIXELS_PER_SECOND = 400;
-const MIN_FIT_PIXELS_PER_SECOND = 0.001;
+export const TIMELINE_ZOOM_STEP = 1.18;
+export const MIN_PIXELS_PER_SECOND_SLIDER = Math.log(MIN_PIXELS_PER_SECOND);
+export const MAX_PIXELS_PER_SECOND_SLIDER = Math.log(MAX_PIXELS_PER_SECOND);
 
 function normalizePixelsPerSecond(value: number): number {
   return Number.isFinite(value) && value > 0
-    ? Math.max(value, MIN_FIT_PIXELS_PER_SECOND)
+    ? Math.max(value, MIN_PIXELS_PER_SECOND)
     : DEFAULT_PIXELS_PER_SECOND;
 }
 
@@ -15,6 +17,20 @@ export function clampPixelsPerSecond(value: number): number {
   }
 
   return Math.min(Math.max(value, MIN_PIXELS_PER_SECOND), MAX_PIXELS_PER_SECOND);
+}
+
+export function stepPixelsPerSecond(current: number, direction: 1 | -1): number {
+  const base = Number.isFinite(current) && current > 0 ? current : DEFAULT_PIXELS_PER_SECOND;
+  const next = direction === 1 ? base * TIMELINE_ZOOM_STEP : base / TIMELINE_ZOOM_STEP;
+  return clampPixelsPerSecond(next);
+}
+
+export function pixelsPerSecondToSliderValue(pps: number): number {
+  return Math.log(clampPixelsPerSecond(pps));
+}
+
+export function sliderValueToPixelsPerSecond(slider: number): number {
+  return clampPixelsPerSecond(Math.exp(slider));
 }
 
 export function getTimelineWidth(
@@ -69,7 +85,7 @@ export function getFitPixelsPerSecond(
     return DEFAULT_PIXELS_PER_SECOND;
   }
 
-  return Math.max(viewportWidth / duration, MIN_FIT_PIXELS_PER_SECOND);
+  return Math.max(viewportWidth / duration, MIN_PIXELS_PER_SECOND);
 }
 
 export function getRulerStepSeconds(pixelsPerSecond: number): number {

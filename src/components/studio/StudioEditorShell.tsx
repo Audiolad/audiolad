@@ -15,9 +15,13 @@ import {
   type StudioTimelineHandle,
 } from "@/components/studio/StudioTimeline";
 import {
-  clampPixelsPerSecond,
   DEFAULT_PIXELS_PER_SECOND,
   getFitPixelsPerSecond,
+  MAX_PIXELS_PER_SECOND_SLIDER,
+  MIN_PIXELS_PER_SECOND_SLIDER,
+  pixelsPerSecondToSliderValue,
+  sliderValueToPixelsPerSecond,
+  stepPixelsPerSecond,
 } from "@/lib/studio/timeline-math";
 import { getStudioDefaultFadeDuration } from "@/lib/studio/fade-math";
 import {
@@ -1688,7 +1692,7 @@ export default function StudioEditorShell({
                 type="button"
                 onClick={() =>
                   setPixelsPerSecond((current) =>
-                    clampPixelsPerSecond(current / 1.25),
+                    stepPixelsPerSecond(current, -1),
                   )
                 }
                 className="h-9 w-9 rounded border border-white/10"
@@ -1699,18 +1703,22 @@ export default function StudioEditorShell({
               <input
                 aria-label="Масштаб временной шкалы"
                 type="range"
-                min="0.001"
-                max="400"
-                step="0.001"
-                value={pixelsPerSecond}
-                onChange={(event) => setPixelsPerSecond(Number(event.target.value))}
+                min={MIN_PIXELS_PER_SECOND_SLIDER}
+                max={MAX_PIXELS_PER_SECOND_SLIDER}
+                step="any"
+                value={pixelsPerSecondToSliderValue(pixelsPerSecond)}
+                onChange={(event) =>
+                  setPixelsPerSecond(
+                    sliderValueToPixelsPerSecond(Number(event.target.value)),
+                  )
+                }
                 className="w-16 accent-[#9f7aea]"
               />
               <button
                 type="button"
                 onClick={() =>
                   setPixelsPerSecond((current) =>
-                    clampPixelsPerSecond(current * 1.25),
+                    stepPixelsPerSecond(current, 1),
                   )
                 }
                 className="h-9 w-9 rounded border border-white/10"
