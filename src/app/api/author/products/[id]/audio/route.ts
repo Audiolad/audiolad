@@ -7,7 +7,7 @@ import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { assertPracticePublicContentEditable } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
 import {
   AUDIO_ITEM_DETAIL_SELECT,
   getAuthorProductDetail,
@@ -21,8 +21,12 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice } = await requirePracticeMutationAccess(id);
-    assertPracticePublicContentEditable(practice);
+    const { supabase, practice, user } = await requirePracticeMutationAccess(id);
+    await assertPracticePublicContentEditableForActor(
+      supabase,
+      practice,
+      user.id,
+    );
 
     let body: unknown;
 

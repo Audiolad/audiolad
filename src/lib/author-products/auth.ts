@@ -23,6 +23,8 @@ import {
 } from "@/lib/author-products/moderation";
 import { isPracticeSaleLockError } from "@/lib/author-products/sale-lock";
 
+import { hasPermission } from "@/lib/auth/platform-access";
+
 import type { AuthorMemberRole, AuthorWorkspace } from "./types";
 
 export class AuthorAccessError extends Error {
@@ -113,6 +115,12 @@ export async function listAuthorWorkspacesForUser(
     throw new AuthorAccessError("internal_error", 500);
   }
 
+  const actorCanBypass = await hasPermission(
+    supabase,
+    userId,
+    "author_products.moderate",
+  );
+
   const workspaces: AuthorWorkspace[] = [];
 
   for (const row of data ?? []) {
@@ -133,7 +141,7 @@ export async function listAuthorWorkspacesForUser(
       role: row.role as AuthorMemberRole,
       accessStatus: (author.access_status ?? "free") as AuthorAccessStatus,
       canBypassProductModeration:
-        author.can_bypass_product_moderation === true,
+        author.can_bypass_product_moderation === true || actorCanBypass,
     });
   }
 

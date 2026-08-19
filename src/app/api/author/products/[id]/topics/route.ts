@@ -5,7 +5,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { assertPracticePublicContentEditable } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 import {
@@ -39,7 +39,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
-    assertPracticePublicContentEditable(practice);
+    await assertPracticePublicContentEditableForActor(
+      supabase,
+      practice,
+      user.id,
+    );
 
     let body: unknown;
 

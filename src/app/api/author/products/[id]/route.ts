@@ -31,7 +31,7 @@ import {
   PRODUCT_KIND,
   PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
 } from "@/lib/author-products/product-kind";
-import { assertPracticePublicContentEditable } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
 import {
   generateUniqueSlug,
   getAuthorProductDetail,
@@ -155,7 +155,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { supabase, practice, user, accessStatus } =
       await requirePracticeMutationAccess(id);
-    assertPracticePublicContentEditable(practice);
+    await assertPracticePublicContentEditableForActor(
+      supabase,
+      practice,
+      user.id,
+    );
 
     let body: unknown;
 

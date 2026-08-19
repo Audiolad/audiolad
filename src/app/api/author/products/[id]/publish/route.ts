@@ -28,7 +28,7 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { supabase, practice, accessStatus } = await requirePracticeMutationAccess(id);
+    const { supabase, practice, accessStatus, user } = await requirePracticeMutationAccess(id);
     const detail = await getAuthorProductDetail(supabase, id);
 
     if (!detail) {
@@ -45,6 +45,7 @@ export async function POST(_request: Request, context: RouteContext) {
     const moderationGate = await assertPublishModerationAllowed(
       supabase,
       detail.practice,
+      user.id,
     );
 
     if (!moderationGate.ok) {

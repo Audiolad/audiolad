@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PracticeRow } from "@/lib/author-products/types";
+import { hasPermission } from "@/lib/auth/platform-access";
 
 export const MODERATION_STATUS = {
   NOT_SUBMITTED: "not_submitted",
@@ -180,6 +181,22 @@ export async function getAuthorCanBypassProductModeration(
 }
 
 /**
+ * Author-workspace flag OR acting user can moderate author products
+ * (owner / admin / editor via author_products.moderate).
+ */
+export async function actorCanBypassProductModeration(
+  supabase: SupabaseClient,
+  authorId: string,
+  userId: string,
+): Promise<boolean> {
+  if (await getAuthorCanBypassProductModeration(supabase, authorId)) {
+    return true;
+  }
+
+  return hasPermission(supabase, userId, "author_products.moderate");
+}
+
+/**
  * Server-side gate before calling publish_audio_product.
  * DB trigger + RPC remain the source of truth; this blocks the old API early.
  */
@@ -189,6 +206,7 @@ export async function assertPublishModerationAllowed(
     PracticeRow,
     "id" | "author_id" | "status" | "moderation_status" | "deleted_at"
   >,
+  userId?: string,
 ): Promise<PublishModerationGateResult> {
   if (practice.deleted_at) {
     return {
@@ -199,10 +217,13 @@ export async function assertPublishModerationAllowed(
     };
   }
 
-  const canBypass = await getAuthorCanBypassProductModeration(
-    supabase,
-    practice.author_id,
-  );
+  const canBypass = userId
+    ? await actorCanBypassProductModeration(
+        supabase,
+        practice.author_id,
+        userId,
+      )
+    : await getAuthorCanBypassProductModeration(supabase, practice.author_id);
 
   if (canBypass) {
     return { ok: true, canBypass: true };
@@ -277,16 +298,23 @@ export class PracticePublishedImmutableError extends Error {
  * Shared server guard for author mutations of public/moderated product content.
  * Blocks deleted, submitted, published, and approved-unpublished products.
  */
-export function assertPracticePublicContentEditable(practice: {
-  status: string;
-  moderation_status?: string | null;
-  deleted_at?: string | null;
-}): void {
+export function assertPracticePublicContentEditable(
+  practice: {
+    status: string;
+    moderation_status?: string | null;
+    deleted_at?: string | null;
+  },
+  options?: { canBypass?: boolean },
+): void {
   if (practice.deleted_at) {
     throw new PracticeDeletedError();
   }
 
   assertPracticeNotUnderModeration(practice.moderation_status);
+
+  if (options?.canBypass) {
+    return;
+  }
 
   if (practice.status === "published") {
     throw new PracticePublishedImmutableError(
@@ -302,6 +330,24 @@ export function assertPracticePublicContentEditable(practice: {
       PRODUCT_APPROVED_UNPUBLISHED_IMMUTABLE_MESSAGE,
     );
   }
+}
+
+export async function assertPracticePublicContentEditableForActor(
+  supabase: SupabaseClient,
+  practice: {
+    author_id: string;
+    status: string;
+    moderation_status?: string | null;
+    deleted_at?: string | null;
+  },
+  userId: string,
+): Promise<void> {
+  const canBypass = await actorCanBypassProductModeration(
+    supabase,
+    practice.author_id,
+    userId,
+  );
+  assertPracticePublicContentEditable(practice, { canBypass });
 }
 
 export function isPracticePublishedImmutableError(

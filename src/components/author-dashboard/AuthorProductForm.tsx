@@ -645,7 +645,10 @@ export default function AuthorProductForm({
     selectedAuthorAccessStatus,
   );
   const canEditPublicFields =
-    canMutateContent && (isDraft || needsChanges);
+    canMutateContent &&
+    (isDraft ||
+      needsChanges ||
+      (canBypassProductModeration && (isPublished || isUnpublished)));
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
   );
