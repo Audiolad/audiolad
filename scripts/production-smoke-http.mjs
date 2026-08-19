@@ -4,12 +4,37 @@
  *
  * Env:
  *   AUDIOLAD_SMOKE_BASE_URL — default https://audiolad.ru
+ *   NEXT_PUBLIC_CDN_ASSET_PREFIX — optional; else cwd .env.local / .env.production
  */
+import { readFileSync } from "node:fs";
+import {
+  collectAllowedNextStaticAssets,
+  resolveSmokeAssetPrefix,
+} from "./lib/next-static-smoke-assets.mjs";
+
 const BASE = (process.env.AUDIOLAD_SMOKE_BASE_URL ?? "https://audiolad.ru").replace(
   /\/$/,
   "",
 );
 const TIMEOUT_MS = Number(process.env.AUDIOLAD_SMOKE_TIMEOUT_MS ?? 30_000);
+
+function readCwdPrefixEnvFileText() {
+  for (const name of [".env.local", ".env.production"]) {
+    try {
+      return readFileSync(name, "utf8");
+    } catch {
+      // missing in this cwd; try the next name
+    }
+  }
+  return undefined;
+}
+
+function resolveConfiguredAssetPrefix() {
+  return resolveSmokeAssetPrefix({
+    env: process.env,
+    envFileText: readCwdPrefixEnvFileText(),
+  });
+}
 
 const results = [];
 const pass = (name) => results.push({ name, ok: true });
@@ -103,17 +128,26 @@ async function main() {
     } else {
       pass("iphone_home_ssr_bottom_nav");
     }
-    const cssHrefs = [
-      ...home.body.matchAll(/href="(\/_next\/static\/[^"]+\.css)"/g),
-    ].map((match) => match[1]);
-    const jsSrcs = [
-      ...home.body.matchAll(/src="(\/_next\/static\/[^"]+\.js)"/g),
-    ].map((match) => match[1]);
-    const uniqueCss = [...new Set(cssHrefs)];
-    const uniqueJs = [...new Set(jsSrcs)];
+    const assetPrefix = resolveConfiguredAssetPrefix();
+    const prefixDetail = assetPrefix
+      ? `assetPrefix set (${assetPrefix})`
+      : "assetPrefix unset";
+    const collected = collectAllowedNextStaticAssets(home.body, {
+      pageOrigin: home.url || BASE,
+      assetPrefix,
+    });
+    const uniqueCss = collected.css;
+    const uniqueJs = collected.js;
+
+    for (const reason of collected.errors) {
+      fail("home_next_static_host", reason);
+    }
 
     if (uniqueCss.length === 0) {
-      fail("home_css_urls", "home HTML has no stylesheet href");
+      fail(
+        "home_css_urls",
+        `home HTML has no allowed /_next/static stylesheet href (${prefixDetail})`,
+      );
     }
 
     for (const href of uniqueCss) {
@@ -129,6 +163,13 @@ async function main() {
       } else {
         pass(`css:${href}`);
       }
+    }
+
+    if (uniqueJs.length === 0) {
+      fail(
+        "home_js_urls",
+        `home HTML has no allowed /_next/static script src (${prefixDetail})`,
+      );
     }
 
     for (const src of uniqueJs) {
