@@ -26,7 +26,16 @@ feature branch → PR → main → deploy explicit canonical SHA → production
 2. PR merged в `main`
 3. CI/checks green
 4. Candidate SHA находится в `origin/main` (`git merge-base --is-ancestor <sha> origin/main`)
-5. `deploy.sh <full-sha>`
+5. Запустить deploy через target-SHA bootstrap (не `/current`, не stale
+   `/var/www/audiolad-clean/deploy/scripts/deploy.sh`):
+
+```bash
+sudo env GIT_WORKDIR=/var/www/audiolad-clean bash -c '
+  git -C "$GIT_WORKDIR" fetch origin main
+  git -C "$GIT_WORKDIR" show "$1:deploy/scripts/run-from-target-sha.sh" | bash -s -- "$1"
+' bash <full-sha>
+```
+
 6. Verify BUILD_ID и health (`/api/health/build`)
 
 Backup pre-sync main: tag `archive/pre-canonical-main-20260711` → `68c4d86`.
@@ -56,7 +65,7 @@ Fixture/data-creating scripts: см. [production-fixture-policy.md](./production
 
 | Действие | Когда |
 |----------|-------|
-| `deploy/scripts/deploy.sh <commit-sha>` | Release-based deploy (explicit canonical SHA required) |
+| `run-from-target-sha.sh <commit-sha>` | Release-based deploy: extract+exec the target SHA's `deploy.sh` (explicit canonical SHA required). Do not exec via `/current`. |
 | HTTP smoke | `scripts/production-smoke-http.mjs` (без браузера) |
 | `scripts/check-server-health.sh` | Ручная или cron-диагностика |
 | `npm run build` внутри deploy | Один build на новый release в `releases/` |

@@ -117,11 +117,11 @@ probe_readiness_once() {
   fi
 
   local output=""
-  if ! output="$("${probe_args[@]}" 2>/dev/null)"; then
-    if [[ -z "$output" ]]; then
-      printf '%s\n' '{"ready":false,"httpStatus":null,"reason":"probe_failed","buildId":null,"status":null}'
-      return 1
-    fi
+  output="$("${probe_args[@]}" 2>/dev/null)" || true
+
+  if [[ -z "${output//[$'\t\r\n ']/}" ]]; then
+    printf '%s\n' '{"ready":false,"httpStatus":null,"reason":"empty_probe_output","buildId":null,"status":null}'
+    return 1
   fi
 
   printf '%s\n' "$output"

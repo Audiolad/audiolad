@@ -69,7 +69,10 @@ curl -sS https://audiolad.ru/api/health/build
 После исправления кода снова используйте:
 
 ```bash
-/var/www/audiolad-deploy/scripts/deploy.sh
+sudo env GIT_WORKDIR=/var/www/audiolad-clean bash -c '
+  git -C "$GIT_WORKDIR" fetch origin main
+  git -C "$GIT_WORKDIR" show "$1:deploy/scripts/run-from-target-sha.sh" | bash -s -- "$1"
+' bash <commit-sha>
 ```
 
 Не переключайте `current` вручную без проверки health и smoke.

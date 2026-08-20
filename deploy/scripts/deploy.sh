@@ -1,7 +1,31 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+# The launching worktree (often /var/www/audiolad-clean) is not updated by
+# canonical_fetch_main. Re-exec the target SHA's deploy/scripts before sourcing
+# policy/zero-downtime helpers. Never keep running via /current.
+_logical_launch_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -L)"
+if [[ "${_logical_launch_dir}" == */current/* || "${_logical_launch_dir}" == */current ]]; then
+  if [[ "${AUDIOLAD_DEPLOY_SCRIPTS_PINNED:-}" == "1" ]]; then
+    printf '[%s] [ERROR] refusing to run pinned deploy.sh via /current symlink\n' \
+      "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >&2
+    exit 1
+  fi
+fi
+if [[ "${AUDIOLAD_DEPLOY_SCRIPTS_PINNED:-}" != "1" ]]; then
+  if [[ -x "$SCRIPT_DIR/run-from-target-sha.sh" ]]; then
+    exec "$SCRIPT_DIR/run-from-target-sha.sh" "$@"
+  fi
+  if [[ -f "$SCRIPT_DIR/lib/pin-target-deploy-scripts.sh" ]]; then
+    # shellcheck source=lib/pin-target-deploy-scripts.sh
+    source "$SCRIPT_DIR/lib/pin-target-deploy-scripts.sh"
+    exec_pinned_target_deploy "$@"
+    # Help/empty SHA falls through so usage() still works from this copy.
+  fi
+fi
+
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/canonical-deploy-policy.sh
@@ -15,6 +39,18 @@ Safely deploy a new release without rebuilding inside the active current directo
 Deploy commit SHA is required. By default, only commits reachable from origin/main
 are allowed. Overrides require AUDIOLAD_DEPLOY_OVERRIDE=1 with
 AUDIOLAD_DEPLOY_OVERRIDE_REASON set.
+
+Canonical launch extracts this SHA's deploy/scripts via git archive, then execs
+that deploy.sh. Do not launch via /var/www/audiolad-deploy/current (symlink
+breaks readiness CLI detection and races during cutover). Do not git reset --hard
+the controlling checkout.
+
+Staff one-liner (objects only; worktree HEAD unchanged):
+
+  sudo env GIT_WORKDIR=/var/www/audiolad-clean bash -c '
+    git -C "$GIT_WORKDIR" fetch origin main
+    git -C "$GIT_WORKDIR" show "$1:deploy/scripts/run-from-target-sha.sh" | bash -s -- "$1"
+  ' bash <commit-sha>
 
 Every candidate must contain the active production commit recorded in
 current/.deploy-commit. Integrate the active production tip before deploying a

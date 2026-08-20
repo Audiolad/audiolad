@@ -207,6 +207,8 @@ assert_true "previous release kept" test -d "$DEPLOY_ROOT/releases/20260724-1200
 
 # Ensure deploy/rollback still parse.
 assert_true "deploy.sh syntax" bash -n "$SCRIPT_DIR/deploy.sh"
+assert_true "run-from-target-sha.sh syntax" bash -n "$SCRIPT_DIR/run-from-target-sha.sh"
+assert_true "pin-target-deploy-scripts.sh syntax" bash -n "$SCRIPT_DIR/lib/pin-target-deploy-scripts.sh"
 assert_true "rollback.sh syntax" bash -n "$SCRIPT_DIR/rollback.sh"
 assert_true "zero-downtime.sh syntax" bash -n "$SCRIPT_DIR/lib/zero-downtime.sh"
 assert_true "common.sh syntax" bash -n "$SCRIPT_DIR/lib/common.sh"
@@ -219,6 +221,14 @@ assert_false "deploy.sh must not call ensure_production_port_ready" \
   grep -q 'ensure_production_port_ready' "$SCRIPT_DIR/deploy.sh"
 assert_false "rollback.sh must not call sync_pm2_audiolad" \
   grep -q 'sync_pm2_audiolad' "$SCRIPT_DIR/rollback.sh"
+assert_true "deploy.sh pins target SHA scripts before cutover helpers" \
+  grep -q 'run-from-target-sha.sh' "$SCRIPT_DIR/deploy.sh"
+assert_true "deploy.sh refuses pinned exec via /current" \
+  grep -q 'refusing to run pinned deploy.sh via /current symlink' "$SCRIPT_DIR/deploy.sh"
+assert_true "canonical launcher exists" \
+  test -x "$SCRIPT_DIR/run-from-target-sha.sh"
+assert_false "canonical launcher must not exec via /current" \
+  grep -q '/var/www/audiolad-deploy/current/deploy/scripts/deploy.sh' "$SCRIPT_DIR/run-from-target-sha.sh"
 assert_true "deploy.sh uses cutover_nginx_to_port" \
   grep -q 'cutover_nginx_to_port' "$SCRIPT_DIR/deploy.sh"
 assert_true "deploy.sh runs candidate overlay precompress" \
@@ -248,6 +258,18 @@ assert_false "generated ecosystem must not disable TLS verification" \
 assert_true "checked-in audiolad-p3000 ecosystem sets NODE_EXTRA_CA_CERTS" \
   grep -q 'NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt"' \
   "$SCRIPT_DIR/../ecosystem.config.cjs"
+
+EMPTY_PROBE="$ROOT_TMP/empty-probe.mjs"
+cat >"$EMPTY_PROBE" <<'EOF'
+#!/usr/bin/env node
+process.exit(0);
+EOF
+chmod +x "$EMPTY_PROBE"
+READINESS_PROBE_SCRIPT="$EMPTY_PROBE"
+empty_probe_json="$(probe_readiness_once "http://127.0.0.1:3999" || true)"
+assert_contains "empty probe stdout is fail-closed" \
+  '"reason":"empty_probe_output"' \
+  "$empty_probe_json"
 
 echo "=== results: pass=${PASS} fail=${FAIL} ==="
 if (( FAIL > 0 )); then
