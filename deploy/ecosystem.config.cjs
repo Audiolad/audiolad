@@ -13,6 +13,7 @@ module.exports = {
         PORT: "3000",
         HOSTNAME: "127.0.0.1",
         AUDIOLAD_PRODUCTION_SERVER: "1",
+        NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt",
       },
       instances: 1,
       exec_mode: "fork",
