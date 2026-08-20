@@ -34,6 +34,10 @@ export default function ListenSignupCta() {
         </svg>
       </div>
 
+      <p className="listen-signup-cta__bookmark" data-listen-bookmark-cta>
+        🔖 Сохраните эту страницу в закладки, чтобы не потерять важную для себя информацию и легко вернуться к ней позже.
+      </p>
+
       <div className="listen-signup-cta__layout">
         <div className="listen-signup-cta__cluster" aria-hidden="true">
           <span className="listen-signup-cta__sparkle listen-signup-cta__sparkle--a" />

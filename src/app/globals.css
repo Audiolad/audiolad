@@ -1061,6 +1061,16 @@ body {
   color: #7042c5;
 }
 
+.listen-signup-cta__bookmark {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0.85rem 1.15rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #7d70a2;
+}
+
 @keyframes listen-signup-cta-float-one {
   0%,
   100% {
@@ -1141,6 +1151,10 @@ body {
 
   .listen-signup-cta__title {
     font-size: 1.35rem;
+  }
+
+  .listen-signup-cta__bookmark {
+    padding: 1rem 1.35rem 0;
   }
 }
 
