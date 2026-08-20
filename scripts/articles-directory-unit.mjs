@@ -41,6 +41,7 @@ import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/sh
 import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zhurchanie-vody-slushat-onlayn.ts";
 import { ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-vodopada-slushat-onlayn.ts";
 import { ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-ruchya-slushat-onlayn.ts";
+import { SHUM_VODY_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-sna.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -712,6 +713,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fourteenthListenHref}`,
     ),
     "directory JSON-LD includes fourteenth listen href",
+  );
+
+  const fifteenthListenHref = "/listens/shum-vody-dlya-sna";
+  const fifteenthListenCard = data.articles.find((card) => card.href === fifteenthListenHref);
+  assert(fifteenthListenCard, "fifteenth indexable listen page is listed");
+  assert(
+    fifteenthListenCard.title === "Шум воды для сна – слушать онлайн бесплатно | АудиоЛад",
+    "fifteenth listen directory title",
+  );
+  assert(
+    fifteenthListenCard.description === SHUM_VODY_DLYA_SNA_PAGE.description,
+    "fifteenth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/shum-vody-dlya-sna",
+    ),
+    "no /articles duplicate for fifteenth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fifteenthListenHref}`,
+    ),
+    "directory JSON-LD includes fifteenth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
