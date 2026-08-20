@@ -234,6 +234,21 @@ assert_true "candidate ecosystem uses *.config.cjs name" \
 assert_false "candidate must not assign ecosystem-<app>.cjs path" \
   grep -q 'eco_file="$DEPLOY_ROOT/shared/ecosystem-${app_name}.cjs"' "$SCRIPT_DIR/lib/zero-downtime.sh"
 
+eco_generated="$ROOT_TMP/ecosystem.generated.cjs"
+write_ecosystem_for_active "$DEPLOY_ROOT/releases/fake-release" 3001 "audiolad-p3001" "$eco_generated"
+generated_eco="$(cat "$eco_generated")"
+assert_contains "generated ecosystem sets NODE_EXTRA_CA_CERTS" \
+  'NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt"' \
+  "$generated_eco"
+assert_contains "generated ecosystem keeps production NODE_ENV" \
+  'NODE_ENV: "production"' \
+  "$generated_eco"
+assert_false "generated ecosystem must not disable TLS verification" \
+  grep -q 'NODE_TLS_REJECT_UNAUTHORIZED' "$eco_generated"
+assert_true "checked-in audiolad-p3000 ecosystem sets NODE_EXTRA_CA_CERTS" \
+  grep -q 'NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt"' \
+  "$SCRIPT_DIR/../ecosystem.config.cjs"
+
 echo "=== results: pass=${PASS} fail=${FAIL} ==="
 if (( FAIL > 0 )); then
   exit 1
