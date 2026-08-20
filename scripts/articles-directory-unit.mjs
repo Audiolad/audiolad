@@ -46,6 +46,7 @@ import { ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/liste
 import { BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/belyy-shum-vody-slushat-onlayn.ts";
 import { SHUM_VODY_DLYA_DETEY_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-detey.ts";
 import { SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-novorozhdennyh.ts";
+import { SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-iz-krana-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -838,6 +839,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${nineteenthListenHref}`,
     ),
     "directory JSON-LD includes nineteenth listen href",
+  );
+
+  const twentiethListenHref = "/listens/shum-vody-iz-krana-slushat-onlayn";
+  const twentiethListenCard = data.articles.find((card) => card.href === twentiethListenHref);
+  assert(twentiethListenCard, "twentieth indexable listen page is listed");
+  assert(
+    twentiethListenCard.title === "Шум воды из крана – слушать онлайн бесплатно | АудиоЛад",
+    "twentieth listen directory title",
+  );
+  assert(
+    twentiethListenCard.description === SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.description,
+    "twentieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/shum-vody-iz-krana-slushat-onlayn",
+    ),
+    "no /articles duplicate for twentieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentiethListenHref}`,
+    ),
+    "directory JSON-LD includes twentieth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();

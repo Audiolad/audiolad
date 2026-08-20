@@ -17,6 +17,7 @@ import { ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-lyush
 import { BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "./content/belyy-shum-vody-slushat-onlayn";
 import { SHUM_VODY_DLYA_DETEY_PAGE } from "./content/shum-vody-dlya-detey";
 import { SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE } from "./content/shum-vody-dlya-novorozhdennyh";
+import { SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "./content/shum-vody-iz-krana-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -43,6 +44,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE,
   SHUM_VODY_DLYA_DETEY_PAGE,
   SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE,
+  SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
