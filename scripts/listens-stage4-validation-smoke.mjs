@@ -18,6 +18,7 @@ import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib
 import { UTRENNYAYA_MEDITATSIYA_NA_DENGI_I_IZOBILIE_PAGE } from "../src/lib/seo/listens/content/utrennyaya-meditatsiya-na-dengi-i-izobilie.ts";
 import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-izobiliya-i-bogatstva-dlya-sna.ts";
 import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts";
+import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zhurchanie-vody-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -846,6 +847,75 @@ const ELEVENTH_EXPECTED_FAQ = [
       "Нет. Можно слушать и через динамики. Наушники стоит использовать только тогда, когда так комфортнее и удобнее в вашей обстановке.",
   },
 ];
+
+
+const TWELFTH_PAGE_SLUG = "zhurchanie-vody-slushat-onlayn";
+const TWELFTH_PAGE_H1 = "Журчание воды – слушать онлайн";
+const TWELFTH_PAGE_TITLE = "Журчание воды – слушать онлайн бесплатно | АудиоЛад";
+const TWELFTH_PAGE_DESCRIPTION =
+  "Журчание воды онлайн бесплатно: выберите спокойный природный звук для расслабления, чтения или работы и слушайте подходящее звучание на АудиоЛаде.";
+
+const TWELFTH_EXPECTED_INTRO = [
+  "Журчание воды можно слушать онлайн бесплатно прямо на АудиоЛаде. Выберите подходящее звучание в подборке и включите его как мягкий природный фон.",
+  "Такой звук можно использовать для отдыха, чтения, спокойной работы, медитации или расслабления.",
+  "Выберите подходящее журчание воды в подборке и начните слушать.",
+];
+
+const TWELFTH_EXPECTED_SECTION_TITLES = [
+  "Как звучит журчание воды",
+  "Почему приятно слушать журчание воды",
+  "Журчание воды для расслабления",
+  "Журчание воды как фоновый звук",
+  "Можно ли включать журчание воды перед сном",
+  "Как выбрать подходящее журчание воды",
+  "Какую громкость выбрать",
+  "Нужно ли слушать журчание воды в наушниках",
+  "Как слушать журчание воды на АудиоЛаде",
+  "Итог",
+];
+
+const TWELFTH_EXPECTED_FAQ = [
+  {
+    question: "Где можно слушать журчание воды онлайн?",
+    answer:
+      "На АудиоЛаде можно открыть подборку звуков воды, выбрать подходящее журчание и запустить запись прямо на странице.",
+  },
+  {
+    question: "Можно ли слушать журчание воды бесплатно?",
+    answer: "Да. Подходящие записи из Public Playlist можно слушать онлайн бесплатно.",
+  },
+  {
+    question: "Чем журчание воды отличается от других звуков воды?",
+    answer:
+      "Обычно журчание воспринимается как более мягкое, текучее и ненавязчивое звучание с небольшими естественными изменениями ритма.",
+  },
+  {
+    question: "Подходит ли журчание воды для расслабления?",
+    answer:
+      "Некоторым людям такой природный фон помогает создать более спокойную атмосферу и переключить внимание. Эффект индивидуален и не является медицинским.",
+  },
+  {
+    question: "Можно ли включать журчание воды во время работы или чтения?",
+    answer:
+      "Да, если фон не отвлекает. Для таких задач обычно удобнее умеренная громкость и более спокойное звучание.",
+  },
+  {
+    question: "Можно ли включать журчание воды перед сном?",
+    answer:
+      "Да, если такое звучание кажется вам комфортным. Его можно использовать как спокойный вечерний фон, но оно не гарантирует засыпание и не является средством лечения бессонницы.",
+  },
+  {
+    question: "Какую громкость лучше выбрать?",
+    answer:
+      "Начните с небольшой громкости и увеличивайте её только до комфортного уровня. Фон не должен раздражать или перекрывать важные звуки вокруг.",
+  },
+  {
+    question: "Обязательно ли слушать журчание воды в наушниках?",
+    answer:
+      "Нет. Можно использовать динамики или наушники – выбирайте тот вариант, который удобнее в вашей обстановке.",
+  },
+];
+
 
 const FORBIDDEN_COMPOSITION_KEYS = [
   "items",
@@ -2382,7 +2452,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 11, "registry contains all 11 listen slugs");
+  assert(slugs.length === 12, "registry contains all 12 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -2426,6 +2496,169 @@ function testEleventhPage() {
   assert(!serialized.includes("primaryPractice"), "eleventh JSON-LD no primaryPractice");
 }
 
+
+function testTwelfthPage() {
+  const parsed = parseListenPageDefinition(
+    ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE,
+  );
+  assert(parsed.ok, "twelfth production definition valid");
+  assert(parsed.definition.slug === TWELFTH_PAGE_SLUG, "twelfth page slug");
+  assert(parsed.definition.playlistSlug === "shum-vody", "twelfth playlistSlug is shum-vody");
+  assert(
+    parsed.definition.playlistSlug !== PLAYLIST_SLUG,
+    "twelfth playlistSlug is not the money playlist",
+  );
+  assert(
+    parsed.definition.playlistSlug !== "zhurchanie-vody-slushat-onlayn",
+    "twelfth playlistSlug is not the page slug",
+  );
+  assert(parsed.definition.h1 === TWELFTH_PAGE_H1, "twelfth h1 exact");
+  assert(parsed.definition.title === TWELFTH_PAGE_TITLE, "twelfth title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "twelfth title !== h1");
+  assert(
+    parsed.definition.description === TWELFTH_PAGE_DESCRIPTION,
+    "twelfth description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 3, "twelfth page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === TWELFTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === TWELFTH_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === TWELFTH_EXPECTED_INTRO[2],
+    "twelfth intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 10, "twelfth page has 10 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      TWELFTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "twelfth page 10 section titles verbatim",
+  );
+  assert(
+    parsed.definition.sections.some(
+      (section) => section.title === "Можно ли включать журчание воды перед сном",
+    ),
+    "twelfth page keeps approved sleep H2",
+  );
+  assert(
+    !parsed.definition.sections.some(
+      (section) => section.title === "Журчание воды для сна",
+    ),
+    "twelfth page does not use rejected H2 as a section title",
+  );
+  assert(parsed.definition.faq.length === 8, "twelfth page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === TWELFTH_EXPECTED_FAQ[index].question &&
+        item.answer === TWELFTH_EXPECTED_FAQ[index].answer,
+    ),
+    "twelfth page 8 FAQ verbatim",
+  );
+  assert(
+    parsed.definition.faq.some(
+      (item) => item.question === "Можно ли включать журчание воды перед сном?",
+    ),
+    "twelfth page keeps approved sleep FAQ",
+  );
+  assert(
+    !parsed.definition.faq.some(
+      (item) => item.question === "Подходит ли звук журчания воды для сна?",
+    ),
+    "twelfth page does not use rejected sleep FAQ",
+  );
+  assert(!("internalLinks" in parsed.definition), "twelfth page has no internalLinks");
+  assert(!("cta" in parsed.definition), "twelfth page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `twelfth page has no static ${key}`);
+  }
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 1, "twelfth page has exactly one title-anchor");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `twelfth link label is not a URL: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `twelfth href is site-relative: ${link.href}`);
+  }
+  assert(
+    allLinks[0].href === "/listens/shum-vody-slushat-onlayn" &&
+      allLinks[0].label === "Шум воды – слушать звуки воды онлайн",
+    "twelfth page links hub listen by page title",
+  );
+
+  const contentSource = read(
+    "src/lib/seo/listens/content/zhurchanie-vody-slushat-onlayn.ts",
+  );
+  assert(
+    !contentSource.includes("https://audiolad.ru/listens/"),
+    "twelfth content file has no production listen URLs",
+  );
+  assert(
+    !contentSource.includes("SEO-самопроверка"),
+    "twelfth content file has no SEO-самопроверка",
+  );
+  assert(
+    !contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"),
+    "twelfth content file has no playlist placeholder",
+  );
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(slugs.includes(THIRD_PAGE_SLUG), "registry contains third listen slug");
+  assert(slugs.includes(FOURTH_PAGE_SLUG), "registry contains fourth listen slug");
+  assert(slugs.includes(FIFTH_PAGE_SLUG), "registry contains fifth listen slug");
+  assert(slugs.includes(SIXTH_PAGE_SLUG), "registry contains sixth listen slug");
+  assert(slugs.includes(SEVENTH_PAGE_SLUG), "registry contains seventh listen slug");
+  assert(slugs.includes(EIGHTH_PAGE_SLUG), "registry contains eighth listen slug");
+  assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
+  assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
+  assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
+  assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
+  assert(slugs.length === 12, "registry contains all 12 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
+    "twelfth page playlistSlug is shum-vody",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${TWELFTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains twelfth listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: "shum-vody",
+          title: "Шум воды | Журчание воды | Звуки воды",
+        },
+      }),
+    },
+  });
+  assert(data, "twelfth page resolves against shum-vody playlist");
+  assert(data.playlist.playlist.slug === "shum-vody", "resolved playlist slug is shum-vody");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "twelfth JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "twelfth JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "twelfth JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "twelfth JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "twelfth JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "twelfth JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "twelfth JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "twelfth JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "twelfth JSON-LD no primaryPractice");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -2439,6 +2672,7 @@ const tests = [
   ["ninth listen page", testNinthPage],
   ["tenth listen page", testTenthPage],
   ["eleventh listen page", testEleventhPage],
+  ["twelfth listen page", testTwelfthPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],

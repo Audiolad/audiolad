@@ -38,6 +38,7 @@ import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib
 import { UTRENNYAYA_MEDITATSIYA_NA_DENGI_I_IZOBILIE_PAGE } from "../src/lib/seo/listens/content/utrennyaya-meditatsiya-na-dengi-i-izobilie.ts";
 import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-izobiliya-i-bogatstva-dlya-sna.ts";
 import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts";
+import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zhurchanie-vody-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -637,6 +638,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${eleventhListenHref}`,
     ),
     "directory JSON-LD includes eleventh listen href",
+  );
+
+  const twelfthListenHref = "/listens/zhurchanie-vody-slushat-onlayn";
+  const twelfthListenCard = data.articles.find((card) => card.href === twelfthListenHref);
+  assert(twelfthListenCard, "twelfth indexable listen page is listed");
+  assert(
+    twelfthListenCard.title === "Журчание воды – слушать онлайн бесплатно | АудиоЛад",
+    "twelfth listen directory title",
+  );
+  assert(
+    twelfthListenCard.description === ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.description,
+    "twelfth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/zhurchanie-vody-slushat-onlayn",
+    ),
+    "no /articles duplicate for twelfth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twelfthListenHref}`,
+    ),
+    "directory JSON-LD includes twelfth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
