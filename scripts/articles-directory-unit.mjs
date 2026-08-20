@@ -36,6 +36,7 @@ import { MEDITATSIYA_NA_DENEZHNYY_POTOK_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "..
 import { MEDITATSIYA_DLYA_DENEG_I_IZOBILIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn.ts";
 import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin.ts";
 import { UTRENNYAYA_MEDITATSIYA_NA_DENGI_I_IZOBILIE_PAGE } from "../src/lib/seo/listens/content/utrennyaya-meditatsiya-na-dengi-i-izobilie.ts";
+import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-izobiliya-i-bogatstva-dlya-sna.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -586,6 +587,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${ninthListenHref}`,
     ),
     "directory JSON-LD includes ninth listen href",
+  );
+
+  const tenthListenHref = "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna";
+  const tenthListenCard = data.articles.find((card) => card.href === tenthListenHref);
+  assert(tenthListenCard, "tenth indexable listen page is listed");
+  assert(
+    tenthListenCard.title === "Медитация изобилия и богатства для сна | АудиоЛад",
+    "tenth listen directory title",
+  );
+  assert(
+    tenthListenCard.description === MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE.description,
+    "tenth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-izobiliya-i-bogatstva-dlya-sna",
+    ),
+    "no /articles duplicate for tenth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${tenthListenHref}`,
+    ),
+    "directory JSON-LD includes tenth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
