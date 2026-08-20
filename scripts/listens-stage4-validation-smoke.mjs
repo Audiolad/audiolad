@@ -22,6 +22,7 @@ import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/cont
 import { ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-vodopada-slushat-onlayn.ts";
 import { ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-ruchya-slushat-onlayn.ts";
 import { SHUM_VODY_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-sna.ts";
+import { ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-lyushcheysya-vody-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -1138,6 +1139,84 @@ const FIFTEENTH_EXPECTED_FAQ = [
     question: "Что делать, если звук воды мешает заснуть?",
     answer:
       "Уменьшите громкость, попробуйте более мягкую запись или выключите звук. Для некоторых людей полная тишина комфортнее любого фонового звучания.",
+  },
+];
+
+const SIXTEENTH_PAGE_SLUG = "zvuk-lyushcheysya-vody-slushat-onlayn";
+const FLOW_WATER_PAGE = ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE;
+const SIXTEENTH_PAGE_H1 = "Звук льющейся воды – слушать шум текущей воды";
+const SIXTEENTH_PAGE_TITLE = "Звук льющейся воды – слушать шум текущей воды онлайн | АудиоЛад";
+const SIXTEENTH_PAGE_DESCRIPTION =
+  "Звук льющейся и текущей воды онлайн бесплатно: выберите подходящее звучание и слушайте спокойный природный фон для отдыха, чтения или расслабления.";
+
+const SIXTEENTH_EXPECTED_INTRO = [
+  "Звук льющейся воды можно слушать онлайн бесплатно прямо на АудиоЛаде. В подборке можно выбрать более мягкое или выраженное течение и включить его как природный фон.",
+  "Текущая вода подходит для отдыха, чтения, спокойной работы, медитации или просто прослушивания без речи и музыки.",
+  "Выберите подходящий звук воды в подборке и начните слушать.",
+];
+
+const SIXTEENTH_EXPECTED_SECTION_TITLES = [
+  "Как звучит льющаяся и текущая вода",
+  "Чем льющаяся вода отличается от других водных звуков",
+  "Почему люди слушают звук текущей воды",
+  "Текущая вода для отдыха и расслабления",
+  "Звук бегущей воды как фоновое звучание",
+  "Шум потока и течения воды",
+  "Как выбрать подходящий звук текущей воды",
+  "Чем текущая вода отличается от водопада",
+  "Можно ли включать текущую воду вечером",
+  "Нужно ли слушать воду в наушниках",
+  "Где слушать разные звуки воды",
+  "Где слушать звук льющейся воды онлайн",
+  "Итог",
+];
+
+const SIXTEENTH_REQUIRED_H2S = [
+  "Можно ли включать текущую воду вечером",
+  "Чем текущая вода отличается от водопада",
+];
+
+const SIXTEENTH_FORBIDDEN_SLEEP_H2 = "для сна";
+
+const SIXTEENTH_EXPECTED_FAQ = [
+  {
+    question: "Где можно слушать звук льющейся воды онлайн?",
+    answer:
+      "На АудиоЛаде можно открыть водную подборку, выбрать подходящий вариант текущей воды и запустить запись прямо на странице.",
+  },
+  {
+    question: "Можно ли слушать текущую воду бесплатно?",
+    answer: "Да. Подходящие записи из Public Playlist можно слушать онлайн бесплатно.",
+  },
+  {
+    question: "Чем звук текущей воды отличается от журчания?",
+    answer:
+      "Текущая вода – более широкое понятие непрерывного движения воды. Журчание обычно описывает более мягкий и локальный характер звучания.",
+  },
+  {
+    question: "Чем текущая вода отличается по звучанию от водопада?",
+    answer:
+      "Водопад чаще создаёт более плотный и мощный шум падающей воды. Текущая вода может звучать мягче и описывает более широкий характер движения.",
+  },
+  {
+    question: "Подходит ли звук бегущей воды для расслабления?",
+    answer:
+      "Некоторым людям такой природный фон помогает создать более спокойную атмосферу и переключить внимание. Реакция индивидуальна и не является медицинским эффектом.",
+  },
+  {
+    question: "Можно ли включать текущую воду во время работы или чтения?",
+    answer:
+      "Да, если такой фон не отвлекает. Отсутствие речи делает его удобным вариантом для людей, которым комфортнее работать не в полной тишине.",
+  },
+  {
+    question: "Как выбрать комфортную громкость?",
+    answer:
+      "Начните с небольшой громкости. Фон не должен постоянно привлекать внимание или перекрывать важные звуки вокруг.",
+  },
+  {
+    question: "Нужно ли слушать звук воды в наушниках?",
+    answer:
+      "Нет. Можно использовать наушники или динамики – выбирайте способ, который удобнее в вашей обстановке.",
   },
 ];
 
@@ -2676,7 +2755,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 15, "registry contains all 15 listen slugs");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -2839,7 +2918,7 @@ function testTwelfthPage() {
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
-  assert(slugs.length === 15, "registry contains all 15 listen slugs");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3008,7 +3087,7 @@ function testThirteenthPage() {
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
-  assert(slugs.length === 15, "registry contains all 15 listen slugs");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3204,7 +3283,7 @@ function testFourteenthPage() {
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
-  assert(slugs.length === 15, "registry contains all 15 listen slugs");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3421,7 +3500,7 @@ function testFifteenthPage() {
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
-  assert(slugs.length === 15, "registry contains all 15 listen slugs");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_SNA_PAGE.playlistSlug === "shum-vody",
@@ -3465,6 +3544,241 @@ function testFifteenthPage() {
   assert(!serialized.includes("primaryPractice"), "fifteenth JSON-LD no primaryPractice");
 }
 
+function testSixteenthPage() {
+  const parsed = parseListenPageDefinition(FLOW_WATER_PAGE);
+  assert(parsed.ok, "sixteenth production definition valid");
+  assert(parsed.definition.slug === SIXTEENTH_PAGE_SLUG, "sixteenth page slug");
+  assert(parsed.definition.playlistSlug === "shum-vody", "sixteenth playlistSlug is shum-vody");
+  assert(
+    parsed.definition.playlistSlug !== PLAYLIST_SLUG,
+    "sixteenth playlistSlug is not the money playlist",
+  );
+  assert(
+    parsed.definition.playlistSlug !== SIXTEENTH_PAGE_SLUG,
+    "sixteenth playlistSlug is not the page slug",
+  );
+  assert(parsed.definition.h1 === SIXTEENTH_PAGE_H1, "sixteenth h1 exact");
+  assert(parsed.definition.title === SIXTEENTH_PAGE_TITLE, "sixteenth title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "sixteenth title !== h1");
+  assert(
+    parsed.definition.description === SIXTEENTH_PAGE_DESCRIPTION,
+    "sixteenth description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 3, "sixteenth page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === SIXTEENTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === SIXTEENTH_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === SIXTEENTH_EXPECTED_INTRO[2],
+    "sixteenth intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 13, "sixteenth page has 13 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      SIXTEENTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "sixteenth page 13 section titles verbatim",
+  );
+  for (const title of SIXTEENTH_REQUIRED_H2S) {
+    assert(
+      parsed.definition.sections.some((section) => section.title === title),
+      `sixteenth page keeps required H2 ${title}`,
+    );
+  }
+  assert(
+    !parsed.definition.sections.some((section) => section.title.includes(SIXTEENTH_FORBIDDEN_SLEEP_H2)),
+    "sixteenth page has no extra sleep H2 like для сна",
+  );
+  assert(parsed.definition.faq.length === 8, "sixteenth page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === SIXTEENTH_EXPECTED_FAQ[index].question &&
+        item.answer === SIXTEENTH_EXPECTED_FAQ[index].answer,
+    ),
+    "sixteenth page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "sixteenth page has no internalLinks");
+  assert(!("cta" in parsed.definition), "sixteenth page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `sixteenth page has no static ${key}`);
+  }
+
+  const allTextChunks = [
+    parsed.definition.h1,
+    parsed.definition.title,
+    parsed.definition.description,
+    ...parsed.definition.intro,
+    ...parsed.definition.sections.flatMap((section) => [
+      section.title,
+      ...(section.paragraphs ?? []),
+      ...(section.blocks ?? []).flatMap((block) => {
+        if (block.kind === "paragraph") return [block.text];
+        if (block.kind === "list") return block.items ?? [];
+        if (block.kind === "rich_paragraph") {
+          return (block.segments ?? []).map((segment) => segment.text ?? segment.label ?? "");
+        }
+        if (block.kind === "heading") return [block.title];
+        return [];
+      }),
+    ]),
+    ...parsed.definition.faq.flatMap((item) => [item.question, item.answer]),
+  ].join("\n");
+
+  assert(!allTextChunks.includes("без рекламы"), "sixteenth page has no без рекламы");
+  assert(!allTextChunks.includes("лечит бессонницу"), "sixteenth page has no лечит бессонницу");
+  assert(
+    !allTextChunks.includes("улучшает качество сна"),
+    "sixteenth page has no улучшает качество сна",
+  );
+  assert(!allTextChunks.includes("делает сон глубже"), "sixteenth page has no делает сон глубже");
+  assert(
+    allTextChunks.includes("не является медицинским эффектом"),
+    "sixteenth page keeps не является медицинским эффектом",
+  );
+  assert(allTextChunks.includes("не гарантирует"), "sixteenth page keeps не гарантирует");
+  assert(
+    allTextChunks.includes("не посвящена специально сну"),
+    "sixteenth page keeps evening/sleep handoff",
+  );
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 5, "sixteenth page has exactly 5 title-anchors");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `sixteenth link label is not a URL: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `sixteenth href is site-relative: ${link.href}`);
+  }
+  const zhurchanie = allLinks.filter(
+    (link) =>
+      link.href === "/listens/zhurchanie-vody-slushat-onlayn" &&
+      link.label === "журчание воды",
+  );
+  assert(zhurchanie.length === 1, "sixteenth page has журчание воды once");
+  const ruchya = allLinks.filter(
+    (link) =>
+      link.href === "/listens/zvuk-ruchya-slushat-onlayn" &&
+      link.label === "звук ручья",
+  );
+  assert(ruchya.length === 1, "sixteenth page has звук ручья once");
+  const vodopad = allLinks.filter(
+    (link) =>
+      link.href === "/listens/zvuk-vodopada-slushat-onlayn" &&
+      link.label === "Звук водопада – слушать шум водопада онлайн",
+  );
+  assert(vodopad.length === 1, "sixteenth page has waterfall title-anchor once");
+  const sleep = allLinks.filter(
+    (link) =>
+      link.href === "/listens/shum-vody-dlya-sna" &&
+      link.label === "Шум воды для сна – слушать онлайн",
+  );
+  assert(sleep.length === 1, "sixteenth page has sleep title-anchor once");
+  const hub = allLinks.filter(
+    (link) =>
+      link.href === "/listens/shum-vody-slushat-onlayn" &&
+      link.label === "Шум воды – слушать звуки воды онлайн",
+  );
+  assert(hub.length === 1, "sixteenth page has hub title-anchor once");
+  const dests = allLinks.map((link) => link.href);
+  assert(
+    dests.filter((href) => href === "/listens/zhurchanie-vody-slushat-onlayn").length === 1,
+    "sixteenth dests: zhurchanie ×1",
+  );
+  assert(
+    dests.filter((href) => href === "/listens/zvuk-ruchya-slushat-onlayn").length === 1,
+    "sixteenth dests: ruchya ×1",
+  );
+  assert(
+    dests.filter((href) => href === "/listens/zvuk-vodopada-slushat-onlayn").length === 1,
+    "sixteenth dests: vodopad ×1",
+  );
+  assert(
+    dests.filter((href) => href === "/listens/shum-vody-dlya-sna").length === 1,
+    "sixteenth dests: sleep ×1",
+  );
+  assert(
+    dests.filter((href) => href === "/listens/shum-vody-slushat-onlayn").length === 1,
+    "sixteenth dests: hub ×1",
+  );
+  assert(new Set(dests).size === 5, "sixteenth page has 5 destinations");
+
+  const contentSource = read("src/lib/seo/listens/content/zvuk-lyushcheysya-vody-slushat-onlayn.ts");
+  assert(
+    !contentSource.includes("https://audiolad.ru/listens/"),
+    "sixteenth content file has no production listen URLs",
+  );
+  assert(!contentSource.includes("https://"), "sixteenth content file has no https://");
+  assert(
+    !contentSource.includes("SEO-самопроверка"),
+    "sixteenth content file has no SEO-самопроверка",
+  );
+  assert(
+    !contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"),
+    "sixteenth content file has no playlist placeholder",
+  );
+  assert(!contentSource.includes("без рекламы"), "sixteenth content file has no без рекламы");
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(slugs.includes(THIRD_PAGE_SLUG), "registry contains third listen slug");
+  assert(slugs.includes(FOURTH_PAGE_SLUG), "registry contains fourth listen slug");
+  assert(slugs.includes(FIFTH_PAGE_SLUG), "registry contains fifth listen slug");
+  assert(slugs.includes(SIXTH_PAGE_SLUG), "registry contains sixth listen slug");
+  assert(slugs.includes(SEVENTH_PAGE_SLUG), "registry contains seventh listen slug");
+  assert(slugs.includes(EIGHTH_PAGE_SLUG), "registry contains eighth listen slug");
+  assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
+  assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
+  assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
+  assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
+  assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
+  assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
+  assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
+  assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
+  assert(slugs.length === 16, "registry contains all 16 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
+    "sixteenth page playlistSlug is shum-vody",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${SIXTEENTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains sixteenth listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: "shum-vody",
+          title: "Шум воды | Журчание воды | Звуки воды",
+        },
+      }),
+    },
+  });
+  assert(data, "sixteenth page resolves against shum-vody playlist");
+  assert(data.playlist.playlist.slug === "shum-vody", "resolved playlist slug is shum-vody");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "sixteenth JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "sixteenth JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "sixteenth JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "sixteenth JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "sixteenth JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "sixteenth JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "sixteenth JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "sixteenth JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "sixteenth JSON-LD no primaryPractice");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -3482,6 +3796,7 @@ const tests = [
   ["thirteenth listen page", testThirteenthPage],
   ["fourteenth listen page", testFourteenthPage],
   ["fifteenth listen page", testFifteenthPage],
+  ["sixteenth listen page", testSixteenthPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
