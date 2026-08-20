@@ -3,6 +3,10 @@
 
 CANONICAL_REF="${CANONICAL_REF:-origin/main}"
 
+# Objects only. This does not checkout, reset, or move GIT_WORKDIR HEAD.
+# That is why a controlling checkout (e.g. /var/www/audiolad-clean) can lag
+# origin/main and accumulate staged deploy/scripts from pathspec checkouts
+# (`git checkout <sha> -- deploy/scripts`) while still deploying via git archive.
 canonical_fetch_main() {
   if git -C "$GIT_WORKDIR" remote get-url origin >/dev/null 2>&1; then
     log_info "Fetching ${CANONICAL_REF} from origin"

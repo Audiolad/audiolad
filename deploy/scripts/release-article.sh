@@ -76,7 +76,15 @@ resolve_git_and_deploy() {
     printf '%s\n' "BLOCKED: GIT_WORKDIR not found"
     exit 1
   fi
-  if [[ -x "${GIT_WORKDIR}/deploy/scripts/deploy.sh" ]]; then
+  # Prefer the target SHA's deploy/scripts. The GIT_WORKDIR copy can lag
+  # origin/main; /current is a symlink and is not a legal exec path.
+  DEPLOY_VIA_TARGET_SHA=0
+  if git -C "${GIT_WORKDIR}" cat-file -e "${SHA}:deploy/scripts/run-from-target-sha.sh" 2>/dev/null; then
+    DEPLOY_VIA_TARGET_SHA=1
+    DEPLOY_SH="git-show:${SHA}:deploy/scripts/run-from-target-sha.sh"
+  elif [[ -x "${GIT_WORKDIR}/deploy/scripts/run-from-target-sha.sh" ]]; then
+    DEPLOY_SH="${GIT_WORKDIR}/deploy/scripts/run-from-target-sha.sh"
+  elif [[ -x "${GIT_WORKDIR}/deploy/scripts/deploy.sh" ]]; then
     DEPLOY_SH="${GIT_WORKDIR}/deploy/scripts/deploy.sh"
   elif [[ -x /var/www/audiolad-deploy/scripts/deploy.sh ]]; then
     DEPLOY_SH="/var/www/audiolad-deploy/scripts/deploy.sh"
@@ -85,6 +93,7 @@ resolve_git_and_deploy() {
     exit 1
   fi
   export GIT_WORKDIR
+  export DEPLOY_VIA_TARGET_SHA
 }
 
 require_full_sha() {
@@ -175,7 +184,13 @@ else
     fi
   fi
   STAGE="immutable_deploy"
-  run env GIT_WORKDIR="${GIT_WORKDIR}" "${DEPLOY_SH}" "${SHA}"
+  if [[ "${DEPLOY_VIA_TARGET_SHA}" == "1" ]]; then
+    run env GIT_WORKDIR="${GIT_WORKDIR}" bash -c \
+      'git -C "$GIT_WORKDIR" show "$1:deploy/scripts/run-from-target-sha.sh" | bash -s -- "$1"' \
+      bash "${SHA}"
+  else
+    run env GIT_WORKDIR="${GIT_WORKDIR}" "${DEPLOY_SH}" "${SHA}"
+  fi
   DEPLOY_ACTION="DEPLOYED"
   refresh_release_metadata
 fi

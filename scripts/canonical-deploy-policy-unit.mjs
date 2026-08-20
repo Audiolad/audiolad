@@ -10,6 +10,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const commonSh = join(repoRoot, "deploy/scripts/lib/common.sh");
 const policySh = join(repoRoot, "deploy/scripts/lib/canonical-deploy-policy.sh");
 const deploySh = join(repoRoot, "deploy/scripts/deploy.sh");
+const runFromTargetShaSh = join(repoRoot, "deploy/scripts/run-from-target-sha.sh");
 const policyDeployRoot = mkdtempSync(join(tmpdir(), "audiolad-policy-deploy-root-"));
 
 function assert(condition, message) {
@@ -322,6 +323,181 @@ function testDirtyWorkdirWarningDoesNotBlock() {
   assert(!hasLocalOnly.stdout.includes("found"), "untracked file must not be archived");
 }
 
+function writeFixtureDeployScripts(dir, { zeroDowntimeMarker, includeCaCerts, deployEcho }) {
+  const caLine = includeCaCerts
+    ? '        NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt",'
+    : "# no NODE_EXTRA_CA_CERTS";
+  runBash(
+    `
+      set -euo pipefail
+      mkdir -p deploy/scripts/lib
+      cat > deploy/scripts/deploy.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+echo "FIXTURE_DEPLOY_ECHO=${deployEcho}"
+echo "PINNED=\${AUDIOLAD_DEPLOY_SCRIPTS_PINNED:-0}"
+echo "PINNED_SHA=\${AUDIOLAD_DEPLOY_SCRIPTS_PINNED_SHA:-}"
+if grep -q 'NODE_EXTRA_CA_CERTS: "/etc/ssl/certs/ca-certificates.crt"' "\$DIR/lib/zero-downtime.sh"; then
+  echo "TARGET_HAS_NODE_EXTRA_CA_CERTS"
+fi
+if grep -q 'MARKER_STALE_ZERO_DOWNTIME' "\$DIR/lib/zero-downtime.sh"; then
+  echo "USING_STALE_ZERO_DOWNTIME"
+fi
+if grep -q 'MARKER_TARGET_ZERO_DOWNTIME' "\$DIR/lib/zero-downtime.sh"; then
+  echo "USING_TARGET_ZERO_DOWNTIME"
+fi
+EOF
+      chmod +x deploy/scripts/deploy.sh
+      cat > deploy/scripts/lib/zero-downtime.sh <<EOF
+# ${zeroDowntimeMarker}
+${caLine}
+EOF
+      cp "${runFromTargetShaSh}" deploy/scripts/run-from-target-sha.sh
+      chmod +x deploy/scripts/run-from-target-sha.sh
+    `,
+    { cwd: dir },
+  );
+}
+
+function initStaleLaunchWorktree() {
+  const dir = mkdtempSync(join(tmpdir(), "audiolad-pin-workdir-"));
+  runBash(
+    `
+      set -euo pipefail
+      git init -q
+      git config user.email "test@audiolad.local"
+      git config user.name "Pin Test"
+      echo base > README.md
+      git add README.md
+      git commit -q -m "base"
+      git branch -M main
+    `,
+    { cwd: dir },
+  );
+
+  writeFixtureDeployScripts(dir, {
+    zeroDowntimeMarker: "MARKER_STALE_ZERO_DOWNTIME",
+    includeCaCerts: false,
+    deployEcho: "STALE_WORKTREE",
+  });
+  runBash(
+    `
+      set -euo pipefail
+      git add deploy/scripts
+      git commit -q -m "stale-deploy-scripts"
+    `,
+    { cwd: dir },
+  );
+  const staleSha = runBash("git rev-parse HEAD", { cwd: dir }).stdout.trim();
+
+  writeFixtureDeployScripts(dir, {
+    zeroDowntimeMarker: "MARKER_TARGET_ZERO_DOWNTIME",
+    includeCaCerts: true,
+    deployEcho: "TARGET_SHA",
+  });
+  runBash(
+    `
+      set -euo pipefail
+      git add deploy/scripts
+      git commit -q -m "target-deploy-scripts"
+    `,
+    { cwd: dir },
+  );
+  const targetSha = runBash("git rev-parse HEAD", { cwd: dir }).stdout.trim();
+
+  runBash(`git checkout -q "${staleSha}"`, { cwd: dir });
+  runBash(
+    `
+      set -euo pipefail
+      mkdir -p deploy/scripts
+      echo staged-workaround > deploy/scripts/stale-staged.sh
+      git add deploy/scripts/stale-staged.sh
+    `,
+    { cwd: dir },
+  );
+
+  return { dir, staleSha, targetSha };
+}
+
+function testTargetShaDeployLogicNotLaunchWorktree() {
+  const mock = initStaleLaunchWorktree();
+  const deployRoot = mkdtempSync(join(tmpdir(), "audiolad-pin-deploy-root-"));
+  try {
+    const headBefore = runBash("git rev-parse HEAD", { cwd: mock.dir }).stdout.trim();
+    assert(headBefore === mock.staleSha, "launch worktree must start at stale SHA");
+
+    const stagedBefore = runBash("git diff --cached --name-only", { cwd: mock.dir }).stdout;
+    assert(stagedBefore.includes("deploy/scripts/stale-staged.sh"), "staged deploy file present");
+
+    const result = runBash(
+      `
+        export GIT_WORKDIR="${mock.dir}"
+        export DEPLOY_ROOT="${deployRoot}"
+        bash "${runFromTargetShaSh}" "${mock.targetSha}"
+      `,
+    );
+    assert(result.status === 0, `target-SHA bootstrap should run fixture deploy: ${result.output}`);
+    assert(result.output.includes("FIXTURE_DEPLOY_ECHO=TARGET_SHA"), result.output);
+    assert(result.output.includes("USING_TARGET_ZERO_DOWNTIME"), result.output);
+    assert(result.output.includes("TARGET_HAS_NODE_EXTRA_CA_CERTS"), result.output);
+    assert(!result.output.includes("FIXTURE_DEPLOY_ECHO=STALE_WORKTREE"), result.output);
+    assert(!result.output.includes("USING_STALE_ZERO_DOWNTIME"), result.output);
+    assert(result.output.includes(`PINNED=1`), result.output);
+    assert(result.output.includes(`PINNED_SHA=${mock.targetSha}`), result.output);
+
+    const headAfter = runBash("git rev-parse HEAD", { cwd: mock.dir }).stdout.trim();
+    assert(headAfter === mock.staleSha, "bootstrap must not checkout/reset GIT_WORKDIR HEAD");
+    const stagedAfter = runBash("git diff --cached --name-only", { cwd: mock.dir }).stdout;
+    assert(
+      stagedAfter.includes("deploy/scripts/stale-staged.sh"),
+      "bootstrap must not clear staged worktree files",
+    );
+
+    const viaShow = runBash(
+      `
+        export GIT_WORKDIR="${mock.dir}"
+        export DEPLOY_ROOT="${deployRoot}"
+        git -C "${mock.dir}" show "${mock.targetSha}:deploy/scripts/run-from-target-sha.sh" \
+          | bash -s -- "${mock.targetSha}"
+      `,
+    );
+    assert(viaShow.status === 0, `git show | bash -s should work: ${viaShow.output}`);
+    assert(viaShow.output.includes("USING_TARGET_ZERO_DOWNTIME"), viaShow.output);
+    assert(viaShow.output.includes("TARGET_HAS_NODE_EXTRA_CA_CERTS"), viaShow.output);
+
+    const viaDeploySh = runBash(
+      `
+        export GIT_WORKDIR="${mock.dir}"
+        export DEPLOY_ROOT="${deployRoot}"
+        bash "${deploySh}" "${mock.targetSha}"
+      `,
+    );
+    assert(viaDeploySh.status === 0, `deploy.sh must re-exec target SHA scripts: ${viaDeploySh.output}`);
+    assert(viaDeploySh.output.includes("USING_TARGET_ZERO_DOWNTIME"), viaDeploySh.output);
+    assert(viaDeploySh.output.includes("TARGET_HAS_NODE_EXTRA_CA_CERTS"), viaDeploySh.output);
+    assert(!viaDeploySh.output.includes("USING_STALE_ZERO_DOWNTIME"), viaDeploySh.output);
+
+    const currentLaunch = runBash(
+      `
+        set -euo pipefail
+        mkdir -p "${deployRoot}/releases/fake-current/deploy/scripts"
+        cp "${deploySh}" "${deployRoot}/releases/fake-current/deploy/scripts/deploy.sh"
+        ln -sfn "${deployRoot}/releases/fake-current" "${deployRoot}/current"
+        export GIT_WORKDIR="${mock.dir}"
+        export DEPLOY_ROOT="${deployRoot}"
+        export AUDIOLAD_DEPLOY_SCRIPTS_PINNED=1
+        bash "${deployRoot}/current/deploy/scripts/deploy.sh" "${mock.targetSha}"
+      `,
+    );
+    assert(currentLaunch.status !== 0, "pinned exec via /current must fail");
+    assert(currentLaunch.output.includes("/current"), currentLaunch.output);
+  } finally {
+    rmSync(mock.dir, { recursive: true, force: true });
+    rmSync(deployRoot, { recursive: true, force: true });
+  }
+}
+
 function testMetadataFormatter() {
   const releaseDir = mkdtempSync(join(tmpdir(), "audiolad-policy-meta-"));
   const result = runBash(
@@ -359,6 +535,7 @@ function main() {
     testOverrideCannotBypassActiveProductionGuard(mock);
     testIntegratedCandidateCanReplaceActiveProduction(mock);
     testDirtyWorkdirWarningDoesNotBlock();
+    testTargetShaDeployLogicNotLaunchWorktree();
     testMetadataFormatter();
     console.log("canonical-deploy-policy-unit: all tests passed");
   } finally {

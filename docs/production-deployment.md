@@ -27,15 +27,31 @@ Nginx serves that overlay first so Safari/PWA clients with a previous HTML docum
 
 ## Команда деплоя
 
+Запускайте **deploy-код целевого SHA**, а не скрипты из mutable checkout
+`/var/www/audiolad-clean` и не symlink `/var/www/audiolad-deploy/current`.
+`canonical_fetch_main` делает только `git fetch` и **не** обновляет HEAD
+worktree — поэтому controlling checkout систематически отстаёт от
+`origin/main`. Dirty/staged файлы не блокируют deploy (только warning):
+release по-прежнему собирается через `git archive`.
+
+Не используйте `git reset --hard` для этого checkout. Не запускайте
+`/var/www/audiolad-deploy/current/deploy/scripts/deploy.sh` — CLI
+readiness через symlink `/current` не должен быть путём деплоя.
+
+Безопасная Timeweb-команда (только git objects, HEAD не меняется):
+
 ```bash
-/var/www/audiolad-deploy/scripts/deploy.sh
+sudo env GIT_WORKDIR=/var/www/audiolad-clean bash -c '
+  set -euo pipefail
+  git -C "$GIT_WORKDIR" fetch origin main
+  git -C "$GIT_WORKDIR" show "$1:deploy/scripts/run-from-target-sha.sh" | bash -s -- "$1"
+' bash <commit-sha>
 ```
 
-Или конкретный commit:
-
-```bash
-/var/www/audiolad-deploy/scripts/deploy.sh <commit-ish>
-```
+Это извлекает `deploy/scripts` целевого SHA в
+`/var/www/audiolad-deploy/shared/deploy-scripts/<full-sha>/` и exec-ит
+тот `deploy.sh`. Policy gates, flock `/run/audiolad-deploy.lock`,
+ancestry и zero-downtime cutover остаются внутри `deploy.sh`.
 
 ## Что делает deploy.sh
 

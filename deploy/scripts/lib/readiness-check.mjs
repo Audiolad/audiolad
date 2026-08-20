@@ -5,6 +5,10 @@
  * Used by deploy/rollback scripts and readiness-check-unit.mjs.
  */
 
+import { realpathSync } from "node:fs";
+import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /**
  * @param {{
  *   httpStatus: number | null,
@@ -160,10 +164,60 @@ async function runCli() {
   throw new Error(`unknown_command:${command ?? "missing"}`);
 }
 
-if (import.meta.url === new URL(process.argv[1], "file:").href) {
+function writeFailClosedDetection(detail) {
+  const payload = {
+    ready: false,
+    httpStatus: null,
+    reason: "cli_detection_failed",
+    buildId: null,
+    status: null,
+  };
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stderr.write(`readiness-check: ${detail}\n`);
+  process.exit(1);
+}
+
+/**
+ * Direct `node readiness-check.mjs` must run the CLI even when argv[1] is a
+ * symlink (`import.meta.url` is the real file). Library import must stay inert.
+ * Never exit 0 with empty stdout.
+ *
+ * @returns {"cli" | "library" | "unknown"}
+ */
+export function resolveReadinessInvocationMode(argvPath = process.argv[1]) {
+  if (typeof argvPath !== "string" || argvPath.length === 0) {
+    return "unknown";
+  }
+
+  try {
+    const selfReal = realpathSync(fileURLToPath(import.meta.url));
+    const argvReal = realpathSync(argvPath);
+    if (argvReal === selfReal) {
+      return "cli";
+    }
+    return "library";
+  } catch {
+    try {
+      if (import.meta.url === new URL(argvPath, "file:").href) {
+        return "cli";
+      }
+    } catch {
+      // fall through
+    }
+    if (basename(argvPath) === "readiness-check.mjs") {
+      return "unknown";
+    }
+    return "library";
+  }
+}
+
+const readinessInvocationMode = resolveReadinessInvocationMode();
+if (readinessInvocationMode === "cli") {
   runCli().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     process.exit(1);
   });
+} else if (readinessInvocationMode === "unknown") {
+  writeFailClosedDetection("cannot decide CLI vs library invocation");
 }
