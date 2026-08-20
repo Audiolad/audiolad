@@ -11,6 +11,7 @@ import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "./content/medit
 import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "./content/shum-vody-slushat-onlayn";
 import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "./content/zhurchanie-vody-slushat-onlayn";
 import { ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-vodopada-slushat-onlayn";
+import { ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE } from "./content/zvuk-ruchya-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -31,6 +32,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   SHUM_VODY_SLUSHAT_ONLAYN_PAGE,
   ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE,
   ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE,
+  ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

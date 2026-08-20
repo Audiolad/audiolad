@@ -40,6 +40,7 @@ import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/
 import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts";
 import { ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zhurchanie-vody-slushat-onlayn.ts";
 import { ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-vodopada-slushat-onlayn.ts";
+import { ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/zvuk-ruchya-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -687,6 +688,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirteenthListenHref}`,
     ),
     "directory JSON-LD includes thirteenth listen href",
+  );
+
+  const fourteenthListenHref = "/listens/zvuk-ruchya-slushat-onlayn";
+  const fourteenthListenCard = data.articles.find((card) => card.href === fourteenthListenHref);
+  assert(fourteenthListenCard, "fourteenth indexable listen page is listed");
+  assert(
+    fourteenthListenCard.title === "Звук ручья – слушать журчание ручья онлайн бесплатно | АудиоЛад",
+    "fourteenth listen directory title",
+  );
+  assert(
+    fourteenthListenCard.description === ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.description,
+    "fourteenth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/zvuk-ruchya-slushat-onlayn",
+    ),
+    "no /articles duplicate for fourteenth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fourteenthListenHref}`,
+    ),
+    "directory JSON-LD includes fourteenth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
