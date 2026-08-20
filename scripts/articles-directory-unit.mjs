@@ -37,6 +37,7 @@ import { MEDITATSIYA_DLYA_DENEG_I_IZOBILIYA_SLUSHAT_ONLAYN_PAGE } from "../src/l
 import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin.ts";
 import { UTRENNYAYA_MEDITATSIYA_NA_DENGI_I_IZOBILIE_PAGE } from "../src/lib/seo/listens/content/utrennyaya-meditatsiya-na-dengi-i-izobilie.ts";
 import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-izobiliya-i-bogatstva-dlya-sna.ts";
+import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -611,6 +612,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${tenthListenHref}`,
     ),
     "directory JSON-LD includes tenth listen href",
+  );
+
+
+  const eleventhListenHref = "/listens/shum-vody-slushat-onlayn";
+  const eleventhListenCard = data.articles.find((card) => card.href === eleventhListenHref);
+  assert(eleventhListenCard, "eleventh indexable listen page is listed");
+  assert(
+    eleventhListenCard.title === "Шум воды – слушать звуки воды онлайн бесплатно | АудиоЛад",
+    "eleventh listen directory title",
+  );
+  assert(
+    eleventhListenCard.description === SHUM_VODY_SLUSHAT_ONLAYN_PAGE.description,
+    "eleventh listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/shum-vody-slushat-onlayn",
+    ),
+    "no /articles duplicate for eleventh listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${eleventhListenHref}`,
+    ),
+    "directory JSON-LD includes eleventh listen href",
   );
 
   const articleCards = listArticleDirectoryCards();

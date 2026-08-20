@@ -17,6 +17,7 @@ import { MEDITATSIYA_DLYA_DENEG_I_IZOBILIYA_SLUSHAT_ONLAYN_PAGE } from "../src/l
 import { MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin.ts";
 import { UTRENNYAYA_MEDITATSIYA_NA_DENGI_I_IZOBILIE_PAGE } from "../src/lib/seo/listens/content/utrennyaya-meditatsiya-na-dengi-i-izobilie.ts";
 import { MEDITATSIYA_IZOBILIYA_I_BOGATSTVA_DLYA_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-izobiliya-i-bogatstva-dlya-sna.ts";
+import { SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -775,6 +776,74 @@ const TENTH_EXPECTED_FAQ = [
     question: "Помогает ли вечерняя медитация привлечь богатство?",
     answer:
       "Медитация не гарантирует привлечения богатства или денег. Она может помочь спокойнее завершить день, уделить внимание своим целям и внутреннему состоянию, но финансовые результаты зависят от реальных решений и действий.",
+  },
+];
+
+
+const ELEVENTH_PAGE_SLUG = "shum-vody-slushat-onlayn";
+const ELEVENTH_PAGE_H1 = "Шум воды – слушать звуки воды онлайн";
+const ELEVENTH_PAGE_TITLE = "Шум воды – слушать звуки воды онлайн бесплатно | АудиоЛад";
+const ELEVENTH_PAGE_DESCRIPTION =
+  "Шум воды онлайн бесплатно: слушайте спокойные звуки воды для расслабления, чтения, работы или медитации и выбирайте подходящее звучание в подборке.";
+
+const ELEVENTH_EXPECTED_INTRO = [
+  "Шум воды можно слушать онлайн бесплатно прямо на АудиоЛаде. Выберите подходящее звучание в подборке и включите его как спокойный природный фон.",
+  "Звуки воды подходят для отдыха, чтения, спокойной работы, медитации или просто времени без разговорного контента.",
+  "Выберите подходящий звук в подборке и начните слушать.",
+];
+
+const ELEVENTH_EXPECTED_SECTION_TITLES = [
+  "Что называют шумом воды",
+  "Почему люди любят слушать звуки воды",
+  "Когда можно включать шум воды",
+  "Шум воды как фон для работы и концентрации",
+  "Звуки воды для расслабления",
+  "Как выбрать подходящий звук воды",
+  "Какую громкость выбрать для шума воды",
+  "Нужно ли слушать шум воды в наушниках",
+  "Как слушать шум воды на АудиоЛаде",
+  "Итог",
+];
+
+const ELEVENTH_EXPECTED_FAQ = [
+  {
+    question: "Где можно слушать шум воды онлайн?",
+    answer:
+      "На АудиоЛаде можно открыть подборку звуков воды, выбрать подходящую запись и запустить её прямо на странице.",
+  },
+  {
+    question: "Можно ли слушать звуки воды бесплатно?",
+    answer: "Да. Звуки воды в подборке можно слушать онлайн бесплатно.",
+  },
+  {
+    question: "Для чего люди включают шум воды?",
+    answer:
+      "Его используют как природный фон для отдыха, расслабления, чтения, спокойной работы, концентрации или медитации.",
+  },
+  {
+    question: "Подходит ли шум воды как фон для работы или чтения?",
+    answer:
+      "Некоторым людям такой фон удобнее полной тишины. Он не содержит речи и может частично маскировать отдельные окружающие звуки, но реакция индивидуальна.",
+  },
+  {
+    question: "Какую громкость выбрать?",
+    answer:
+      "Выбирайте комфортный уровень. Для фонового прослушивания обычно не требуется высокая громкость. Звук не должен раздражать или перекрывать важные сигналы вокруг.",
+  },
+  {
+    question: "Чем отличаются разные звуки воды?",
+    answer:
+      "Они могут различаться интенсивностью, ритмом, плотностью, ровностью и общим характером звучания. Поэтому полезно попробовать несколько вариантов.",
+  },
+  {
+    question: "Можно ли использовать шум воды для медитации?",
+    answer:
+      "Да, если такой фон помогает сосредоточиться и не отвлекает. Громкость лучше оставить умеренной.",
+  },
+  {
+    question: "Нужно ли слушать звук воды в наушниках?",
+    answer:
+      "Нет. Можно слушать и через динамики. Наушники стоит использовать только тогда, когда так комфортнее и удобнее в вашей обстановке.",
   },
 ];
 
@@ -2224,6 +2293,139 @@ function testTenthPage() {
   assert(!serialized.includes("primaryPractice"), "tenth JSON-LD no primaryPractice");
 }
 
+
+function testEleventhPage() {
+  const parsed = parseListenPageDefinition(
+    SHUM_VODY_SLUSHAT_ONLAYN_PAGE,
+  );
+  assert(parsed.ok, "eleventh production definition valid");
+  assert(parsed.definition.slug === ELEVENTH_PAGE_SLUG, "eleventh page slug");
+  assert(parsed.definition.playlistSlug === "shum-vody", "eleventh playlistSlug is shum-vody");
+  assert(
+    parsed.definition.playlistSlug !== PLAYLIST_SLUG,
+    "eleventh playlistSlug is not the money playlist",
+  );
+  assert(
+    parsed.definition.playlistSlug !== "shum-vody-slushat-onlayn",
+    "eleventh playlistSlug is not the page slug",
+  );
+  assert(
+    parsed.definition.playlistSlug !== "meditaciya-na-dengi",
+    "eleventh playlistSlug is not meditaciya-na-dengi",
+  );
+  assert(parsed.definition.h1 === ELEVENTH_PAGE_H1, "eleventh h1 exact");
+  assert(parsed.definition.title === ELEVENTH_PAGE_TITLE, "eleventh title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "eleventh title !== h1");
+  assert(
+    parsed.definition.description === ELEVENTH_PAGE_DESCRIPTION,
+    "eleventh description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 3, "eleventh page has three intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === ELEVENTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === ELEVENTH_EXPECTED_INTRO[1] &&
+      parsed.definition.intro[2] === ELEVENTH_EXPECTED_INTRO[2],
+    "eleventh intro[0..2] verbatim",
+  );
+  assert(parsed.definition.sections.length === 10, "eleventh page has 10 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      ELEVENTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "eleventh page 10 section titles verbatim",
+  );
+  assert(parsed.definition.faq.length === 8, "eleventh page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === ELEVENTH_EXPECTED_FAQ[index].question &&
+        item.answer === ELEVENTH_EXPECTED_FAQ[index].answer,
+    ),
+    "eleventh page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "eleventh page has no internalLinks");
+  assert(!("cta" in parsed.definition), "eleventh page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `eleventh page has no static ${key}`);
+  }
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 0, "eleventh page has zero rich_paragraph links");
+
+  const contentSource = read(
+    "src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts",
+  );
+  assert(
+    !contentSource.includes("https://audiolad.ru/listens/"),
+    "eleventh content file has no production listen URLs",
+  );
+  assert(
+    !contentSource.includes("SEO-самопроверка"),
+    "eleventh content file has no SEO-самопроверка",
+  );
+  assert(
+    !contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"),
+    "eleventh content file has no playlist placeholder",
+  );
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(slugs.includes(THIRD_PAGE_SLUG), "registry contains third listen slug");
+  assert(slugs.includes(FOURTH_PAGE_SLUG), "registry contains fourth listen slug");
+  assert(slugs.includes(FIFTH_PAGE_SLUG), "registry contains fifth listen slug");
+  assert(slugs.includes(SIXTH_PAGE_SLUG), "registry contains sixth listen slug");
+  assert(slugs.includes(SEVENTH_PAGE_SLUG), "registry contains seventh listen slug");
+  assert(slugs.includes(EIGHTH_PAGE_SLUG), "registry contains eighth listen slug");
+  assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
+  assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
+  assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
+  assert(slugs.length === 11, "registry contains all 11 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
+    "eleventh page playlistSlug is shum-vody",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${ELEVENTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains eleventh listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: SHUM_VODY_SLUSHAT_ONLAYN_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: "shum-vody",
+          title: "Шум воды | Журчание воды | Звуки воды",
+        },
+      }),
+    },
+  });
+  assert(data, "eleventh page resolves against shum-vody playlist");
+  assert(data.playlist.playlist.slug === "shum-vody", "resolved playlist slug is shum-vody");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "eleventh JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "eleventh JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "eleventh JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "eleventh JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "eleventh JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "eleventh JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "eleventh JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "eleventh JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "eleventh JSON-LD no primaryPractice");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -2236,6 +2438,7 @@ const tests = [
   ["eighth listen page", testEighthPage],
   ["ninth listen page", testNinthPage],
   ["tenth listen page", testTenthPage],
+  ["eleventh listen page", testEleventhPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
