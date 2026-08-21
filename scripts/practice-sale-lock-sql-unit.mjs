@@ -170,13 +170,13 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
   psqlFile(
     TEST_DB,
-    join(ROOT, "supabase/migrations/20260728120000_practice_content_sale_lock.sql"),
+    join(ROOT, "supabase/migrations/20260728121000_practice_content_sale_lock.sql"),
   );
 
   // Idempotency: re-apply migration.
   psqlFile(
     TEST_DB,
-    join(ROOT, "supabase/migrations/20260728120000_practice_content_sale_lock.sql"),
+    join(ROOT, "supabase/migrations/20260728121000_practice_content_sale_lock.sql"),
   );
 
   psql(

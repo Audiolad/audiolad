@@ -129,7 +129,7 @@ function safeConversionRate(numerator, denominator) {
 
 function testMigrationContract() {
   const sql = readFileSync(
-    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
+    join(ROOT, "supabase/migrations/20260716182000_promotion_campaigns.sql"),
     "utf8",
   );
 
@@ -159,7 +159,7 @@ function testPromotionRoutes() {
 
 function testStatsDoNotExposePii() {
   const migration = readFileSync(
-    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
+    join(ROOT, "supabase/migrations/20260716182000_promotion_campaigns.sql"),
     "utf8",
   );
   const statsRoute = readFileSync(
@@ -322,7 +322,7 @@ function testUnknownSourceLabel() {
 
 function testArchivedCampaignHistory() {
   const migration = readFileSync(
-    join(ROOT, "supabase/migrations/20260716180000_promotion_campaigns.sql"),
+    join(ROOT, "supabase/migrations/20260716182000_promotion_campaigns.sql"),
     "utf8",
   );
   assert(migration.includes("'archived'"), "archived status supported");

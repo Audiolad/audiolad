@@ -72,9 +72,10 @@ Do **not** stop the healthy production PM2 app while restoring scripts.
 
 ## Database migration stage (before candidate start)
 
+Production is **self-hosted Supabase** (`supabase-db` on the Timeweb VPS), not Cloud.
 After the candidate is built and overlay gzip siblings are asserted, deploy
-leaves the release tree (`cd "$DEPLOY_ROOT"`) and runs official Supabase
-migrations against the **candidate SHA** release directory:
+leaves the release tree (`cd "$DEPLOY_ROOT"`) and runs docker-exec `psql`
+against the **candidate SHA** release directory:
 
 1. Source `deploy/scripts/lib/database-migrations.sh`
 2. `run_database_migration_stage "$RELEASE_DIR"`
@@ -84,14 +85,12 @@ This is **before** `start_release_on_port` and Nginx/symlink cutover. A failed
 migration leaves `current` and Nginx on the old release. The candidate process
 is never started, so `cleanup_failed_candidate` is a no-op.
 
-### Fail-closed credentials
-
-`SUPABASE_DB_URL` must be present in
-`/var/www/audiolad-deploy/shared/.env.production`. Missing or empty fails with
-`database_migration_credentials_missing`. The URL is never committed and never
-logged. Service-role is not used for SQL.
-
-The CLI is pinned to `supabase@2.115.0`. Empty remote history with local
-migration files aborts (`database_migration_history_uninitialized`) instead of
-applying the full tree. History holes abort (`database_migration_history_drift`).
-No automatic DB rollback; see `docs/database-migration-safety.md`.
+`SUPABASE_DB_URL` is **not** required. The helper talks to
+`docker exec ${AUDIOLAD_SUPABASE_DB_CONTAINER:-supabase-db} psql -U postgres -d postgres`.
+Missing docker/container/`select 1` fails with
+`database_migration_target_unavailable`. Missing or empty
+`supabase_migrations.schema_migrations` fails with
+`database_migration_history_uninitialized` (current production until the
+one-time baseline). History holes abort (`database_migration_history_drift`).
+No Cloud dashboard. No extra flock. No automatic DB rollback; rollback is
+app-only. See `docs/database-migration-safety.md`.

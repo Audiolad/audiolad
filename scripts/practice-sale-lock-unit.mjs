@@ -208,7 +208,7 @@ function testSourceWiring() {
     "src/app/api/author/products/[id]/audio/[audioId]/route.ts",
   );
   const migration = read(
-    "supabase/migrations/20260728120000_practice_content_sale_lock.sql",
+    "supabase/migrations/20260728121000_practice_content_sale_lock.sql",
   );
   const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 

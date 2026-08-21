@@ -61,7 +61,7 @@ dirty working tree files are never included.
 
 Zero-downtime cutover:
   1) build candidate release
-  2) DB migration preflight/apply (official pinned Supabase CLI; fail-closed)
+  2) DB migration preflight/apply (self-hosted supabase-db docker-exec; fail-closed)
   3) start candidate on standby loopback port
   4) local readiness (BUILD_ID) + candidate smoke
   5) switch current/previous symlinks (Nginx still on old port)
@@ -179,7 +179,7 @@ main() {
   log_info "Active production remains on port ${OLD_ACTIVE_PORT} app=${OLD_ACTIVE_PM2_APP}"
   # Leave release tree before any destructive cleanup/rollback paths.
   cd "$DEPLOY_ROOT"
-  # Official Supabase CLI migrations against the candidate SHA tree only.
+  # Self-hosted supabase-db docker-exec migrations against the candidate SHA tree only.
   # Failure leaves current/nginx on the old release (candidate not started).
   # shellcheck source=lib/database-migrations.sh
   source "$SCRIPT_DIR/lib/database-migrations.sh"

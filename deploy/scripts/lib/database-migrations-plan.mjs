@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Pure planner + parsers for official Supabase CLI migration list/push.
+ * Pure planner + parsers for self-hosted supabase-db migration apply.
  * Never repairs history. Never talks to a database.
  */
 
@@ -30,6 +30,81 @@ function uniqueSorted(versions) {
 export function versionsFromMigrationFilenames(names) {
   const list = Array.isArray(names) ? names : [];
   return uniqueSorted(list);
+}
+
+export function listLocalMigrationFiles(dir) {
+  const files = [];
+  const byVersion = new Map();
+  let names = [];
+  try {
+    names = readdirSync(dir).filter((name) => name.toLowerCase().endsWith(".sql"));
+  } catch {
+    return { files: [], versions: [], duplicates: [], fileCount: 0 };
+  }
+  for (const filename of names) {
+    const version = normalizeVersion(filename);
+    if (!version) continue;
+    const rec = {
+      version,
+      filename,
+      path: join(dir, filename),
+      name: filename.replace(/^\d+_/, "").replace(/\.sql$/i, ""),
+    };
+    files.push(rec);
+    if (!byVersion.has(version)) byVersion.set(version, []);
+    byVersion.get(version).push(filename);
+  }
+  files.sort((a, b) => {
+    if (a.version === b.version) return a.filename.localeCompare(b.filename);
+    return a.version < b.version ? -1 : 1;
+  });
+  const duplicates = [...byVersion.entries()]
+    .filter(([, list]) => list.length > 1)
+    .map(([version, list]) => ({ version, files: list }))
+    .sort((a, b) => a.version.localeCompare(b.version));
+  return {
+    files,
+    versions: uniqueSorted(files.map((f) => f.version)),
+    duplicates,
+    fileCount: files.length,
+  };
+}
+
+export function parsePsqlVersionList(text) {
+  const versions = [];
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^ERROR:/i.test(trimmed)) continue;
+    if (/does not exist/i.test(trimmed)) continue;
+    const version = extractVersionToken(trimmed);
+    if (version) versions.push(version);
+  }
+  return uniqueSorted(versions);
+}
+
+export function classifyRemoteHistory({ tableExists, versions = [] } = {}) {
+  if (!tableExists) {
+    return {
+      status: "missing",
+      ready: false,
+      code: ABORT_UNINITIALIZED,
+    };
+  }
+  const remote = uniqueSorted(versions);
+  if (remote.length === 0) {
+    return {
+      status: "empty",
+      ready: false,
+      code: ABORT_UNINITIALIZED,
+    };
+  }
+  return {
+    status: "ready",
+    ready: true,
+    code: "ready",
+    remoteVersions: remote,
+  };
 }
 
 function collectFilenames(args) {
@@ -245,7 +320,14 @@ function writeJson(value) {
 function main(argv) {
   const mode = argv[2] || "";
   const rest = argv.slice(3);
-  const stdin = mode === "from-files" && rest.length > 0 ? "" : readStdin();
+  const needsStdin = (
+    mode === "plan" ||
+    mode === "parse-list" ||
+    mode === "parse-psql-versions" ||
+    mode === "redact" ||
+    (mode === "from-files" && rest.length === 0)
+  );
+  const stdin = needsStdin ? readStdin() : "";
 
   if (mode === "plan") {
     const parsed = tryParseJson(stdin);
@@ -287,7 +369,18 @@ function main(argv) {
     return;
   }
 
-  process.stderr.write("usage: database-migrations-plan.mjs plan|parse-list|from-files|redact\n");
+  if (mode === "from-files-detailed") {
+    const dir = rest[0] || "";
+    writeJson(listLocalMigrationFiles(dir));
+    return;
+  }
+
+  if (mode === "parse-psql-versions") {
+    writeJson(parsePsqlVersionList(stdin));
+    return;
+  }
+
+  process.stderr.write("usage: database-migrations-plan.mjs plan|parse-list|from-files|from-files-detailed|parse-psql-versions|redact\n");
   process.exit(2);
 }
 

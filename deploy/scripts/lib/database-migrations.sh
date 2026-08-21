@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Official Supabase CLI migration preflight/apply for Audiolad deploys.
+# Self-hosted supabase-db docker-exec migration preflight/apply for Audiolad deploys.
 # Source from deploy.sh. This helper must not take the deploy lock.
-# Do not print SUPABASE_DB_URL or other secrets.
-
-SUPABASE_CLI_SPEC="${SUPABASE_CLI_SPEC:-supabase@2.115.0}"
+# Do not print secrets. Do not require SUPABASE_DB_URL. Do not use supabase db push.
 
 _AUDIOLAD_DBMIG_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 AUDIOLAD_MIGRATIONS_PLANNER="${AUDIOLAD_MIGRATIONS_PLANNER:-$_AUDIOLAD_DBMIG_LIB_DIR/database-migrations-plan.mjs}"
+
+# shellcheck source=self-hosted-db.sh
+source "$_AUDIOLAD_DBMIG_LIB_DIR/self-hosted-db.sh"
 
 if ! declare -F log_info >/dev/null 2>&1; then
   log_info() { printf '[INFO] %s\n' "$*"; }
@@ -14,88 +15,6 @@ fi
 if ! declare -F log_error >/dev/null 2>&1; then
   log_error() { printf '[ERROR] %s\n' "$*" >&2; }
 fi
-
-SUPABASE_CLI_CMD=()
-SUPABASE_DB_URL=""
-LAST_SUPABASE_CLI_OUTPUT=""
-
-extract_env_value() {
-  local file="$1"
-  local key="$2"
-  node -e '
-    const fs = require("fs");
-    const file = process.argv[process.argv.length - 2];
-    const key = process.argv[process.argv.length - 1];
-    const text = fs.readFileSync(file, "utf8");
-    const prefixes = [key + "=", "export " + key + "="];
-    for (const rawLine of text.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) continue;
-      let rest = null;
-      for (const prefix of prefixes) {
-        if (line.startsWith(prefix)) {
-          rest = line.slice(prefix.length).trim();
-          break;
-        }
-      }
-      if (rest == null) {
-        const spaced = line.match(new RegExp("^(?:export\\s+)?" + key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*=\\s*(.*)$"));
-        if (spaced) rest = spaced[1];
-      }
-      if (rest == null) continue;
-      let value = rest;
-      if (
-        (value.startsWith("\"") && value.endsWith("\"")) ||
-        (value.startsWith("'\''") && value.endsWith("'\''"))
-      ) {
-        value = value.slice(1, -1);
-      } else {
-        value = value.replace(/\s+#.*$/, "").trim();
-      }
-      process.stdout.write(value);
-      process.exit(0);
-    }
-    process.exit(0);
-  ' "$file" "$key"
-}
-
-redact_migration_stream() {
-  node "$AUDIOLAD_MIGRATIONS_PLANNER" redact
-}
-
-_log_redacted() {
-  local text="${1:-}"
-  local redacted=""
-  redacted="$(printf '%s' "$text" | redact_migration_stream)"
-  if [[ -z "$redacted" ]]; then
-    return 0
-  fi
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -n "$line" ]] && log_info "$line"
-  done <<<"$redacted"
-}
-
-resolve_supabase_cli() {
-  local release_dir="$1"
-  local local_bin=""
-  local version=""
-
-  if [[ -n "${AUDIOLAD_SUPABASE_CLI:-}" ]]; then
-    SUPABASE_CLI_CMD=("$AUDIOLAD_SUPABASE_CLI")
-    return 0
-  fi
-
-  local_bin="$release_dir/node_modules/.bin/supabase"
-  if [[ -x "$local_bin" ]]; then
-    version="$("$local_bin" --version 2>/dev/null || true)"
-    if [[ "$version" == *2.115.0* ]]; then
-      SUPABASE_CLI_CMD=("$local_bin")
-      return 0
-    fi
-  fi
-
-  SUPABASE_CLI_CMD=(npx --yes --package="${SUPABASE_CLI_SPEC}" supabase)
-}
 
 list_local_migration_versions() {
   local release_dir="$1"
@@ -107,57 +26,14 @@ list_local_migration_versions() {
   node "$AUDIOLAD_MIGRATIONS_PLANNER" from-files "$migrations_dir"
 }
 
-load_migration_db_url() {
-  local env_file="${DEPLOY_ROOT:?DEPLOY_ROOT is required}/shared/.env.production"
-  local value=""
-  SUPABASE_DB_URL=""
-  if [[ ! -f "$env_file" ]]; then
-    log_error "database_migration_credentials_missing"
-    return 2
+list_local_migration_files_json() {
+  local release_dir="$1"
+  local migrations_dir="$release_dir/supabase/migrations"
+  if [[ ! -d "$migrations_dir" ]]; then
+    printf '%s\n' '{"files":[],"versions":[],"duplicates":[],"fileCount":0}'
+    return 0
   fi
-  value="$(extract_env_value "$env_file" "SUPABASE_DB_URL" || true)"
-  if [[ -z "$value" ]]; then
-    log_error "database_migration_credentials_missing"
-    return 2
-  fi
-  SUPABASE_DB_URL="$value"
-  return 0
-}
-
-_make_cli_project() {
-  local release_dir="$1"
-  local tmp=""
-  tmp="$(mktemp -d /tmp/audiolad-supabase-cli.XXXXXX)"
-  mkdir -p "$tmp/supabase"
-  cat >"$tmp/supabase/config.toml" <<'EOF'
-project_id = "audiolad"
-[db]
-major_version = 15
-EOF
-  ln -sfn "$release_dir/supabase/migrations" "$tmp/supabase/migrations"
-  printf '%s\n' "$tmp"
-}
-
-_run_supabase_in_release() {
-  local release_dir="$1"
-  shift
-  local tmp=""
-  local status=0
-  local raw=""
-  tmp="$(_make_cli_project "$release_dir")"
-  raw="$(
-    cd "$tmp"
-    "${SUPABASE_CLI_CMD[@]}" "$@" --db-url "$SUPABASE_DB_URL" 2>&1
-  )" || status=$?
-  rm -rf "$tmp"
-  LAST_SUPABASE_CLI_OUTPUT="$raw"
-  _log_redacted "$raw"
-  return "$status"
-}
-
-run_supabase_migration_list() {
-  local release_dir="$1"
-  _run_supabase_in_release "$release_dir" migration list
+  node "$AUDIOLAD_MIGRATIONS_PLANNER" from-files-detailed "$migrations_dir"
 }
 
 _plan_from_versions() {
@@ -181,18 +57,6 @@ _plan_from_versions() {
   ' "$AUDIOLAD_MIGRATIONS_PLANNER" "$local_json" "$remote_json"
 }
 
-_parse_list_remote_versions() {
-  local text="$1"
-  printf '%s' "$text" | node "$AUDIOLAD_MIGRATIONS_PLANNER" parse-list | node -e '
-    let raw = "";
-    process.stdin.on("data", (chunk) => { raw += chunk; });
-    process.stdin.on("end", () => {
-      const parsed = JSON.parse(raw || "{}");
-      process.stdout.write(JSON.stringify(parsed.remoteVersions || []));
-    });
-  '
-}
-
 _plan_field() {
   local plan_json="$1"
   local field="$2"
@@ -204,6 +68,19 @@ _plan_field() {
     else if (typeof value === "string" || typeof value === "number") process.stdout.write(String(value));
     else process.stdout.write(JSON.stringify(value));
   ' "$plan_json" "$field"
+}
+
+_json_field() {
+  local json="$1"
+  local field="$2"
+  node -e '
+    const value = JSON.parse(process.argv[1]);
+    const field = process.argv[2];
+    const found = value[field];
+    if (found == null) process.stdout.write("");
+    else if (typeof found === "string" || typeof found === "number") process.stdout.write(String(found));
+    else process.stdout.write(JSON.stringify(found));
+  ' "$json" "$field"
 }
 
 _is_current_symlink_path() {
@@ -230,18 +107,74 @@ _is_current_symlink_path() {
   return 1
 }
 
+_file_for_version() {
+  local files_json="$1"
+  local version="$2"
+  node -e '
+    const detailed = JSON.parse(process.argv[1]);
+    const version = process.argv[2];
+    const files = Array.isArray(detailed.files) ? detailed.files : [];
+    const match = files.filter((row) => row.version === version);
+    if (match.length !== 1) process.exit(2);
+    process.stdout.write(match[0].path || "");
+  ' "$files_json" "$version"
+}
+
+_name_for_version() {
+  local files_json="$1"
+  local version="$2"
+  node -e '
+    const detailed = JSON.parse(process.argv[1]);
+    const version = process.argv[2];
+    const files = Array.isArray(detailed.files) ? detailed.files : [];
+    const match = files.find((row) => row.version === version);
+    process.stdout.write((match && match.name) || "");
+  ' "$files_json" "$version"
+}
+
+apply_pending_migration_file() {
+  local file="$1"
+  local version="$2"
+  local name="$3"
+  local insert_sql=""
+
+  if [[ ! -f "$file" ]]; then
+    log_error "migration file missing: $file"
+    return 1
+  fi
+  if [[ ! "$version" =~ ^[0-9]{8,}$ ]]; then
+    log_error "invalid migration version"
+    return 1
+  fi
+  if ! docker_psql_file "$file"; then
+    return 1
+  fi
+  insert_sql="$(insert_schema_migrations_row_sql "$version" "$name")"
+  if ! docker_psql -c "$insert_sql"; then
+    return 1
+  fi
+  return 0
+}
+
 run_database_migration_stage() {
   local release_dir="$1"
   local local_json="[]"
-  local list_status=0
+  local files_json=""
+  local duplicates="[]"
+  local history_status=""
+  local remote_raw=""
   local remote_json="[]"
   local plan_json=""
   local action=""
   local code=""
   local pending_count="0"
+  local pending_json="[]"
   local after_plan=""
   local after_action=""
   local after_pending="1"
+  local version=""
+  local file=""
+  local name=""
 
   log_info "database_migration_preflight_started"
 
@@ -263,27 +196,45 @@ run_database_migration_stage() {
     return 1
   fi
 
-  if ! load_migration_db_url; then
+  if ! preflight_self_hosted_db; then
     log_error "database_migration_failed"
     return 1
   fi
 
-  resolve_supabase_cli "$release_dir"
+  files_json="$(list_local_migration_files_json "$release_dir")"
+  duplicates="$(_json_field "$files_json" "duplicates")"
+  if [[ -n "$duplicates" && "$duplicates" != "[]" ]]; then
+    log_error "database_migration_failed"
+    log_error "database_migration_duplicate_versions"
+    return 1
+  fi
   local_json="$(list_local_migration_versions "$release_dir")"
 
-  list_status=0
-  run_supabase_migration_list "$release_dir" || list_status=$?
-  if (( list_status != 0 )); then
+  history_status="$(inspect_schema_migrations_table)" || {
     log_error "database_migration_failed"
-    log_error "supabase migration list failed"
+    log_error "failed to inspect schema_migrations"
+    return 1
+  }
+  history_status="$(printf '%s' "$history_status" | tr -d '[:space:]')"
+
+  if [[ "$history_status" == "missing" || "$history_status" == "empty" ]]; then
+    log_error "database_migration_failed"
+    log_error "database_migration_history_uninitialized"
     return 1
   fi
 
-  remote_json="$(_parse_list_remote_versions "$LAST_SUPABASE_CLI_OUTPUT")"
+  if ! list_remote_migration_versions; then
+    log_error "database_migration_failed"
+    log_error "failed to list remote migration versions"
+    return 1
+  fi
+  remote_raw="$LAST_PSQL_OUTPUT"
+  remote_json="$(parse_remote_versions_json "$remote_raw")"
   plan_json="$(_plan_from_versions "$local_json" "$remote_json")"
   action="$(_plan_field "$plan_json" "action")"
   code="$(_plan_field "$plan_json" "code")"
   pending_count="$(_plan_field "$plan_json" "database_migrations_pending")"
+  pending_json="$(_plan_field "$plan_json" "pending")"
   if [[ -z "$pending_count" ]]; then
     pending_count=0
   fi
@@ -308,20 +259,29 @@ run_database_migration_stage() {
   fi
 
   log_info "database_migration_apply_started"
-  if ! _run_supabase_in_release "$release_dir" db push --yes; then
+  while IFS= read -r version; do
+    [[ -n "$version" ]] || continue
+    file="$(_file_for_version "$files_json" "$version")" || {
+      log_error "database_migration_failed"
+      log_error "could not resolve file for $version"
+      return 1
+    }
+    name="$(_name_for_version "$files_json" "$version")"
+    if ! apply_pending_migration_file "$file" "$version" "$name"; then
+      log_error "database_migration_failed"
+      return 1
+    fi
+  done < <(node -e '
+    const pending = JSON.parse(process.argv[1] || "[]");
+    for (const version of pending) process.stdout.write(String(version) + "\n");
+  ' "$pending_json")
+
+  if ! list_remote_migration_versions; then
     log_error "database_migration_failed"
+    log_error "failed to list remote migration versions after apply"
     return 1
   fi
-
-  list_status=0
-  run_supabase_migration_list "$release_dir" || list_status=$?
-  if (( list_status != 0 )); then
-    log_error "database_migration_failed"
-    log_error "supabase migration list failed after apply"
-    return 1
-  fi
-
-  remote_json="$(_parse_list_remote_versions "$LAST_SUPABASE_CLI_OUTPUT")"
+  remote_json="$(parse_remote_versions_json "$LAST_PSQL_OUTPUT")"
   after_plan="$(_plan_from_versions "$local_json" "$remote_json")"
   after_action="$(_plan_field "$after_plan" "action")"
   after_pending="$(_plan_field "$after_plan" "database_migrations_pending")"
