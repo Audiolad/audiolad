@@ -69,3 +69,29 @@ curl -sS https://audiolad.ru/api/health/build
 ```
 
 Do **not** stop the healthy production PM2 app while restoring scripts.
+
+## Database migration stage (before candidate start)
+
+After the candidate is built and overlay gzip siblings are asserted, deploy
+leaves the release tree (`cd "$DEPLOY_ROOT"`) and runs official Supabase
+migrations against the **candidate SHA** release directory:
+
+1. Source `deploy/scripts/lib/database-migrations.sh`
+2. `run_database_migration_stage "$RELEASE_DIR"`
+3. On failure: log `database_migration_failed`, `send_deploy_alert`, exit 1
+
+This is **before** `start_release_on_port` and Nginx/symlink cutover. A failed
+migration leaves `current` and Nginx on the old release. The candidate process
+is never started, so `cleanup_failed_candidate` is a no-op.
+
+### Fail-closed credentials
+
+`SUPABASE_DB_URL` must be present in
+`/var/www/audiolad-deploy/shared/.env.production`. Missing or empty fails with
+`database_migration_credentials_missing`. The URL is never committed and never
+logged. Service-role is not used for SQL.
+
+The CLI is pinned to `supabase@2.115.0`. Empty remote history with local
+migration files aborts (`database_migration_history_uninitialized`) instead of
+applying the full tree. History holes abort (`database_migration_history_drift`).
+No automatic DB rollback; see `docs/database-migration-safety.md`.
