@@ -61,12 +61,13 @@ dirty working tree files are never included.
 
 Zero-downtime cutover:
   1) build candidate release
-  2) start candidate on standby loopback port
-  3) local readiness (BUILD_ID) + candidate smoke
-  4) switch current/previous symlinks (Nginx still on old port)
-  5) Nginx upstream cutover to candidate
-  6) public readiness + smoke + health-watch
-  7) stop previous process only after success
+  2) DB migration preflight/apply (official pinned Supabase CLI; fail-closed)
+  3) start candidate on standby loopback port
+  4) local readiness (BUILD_ID) + candidate smoke
+  5) switch current/previous symlinks (Nginx still on old port)
+  6) Nginx upstream cutover to candidate
+  7) public readiness + smoke + health-watch
+  8) stop previous process only after success
 EOF
 }
 
@@ -178,6 +179,16 @@ main() {
   log_info "Active production remains on port ${OLD_ACTIVE_PORT} app=${OLD_ACTIVE_PM2_APP}"
   # Leave release tree before any destructive cleanup/rollback paths.
   cd "$DEPLOY_ROOT"
+  # Official Supabase CLI migrations against the candidate SHA tree only.
+  # Failure leaves current/nginx on the old release (candidate not started).
+  # shellcheck source=lib/database-migrations.sh
+  source "$SCRIPT_DIR/lib/database-migrations.sh"
+  if ! run_database_migration_stage "$RELEASE_DIR"; then
+    log_error "database_migration_failed"
+    send_deploy_alert "deploy_failed" "Database migration failed for $RELEASE_NAME"
+    exit 1
+  fi
+
 
   if ! start_release_on_port "$RELEASE_DIR" "$candidate_port" "$candidate_app"; then
     log_error "Failed to start candidate process"
