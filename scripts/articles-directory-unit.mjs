@@ -49,6 +49,7 @@ import { SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE } from "../src/lib/seo/listens/conte
 import { SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-iz-krana-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
+import { USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -913,6 +914,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${twentySecondListenHref}`,
     ),
     "directory JSON-LD includes twenty-second listen href",
+  );
+
+  const twentyThirdListenHref = "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn";
+  const twentyThirdListenCard = data.articles.find((card) => card.href === twentyThirdListenHref);
+  assert(twentyThirdListenCard, "twenty-third indexable listen page is listed");
+  assert(
+    twentyThirdListenCard.title === "Усыпляющая музыка для сна – слушать онлайн бесплатно | АудиоЛад",
+    "twenty-third listen directory title",
+  );
+  assert(
+    twentyThirdListenCard.description === USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "twenty-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for twenty-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-third listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
