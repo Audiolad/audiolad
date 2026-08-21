@@ -7,6 +7,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { normalizeVersion } from "./database-migrations-plan.mjs";
+import { lineageForVersion } from "./migration-audit-lineage.mjs";
 
 export const AUDIT_FORMAT = "audiolad.migration-audit.v1";
 export const OLGA_VERSION = "20260821140000";
@@ -212,6 +213,18 @@ export function buildProbesFromSql(filename, sql) {
     });
   }
 
+  const lineage = lineageForVersion(version);
+  const superseded = lineage.superseded || {};
+  for (const probe of probes) {
+    const meta = superseded[probe.id];
+    if (!meta) continue;
+    probe.supersededBy = meta.supersededBy;
+    probe.replacementId = meta.replacementId;
+  }
+  for (const extra of lineage.extraProbes || []) {
+    addProbe(probes, extra);
+  }
+
   const kind = isDataOrBackfillMigration(filename, sql) ? "data" : "schema";
   return {
     version,
@@ -219,6 +232,23 @@ export function buildProbesFromSql(filename, sql) {
     kind,
     probes,
   };
+}
+
+function probeSatisfied(probe, probes) {
+  if (!probe.executed) return null;
+  if (probe.ok === true) return true;
+  if (probe.ok === false && probe.supersededBy && probe.replacementId) {
+    const replacement = probes.find((item) => item.id === probe.replacementId);
+    if (replacement?.executed && replacement.ok === true) return true;
+  }
+  return probe.ok;
+}
+
+function evidenceTypeFor(probe, satisfied) {
+  if (probe.ok === false && satisfied === true && probe.supersededBy) {
+    return `superseded_by:${probe.supersededBy}`;
+  }
+  return probe.kind;
 }
 
 function truthyResult(value) {
@@ -234,20 +264,29 @@ function truthyResult(value) {
 
 export function classifyMigration({ filename, sql, probeResults = {} } = {}) {
   const built = buildProbesFromSql(filename, sql);
-  const evidence = [];
   const probes = built.probes.map((probe) => {
     const raw = probeResults[probe.id];
     const hasResult = Object.prototype.hasOwnProperty.call(probeResults, probe.id);
     const ok = hasResult ? truthyResult(raw) : null;
-    const item = { ...probe, result: raw ?? null, ok, executed: hasResult };
+    return { ...probe, result: raw ?? null, ok, executed: hasResult };
+  });
+
+  const evidence = [];
+  for (const probe of probes) {
+    const satisfied = probeSatisfied(probe, probes);
+    probe.satisfied = satisfied;
+    probe.evidenceType = evidenceTypeFor(probe, satisfied);
     evidence.push({
       id: probe.id,
       kind: probe.kind,
-      ok,
-      result: raw ?? null,
+      ok: probe.ok,
+      result: probe.result,
+      satisfied,
+      evidenceType: probe.evidenceType,
+      supersededBy: probe.supersededBy || null,
+      replacementId: probe.replacementId || null,
     });
-    return item;
-  });
+  }
 
   let status = "REQUIRES_MANUAL_REVIEW";
   if (built.version === OLGA_VERSION) {
@@ -259,9 +298,9 @@ export function classifyMigration({ filename, sql, probeResults = {} } = {}) {
     status = "REQUIRES_MANUAL_REVIEW";
   } else if (probes.length === 0) {
     status = "REQUIRES_MANUAL_REVIEW";
-  } else if (probes.every((probe) => probe.executed && probe.ok === true)) {
+  } else if (probes.every((probe) => probe.executed && probe.satisfied === true)) {
     status = "PROVEN_APPLIED";
-  } else if (probes.every((probe) => probe.executed && probe.ok === false)) {
+  } else if (probes.every((probe) => probe.executed && probe.satisfied === false)) {
     status = "PROVEN_NOT_APPLIED";
   } else {
     status = "REQUIRES_MANUAL_REVIEW";

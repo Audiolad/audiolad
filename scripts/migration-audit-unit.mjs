@@ -14,6 +14,7 @@ import {
   approvedBaselineVersions,
   isDataOrBackfillMigration,
 } from "../deploy/scripts/lib/migration-audit.mjs";
+import { AUDIT_LINEAGE } from "../deploy/scripts/lib/migration-audit-lineage.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const AUDIT_SH = join(ROOT, "deploy/scripts/audit-production-migrations.sh");
@@ -176,12 +177,177 @@ function testRepoOlgaFileHasNoAuditWrite() {
   assert.equal(built.probes.every((probe) => /^SELECT\b/i.test(probe.sql.trim())), true);
 }
 
+const THIRTEEN = [
+  "20260710122053_configure_starter_practices.sql",
+  "20260710123015_backfill_starter_practices.sql",
+  "20260713150000_seed_first_audio_course_practice.sql",
+  "20260714190000_assign_platform_owner_memberships.sql",
+  "20260714201600_rename_sergey_and_zoya_author.sql",
+  "20260715160000_archive_demo_catalog_practices.sql",
+  "20260715240000_repair_published_practice_audio_status.sql",
+  "20260719140000_clear_legacy_author_seed_description.sql",
+  "20260719150000_promo_pages_foundation.sql",
+  "20260728190000_admin_analytics_p2_privileges_harden.sql",
+  "20260801120000_aurafon_bypass_product_moderation.sql",
+  "20260810160000_studio_recording_webm_assets.sql",
+  "20260816120000_playlist_description_max_300.sql",
+];
+
+function readMigration(name) {
+  return readFileSync(join(ROOT, "supabase/migrations", name), "utf8");
+}
+
+function resultsFor(built, overrides = {}) {
+  const results = {};
+  for (const probe of built.probes) {
+    results[probe.id] = "t";
+  }
+  return { ...results, ...overrides };
+}
+
+function testThirteenHaveSelectProbes() {
+  for (const name of THIRTEEN) {
+    const version = name.slice(0, 14);
+    assert.ok(AUDIT_LINEAGE[version], `lineage missing for ${version}`);
+    const built = buildProbesFromSql(name, readMigration(name));
+    assert.ok(built.probes.length > 0, `${name} must have probes`);
+    assert.equal(
+      built.probes.every((probe) => /^SELECT\b/i.test(probe.sql.trim())),
+      true,
+      `${name} probes must be SELECT`,
+    );
+    assert.doesNotMatch(built.probes.map((probe) => probe.sql).join("\n"), /\b(UPDATE|INSERT|DELETE)\b/i);
+  }
+}
+
+function testDataLineageAppliedAndNotApplied() {
+  const cases = {
+    "20260710122053_configure_starter_practices.sql": "data:starter_practices.configured_bundle",
+    "20260710123015_backfill_starter_practices.sql": "data:user_practices.starter_backfill_footprint",
+    "20260713150000_seed_first_audio_course_practice.sql": "data:practices.first_audio_course_seed",
+    "20260714190000_assign_platform_owner_memberships.sql": "data:author_members.platform_owner_three_workspaces",
+    "20260714201600_rename_sergey_and_zoya_author.sql": "data:authors.sergey_and_zoya_final_name",
+    "20260715160000_archive_demo_catalog_practices.sql": "data:practices.demo_catalog_archived",
+    "20260715240000_repair_published_practice_audio_status.sql": "data:audio_items.no_draft_audio_on_published",
+    "20260719140000_clear_legacy_author_seed_description.sql": "data:authors.legacy_seed_description_cleared",
+    "20260801120000_aurafon_bypass_product_moderation.sql": "data:authors.aurafon_bypass_product_moderation",
+    "20260810160000_studio_recording_webm_assets.sql": "data:storage.studio_draft_assets_allows_webm",
+  };
+  for (const [name, probeId] of Object.entries(cases)) {
+    const sql = readMigration(name);
+    const built = buildProbesFromSql(name, sql);
+    assert.ok(built.probes.some((probe) => probe.id === probeId), `${name} missing ${probeId}`);
+    const applied = classifyMigration({
+      filename: name,
+      sql,
+      probeResults: resultsFor(built),
+    });
+    assert.equal(applied.status, "PROVEN_APPLIED", name);
+    const missing = classifyMigration({
+      filename: name,
+      sql,
+      probeResults: resultsFor(built, { [probeId]: "f" }),
+    });
+    assert.equal(missing.status, "PROVEN_NOT_APPLIED", `${name} false probe`);
+  }
+}
+
+function testPromoFoundationSuperseded() {
+  const name = "20260719150000_promo_pages_foundation.sql";
+  const sql = readMigration(name);
+  const built = buildProbesFromSql(name, sql);
+  const superseded = [
+    "trigger:promo_pages_status_change_guard",
+    "policy:promo_pages.promo_pages_insert",
+    "policy:promo_pages.promo_pages_update",
+    "policy:promo_page_products.promo_page_products_insert",
+    "policy:promo_page_products.promo_page_products_update",
+    "policy:promo_page_products.promo_page_products_delete",
+  ];
+  for (const id of superseded) {
+    const probe = built.probes.find((item) => item.id === id);
+    assert.ok(probe, `missing auto probe ${id}`);
+    assert.ok(probe.supersededBy, `${id} must be marked superseded`);
+  }
+  const overrides = Object.fromEntries(superseded.map((id) => [id, "f"]));
+  const applied = classifyMigration({
+    filename: name,
+    sql,
+    probeResults: resultsFor(built, overrides),
+  });
+  assert.equal(applied.status, "PROVEN_APPLIED");
+  const guard = applied.evidence.find((row) => row.id === "trigger:promo_pages_status_change_guard");
+  assert.equal(guard.ok, false);
+  assert.equal(guard.satisfied, true);
+  assert.equal(guard.evidenceType, "superseded_by:20260719154000");
+  const insert = applied.evidence.find((row) => row.id === "policy:promo_pages.promo_pages_insert");
+  assert.equal(insert.evidenceType, "superseded_by:20260719155000");
+
+  const blocked = classifyMigration({
+    filename: name,
+    sql,
+    probeResults: resultsFor(built, {
+      ...overrides,
+      "trigger:promo_pages_mutation_guard": "f",
+      "function:public.create_promo_page_draft": "f",
+      "function:public.update_promo_page_draft": "f",
+      "function:public.promo_page_replace_products_core": "f",
+    }),
+  });
+  assert.equal(blocked.status, "REQUIRES_MANUAL_REVIEW");
+}
+
+function testSchemaHardenAndPlaylistFinalState() {
+  const harden = "20260728190000_admin_analytics_p2_privileges_harden.sql";
+  const hardenSql = readMigration(harden);
+  const hardenBuilt = buildProbesFromSql(harden, hardenSql);
+  assert.ok(hardenBuilt.probes.some((probe) => probe.id === "privilege:admin_analytics_p2.locked"));
+  assert.equal(
+    classifyMigration({
+      filename: harden,
+      sql: hardenSql,
+      probeResults: resultsFor(hardenBuilt),
+    }).status,
+    "PROVEN_APPLIED",
+  );
+  assert.equal(
+    classifyMigration({
+      filename: harden,
+      sql: hardenSql,
+      probeResults: resultsFor(hardenBuilt, { "privilege:admin_analytics_p2.locked": "f" }),
+    }).status,
+    "PROVEN_NOT_APPLIED",
+  );
+
+  const playlist = "20260816120000_playlist_description_max_300.sql";
+  const playlistSql = readMigration(playlist);
+  const playlistBuilt = buildProbesFromSql(playlist, playlistSql);
+  const constraint = playlistBuilt.probes.find(
+    (probe) => probe.id === "constraint:public.playlists.playlists_description_length_check_300",
+  );
+  assert.ok(constraint);
+  assert.match(constraint.sql, /<= 300/);
+  assert.doesNotMatch(constraint.sql, /<= 1000/);
+  assert.equal(
+    classifyMigration({
+      filename: playlist,
+      sql: playlistSql,
+      probeResults: resultsFor(playlistBuilt),
+    }).status,
+    "PROVEN_APPLIED",
+  );
+}
+
 function main() {
   testOlgaSpecialCase();
   testSchemaAndDataClassification();
   testApprovedBaselineRefusesReview();
   testAuditScriptFixtureNeverMutates();
   testRepoOlgaFileHasNoAuditWrite();
+  testThirteenHaveSelectProbes();
+  testDataLineageAppliedAndNotApplied();
+  testPromoFoundationSuperseded();
+  testSchemaHardenAndPlaylistFinalState();
   console.log("migration-audit-unit: all tests passed");
 }
 
