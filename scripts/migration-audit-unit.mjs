@@ -15,6 +15,10 @@ import {
   isDataOrBackfillMigration,
 } from "../deploy/scripts/lib/migration-audit.mjs";
 import { AUDIT_LINEAGE } from "../deploy/scripts/lib/migration-audit-lineage.mjs";
+import {
+  ARCHIVE_DEMO_MIGRATION_AT,
+  archiveDemoUnpublishedInvariantHolds,
+} from "../deploy/scripts/lib/migration-audit-archive-demo.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const AUDIT_SH = join(ROOT, "deploy/scripts/audit-production-migrations.sh");
@@ -295,6 +299,34 @@ function testPromoFoundationSuperseded() {
   assert.equal(blocked.status, "REQUIRES_MANUAL_REVIEW");
 }
 
+
+function testArchiveIgnoresLaterSameSlugPublish() {
+  const name = "20260715160000_archive_demo_catalog_practices.sql";
+  const sql = readMigration(name);
+  const built = buildProbesFromSql(name, sql);
+  const unpublished = built.probes.find((probe) => probe.id === "data:practices.demo_catalog_unpublished");
+  assert.match(unpublished.sql, /published_at < TIMESTAMPTZ '2026-07-15 16:00:00\+00'/);
+  assert.doesNotMatch(unpublished.sql, /940c50fc/i);
+  assert.equal(ARCHIVE_DEMO_MIGRATION_AT, "2026-07-15 16:00:00+00");
+
+  const liveLikeRows = [
+    { slug: "e2e-test-odinochnyy-audioprodukt", published_at: "2026-07-14T21:25:03+00:00", status: "unpublished", deleted_at: "2026-08-05T07:45:50+00:00" },
+    { slug: "e2e-test-programma-3-audio", published_at: "2026-07-15T03:47:19+00:00", status: "unpublished", deleted_at: null },
+    { slug: "first-audio-course", published_at: "2026-07-13T19:01:10+00:00", status: "unpublished", deleted_at: null },
+    { slug: "personal-boundaries", published_at: "2026-07-09T05:04:37+00:00", status: "unpublished", deleted_at: "2026-08-11T05:55:48+00:00" },
+    { slug: "sila-zhenstvennosti", published_at: "2026-07-09T05:04:37+00:00", status: "unpublished", deleted_at: "2026-08-11T05:56:37+00:00" },
+    { slug: "sila-zhenstvennosti", published_at: "2026-07-16T05:52:24+00:00", status: "published", deleted_at: null },
+  ];
+  assert.equal(archiveDemoUnpublishedInvariantHolds(liveLikeRows), true);
+
+  const applied = classifyMigration({
+    filename: name,
+    sql,
+    probeResults: resultsFor(built, { "data:practices.demo_catalog_archived": "f" }),
+  });
+  assert.equal(applied.status, "PROVEN_APPLIED");
+}
+
 function testArchiveStatusSupersededByUnpublished() {
   const name = "20260715160000_archive_demo_catalog_practices.sql";
   const sql = readMigration(name);
@@ -372,6 +404,7 @@ function main() {
   testThirteenHaveSelectProbes();
   testDataLineageAppliedAndNotApplied();
   testPromoFoundationSuperseded();
+  testArchiveIgnoresLaterSameSlugPublish();
   testArchiveStatusSupersededByUnpublished();
   testSchemaHardenAndPlaylistFinalState();
   console.log("migration-audit-unit: all tests passed");
