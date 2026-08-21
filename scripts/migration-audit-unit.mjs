@@ -183,7 +183,6 @@ const THIRTEEN = [
   "20260713150000_seed_first_audio_course_practice.sql",
   "20260714190000_assign_platform_owner_memberships.sql",
   "20260714201600_rename_sergey_and_zoya_author.sql",
-  "20260715160000_archive_demo_catalog_practices.sql",
   "20260715240000_repair_published_practice_audio_status.sql",
   "20260719140000_clear_legacy_author_seed_description.sql",
   "20260719150000_promo_pages_foundation.sql",
@@ -227,7 +226,6 @@ function testDataLineageAppliedAndNotApplied() {
     "20260713150000_seed_first_audio_course_practice.sql": "data:practices.first_audio_course_seed",
     "20260714190000_assign_platform_owner_memberships.sql": "data:author_members.platform_owner_three_workspaces",
     "20260714201600_rename_sergey_and_zoya_author.sql": "data:authors.sergey_and_zoya_final_name",
-    "20260715160000_archive_demo_catalog_practices.sql": "data:practices.demo_catalog_archived",
     "20260715240000_repair_published_practice_audio_status.sql": "data:audio_items.no_draft_audio_on_published",
     "20260719140000_clear_legacy_author_seed_description.sql": "data:authors.legacy_seed_description_cleared",
     "20260801120000_aurafon_bypass_product_moderation.sql": "data:authors.aurafon_bypass_product_moderation",
@@ -297,6 +295,33 @@ function testPromoFoundationSuperseded() {
   assert.equal(blocked.status, "REQUIRES_MANUAL_REVIEW");
 }
 
+function testArchiveStatusSupersededByUnpublished() {
+  const name = "20260715160000_archive_demo_catalog_practices.sql";
+  const sql = readMigration(name);
+  const built = buildProbesFromSql(name, sql);
+  const archived = built.probes.find((probe) => probe.id === "data:practices.demo_catalog_archived");
+  assert.equal(archived.supersededBy, "20260731180000");
+  const applied = classifyMigration({
+    filename: name,
+    sql,
+    probeResults: resultsFor(built, { "data:practices.demo_catalog_archived": "f" }),
+  });
+  assert.equal(applied.status, "PROVEN_APPLIED");
+  const ev = applied.evidence.find((row) => row.id === "data:practices.demo_catalog_archived");
+  assert.equal(ev.ok, false);
+  assert.equal(ev.satisfied, true);
+  assert.equal(ev.evidenceType, "superseded_by:20260731180000");
+  const missing = classifyMigration({
+    filename: name,
+    sql,
+    probeResults: resultsFor(built, {
+      "data:practices.demo_catalog_archived": "f",
+      "data:practices.demo_catalog_unpublished": "f",
+    }),
+  });
+  assert.equal(missing.status, "PROVEN_NOT_APPLIED");
+}
+
 function testSchemaHardenAndPlaylistFinalState() {
   const harden = "20260728190000_admin_analytics_p2_privileges_harden.sql";
   const hardenSql = readMigration(harden);
@@ -347,6 +372,7 @@ function main() {
   testThirteenHaveSelectProbes();
   testDataLineageAppliedAndNotApplied();
   testPromoFoundationSuperseded();
+  testArchiveStatusSupersededByUnpublished();
   testSchemaHardenAndPlaylistFinalState();
   console.log("migration-audit-unit: all tests passed");
 }
