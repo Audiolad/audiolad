@@ -27,6 +27,7 @@ import { BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/cont
 import { SHUM_VODY_DLYA_DETEY_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-detey.ts";
 import { SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-novorozhdennyh.ts";
 import { SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-iz-krana-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -1553,6 +1554,80 @@ const FORBIDDEN_COMPOSITION_KEYS = [
   "tracks",
 ];
 
+
+const TWENTY_FIRST_PAGE_SLUG = "muzyka-dlya-sna-slushat-onlayn";
+const SLEEP_MUSIC_PAGE = MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
+const TWENTY_FIRST_PAGE_H1 = "Музыка для сна – слушать онлайн бесплатно";
+const TWENTY_FIRST_PAGE_TITLE = "Музыка для сна – слушать онлайн бесплатно | АудиоЛад";
+const TWENTY_FIRST_PAGE_DESCRIPTION =
+  "Музыка для сна онлайн бесплатно: выберите спокойную композицию для вечернего отдыха и слушайте подходящую музыку перед сном на АудиоЛаде.";
+
+const TWENTY_FIRST_EXPECTED_INTRO = [
+  "Музыку для сна можно слушать онлайн бесплатно прямо на АудиоЛаде. В подборке собрана спокойная музыка для вечернего отдыха и сна, которую можно включить сразу на странице.",
+  "Выберите подходящую композицию, установите комфортную громкость и попробуйте разные варианты звучания.",
+];
+
+const TWENTY_FIRST_EXPECTED_SECTION_TITLES = [
+  "Какая музыка подходит для сна",
+  "Как слушать музыку перед сном",
+  "Музыка для сна онлайн бесплатно",
+  "Музыка для сна без слов",
+  "Спокойная музыка на ночь",
+  "Как выбрать музыку для сна",
+  "Лучшая музыка для сна – какая она",
+  "Какую громкость выбрать",
+  "Нужно ли слушать музыку всю ночь",
+  "Что делать, если музыка мешает расслабиться",
+  "Где слушать музыку для сна онлайн",
+  "Итог",
+];
+
+const TWENTY_FIRST_EXPECTED_FAQ = [
+  {
+    question: "Где можно слушать музыку для сна онлайн?",
+    answer: "На АудиоЛаде можно открыть подборку, выбрать подходящую композицию и запустить воспроизведение прямо на странице.",
+  },
+  {
+    question: "Можно ли слушать музыку для сна бесплатно?",
+    answer: "Да. Музыку в Public Playlist можно слушать онлайн бесплатно.",
+  },
+  {
+    question: "Какая музыка лучше подходит для сна?",
+    answer: "Чаще выбирают спокойные композиции без резких переходов и слишком насыщенной аранжировки. Но лучший вариант зависит от личного восприятия.",
+  },
+  {
+    question: "Лучше выбирать музыку для сна со словами или без слов?",
+    answer: "Это индивидуально. Некоторым удобнее инструментальная музыка, потому что текст не удерживает внимание. Другим спокойно слушается и музыка с вокалом.",
+  },
+  {
+    question: "Когда лучше включать музыку перед сном?",
+    answer: "Можно включить её заранее вечером, во время чтения, спокойных домашних дел или уже перед сном. Единого правильного времени нет.",
+  },
+  {
+    question: "Как выбрать комфортную громкость музыки?",
+    answer: "Начните с небольшой громкости. Музыка должна оставаться фоном и не раздражать или постоянно привлекать внимание.",
+  },
+  {
+    question: "Можно ли слушать музыку всю ночь?",
+    answer: "Можно слушать столько, сколько вам комфортно. Нет необходимости обязательно оставлять музыку включённой всю ночь.",
+  },
+  {
+    question: "Как выбрать спокойную музыку на ночь?",
+    answer: "Попробуйте несколько композиций и сравните темп, плотность аранжировки, инструменты и наличие вокала. Оставьте тот вариант, который субъективно кажется наиболее спокойным.",
+  },
+];
+
+const TWENTY_FIRST_FORBIDDEN_MEDICAL = [
+  "лечит бессонниц",
+  "лечит тревож",
+  "улучшает качество сна",
+  "делает сон глубже",
+  "ускоряет засыпание",
+  "обязательно расслабляет",
+  "необходима для хорошего сна",
+  "усыпляет",
+];
+
 function testDefinition() {
   const parsed = parseListenPageDefinition(
     MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE,
@@ -1839,6 +1914,9 @@ function testSignupCta() {
   const newbornContent = read("src/lib/seo/listens/content/shum-vody-dlya-novorozhdennyh.ts");
   assert(!newbornContent.includes(EIGHTEENTH_BOOKMARK_PHRASE), "newborn content file has no bookmark phrase");
   assert(!newbornContent.includes("🔖"), "newborn content file has no bookmark emoji");
+  const sleepMusicContent = read("src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts");
+  assert(!sleepMusicContent.includes(EIGHTEENTH_BOOKMARK_PHRASE), "sleep-music content file has no bookmark phrase");
+  assert(!sleepMusicContent.includes("🔖"), "sleep-music content file has no bookmark emoji");
   assert(cta.includes('data-listen-signup-cta'), "section keeps data-listen-signup-cta");
   assert(cta.includes("data-listen-bookmark-cta"), "bookmark has data attribute");
 }
@@ -3199,7 +3277,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3381,7 +3459,7 @@ function testTwelfthPage() {
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3556,7 +3634,7 @@ function testThirteenthPage() {
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3752,7 +3830,7 @@ function testFourteenthPage() {
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -3969,7 +4047,7 @@ function testFifteenthPage() {
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_SNA_PAGE.playlistSlug === "shum-vody",
@@ -4204,7 +4282,7 @@ function testSixteenthPage() {
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4441,7 +4519,7 @@ function testSeventeenthPage() {
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4678,7 +4756,7 @@ function testEighteenthPage() {
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_DETEY_PAGE.playlistSlug === "shum-vody",
@@ -4926,7 +5004,7 @@ function testNineteenthPage() {
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE.playlistSlug === "shum-vody",
@@ -5169,7 +5247,7 @@ function testTwentiethPage() {
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
-  assert(slugs.length === 20, "registry contains all 20 listen slugs");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5215,6 +5293,208 @@ function testTwentiethPage() {
   assert(!serialized.includes("🔖"), "twentieth JSON-LD has no bookmark emoji");
 }
 
+
+function testTwentyFirstPage() {
+  const parsed = parseListenPageDefinition(SLEEP_MUSIC_PAGE);
+  assert(parsed.ok, "twenty-first production definition valid");
+  assert(parsed.definition.slug === TWENTY_FIRST_PAGE_SLUG, "twenty-first page slug");
+  assert(parsed.definition.playlistSlug === "muzyka-dlya-sna", "twenty-first playlistSlug is muzyka-dlya-sna");
+  assert(
+    parsed.definition.playlistSlug !== PLAYLIST_SLUG,
+    "twenty-first playlistSlug is not the money playlist",
+  );
+  assert(
+    parsed.definition.playlistSlug !== TWENTY_FIRST_PAGE_SLUG,
+    "twenty-first playlistSlug is not the page slug",
+  );
+  assert(parsed.definition.h1 === TWENTY_FIRST_PAGE_H1, "twenty-first h1 exact");
+  assert(parsed.definition.title === TWENTY_FIRST_PAGE_TITLE, "twenty-first title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "twenty-first title !== h1");
+  assert(
+    parsed.definition.description === TWENTY_FIRST_PAGE_DESCRIPTION,
+    "twenty-first description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 2, "twenty-first page has two intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === TWENTY_FIRST_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === TWENTY_FIRST_EXPECTED_INTRO[1],
+    "twenty-first intro[0..1] verbatim",
+  );
+  assert(parsed.definition.sections.length === 12, "twenty-first page has 12 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      TWENTY_FIRST_EXPECTED_SECTION_TITLES.join("\n"),
+    "twenty-first page 12 section titles verbatim",
+  );
+  assert(
+    parsed.definition.sections.filter((section) => section.title === "Музыка для сна без слов").length === 1,
+    "twenty-first page has exactly one secondary без слов H2",
+  );
+  assert(
+    !parsed.definition.sections.some((section) => section.title === "успокаивающая музыка для сна"),
+    "twenty-first page has no успокаивающая H2",
+  );
+  assert(
+    !parsed.definition.sections.some((section) => section.title === "усыпляющая музыка для сна"),
+    "twenty-first page has no усыпляющая H2",
+  );
+  assert(parsed.definition.faq.length === 8, "twenty-first page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === TWENTY_FIRST_EXPECTED_FAQ[index].question &&
+        item.answer === TWENTY_FIRST_EXPECTED_FAQ[index].answer,
+    ),
+    "twenty-first page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "twenty-first page has no internalLinks");
+  assert(!("cta" in parsed.definition), "twenty-first page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `twenty-first page has no static ${key}`);
+  }
+
+  const allTextChunks = [
+    parsed.definition.h1,
+    parsed.definition.title,
+    parsed.definition.description,
+    ...parsed.definition.intro,
+    ...parsed.definition.sections.flatMap((section) => [
+      section.title,
+      ...(section.paragraphs ?? []),
+      ...(section.blocks ?? []).flatMap((block) => {
+        if (block.kind === "paragraph") return [block.text];
+        if (block.kind === "list") return block.items ?? [];
+        if (block.kind === "rich_paragraph") {
+          return (block.segments ?? []).map((segment) => segment.text ?? segment.label ?? "");
+        }
+        if (block.kind === "heading") return [block.title];
+        return [];
+      }),
+    ]),
+    ...parsed.definition.faq.flatMap((item) => [item.question, item.answer]),
+  ].join("\n");
+
+  assert(
+    allTextChunks.includes("не является способом лечения бессонницы"),
+    "twenty-first page keeps insomnia non-treatment sentence",
+  );
+  assert(
+    allTextChunks.includes("не гарантирует засыпание"),
+    "twenty-first page keeps no-sleep-guarantee sentence",
+  );
+  assert(
+    allTextChunks.split("гарантирует засыпание").length - 1 === 1,
+    "twenty-first page has only the negated sleep-guarantee wording",
+  );
+  assert(!allTextChunks.includes("без рекламы"), "twenty-first page has no без рекламы");
+  assert(!allTextChunks.includes("без рекламных вставок"), "twenty-first page has no без рекламных вставок");
+  assert(!allTextChunks.includes("no ads"), "twenty-first page has no no ads");
+  for (const term of TWENTY_FIRST_FORBIDDEN_MEDICAL) {
+    assert(!allTextChunks.includes(term), `twenty-first page has no medical term ${term}`);
+  }
+  assert(!allTextChunks.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-first definition has no bookmark phrase");
+  assert(!allTextChunks.includes("🔖"), "twenty-first definition has no bookmark emoji");
+  assert(!allTextChunks.includes("SEO-самопроверка"), "twenty-first definition has no SEO-самопроверка");
+  assert(!allTextChunks.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "twenty-first definition has no playlist placeholder");
+  assert(!allTextChunks.includes("[ДАЛЕЕ"), "twenty-first definition has no [ДАЛЕЕ leak");
+  assert(!allTextChunks.includes("https://audiolad.ru/listens/"), "twenty-first definition has no production listen URLs");
+  assert(!allTextChunks.includes("/listens/"), "twenty-first definition has no invented listen hrefs");
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 0, "twenty-first page has no internal title-anchors");
+
+  const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts");
+  assert(
+    !contentSource.includes("https://audiolad.ru/listens/"),
+    "twenty-first content file has no production listen URLs",
+  );
+  assert(!contentSource.includes("https://"), "twenty-first content file has no https://");
+  assert(
+    !contentSource.includes("SEO-самопроверка"),
+    "twenty-first content file has no SEO-самопроверка",
+  );
+  assert(
+    !contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"),
+    "twenty-first content file has no playlist placeholder",
+  );
+  assert(!contentSource.includes("[ДАЛЕЕ"), "twenty-first content file has no [ДАЛЕЕ");
+  assert(!contentSource.includes("🔖"), "twenty-first content file has no bookmark emoji");
+  assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-first content file has no bookmark phrase");
+  assert(!contentSource.includes("без рекламы"), "twenty-first content file has no без рекламы");
+  assert(!contentSource.includes("href:"), "twenty-first content file has no href fields");
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
+  assert(slugs.includes(SECOND_PAGE_SLUG), "registry contains second listen slug");
+  assert(slugs.includes(THIRD_PAGE_SLUG), "registry contains third listen slug");
+  assert(slugs.includes(FOURTH_PAGE_SLUG), "registry contains fourth listen slug");
+  assert(slugs.includes(FIFTH_PAGE_SLUG), "registry contains fifth listen slug");
+  assert(slugs.includes(SIXTH_PAGE_SLUG), "registry contains sixth listen slug");
+  assert(slugs.includes(SEVENTH_PAGE_SLUG), "registry contains seventh listen slug");
+  assert(slugs.includes(EIGHTH_PAGE_SLUG), "registry contains eighth listen slug");
+  assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
+  assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
+  assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
+  assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
+  assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
+  assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
+  assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
+  assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
+  assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
+  assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
+  assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
+  assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
+  assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
+  assert(slugs.length === 21, "registry contains all 21 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
+    "twenty-first page playlistSlug is muzyka-dlya-sna",
+  );
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(
+    undefined,
+    "https://audiolad.ru",
+  );
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${TWENTY_FIRST_PAGE_SLUG}`).length === 1,
+    "sitemap contains twenty-first listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: "muzyka-dlya-sna",
+          title: "Музыка для сна | Успокаивающая музыка для сна | Усыпляющая музыка для сна",
+        },
+      }),
+    },
+  });
+  assert(data, "twenty-first page resolves against muzyka-dlya-sna playlist");
+  assert(data.playlist.playlist.slug === "muzyka-dlya-sna", "resolved playlist slug is muzyka-dlya-sna");
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "twenty-first JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "twenty-first JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "twenty-first JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "twenty-first JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "twenty-first JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "twenty-first JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "twenty-first JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "twenty-first JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "twenty-first JSON-LD no primaryPractice");
+  assert(!serialized.includes("Medical"), "twenty-first JSON-LD no medical schema");
+  assert(!serialized.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-first JSON-LD has no bookmark phrase");
+  assert(!serialized.includes("🔖"), "twenty-first JSON-LD has no bookmark emoji");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -5237,6 +5517,7 @@ const tests = [
   ["eighteenth listen page", testEighteenthPage],
   ["nineteenth listen page", testNineteenthPage],
   ["twentieth listen page", testTwentiethPage],
+  ["twenty-first listen page", testTwentyFirstPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],

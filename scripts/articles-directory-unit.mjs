@@ -47,6 +47,7 @@ import { BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/cont
 import { SHUM_VODY_DLYA_DETEY_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-detey.ts";
 import { SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE } from "../src/lib/seo/listens/content/shum-vody-dlya-novorozhdennyh.ts";
 import { SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/shum-vody-iz-krana-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -863,6 +864,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${twentiethListenHref}`,
     ),
     "directory JSON-LD includes twentieth listen href",
+  );
+
+  const twentyFirstListenHref = "/listens/muzyka-dlya-sna-slushat-onlayn";
+  const twentyFirstListenCard = data.articles.find((card) => card.href === twentyFirstListenHref);
+  assert(twentyFirstListenCard, "twenty-first indexable listen page is listed");
+  assert(
+    twentyFirstListenCard.title === "Музыка для сна – слушать онлайн бесплатно | АудиоЛад",
+    "twenty-first listen directory title",
+  );
+  assert(
+    twentyFirstListenCard.description === MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "twenty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for twenty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-first listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
