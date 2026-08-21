@@ -263,7 +263,7 @@ Public slug генерируется только сервером (трансл
 
 ## practices / audio_items — обложки (per-track covers)
 
-Миграция: `supabase/migrations/20260716180000_per_track_covers.sql`.  
+Миграция: `supabase/migrations/20260716181000_per_track_covers.sql`.  
 **На production пока не применялась.**
 
 ### practices (дополнительно)

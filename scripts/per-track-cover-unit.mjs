@@ -28,7 +28,7 @@ function isCoverVisible(failed, trackId, url) {
 
 function testMigrationContract() {
   const sql = readSource(
-    "supabase/migrations/20260716180000_per_track_covers.sql",
+    "supabase/migrations/20260716181000_per_track_covers.sql",
   );
 
   assert(sql.includes("use_shared_cover"), "practices.use_shared_cover column");

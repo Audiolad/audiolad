@@ -4,56 +4,111 @@ Automatic rollback concerns **the application only**.
 
 The production database is **never rolled back automatically**.
 
-## Official apply mechanism (production deploy)
+## Production is self-hosted Supabase (Timeweb VPS)
 
-Audiolad applies `supabase/migrations/` during production deploy with the official
-pinned Supabase CLI. Not PostgREST, not `psql`, not ad-hoc SQL.
+Audiolad production is **self-hosted Supabase on a Timeweb VPS**, not Supabase Cloud.
 
-- CLI pin: `supabase@2.115.0` via `npx --yes --package=supabase@2.115.0 supabase`
-  (or `$RELEASE_DIR/node_modules/.bin/supabase` when that exact 2.115.0 binary exists).
-- Never use `@latest`. Do not add `supabase` to `package.json`.
-- Commands:
-  - `supabase migration list --db-url "$SUPABASE_DB_URL"`
-  - `supabase db push --db-url "$SUPABASE_DB_URL" --yes`
-- History table: `supabase_migrations.schema_migrations`.
-- The first `db push` against empty history would create that table and try to
-  apply every local file. That is forbidden on live Audiolad. Deploy fails
-  closed with `database_migration_history_uninitialized` and does not apply.
+- App URL: `https://audiolad.ru`
+- Postgres container (default): `supabase-db` (override `AUDIOLAD_SUPABASE_DB_CONTAINER`)
+- Pooler container: `supabase-pooler`
+- Listeners: `127.0.0.1:5432` / `127.0.0.1:6543`
+- Config lives at `/opt/supabase/docker` (do not edit production config from app deploys)
+- Deploy target: `docker exec <container> psql -U postgres -d postgres`
+- No Cloud dashboard. Do not pass a superuser URL to Next.js.
+- `SUPABASE_DB_URL` is **not** required in application `.env.production`.
+
+## Official apply mechanism (ordinary deploy)
+
+After a successful **one-time baseline** (history already has rows), `deploy.sh` applies
+pending `supabase/migrations/` files from the **candidate release directory** via
+docker-exec. Not PostgREST, not `supabase db push`, not Cloud.
+
+1. Preflight: docker available, container exists, status `running`, `select 1` works.
+   Fail closed: `database_migration_target_unavailable`.
+2. List local versions from `RELEASE_DIR/supabase/migrations` (**1 file = 1 version**).
+3. List remote versions from `supabase_migrations.schema_migrations` via `docker exec psql`.
+4. `pending = local - remote`. Holes (pending older than max remote) abort:
+   `database_migration_history_drift`.
+5. Apply each pending file exactly once:
+   `docker exec -i <container> psql -U postgres -d postgres -v ON_ERROR_STOP=1 < file.sql`
+   then `INSERT` the official history row (`ON CONFLICT DO NOTHING`).
+6. Verify `pending=0`.
+7. Then candidate start / Nginx cutover.
+
+If `schema_migrations` schema/table is missing **or empty**, ordinary deploy aborts:
+`database_migration_history_uninitialized`. That is the current production state
+until the one-time baseline has been applied.
 
 The stage runs from the candidate release directory (the target SHA extracted by
 `git archive`), never from `/current`, never from a dirty `GIT_WORKDIR` tree.
+It does not take an extra flock. Secrets in docker/psql output are redacted.
 
-## Secret
+## One-time baseline (not hooked into deploy.sh)
 
-The only extra production secret is `SUPABASE_DB_URL` (percent-encoded Postgres
-URL). Store it in:
-
-`/var/www/audiolad-deploy/shared/.env.production`
-
-- Never commit it.
-- Never log it. Deploy redacts CLI stdout/stderr.
-- Service-role (`SUPABASE_SERVICE_ROLE_KEY`) is not enough and must not be used
-  to execute SQL via PostgREST.
-
-## How to check `migration list`
-
-On the deploy host, after the secret is present (do not print the URL):
+Use the read-only audit, then the explicit baseline. Do **not** run `--apply`
+until a backup exists. Do **not** execute historical SQL. Do **not** UPDATE Olga.
 
 ```bash
-npx --yes --package=supabase@2.115.0 supabase migration list --db-url "$SUPABASE_DB_URL"
+# Read-only audit (default: inject fixture / probe builder).
+# On the VPS, set AUDIOLAD_MIGRATION_AUDIT_EXEC=1 to run SELECT probes.
+bash deploy/scripts/audit-production-migrations.sh \
+  --migrations-dir supabase/migrations \
+  --out /tmp/audiolad-migration-audit.json
+
+# Dry-run (default): zero mutations. Prints backup recommendation, DB identity,
+# public-table fingerprint, and versions that WOULD be registered.
+bash deploy/scripts/baseline-schema-migrations.sh \
+  --dry-run \
+  --from /tmp/audiolad-migration-audit.json
+
+# Apply only after a real backup. Do not run this from a laptop checkout.
+# bash deploy/scripts/baseline-schema-migrations.sh \
+#   --apply --i-have-backup \
+#   --from /tmp/audiolad-migration-audit.json
 ```
 
-The table columns are LOCAL | REMOTE | TIME (UTC):
+Recommended backup (print-only from the script; run it yourself on the VPS):
 
-- LOCAL = files in `supabase/migrations/`
-- REMOTE = rows in `supabase_migrations.schema_migrations`
+```bash
+docker exec supabase-db pg_dump -U postgres -d postgres -Fc -f /tmp/audiolad-pre-baseline.dump
+# or checkpoint the Docker volume used by /opt/supabase/docker
+```
 
-Pending = LOCAL versions that are not REMOTE. Deploy applies only that suffix
-when it is strictly newer than `max(REMOTE)`.
+Baseline registers **PROVEN_APPLIED** versions only. It refuses
+`REQUIRES_MANUAL_REVIEW`. It does not register `PROVEN_NOT_APPLIED`.
+It creates the official table if missing:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS supabase_migrations;
+CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+  version text PRIMARY KEY,
+  statements text[],
+  name text
+);
+```
+
+`version` stays the primary key so a later `supabase migration list` remains compatible.
+
+## Duplicate history
+
+Several files originally shared a timestamp prefix. They were renamed so that
+**1 file = 1 version**. See `deploy/migration-baseline/DUPLICATE_VERSION_MAPPING.md`.
+`scripts/duplicate-migration-versions-unit.mjs` fails if any timestamp is reused.
+
+## How to inspect history on the VPS
+
+```bash
+docker exec supabase-db psql -U postgres -d postgres -c \
+  "SELECT version, name FROM supabase_migrations.schema_migrations ORDER BY version;"
+```
+
+Pending = local filename versions that are not remote rows. Deploy applies only
+the suffix when it is strictly newer than `max(REMOTE)`.
 
 ## Normal deploy flow
+
 If the migration stage fails, the candidate is never started.
-current and Nginx stay on the old release.
+`current` and Nginx stay on the old release.
 
 Logs:
 
@@ -62,24 +117,27 @@ Logs:
 - database_migration_apply_started / database_migration_apply_succeeded
 - database_migrations_pending_after=0
 - or database_migration_failed plus a fail-closed code
+  (`database_migration_target_unavailable`,
+   `database_migration_history_uninitialized`,
+   `database_migration_history_drift`)
 
 ## Drift
 
 If any pending local version is older than max(remote), deploy aborts with
-database_migration_history_drift. It does not repair history.
+`database_migration_history_drift`. It does not repair history.
 
 Do not repair blindly. Compare release migration files with
-supabase_migrations.schema_migrations and supabase migration list, then decide.
+`supabase_migrations.schema_migrations`, then decide.
 
-Empty remote plus nonempty local is uninitialized history and is also fail-closed.
+Empty or missing remote history is uninitialized and is also fail-closed.
 
 ## Schema change rules
 
-1. Never edit the production schema outside migration files.
+1. Never edit the production schema outside migration files except a documented emergency.
 2. Migrations must stay backward compatible with the old app (expand / contract).
 3. Add new columns/tables first. Drop old columns only in a later release.
 4. Destructive SQL needs a separate confirmation.
-5. Take a backup before substantial migrations.
+5. Take a backup before substantial migrations and before the one-time baseline.
 
 Expand / contract:
 
@@ -91,7 +149,7 @@ Expand / contract:
 
 ## App rollback after an applied migration
 
-If db push succeeded and a later deploy step fails, rollback restores the
+If docker-exec apply succeeded and a later deploy step fails, rollback restores the
 old app against the new schema.
 
 - Safe only when the migration was expand-only / backward compatible.
@@ -103,6 +161,9 @@ old app against the new schema.
 
 - Does not production-deploy.
 - Does not apply migrations to production from this checkout.
+- Does not `docker exec` against a real `supabase-db`.
+- Does not run `baseline --apply`.
 - Does not change Olga data. The Olga entitlement file is applied only when a
   future production deploy runs this stage against a remote history that already
-  contains every older version.
+  contains every older version, or when the live audit proves it is already applied
+  and the baseline registers that version.

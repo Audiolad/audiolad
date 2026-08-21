@@ -46,8 +46,8 @@
 | Migration | Назначение |
 |-----------|------------|
 | `20260716150000_practice_guest_promo_funnel.sql` | guest funnel MVP (ранее) |
-| `20260716180000_per_track_covers.sql` | `practices.use_shared_cover` — без неё `/listen/*` падает |
-| `20260716190000_claim_promo_practice_by_id.sql` | RPC claim by UUID + slug |
+| `20260716181000_per_track_covers.sql` | `practices.use_shared_cover` — без неё `/listen/*` падает |
+| `20260716191000_claim_promo_practice_by_id.sql` | RPC claim by UUID + slug |
 
 ## Файлы fix
 
@@ -58,7 +58,7 @@ src/components/audio/ListenPageClient.tsx
 src/app/practice/[...segments]/page.tsx
 src/lib/promo/complete-signup-api.ts
 src/app/api/promo/complete-signup/route.ts
-supabase/migrations/20260716190000_claim_promo_practice_by_id.sql
+supabase/migrations/20260716191000_claim_promo_practice_by_id.sql
 scripts/promo-signup-claim-unit.mjs
 ```
 

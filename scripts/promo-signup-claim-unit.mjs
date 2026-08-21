@@ -81,7 +81,7 @@ function testCompleteSignupApi() {
 
 function testClaimRpcMigration() {
   const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716190000_claim_promo_practice_by_id.sql",
+    "/var/www/audiolad/supabase/migrations/20260716191000_claim_promo_practice_by_id.sql",
     "utf8",
   );
 

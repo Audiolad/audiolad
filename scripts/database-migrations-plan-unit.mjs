@@ -7,6 +7,9 @@ import {
   normalizeVersion,
   versionsFromMigrationFilenames,
   parseMigrationListOutput,
+  parsePsqlVersionList,
+  listLocalMigrationFiles,
+  classifyRemoteHistory,
   planDatabaseMigrations,
   redactMigrationSecrets,
 } from "../deploy/scripts/lib/database-migrations-plan.mjs";
@@ -180,6 +183,25 @@ function testCliModes() {
   assert.equal(redacted.stdout.includes("super-secret-pass"), false);
 }
 
+
+function testPsqlVersionListAndHistory() {
+  const parsed = parsePsqlVersionList("20260819183000\n20260821140000\n");
+  assert.deepEqual(parsed, ["20260819183000", "20260821140000"]);
+  assert.equal(classifyRemoteHistory({ tableExists: false }).code, "database_migration_history_uninitialized");
+  assert.equal(classifyRemoteHistory({ tableExists: true, versions: [] }).code, "database_migration_history_uninitialized");
+  assert.equal(classifyRemoteHistory({ tableExists: true, versions: ["20260819183000"] }).status, "ready");
+}
+
+function testRepoOneFileOneVersion() {
+  const listed = listLocalMigrationFiles(join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"));
+  assert.equal(listed.duplicates.length, 0, JSON.stringify(listed.duplicates));
+  assert.equal(listed.files.length, listed.versions.length);
+  assert.ok(listed.files.some((row) => row.filename === "20260716181000_per_track_covers.sql"));
+  assert.ok(listed.files.some((row) => row.filename === "20260716182000_promotion_campaigns.sql"));
+  assert.ok(listed.files.some((row) => row.filename === "20260716191000_claim_promo_practice_by_id.sql"));
+  assert.ok(listed.files.some((row) => row.filename === "20260728121000_practice_content_sale_lock.sql"));
+}
+
 function main() {
   testNormalizeAndFilenames();
   testParseTableAndJson();
@@ -190,6 +212,8 @@ function main() {
   testOlgaPendingAfterOlderRemotes();
   testRedactHidesPostgresUrlAndServiceRole();
   testCliModes();
+  testPsqlVersionListAndHistory();
+  testRepoOneFileOneVersion();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 
