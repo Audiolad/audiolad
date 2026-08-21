@@ -51,6 +51,17 @@ function main() {
   );
   assert.match(migration, /create_author_project/);
 
+  const olgaMigration = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260821140000_olga_nevskaya_author_project_limit_override.sql",
+    ),
+    "utf8",
+  );
+  assert.match(olgaMigration, /olganevska@yandex\.ru/);
+  assert.match(olgaMigration, /author_project_limit_override = 5/);
+  assert.doesNotMatch(olgaMigration, /INSERT INTO public\.authors/i);
+
   const hasOverride = psql(`
     SELECT count(*)::text
     FROM information_schema.columns
@@ -108,6 +119,83 @@ function main() {
   `);
   assert.equal(effective, "5");
   assert.ok(Number(owned) < Number(effective), "Sergey should have free slots (3 of 5)");
+
+  const olgaId = psql(`
+    SELECT id::text
+    FROM (
+      SELECT p.id
+      FROM public.profiles AS p
+      WHERE public.normalize_contact_email(p.email) = public.normalize_contact_email('olganevska@yandex.ru')
+      UNION ALL
+      SELECT u.id
+      FROM auth.users AS u
+      WHERE public.normalize_contact_email(u.email) = public.normalize_contact_email('olganevska@yandex.ru')
+    ) AS found
+    LIMIT 1;
+  `);
+
+  if (olgaId) {
+    const olgaOwnedBefore = psql(`
+      SELECT count(*)::text
+      FROM public.author_members
+      WHERE user_id = '${olgaId}'
+        AND role = 'owner';
+    `);
+    const olgaLimit = psql(`
+      SELECT coalesce(author_project_limit_override::text, 'null')
+      FROM public.profiles
+      WHERE id = '${olgaId}';
+    `);
+    assert.equal(olgaLimit, "5", "Olga override must be 5");
+
+    psql(`
+      UPDATE public.profiles
+      SET author_project_limit_override = 5
+      WHERE id = '${olgaId}';
+    `);
+
+    const olgaLimitAfter = psql(`
+      SELECT author_project_limit_override::text
+      FROM public.profiles
+      WHERE id = '${olgaId}';
+    `);
+    assert.equal(olgaLimitAfter, "5");
+
+    const olgaOwnedAfter = psql(`
+      SELECT count(*)::text
+      FROM public.author_members
+      WHERE user_id = '${olgaId}'
+        AND role = 'owner';
+    `);
+    assert.equal(
+      olgaOwnedAfter,
+      olgaOwnedBefore,
+      "re-applying Olga entitlement must not create authors",
+    );
+  } else {
+    console.log("author-multi-project-sql-unit: Olga account not in test DB; email grant checked via migration text");
+  }
+
+  const ordinaryOverrideCount = psql(`
+    SELECT count(*)::text
+    FROM public.profiles
+    WHERE author_project_limit_override = 5
+      AND id <> 'e5d273d0-9b4d-4e0e-836a-bdcf0332b9bb'
+      AND id::text <> coalesce(
+        (
+          SELECT id::text
+          FROM public.profiles
+          WHERE public.normalize_contact_email(email) = public.normalize_contact_email('olganevska@yandex.ru')
+          LIMIT 1
+        ),
+        ''
+      );
+  `);
+  assert.equal(
+    ordinaryOverrideCount,
+    "0",
+    "ordinary authors must not inherit the manual 5-project entitlement",
+  );
 
   console.log("author-multi-project-sql-unit: ok");
 }
