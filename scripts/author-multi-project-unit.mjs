@@ -83,6 +83,34 @@ function main() {
     false,
   );
 
+  // 5b. Olga Nevskaya: keep existing 1 artist, allow 4 more, block a 6th
+  const olga = resolveEffectiveAuthorProjectLimit({
+    override: 5,
+    premiumEnabled: false,
+  });
+  assert.equal(olga.limit, 5);
+  assert.equal(olga.source, "override");
+  assert.equal(canCreateOwnedAuthorProject(1, 5), true);
+  assert.equal(canCreateOwnedAuthorProject(4, 5), true);
+  assert.equal(canCreateOwnedAuthorProject(5, 5), false);
+  assert.equal(
+    shouldShowPremiumProjectUpsell({ used: 5, limit: 5, source: "override" }),
+    false,
+  );
+  assert.match(
+    getAuthorProjectLimitReachedMessage({ used: 5, limit: 5, source: "override" }),
+    /5 из 5/,
+  );
+
+  // Ordinary author does not inherit Olga/Sergey override
+  const ordinary = resolveEffectiveAuthorProjectLimit({
+    override: null,
+    premiumEnabled: false,
+  });
+  assert.equal(ordinary.limit, 1);
+  assert.equal(ordinary.source, "default");
+  assert.equal(ordinary.hasOverride, false);
+
   // 6. Selection isolation + cookie
   const selected = resolveSelectedAuthorWorkspace(projects, {
     querySlug: "zoya-petrova",
@@ -118,6 +146,18 @@ function main() {
   assert.match(migration, /author_project_limit_override = 5/);
   assert.match(migration, /protect_profiles_author_project_limit_columns/);
   assert.match(migration, /pg_advisory_xact_lock/);
+
+  const olgaMigration = read(
+    "supabase/migrations/20260821140000_olga_nevskaya_author_project_limit_override.sql",
+  );
+  assert.match(olgaMigration, /olganevska@yandex\.ru/);
+  assert.match(olgaMigration, /author_project_limit_override = 5/);
+  assert.match(olgaMigration, /normalize_contact_email/);
+  assert.match(olgaMigration, /auth\.users/);
+  assert.match(olgaMigration, /email_contacts/);
+  assert.doesNotMatch(olgaMigration, /INSERT INTO public\.authors/i);
+  assert.doesNotMatch(olgaMigration, /INSERT INTO public\.author_members/i);
+  assert.doesNotMatch(olgaMigration, /e5d273d0-9b4d-4e0e-836a-bdcf0332b9bb/);
 
   const route = read("src/app/api/author/projects/route.ts");
   assert.match(route, /createAuthorProjectViaRpc/);
