@@ -167,3 +167,15 @@ old app against the new schema.
   future production deploy runs this stage against a remote history that already
   contains every older version, or when the live audit proves it is already applied
   and the baseline registers that version.
+
+
+## Lineage probes and superseded objects
+
+Some historical files have no auto-extracted schema objects, or later files
+DROP / REPLACE their triggers, policies, constraints, or data post-checks.
+
+`deploy/scripts/lib/migration-audit-lineage.mjs` adds read-only SELECT probes
+for those versions. If a later migration replaced an object, the missing
+original probe is marked `superseded_by:<version>` when the replacement is
+present. That is still `PROVEN_APPLIED`. See
+`deploy/migration-baseline/MANUAL_REVIEW_LINEAGE.md`.
