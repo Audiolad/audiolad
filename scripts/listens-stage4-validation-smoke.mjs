@@ -1631,6 +1631,13 @@ const TWENTY_FIRST_FORBIDDEN_MEDICAL = [
   "усыпляет",
 ];
 
+const TWENTY_FIRST_SOOTHING_HREF = "/listens/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn";
+const TWENTY_FIRST_SOOTHING_LABEL = "успокаивающая музыка для сна";
+const TWENTY_FIRST_SLEEP_INDUCING_HREF = "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn";
+const TWENTY_FIRST_SLEEP_INDUCING_LABEL = "усыпляющая музыка для сна";
+const TWENTY_FIRST_NO_LYRICS_HREF = "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn";
+const TWENTY_FIRST_NO_LYRICS_LABEL = "музыка для сна без слов";
+
 
 const TWENTY_SECOND_PAGE_SLUG = "uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn";
 const SOOTHING_SLEEP_MUSIC_PAGE = USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE;
@@ -1697,6 +1704,10 @@ const TWENTY_SECOND_EXPECTED_FAQ = [
 
 const TWENTY_SECOND_HUB_HREF = "/listens/muzyka-dlya-sna-slushat-onlayn";
 const TWENTY_SECOND_HUB_LABEL = "Музыка для сна – слушать онлайн бесплатно";
+const TWENTY_SECOND_SLEEP_INDUCING_HREF = "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn";
+const TWENTY_SECOND_SLEEP_INDUCING_LABEL = "усыпляющая музыка для сна";
+const TWENTY_SECOND_NO_LYRICS_HREF = "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn";
+const TWENTY_SECOND_NO_LYRICS_LABEL = "музыка для сна без слов";
 
 const TWENTY_SECOND_FORBIDDEN_MEDICAL = [
   "лечит бессонниц",
@@ -1777,6 +1788,8 @@ const TWENTY_THIRD_SOOTHING_HREF = "/listens/uspokaivayushchaya-muzyka-dlya-sna-
 const TWENTY_THIRD_SOOTHING_LABEL = "Успокаивающая музыка для сна – слушать онлайн бесплатно";
 const TWENTY_THIRD_HUB_HREF = "/listens/muzyka-dlya-sna-slushat-onlayn";
 const TWENTY_THIRD_HUB_LABEL = "подборку музыки для сна";
+const TWENTY_THIRD_NO_LYRICS_HREF = "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn";
+const TWENTY_THIRD_NO_LYRICS_LABEL = "музыка для сна без слов";
 
 const TWENTY_THIRD_FORBIDDEN_MEDICAL = [
   "лечит бессонниц",
@@ -5653,11 +5666,56 @@ function testTwentyFirstPage() {
   assert(!allTextChunks.includes("https://audiolad.ru/listens/"), "twenty-first definition has no production listen URLs");
   assert(!allTextChunks.includes("/listens/"), "twenty-first definition has no invented listen hrefs");
 
+  const noLyricsSection = parsed.definition.sections.find((section) => section.id === "muzyka-dlya-sna-bez-slov");
+  assert(noLyricsSection, "twenty-first page has no-lyrics section");
+  const nightSection = parsed.definition.sections.find((section) => section.id === "spokoynaya-muzyka-na-noch");
+  assert(nightSection, "twenty-first page has night-music section");
+  const howToListenSection = parsed.definition.sections.find((section) => section.id === "kak-slushat-muzyku-pered-snom");
+  assert(howToListenSection, "twenty-first page has how-to-listen section");
+
   const allLinks = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "twenty-first page has no internal title-anchors");
+  assert(allLinks.length === 3, "twenty-first page has exactly three internal title-anchors");
+  const soothingLinks = allLinks.filter((link) => link.href === TWENTY_FIRST_SOOTHING_HREF);
+  assert(soothingLinks.length === 1, "twenty-first page has one soothing phrase link");
+  assert(soothingLinks[0].label === TWENTY_FIRST_SOOTHING_LABEL, "twenty-first soothing label is exact phrase");
+  const sleepInducingLinks = allLinks.filter((link) => link.href === TWENTY_FIRST_SLEEP_INDUCING_HREF);
+  assert(sleepInducingLinks.length === 1, "twenty-first page has one sleep-inducing phrase link");
+  assert(sleepInducingLinks[0].label === TWENTY_FIRST_SLEEP_INDUCING_LABEL, "twenty-first sleep-inducing label is exact phrase");
+  const noLyricsLinks = allLinks.filter((link) => link.href === TWENTY_FIRST_NO_LYRICS_HREF);
+  assert(noLyricsLinks.length === 1, "twenty-first page has one no-lyrics phrase link");
+  assert(noLyricsLinks[0].label === TWENTY_FIRST_NO_LYRICS_LABEL, "twenty-first no-lyrics label is exact phrase");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `twenty-first link label is not a URL: ${link.label}`);
+    assert(!String(link.label).includes("/listens/"), `twenty-first link label is not a path: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `twenty-first href is site-relative: ${link.href}`);
+  }
+  const dests = new Set(allLinks.map((link) => link.href));
+  assert(dests.size === 3, "twenty-first page uses exactly three internal destinations");
+  assert(dests.has(TWENTY_FIRST_SOOTHING_HREF), "twenty-first destinations include soothing page");
+  assert(dests.has(TWENTY_FIRST_SLEEP_INDUCING_HREF), "twenty-first destinations include sleep-inducing page");
+  assert(dests.has(TWENTY_FIRST_NO_LYRICS_HREF), "twenty-first destinations include no-lyrics page");
+
+  const noLyricsSectionLinks = (noLyricsSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(noLyricsSectionLinks.length === 1, "no-lyrics section has one no-lyrics link");
+  assert(noLyricsSectionLinks[0].href === TWENTY_FIRST_NO_LYRICS_HREF, "no-lyrics section dest is no-lyrics page");
+  assert(noLyricsSectionLinks[0].label === TWENTY_FIRST_NO_LYRICS_LABEL, "no-lyrics section label is exact phrase");
+  const nightSectionLinks = (nightSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(nightSectionLinks.length === 1, "night-music section has one soothing link");
+  assert(nightSectionLinks[0].href === TWENTY_FIRST_SOOTHING_HREF, "night-music section dest is soothing page");
+  assert(nightSectionLinks[0].label === TWENTY_FIRST_SOOTHING_LABEL, "night-music section label is exact phrase");
+  const howToListenSectionLinks = (howToListenSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(howToListenSectionLinks.length === 1, "how-to-listen section has one sleep-inducing link");
+  assert(howToListenSectionLinks[0].href === TWENTY_FIRST_SLEEP_INDUCING_HREF, "how-to-listen section dest is sleep-inducing page");
+  assert(howToListenSectionLinks[0].label === TWENTY_FIRST_SLEEP_INDUCING_LABEL, "how-to-listen section label is exact phrase");
 
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-slushat-onlayn.ts");
   assert(
@@ -5677,7 +5735,12 @@ function testTwentyFirstPage() {
   assert(!contentSource.includes("🔖"), "twenty-first content file has no bookmark emoji");
   assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-first content file has no bookmark phrase");
   assert(!contentSource.includes("без рекламы"), "twenty-first content file has no без рекламы");
-  assert(!contentSource.includes("href:"), "twenty-first content file has no href fields");
+  assert(contentSource.includes(TWENTY_FIRST_SOOTHING_HREF), "twenty-first content file has soothing href");
+  assert(contentSource.includes(TWENTY_FIRST_SOOTHING_LABEL), "twenty-first content file has soothing label");
+  assert(contentSource.includes(TWENTY_FIRST_SLEEP_INDUCING_HREF), "twenty-first content file has sleep-inducing href");
+  assert(contentSource.includes(TWENTY_FIRST_SLEEP_INDUCING_LABEL), "twenty-first content file has sleep-inducing label");
+  assert(contentSource.includes(TWENTY_FIRST_NO_LYRICS_HREF), "twenty-first content file has no-lyrics href");
+  assert(contentSource.includes(TWENTY_FIRST_NO_LYRICS_LABEL), "twenty-first content file has no-lyrics label");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
@@ -5746,6 +5809,9 @@ function testTwentyFirstPage() {
   assert(!serialized.includes("Medical"), "twenty-first JSON-LD no medical schema");
   assert(!serialized.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-first JSON-LD has no bookmark phrase");
   assert(!serialized.includes("🔖"), "twenty-first JSON-LD has no bookmark emoji");
+  assert(!serialized.includes("https://audiolad.ru/listens/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn"), "twenty-first JSON-LD does not leak raw soothing URL as visible label source");
+  assert(!serialized.includes("https://audiolad.ru/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn"), "twenty-first JSON-LD does not leak raw sleep-inducing URL as visible label source");
+  assert(!serialized.includes("https://audiolad.ru/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn"), "twenty-first JSON-LD does not leak raw no-lyrics URL as visible label source");
 }
 
 
@@ -5863,15 +5929,48 @@ function testTwentySecondPage() {
   assert(calmSection, "twenty-second page has Спокойная музыка для сна section");
   const richBlocks = (calmSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(richBlocks.length === 1, "calm-music section has exactly one rich_paragraph");
+  const differenceSection = parsed.definition.sections.find((section) => section.id === "chem-uspokaivayushchaya-muzyka-otlichaetsya-ot-usyplyayushchey");
+  assert(differenceSection, "twenty-second page has sleep-inducing-difference section");
+  const noLyricsSection = parsed.definition.sections.find((section) => section.id === "luchshe-muzyka-so-slovami-ili-bez-slov");
+  assert(noLyricsSection, "twenty-second page has no-lyrics-park section");
+
   const allLinks = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "twenty-second page has exactly one internal title-anchor");
-  assert(allLinks[0].href === TWENTY_SECOND_HUB_HREF, "twenty-second link href is hub path");
-  assert(allLinks[0].label === TWENTY_SECOND_HUB_LABEL, "twenty-second link label is hub title");
-  assert(!String(allLinks[0].label).includes("https://"), "twenty-second link label is not a URL");
-  assert(!String(allLinks[0].label).includes("/listens/"), "twenty-second link label is not a path");
+  assert(allLinks.length === 3, "twenty-second page has exactly three internal title-anchors");
+  const hubLinks = allLinks.filter((link) => link.href === TWENTY_SECOND_HUB_HREF);
+  assert(hubLinks.length === 1, "twenty-second page has one hub title-only link");
+  assert(hubLinks[0].label === TWENTY_SECOND_HUB_LABEL, "twenty-second hub label is hub title");
+  const sleepInducingLinks = allLinks.filter((link) => link.href === TWENTY_SECOND_SLEEP_INDUCING_HREF);
+  assert(sleepInducingLinks.length === 1, "twenty-second page has one sleep-inducing phrase link");
+  assert(sleepInducingLinks[0].label === TWENTY_SECOND_SLEEP_INDUCING_LABEL, "twenty-second sleep-inducing label is exact phrase");
+  const noLyricsLinks = allLinks.filter((link) => link.href === TWENTY_SECOND_NO_LYRICS_HREF);
+  assert(noLyricsLinks.length === 1, "twenty-second page has one no-lyrics phrase link");
+  assert(noLyricsLinks[0].label === TWENTY_SECOND_NO_LYRICS_LABEL, "twenty-second no-lyrics label is exact phrase");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `twenty-second link label is not a URL: ${link.label}`);
+    assert(!String(link.label).includes("/listens/"), `twenty-second link label is not a path: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `twenty-second href is site-relative: ${link.href}`);
+  }
+  const dests = new Set(allLinks.map((link) => link.href));
+  assert(dests.size === 3, "twenty-second page uses exactly three internal destinations");
+  assert(dests.has(TWENTY_SECOND_HUB_HREF), "twenty-second destinations include hub page");
+  assert(dests.has(TWENTY_SECOND_SLEEP_INDUCING_HREF), "twenty-second destinations include sleep-inducing page");
+  assert(dests.has(TWENTY_SECOND_NO_LYRICS_HREF), "twenty-second destinations include no-lyrics page");
+
+  const differenceLinks = (differenceSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(differenceLinks.length === 1, "difference section has one sleep-inducing link");
+  assert(differenceLinks[0].href === TWENTY_SECOND_SLEEP_INDUCING_HREF, "difference section dest is sleep-inducing page");
+  assert(differenceLinks[0].label === TWENTY_SECOND_SLEEP_INDUCING_LABEL, "difference section label is exact phrase");
+  const noLyricsSectionLinks = (noLyricsSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(noLyricsSectionLinks.length === 1, "no-lyrics-park section has one no-lyrics link");
+  assert(noLyricsSectionLinks[0].href === TWENTY_SECOND_NO_LYRICS_HREF, "no-lyrics-park section dest is no-lyrics page");
+  assert(noLyricsSectionLinks[0].label === TWENTY_SECOND_NO_LYRICS_LABEL, "no-lyrics-park section label is exact phrase");
 
   const contentSource = read("src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn.ts");
   assert(
@@ -5893,6 +5992,10 @@ function testTwentySecondPage() {
   assert(!contentSource.includes("без рекламы"), "twenty-second content file has no без рекламы");
   assert(contentSource.includes(TWENTY_SECOND_HUB_HREF), "twenty-second content file has hub href");
   assert(contentSource.includes(TWENTY_SECOND_HUB_LABEL), "twenty-second content file has hub label");
+  assert(contentSource.includes(TWENTY_SECOND_SLEEP_INDUCING_HREF), "twenty-second content file has sleep-inducing href");
+  assert(contentSource.includes(TWENTY_SECOND_SLEEP_INDUCING_LABEL), "twenty-second content file has sleep-inducing label");
+  assert(contentSource.includes(TWENTY_SECOND_NO_LYRICS_HREF), "twenty-second content file has no-lyrics href");
+  assert(contentSource.includes(TWENTY_SECOND_NO_LYRICS_LABEL), "twenty-second content file has no-lyrics label");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
@@ -5948,6 +6051,8 @@ function testTwentySecondPage() {
   assert(!serialized.includes(EIGHTEENTH_BOOKMARK_PHRASE), "twenty-second JSON-LD has no bookmark phrase");
   assert(!serialized.includes("🔖"), "twenty-second JSON-LD has no bookmark emoji");
   assert(!serialized.includes("https://audiolad.ru/listens/muzyka-dlya-sna-slushat-onlayn"), "twenty-second JSON-LD does not leak raw hub URL as visible label source");
+  assert(!serialized.includes("https://audiolad.ru/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn"), "twenty-second JSON-LD does not leak raw sleep-inducing URL as visible label source");
+  assert(!serialized.includes("https://audiolad.ru/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn"), "twenty-second JSON-LD does not leak raw no-lyrics URL as visible label source");
 }
 
 
@@ -6094,34 +6199,50 @@ function testTwentyThirdPage() {
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
   assert(allLinks.length === 3, "twenty-third page has exactly three internal title-anchors");
   const soothingLinks = allLinks.filter((link) => link.href === TWENTY_THIRD_SOOTHING_HREF);
-  assert(soothingLinks.length === 2, "twenty-third page has two soothing title-only links");
-  assert(
-    soothingLinks.every((link) => link.label === TWENTY_THIRD_SOOTHING_LABEL),
-    "twenty-third soothing labels are exact title-only",
-  );
+  assert(soothingLinks.length === 1, "twenty-third page has exactly one soothing title-only link");
+  assert(soothingLinks[0].label === TWENTY_THIRD_SOOTHING_LABEL, "twenty-third soothing label is exact title-only");
   const hubLinks = allLinks.filter((link) => link.href === TWENTY_THIRD_HUB_HREF);
   assert(hubLinks.length === 1, "twenty-third page has one hub phrase link");
   assert(hubLinks[0].label === TWENTY_THIRD_HUB_LABEL, "twenty-third hub label is подборку музыки для сна");
+  const noLyricsLinks = allLinks.filter((link) => link.href === TWENTY_THIRD_NO_LYRICS_HREF);
+  assert(noLyricsLinks.length === 1, "twenty-third page has one no-lyrics phrase link");
+  assert(noLyricsLinks[0].label === TWENTY_THIRD_NO_LYRICS_LABEL, "twenty-third no-lyrics label is exact phrase");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `twenty-third link label is not a URL: ${link.label}`);
     assert(!String(link.label).includes("/listens/"), `twenty-third link label is not a path: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `twenty-third href is site-relative: ${link.href}`);
   }
   const dests = new Set(allLinks.map((link) => link.href));
-  assert(dests.size === 2, "twenty-third page uses only two internal destinations");
+  assert(dests.size === 3, "twenty-third page uses exactly three internal destinations");
   assert(dests.has(TWENTY_THIRD_SOOTHING_HREF), "twenty-third destinations include soothing page");
   assert(dests.has(TWENTY_THIRD_HUB_HREF), "twenty-third destinations include hub page");
+  assert(dests.has(TWENTY_THIRD_NO_LYRICS_HREF), "twenty-third destinations include no-lyrics page");
 
   const mixedLinks = (mixedSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(mixedLinks.length === 1, "mixed-query section has one soothing link");
-  assert(mixedLinks[0].href === TWENTY_THIRD_SOOTHING_HREF, "mixed-query link dest is soothing page");
+  assert(mixedLinks.length === 0, "mixed-query section has no soothing href after duplicate removal");
+  const mixedPlain = (mixedSection.blocks ?? [])
+    .filter((block) => block.kind === "paragraph")
+    .map((block) => block.text)
+    .join("\n");
+  assert(
+    mixedPlain.includes("Успокаивающая музыка для сна – слушать онлайн бесплатно"),
+    "mixed-query section keeps soothing H1 as ordinary text",
+  );
   const differenceLinks = (differenceSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
   assert(differenceLinks.length === 1, "difference section has one soothing link");
   assert(differenceLinks[0].href === TWENTY_THIRD_SOOTHING_HREF, "difference link dest is soothing page");
+  const noLyricsSection = parsed.definition.sections.find((section) => section.id === "luchshe-muzyka-so-slovami-ili-bez-slov");
+  assert(noLyricsSection, "twenty-third page has no-lyrics-park section");
+  const noLyricsSectionLinks = (noLyricsSection.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(noLyricsSectionLinks.length === 1, "no-lyrics-park section has one no-lyrics link");
+  assert(noLyricsSectionLinks[0].href === TWENTY_THIRD_NO_LYRICS_HREF, "no-lyrics-park section dest is no-lyrics page");
+  assert(noLyricsSectionLinks[0].label === TWENTY_THIRD_NO_LYRICS_LABEL, "no-lyrics-park section label is exact phrase");
   const hubSectionLinks = (hubSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
@@ -6151,6 +6272,12 @@ function testTwentyThirdPage() {
   assert(contentSource.includes(TWENTY_THIRD_SOOTHING_LABEL), "twenty-third content file has soothing label");
   assert(contentSource.includes(TWENTY_THIRD_HUB_HREF), "twenty-third content file has hub href");
   assert(contentSource.includes(TWENTY_THIRD_HUB_LABEL), "twenty-third content file has hub label");
+  assert(contentSource.includes(TWENTY_THIRD_NO_LYRICS_HREF), "twenty-third content file has no-lyrics href");
+  assert(contentSource.includes(TWENTY_THIRD_NO_LYRICS_LABEL), "twenty-third content file has no-lyrics label");
+  assert(
+    contentSource.split(TWENTY_THIRD_SOOTHING_HREF).length - 1 === 1,
+    "twenty-third content file has soothing href exactly once",
+  );
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
@@ -6225,6 +6352,7 @@ function testTwentyThirdPage() {
   assert(!serialized.includes("🔖"), "twenty-third JSON-LD has no bookmark emoji");
   assert(!serialized.includes("https://audiolad.ru/listens/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn"), "twenty-third JSON-LD does not leak raw soothing URL as visible label source");
   assert(!serialized.includes("https://audiolad.ru/listens/muzyka-dlya-sna-slushat-onlayn"), "twenty-third JSON-LD does not leak raw hub URL as visible label source");
+  assert(!serialized.includes("https://audiolad.ru/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn"), "twenty-third JSON-LD does not leak raw no-lyrics URL as visible label source");
 }
 
 

@@ -146,7 +146,14 @@ export const USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Другим людям вокал совершенно не мешает." },
           { kind: "paragraph", text: "Поэтому отсутствие слов не является обязательным условием спокойного вечернего прослушивания." },
           { kind: "paragraph", text: "Если вам комфортна музыка с голосом – её можно оставить." },
-          { kind: "paragraph", text: "Отдельный самостоятельный intent «музыка для сна без слов» здесь намеренно не раскрывается подробно." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Отдельный самостоятельный intent «" },
+              { href: "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn", label: "музыка для сна без слов" },
+              { text: "» здесь намеренно не раскрывается подробно." },
+            ],
+          },
         ],
       },
       {
@@ -195,7 +202,14 @@ export const USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         blocks: [
           { kind: "paragraph", text: "Успокаивающая музыка – это прежде всего спокойный характер звучания и субъективное ощущение от него." },
           { kind: "paragraph", text: "Человек может включать её вечером, во время чтения или отдыха, не ставя перед собой задачу обязательно заснуть." },
-          { kind: "paragraph", text: "Усыпляющая музыка – отдельный поисковый intent. Там пользователь уже ищет музыку именно с выраженной целью засыпания." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Отдельный поисковый intent – " },
+              { href: "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn", label: "усыпляющая музыка для сна" },
+              { text: ". Там пользователь уже ищет музыку именно с выраженной целью засыпания." },
+            ],
+          },
           { kind: "paragraph", text: "Поэтому текущая страница не строится вокруг обещаний сна, быстрого засыпания или сильного усыпляющего эффекта." },
           { kind: "paragraph", text: "Эти темы будут раскрыты отдельно." },
         ],
