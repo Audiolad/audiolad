@@ -145,6 +145,12 @@ export const AUDIT_LINEAGE = {
   },
 
   "20260715160000": {
+    superseded: {
+      "data:practices.demo_catalog_archived": {
+        supersededBy: "20260731180000",
+        replacementId: "data:practices.demo_catalog_unpublished",
+      },
+    },
     extraProbes: [
       dataProbe(
         "data:practices.demo_catalog_archived",
@@ -160,7 +166,23 @@ export const AUDIT_LINEAGE = {
   )
     AND status IS DISTINCT FROM 'archived'
 )`,
-        "demo/off-catalog slugs that still exist are archived; starters were republished later",
+        "original archive status; later remapped to unpublished",
+      ),
+      dataProbe(
+        "data:practices.demo_catalog_unpublished",
+        `SELECT NOT EXISTS (
+  SELECT 1
+  FROM public.practices
+  WHERE slug IN (
+    'e2e-test-programma-3-audio',
+    'e2e-test-odinochnyy-audioprodukt',
+    'first-audio-course',
+    'personal-boundaries',
+    'sila-zhenstvennosti'
+  )
+    AND status IS DISTINCT FROM 'unpublished'
+)`,
+        "20260731180000 remapped leftover archived rows to unpublished",
       ),
     ],
   },

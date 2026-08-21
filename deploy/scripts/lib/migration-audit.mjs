@@ -214,15 +214,15 @@ export function buildProbesFromSql(filename, sql) {
   }
 
   const lineage = lineageForVersion(version);
+  for (const extra of lineage.extraProbes || []) {
+    addProbe(probes, extra);
+  }
   const superseded = lineage.superseded || {};
   for (const probe of probes) {
     const meta = superseded[probe.id];
     if (!meta) continue;
     probe.supersededBy = meta.supersededBy;
     probe.replacementId = meta.replacementId;
-  }
-  for (const extra of lineage.extraProbes || []) {
-    addProbe(probes, extra);
   }
 
   const kind = isDataOrBackfillMigration(filename, sql) ? "data" : "schema";
