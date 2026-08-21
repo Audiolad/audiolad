@@ -3,6 +3,14 @@
  * auto-extracted objects are incomplete or later replaced.
  * Never mutates a database. Every sql must be SELECT/WITH only.
  */
+import {
+  ARCHIVE_DEMO_SLUGS_FINAL,
+  ARCHIVE_DEMO_MIGRATION_AT,
+  archiveDemoHistoricalTargetSql,
+} from "./migration-audit-archive-demo.mjs";
+
+export { ARCHIVE_DEMO_SLUGS_FINAL, ARCHIVE_DEMO_MIGRATION_AT };
+
 export const STARTER_SLUGS = [
   "elixir-molodosti",
   "klyuch-k-izobiliyu",
@@ -15,14 +23,6 @@ export const AURAFON_AUTHOR_ID = "59c7e5b8-eae4-4394-82fb-b815a10be6c2";
 export const PLATFORM_OWNER_EMAIL = "1@audiolad.ru";
 export const LEGACY_AUTHOR_SEED_TEXT =
   "Медитации, энергопрактики и программы для внутренней гармонии.";
-
-export const ARCHIVE_DEMO_SLUGS_FINAL = [
-  "e2e-test-programma-3-audio",
-  "e2e-test-odinochnyy-audioprodukt",
-  "first-audio-course",
-  "personal-boundaries",
-  "sila-zhenstvennosti",
-];
 
 function dataProbe(id, sql, evidenceHint) {
   return {
@@ -157,32 +157,33 @@ export const AUDIT_LINEAGE = {
         `SELECT NOT EXISTS (
   SELECT 1
   FROM public.practices
-  WHERE slug IN (
-    'e2e-test-programma-3-audio',
-    'e2e-test-odinochnyy-audioprodukt',
-    'first-audio-course',
-    'personal-boundaries',
-    'sila-zhenstvennosti'
-  )
+  WHERE ${archiveDemoHistoricalTargetSql()}
+    AND deleted_at IS NULL
     AND status IS DISTINCT FROM 'archived'
 )`,
-        "original archive status; later remapped to unpublished",
+        "historical published-at-apply-time rows still archived; 31180000 remaps them",
       ),
       dataProbe(
         "data:practices.demo_catalog_unpublished",
-        `SELECT NOT EXISTS (
-  SELECT 1
-  FROM public.practices
-  WHERE slug IN (
-    'e2e-test-programma-3-audio',
-    'e2e-test-odinochnyy-audioprodukt',
-    'first-audio-course',
-    'personal-boundaries',
-    'sila-zhenstvennosti'
+        `SELECT (
+  EXISTS (
+    SELECT 1
+    FROM public.practices
+    WHERE ${archiveDemoHistoricalTargetSql()}
+      AND (
+        status IN ('unpublished', 'archived')
+        OR deleted_at IS NOT NULL
+      )
   )
-    AND status IS DISTINCT FROM 'unpublished'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.practices
+    WHERE ${archiveDemoHistoricalTargetSql()}
+      AND deleted_at IS NULL
+      AND status NOT IN ('unpublished', 'archived')
+  )
 )`,
-        "20260731180000 remapped leftover archived rows to unpublished",
+        "historical archive targets are unpublished/archived/deleted; later same-slug rows ignored",
       ),
     ],
   },
