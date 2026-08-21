@@ -43,6 +43,10 @@ function testStatusEndpointContract() {
   assert(route.includes("practiceSlug"), "status route returns practice slug");
   assert(!route.includes("user_id"), "status route does not expose user id");
   assert(!route.includes("amount_minor"), "status route does not expose amount");
+  assert(
+    !route.includes("notifyPlatformOwnerOfConfirmedSale"),
+    "checkout status does not send owner sale email",
+  );
   assert(ordersRoute.includes('if (!user)'), "orders route still requires auth");
 }
 

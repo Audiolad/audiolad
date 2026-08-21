@@ -99,6 +99,14 @@ function testSourceContracts() {
     "fulfill calls transactional RPC",
   );
   assert(
+    fulfill.includes("notifyPlatformOwnerOfConfirmedSale"),
+    "fulfill notifies platform owner after confirmed success",
+  );
+  assert(
+    fulfill.includes("shouldNotifyPlatformOwnerOfSale"),
+    "owner notify is gated on confirmed success",
+  );
+  assert(
     !fulfill.includes('from("payments")\n    .update'),
     "fulfill no longer updates payments table directly",
   );

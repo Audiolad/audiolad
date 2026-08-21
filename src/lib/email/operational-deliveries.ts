@@ -42,6 +42,7 @@ export const PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE =
 export const PAYOUT_PROFILE_VERIFIED_MESSAGE_TYPE = "payout_profile_verified";
 export const PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE = "payout_profile_rejected";
 export const AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE = "author_product_sold";
+export const PLATFORM_OWNER_SALE_MESSAGE_TYPE = "platform_owner_sale";
 
 const PAYOUT_PROFILE_MESSAGE_TYPES = new Set([
   PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE,
@@ -54,6 +55,7 @@ const NULL_APPLICATION_FK_MESSAGE_TYPES = new Set([
   ...PAYOUT_PROFILE_MESSAGE_TYPES,
   COMMERCIAL_APPLICATION_APPROVED_MESSAGE_TYPE,
   AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE,
+  PLATFORM_OWNER_SALE_MESSAGE_TYPE,
 ]);
 
 export function buildAuthorAccessGrantedDedupKey(applicationId: string): string {
@@ -111,6 +113,10 @@ export function buildAuthorProductSoldDedupKey(saleId: string): string {
   return `author_product_sold:${saleId.trim()}`;
 }
 
+export function buildPlatformOwnerSaleDedupKey(paymentId: string): string {
+  return `platform_owner_sale:${paymentId.trim()}`;
+}
+
 function resolveOperationalEmailDedupKey(
   applicationId: string,
   messageType: string,
@@ -134,6 +140,10 @@ function resolveOperationalEmailDedupKey(
 
   if (messageType === AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE) {
     return buildAuthorProductSoldDedupKey(applicationId);
+  }
+
+  if (messageType === PLATFORM_OWNER_SALE_MESSAGE_TYPE) {
+    return buildPlatformOwnerSaleDedupKey(applicationId);
   }
 
   const version = profileVersion ?? 1;
@@ -286,6 +296,29 @@ export async function acquireOperationalEmailDelivery(
       .single();
 
     if (insertError || !inserted) {
+      if (insertError?.code === "23505") {
+        const { data: raced, error: reloadError } = await client
+          .from("operational_email_deliveries")
+          .select("*")
+          .eq("dedup_key", dedupKey)
+          .maybeSingle();
+
+        if (!reloadError && raced) {
+          const racedIntent = resolveOperationalEmailDeliverySendIntent(
+            raced as OperationalEmailDeliveryRow,
+            input.forceResend === true,
+          );
+          if (racedIntent.kind === "skip") {
+            return {
+              ok: true,
+              delivery: raced as OperationalEmailDeliveryRow,
+              shouldSend: false,
+              reason: racedIntent.reason,
+            };
+          }
+        }
+      }
+
       console.error("operational_email_delivery_insert_error", insertError?.message);
       return { ok: false, code: "delivery_persist_failed" };
     }
