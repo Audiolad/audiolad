@@ -164,7 +164,7 @@ export const MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
             kind: "rich_paragraph",
             segments: [
               { text: "Если вы ищете практики именно с более прямым фокусом на финансовой теме, можно также открыть страницу «Медитация на деньги: слушать онлайн бесплатно» (" },
-              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" },
+              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "Медитация на деньги: слушать онлайн бесплатно" },
               { text: ")." },
             ],
           },
@@ -172,7 +172,7 @@ export const MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
             kind: "rich_paragraph",
             segments: [
               { text: "А если вам ближе сама формулировка «денежная медитация», для неё есть отдельная страница «Денежная медитация: слушать онлайн бесплатно» (" },
-              { href: "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" },
+              { href: "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno", label: "Денежная медитация: слушать онлайн бесплатно" },
               { text: ")." },
             ],
           },

@@ -149,6 +149,14 @@ export const SHUM_VODY_DLYA_DETEY_PAGE =
               { text: "» посвящена вечернему и ночному водному фону независимо от возраста." },
             ],
           },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен более узкий младенческий сценарий, есть отдельная страница «" },
+              { href: "/listens/shum-vody-dlya-novorozhdennyh", label: "Шум воды для новорождённых – слушать онлайн для сна" },
+              { text: "»." },
+            ],
+          },
           { kind: "paragraph", text: "Текущая страница собрана специально для родителей, которые ищут шум воды для ребёнка." },
           { kind: "paragraph", text: "Поэтому здесь важнее:" },
           { kind: "list", items: [

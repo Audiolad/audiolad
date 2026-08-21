@@ -176,6 +176,14 @@ export const KAK_SOZDAT_SVOYU_MEDITATSIYU_ARTICLE = {
         {
           kind: "rich_paragraph",
           segments: [
+            { text: "Подробнее процесс записи разобран в статье " },
+            { href: "/articles/kak-zapisat-meditatsiyu-samostoyatelno", label: "«Как записать медитацию самостоятельно»" },
+            { text: "." },
+          ],
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
             { text: "Записать свою медитацию можно и на телефон. Если исходник получился чистым, его уже можно использовать для дальнейшей обработки. Для записи и сборки практики в браузере можно использовать " },
             { href: "https://audiolad.ru/studio/meditation", label: "Студию АудиоЛад" },
             { text: "." },
@@ -203,6 +211,14 @@ export const KAK_SOZDAT_SVOYU_MEDITATSIYU_ARTICLE = {
         {
           kind: "paragraph",
           text: "Обязательно учитывайте и права на использование композиции. Возможность прослушать трек в интернете ещё не означает разрешение включать его в собственную опубликованную медитацию.",
+        },
+        {
+          kind: "rich_paragraph",
+          segments: [
+            { text: "Если хочется отдельно разобрать выбор и сборку фона, есть статья " },
+            { href: "/articles/sozdanie-muzyki-dlya-meditatsiy", label: "«Создание музыки для медитаций»" },
+            { text: "." },
+          ],
         },
       ],
     },

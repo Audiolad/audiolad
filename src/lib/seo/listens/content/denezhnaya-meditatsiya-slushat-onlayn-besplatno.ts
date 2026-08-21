@@ -29,7 +29,7 @@ export const DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
             kind: "rich_paragraph",
             segments: [
               { text: "Если вы ищете именно практики по формулировке «на деньги», на АудиоЛаде есть отдельная подборка «Медитация на деньги: слушать онлайн бесплатно» (" },
-              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" },
+              { href: "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno", label: "Медитация на деньги: слушать онлайн бесплатно" },
               { text: ")." },
             ],
           },

@@ -1601,6 +1601,57 @@ function testDefinition() {
   for (const key of FORBIDDEN_COMPOSITION_KEYS) {
     assert(!(key in parsed.definition), `no static ${key}`);
   }
+
+  const allLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 4, "first page has exactly 4 outbound listen anchors");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `first link label is not a URL: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `first href is site-relative: ${link.href}`);
+  }
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno" &&
+        link.label === "медитация на изобилие",
+    ),
+    "first page links изобилие with short natural label",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya" &&
+        link.label === "медитация для привлечения денег, богатства и изобилия",
+    ),
+    "first page links привлечение with short natural label",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie" &&
+        link.label === "утренняя медитация на деньги и изобилие",
+    ),
+    "first page links утренняя with short natural label",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna" &&
+        link.label === "медитация изобилия и богатства для сна",
+    ),
+    "first page links sleep-abundance with short natural label",
+  );
+  assert(
+    !allLinks.some((link) => link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno"),
+    "first page does not link near-duplicate denezhnaya",
+  );
+  const firstContent = read("src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts");
+  assert(
+    !firstContent.includes("https://audiolad.ru/listens/"),
+    "first content file has no production listen URLs as labels",
+  );
 }
 
 function testRegistryAndSitemap() {
@@ -1853,9 +1904,15 @@ function testSecondPage() {
     "rich_paragraph href is first listen path",
   );
   assert(
-    link?.label ===
-      "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
-    "rich_paragraph label is full first listen URL",
+    link?.label === "Медитация на деньги: слушать онлайн бесплатно",
+    "rich_paragraph label is human first listen title",
+  );
+  const secondContent = read(
+    "src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts",
+  );
+  assert(
+    !secondContent.includes("https://audiolad.ru/listens/"),
+    "second content file has no production listen URLs as labels",
   );
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -1972,19 +2029,24 @@ function testThirdPage() {
     links.some(
       (link) =>
         link.href === "/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno" &&
-        link.label ===
-          "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+        link.label === "Медитация на деньги: слушать онлайн бесплатно",
     ),
-    "financial section links first listen with full URL label",
+    "financial section links first listen with human title label",
   );
   assert(
     links.some(
       (link) =>
         link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" &&
-        link.label ===
-          "https://audiolad.ru/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno",
+        link.label === "Денежная медитация: слушать онлайн бесплатно",
     ),
-    "financial section links second listen with full URL label",
+    "financial section links second listen with human title label",
+  );
+  const thirdContent = read(
+    "src/lib/seo/listens/content/meditatsiya-na-izobilie-slushat-onlayn-besplatno.ts",
+  );
+  assert(
+    !thirdContent.includes("https://audiolad.ru/listens/"),
+    "third content file has no production listen URLs as labels",
   );
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -3079,7 +3141,35 @@ function testEleventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "eleventh page has zero rich_paragraph links");
+  assert(allLinks.length === 3, "eleventh page has exactly 3 outbound listen anchors");
+  for (const link of allLinks) {
+    assert(!String(link.label).includes("https://"), `eleventh link label is not a URL: ${link.label}`);
+    assert(link.href.startsWith("/listens/"), `eleventh href is site-relative: ${link.href}`);
+  }
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/zhurchanie-vody-slushat-onlayn" &&
+        link.label === "журчание воды",
+    ),
+    "eleventh page links журчание воды",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/zvuk-vodopada-slushat-onlayn" &&
+        link.label === "звук водопада",
+    ),
+    "eleventh page links звук водопада",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/shum-vody-dlya-sna" &&
+        link.label === "шум воды для сна",
+    ),
+    "eleventh page links шум воды для сна",
+  );
 
   const contentSource = read(
     "src/lib/seo/listens/content/shum-vody-slushat-onlayn.ts",
@@ -3232,15 +3322,34 @@ function testTwelfthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "twelfth page has exactly one title-anchor");
+  assert(allLinks.length === 3, "twelfth page has exactly 3 outbound listen anchors");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `twelfth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `twelfth href is site-relative: ${link.href}`);
   }
   assert(
-    allLinks[0].href === "/listens/shum-vody-slushat-onlayn" &&
-      allLinks[0].label === "Шум воды – слушать звуки воды онлайн",
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/shum-vody-slushat-onlayn" &&
+        link.label === "Шум воды – слушать звуки воды онлайн",
+    ),
     "twelfth page links hub listen by page title",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/zvuk-ruchya-slushat-onlayn" &&
+        link.label === "звук ручья",
+    ),
+    "twelfth page links звук ручья",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/shum-vody-dlya-sna" &&
+        link.label === "шум воды для сна",
+    ),
+    "twelfth page links шум воды для сна",
   );
 
   const contentSource = read(
@@ -3389,7 +3498,7 @@ function testThirteenthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "thirteenth page has exactly 3 title-anchors");
+  assert(allLinks.length === 4, "thirteenth page has exactly 4 outbound listen anchors");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `thirteenth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `thirteenth href is site-relative: ${link.href}`);
@@ -3406,6 +3515,12 @@ function testThirteenthPage() {
       link.label === "журчание воды",
   );
   assert(zhurchanieLinks.length === 1, "thirteenth page has short zhurchanie anchor once");
+  const whiteNoiseLinks = allLinks.filter(
+    (link) =>
+      link.href === "/listens/belyy-shum-vody-slushat-onlayn" &&
+      link.label === "белый шум воды",
+  );
+  assert(whiteNoiseLinks.length === 1, "thirteenth page has short белый шум воды once");
 
   const contentSource = read(
     "src/lib/seo/listens/content/zvuk-vodopada-slushat-onlayn.ts",
@@ -4470,7 +4585,7 @@ function testEighteenthPage() {
   assert(!allTextChunks.includes("SEO-самопроверка"), "eighteenth definition has no SEO-самопроверка");
   assert(!allTextChunks.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "eighteenth definition has no playlist placeholder");
   assert(!allTextChunks.includes("https://audiolad.ru/listens/"), "eighteenth definition has no production listen URLs");
-  assert(!allTextChunks.includes("/listens/shum-vody-dlya-novorozhden"), "eighteenth page invents no newborn cluster URL");
+  assert(!allTextChunks.includes("/listens/shum-vody-dlya-novorozhden"), "eighteenth page does not show a raw newborn path as visible text");
   assert(!allTextChunks.includes("/listens/shum-vody-dlya-grudnich"), "eighteenth page invents no infant cluster URL");
   assert(!allTextChunks.includes("/listens/shum-vody-dlya-malyshe"), "eighteenth page invents no toddler cluster URL");
   assert(!allTextChunks.includes("/listens/shum-vody-dlya-mladenc"), "eighteenth page invents no baby cluster URL");
@@ -4479,7 +4594,7 @@ function testEighteenthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "eighteenth page has exactly 3 title-anchors");
+  assert(allLinks.length === 4, "eighteenth page has exactly 4 outbound listen anchors");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `eighteenth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `eighteenth href is site-relative: ${link.href}`);
@@ -4502,6 +4617,12 @@ function testEighteenthPage() {
       link.label === "Шум воды – слушать звуки воды онлайн",
   );
   assert(hub.length === 1, "eighteenth page has hub title-anchor once");
+  const newborn = allLinks.filter(
+    (link) =>
+      link.href === "/listens/shum-vody-dlya-novorozhdennyh" &&
+      link.label === "Шум воды для новорождённых – слушать онлайн для сна",
+  );
+  assert(newborn.length === 1, "eighteenth page has newborn title-anchor once");
   const dests = allLinks.map((link) => link.href);
   assert(
     dests.filter((href) => href === "/listens/belyy-shum-vody-slushat-onlayn").length === 1,
@@ -4515,7 +4636,11 @@ function testEighteenthPage() {
     dests.filter((href) => href === "/listens/shum-vody-slushat-onlayn").length === 1,
     "eighteenth dests: hub ×1",
   );
-  assert(new Set(dests).size === 3, "eighteenth page has 3 destinations");
+  assert(
+    dests.filter((href) => href === "/listens/shum-vody-dlya-novorozhdennyh").length === 1,
+    "eighteenth dests: newborn ×1",
+  );
+  assert(new Set(dests).size === 4, "eighteenth page has 4 destinations");
 
   const contentSource = read("src/lib/seo/listens/content/shum-vody-dlya-detey.ts");
   assert(
