@@ -53,6 +53,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     requiredPermission: "users.view",
     match: (path) => path.startsWith("/admin/users"),
   },
+  {
+    href: "/admin/sales",
+    label: "Продажи",
+    requiredPermission: "sales.view",
+    match: (path) => path.startsWith("/admin/sales"),
+  },
 ] as const;
 
 export function getVisibleAdminNavItems(

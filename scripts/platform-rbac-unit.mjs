@@ -130,6 +130,11 @@ assert.equal(
   "editor must not see users nav",
 );
 assert.equal(
+  editorNav.some((item) => item.href === "/admin/sales"),
+  false,
+  "editor must not see sales nav",
+);
+assert.equal(
   editorNav.some((item) => item.href === "/admin/product-moderation"),
   false,
   "editor must not see product moderation nav",

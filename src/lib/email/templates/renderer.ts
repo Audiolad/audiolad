@@ -85,6 +85,13 @@ import {
   renderPayoutProfileVerifiedEmailText,
 } from "./payout-profile-verified";
 import {
+  PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_KEY,
+  PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_VERSION,
+  buildPlatformOwnerSaleEmailSubject,
+  renderPlatformOwnerSaleEmailHtml,
+  renderPlatformOwnerSaleEmailText,
+} from "./platform-owner-sale";
+import {
   RECOVERY_EMAIL_SUBJECT,
   RECOVERY_EMAIL_TEMPLATE_KEY,
   RECOVERY_EMAIL_TEMPLATE_VERSION,
@@ -451,6 +458,72 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (input.templateKey === PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_KEY) {
+      const productTitle = readString(input.payload, "productTitle");
+      const buyerName = readString(input.payload, "buyerName");
+      const paidAt = readString(input.payload, "paidAt");
+      const orderId = readString(input.payload, "orderId");
+      const paymentId = readString(input.payload, "paymentId");
+      const paymentStatus = readString(input.payload, "paymentStatus");
+      const amountMinorRaw = input.payload.amountMinor;
+
+      if (
+        !productTitle ||
+        !buyerName ||
+        !paidAt ||
+        !orderId ||
+        !paymentId ||
+        !paymentStatus ||
+        typeof amountMinorRaw !== "number" ||
+        !Number.isFinite(amountMinorRaw)
+      ) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const siteOrigin = readString(input.payload, "siteOrigin") ?? undefined;
+      const currency = readString(input.payload, "currency") ?? undefined;
+      const authorName = readString(input.payload, "authorName");
+      const buyerEmail = readString(input.payload, "buyerEmail");
+      const checkoutOriginPath = readString(input.payload, "checkoutOriginPath");
+
+      return {
+        ok: true,
+        subject: buildPlatformOwnerSaleEmailSubject(
+          amountMinorRaw,
+          productTitle,
+          currency,
+        ),
+        html: renderPlatformOwnerSaleEmailHtml({
+          productTitle,
+          authorName,
+          amountMinor: amountMinorRaw,
+          currency,
+          buyerName,
+          buyerEmail,
+          paidAt,
+          orderId,
+          paymentId,
+          paymentStatus,
+          checkoutOriginPath,
+          siteOrigin,
+        }),
+        text: renderPlatformOwnerSaleEmailText({
+          productTitle,
+          authorName,
+          amountMinor: amountMinorRaw,
+          currency,
+          buyerName,
+          buyerEmail,
+          paidAt,
+          orderId,
+          paymentId,
+          paymentStatus,
+          checkoutOriginPath,
+          siteOrigin,
+        }),
+      };
+    }
+
     if (input.templateKey === AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY) {
       const productTitle = readString(input.payload, "productTitle");
       const authorDashboardPath = readString(input.payload, "authorDashboardPath");
@@ -544,6 +617,10 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
 
   if (templateKey === AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_KEY) {
     return AUTHOR_PRODUCT_MODERATION_APPROVED_EMAIL_TEMPLATE_VERSION;
+  }
+
+  if (templateKey === PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_KEY) {
+    return PLATFORM_OWNER_SALE_EMAIL_TEMPLATE_VERSION;
   }
 
   return null;

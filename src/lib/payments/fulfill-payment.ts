@@ -1,6 +1,8 @@
 import { ensureFinanceObligationProcessed } from "@/lib/payments/author-finance/finance-rpc";
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
+import { shouldNotifyPlatformOwnerOfSale } from "@/lib/admin/sales";
 import { notifyAuthorOfCanonicalSale } from "@/lib/payments/notify-author-sale";
+import { notifyPlatformOwnerOfConfirmedSale } from "@/lib/payments/notify-platform-owner-sale";
 import type { PaymentRow } from "@/lib/payments/payment-api";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -253,6 +255,22 @@ export async function fulfillSucceededTochkaPayment(input: {
     // handler crash after fulfillment cannot permanently lose the notification.
     await notifyAuthorOfCanonicalSale({
       orderId: result.orderId,
+    });
+  }
+
+  if (
+    shouldNotifyPlatformOwnerOfSale({
+      ok: result.ok,
+      paymentStatus: result.paymentStatus,
+      isTest: result.isTest,
+      paymentId: result.paymentId,
+      orderId: result.orderId,
+    })
+  ) {
+    // Isolated from checkout: never throws, never retries the payment itself.
+    await notifyPlatformOwnerOfConfirmedSale({
+      paymentId: result.paymentId as string,
+      orderId: result.orderId as string,
     });
   }
 

@@ -6,8 +6,10 @@ import { readFileSync } from "node:fs";
 import {
   AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE,
   AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
+  PLATFORM_OWNER_SALE_MESSAGE_TYPE,
   buildAuthorAccessGrantedDedupKey,
   buildAuthorApplicationApprovedDedupKey,
+  buildPlatformOwnerSaleDedupKey,
 } from "../src/lib/email/operational-deliveries.ts";
 
 function testDedupKeyFormat() {
@@ -86,10 +88,16 @@ function testApprovedSenderUsesAuthorsSmtp() {
 }
 
 function testMessageTypeConstant() {
+  const paymentId = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
   assert.equal(AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE, "author_access_granted");
   assert.equal(
     AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
     "author_application_approved",
+  );
+  assert.equal(PLATFORM_OWNER_SALE_MESSAGE_TYPE, "platform_owner_sale");
+  assert.equal(
+    buildPlatformOwnerSaleDedupKey(paymentId),
+    `platform_owner_sale:${paymentId}`,
   );
 }
 
