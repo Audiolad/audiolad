@@ -57,6 +57,7 @@ import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src
 import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn.ts";
 import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-noch-slushat-pered-snom.ts";
 import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-horoshego-i-spokoynogo-sna.ts";
+import { MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-s-golosom-slushat-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1118,6 +1119,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirtiethListenHref}`,
     ),
     "directory JSON-LD includes thirtieth listen href",
+  );
+
+  const thirtyFirstListenHref = "/listens/meditatsiya-dlya-sna-s-golosom-slushat-besplatno";
+  const thirtyFirstListenCard = data.articles.find((card) => card.href === thirtyFirstListenHref);
+  assert(thirtyFirstListenCard, "thirty-first indexable listen page is listed");
+  assert(
+    thirtyFirstListenCard.title === "Медитация для сна с голосом – слушать бесплатно | АудиоЛад",
+    "thirty-first listen directory title",
+  );
+  assert(
+    thirtyFirstListenCard.description === MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE.description,
+    "thirty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-s-golosom-slushat-besplatno",
+    ),
+    "no /articles duplicate for thirty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-first listen href",
   );
 
 

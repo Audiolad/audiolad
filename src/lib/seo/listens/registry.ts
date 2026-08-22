@@ -28,6 +28,7 @@ import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "./cont
 import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn";
 import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "./content/meditatsiya-na-noch-slushat-pered-snom";
 import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "./content/meditatsiya-dlya-horoshego-i-spokoynogo-sna";
+import { MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE } from "./content/meditatsiya-dlya-sna-s-golosom-slushat-besplatno";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -65,6 +66,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE,
   MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE,
   MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE,
+  MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
