@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import CatalogTilePlayControl from "@/components/products/CatalogTilePlayControl";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
@@ -83,9 +84,10 @@ function CatalogTileFallbackVisual({
 
 export default function CatalogProductTile({ product }: CatalogProductTileProps) {
   const visual = resolveCatalogCardVisual(product);
+  const authorSlug = product.authorSlug?.trim() || null;
 
   return (
-    <article className="h-full" data-catalog-product-tile="">
+    <article className="relative h-full" data-catalog-product-tile="">
       <Link
         href={product.href}
         className="flex h-full flex-col rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
@@ -106,6 +108,13 @@ export default function CatalogProductTile({ product }: CatalogProductTileProps)
           </p>
         ) : null}
       </Link>
+      {authorSlug ? (
+        <CatalogTilePlayControl
+          authorSlug={authorSlug}
+          productSlug={product.slug}
+          title={product.title}
+        />
+      ) : null}
     </article>
   );
 }

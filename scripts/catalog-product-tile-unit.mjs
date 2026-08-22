@@ -245,9 +245,15 @@ function testTileLinksToCanonicalPdp() {
 
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
   assert.match(tile, /href=\{product\.href\}/, "tile links to catalog product href");
-  assert.match(tile, /<Link/, "keyboard access is the single Link");
+  assert.match(tile, /<Link/, "card keyboard access is the PDP Link");
   assert.doesNotMatch(tile, /AuthorLink/, "no nested author link");
-  assert.doesNotMatch(tile, /PlayIcon|showPlayButton|listenHref/, "no play control");
+  assert.match(tile, /CatalogTilePlayControl/, "Play control is present on the tile");
+  assert.match(
+    tile,
+    /<\/Link>[\s\S]*<CatalogTilePlayControl/,
+    "Play is a sibling after Link, not nested inside it",
+  );
+  assert.doesNotMatch(tile, /listenHref/, "Play is not a listen-page Link");
   assert.match(tile, /alt=\{alt\}/, "cover alt comes from product title");
   assert.match(tile, /data-catalog-tile-image="blur-background"/);
   assert.match(tile, /data-catalog-tile-image="square-cover"/);
