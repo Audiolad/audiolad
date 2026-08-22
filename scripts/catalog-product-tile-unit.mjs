@@ -97,7 +97,7 @@ function createCoverManifest(overrides = {}) {
   };
 }
 
-function testSquareCoverResolvesToBlurFallback() {
+function testSquareCoverResolvesToSquareViewModel() {
   const product = createCatalogProduct({
     coverUrl: "https://cdn.example/covers/square.jpg",
     updatedAt: "2026-08-01T00:00:00.000Z",
@@ -105,7 +105,7 @@ function testSquareCoverResolvesToBlurFallback() {
   const visual = resolveCatalogCardVisual(product);
 
   assert.equal(visual.hasSquareCover, true, "square cover is present");
-  assert.equal(visual.fallbackMode, "square_blur", "uses CSS square-blur fallback");
+  assert.equal(visual.fallbackMode, "square", "system slide uses a 1:1 square cover");
   assert.ok(visual.image?.src, "image src is resolved from existing helpers");
   assert.match(
     visual.image.src,
@@ -113,7 +113,7 @@ function testSquareCoverResolvesToBlurFallback() {
     "legacy square cover url is reused",
   );
   assert.equal(visual.image.sizes, CATALOG_TILE_IMAGE_SIZES);
-  assert.deepEqual(visual.additionalVisuals, [], "no gallery visuals in phase 1");
+  assert.deepEqual(visual.additionalVisuals, [], "no gallery visuals on the system slide");
 }
 
 function testManifestPrefersSmMdNotXl() {
@@ -122,7 +122,7 @@ function testManifestPrefersSmMdNotXl() {
   });
   const visual = resolveCatalogCardVisual(product);
 
-  assert.equal(visual.fallbackMode, "square_blur");
+  assert.equal(visual.fallbackMode, "square");
   assert.ok(visual.image?.src.includes("covers/practice/md.webp"), "src prefers md");
   assert.ok(visual.image.srcSet.includes("covers/practice/sm.webp"));
   assert.ok(visual.image.srcSet.includes("covers/practice/md.webp"));
@@ -166,12 +166,12 @@ function testLongTitleIsCssClamped() {
   assert.deepEqual(visual.additionalVisuals, []);
   assert.equal(product.title, longTitle, "resolver does not truncate the title");
 
-  const tile = readRoot("src/components/products/CatalogProductTile.tsx");
-  assert.match(tile, /CATALOG_PRODUCT_TILE_TITLE_CLASS/);
-  assert.match(tile, /line-clamp-2/);
-  assert.match(tile, /min-h-\[44px\]/);
-  assert.match(tile, /product\.title/, "full title is rendered");
-  assert.doesNotMatch(tile, /title\.slice|substring\(/, "title is not truncated in JS");
+  const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
+  assert.match(slide, /CATALOG_PRODUCT_TILE_TITLE_CLASS/);
+  assert.match(slide, /line-clamp-2/);
+  assert.match(slide, /min-h-\[44px\]/);
+  assert.match(slide, /product\.title/, "full title is rendered");
+  assert.doesNotMatch(slide, /title\.slice|substring\(/, "title is not truncated in JS");
 }
 
 function testGridClassStructure() {
@@ -244,8 +244,12 @@ function testTileLinksToCanonicalPdp() {
   assert.equal(product.href, href);
 
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
+  const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
+  const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
+
   assert.match(tile, /href=\{product\.href\}/, "tile links to catalog product href");
   assert.match(tile, /<Link/, "card keyboard access is the PDP Link");
+  assert.match(tile, /CatalogSystemProductSlide/, "tile wraps the system first slide");
   assert.doesNotMatch(tile, /AuthorLink/, "no nested author link");
   assert.match(tile, /CatalogTilePlayControl/, "Play control is present on the tile");
   assert.match(
@@ -254,9 +258,13 @@ function testTileLinksToCanonicalPdp() {
     "Play is a sibling after Link, not nested inside it",
   );
   assert.doesNotMatch(tile, /listenHref/, "Play is not a listen-page Link");
-  assert.match(tile, /alt=\{alt\}/, "cover alt comes from product title");
-  assert.match(tile, /data-catalog-tile-image="blur-background"/);
-  assert.match(tile, /data-catalog-tile-image="square-cover"/);
+  assert.doesNotMatch(tile + slide + control, /Подробнее/, "no Подробнее button");
+  assert.match(slide, /alt=\{alt\}/, "cover alt comes from product title");
+  assert.match(slide, /data-catalog-tile-image="square-cover"/);
+  assert.match(slide, /data-catalog-tile-author=""/);
+  assert.match(slide, /data-catalog-tile-duration=""/);
+  assert.match(slide, /product\.statsLabel/, "duration uses existing statsLabel");
+  assert.match(control, /Слушать/, "Play control reads as Слушать");
 }
 
 function testPreviewReusesCatalogListing() {
@@ -286,20 +294,23 @@ function testPreviewReusesCatalogListing() {
   );
 }
 
-function testBlurAndSharpShareOneSrc() {
+function testSystemSlideIsSquareNotBlurFrame() {
+  const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
+  const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
 
-  assert.match(tile, /src=\{src\}/, "both images use the resolved src");
-  assert.match(
-    tile,
-    /data-catalog-tile-image="blur-background"[\s\S]*src=\{src\}[\s\S]*data-catalog-tile-image="square-cover"/,
-    "blur background and sharp square are consecutive imgs with the same src binding",
-  );
-  assert.doesNotMatch(tile, /next\/image/, "does not use next/image");
-  assert.doesNotMatch(tile, /from ["']sharp["']/, "does not import Sharp");
+  assert.match(slide, /aspect-square/, "cover is 1:1");
+  assert.match(slide, /data-catalog-tile-cover="square"/);
+  assert.doesNotMatch(slide, /aspect-\[4\/5\]/, "first slide is not forced into 4:5");
+  assert.doesNotMatch(slide, /blur-background|blur-2xl|square_blur/, "no square-in-blur frame");
+  assert.doesNotMatch(tile, /aspect-\[4\/5\]|blur-background|square_blur/);
+  assert.doesNotMatch(control, /aspect-\[4\/5\]/, "Play is not overlaid on a 4:5 frame");
+  assert.doesNotMatch(slide, /next\/image/, "does not use next/image");
+  assert.doesNotMatch(slide, /from ["']sharp["']/, "does not import Sharp");
+  assert.doesNotMatch(slide, /Подробнее/);
 }
 
-testSquareCoverResolvesToBlurFallback();
+testSquareCoverResolvesToSquareViewModel();
 testManifestPrefersSmMdNotXl();
 testMissingOptionalVisualsDoesNotThrow();
 testLongTitleIsCssClamped();
@@ -307,6 +318,6 @@ testGridClassStructure();
 testContainerAwareColumnResolution();
 testTileLinksToCanonicalPdp();
 testPreviewReusesCatalogListing();
-testBlurAndSharpShareOneSrc();
+testSystemSlideIsSquareNotBlurFrame();
 
 console.log("catalog-product-tile-unit: ok");

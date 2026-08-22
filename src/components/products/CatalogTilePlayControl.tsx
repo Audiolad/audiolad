@@ -106,10 +106,7 @@ export default function CatalogTilePlayControl({
       : `Слушать ${title}`;
 
   return (
-    <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-10 aspect-[4/5]"
-      data-catalog-tile-play-layer=""
-    >
+    <div className="mt-2" data-catalog-tile-play-layer="">
       <button
         type="button"
         data-catalog-tile-play=""
@@ -117,17 +114,18 @@ export default function CatalogTilePlayControl({
         aria-busy={loading || undefined}
         disabled={loading}
         onClick={handlePlayClick}
-        className="pointer-events-auto absolute bottom-2 right-2 flex h-11 w-11 items-center justify-center rounded-full bg-[#7042c5] text-white shadow-[0_8px_20px_rgba(96,59,168,0.28)] disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl bg-[#7042c5] px-2.5 py-2 text-[13px] font-semibold leading-4 text-white disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         {isPlaying ? (
-          <PauseIcon className="h-5 w-5" />
+          <PauseIcon className="h-4 w-4 shrink-0" />
         ) : (
-          <PlayIcon className="h-5 w-5" />
+          <PlayIcon className="h-4 w-4 shrink-0" />
         )}
+        <span>{isPlaying ? "Пауза" : "Слушать"}</span>
       </button>
       {errorMessage ? (
         <p
-          className="pointer-events-none absolute inset-x-2 bottom-[3.25rem] line-clamp-2 rounded-[10px] bg-white/90 px-1.5 py-1 text-[11px] leading-4 text-[#b34f63]"
+          className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#b34f63]"
           role="alert"
         >
           {errorMessage}

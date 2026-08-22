@@ -20,7 +20,7 @@ export const CATALOG_TILE_VARIANT_KEYS = ["sm", "md"] as const satisfies readonl
 
 export const CATALOG_TILE_IMAGE_SIZES = `${CATALOG_TILE_DISPLAY_WIDTH}px`;
 
-export type CatalogCardFallbackMode = "square_blur" | "system";
+export type CatalogCardFallbackMode = "square" | "system";
 
 /**
  * Reserved slot for a later CardVisuals gallery.
@@ -76,9 +76,9 @@ function buildTileSrcSet(manifest: ImageManifest | null): string | null {
 /**
  * Presentation model for catalog tiles.
  *
- * Phase 1: square cover from existing CatalogProduct fields only.
- * `additionalVisuals` stays empty so a later CardVisuals path can replace
- * the square-blur FallbackVisual without rewriting the tile or listing.
+ * Square cover from existing CatalogProduct fields only.
+ * `additionalVisuals` stays empty so later author CardVisuals can add
+ * slides without rewriting the listing or the system first slide.
  */
 export function resolveCatalogCardVisual(
   product: CatalogProduct,
@@ -110,7 +110,7 @@ export function resolveCatalogCardVisual(
 
   return {
     hasSquareCover,
-    fallbackMode: "square_blur",
+    fallbackMode: "square",
     additionalVisuals: [],
     image: {
       src,
