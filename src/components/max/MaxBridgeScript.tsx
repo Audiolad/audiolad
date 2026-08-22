@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
   MAX_WEB_APP_SCRIPT_SRC,
@@ -37,21 +37,18 @@ export default function MaxBridgeScript() {
   const [snapshot, setSnapshot] = useState<MaxBridgeSnapshot>(() =>
     readMaxBridgeSnapshot(),
   );
-  const [bridgeTick, setBridgeTick] = useState(0);
   const [status, setStatus] = useState<ShellStatus>("neutral");
+  const verifyGeneration = useRef(0);
 
-  const refresh = useCallback(() => {
+  const refreshAndVerify = useCallback(() => {
     setSnapshot(readMaxBridgeSnapshot());
-    setBridgeTick((tick) => tick + 1);
-  }, []);
 
-  useEffect(() => {
     const initData = readMaxInitData();
     if (!initData) {
       return;
     }
 
-    let cancelled = false;
+    const generation = ++verifyGeneration.current;
     setStatus("connecting");
 
     void (async () => {
@@ -63,7 +60,10 @@ export default function MaxBridgeScript() {
           body: JSON.stringify({ initData }),
         });
         const payload = (await response.json()) as { ok?: unknown };
-        if (!cancelled && response.ok && payload.ok === true) {
+        if (generation !== verifyGeneration.current) {
+          return;
+        }
+        if (response.ok && payload.ok === true) {
           setStatus("verified");
           return;
         }
@@ -71,23 +71,19 @@ export default function MaxBridgeScript() {
         // Ordinary browser / failed verify: keep the existing technical line.
       }
 
-      if (!cancelled) {
+      if (generation === verifyGeneration.current) {
         setStatus("neutral");
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bridgeTick]);
+  }, []);
 
   return (
     <>
       <Script
         src={MAX_WEB_APP_SCRIPT_SRC}
         strategy="afterInteractive"
-        onLoad={refresh}
-        onError={refresh}
+        onReady={refreshAndVerify}
+        onError={refreshAndVerify}
       />
       <p
         hidden
