@@ -5,6 +5,8 @@ import {
   MAX_EXTERNAL_IDENTITY_PROVIDER,
   touchExternalIdentity,
 } from "@/lib/max/touch-external-identity";
+
+export { setTouchExternalIdentityForTests } from "@/lib/max/touch-external-identity";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 

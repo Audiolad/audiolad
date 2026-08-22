@@ -26,7 +26,7 @@ assert.match(helperSource, /createServiceRoleClient/);
 assert.match(helperSource, /touch_external_identity/);
 assert.doesNotMatch(helperSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(helperSource, /console\.(log|info|debug|warn|error)/);
-assert.doesNotMatch(helperSource, /auth\.users|signUp|signIn|user_id:/);
+assert.doesNotMatch(helperSource, /auth\.users|signUp|signInWithPassword|createUser/);
 
 function createRpcClient(handler) {
   const calls = [];

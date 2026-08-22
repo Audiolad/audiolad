@@ -50,7 +50,9 @@ async function touchExternalIdentityImpl(
   }
 
   try {
-    const client = deps.client ?? createServiceRoleClient();
+    const client: TouchExternalIdentityRpcClient =
+      deps.client ??
+      (createServiceRoleClient() as unknown as TouchExternalIdentityRpcClient);
     const { data, error } = await client.rpc("touch_external_identity", {
       p_provider: trimmedProvider,
       p_provider_user_id: trimmedProviderUserId,

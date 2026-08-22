@@ -9,14 +9,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MAX_HOSTNAME, MAX_ORIGIN, MAX_SESSION_VERIFY_PATH } from "../src/lib/max/host.ts";
-import {
-  MAX_EXTERNAL_IDENTITY_PROVIDER,
-  setTouchExternalIdentityForTests,
-} from "../src/lib/max/touch-external-identity.ts";
+import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "../src/lib/max/touch-external-identity.ts";
 import {
   isAllowedMaxVerifyOrigin,
   MAX_VERIFY_BODY_MAX_BYTES,
   POST,
+  setTouchExternalIdentityForTests,
 } from "../src/app/api/max/session/verify/route.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");

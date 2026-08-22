@@ -100,11 +100,11 @@ assert.equal(largeIdResult.ok, true);
 assert.equal(largeIdResult.data.user.id, "9007199254740993");
 assert.equal(largeIdResult.data.query_id, "replay-later");
 assert.equal(
-  Number("9007199254740993") === 9007199254740993,
-  false,
-  "this id is wider than Number.MAX_SAFE_INTEGER and must not be stored via Number()",
+  String(Number("9007199254740993")),
+  "9007199254740992",
+  "JSON/Number already lose this id; persist the raw decimal string instead",
 );
-assert.equal(Number.isSafeInteger(9007199254740993), false);
+assert.equal(Number.isSafeInteger(Number("9007199254740993")), false);
 assert.notEqual(largeIdResult.data.user.id, String(Number("9007199254740993")));
 
 const largeIdAsString = signInitData({
