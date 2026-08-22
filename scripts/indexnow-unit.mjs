@@ -193,6 +193,20 @@ function testUrlRules() {
   );
   assert(!preview.ok && preview.reason === "private_path", "preview path private");
 
+  const listenPlayer = normalizeIndexNowUrl("https://audiolad.ru/listen/elixir-molodosti");
+  assert(!listenPlayer.ok && listenPlayer.reason === "private_path", "listen player private");
+
+  const listensSeo = normalizeIndexNowUrl(
+    "https://audiolad.ru/listens/meditatsiya-na-dengi-slushat-onlayn-besplatno",
+  );
+  assert(listensSeo.ok, "SEO listen URL is indexable for IndexNow");
+
+  const innerSupport = normalizeIndexNowUrl("/program/inner-support");
+  assert(!innerSupport.ok && innerSupport.reason === "private_path", "inner-support private");
+
+  const adminUrl = normalizeIndexNowUrl("https://audiolad.ru/admin");
+  assert(!adminUrl.ok && adminUrl.reason === "private_path", "admin private");
+
   const okPath = normalizeIndexNowUrl("/articles/kak-razvit-lyubov-k-sebe");
   assert(
     okPath.ok &&

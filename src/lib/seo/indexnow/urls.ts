@@ -24,6 +24,7 @@ const EXTRA_PRIVATE_PREFIXES = [
   "/author-dashboard",
   "/personal-materials",
   "/checkout",
+  "/program/inner-support",
 ] as const;
 
 export type IndexNowUrlRejectReason =

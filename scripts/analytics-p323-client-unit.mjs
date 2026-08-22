@@ -39,6 +39,17 @@ function testLabels() {
   );
   assertEqual(acquisitionSourceLabel("internal"), "Внутренний переход", "internal");
   assertEqual(acquisitionSourceLabel("unknown"), "Нет данных", "unknown");
+  assertEqual(acquisitionSourceLabel("ai"), "AI-сервисы", "ai");
+  assertEqual(
+    classifyAcquisitionSourceClass({ referrerDomain: "chatgpt.com" }),
+    "ai",
+    "chatgpt referrer is ai",
+  );
+  assertEqual(
+    classifyAcquisitionSourceClass({ referrerDomain: "www.google.com" }),
+    "organic_search",
+    "google stays organic",
+  );
   assertEqual(
     classifyAcquisitionSourceClass({ referrerDomain: "audiolad.ru" }),
     "direct_or_unknown",

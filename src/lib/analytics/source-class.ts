@@ -11,13 +11,46 @@ export type AcquisitionSourceClass =
   | "referral"
   | "direct_or_unknown"
   | "internal"
-  | "unknown";
+  | "unknown"
+  | "ai";
 
 const INTERNAL_REFERRERS = new Set([
   "audiolad.ru",
   "www.audiolad.ru",
   "localhost",
   "127.0.0.1",
+]);
+
+/**
+ * Hosts that are independently AI products. Do not list google.com, bing.com, or yandex.ru.
+ */
+export const AI_REFERRER_ROOTS = [
+  "chatgpt.com",
+  "chat.openai.com",
+  "perplexity.ai",
+  "copilot.microsoft.com",
+  "gemini.google.com",
+  "bard.google.com",
+  "alice.yandex.ru",
+  "alice.yandex.com",
+] as const;
+
+/** Explicit UTM sources only — never infer from "google" / "bing" / "yandex". */
+export const AI_UTM_SOURCES = new Set([
+  "chatgpt",
+  "chatgpt.com",
+  "chat-gpt",
+  "perplexity",
+  "perplexity.ai",
+  "copilot",
+  "microsoft-copilot",
+  "gemini",
+  "google-gemini",
+  "bard",
+  "alice",
+  "alisa",
+  "yandex-alice",
+  "yandex-alisa",
 ]);
 
 function sanitizeUtmValue(value: string | null | undefined): string | null {
@@ -31,6 +64,25 @@ function sanitizeUtmValue(value: string | null | undefined): string | null {
     .slice(0, 128);
 
   return cleaned || null;
+}
+
+function normalizeReferrerHost(value: string): string {
+  return value.trim().toLowerCase().replace(/^www\./, "");
+}
+
+export function isReliableAiReferrerHost(referrerDomain: string | null | undefined): boolean {
+  const host = normalizeReferrerHost(referrerDomain ?? "");
+
+  if (!host) {
+    return false;
+  }
+
+  return AI_REFERRER_ROOTS.some((root) => host === root || host.endsWith(`.${root}`));
+}
+
+export function isReliableAiUtmSource(utmSource: string | null | undefined): boolean {
+  const src = (sanitizeUtmValue(utmSource) ?? "").toLowerCase();
+  return AI_UTM_SOURCES.has(src);
 }
 
 /**
@@ -54,6 +106,8 @@ export function acquisitionSourceLabel(
       return "Без UTM / источник не определён";
     case "internal":
       return "Внутренний переход";
+    case "ai":
+      return "AI-сервисы";
     case "unknown":
       return "Нет данных";
     default:
@@ -77,6 +131,10 @@ export function classifyAcquisitionSourceClass(input: {
   }
 
   if (src || med || camp) {
+    if (isReliableAiUtmSource(src)) {
+      return "ai";
+    }
+
     if (
       ["telegram", "tg", "max", "vk", "whatsapp", "viber"].includes(src) ||
       ["messenger", "messaging", "messaging_bot", "social_messenger"].includes(med) ||
@@ -100,6 +158,10 @@ export function classifyAcquisitionSourceClass(input: {
 
   if (!ref) {
     return "direct_or_unknown";
+  }
+
+  if (isReliableAiReferrerHost(ref)) {
+    return "ai";
   }
 
   if (
