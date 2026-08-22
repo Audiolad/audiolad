@@ -56,6 +56,19 @@ export function hashIndicatesMaxLaunch(hash: string): boolean {
   );
 }
 
+export function readMaxInitData(): string | null {
+  const webApp = getWindowWebApp();
+  if (!webApp || typeof webApp.initData !== "string") {
+    return null;
+  }
+
+  if (webApp.initData.length === 0 || webApp.initData.trim().length === 0) {
+    return null;
+  }
+
+  return webApp.initData;
+}
+
 export function getWindowWebApp(): MaxWebAppLike | null {
   if (typeof window === "undefined") {
     return null;

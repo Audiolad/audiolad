@@ -10,8 +10,10 @@ import { fileURLToPath } from "node:url";
 import {
   hashIndicatesMaxLaunch,
   MAX_WEB_APP_SCRIPT_SRC,
+  readMaxInitData,
   resolveMaxBridgeSnapshot,
 } from "../src/lib/max/bridge.ts";
+import { MAX_SESSION_VERIFY_PATH } from "../src/lib/max/host.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -55,13 +57,15 @@ assert.deepEqual(
   { inMax: true, platform: null, version: null },
 );
 
+assert.equal(readMaxInitData(), null);
+
 const screen = readFileSync(
   join(repoRoot, "src/components/max/MaxMiniAppScreen.tsx"),
   "utf8",
 );
-assert.match(screen, /АудиоЛад открыт внутри MAX/);
 assert.match(screen, /Музыка, медитации, аудиопрактики и аудиокурсы/);
 assert.doesNotMatch(screen, /ListenerAppShell|ProductCard|catalog/);
+assert.doesNotMatch(screen, /подтверждено|user\.id|query_id/);
 
 const bridgeSource = readFileSync(join(repoRoot, "src/lib/max/bridge.ts"), "utf8");
 assert.doesNotMatch(bridgeSource, /WebApp\.ready\(/);
@@ -74,9 +78,19 @@ const scriptSource = readFileSync(
 );
 assert.match(scriptSource, /MAX_WEB_APP_SCRIPT_SRC/);
 assert.match(scriptSource, /afterInteractive/);
+assert.match(scriptSource, /MAX_SESSION_VERIFY_PATH/);
+assert.match(scriptSource, /АудиоЛад открыт внутри MAX/);
+assert.match(scriptSource, /Подключение к MAX…/);
+assert.match(scriptSource, /Подключение к MAX подтверждено/);
+assert.doesNotMatch(
+  scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  /initDataUnsafe/,
+);
+assert.doesNotMatch(scriptSource, /MAX_BOT_TOKEN|NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(
   scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /\.ready\s*\(/,
 );
+assert.equal(MAX_SESSION_VERIFY_PATH, "/api/max/session/verify");
 
 console.log("max-bridge-unit: ok");

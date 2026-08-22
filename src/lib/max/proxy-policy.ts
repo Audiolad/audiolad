@@ -1,4 +1,9 @@
-import { isMaxHostname, isMaxSitePath, MAX_SITE_PATH } from "./host";
+import {
+  isMaxHostname,
+  isMaxSessionVerifyPath,
+  isMaxSitePath,
+  MAX_SITE_PATH,
+} from "./host";
 
 /**
  * Public files the MAX host must still serve. The proxy matcher also skips
@@ -20,6 +25,7 @@ export const MAX_PUBLIC_ASSET_PATHS = [
  * - MAX host exposes no catalog, studio, listen, or author-cabinet routes.
  * - `/sitemap.xml` is 404 on MAX (do not leak the apex catalog sitemap).
  * - `/robots.txt` still passes through so the host can emit a disallow-all file.
+ * - Stage 1 opens only `/api/max/session/verify` on the MAX host. Not `/api/*`.
  */
 export type MaxProxyAction =
   | { action: "not_found" }
@@ -42,6 +48,10 @@ export function resolveMaxProxyAction(
     isMaxHostname(hostname) &&
     (MAX_PUBLIC_ASSET_PATHS as readonly string[]).includes(pathname)
   ) {
+    return { action: "pass_through" };
+  }
+
+  if (isMaxHostname(hostname) && isMaxSessionVerifyPath(pathname)) {
     return { action: "pass_through" };
   }
 
