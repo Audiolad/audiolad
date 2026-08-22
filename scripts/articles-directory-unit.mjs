@@ -53,6 +53,11 @@ import { USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib
 import { MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-bez-slov-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-pered-snom-slushat-onlayn-besplatno.ts";
+import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn.ts";
+import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn.ts";
+import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-noch-slushat-pered-snom.ts";
+import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-horoshego-i-spokoynogo-sna.ts";
+import { MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-s-golosom-slushat-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1020,6 +1025,130 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes twenty-sixth listen href",
   );
+
+
+  const twentySeventhListenHref = "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn";
+  const twentySeventhListenCard = data.articles.find((card) => card.href === twentySeventhListenHref);
+  assert(twentySeventhListenCard, "twenty-seventh indexable listen page is listed");
+  assert(
+    twentySeventhListenCard.title === "Медитация для сна и расслабления – слушать онлайн | АудиоЛад",
+    "twenty-seventh listen directory title",
+  );
+  assert(
+    twentySeventhListenCard.description === MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE.description,
+    "twenty-seventh listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn",
+    ),
+    "no /articles duplicate for twenty-seventh listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentySeventhListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-seventh listen href",
+  );
+
+
+  const twentyEighthListenHref = "/listens/meditatsiya-dlya-glubokogo-sna-slushat-onlayn";
+  const twentyEighthListenCard = data.articles.find((card) => card.href === twentyEighthListenHref);
+  assert(twentyEighthListenCard, "twenty-eighth indexable listen page is listed");
+  assert(
+    twentyEighthListenCard.title === "Медитация для глубокого сна – слушать онлайн | АудиоЛад",
+    "twenty-eighth listen directory title",
+  );
+  assert(
+    twentyEighthListenCard.description === MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "twenty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-glubokogo-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for twenty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-eighth listen href",
+  );
+
+
+  const twentyNinthListenHref = "/listens/meditatsiya-na-noch-slushat-pered-snom";
+  const twentyNinthListenCard = data.articles.find((card) => card.href === twentyNinthListenHref);
+  assert(twentyNinthListenCard, "twenty-ninth indexable listen page is listed");
+  assert(
+    twentyNinthListenCard.title === "Медитация на ночь – слушать перед сном онлайн | АудиоЛад",
+    "twenty-ninth listen directory title",
+  );
+  assert(
+    twentyNinthListenCard.description === MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE.description,
+    "twenty-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-noch-slushat-pered-snom",
+    ),
+    "no /articles duplicate for twenty-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-ninth listen href",
+  );
+
+  const thirtiethListenHref = "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna";
+  const thirtiethListenCard = data.articles.find((card) => card.href === thirtiethListenHref);
+  assert(thirtiethListenCard, "thirtieth indexable listen page is listed");
+  assert(
+    thirtiethListenCard.title === "Медитация для хорошего и спокойного сна – слушать онлайн | АудиоЛад",
+    "thirtieth listen directory title",
+  );
+  assert(
+    thirtiethListenCard.description === MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE.description,
+    "thirtieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-horoshego-i-spokoynogo-sna",
+    ),
+    "no /articles duplicate for thirtieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtiethListenHref}`,
+    ),
+    "directory JSON-LD includes thirtieth listen href",
+  );
+
+  const thirtyFirstListenHref = "/listens/meditatsiya-dlya-sna-s-golosom-slushat-besplatno";
+  const thirtyFirstListenCard = data.articles.find((card) => card.href === thirtyFirstListenHref);
+  assert(thirtyFirstListenCard, "thirty-first indexable listen page is listed");
+  assert(
+    thirtyFirstListenCard.title === "Медитация для сна с голосом – слушать бесплатно | АудиоЛад",
+    "thirty-first listen directory title",
+  );
+  assert(
+    thirtyFirstListenCard.description === MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE.description,
+    "thirty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-s-golosom-slushat-besplatno",
+    ),
+    "no /articles duplicate for thirty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-first listen href",
+  );
+
 
   const articleCards = listArticleDirectoryCards();
   const articleHrefs = new Set(articleCards.map((card) => card.href));
