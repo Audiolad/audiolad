@@ -58,6 +58,7 @@ import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/s
 import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-noch-slushat-pered-snom.ts";
 import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-horoshego-i-spokoynogo-sna.ts";
 import { MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-s-golosom-slushat-besplatno.ts";
+import { MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1144,6 +1145,32 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes thirty-first listen href",
   );
+
+
+  const thirtySecondListenHref = "/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn";
+  const thirtySecondListenCard = data.articles.find((card) => card.href === thirtySecondListenHref);
+  assert(thirtySecondListenCard, "thirty-second indexable listen page is listed");
+  assert(
+    thirtySecondListenCard.title === "Медитация для сна без голоса – слушать онлайн | АудиоЛад",
+    "thirty-second listen directory title",
+  );
+  assert(
+    thirtySecondListenCard.description === MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE.description,
+    "thirty-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn",
+    ),
+    "no /articles duplicate for thirty-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtySecondListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-second listen href",
+  );
+
 
 
   const articleCards = listArticleDirectoryCards();
