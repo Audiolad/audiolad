@@ -1,10 +1,11 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import {
   buildBreadcrumbListJsonLd,
+  buildOrganizationJsonLd,
   type JsonLdNode,
 } from "@/lib/seo/json-ld";
+import { sanitizeJsonLdPlainText } from "@/lib/seo/json-ld/sanitize-text";
 import { resolveJsonLdImageUrl } from "@/lib/seo/json-ld/url-policy";
-import { SITE_BRAND } from "@/lib/seo/site-copy";
 
 import type { TopicHubPageData } from "./types";
 
@@ -24,10 +25,10 @@ export function buildTopicHubFaqJsonLd(
     "@id": `${data.canonicalUrl}#faq`,
     mainEntity: data.hub.faq.map((item) => ({
       "@type": "Question",
-      name: item.question,
+      name: sanitizeJsonLdPlainText(item.question),
       acceptedAnswer: {
         "@type": "Answer",
-        text: item.answer,
+        text: sanitizeJsonLdPlainText(item.answer),
       },
     })),
   };
@@ -90,12 +91,7 @@ export function buildTopicHubJsonLdGraph(
   const collection = buildTopicHubCollectionJsonLd(data, origin);
 
   const graph: JsonLdNode[] = [
-    {
-      "@type": "Organization",
-      "@id": `${originUrl(origin)}/#organization`,
-      name: SITE_BRAND,
-      url: `${originUrl(origin)}/`,
-    },
+    buildOrganizationJsonLd(origin),
     collection,
   ];
 

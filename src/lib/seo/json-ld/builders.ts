@@ -13,6 +13,14 @@ import {
   HOME_SEO_DESCRIPTION,
   SITE_BRAND,
 } from "@/lib/seo/site-copy";
+import {
+  ORGANIZATION_EMAIL,
+  ORGANIZATION_FOUNDER_NAME,
+  ORGANIZATION_LEGAL_NAME,
+  ORGANIZATION_TAX_ID,
+  buildOrganizationFounderPath,
+} from "@/lib/seo/json-ld/organization-entity";
+import { sanitizeJsonLdPlainText } from "@/lib/seo/json-ld/sanitize-text";
 
 import { secondsToIso8601Duration } from "./duration";
 import { resolveJsonLdImageUrl } from "./url-policy";
@@ -104,6 +112,8 @@ function resolveAuthorSchemaType(authorType: string | undefined): "Person" | "Or
 export function buildOrganizationJsonLd(origin = getAppOrigin()): JsonLdNode {
   const siteOrigin = originUrl(origin);
 
+  const founderUrl = `${siteOrigin}${buildOrganizationFounderPath()}`;
+
   return {
     "@type": "Organization",
     "@id": `${siteOrigin}/#organization`,
@@ -111,6 +121,15 @@ export function buildOrganizationJsonLd(origin = getAppOrigin()): JsonLdNode {
     url: `${siteOrigin}/`,
     logo: `${siteOrigin}/audiolad-logo.png`,
     description: SITE_DESCRIPTION,
+    legalName: ORGANIZATION_LEGAL_NAME,
+    taxID: ORGANIZATION_TAX_ID,
+    email: ORGANIZATION_EMAIL,
+    founder: {
+      "@type": "Person",
+      "@id": `${founderUrl}#author`,
+      name: ORGANIZATION_FOUNDER_NAME,
+      url: founderUrl,
+    },
   };
 }
 
@@ -262,10 +281,10 @@ export function buildPhilosophyPageJsonLd(
       "@id": `${pageUrl}#faq`,
       mainEntity: input.faq.map((item) => ({
         "@type": "Question",
-        name: item.question,
+        name: sanitizeJsonLdPlainText(item.question),
         acceptedAnswer: {
           "@type": "Answer",
-          text: item.answer,
+          text: sanitizeJsonLdPlainText(item.answer),
         },
       })),
     });
@@ -341,10 +360,10 @@ export function buildForAuthorsPageJsonLd(
       "@id": `${pageUrl}#faq`,
       mainEntity: input.faq.map((item) => ({
         "@type": "Question",
-        name: item.question,
+        name: sanitizeJsonLdPlainText(item.question),
         acceptedAnswer: {
           "@type": "Answer",
-          text: item.answer,
+          text: sanitizeJsonLdPlainText(item.answer),
         },
       })),
     });
@@ -406,6 +425,13 @@ export function buildAuthorJsonLd(
     image,
     knowsAbout: knowsAbout.length > 0 ? knowsAbout : undefined,
     sameAs: sameAs.length > 0 ? sameAs : undefined,
+    ...(schemaType === "Person"
+      ? {
+          worksFor: {
+            "@id": `${originUrl(origin)}/#organization`,
+          },
+        }
+      : {}),
   };
 
   const breadcrumbs = buildBreadcrumbListJsonLd(
@@ -436,11 +462,20 @@ function buildPracticeAuthorNode(
 ): JsonLdNode {
   const authorUrl = absolutePath(buildAuthorPublicPath(input.authorSlug), origin);
 
+  const schemaType = resolveAuthorSchemaType(input.authorType);
+
   return {
-    "@type": resolveAuthorSchemaType(input.authorType),
+    "@type": schemaType,
     "@id": `${authorUrl}#author`,
     name: input.authorName,
     url: authorUrl,
+    ...(schemaType === "Person"
+      ? {
+          worksFor: {
+            "@id": `${originUrl(origin)}/#organization`,
+          },
+        }
+      : {}),
   };
 }
 

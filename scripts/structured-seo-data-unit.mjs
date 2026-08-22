@@ -16,6 +16,8 @@ import {
   shouldEmitAuthorJsonLd,
   shouldEmitPracticeJsonLd,
 } from "../src/lib/seo/json-ld/index.ts";
+import { sanitizeJsonLdPlainText } from "../src/lib/seo/json-ld/sanitize-text.ts";
+import { buildArticleFaqJsonLd } from "../src/lib/seo/articles/json-ld.ts";
 import {
   buildCatalogMetadata,
   buildHomeMetadata,
@@ -112,6 +114,7 @@ function testAuthorPersonAndOrganization() {
 
   assert(personNode?.name === "Сергей", "person author name mapped");
   assert(personNode?.url === `${ORIGIN}/authors/sergey`, "person author canonical URL");
+  assert(personNode?.worksFor?.["@id"] === `${ORIGIN}/#organization`, "person worksFor organization");
 
   const organization = buildAuthorJsonLd(
     {
@@ -367,10 +370,123 @@ function testSerializedGraphHasNoSecrets() {
   assert(() => parseSerializedJsonLd(serialized), "serialized output parses as JSON");
 }
 
+
+function testFaqSanitation() {
+  assert(
+    sanitizeJsonLdPlainText("### Женская энергия – что это простыми словами?") ===
+      "Женская энергия – что это простыми словами?",
+    "strips markdown heading markers from FAQ question",
+  );
+  assert(
+    sanitizeJsonLdPlainText("  ## Можно ли **потерять** женскую энергию?  ") ===
+      "Можно ли потерять женскую энергию?",
+    "strips heading hashes and bold markers",
+  );
+  assert(
+    sanitizeJsonLdPlainText("<p>Ответ <strong>короткий</strong></p>") ===
+      "Ответ короткий",
+    "strips HTML from FAQ answer",
+  );
+
+  const faq = buildArticleFaqJsonLd({
+    path: "/articles/zhenskaya-energiya-chto-eto",
+    canonicalUrl: `${ORIGIN}/articles/zhenskaya-energiya-chto-eto`,
+    readingTimeMinutes: 1,
+    article: {
+      title: "Женская энергия",
+      metaDescription: "desc",
+      authorLabel: "Редакция АудиоЛада",
+      publishedAt: "2026-07-29T00:00:00.000Z",
+      updatedAt: "2026-07-29T00:00:00.000Z",
+      topicTitle: "Женская энергия",
+      topicHref: "/topics/zhenskaya-energiya",
+      faq: [
+        {
+          question: "### Женская энергия – что это простыми словами?",
+          answer: "Это образное выражение, а не научный термин.",
+        },
+      ],
+    },
+  });
+
+  assert(faq?.mainEntity?.[0]?.name === "Женская энергия – что это простыми словами?", "FAQ JSON-LD name has no ###");
+  assert(!JSON.stringify(faq).includes("###"), "FAQ JSON-LD has no markdown hashes");
+}
+
+function testOrganizationEntityFields() {
+  const graph = buildHomeJsonLd(ORIGIN);
+  const organization = graph["@graph"].find((node) => node["@type"] === "Organization");
+
+  assert(organization?.["@id"] === `${ORIGIN}/#organization`, "stable organization @id");
+  assert(
+    organization?.legalName ===
+      "Индивидуальный предприниматель Петров Сергей Сергеевич",
+    "legalName comes from requisites",
+  );
+  assert(organization?.email === "1@audiolad.ru", "public email from requisites");
+  assert(organization?.taxID === "507305817690", "INN from requisites");
+  assert(!("address" in (organization ?? {})), "no local postal address on Organization");
+  assert(!JSON.stringify(organization).includes("Ставрополь"), "no Stavropol geo signal");
+  assert(
+    organization?.founder?.["@id"] === `${ORIGIN}/authors/sergey-petrov#author`,
+    "founder points to existing Person @id",
+  );
+  assert(!("sameAs" in (organization ?? {})), "no invented Organization sameAs");
+}
+
+function testPracticePersonAuthor() {
+  const personPractice = buildPracticeJsonLd(
+    {
+      title: "Молитва",
+      description: "desc",
+      authorSlug: "sergey-petrov",
+      authorName: "Сергей Петров",
+      authorType: "person",
+      productSlug: "molitva-optinskih-startsev",
+      imageUrl: null,
+      isFree: true,
+      price: 0,
+    },
+    ORIGIN,
+  );
+  const work = personPractice["@graph"].find((node) => node["@type"] === "CreativeWork");
+
+  assert(work?.author?.["@type"] === "Person", "physical author stays Person");
+  assert(
+    work?.author?.["@id"] === `${ORIGIN}/authors/sergey-petrov#author`,
+    "practice author uses stable Person @id",
+  );
+  assert(
+    work?.author?.worksFor?.["@id"] === `${ORIGIN}/#organization`,
+    "Person worksFor Audiolad organization",
+  );
+
+  const studioPractice = buildPracticeJsonLd(
+    {
+      title: "Студийная практика",
+      description: null,
+      authorSlug: "audio-studio",
+      authorName: "АудиоСтудия",
+      authorType: "studio",
+      productSlug: "studio-work",
+      imageUrl: null,
+      isFree: true,
+      price: 0,
+    },
+    ORIGIN,
+  );
+  const studioWork = studioPractice["@graph"].find((node) => node["@type"] === "CreativeWork");
+  assert(studioWork?.author?.["@type"] === "Organization", "studio author remains Organization");
+  assert(!studioWork?.author?.worksFor, "organization author has no worksFor");
+}
+
 const tests = [
   ["serializeJsonLd", testSerializeJsonLd],
   ["pruneJsonLdValue", testPruneRemovesEmptyValues],
   ["home graph", testHomeOrganizationAndWebsite],
+  ["faq sanitation", testFaqSanitation],
+  ["organization entity", testOrganizationEntityFields],
+  ["practice person author", testPracticePersonAuthor],
   ["author schemas", testAuthorPersonAndOrganization],
   ["practice free", testPracticeCreativeWork],
   ["practice paid offer", testPracticePaidOffer],

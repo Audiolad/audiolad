@@ -7,6 +7,7 @@ export type PublicPracticeAuthor = {
   slug: string;
   description: string | null;
   avatar_url: string | null;
+  author_type: string | null;
 };
 
 export type PublicPracticeRow = {
@@ -106,7 +107,8 @@ export async function getPracticeByAuthorAndSlug(
         name,
         slug,
         description,
-        avatar_url
+        avatar_url,
+        author_type
       )
     `,
     )

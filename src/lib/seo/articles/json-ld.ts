@@ -1,8 +1,10 @@
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import {
   buildBreadcrumbListJsonLd,
+  buildOrganizationJsonLd,
   type JsonLdNode,
 } from "@/lib/seo/json-ld";
+import { sanitizeJsonLdPlainText } from "@/lib/seo/json-ld/sanitize-text";
 import { resolveJsonLdImageUrl } from "@/lib/seo/json-ld/url-policy";
 import { SITE_BRAND } from "@/lib/seo/site-copy";
 
@@ -24,10 +26,10 @@ export function buildArticleFaqJsonLd(
     "@id": `${data.canonicalUrl}#faq`,
     mainEntity: data.article.faq.map((item) => ({
       "@type": "Question",
-      name: item.question,
+      name: sanitizeJsonLdPlainText(item.question),
       acceptedAnswer: {
         "@type": "Answer",
-        text: item.answer,
+        text: sanitizeJsonLdPlainText(item.answer),
       },
     })),
   };
@@ -83,7 +85,6 @@ export function buildArticleJsonLdGraph(
   data: ArticlePageData,
   origin = getAppOrigin(),
 ): JsonLdNode {
-  const siteOrigin = originUrl(origin);
   const breadcrumbs = buildBreadcrumbListJsonLd(
     [
       { name: "Главная", path: "/" },
@@ -94,12 +95,7 @@ export function buildArticleJsonLdGraph(
   );
 
   const graph: JsonLdNode[] = [
-    {
-      "@type": "Organization",
-      "@id": `${siteOrigin}/#organization`,
-      name: SITE_BRAND,
-      url: `${siteOrigin}/`,
-    },
+    buildOrganizationJsonLd(origin),
     buildArticleJsonLd(data, origin),
   ];
 

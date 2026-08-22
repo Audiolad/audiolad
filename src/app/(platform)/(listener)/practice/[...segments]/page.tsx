@@ -503,6 +503,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         description: practice.description,
         authorSlug: resolvedAuthorSlug,
         authorName: authorName ?? resolvedAuthorSlug,
+        authorType: normalizeOne(practice.authors)?.author_type ?? "person",
         productSlug: practice.slug,
         imageUrl: practiceCoverUrl,
         isFree: practice.is_free,
