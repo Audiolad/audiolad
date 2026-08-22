@@ -56,6 +56,7 @@ import { MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib
 import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn.ts";
 import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-noch-slushat-pered-snom.ts";
+import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-horoshego-i-spokoynogo-sna.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1093,6 +1094,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${twentyNinthListenHref}`,
     ),
     "directory JSON-LD includes twenty-ninth listen href",
+  );
+
+  const thirtiethListenHref = "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna";
+  const thirtiethListenCard = data.articles.find((card) => card.href === thirtiethListenHref);
+  assert(thirtiethListenCard, "thirtieth indexable listen page is listed");
+  assert(
+    thirtiethListenCard.title === "Медитация для хорошего и спокойного сна – слушать онлайн | АудиоЛад",
+    "thirtieth listen directory title",
+  );
+  assert(
+    thirtiethListenCard.description === MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE.description,
+    "thirtieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-horoshego-i-spokoynogo-sna",
+    ),
+    "no /articles duplicate for thirtieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtiethListenHref}`,
+    ),
+    "directory JSON-LD includes thirtieth listen href",
   );
 
 
