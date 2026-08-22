@@ -62,6 +62,7 @@ import { MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/
 import { MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-bez-reklamy-slushat-besplatno.ts";
 import { MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy.ts";
 import { MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn.ts";
+import { MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-zasypaniya-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1251,6 +1252,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirtyFifthListenHref}`,
     ),
     "directory JSON-LD includes thirty-fifth listen href",
+  );
+
+  const thirtySixthListenHref = "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn";
+  const thirtySixthListenCard = data.articles.find((card) => card.href === thirtySixthListenHref);
+  assert(thirtySixthListenCard, "thirty-sixth indexable listen page is listed");
+  assert(
+    thirtySixthListenCard.title === "Медитация для засыпания – слушать онлайн | АудиоЛад",
+    "thirty-sixth listen directory title",
+  );
+  assert(
+    thirtySixthListenCard.description === MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE.description,
+    "thirty-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-zasypaniya-slushat-onlayn",
+    ),
+    "no /articles duplicate for thirty-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtySixthListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-sixth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
