@@ -1,6 +1,10 @@
 import "server-only";
 
 import { isMaxHostname, MAX_HOSTNAME } from "@/lib/max/host";
+import {
+  MAX_EXTERNAL_IDENTITY_PROVIDER,
+  touchExternalIdentity,
+} from "@/lib/max/touch-external-identity";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
@@ -26,7 +30,8 @@ type VerifyErrorReason =
   | "invalid_auth_date"
   | "invalid_hash"
   | "expired"
-  | "future";
+  | "future"
+  | "storage_unavailable";
 
 const PARSE_REASONS = new Set<VerifyErrorReason>([
   "empty_init_data",
@@ -78,6 +83,9 @@ export function isAllowedMaxVerifyOrigin(request: Request): boolean {
 
 function statusForReason(reason: VerifyErrorReason): number {
   if (reason === "payload_too_large") return 413;
+  if (reason === "storage_unavailable" || reason === "service_unavailable") {
+    return 503;
+  }
   if (reason === "invalid_hash" || reason === "expired" || reason === "future") {
     return 401;
   }
@@ -141,5 +149,13 @@ export async function POST(request: Request) {
     return errorResponse(result.reason, statusForReason(result.reason));
   }
 
-  return Response.json({ ok: true });
+  const touch = await touchExternalIdentity(
+    MAX_EXTERNAL_IDENTITY_PROVIDER,
+    result.data.user.id,
+  );
+  if (!touch.ok) {
+    return errorResponse("storage_unavailable", 503);
+  }
+
+  return Response.json({ ok: true, linked: touch.linked });
 }

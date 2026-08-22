@@ -202,20 +202,31 @@ assert.match(
   "shell must call the Stage 1 verify path",
 );
 
-const maxServerSources = [
-  "src/lib/max/verify-init-data.ts",
-  "src/app/api/max/session/verify/route.ts",
-]
-  .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
-  .join("\n");
-assert.doesNotMatch(maxServerSources, /NEXT_PUBLIC_MAX/);
+const verifierSource = readFileSync(
+  join(repoRoot, "src/lib/max/verify-init-data.ts"),
+  "utf8",
+);
+const routeSource = readFileSync(
+  join(repoRoot, "src/app/api/max/session/verify/route.ts"),
+  "utf8",
+);
+const touchSource = readFileSync(
+  join(repoRoot, "src/lib/max/touch-external-identity.ts"),
+  "utf8",
+);
+assert.doesNotMatch(`${verifierSource}\n${routeSource}\n${touchSource}`, /NEXT_PUBLIC_MAX/);
+assert.doesNotMatch(verifierSource, /CREATE TABLE|alter table|external_identities/i);
+assert.doesNotMatch(verifierSource, /createServiceRoleClient|@\/lib\/supabase/);
+assert.match(routeSource, /touchExternalIdentity/);
+assert.match(touchSource, /createServiceRoleClient/);
+assert.doesNotMatch(`${routeSource}\n${touchSource}`, /CREATE TABLE|alter table/i);
 assert.doesNotMatch(
-  maxServerSources,
-  /external_identities|CREATE TABLE|alter table/i,
+  maxClientSources,
+  /зарегистрир|вошли|вход выполнен|logged in|registered/i,
 );
 assert.match(policySource, /isMaxSessionVerifyPath/);
 assert.doesNotMatch(
-  `${maxClientSources}\n${maxServerSources}`
+  `${maxClientSources}\n${verifierSource}\n${routeSource}\n${touchSource}`
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, ""),
   /\.ready\s*\(/,

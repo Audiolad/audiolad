@@ -6,7 +6,7 @@ export const MAX_ORIGIN = `https://${MAX_HOSTNAME}`;
 /** Internal App Router path served for the MAX Mini App root. */
 export const MAX_SITE_PATH = "/max-site";
 
-/** Stage 1: HMAC-verify raw `window.WebApp.initData`. MAX host only. */
+/** HMAC-verify raw `window.WebApp.initData`, then touch external identity. MAX host only. */
 export const MAX_SESSION_VERIFY_PATH = "/api/max/session/verify";
 
 export function isMaxHostname(hostname: string): boolean {
