@@ -184,7 +184,7 @@ Timeweb Cloud
 - Каталог и карточки продукта — только общая обложка.
 - Author UI: `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API `POST/DELETE .../audio/[audioId]/cover`.
 
-## MAX Mini App (этап 1: проверка initData)
+## MAX Mini App (этапы 1–2)
 
 Изолированная оболочка на `max.audiolad.ru` (см. `src/lib/max/`, `/max-site`).
 Каталог, Студия, статьи и прочие маршруты приложения на этом хосте остаются 404.
@@ -192,18 +192,33 @@ Timeweb Cloud
 **Этап 1 (реализован):** серверная HMAC-проверка сырого `window.WebApp.initData`
 по официальному алгоритму MAX (`https://dev.max.ru/docs/webapps/validation`).
 
-- Чистый модуль: `src/lib/max/verify-init-data.ts` (только сервер).
+- Чистый модуль: `src/lib/max/verify-init-data.ts` (только сервер, без Supabase).
 - Эндпоинт: `POST /api/max/session/verify`, тело `{ initData }`.
 - Токен: только `MAX_BOT_TOKEN` на сервере. `NEXT_PUBLIC_MAX_BOT_TOKEN` запрещён.
 - Proxy на MAX-хосте открывает **только** этот API-путь, не `/api/*`.
-- Успех API: `{ ok: true }`. Пользователь АудиоЛада, cookies и
-  `external_identities` не создаются. Replay-таблица не вводится;
-  при успехе верификатор сохраняет `query_id` для будущего этапа.
 - `initDataUnsafe`, platform и version не являются доверенной идентичностью.
+- `user.id` хранится как десятичная целочисленная строка из подписанного JSON
+  (сырые цифры, не `Number`, не UUID).
+
+**Этап 2 (реализован):** после успешной HMAC-проверки сервер атомарно
+`upsert` строку в `public.external_identities` через SECURITY DEFINER RPC
+`touch_external_identity` (вызов только `service_role`).
+
+- `provider = 'max'`, `provider_user_id` = проверенный MAX `user.id` (text).
+- `user_id` и `linked_at` на этапе 2 не выставляются (остаются NULL).
+- Повтор того же MAX id — одна строка, обновляются только `last_verified_at`
+  и `updated_at`. Существующие `user_id` / `linked_at` не затираются.
+- Успех API: `{ ok: true, linked }` (`linked` true только если у строки уже
+  есть `user_id`; для новых строк этапа 2 всегда false).
+- HMAC/свежесть не прошли → 4xx, RPC не вызывается.
+- HMAC ок, persist нет → 5xx `{ ok: false, reason: "storage_unavailable" }`.
+- Ответ не содержит MAX id, `user_id` АудиоЛада, профиль, initData.
+- `auth.users` не создаются; вход / регистрация / связка — не этот этап.
+- Replay-таблица не вводится.
 
 Поздние этапы (связь MAX user id с профилем, вход, библиотека) **не реализованы**.
 
-### Планируемая связь идентификаторов (не этап 1)
+### Планируемая связь идентификаторов (не этап 2)
 
 ```
 MAX user_id  ↔  профиль АудиоЛада  ↔  пользователь Supabase Auth

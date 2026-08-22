@@ -364,6 +364,47 @@ RPC `public.remove_library_practice(p_practice_id uuid)`:
 
 API: `POST /api/library/remove` `{ practice_id }` → success / `not_in_library` / `not_removable` / `unauthorized` / `internal_error`.
 
+## external_identities (MAX Mini App, этап 2)
+
+Миграция: `supabase/migrations/20260822200000_external_identities.sql`.
+
+Таблица внешних идентификаторов мессенджера. На этапе 2 пишется только
+после серверной HMAC-проверки `initData`. Строка **не** создаёт
+`auth.users` и **не** связывает MAX id с аккаунтом АудиоЛада.
+
+### public.external_identities
+
+| Колонка | Тип | Назначение |
+|---------|-----|------------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `provider` | text NOT NULL | этап 2: `'max'`; non-empty trimmed |
+| `provider_user_id` | text NOT NULL | десятичная целочисленная строка MAX `user.id`, не UUID |
+| `user_id` | uuid NULL | FK `auth.users(id)` ON DELETE CASCADE; этап 2 всегда NULL |
+| `created_at` / `updated_at` | timestamptz | defaults `now()` |
+| `last_verified_at` | timestamptz | обновляется при каждом успешном touch |
+| `linked_at` | timestamptz NULL | этап 3; touch не выставляет и не затирает |
+
+UNIQUE `(provider, provider_user_id)`. Частичный UNIQUE
+`(provider, user_id) WHERE user_id IS NOT NULL`.
+
+RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `authenticated`.
+Запись только через RPC.
+
+### RPC `public.touch_external_identity(p_provider, p_provider_user_id)`
+
+- `SECURITY DEFINER`, `search_path = public, pg_temp`.
+- `REVOKE ALL FROM PUBLIC/anon/authenticated`; `GRANT EXECUTE` только `service_role`.
+- Атомарно: `INSERT ... ON CONFLICT (provider, provider_user_id) DO UPDATE SET last_verified_at = now(), updated_at = now()`.
+- UPDATE **не** трогает `user_id` и `linked_at`.
+- Возвращает `{ linked boolean }` (`user_id IS NOT NULL`).
+- Пустые provider / provider_user_id — ошибка.
+
+Приложение: `src/lib/max/touch-external-identity.ts` через
+`createServiceRoleClient()`. Маршрут `POST /api/max/session/verify` после
+успешного HMAC вызывает RPC и отвечает `{ ok: true, linked }`.
+
+Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

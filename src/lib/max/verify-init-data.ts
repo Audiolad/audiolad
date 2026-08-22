@@ -76,26 +76,34 @@ function optionalString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function isDecimalIntegerString(value: string): boolean {
+  return /^-?[0-9]+$/.test(value);
+}
+
+/**
+ * Prefer the raw JSON digits for `id`. JSON.parse turns integers wider than
+ * Number.MAX_SAFE_INTEGER into an already-rounded JS number (e.g.
+ * 9007199254740993 → 9007199254740992). That rounded number must never become
+ * provider_user_id, and it is not a UUID.
+ */
 function extractRawJsonNumberId(rawJson: string): string | null {
-  const match = rawJson.match(/"id"\s*:\s*(-?\d+)/);
+  const match = rawJson.match(/"id"\s*:\s*(-?[0-9]+)(?=$|[^0-9.eE])/);
   return match?.[1] ?? null;
 }
 
 function readExternalId(value: unknown, rawJson: string): string | null {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
+  const raw = extractRawJsonNumberId(rawJson);
+  if (raw && isDecimalIntegerString(raw)) {
+    return raw;
   }
 
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const raw = extractRawJsonNumberId(rawJson);
-    if (raw) {
-      return raw;
-    }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return isDecimalIntegerString(trimmed) ? trimmed : null;
+  }
 
-    if (Number.isSafeInteger(value)) {
-      return String(value);
-    }
+  if (typeof value === "number" && Number.isSafeInteger(value)) {
+    return String(value);
   }
 
   return null;

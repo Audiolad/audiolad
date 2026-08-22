@@ -99,6 +99,41 @@ const largeIdResult = verifyMaxInitData(largeId, FICTIONAL_BOT_TOKEN, {
 assert.equal(largeIdResult.ok, true);
 assert.equal(largeIdResult.data.user.id, "9007199254740993");
 assert.equal(largeIdResult.data.query_id, "replay-later");
+assert.equal(
+  String(Number("9007199254740993")),
+  "9007199254740992",
+  "JSON/Number already lose this id; persist the raw decimal string instead",
+);
+assert.equal(Number.isSafeInteger(Number("9007199254740993")), false);
+assert.notEqual(largeIdResult.data.user.id, String(Number("9007199254740993")));
+
+const largeIdAsString = signInitData({
+  auth_date: "1700000000",
+  user: '{"id":"9007199254740993","first_name":"Wide"}',
+});
+const largeIdAsStringResult = verifyMaxInitData(
+  largeIdAsString,
+  FICTIONAL_BOT_TOKEN,
+  { nowSeconds: HARD_CODED_NOW },
+);
+assert.equal(largeIdAsStringResult.ok, true);
+assert.equal(largeIdAsStringResult.data.user.id, "9007199254740993");
+
+const scientificId = signInitData({
+  auth_date: "1700000000",
+  user: '{"id":1e21,"first_name":"Sci"}',
+});
+assertReject(scientificId, FICTIONAL_BOT_TOKEN, "missing_user_id", {
+  nowSeconds: HARD_CODED_NOW,
+});
+
+const uuidId = signInitData({
+  auth_date: "1700000000",
+  user: '{"id":"550e8400-e29b-41d4-a716-446655440000","first_name":"Uuid"}',
+});
+assertReject(uuidId, FICTIONAL_BOT_TOKEN, "missing_user_id", {
+  nowSeconds: HARD_CODED_NOW,
+});
 
 assertReject(
   HARD_CODED_INIT_DATA.replace("%3A67890", "%3A67891"),
@@ -225,6 +260,8 @@ const verifierSource = readFileSync(
 );
 assert.match(verifierSource, /import "server-only"/);
 assert.match(verifierSource, /timingSafeEqual/);
+assert.doesNotMatch(verifierSource, /from ["']@\/lib\/supabase|from ["']@supabase/);
+assert.doesNotMatch(verifierSource, /createServiceRoleClient|touch_external_identity/);
 assert.doesNotMatch(verifierSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(verifierSource, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(

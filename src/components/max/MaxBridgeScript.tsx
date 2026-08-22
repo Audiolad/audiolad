@@ -17,8 +17,9 @@ import { MAX_SESSION_VERIFY_PATH } from "@/lib/max/host";
  * in a regular browser and must not throw.
  *
  * When `window.WebApp.initData` is non-empty, POSTs the raw string to the
- * Stage 1 verifier. Never treats initDataUnsafe / platform / version as
- * verified identity. Does not display user id, query_id, or raw initData.
+ * verifier. Never treats initDataUnsafe / platform / version as verified
+ * identity. Does not display user id, query_id, or raw initData. Does not
+ * write the database from the browser; missing initData skips POST.
  */
 
 export const MAX_SHELL_STATUS_NEUTRAL = "АудиоЛад открыт внутри MAX";

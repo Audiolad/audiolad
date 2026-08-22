@@ -4,6 +4,27 @@
 
 ---
 
+## Сессия — 22 августа 2026 (MAX Mini App этап 2)
+
+**Сделано:**
+
+- Миграция `20260822200000_external_identities.sql`: таблица + RPC
+  `touch_external_identity` (RLS, revoke anon/authenticated, execute только
+  service_role).
+- Helper `src/lib/max/touch-external-identity.ts` через
+  `createServiceRoleClient()`.
+- `POST /api/max/session/verify` после HMAC вызывает touch и возвращает
+  `{ ok, linked }`. HMAC fail не пишет БД.
+- `verifyMaxInitData` остаётся без Supabase; `user.id` — decimal integer
+  string из сырого JSON.
+- Тесты: schema/SQL parse, mocked RPC, route, существующие Stage 1.
+- Коммит/PR без merge. Production / PM2 / Nginx не менялись.
+
+**Следующий шаг:** этап 3 (связка `user_id` / `linked_at`) только по
+отдельному заданию. До появления связей откат = DROP FUNCTION + DROP TABLE.
+
+---
+
 ## Сессия — 16 июля 2026 (owned playlists filter — push и production verify)
 
 **Сделано:**

@@ -92,14 +92,17 @@ PR1–PR5 на production (`6a692a2`). Play All реализован в рабо
 ## MAX Mini App
 
 **Этап 1 — проверка initData: сделано.** Сервер принимает сырой
-`window.WebApp.initData`, проверяет HMAC (`MAX_BOT_TOKEN`), свежесть и
-возвращает ok/reject. Пользователи АудиоЛада, `external_identities`,
-миграции и вход не входят в этот этап.
+`window.WebApp.initData`, проверяет HMAC (`MAX_BOT_TOKEN`) и свежесть.
+
+**Этап 2 — touch `external_identities`: сделано.** После успешного HMAC
+сервер атомарно upsert-ит `(provider='max', provider_user_id)` с
+`user_id = NULL`. Вход, регистрация и связка с аккаунтом АудиоЛада
+не входят в этот этап.
 
 Следующие этапы MAX (не начинать без отдельного задания):
 
 - replay / повторное использование `query_id`;
-- связь MAX user id с профилем;
+- связь MAX user id с профилем (`user_id` / `linked_at`);
 - вход и библиотека внутри мини-приложения.
 
 ### Планируемый результат полной воронки
