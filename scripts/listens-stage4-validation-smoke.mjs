@@ -40,6 +40,7 @@ import { MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE } from "../src/lib/seo
 import { MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-s-golosom-slushat-besplatno.ts";
 import { MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-bez-reklamy-slushat-besplatno.ts";
+import { MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy.ts";
 import {
   buildListenPageJsonLdGraph,
   getListenPageBySlug,
@@ -4079,7 +4080,7 @@ function testEleventhPage() {
   assert(slugs.includes(NINTH_PAGE_SLUG), "registry contains ninth listen slug");
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4261,7 +4262,7 @@ function testTwelfthPage() {
   assert(slugs.includes(TENTH_PAGE_SLUG), "registry contains tenth listen slug");
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZHURCHANIE_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4436,7 +4437,7 @@ function testThirteenthPage() {
   assert(slugs.includes(ELEVENTH_PAGE_SLUG), "registry contains eleventh listen slug");
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_VODOPADA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4632,7 +4633,7 @@ function testFourteenthPage() {
   assert(slugs.includes(TWELFTH_PAGE_SLUG), "registry contains twelfth listen slug");
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_RUCHYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -4849,7 +4850,7 @@ function testFifteenthPage() {
   assert(slugs.includes(THIRTEENTH_PAGE_SLUG), "registry contains thirteenth listen slug");
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_SNA_PAGE.playlistSlug === "shum-vody",
@@ -5084,7 +5085,7 @@ function testSixteenthPage() {
   assert(slugs.includes(FOURTEENTH_PAGE_SLUG), "registry contains fourteenth listen slug");
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     ZVUK_LYUSHCHEYSYA_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5321,7 +5322,7 @@ function testSeventeenthPage() {
   assert(slugs.includes(FIFTEENTH_PAGE_SLUG), "registry contains fifteenth listen slug");
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     BELYY_SHUM_VODY_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -5558,7 +5559,7 @@ function testEighteenthPage() {
   assert(slugs.includes(SIXTEENTH_PAGE_SLUG), "registry contains sixteenth listen slug");
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_DETEY_PAGE.playlistSlug === "shum-vody",
@@ -5806,7 +5807,7 @@ function testNineteenthPage() {
   assert(slugs.includes(SEVENTEENTH_PAGE_SLUG), "registry contains seventeenth listen slug");
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_DLYA_NOVOROZHDENNYH_PAGE.playlistSlug === "shum-vody",
@@ -6049,7 +6050,7 @@ function testTwentiethPage() {
   assert(slugs.includes(EIGHTEENTH_PAGE_SLUG), "registry contains eighteenth listen slug");
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     SHUM_VODY_IZ_KRANA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "shum-vody",
@@ -6300,7 +6301,7 @@ function testTwentyFirstPage() {
   assert(slugs.includes(NINETEENTH_PAGE_SLUG), "registry contains nineteenth listen slug");
   assert(slugs.includes(TWENTIETH_PAGE_SLUG), "registry contains twentieth listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -6537,7 +6538,7 @@ function testTwentySecondPage() {
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -6820,7 +6821,7 @@ function testTwentyThirdPage() {
   assert(slugs.includes(TWENTY_FIRST_PAGE_SLUG), "registry contains twenty-first listen slug");
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7122,7 +7123,7 @@ function testTwentyFourthPage() {
   assert(slugs.includes(TWENTY_SECOND_PAGE_SLUG), "registry contains twenty-second listen slug");
   assert(slugs.includes(TWENTY_THIRD_PAGE_SLUG), "registry contains twenty-third listen slug");
   assert(slugs.includes(TWENTY_FOURTH_PAGE_SLUG), "registry contains twenty-fourth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -7331,7 +7332,7 @@ function testTwentyFifthPage() {
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry contains twenty-fifth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7529,7 +7530,7 @@ function testTwentySixthPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7749,7 +7750,7 @@ function testTwentySeventhPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -7991,7 +7992,7 @@ function testTwentyEighthPage() {
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
   assert(slugs.includes(TWENTY_FIFTH_PAGE_SLUG), "registry still contains twenty-fifth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8235,7 +8236,7 @@ function testTwentyNinthPage() {
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
   assert(slugs.includes(TWENTY_SIXTH_PAGE_SLUG), "registry still contains twenty-sixth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8473,7 +8474,7 @@ function testThirtiethPage() {
   assert(slugs.includes(TWENTY_NINTH_PAGE_SLUG), "registry still contains twenty-ninth listen slug");
   assert(slugs.includes(TWENTY_EIGHTH_PAGE_SLUG), "registry still contains twenty-eighth listen slug");
   assert(slugs.includes(TWENTY_SEVENTH_PAGE_SLUG), "registry still contains twenty-seventh listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -8782,7 +8783,7 @@ function testThirtyFirstPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry contains thirty-first listen slug");
   assert(slugs.includes(THIRTIETH_PAGE_SLUG), "registry still contains thirtieth listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9078,7 +9079,7 @@ function testThirtySecondPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry contains thirty-second listen slug");
   assert(slugs.includes(THIRTY_FIRST_PAGE_SLUG), "registry still contains thirty-first listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE.playlistSlug === "muzyka-dlya-sna",
@@ -9357,7 +9358,7 @@ function testThirtyThirdPage() {
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry contains thirty-third listen slug");
   assert(slugs.includes(THIRTY_SECOND_PAGE_SLUG), "registry still contains thirty-second listen slug");
-  assert(slugs.length === 33, "registry contains all 33 listen slugs");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
   assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
   assert(
     MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE.playlistSlug === "meditatsiya-dlya-sna",
@@ -9413,6 +9414,284 @@ function testThirtyThirdPage() {
 }
 
 
+const THIRTY_FOURTH_PAGE_SLUG = "meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy";
+const SLEEP_CALMING_MEDITATION_PAGE = MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE;
+const THIRTY_FOURTH_PAGE_H1 = "Медитация для сна и успокоения нервной системы";
+const THIRTY_FOURTH_PAGE_TITLE = "Медитация для сна и успокоения нервной системы | АудиоЛад";
+const THIRTY_FOURTH_PAGE_DESCRIPTION =
+  "Медитация для сна и успокоения: выберите спокойную практику и слушайте онлайн. Для переключения после дня и мягкой подготовки ко сну.";
+
+const THIRTY_FOURTH_EXPECTED_INTRO = [
+  "Медитация для сна и успокоения нервной системы может подойти вечером, когда тело уже готово отдыхать, а внимание всё ещё занято событиями дня. На этой странице можно выбрать спокойную практику и начать слушать её онлайн.",
+  "Здесь выражение «успокоение нервной системы» используется в бытовом смысле – как желание почувствовать меньше внутреннего напряжения, немного замедлиться и мягко перейти ко сну.",
+];
+
+const THIRTY_FOURTH_EXPECTED_SECTION_TITLES = [
+  "Что такое медитация для сна и успокоения",
+  "Что значит «успокоить нервную систему» в бытовом смысле",
+  "Почему бывает трудно успокоиться перед сном",
+  "Медитация для успокоения перед сном",
+  "Как слушать медитацию для сна и успокоения",
+  "Нужно ли специально контролировать дыхание",
+  "Что делать с мыслями во время медитации",
+  "Можно ли слушать медитацию уже лёжа в кровати",
+  "Можно ли заснуть во время медитации",
+  "Как выбрать успокаивающую медитацию для сна",
+  "Сон, успокоение и расслабление – в чём разница",
+  "Нужно ли слушать такую медитацию каждый вечер",
+  "Можно ли слушать медитацию для сна и успокоения онлайн",
+  "Когда стоит не ограничиваться медитацией",
+  "Итог",
+];
+
+const THIRTY_FOURTH_EXPECTED_FAQ = [
+  {
+    question: "Что такое медитация для сна и успокоения нервной системы?",
+    answer: "Это вечерняя аудиопрактика, направленная на более спокойный переход от дневной активности к отдыху. Выражение «успокоение нервной системы» здесь используется в бытовом, а не медицинском смысле.",
+  },
+  {
+    question: "Можно ли медитацией успокоиться перед сном?",
+    answer: "Она может помочь переключить внимание, немного замедлиться и уменьшить субъективное ощущение внутреннего напряжения. Но одинаковый результат для всех людей не гарантируется.",
+  },
+  {
+    question: "Что делать, если во время медитации продолжают идти мысли?",
+    answer: "Не нужно пытаться полностью их остановить. Можно заметить мысль и снова вернуть внимание к голосу, дыханию или ощущениям.",
+  },
+  {
+    question: "Нужно ли специально контролировать дыхание?",
+    answer: "Нет. Если практика предлагает обратить внимание на дыхание, достаточно спокойно наблюдать за ним без обязательных глубоких вдохов или специальных техник.",
+  },
+  {
+    question: "Можно ли слушать медитацию уже в кровати?",
+    answer: "Да. Если вам так комфортно, можно включить практику уже лёжа. Медитировать обязательно сидя не требуется.",
+  },
+  {
+    question: "Можно ли заснуть во время практики?",
+    answer: "Да. Если вы естественно засыпаете во время вечерней медитации, это допустимо. При этом сама практика не гарантирует засыпание.",
+  },
+  {
+    question: "Чем успокаивающая медитация отличается от расслабляющей?",
+    answer: "В успокаивающей практике акцент больше на уменьшении внутренней активности и переключении внимания. В расслабляющей – на телесном и общем отпускании напряжения. Эти процессы могут пересекаться.",
+  },
+  {
+    question: "Можно ли слушать такую медитацию каждый вечер?",
+    answer: "Да, если вам это подходит. Но обязательного режима нет – можно слушать ежедневно, несколько раз в неделю или только время от времени.",
+  },
+];
+
+const THIRTY_FOURTH_LINK1_HREF = "/listens/meditatsiya-pered-snom-slushat-onlayn-besplatno";
+const THIRTY_FOURTH_LINK1_LABEL = "медитацию перед сном";
+const THIRTY_FOURTH_LINK1_BEFORE = "Если основной интерес связан именно с последними минутами перед засыпанием, можно открыть ";
+const THIRTY_FOURTH_LINK1_AFTER = ".";
+const THIRTY_FOURTH_LINK2_HREF = "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn";
+const THIRTY_FOURTH_LINK2_LABEL = "медитацию для сна и расслабления";
+const THIRTY_FOURTH_LINK2_BEFORE = "Но если главная задача именно в телесном и общем расслаблении, полезнее открыть отдельную ";
+const THIRTY_FOURTH_LINK2_AFTER = ".";
+
+const THIRTY_FOURTH_FORBIDDEN = [
+  "7 дней",
+  "21 день",
+  "30 дней",
+  "лечит тревог",
+  "лечит бессонниц",
+  "восстанавливает нервную систему",
+  "нормализует нервную систему",
+];
+
+function testThirtyFourthPage() {
+  const parsed = parseListenPageDefinition(SLEEP_CALMING_MEDITATION_PAGE);
+  assert(parsed.ok, "thirty-fourth production definition valid");
+  assert(parsed.definition.slug === THIRTY_FOURTH_PAGE_SLUG, "thirty-fourth page slug");
+  assert(parsed.definition.playlistSlug === "meditatsiya-dlya-sna", "thirty-fourth playlistSlug is meditatsiya-dlya-sna");
+  assert(parsed.definition.h1 === THIRTY_FOURTH_PAGE_H1, "thirty-fourth h1 exact");
+  assert(parsed.definition.title === THIRTY_FOURTH_PAGE_TITLE, "thirty-fourth title is TZ Meta Title");
+  assert(parsed.definition.title !== parsed.definition.h1, "thirty-fourth title !== h1");
+  assert(
+    parsed.definition.description === THIRTY_FOURTH_PAGE_DESCRIPTION,
+    "thirty-fourth description equals TZ meta string",
+  );
+  assert(parsed.definition.intro.length === 2, "thirty-fourth page has two intro paragraphs");
+  assert(
+    parsed.definition.intro[0] === THIRTY_FOURTH_EXPECTED_INTRO[0] &&
+      parsed.definition.intro[1] === THIRTY_FOURTH_EXPECTED_INTRO[1],
+    "thirty-fourth intro verbatim",
+  );
+  assert(parsed.definition.sections.length === 15, "thirty-fourth page has 15 sections");
+  assert(
+    parsed.definition.sections.map((section) => section.title).join("\n") ===
+      THIRTY_FOURTH_EXPECTED_SECTION_TITLES.join("\n"),
+    "thirty-fourth page 15 section titles verbatim",
+  );
+  assert(parsed.definition.faq.length === 8, "thirty-fourth page has 8 FAQ items");
+  assert(
+    parsed.definition.faq.every(
+      (item, index) =>
+        item.question === THIRTY_FOURTH_EXPECTED_FAQ[index].question &&
+        item.answer === THIRTY_FOURTH_EXPECTED_FAQ[index].answer,
+    ),
+    "thirty-fourth page 8 FAQ verbatim",
+  );
+  assert(!("internalLinks" in parsed.definition), "thirty-fourth page has no internalLinks");
+  assert(!("cta" in parsed.definition), "thirty-fourth page has no cta");
+  for (const key of FORBIDDEN_COMPOSITION_KEYS) {
+    assert(!(key in parsed.definition), `thirty-fourth page has no static ${key}`);
+  }
+
+  const allTextChunks = [
+    parsed.definition.h1,
+    parsed.definition.title,
+    parsed.definition.description,
+    ...parsed.definition.intro,
+    ...parsed.definition.sections.flatMap((section) => [
+      section.title,
+      ...(section.paragraphs ?? []),
+      ...(section.blocks ?? []).flatMap((block) => {
+        if (block.kind === "paragraph") return [block.text];
+        if (block.kind === "list") return block.items ?? [];
+        if (block.kind === "rich_paragraph") {
+          return (block.segments ?? []).map((segment) => segment.text ?? segment.label ?? "");
+        }
+        if (block.kind === "heading") return [block.title];
+        return [];
+      }),
+    ]),
+    ...parsed.definition.faq.flatMap((item) => [item.question, item.answer]),
+  ].join("\n");
+
+  assert(!allTextChunks.includes(EIGHTEENTH_BOOKMARK_PHRASE), "thirty-fourth definition has no bookmark phrase");
+  assert(!allTextChunks.includes("🔖"), "thirty-fourth definition has no bookmark emoji");
+  assert(!allTextChunks.includes("SEO-самопроверка"), "thirty-fourth definition has no SEO-самопроверка");
+  assert(!allTextChunks.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "thirty-fourth definition has no playlist placeholder");
+  assert(!allTextChunks.includes("[ДАЛЕЕ"), "thirty-fourth definition has no [ДАЛЕЕ leak");
+  assert(!allTextChunks.includes("https://audiolad.ru/listens/"), "thirty-fourth definition has no production listen URLs");
+  assert(!allTextChunks.includes("https://"), "thirty-fourth visible text has no raw https URLs");
+  assert(allTextChunks.includes("не лечит нервную систему"), "thirty-fourth keeps medical boundary");
+  assert(allTextChunks.includes("не гарантирует засыпание"), "thirty-fourth keeps no-sleep-guarantee");
+  assert(allTextChunks.includes("бытовом смысле"), "thirty-fourth household meaning");
+  assert(!allTextChunks.includes("Медитация для сна от стресса"), "thirty-fourth has no stress H2/URL phrase");
+  for (const term of THIRTY_FOURTH_FORBIDDEN) {
+    assert(!allTextChunks.includes(term), `thirty-fourth page has no forbidden term ${term}`);
+  }
+  for (const section of parsed.definition.sections) {
+    assert(!/стресс|тревог/i.test(section.title), `thirty-fourth H2 has no stress/anxiety: ${section.title}`);
+  }
+
+  const bedtimeSection = parsed.definition.sections.find((section) => section.title === "Медитация для успокоения перед сном");
+  const relaxSection = parsed.definition.sections.find((section) => section.title === "Сон, успокоение и расслабление – в чём разница");
+  assert(bedtimeSection, "thirty-fourth page has bedtime section");
+  assert(relaxSection, "thirty-fourth page has relaxation distinction section");
+
+  const allRich = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph");
+  const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(allLinks.length === 2, "thirty-fourth page has exactly two internal anchors");
+  assert(allLinks[0].href === THIRTY_FOURTH_LINK1_HREF, "first link href exact");
+  assert(allLinks[0].label === THIRTY_FOURTH_LINK1_LABEL, "first link label exact");
+  assert(allLinks[1].href === THIRTY_FOURTH_LINK2_HREF, "second link href exact");
+  assert(allLinks[1].label === THIRTY_FOURTH_LINK2_LABEL, "second link label exact");
+
+  const bedtimeRich = (bedtimeSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
+  assert(bedtimeRich.length === 1, "bedtime section has one rich_paragraph");
+  assert(bedtimeRich[0].segments[0].text === THIRTY_FOURTH_LINK1_BEFORE, "link1 surrounding before verbatim");
+  assert(bedtimeRich[0].segments[1].href === THIRTY_FOURTH_LINK1_HREF, "link1 in bedtime section");
+  assert(bedtimeRich[0].segments[1].label === THIRTY_FOURTH_LINK1_LABEL, "link1 label in bedtime section");
+  assert(bedtimeRich[0].segments[2].text === THIRTY_FOURTH_LINK1_AFTER, "link1 surrounding after verbatim");
+  assert(
+    `${bedtimeRich[0].segments[0].text}${bedtimeRich[0].segments[1].label}${bedtimeRich[0].segments[2].text}` ===
+      "Если основной интерес связан именно с последними минутами перед засыпанием, можно открыть медитацию перед сном.",
+    "link1 full sentence verbatim",
+  );
+
+  const relaxRich = (relaxSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
+  assert(relaxRich.length === 1, "relax section has one rich_paragraph");
+  assert(relaxRich[0].segments[0].text === THIRTY_FOURTH_LINK2_BEFORE, "link2 surrounding before verbatim");
+  assert(relaxRich[0].segments[1].href === THIRTY_FOURTH_LINK2_HREF, "link2 in relax section");
+  assert(relaxRich[0].segments[1].label === THIRTY_FOURTH_LINK2_LABEL, "link2 label in relax section");
+  assert(relaxRich[0].segments[2].text === THIRTY_FOURTH_LINK2_AFTER, "link2 surrounding after verbatim");
+  assert(
+    `${relaxRich[0].segments[0].text}${relaxRich[0].segments[1].label}${relaxRich[0].segments[2].text}` ===
+      "Но если главная задача именно в телесном и общем расслаблении, полезнее открыть отдельную медитацию для сна и расслабления.",
+    "link2 full sentence verbatim",
+  );
+
+  const contentSource = read("src/lib/seo/listens/content/meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy.ts");
+  assert(!contentSource.includes("https://audiolad.ru/listens/"), "thirty-fourth content file has no production listen URLs");
+  assert(!contentSource.includes("https://"), "thirty-fourth content file has no https://");
+  assert(!contentSource.includes("SEO-самопроверка"), "thirty-fourth content file has no SEO-самопроверка");
+  assert(!contentSource.includes("[ЗДЕСЬ ВСТАВЛЯЕТСЯ"), "thirty-fourth content file has no playlist placeholder");
+  assert(!contentSource.includes("[ДАЛЕЕ"), "thirty-fourth content file has no [ДАЛЕЕ");
+  assert(!contentSource.includes("🔖"), "thirty-fourth content file has no bookmark emoji");
+  assert(!contentSource.includes(EIGHTEENTH_BOOKMARK_PHRASE), "thirty-fourth content file has no bookmark phrase");
+  assert(!contentSource.includes("primaryPractice"), "thirty-fourth content file has no primaryPractice");
+  assert(!contentSource.includes("CreatorPathsCta"), "thirty-fourth content file has no CreatorPathsCta");
+  assert(!contentSource.includes("ListenSignupCta"), "thirty-fourth content file does not edit ListenSignupCta");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK1_HREF), "thirty-fourth content file has link1 href");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK1_LABEL), "thirty-fourth content file has link1 label");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK1_BEFORE), "thirty-fourth content file has link1 before sentence");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK2_HREF), "thirty-fourth content file has link2 href");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK2_LABEL), "thirty-fourth content file has link2 label");
+  assert(contentSource.includes(THIRTY_FOURTH_LINK2_BEFORE), "thirty-fourth content file has link2 before sentence");
+
+  const slugs = listListenPageDefinitions().map((page) => page.slug);
+  assert(slugs.includes(THIRTY_FOURTH_PAGE_SLUG), "registry contains thirty-fourth listen slug");
+  assert(slugs.includes(THIRTY_THIRD_PAGE_SLUG), "registry still contains thirty-third listen slug");
+  assert(slugs.length === 34, "registry contains all 34 listen slugs");
+  assert(new Set(slugs).size === slugs.length, "listen slugs stay unique");
+  assert(
+    MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE.playlistSlug === "meditatsiya-dlya-sna",
+    "thirty-fourth page playlistSlug is meditatsiya-dlya-sna",
+  );
+  assert(Boolean(getListenPageBySlug("meditatsiya-pered-snom-slushat-onlayn-besplatno")), "before-sleep destination exists");
+  assert(Boolean(getListenPageBySlug("meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn")), "relax destination exists");
+
+  const sitemap = mapListenPageDefinitionsToSitemapEntries(undefined, "https://audiolad.ru");
+  const sitemapUrls = sitemap.map((entry) => entry.url);
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${THIRTY_FOURTH_PAGE_SLUG}`).length === 1,
+    "sitemap contains thirty-fourth listen canonical exactly once",
+  );
+  assert(
+    sitemapUrls.filter((url) => url === `https://audiolad.ru/listens/${THIRTY_THIRD_PAGE_SLUG}`).length === 1,
+    "sitemap still contains thirty-third listen canonical exactly once",
+  );
+
+  const data = resolveListenPageFromPlaylist({
+    definition: MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE,
+    loaded: {
+      ok: true,
+      detail: makePlaylist({
+        playlist: {
+          slug: "meditatsiya-dlya-sna",
+          title: "Медитация для сна | Медитация перед сном | Медитация для сна и расслабления",
+        },
+      }),
+    },
+  });
+  assert(data, "thirty-fourth page resolves against meditatsiya-dlya-sna playlist");
+  assert(data.playlist.playlist.slug === "meditatsiya-dlya-sna", "resolved playlist slug is meditatsiya-dlya-sna");
+  assert(data.path === `/listens/${THIRTY_FOURTH_PAGE_SLUG}`, "thirty-fourth path");
+  assert(
+    data.canonicalUrl === `https://audiolad.ru/listens/${THIRTY_FOURTH_PAGE_SLUG}`,
+    "thirty-fourth canonical",
+  );
+  const graph = buildListenPageJsonLdGraph(data, "https://audiolad.ru");
+  const serialized = JSON.stringify(graph);
+  assert(serialized.includes('"Article"'), "thirty-fourth JSON-LD Article");
+  assert(serialized.includes('"WebPage"'), "thirty-fourth JSON-LD WebPage");
+  assert(serialized.includes('"Organization"'), "thirty-fourth JSON-LD Organization");
+  assert(serialized.includes('"BreadcrumbList"'), "thirty-fourth JSON-LD BreadcrumbList");
+  assert(serialized.includes('"ItemList"'), "thirty-fourth JSON-LD ItemList");
+  assert(serialized.includes('"FAQPage"'), "thirty-fourth JSON-LD FAQPage");
+  assert(!serialized.includes("MusicPlaylist"), "thirty-fourth JSON-LD no MusicPlaylist");
+  assert(!serialized.includes("AudioObject"), "thirty-fourth JSON-LD no AudioObject");
+  assert(!serialized.includes("primaryPractice"), "thirty-fourth JSON-LD no primaryPractice");
+  assert(!serialized.includes("Medical"), "thirty-fourth JSON-LD no medical schema");
+  assert(!serialized.includes(EIGHTEENTH_BOOKMARK_PHRASE), "thirty-fourth JSON-LD has no bookmark phrase");
+  assert(!serialized.includes("🔖"), "thirty-fourth JSON-LD has no bookmark emoji");
+}
+
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -9448,6 +9727,7 @@ const tests = [
   ["thirty-first listen page", testThirtyFirstPage],
   ["thirty-second listen page", testThirtySecondPage],
   ["thirty-third listen page", testThirtyThirdPage],
+  ["thirty-fourth listen page", testThirtyFourthPage],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
