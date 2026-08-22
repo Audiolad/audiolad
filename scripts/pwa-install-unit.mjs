@@ -627,6 +627,10 @@ function testSchoolHostDoesNotRegisterServiceWorker() {
     "school host must not register the main PWA worker",
   );
   assert(
+    register.includes("isMaxHostname"),
+    "MAX host must not register the main PWA worker",
+  );
+  assert(
     proxy.includes("sw\\\\.js"),
     "proxy matcher skips sw.js",
   );

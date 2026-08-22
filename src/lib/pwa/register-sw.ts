@@ -1,6 +1,7 @@
 "use client";
 
 import type { PwaPlatform } from "@/lib/pwa/constants";
+import { isMaxHostname } from "@/lib/max/host";
 import { isSchoolHostname } from "@/lib/school/host";
 
 export async function syncPwaProfileState(input: {
@@ -23,7 +24,7 @@ export async function syncPwaProfileState(input: {
 }
 
 export function shouldRegisterPwaServiceWorker(hostname: string): boolean {
-  return !isSchoolHostname(hostname);
+  return !isSchoolHostname(hostname) && !isMaxHostname(hostname);
 }
 
 export function registerPwaServiceWorker(): void {
