@@ -158,7 +158,7 @@ export const MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если интерес связан прежде всего с самим intent глубокого сна, можно перейти на страницу «" },
+              { text: "Если интерес связан прежде всего с самим запросом глубокого сна, можно перейти на страницу «" },
               { href: "/listens/meditatsiya-dlya-glubokogo-sna-slushat-onlayn", label: "Медитация для глубокого сна: слушать онлайн" },
               { text: "»." },
             ],

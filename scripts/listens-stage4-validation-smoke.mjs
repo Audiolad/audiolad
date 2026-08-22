@@ -8601,7 +8601,7 @@ const THIRTY_FIRST_LINK2_BEFORE = "Если важен именно сценар
 const THIRTY_FIRST_LINK2_AFTER = ".";
 const THIRTY_FIRST_LINK3_HREF = "/listens/meditatsiya-dlya-glubokogo-sna-slushat-onlayn";
 const THIRTY_FIRST_LINK3_LABEL = "Медитация для глубокого сна: слушать онлайн";
-const THIRTY_FIRST_LINK3_BEFORE = "Если интерес связан прежде всего с самим intent глубокого сна, можно перейти на страницу «";
+const THIRTY_FIRST_LINK3_BEFORE = "Если интерес связан прежде всего с самим запросом глубокого сна, можно перейти на страницу «";
 const THIRTY_FIRST_LINK3_AFTER = "».";
 
 const THIRTY_FIRST_FORBIDDEN_MEDICAL = [
@@ -8753,7 +8753,7 @@ function testThirtyFirstPage() {
   assert(deepRich[0].segments[2].text === THIRTY_FIRST_LINK3_AFTER, "link3 surrounding after verbatim");
   assert(
     `${deepRich[0].segments[0].text}${deepRich[0].segments[1].label}${deepRich[0].segments[2].text}` ===
-      "Если интерес связан прежде всего с самим intent глубокого сна, можно перейти на страницу «Медитация для глубокого сна: слушать онлайн».",
+      "Если интерес связан прежде всего с самим запросом глубокого сна, можно перейти на страницу «Медитация для глубокого сна: слушать онлайн».",
     "link3 full sentence verbatim uncompressed",
   );
 
