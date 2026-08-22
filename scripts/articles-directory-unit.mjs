@@ -353,6 +353,10 @@ function testStructuredData() {
     "ItemList count matches visible cards",
   );
   assert(
+    itemList.numberOfItems !== 123 || data.articles.length === 123,
+    "numberOfItems is not a stale hardcoded 123",
+  );
+  assert(
     itemList.itemListElement.length === data.articles.length,
     "ItemList elements match visible cards",
   );

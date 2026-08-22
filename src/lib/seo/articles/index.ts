@@ -69,3 +69,10 @@ export {
   isPracticeArticleDefinition,
   isPracticeArticlePageData,
 } from "./types";
+
+export {
+  articleDatesDiffer,
+  formatArticleVisibleDate,
+  resolveArticleVisibleDates,
+} from "./visible-dates";
+export type { ArticleVisibleDates } from "./visible-dates";

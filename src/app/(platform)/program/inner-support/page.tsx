@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+import { PRIVATE_PAGE_ROBOTS } from "@/lib/seo/private-robots";
+
+export const metadata: Metadata = {
+  robots: PRIVATE_PAGE_ROBOTS,
+};
 
 const programDays = [
   {

@@ -818,4 +818,102 @@ assert(abundanceJson.includes("BreadcrumbList"), "izobilie JSON-LD BreadcrumbLis
 
 assert(topicsDoc.includes("izobilie"), "TOPICS.md mentions izobilie");
 
+
+import {
+  buildTopicsDirectoryJsonLdGraph,
+  buildTopicsDirectoryMetadata,
+  listTopicsDirectoryCards,
+  loadTopicsDirectoryPageData,
+  TOPICS_DIRECTORY_PATH,
+} from "../src/lib/seo/topic-hubs/index.ts";
+import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
+
+const topicsDirectory = loadTopicsDirectoryPageData();
+assert(topicsDirectory.path === TOPICS_DIRECTORY_PATH, "topics directory path");
+assert(topicsDirectory.canonicalUrl === "https://audiolad.ru/topics", "topics canonical");
+assert(topicsDirectory.h1 === "Темы", "topics H1");
+assert(topicsDirectory.intro.length > 20, "topics intro");
+const expectedHubs = [
+  "lyubov-k-sebe",
+  "zhenskaya-energiya",
+  "besplatnye-meditatsii",
+  "meditatsii-na-dengi",
+  "izobilie",
+];
+assert(
+  topicsDirectory.hubs.map((hub) => hub.slug).join(",") === expectedHubs.join(","),
+  "topics directory lists existing hubs only",
+);
+assert(listTopicsDirectoryCards().length === 5, "no new hubs in this block");
+
+const topicsMeta = buildTopicsDirectoryMetadata();
+assert(topicsMeta.robots?.index === true, "topics index");
+assert(topicsMeta.robots?.follow === true, "topics follow");
+assert(topicsMeta.alternates?.canonical === "https://audiolad.ru/topics", "topics meta canonical");
+assert(String(topicsMeta.title).includes("Темы"), "topics title");
+
+const topicsGraph = buildTopicsDirectoryJsonLdGraph(topicsDirectory);
+
+const topicsOrg = topicsGraph["@graph"].find((node) => node["@type"] === "Organization");
+assert(topicsOrg, "topics Organization node");
+assert(
+  topicsOrg["@id"] === "https://audiolad.ru/#organization",
+  "topics Organization @id",
+);
+assert(topicsOrg.legalName, "topics Organization legalName");
+assert(topicsOrg.taxID, "topics Organization taxID");
+assert(
+  String(topicsOrg.founder?.["@id"] ?? "").includes("/authors/sergey-petrov#author"),
+  "topics Organization founder",
+);
+assert(!Object.hasOwn(topicsOrg, "address"), "topics Organization has no address");
+const topicsOrgJson = JSON.stringify(topicsOrg);
+assert(!topicsOrgJson.includes("Stavropol"), "topics Organization no Stavropol");
+assert(!topicsOrgJson.includes("Ставрополь"), "topics Organization no Stavropol ru");
+assert(!Object.hasOwn(topicsOrg, "sameAs"), "topics Organization has no sameAs");
+
+const directoryJsonLdSource = read("src/lib/seo/topic-hubs/directory-json-ld.ts");
+assert(
+  directoryJsonLdSource.includes("buildOrganizationJsonLd"),
+  "directory-json-ld uses buildOrganizationJsonLd",
+);
+assert(
+  !directoryJsonLdSource.includes("SITE_BRAND"),
+  "directory-json-ld does not use SITE_BRAND",
+);
+
+const directorySource = read("src/lib/seo/topic-hubs/directory.ts");
+assert(
+  directorySource.includes("Тематические подборки АудиоЛада"),
+  "topics meta uses подборки",
+);
+assert(
+  !directorySource.includes("Тематические хабы АудиоЛада"),
+  "topics meta does not use хабы",
+);
+const topicsNodes = topicsGraph["@graph"];
+assert(
+  topicsNodes.some((node) => node["@type"] === "CollectionPage"),
+  "topics CollectionPage",
+);
+assert(
+  topicsNodes.some((node) => node["@type"] === "BreadcrumbList"),
+  "topics BreadcrumbList",
+);
+const topicsCollection = topicsNodes.find((node) => node["@type"] === "CollectionPage");
+assert(
+  topicsCollection.mainEntity.numberOfItems === topicsDirectory.hubs.length,
+  "topics numberOfItems matches hubs",
+);
+
+assert(
+  STATIC_SITEMAP_PAGES.some((page) => page.path === "/topics"),
+  "topics in static sitemap",
+);
+
+const topicsPage = read("src/app/(platform)/(listener)/topics/page.tsx");
+assert(topicsPage.includes("buildTopicsDirectoryMetadata"), "topics page metadata");
+assert(topicsPage.includes("loadTopicsDirectoryPageData"), "topics page data");
+assert(!topicsPage.includes('slug: "'), "topics page has no hardcoded hubs");
+
 console.log("seo-topic-hub-unit: ok");

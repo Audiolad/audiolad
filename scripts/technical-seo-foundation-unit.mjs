@@ -8,6 +8,8 @@ import { buildRobotsRoute, SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/ro
 import {
   PRODUCTION_APP_ORIGIN,
   STATIC_SITEMAP_PAGES,
+  mapListenPageDefinitionsToSitemapEntries,
+  mapTopicHubDefinitionsToSitemapEntries,
   buildStaticSitemapEntries,
   deduplicateSitemapEntries,
   mapAuthorPracticeRowsToSitemapEntries,
@@ -391,6 +393,25 @@ function testRouteFiles() {
   assert(
     STATIC_SITEMAP_PAGES.some((page) => page.path === "/become-author"),
     "become-author included in static sitemap pages",
+  );
+  assert(
+    STATIC_SITEMAP_PAGES.some((page) => page.path === "/topics"),
+    "topics index included in static sitemap pages",
+  );
+  const listenEntries = mapListenPageDefinitionsToSitemapEntries();
+  assert(
+    listenEntries.every((entry) => entry.lastModified == null),
+    "listen sitemap entries omit lastModified without a real timestamp",
+  );
+  const hubEntries = mapTopicHubDefinitionsToSitemapEntries();
+  assert(
+    hubEntries.every((entry) => entry.lastModified == null),
+    "topic hub sitemap entries omit lastModified without a real timestamp",
+  );
+  const sitemapData = read("src/lib/seo/sitemap-data.ts");
+  assert(
+    !/lastModified:\s*new Date\(\s*\)/.test(sitemapData),
+    "sitemap must not use build-time new Date() as lastModified",
   );
   const forAuthorsEntry = STATIC_SITEMAP_PAGES.find(
     (page) => page.path === "/for-authors",

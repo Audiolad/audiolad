@@ -43,6 +43,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
   { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/topics", changeFrequency: "weekly", priority: 0.8 },
   { path: "/about", changeFrequency: "monthly", priority: 0.7 },
   { path: "/philosophy", changeFrequency: "monthly", priority: 0.6 },
   { path: "/for-authors", changeFrequency: "monthly", priority: 0.7 },
@@ -563,6 +564,7 @@ export function mapTopicHubDefinitionsToSitemapEntries(
   hubs: ReadonlyArray<{ slug: string }> = listTopicHubDefinitions(),
   origin: string = getAppOrigin(),
 ): SitemapEntry[] {
+  // Topic hubs have no reliable editorial lastmod. Do not invent build-time dates.
   return hubs.map((hub) => ({
     url: toAbsoluteSitemapUrl(buildTopicHubPath(hub.slug), origin),
     changeFrequency: "weekly" as const,
@@ -577,6 +579,7 @@ export function mapListenPageDefinitionsToSitemapEntries(
   }> = listIndexableListenPageDefinitions(),
   origin: string = getAppOrigin(),
 ): SitemapEntry[] {
+  // Listen pages have no publication/update timestamps in the model.
   return pages
     .filter((page) => page.indexable !== false)
     .map((page) => ({

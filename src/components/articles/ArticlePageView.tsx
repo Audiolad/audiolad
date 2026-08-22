@@ -23,12 +23,40 @@ import type {
   PracticeArticlePageData,
 } from "@/lib/seo/articles";
 import { isCreatorArticlePageData } from "@/lib/seo/articles";
+import { resolveArticleVisibleDates } from "@/lib/seo/articles/visible-dates";
 import { resolveArticleClosingHeading } from "@/lib/seo/articles/public-heading";
 import { SCHOOL_ORIGIN } from "@/lib/school/host";
 
 type ArticlePageViewProps = {
   data: ArticlePageData;
 };
+
+
+function ArticleBylineDates({
+  publishedAt,
+  updatedAt,
+}: {
+  publishedAt: string;
+  updatedAt: string;
+}) {
+  const dates = resolveArticleVisibleDates({ publishedAt, updatedAt });
+
+  if (!dates) {
+    return null;
+  }
+
+  return (
+    <p className="mt-1.5 text-xs leading-5 text-[#9a90b4]">
+      <span>Опубликовано: {dates.publishedLabel}</span>
+      {dates.showUpdated ? (
+        <>
+          <span aria-hidden="true"> · </span>
+          <span>Обновлено: {dates.updatedLabel}</span>
+        </>
+      ) : null}
+    </p>
+  );
+}
 
 function readingTimeLabel(minutes: number): string {
   const mod10 = minutes % 10;
@@ -254,6 +282,10 @@ function CreatorPathsArticlePageView({
           <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
             {article.authorLabel} · {readingTimeLabel(data.readingTimeMinutes)}
           </p>
+          <ArticleBylineDates
+            publishedAt={article.publishedAt}
+            updatedAt={article.updatedAt}
+          />
         </header>
 
         <div className={`mt-4 sm:mt-5 ${articleBodyStackClass}`}>
@@ -503,6 +535,10 @@ function PracticeArticlePageView({
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
               {article.authorLabel} · {readingTimeLabel(data.readingTimeMinutes)}
             </p>
+            <ArticleBylineDates
+              publishedAt={article.publishedAt}
+              updatedAt={article.updatedAt}
+            />
           </header>
 
           <section
