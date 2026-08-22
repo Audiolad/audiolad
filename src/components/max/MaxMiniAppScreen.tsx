@@ -11,7 +11,6 @@ const logoImageClassName =
 export default function MaxMiniAppScreen() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#faf8ff] px-6 py-12 text-center">
-      <MaxBridgeScript />
       <AudioladHorizontalLogo
         className={logoImageClassName}
         linkClassName={logoLinkClassName}
@@ -24,9 +23,7 @@ export default function MaxMiniAppScreen() {
       <p className="mt-3 max-w-sm text-[17px] leading-6 text-[#4a3d73]">
         Музыка, медитации, аудиопрактики и аудиокурсы
       </p>
-      <p className="mt-8 text-sm font-medium text-[#7042c5]">
-        АудиоЛад открыт внутри MAX
-      </p>
+      <MaxBridgeScript />
     </main>
   );
 }

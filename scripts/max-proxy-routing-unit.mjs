@@ -10,8 +10,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   isMaxHostname,
+  isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_HOSTNAME,
+  MAX_SESSION_VERIFY_PATH,
   MAX_SITE_PATH,
 } from "../src/lib/max/host.ts";
 import { resolveMaxProxyAction } from "../src/lib/max/proxy-policy.ts";
@@ -66,11 +68,20 @@ assert.equal(isMaxSitePath(MAX_SITE_PATH), true);
 assert.equal(isMainSiteHostname(MAX_HOSTNAME), false);
 
 // max.audiolad.ru/ → rewrite landing (no redirect loop).
+assert.equal(isMaxSessionVerifyPath(MAX_SESSION_VERIFY_PATH), true);
+assert.equal(isMaxSessionVerifyPath(`${MAX_SESSION_VERIFY_PATH}/`), false);
+assert.equal(isMaxSessionVerifyPath("/api/max"), false);
+
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/robots.txt", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/sw.js", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/health/build", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/session", "not_found");
 
 for (const pathname of [
   "/catalog",
@@ -99,6 +110,7 @@ assertMaxAction("audiolad.ru", "/", "pass_through");
 assertMaxAction("audiolad.ru", "/catalog", "pass_through");
 assertMaxAction("www.audiolad.ru", "/", "pass_through");
 assertMaxAction(SCHOOL_HOSTNAME, "/", "pass_through");
+assertMaxAction("audiolad.ru", MAX_SESSION_VERIFY_PATH, "pass_through");
 
 // School policy still owns school host isolation.
 assertSchoolAction(SCHOOL_HOSTNAME, "/", "rewrite_school_landing");
@@ -162,7 +174,7 @@ assert.doesNotMatch(
   /Content-Security-Policy|X-Frame-Options/,
   "proxy must not invent CSP or X-Frame-Options",
 );
-const maxSources = [
+const maxClientSources = [
   "src/lib/max/bridge.ts",
   "src/lib/max/host.ts",
   "src/lib/max/proxy-policy.ts",
@@ -175,12 +187,37 @@ const maxSources = [
   .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
   .join("\n");
 assert.doesNotMatch(
-  maxSources,
+  maxClientSources,
   /MAX_BOT|BOT_TOKEN|process\.env\.\w*SECRET|process\.env\.\w*TOKEN/,
-  "MAX sources must not embed bot tokens or secrets",
+  "MAX client/shell sources must not embed bot tokens or secrets",
 );
 assert.doesNotMatch(
-  maxSources.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  maxClientSources,
+  /NEXT_PUBLIC_MAX/,
+  "MAX client/shell sources must not expose MAX secrets",
+);
+assert.match(
+  maxClientSources,
+  /MAX_SESSION_VERIFY_PATH/,
+  "shell must call the Stage 1 verify path",
+);
+
+const maxServerSources = [
+  "src/lib/max/verify-init-data.ts",
+  "src/app/api/max/session/verify/route.ts",
+]
+  .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
+  .join("\n");
+assert.doesNotMatch(maxServerSources, /NEXT_PUBLIC_MAX/);
+assert.doesNotMatch(
+  maxServerSources,
+  /external_identities|CREATE TABLE|alter table/i,
+);
+assert.match(policySource, /isMaxSessionVerifyPath/);
+assert.doesNotMatch(
+  `${maxClientSources}\n${maxServerSources}`
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, ""),
   /\.ready\s*\(/,
   "MAX sources must not call Telegram-style ready()",
 );
