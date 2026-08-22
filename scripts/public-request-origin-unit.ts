@@ -68,6 +68,13 @@ function runTests() {
     "https://school.audiolad.ru",
   );
 
+  const maxForwarded = requestAt("http://localhost:3000/max-site", {
+    host: "localhost:3000",
+    "x-forwarded-host": "max.audiolad.ru",
+    "x-forwarded-proto": "https",
+  });
+  assert.equal(getPublicRequestOrigin(maxForwarded), "https://max.audiolad.ru");
+
   const publicHost = requestAt("http://localhost:3000/auth/callback", {
     host: "audiolad.ru",
   });

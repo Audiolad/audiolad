@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 
+import { isMaxHostname } from "@/lib/max/host";
 import {
   getHostnameFromHeaders,
   isSchoolHostname,
@@ -22,6 +23,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       },
     ];
+  }
+
+  if (isMaxHostname(hostname)) {
+    return [];
   }
 
   const { entries } = await buildSitemapEntries();

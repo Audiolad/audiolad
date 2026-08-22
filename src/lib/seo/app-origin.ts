@@ -5,6 +5,7 @@ const PUBLIC_REQUEST_HOSTS = new Set([
   "audiolad.ru",
   "www.audiolad.ru",
   "school.audiolad.ru",
+  "max.audiolad.ru",
   "localhost",
   "127.0.0.1",
 ]);
