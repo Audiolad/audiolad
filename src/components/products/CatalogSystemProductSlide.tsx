@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
@@ -8,11 +11,15 @@ import {
 type CatalogSystemProductSlideProps = {
   product: CatalogProduct;
   visual?: CatalogCardVisual;
+  playControl?: ReactNode;
 };
 
-/** Two-line clamp with reserved height so grid rows stay even. */
+/** Canonical first-slide (and later carousel slide) geometry. */
+export const CATALOG_SYSTEM_SLIDE_ASPECT_CLASS = "aspect-[9/16]";
+
+/** Two-line clamp with reserved height so 9:16 rows stay even. */
 export const CATALOG_PRODUCT_TILE_TITLE_CLASS =
-  "mt-1 line-clamp-2 min-h-[44px] text-[15px] font-semibold leading-[22px] text-[#25135c]";
+  "line-clamp-2 min-h-8 text-[13px] font-semibold leading-4 text-[#25135c]";
 
 function CatalogSystemCover({
   product,
@@ -29,7 +36,7 @@ function CatalogSystemCover({
 
     return (
       <div
-        className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-[#f4ecfb]"
+        className="relative aspect-square w-full shrink-0 overflow-hidden bg-[#f4ecfb]"
         data-catalog-tile-cover="square"
         style={
           placeholder
@@ -57,7 +64,7 @@ function CatalogSystemCover({
 
   return (
     <div
-      className={`flex aspect-square w-full items-center justify-center rounded-[18px] bg-gradient-to-br ${visual.systemFallback.gradientClassName} text-4xl text-white`}
+      className={`flex aspect-square w-full shrink-0 items-center justify-center bg-gradient-to-br ${visual.systemFallback.gradientClassName} text-4xl text-white`}
       data-catalog-tile-cover="system"
       data-catalog-tile-fallback="system"
       role="img"
@@ -68,49 +75,85 @@ function CatalogSystemCover({
   );
 }
 
+function CatalogSystemSlideMeta({
+  authorName,
+  durationLabel,
+}: {
+  authorName: string | null;
+  durationLabel: string | null;
+}) {
+  if (!authorName && !durationLabel) {
+    return null;
+  }
+
+  return (
+    <p
+      className="flex min-w-0 items-baseline text-[11px] leading-3"
+      data-catalog-tile-meta=""
+    >
+      {authorName ? (
+        <span
+          className="min-w-0 truncate font-medium text-[#7042c5]"
+          data-catalog-tile-author=""
+        >
+          {authorName}
+        </span>
+      ) : null}
+      {authorName && durationLabel ? (
+        <span className="shrink-0 text-[#7d70a2]" aria-hidden="true">
+          {" · "}
+        </span>
+      ) : null}
+      {durationLabel ? (
+        <span className="shrink-0 text-[#7d70a2]" data-catalog-tile-duration="">
+          {durationLabel}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
 /**
- * System first slide for the experimental catalog tile.
- * Later ProductCardCarousel can use this as Slide 1 without rewriting the tile.
+ * System first slide: one 9:16 frame that includes Play.
+ * Later ProductCardCarousel can use this as Slide 1 (author slides also 9:16).
  */
 export default function CatalogSystemProductSlide({
   product,
   visual: visualProp,
+  playControl,
 }: CatalogSystemProductSlideProps) {
   const visual = visualProp ?? resolveCatalogCardVisual(product);
   const durationLabel = product.statsLabel?.trim() || null;
+  const authorName = product.authorName?.trim() || null;
 
   return (
     <div
-      className="flex min-w-0 flex-col"
+      className={`flex ${CATALOG_SYSTEM_SLIDE_ASPECT_CLASS} w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff]`}
       data-catalog-system-slide=""
+      data-catalog-system-slide-aspect="9/16"
     >
-      <CatalogSystemCover product={product} visual={visual} />
+      <Link
+        href={product.href}
+        className="flex min-h-0 min-w-0 flex-1 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+      >
+        <CatalogSystemCover product={product} visual={visual} />
 
-      {product.productTypeLabel ? (
-        <p className={`mt-2.5 ${PRODUCT_FORMAT_LINE_CLASS}`}>
-          {product.productTypeLabel}
-        </p>
-      ) : null}
+        <div className="flex min-h-0 flex-col gap-0.5 px-1.5 pt-1">
+          {product.productTypeLabel ? (
+            <p className={`leading-3 ${PRODUCT_FORMAT_LINE_CLASS}`}>
+              {product.productTypeLabel}
+            </p>
+          ) : null}
 
-      <h3 className={CATALOG_PRODUCT_TILE_TITLE_CLASS}>{product.title}</h3>
+          <h3 className={CATALOG_PRODUCT_TILE_TITLE_CLASS}>{product.title}</h3>
 
-      {product.authorName ? (
-        <p
-          className="mt-1 line-clamp-1 text-xs font-medium leading-4 text-[#7042c5]"
-          data-catalog-tile-author=""
-        >
-          {product.authorName}
-        </p>
-      ) : null}
-
-      {durationLabel ? (
-        <p
-          className="mt-1 line-clamp-1 text-xs leading-4 text-[#7d70a2]"
-          data-catalog-tile-duration=""
-        >
-          {durationLabel}
-        </p>
-      ) : null}
+          <CatalogSystemSlideMeta
+            authorName={authorName}
+            durationLabel={durationLabel}
+          />
+        </div>
+      </Link>
+      {playControl}
     </div>
   );
 }

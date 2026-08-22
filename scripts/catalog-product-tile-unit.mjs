@@ -169,7 +169,7 @@ function testLongTitleIsCssClamped() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   assert.match(slide, /CATALOG_PRODUCT_TILE_TITLE_CLASS/);
   assert.match(slide, /line-clamp-2/);
-  assert.match(slide, /min-h-\[44px\]/);
+  assert.match(slide, /min-h-8/, "two-line title keeps reserved height");
   assert.match(slide, /product\.title/, "full title is rendered");
   assert.doesNotMatch(slide, /title\.slice|substring\(/, "title is not truncated in JS");
 }
@@ -247,22 +247,34 @@ function testTileLinksToCanonicalPdp() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
 
-  assert.match(tile, /href=\{product\.href\}/, "tile links to catalog product href");
-  assert.match(tile, /<Link/, "card keyboard access is the PDP Link");
+  assert.match(slide, /href=\{product\.href\}/, "slide Link is catalog product href");
+  assert.match(slide, /<Link/, "card keyboard access is the PDP Link");
   assert.match(tile, /CatalogSystemProductSlide/, "tile wraps the system first slide");
-  assert.doesNotMatch(tile, /AuthorLink/, "no nested author link");
+  assert.doesNotMatch(tile + slide, /AuthorLink/, "no nested author link");
   assert.match(tile, /CatalogTilePlayControl/, "Play control is present on the tile");
+  assert.match(tile, /playControl=/, "tile passes Play into the system slide slot");
   assert.match(
-    tile,
-    /<\/Link>[\s\S]*<CatalogTilePlayControl/,
+    slide,
+    /<\/Link>[\s\S]*\{playControl\}/,
     "Play is a sibling after Link, not nested inside it",
   );
-  assert.doesNotMatch(tile, /listenHref/, "Play is not a listen-page Link");
+  assert.doesNotMatch(
+    slide,
+    /<Link[\s\S]*\{playControl\}[\s\S]*<\/Link>/,
+    "playControl is not rendered inside the PDP Link",
+  );
+  assert.doesNotMatch(
+    tile,
+    /<Link[\s\S]*<(button|CatalogTilePlayControl)[\s\S]*<\/Link>/,
+    "tile does not nest Play inside a Link",
+  );
+  assert.doesNotMatch(tile + slide + control, /listenHref/, "Play is not a listen-page Link");
   assert.doesNotMatch(tile + slide + control, /Подробнее/, "no Подробнее button");
   assert.match(slide, /alt=\{alt\}/, "cover alt comes from product title");
   assert.match(slide, /data-catalog-tile-image="square-cover"/);
   assert.match(slide, /data-catalog-tile-author=""/);
   assert.match(slide, /data-catalog-tile-duration=""/);
+  assert.match(slide, /data-catalog-tile-meta=""/);
   assert.match(slide, /product\.statsLabel/, "duration uses existing statsLabel");
   assert.match(control, /Слушать/, "Play control reads as Слушать");
 }
@@ -294,13 +306,19 @@ function testPreviewReusesCatalogListing() {
   );
 }
 
-function testSystemSlideIsSquareNotBlurFrame() {
+function testSystemSlideIsNineSixteenIncludingPlay() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
   const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
 
+  assert.match(slide, /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
+  assert.match(slide, /aspect-\[9\/16\]/, "system slide is locked to 9:16");
+  assert.match(slide, /data-catalog-system-slide-aspect="9\/16"/);
+  assert.match(slide, /overflow-hidden/, "9:16 frame does not grow or overflow");
   assert.match(slide, /aspect-square/, "cover is 1:1");
   assert.match(slide, /data-catalog-tile-cover="square"/);
+  assert.match(slide, /\{playControl\}/, "Play lives inside the first-slide geometry");
+  assert.doesNotMatch(tile, /aspect-\[9\/16\]/, "tile does not add a second aspect box");
   assert.doesNotMatch(slide, /aspect-\[4\/5\]/, "first slide is not forced into 4:5");
   assert.doesNotMatch(slide, /blur-background|blur-2xl|square_blur/, "no square-in-blur frame");
   assert.doesNotMatch(tile, /aspect-\[4\/5\]|blur-background|square_blur/);
@@ -308,6 +326,21 @@ function testSystemSlideIsSquareNotBlurFrame() {
   assert.doesNotMatch(slide, /next\/image/, "does not use next/image");
   assert.doesNotMatch(slide, /from ["']sharp["']/, "does not import Sharp");
   assert.doesNotMatch(slide, /Подробнее/);
+}
+
+function testAuthorAndDurationShareOneLine() {
+  const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
+
+  assert.match(slide, /data-catalog-tile-meta=""/, "author and duration share one meta row");
+  assert.match(slide, /data-catalog-tile-author=""/);
+  assert.match(slide, /data-catalog-tile-duration=""/);
+  assert.match(slide, /["'] · ["']/, "meta joins author and duration with a middle dot");
+  assert.match(slide, /truncate/, "long author truncates");
+  assert.doesNotMatch(
+    slide,
+    /data-catalog-tile-author=""[\s\S]*<\/p>[\s\S]*data-catalog-tile-duration=""/,
+    "duration is not a second stacked row",
+  );
 }
 
 testSquareCoverResolvesToSquareViewModel();
@@ -318,6 +351,7 @@ testGridClassStructure();
 testContainerAwareColumnResolution();
 testTileLinksToCanonicalPdp();
 testPreviewReusesCatalogListing();
-testSystemSlideIsSquareNotBlurFrame();
+testSystemSlideIsNineSixteenIncludingPlay();
+testAuthorAndDurationShareOneLine();
 
 console.log("catalog-product-tile-unit: ok");

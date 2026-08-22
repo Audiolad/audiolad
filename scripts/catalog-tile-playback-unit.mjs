@@ -267,22 +267,29 @@ async function testToggleDoesNotFetch() {
 
 function testMarkupSplitsLinkAndPlay() {
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
+  const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
   const helper = readRoot("src/lib/products/catalog-tile-playback.ts");
   const href = buildPracticePublicPath("sergey-petrov", "klyuch-k-izobiliyu");
 
   assert.equal(href, "/practice/sergey-petrov/klyuch-k-izobiliyu");
-  assert.match(tile, /href=\{product\.href\}/, "Link stays on canonical PDP");
+  assert.match(slide, /href=\{product\.href\}/, "Link stays on canonical PDP");
   assert.match(tile, /CatalogTilePlayControl/, "Play control is present");
+  assert.match(tile, /playControl=/, "Play is passed into the 9:16 system slide");
   assert.match(
-    tile,
-    /<\/Link>[\s\S]*<CatalogTilePlayControl/,
+    slide,
+    /<\/Link>[\s\S]*\{playControl\}/,
     "Play control is a sibling after Link, not nested inside it",
+  );
+  assert.doesNotMatch(
+    slide,
+    /<Link[\s\S]*\{playControl\}[\s\S]*<\/Link>/,
+    "no playControl inside the card Link",
   );
   assert.doesNotMatch(
     tile,
     /<Link[\s\S]*<(button|CatalogTilePlayControl)[\s\S]*<\/Link>/,
-    "no button inside the card Link",
+    "no button inside a tile Link",
   );
   assert.match(control, /<button/, "Play is a button");
   assert.match(control, /type="button"/);
