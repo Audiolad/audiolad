@@ -9698,7 +9698,7 @@ const SLEEP_WOMEN_MEDITATION_PAGE = MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT
 const THIRTY_FIFTH_PAGE_H1 = "Медитация для сна для женщин: слушать онлайн";
 const THIRTY_FIFTH_PAGE_TITLE = "Медитация для сна для женщин – слушать онлайн | АудиоЛад";
 const THIRTY_FIFTH_PAGE_DESCRIPTION =
-  "Медитация для сна для женщин онлайн: выберите подходящую вечернюю практику и начните слушать. Женский голос, расслабление и спокойная подготовка ко сну.";
+  "Медитация для сна для женщин онлайн: выберите подходящую вечернюю практику и начните слушать. Спокойный формат, расслабление и мягкая подготовка ко сну.";
 
 const THIRTY_FIFTH_EXPECTED_INTRO = [
   "Медитацию для сна для женщин можно слушать онлайн прямо на АудиоЛаде. Выберите подходящую вечернюю практику и включите её, когда хочется завершить дневные дела, немного переключиться и постепенно перейти к отдыху.",
@@ -9791,7 +9791,7 @@ function testThirtyFifthPage() {
     parsed.definition.description === THIRTY_FIFTH_PAGE_DESCRIPTION,
     "thirty-fifth description equals TZ meta string",
   );
-  assert(parsed.definition.description.includes("Женский голос"), "thirty-fifth meta has Женский голос");
+  assert(parsed.definition.description.includes("Спокойный формат"), "thirty-fifth meta has Спокойный формат");
   assert(parsed.definition.intro.length === 2, "thirty-fifth page has two intro paragraphs");
   assert(
     parsed.definition.intro[0] === THIRTY_FIFTH_EXPECTED_INTRO[0] &&
