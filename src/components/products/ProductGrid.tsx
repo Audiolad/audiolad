@@ -1,13 +1,11 @@
 import CatalogProductTile from "@/components/products/CatalogProductTile";
 import type { CatalogProduct } from "@/lib/products/catalog";
+import {
+  PRODUCT_GRID_CLASS_NAME,
+  PRODUCT_GRID_CONTAINER_CLASS_NAME,
+} from "@/lib/products/product-grid-layout";
 
-/**
- * Experimental catalog tile grid.
- * Mobile 2 / tablet (md) 3 / desktop preview (xl) 4.
- * `xl` matches the listener desktop shell breakpoint.
- */
-export const PRODUCT_GRID_CLASS_NAME =
-  "grid list-none grid-cols-2 gap-3 p-0 md:grid-cols-3 md:gap-4 xl:grid-cols-4";
+export { PRODUCT_GRID_CLASS_NAME };
 
 type ProductGridProps = {
   products: CatalogProduct[];
@@ -20,12 +18,21 @@ export default function ProductGrid({ products, ariaLabel }: ProductGridProps) {
   }
 
   return (
-    <ul className={PRODUCT_GRID_CLASS_NAME} aria-label={ariaLabel}>
-      {products.map((product) => (
-        <li key={product.id} className="min-w-0">
-          <CatalogProductTile product={product} />
-        </li>
-      ))}
-    </ul>
+    <div
+      className={PRODUCT_GRID_CONTAINER_CLASS_NAME}
+      data-product-grid-container=""
+    >
+      <ul
+        className={PRODUCT_GRID_CLASS_NAME}
+        aria-label={ariaLabel}
+        data-product-grid=""
+      >
+        {products.map((product) => (
+          <li key={product.id} className="min-w-0">
+            <CatalogProductTile product={product} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

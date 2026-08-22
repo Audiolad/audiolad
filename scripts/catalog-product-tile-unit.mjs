@@ -14,6 +14,17 @@ import {
   CATALOG_TILE_VARIANT_KEYS,
   resolveCatalogCardVisual,
 } from "../src/lib/products/catalog-card-visual.ts";
+import {
+  PRODUCT_GRID_CLASS_NAME,
+  PRODUCT_GRID_COLUMN_MIN_WIDTHS,
+  PRODUCT_GRID_CONTAINER_CLASS_NAME,
+  PRODUCT_GRID_GAP_PX,
+  PRODUCT_GRID_MAX_COLUMNS,
+  PRODUCT_GRID_MIN_COLUMNS,
+  PRODUCT_GRID_MIN_TILE_PX,
+  productGridMinWidthForColumns,
+  resolveProductGridColumns,
+} from "../src/lib/products/product-grid-layout.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -165,13 +176,59 @@ function testLongTitleIsCssClamped() {
 
 function testGridClassStructure() {
   const grid = readRoot("src/components/products/ProductGrid.tsx");
+  const layout = readRoot("src/lib/products/product-grid-layout.ts");
 
-  assert.match(grid, /grid-cols-2/, "2 columns on mobile");
-  assert.match(grid, /md:grid-cols-3/, "3 columns on tablet");
-  assert.match(grid, /xl:grid-cols-4/, "4 columns on desktop preview");
+  assert.match(grid, /PRODUCT_GRID_CLASS_NAME/, "grid uses shared layout classes");
+  assert.match(grid, /data-product-grid-container/, "container is measurable");
+  assert.match(PRODUCT_GRID_CONTAINER_CLASS_NAME, /@container/, "wrapper is a CQ container");
+  assert.match(PRODUCT_GRID_CLASS_NAME, /grid-cols-2/, "default is 2 columns");
+  assert.match(PRODUCT_GRID_CLASS_NAME, /@min-\[474px\]:grid-cols-3/);
+  assert.match(PRODUCT_GRID_CLASS_NAME, /@min-\[636px\]:grid-cols-4/);
+  assert.match(PRODUCT_GRID_CLASS_NAME, /@min-\[798px\]:grid-cols-5/);
+  assert.match(PRODUCT_GRID_CLASS_NAME, /@min-\[960px\]:grid-cols-6/);
+  assert.doesNotMatch(
+    PRODUCT_GRID_CLASS_NAME,
+    /\b(sm|md|lg|xl|2xl):grid-cols-/,
+    "columns are not viewport breakpoints",
+  );
+  assert.doesNotMatch(layout, /minmax\(|auto-fit|auto-fill/, "no auto-fit that can collapse 320 to 1");
   assert.doesNotMatch(grid, /overflow-x-auto|snap-|carousel/);
   assert.match(grid, /CatalogProductTile/, "grid renders the new tile");
   assert.doesNotMatch(grid, /CatalogProductCard/, "grid does not reuse the row card");
+}
+
+function testContainerAwareColumnResolution() {
+  assert.equal(productGridMinWidthForColumns(3), PRODUCT_GRID_COLUMN_MIN_WIDTHS[3]);
+  assert.equal(productGridMinWidthForColumns(3), 3 * PRODUCT_GRID_MIN_TILE_PX + 2 * PRODUCT_GRID_GAP_PX);
+  assert.equal(productGridMinWidthForColumns(4), PRODUCT_GRID_COLUMN_MIN_WIDTHS[4]);
+  assert.equal(productGridMinWidthForColumns(6), PRODUCT_GRID_COLUMN_MIN_WIDTHS[6]);
+
+  assert.equal(resolveProductGridColumns(280), PRODUCT_GRID_MIN_COLUMNS);
+  assert.equal(resolveProductGridColumns(320), 2);
+  assert.equal(resolveProductGridColumns(390), 2);
+  assert.equal(resolveProductGridColumns(430), 2);
+  assert.equal(resolveProductGridColumns(473), 2);
+  assert.equal(resolveProductGridColumns(474), 3);
+  assert.equal(resolveProductGridColumns(600), 3);
+  assert.equal(resolveProductGridColumns(635), 3);
+  assert.equal(resolveProductGridColumns(636), 4);
+  assert.equal(resolveProductGridColumns(797), 4);
+  assert.equal(resolveProductGridColumns(798), 5);
+  assert.equal(resolveProductGridColumns(959), 5);
+  assert.equal(resolveProductGridColumns(960), PRODUCT_GRID_MAX_COLUMNS);
+
+  const widths = [280, 335, 350, 390, 474, 600, 636, 798, 960];
+  let previous = 2;
+  for (const width of widths) {
+    const columns = resolveProductGridColumns(width);
+    assert.ok(columns >= previous, `columns must not drop as container grows (${width})`);
+    previous = columns;
+    if (columns >= 3) {
+      const tile =
+        (width - (columns - 1) * PRODUCT_GRID_GAP_PX) / columns;
+      assert.ok(tile >= PRODUCT_GRID_MIN_TILE_PX, `tile ${tile} too narrow at ${width}px / ${columns} cols`);
+    }
+  }
 }
 
 function testTileLinksToCanonicalPdp() {
@@ -241,6 +298,7 @@ testManifestPrefersSmMdNotXl();
 testMissingOptionalVisualsDoesNotThrow();
 testLongTitleIsCssClamped();
 testGridClassStructure();
+testContainerAwareColumnResolution();
 testTileLinksToCanonicalPdp();
 testPreviewReusesCatalogListing();
 testBlurAndSharpShareOneSrc();
