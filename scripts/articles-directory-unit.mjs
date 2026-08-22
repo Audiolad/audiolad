@@ -51,6 +51,7 @@ import { MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/cont
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { USYPLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-bez-slov-slushat-onlayn.ts";
+import { MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-slushat-onlayn-besplatno.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -963,6 +964,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${twentyFourthListenHref}`,
     ),
     "directory JSON-LD includes twenty-fourth listen href",
+  );
+
+
+  const twentyFifthListenHref = "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno";
+  const twentyFifthListenCard = data.articles.find((card) => card.href === twentyFifthListenHref);
+  assert(twentyFifthListenCard, "twenty-fifth indexable listen page is listed");
+  assert(
+    twentyFifthListenCard.title === "Медитация для сна – слушать онлайн бесплатно | АудиоЛад",
+    "twenty-fifth listen directory title",
+  );
+  assert(
+    twentyFifthListenCard.description === MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE.description,
+    "twenty-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-slushat-onlayn-besplatno",
+    ),
+    "no /articles duplicate for twenty-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyFifthListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-fifth listen href",
   );
 
   const articleCards = listArticleDirectoryCards();
