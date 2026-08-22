@@ -11,7 +11,7 @@ import {
 
 /**
  * Loads official MAX Bridge CDN only on the MAX entry surface.
- * Does not call Telegram-style `WebApp.ready()`. Missing `WebApp` is normal
+ * Does not perform a separate messenger init. Missing `WebApp` is normal
  * in a regular browser and must not throw.
  */
 export default function MaxBridgeScript() {

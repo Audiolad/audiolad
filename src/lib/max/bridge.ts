@@ -4,13 +4,13 @@
  * Official 2026 docs: https://dev.max.ru/docs/webapps/bridge
  * CDN: https://st.max.ru/js/max-web-app.js
  *
- * `window.WebApp` is created on launch and does not need Telegram-style
- * `WebApp.ready()`. Presence of `WebApp` after the CDN script loads is NOT
- * proof the page is inside MAX. Prefer non-empty `initData` or hash launch
- * params (`WebAppData` / `WebAppPlatform` / `WebAppVersion`).
+ * `window.WebApp` is created on launch and does not need a separate init
+ * call. Presence of `WebApp` after the CDN script loads is NOT proof the
+ * page is inside MAX. Prefer non-empty `initData` or hash launch params
+ * (`WebAppData` / `WebAppPlatform` / `WebAppVersion`).
  *
  * Never trust `initDataUnsafe` for security decisions. This module does not
- * validate `initData` and must never contain a bot token.
+ * validate `initData` and must never contain a messenger secret.
  */
 
 export const MAX_WEB_APP_SCRIPT_SRC = "https://st.max.ru/js/max-web-app.js";

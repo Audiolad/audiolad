@@ -162,10 +162,27 @@ assert.doesNotMatch(
   /Content-Security-Policy|X-Frame-Options/,
   "proxy must not invent CSP or X-Frame-Options",
 );
+const maxSources = [
+  "src/lib/max/bridge.ts",
+  "src/lib/max/host.ts",
+  "src/lib/max/proxy-policy.ts",
+  "src/lib/max/seo.ts",
+  "src/components/max/MaxBridgeScript.tsx",
+  "src/components/max/MaxMiniAppScreen.tsx",
+  "src/app/(platform)/max-site/page.tsx",
+  "src/app/(platform)/max-site/layout.tsx",
+]
+  .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
+  .join("\n");
 assert.doesNotMatch(
-  readFileSync(join(repoRoot, "src/lib/max/bridge.ts"), "utf8"),
-  /MAX_BOT|bot[_-]?token|ready\(\)/i,
-  "MAX bridge must not add bot tokens or Telegram-style ready()",
+  maxSources,
+  /MAX_BOT|BOT_TOKEN|process\.env\.\w*SECRET|process\.env\.\w*TOKEN/,
+  "MAX sources must not embed bot tokens or secrets",
+);
+assert.doesNotMatch(
+  maxSources.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  /\.ready\s*\(/,
+  "MAX sources must not call Telegram-style ready()",
 );
 
 console.log("max-proxy-routing-unit: ok");

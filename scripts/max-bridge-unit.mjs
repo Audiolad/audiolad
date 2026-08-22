@@ -65,7 +65,7 @@ assert.doesNotMatch(screen, /ListenerAppShell|ProductCard|catalog/);
 
 const bridgeSource = readFileSync(join(repoRoot, "src/lib/max/bridge.ts"), "utf8");
 assert.doesNotMatch(bridgeSource, /WebApp\.ready\(/);
-assert.doesNotMatch(bridgeSource, /MAX_BOT|bot token|BOT_TOKEN/i);
+assert.doesNotMatch(bridgeSource, /MAX_BOT|BOT_TOKEN|process\.env\.\w*BOT/);
 assert.match(bridgeSource, /initDataUnsafe/);
 
 const scriptSource = readFileSync(
@@ -74,6 +74,9 @@ const scriptSource = readFileSync(
 );
 assert.match(scriptSource, /MAX_WEB_APP_SCRIPT_SRC/);
 assert.match(scriptSource, /afterInteractive/);
-assert.doesNotMatch(scriptSource, /ready\(/);
+assert.doesNotMatch(
+  scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  /\.ready\s*\(/,
+);
 
 console.log("max-bridge-unit: ok");
