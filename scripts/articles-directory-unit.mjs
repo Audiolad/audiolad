@@ -54,6 +54,7 @@ import { MUZYKA_DLYA_SNA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/lis
 import { MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-pered-snom-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn.ts";
+import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1042,6 +1043,32 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes twenty-seventh listen href",
   );
+
+
+  const twentyEighthListenHref = "/listens/meditatsiya-dlya-glubokogo-sna-slushat-onlayn";
+  const twentyEighthListenCard = data.articles.find((card) => card.href === twentyEighthListenHref);
+  assert(twentyEighthListenCard, "twenty-eighth indexable listen page is listed");
+  assert(
+    twentyEighthListenCard.title === "Медитация для глубокого сна – слушать онлайн | АудиоЛад",
+    "twenty-eighth listen directory title",
+  );
+  assert(
+    twentyEighthListenCard.description === MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "twenty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-glubokogo-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for twenty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-eighth listen href",
+  );
+
 
   const articleCards = listArticleDirectoryCards();
   const articleHrefs = new Set(articleCards.map((card) => card.href));
