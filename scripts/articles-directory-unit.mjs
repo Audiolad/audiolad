@@ -55,6 +55,7 @@ import { MEDITATSIYA_DLYA_SNA_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/s
 import { MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE } from "../src/lib/seo/listens/content/meditatsiya-pered-snom-slushat-onlayn-besplatno.ts";
 import { MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-glubokogo-sna-slushat-onlayn.ts";
+import { MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE } from "../src/lib/seo/listens/content/meditatsiya-na-noch-slushat-pered-snom.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1067,6 +1068,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${twentyEighthListenHref}`,
     ),
     "directory JSON-LD includes twenty-eighth listen href",
+  );
+
+
+  const twentyNinthListenHref = "/listens/meditatsiya-na-noch-slushat-pered-snom";
+  const twentyNinthListenCard = data.articles.find((card) => card.href === twentyNinthListenHref);
+  assert(twentyNinthListenCard, "twenty-ninth indexable listen page is listed");
+  assert(
+    twentyNinthListenCard.title === "Медитация на ночь – слушать перед сном онлайн | АудиоЛад",
+    "twenty-ninth listen directory title",
+  );
+  assert(
+    twentyNinthListenCard.description === MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE.description,
+    "twenty-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-na-noch-slushat-pered-snom",
+    ),
+    "no /articles duplicate for twenty-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${twentyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes twenty-ninth listen href",
   );
 
 
