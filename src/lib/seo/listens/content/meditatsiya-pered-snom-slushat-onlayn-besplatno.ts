@@ -176,7 +176,7 @@ export const MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если нужен более широкий выбор без акцента на вечерний ритуал, откройте «" },
+              { text: "Если же хочется посмотреть более широкий выбор практик без акцента именно на вечернем ритуале, можно перейти на основную страницу «" },
               { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "Медитация для сна: слушать онлайн бесплатно" },
               { text: "»." },
             ],
