@@ -154,3 +154,171 @@ export function releaseCatalogTilePlayPointerFocus(
 ): void {
   target?.blur();
 }
+
+export type CatalogTileCarouselGesturePhase = "idle" | "down";
+
+/**
+ * Pointer session for the in-tile scroller.
+ * Play lives inside the overflow node, so its pointerdown/up bubble here.
+ * A Play tap must not leave startX/pointerId/horizontalIntent mid-gesture.
+ */
+export type CatalogTileCarouselGesture = {
+  phase: CatalogTileCarouselGesturePhase;
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  startScrollLeft: number;
+  horizontalIntent: boolean;
+  scrolled: boolean;
+  suppressClick: boolean;
+  startedOnControl: boolean;
+};
+
+const INTERACTIVE_GESTURE_TARGET_SELECTOR = "button, [data-catalog-tile-play]";
+
+export function createIdleCatalogTileCarouselGesture(): CatalogTileCarouselGesture {
+  return {
+    phase: "idle",
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    horizontalIntent: false,
+    scrolled: false,
+    suppressClick: false,
+    startedOnControl: false,
+  };
+}
+
+export function isCatalogTileCarouselGestureIdle(
+  gesture: CatalogTileCarouselGesture,
+): boolean {
+  return (
+    gesture.phase === "idle" &&
+    gesture.pointerId === null &&
+    gesture.horizontalIntent === false &&
+    gesture.scrolled === false &&
+    gesture.startedOnControl === false &&
+    gesture.startX === 0 &&
+    gesture.startY === 0
+  );
+}
+
+export function isCatalogTileCarouselInteractiveTarget(
+  target: { closest?: (selector: string) => unknown } | null | undefined,
+): boolean {
+  return Boolean(
+    target &&
+      typeof target.closest === "function" &&
+      target.closest(INTERACTIVE_GESTURE_TARGET_SELECTOR),
+  );
+}
+
+export function beginCatalogTileCarouselGesture(
+  input: {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startScrollLeft: number;
+    isInteractiveTarget?: boolean;
+  },
+): CatalogTileCarouselGesture {
+  return {
+    phase: "down",
+    pointerId: input.pointerId,
+    startX: input.startX,
+    startY: input.startY,
+    startScrollLeft: input.startScrollLeft,
+    horizontalIntent: false,
+    scrolled: false,
+    suppressClick: false,
+    startedOnControl: Boolean(input.isInteractiveTarget),
+  };
+}
+
+export function updateCatalogTileCarouselGesture(
+  gesture: CatalogTileCarouselGesture,
+  input: {
+    pointerId: number;
+    endX: number;
+    endY: number;
+    currentScrollLeft: number;
+  },
+): CatalogTileCarouselGesture {
+  if (gesture.phase !== "down" || gesture.pointerId !== input.pointerId) {
+    return gesture;
+  }
+
+  const dx = input.endX - gesture.startX;
+  const dy = input.endY - gesture.startY;
+
+  return {
+    ...gesture,
+    horizontalIntent:
+      gesture.horizontalIntent || hasCatalogSlideHorizontalIntent(dx, dy),
+    scrolled:
+      gesture.scrolled ||
+      didCatalogTileScrollerMove(gesture.startScrollLeft, input.currentScrollLeft),
+  };
+}
+
+export function endCatalogTileCarouselGesture(
+  gesture: CatalogTileCarouselGesture,
+  input: {
+    pointerId: number;
+    endX: number;
+    endY: number;
+    currentScrollLeft: number;
+  },
+): {
+  gesture: CatalogTileCarouselGesture;
+  intent: CatalogSlidePointerIntent;
+} {
+  if (gesture.phase !== "down" || gesture.pointerId !== input.pointerId) {
+    return {
+      gesture: {
+        ...createIdleCatalogTileCarouselGesture(),
+        suppressClick: gesture.suppressClick,
+      },
+      intent: "tap",
+    };
+  }
+
+  const scrolled =
+    gesture.scrolled ||
+    didCatalogTileScrollerMove(gesture.startScrollLeft, input.currentScrollLeft);
+  const intent = resolveCatalogSlidePointerIntent({
+    startX: gesture.startX,
+    startY: gesture.startY,
+    endX: input.endX,
+    endY: input.endY,
+    startScrollLeft: gesture.startScrollLeft,
+    currentScrollLeft: input.currentScrollLeft,
+    scrolled,
+    horizontalIntent: gesture.horizontalIntent,
+  });
+
+  // A completed tap on Play must not suppress the button click.
+  const suppressClick =
+    !gesture.startedOnControl && !shouldAllowCatalogSlidePdpNavigation(intent);
+
+  return {
+    gesture: {
+      ...createIdleCatalogTileCarouselGesture(),
+      suppressClick,
+    },
+    intent,
+  };
+}
+
+export function consumeCatalogTileCarouselClickSuppress(
+  gesture: CatalogTileCarouselGesture,
+): {
+  gesture: CatalogTileCarouselGesture;
+  suppressClick: boolean;
+} {
+  return {
+    gesture: { ...gesture, suppressClick: false },
+    suppressClick: gesture.suppressClick,
+  };
+}

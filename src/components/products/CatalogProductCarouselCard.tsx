@@ -17,14 +17,16 @@ import CatalogSystemProductSlide, {
 } from "@/components/products/CatalogSystemProductSlide";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
-  didCatalogTileScrollerMove,
+  beginCatalogTileCarouselGesture,
+  consumeCatalogTileCarouselClickSuppress,
+  createIdleCatalogTileCarouselGesture,
+  endCatalogTileCarouselGesture,
   formatCatalogTilePagerAriaLabel,
   formatCatalogTilePagerLabel,
-  hasCatalogSlideHorizontalIntent,
-  resolveCatalogSlidePointerIntent,
+  isCatalogTileCarouselInteractiveTarget,
   resolveCatalogTileSlideIndex,
-  shouldAllowCatalogSlidePdpNavigation,
   shouldShowCatalogTilePager,
+  updateCatalogTileCarouselGesture,
   type CatalogAuthorSlide as CatalogAuthorSlideModel,
 } from "@/lib/products/catalog-tile-carousel";
 
@@ -33,26 +35,6 @@ type CatalogProductCarouselCardProps = {
   authorSlides: readonly CatalogAuthorSlideModel[];
   playControl?: ReactNode;
 };
-
-type GestureState = {
-  startX: number;
-  startY: number;
-  startScrollLeft: number;
-  horizontalIntent: boolean;
-  scrolled: boolean;
-  suppressClick: boolean;
-};
-
-function createIdleGesture(): GestureState {
-  return {
-    startX: 0,
-    startY: 0,
-    startScrollLeft: 0,
-    horizontalIntent: false,
-    scrolled: false,
-    suppressClick: false,
-  };
-}
 
 /**
  * In-tile 9:16 carousel: Slide 1 = system, Slide 2+ = author.
@@ -64,7 +46,7 @@ export default function CatalogProductCarouselCard({
   playControl,
 }: CatalogProductCarouselCardProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef<GestureState>(createIdleGesture());
+  const gestureRef = useRef(createIdleCatalogTileCarouselGesture());
   const totalSlides = 1 + authorSlides.length;
   const showPager = shouldShowCatalogTilePager(totalSlides);
   const [currentIndex, setCurrentIndex] = useState(1);
@@ -76,13 +58,13 @@ export default function CatalogProductCarouselCard({
       return;
     }
 
-    if (
-      didCatalogTileScrollerMove(
-        gestureRef.current.startScrollLeft,
-        scroller.scrollLeft,
-      )
-    ) {
-      gestureRef.current.scrolled = true;
+    if (gestureRef.current.phase === "down") {
+      gestureRef.current = updateCatalogTileCarouselGesture(gestureRef.current, {
+        pointerId: gestureRef.current.pointerId ?? -1,
+        endX: gestureRef.current.startX,
+        endY: gestureRef.current.startY,
+        currentScrollLeft: scroller.scrollLeft,
+      });
     }
 
     const nextIndex = resolveCatalogTileSlideIndex(
@@ -96,64 +78,60 @@ export default function CatalogProductCarouselCard({
 
   const finishGesture = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const scroller = scrollerRef.current;
-    const gesture = gestureRef.current;
-    const currentScrollLeft = scroller?.scrollLeft ?? gesture.startScrollLeft;
-    const scrolled =
-      gesture.scrolled ||
-      didCatalogTileScrollerMove(gesture.startScrollLeft, currentScrollLeft);
-    const intent = resolveCatalogSlidePointerIntent({
-      startX: gesture.startX,
-      startY: gesture.startY,
+    const ended = endCatalogTileCarouselGesture(gestureRef.current, {
+      pointerId: event.pointerId,
       endX: event.clientX,
       endY: event.clientY,
-      startScrollLeft: gesture.startScrollLeft,
-      currentScrollLeft,
-      scrolled,
-      horizontalIntent: gesture.horizontalIntent,
+      currentScrollLeft: scroller?.scrollLeft ?? 0,
     });
-
-    gestureRef.current.suppressClick = !shouldAllowCatalogSlidePdpNavigation(intent);
+    gestureRef.current = ended.gesture;
   }, []);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const scroller = scrollerRef.current;
 
-    gestureRef.current = {
+    if (gestureRef.current.phase === "down") {
+      const abandoned = endCatalogTileCarouselGesture(gestureRef.current, {
+        pointerId: gestureRef.current.pointerId ?? event.pointerId,
+        endX: event.clientX,
+        endY: event.clientY,
+        currentScrollLeft: scroller?.scrollLeft ?? 0,
+      });
+      gestureRef.current = abandoned.gesture;
+    }
+
+    gestureRef.current = beginCatalogTileCarouselGesture({
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       startScrollLeft: scroller?.scrollLeft ?? 0,
-      horizontalIntent: false,
-      scrolled: false,
-      suppressClick: false,
-    };
+      isInteractiveTarget: isCatalogTileCarouselInteractiveTarget(
+        event.target as { closest?: (selector: string) => unknown } | null,
+      ),
+    });
   }, []);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const gesture = gestureRef.current;
     const scroller = scrollerRef.current;
-    const dx = event.clientX - gesture.startX;
-    const dy = event.clientY - gesture.startY;
 
-    if (hasCatalogSlideHorizontalIntent(dx, dy)) {
-      gesture.horizontalIntent = true;
-    }
-
-    if (
-      scroller &&
-      didCatalogTileScrollerMove(gesture.startScrollLeft, scroller.scrollLeft)
-    ) {
-      gesture.scrolled = true;
-    }
+    gestureRef.current = updateCatalogTileCarouselGesture(gestureRef.current, {
+      pointerId: event.pointerId,
+      endX: event.clientX,
+      endY: event.clientY,
+      currentScrollLeft: scroller?.scrollLeft ?? 0,
+    });
   }, []);
 
   const handleClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    if (!gestureRef.current.suppressClick) {
+    const consumed = consumeCatalogTileCarouselClickSuppress(gestureRef.current);
+    gestureRef.current = consumed.gesture;
+
+    if (!consumed.suppressClick) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    gestureRef.current.suppressClick = false;
   }, []);
 
   const handleDragStartCapture = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -199,6 +177,7 @@ export default function CatalogProductCarouselCard({
         onPointerMove={handlePointerMove}
         onPointerUp={finishGesture}
         onPointerCancel={finishGesture}
+        onLostPointerCapture={finishGesture}
         onClickCapture={handleClickCapture}
         onDragStartCapture={handleDragStartCapture}
         onScroll={syncIndexFromScroll}

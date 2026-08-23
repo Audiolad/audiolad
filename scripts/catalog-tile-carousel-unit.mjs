@@ -12,9 +12,15 @@ import {
   CATALOG_SLIDE_HORIZONTAL_INTENT_PX,
   CATALOG_SLIDE_TAP_JITTER_PX,
   CATALOG_SLIDE_VERTICAL_DOMINANCE_PX,
+  beginCatalogTileCarouselGesture,
+  consumeCatalogTileCarouselClickSuppress,
+  createIdleCatalogTileCarouselGesture,
   didCatalogTileScrollerMove,
+  endCatalogTileCarouselGesture,
   formatCatalogTilePagerAriaLabel,
   formatCatalogTilePagerLabel,
+  isCatalogTileCarouselGestureIdle,
+  isCatalogTileCarouselInteractiveTarget,
   releaseCatalogTilePlayPointerFocus,
   resolveCatalogSlidePointerIntent,
   resolveCatalogTileSlideIndex,
@@ -22,6 +28,7 @@ import {
   shouldBlurCatalogTilePlayAfterPointerClick,
   shouldShowCatalogTilePager,
   shouldTreatCatalogSlidePointerAsTap,
+  updateCatalogTileCarouselGesture,
 } from "../src/lib/products/catalog-tile-carousel.ts";
 import {
   buildExperimentalAuthorSlides,
@@ -256,8 +263,9 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
   assert.match(authorSlide, /data-catalog-author-slide-aspect="9\/16"/);
   assert.match(authorSlide, /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[9\/16\]/);
   assert.match(carousel, /catalog-tile-carousel/, "native CSS scroller class");
-  assert.match(carousel, /resolveCatalogSlidePointerIntent/, "swipe is not a tap");
+  assert.match(carousel, /beginCatalogTileCarouselGesture/, "swipe is not a tap");
   assert.match(carousel, /onPointerMove/, "horizontal intent is tracked during the pan");
+  assert.match(carousel, /onLostPointerCapture/, "lost capture always ends the pointer session");
   assert.match(carousel, /onClickCapture/, "swipe click is suppressed");
   assert.match(carousel, /onDragStartCapture/, "system Link drag does not eat the first swipe");
   assert.match(authorSlide, /href=\{productHref\}/, "author slide uses product.href");
@@ -287,6 +295,240 @@ function testPagerOnlyWhenMultipleSlides() {
     "does not render one fat dot per slide",
   );
   assert.match(carousel, /formatCatalogTilePagerLabel/, "compact 3\/12 progress");
+}
+
+function playTarget() {
+  return {
+    closest(selector) {
+      return selector.includes("button") || selector.includes("data-catalog-tile-play")
+        ? this
+        : null;
+    },
+  };
+}
+
+function coverTarget() {
+  return {
+    closest() {
+      return null;
+    },
+  };
+}
+
+/**
+ * Real event sequence: pointer Play tap, then the first horizontal pan.
+ * Proves Play bubbles into the carousel, must fully idle, and the next
+ * pointer sequence is a clean swipe (slide would change natively).
+ */
+function testPointerPlayThenFirstSwipeStartsClean() {
+  assert.equal(isCatalogTileCarouselInteractiveTarget(playTarget()), true);
+  assert.equal(isCatalogTileCarouselInteractiveTarget(coverTarget()), false);
+  assert.equal(isCatalogTileCarouselInteractiveTarget(null), false);
+
+  let gesture = createIdleCatalogTileCarouselGesture();
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), true, "before Play: idle");
+
+  // A) tap Play — carousel SEES pointerdown (Play does not stop pointer events)
+  gesture = beginCatalogTileCarouselGesture({
+    pointerId: 7,
+    startX: 84,
+    startY: 210,
+    startScrollLeft: 0,
+    isInteractiveTarget: isCatalogTileCarouselInteractiveTarget(playTarget()),
+  });
+  assert.equal(gesture.phase, "down");
+  assert.equal(gesture.pointerId, 7);
+  assert.equal(gesture.startedOnControl, true);
+  assert.equal(gesture.suppressClick, false);
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), false, "after Play pointerdown: mid-gesture");
+
+  // Play pointerup (symmetric). Click stopPropagation must NOT skip this.
+  const playEnd = endCatalogTileCarouselGesture(gesture, {
+    pointerId: 7,
+    endX: 86,
+    endY: 211,
+    currentScrollLeft: 0,
+  });
+  gesture = playEnd.gesture;
+  assert.equal(playEnd.intent, "tap");
+  assert.equal(gesture.suppressClick, false, "Play tap must not suppress the button click");
+  assert.equal(
+    isCatalogTileCarouselGestureIdle(gesture),
+    true,
+    "after Play pointerup: fully idle — no leftover startX/pointerId/intent",
+  );
+  assert.equal(gesture.startX, 0);
+  assert.equal(gesture.pointerId, null);
+  assert.equal(gesture.horizontalIntent, false);
+  assert.equal(gesture.phase, "idle");
+
+  const playClick = consumeCatalogTileCarouselClickSuppress(gesture);
+  gesture = playClick.gesture;
+  assert.equal(playClick.suppressClick, false, "after Play click: carousel does not eat Play");
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), true, "after Play click / loading: still idle");
+
+  // B) first horizontal pan on the cover — new pointerId, must start clean
+  gesture = beginCatalogTileCarouselGesture({
+    pointerId: 8,
+    startX: 90,
+    startY: 40,
+    startScrollLeft: 0,
+    isInteractiveTarget: isCatalogTileCarouselInteractiveTarget(coverTarget()),
+  });
+  assert.equal(gesture.startedOnControl, false);
+  assert.equal(gesture.pointerId, 8);
+  assert.equal(gesture.startX, 90, "swipe does not reuse Play startX");
+
+  gesture = updateCatalogTileCarouselGesture(gesture, {
+    pointerId: 8,
+    endX: 40,
+    endY: 42,
+    currentScrollLeft: 48,
+  });
+  assert.equal(gesture.horizontalIntent, true);
+  assert.equal(gesture.scrolled, true);
+
+  const swipeEnd = endCatalogTileCarouselGesture(gesture, {
+    pointerId: 8,
+    endX: 20,
+    endY: 43,
+    currentScrollLeft: 169,
+  });
+  assert.equal(swipeEnd.intent, "swipe");
+  assert.equal(shouldAllowCatalogSlidePdpNavigation(swipeEnd.intent), false);
+  assert.equal(swipeEnd.gesture.suppressClick, true);
+  assert.equal(swipeEnd.gesture.phase, "idle");
+  assert.equal(swipeEnd.gesture.pointerId, null);
+  assert.equal(resolveCatalogTileSlideIndex(169, 169, 4), 2, "first swipe after Play changes slide");
+
+  const swipeClick = consumeCatalogTileCarouselClickSuppress(swipeEnd.gesture);
+  assert.equal(swipeClick.suppressClick, true);
+  assert.equal(swipeClick.gesture.suppressClick, false);
+}
+
+function testPlayPointerupLostThenNewSwipeStillStartsClean() {
+  let gesture = beginCatalogTileCarouselGesture({
+    pointerId: 3,
+    startX: 80,
+    startY: 200,
+    startScrollLeft: 0,
+    isInteractiveTarget: true,
+  });
+
+  // Lost capture / pointercancel without a matching leftover: end by pointerId
+  gesture = endCatalogTileCarouselGesture(gesture, {
+    pointerId: 3,
+    endX: 80,
+    endY: 200,
+    currentScrollLeft: 0,
+  }).gesture;
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), true);
+
+  // New swipe pointer must not be ignored as a continuation of Play
+  gesture = beginCatalogTileCarouselGesture({
+    pointerId: 4,
+    startX: 88,
+    startY: 36,
+    startScrollLeft: 0,
+    isInteractiveTarget: false,
+  });
+  gesture = updateCatalogTileCarouselGesture(gesture, {
+    pointerId: 3,
+    endX: 10,
+    endY: 36,
+    currentScrollLeft: 80,
+  });
+  assert.equal(gesture.horizontalIntent, false, "moves from Play pointerId are ignored");
+  gesture = updateCatalogTileCarouselGesture(gesture, {
+    pointerId: 4,
+    endX: 20,
+    endY: 38,
+    currentScrollLeft: 80,
+  });
+  assert.equal(gesture.horizontalIntent, true);
+  assert.equal(endCatalogTileCarouselGesture(gesture, {
+    pointerId: 4,
+    endX: 16,
+    endY: 38,
+    currentScrollLeft: 169,
+  }).intent, "swipe");
+}
+
+function testKeyboardPlayLeavesGestureIdle() {
+  const gesture = createIdleCatalogTileCarouselGesture();
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), true);
+  // Keyboard Enter does not emit pointerdown on the scroller.
+  const swipe = beginCatalogTileCarouselGesture({
+    pointerId: 11,
+    startX: 90,
+    startY: 40,
+    startScrollLeft: 0,
+    isInteractiveTarget: false,
+  });
+  assert.equal(swipe.startedOnControl, false);
+  assert.equal(
+    endCatalogTileCarouselGesture(updateCatalogTileCarouselGesture(swipe, {
+      pointerId: 11,
+      endX: 30,
+      endY: 42,
+      currentScrollLeft: 169,
+    }), {
+      pointerId: 11,
+      endX: 24,
+      endY: 42,
+      currentScrollLeft: 169,
+    }).intent,
+    "swipe",
+  );
+}
+
+function testSwipeStartedOnPlayButtonStillCountsAsSwipe() {
+  let gesture = beginCatalogTileCarouselGesture({
+    pointerId: 9,
+    startX: 84,
+    startY: 210,
+    startScrollLeft: 0,
+    isInteractiveTarget: true,
+  });
+  gesture = updateCatalogTileCarouselGesture(gesture, {
+    pointerId: 9,
+    endX: 20,
+    endY: 208,
+    currentScrollLeft: 90,
+  });
+  const ended = endCatalogTileCarouselGesture(gesture, {
+    pointerId: 9,
+    endX: 16,
+    endY: 208,
+    currentScrollLeft: 169,
+  });
+  assert.equal(ended.intent, "swipe", "pan that starts on Play is still a swipe");
+  assert.equal(ended.gesture.suppressClick, false, "do not suppress — Play is not a PDP Link");
+  assert.equal(ended.gesture.phase, "idle");
+}
+
+function testAnyButtonInsideScrollerIsAControlSequence() {
+  const dummyButton = {
+    closest(selector) {
+      return selector.includes("button") ? this : null;
+    },
+  };
+
+  let gesture = beginCatalogTileCarouselGesture({
+    pointerId: 1,
+    startX: 50,
+    startY: 50,
+    startScrollLeft: 0,
+    isInteractiveTarget: isCatalogTileCarouselInteractiveTarget(dummyButton),
+  });
+  gesture = endCatalogTileCarouselGesture(gesture, {
+    pointerId: 1,
+    endX: 51,
+    endY: 50,
+    currentScrollLeft: 0,
+  }).gesture;
+  assert.equal(isCatalogTileCarouselGestureIdle(gesture), true);
+  assert.equal(gesture.suppressClick, false, "dummy button tap is not a PDP swipe");
 }
 
 function testFirstSwipeAfterPlayDoesNotTrapOverflowFocus() {
@@ -417,6 +659,11 @@ testZeroAndManyAuthorSlides();
 testZeroAuthorSlidesKeepCurrentTile();
 testCarouselGeometryAndPlayStayOnSlideOne();
 testPagerOnlyWhenMultipleSlides();
+testPointerPlayThenFirstSwipeStartsClean();
+testPlayPointerupLostThenNewSwipeStillStartsClean();
+testKeyboardPlayLeavesGestureIdle();
+testSwipeStartedOnPlayButtonStillCountsAsSwipe();
+testAnyButtonInsideScrollerIsAControlSequence();
 testFirstSwipeAfterPlayDoesNotTrapOverflowFocus();
 testFirstSwipeStabilizers();
 testDemoDataStaysExperimental();
