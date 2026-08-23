@@ -23,6 +23,7 @@ type BuyPracticeButtonProps = {
   productPriceMinorSnapshot?: number | null;
   currency?: string | null;
   purchaseSurface?: PurchaseSurface | string | null;
+  quickOfferId?: string | null;
   label: string;
   className?: string;
   signInReturnPath?: string;
@@ -88,6 +89,7 @@ export default function BuyPracticeButton({
   productPriceMinorSnapshot = null,
   currency = "RUB",
   purchaseSurface = "practice_page",
+  quickOfferId = null,
   label,
   className,
   signInReturnPath,
@@ -192,7 +194,10 @@ export default function BuyPracticeButton({
           checkout_origin_path: path,
           buy_click_client_event_id:
             sessionId && practiceId ? buyClickClientEventId : null,
-          expected_amount_minor: productPriceMinorSnapshot,
+          quick_offer_id: quickOfferId,
+          expected_amount_minor: quickOfferId
+            ? null
+            : productPriceMinorSnapshot,
         }),
       });
 

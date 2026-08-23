@@ -34,6 +34,9 @@ export type UploadImageSetContext = {
   authorKind?: "avatar" | "banner";
   userId?: string;
   playlistId?: string;
+  offerId?: string;
+  offerAssetKind?: "hero" | "material";
+  materialId?: string;
 };
 
 export type UploadImageSetOptions = {

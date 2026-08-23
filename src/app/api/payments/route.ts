@@ -20,6 +20,7 @@ import {
 } from "@/lib/payments/tochka-client";
 import { getTochkaConfig } from "@/lib/payments/tochka-config";
 import { getOrderSaleAccrualReady } from "@/lib/author-sales/queries";
+import { applyServerQuickOfferAmount } from "@/lib/quick-offers/apply-offer-amount";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -154,7 +155,7 @@ export async function POST(request: Request) {
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at",
+      "id, user_id, practice_id, status, amount_minor, currency, practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot, created_at, paid_at, quick_offer_id",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -176,6 +177,26 @@ export async function POST(request: Request) {
       { error: statusError.error },
       { status: statusError.status },
     );
+  }
+
+  if (orderRow.quick_offer_id) {
+    const priced = await applyServerQuickOfferAmount({
+      supabase,
+      orderId: orderRow.id,
+      quickOfferId: orderRow.quick_offer_id,
+      cookieHeader: request.headers.get("cookie"),
+    });
+
+    if (!priced.ok) {
+      return NextResponse.json(
+        { error: priced.error },
+        { status: priced.status },
+      );
+    }
+
+    orderRow.amount_minor = priced.amount.amount_minor;
+    orderRow.price_minor_snapshot =
+      priced.amount.price_minor_snapshot ?? priced.amount.amount_minor;
   }
 
   if (
@@ -233,7 +254,20 @@ export async function POST(request: Request) {
   const paymentRows = (existingPayments ?? []) as PaymentRow[];
   const pendingPayment = paymentRows.find((row) => row.status === "pending");
 
-  if (pendingPayment) {
+  if (pendingPayment && pendingPayment.amount_minor !== orderRow.amount_minor) {
+    await serviceRoleClient
+      .from("payments")
+      .update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        provider_metadata: {
+          ...(pendingPayment.provider_metadata ?? {}),
+          error: "quick_offer_amount_changed",
+        },
+      })
+      .eq("id", pendingPayment.id);
+  } else if (pendingPayment) {
     const paymentUrl = getPaymentUrlFromMetadata(pendingPayment.provider_metadata);
     const hasValidCheckoutToken = isStoredCheckoutTokenValidForOrder(
       pendingPayment.provider_metadata,

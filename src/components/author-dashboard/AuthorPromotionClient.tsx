@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorPromoPagesClient from "@/components/author-dashboard/AuthorPromoPagesClient";
+import AuthorQuickOffersClient from "@/components/author-dashboard/AuthorQuickOffersClient";
 import PromotionCampaignLinksSection, {
   type PromotionChannelFormSeed,
 } from "@/components/author-dashboard/PromotionCampaignLinksSection";
@@ -455,6 +456,15 @@ export default function AuthorPromotionClient({
     return null;
   }
 
+  if (searchParams.get("offer")) {
+    return (
+      <div className="space-y-8">
+        <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
+        <AuthorQuickOffersClient selectedAuthor={selectedAuthor} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} />
@@ -602,6 +612,10 @@ export default function AuthorPromotionClient({
             })}
           </div>
         ) : null}
+      </section>
+
+      <section className="space-y-4">
+        <AuthorQuickOffersClient selectedAuthor={selectedAuthor} />
       </section>
 
       <section className="space-y-4">

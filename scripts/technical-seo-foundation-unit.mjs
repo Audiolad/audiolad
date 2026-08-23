@@ -357,6 +357,10 @@ function testRobotsConfig() {
     !SEO_ROBOTS_DISALLOWED_PATHS.includes("/practice/"),
     "robots must not block public products",
   );
+  assert(
+    !SEO_ROBOTS_DISALLOWED_PATHS.includes("/offers/"),
+    "robots must not block quick offers so crawlers can read noindex",
+  );
 
   process.env.NODE_ENV = previousNodeEnv;
   process.env.SEO_INDEXING = previousSeo;
