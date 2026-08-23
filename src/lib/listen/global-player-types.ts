@@ -52,6 +52,7 @@ type GlobalPlayerSessionBase = {
    * Missing value is treated as full so legacy session payloads keep working.
    */
   playbackMode?: GlobalPlayerPlaybackMode;
+  previewStartMs?: number;
   previewEndMs?: number;
   previewCta?: GlobalPlayerPreviewCta;
 };
@@ -164,6 +165,7 @@ export function resolveGlobalPlayerPlaybackMode(
 export type GlobalPlayerPlaybackContract = {
   entrySurface?: GlobalPlayerEntrySurface;
   playbackMode?: GlobalPlayerPlaybackMode;
+  previewStartMs?: number;
   previewEndMs?: number;
   previewCta?: GlobalPlayerPreviewCta;
 };

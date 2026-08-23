@@ -30,7 +30,8 @@ export function isInlineOnlyPlaybackSession(
   return Boolean(
     session &&
       isCatalogGlobalPlayerSession(session) &&
-      session.playbackNavigation === "inline_only",
+      (session.playbackNavigation === "inline_only" ||
+        session.entrySurface === "catalog"),
   );
 }
 

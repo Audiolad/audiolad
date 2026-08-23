@@ -42,6 +42,7 @@ import {
   writeDesktopPlayerLastSession,
 } from "@/lib/listen/desktop-player-persistence";
 import { isListenPlayerPathname, isWorkspaceDashboardPathname } from "@/lib/navigation/bottom-nav";
+import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 import {
   guestProgressToListenEntries,
   readGuestPracticeProgress,
@@ -210,6 +211,9 @@ function GlobalPlayerEngine({
     guestProgressMode: Boolean(catalogSession?.guestProgressMode),
     guestProgressMeta: catalogSession?.guestProgressMeta,
     audioRef: persistentAudioRef,
+    playbackMode: catalogSession?.playbackMode ?? "full",
+    previewStartMs: catalogSession?.previewStartMs,
+    previewEndMs: catalogSession?.previewEndMs,
   });
 
   const {
@@ -815,8 +819,8 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    // audio_post: playback stays inline; never navigate to /listen fullscreen.
-    if (session.playbackNavigation === "inline_only") {
+    // audio_post and catalog Play stay on the current page; never /listen.
+    if (isInlineOnlyPlaybackSession(session)) {
       return;
     }
 

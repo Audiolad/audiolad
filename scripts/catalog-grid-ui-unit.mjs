@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Catalog grid UI contract: unified feed, 2 columns, 3:4 cards, no play/heart.
+ * Catalog grid UI contract: unified feed, 2 columns, 3:4 cards, Play overlay.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -59,8 +59,9 @@ assert.match(
 
 assert.match(card, /aspect-\[3\/4\]/, "cards use 3:4 ratio");
 assert.doesNotMatch(card, /aspect-square/, "grid cards are not square");
-assert.doesNotMatch(card, /PlayIcon|loadSession|Heart|Избранн/, "no play or heart UI");
-assert.match(card, /href=\{product\.href\}/, "whole card goes to the product page");
+assert.match(card, /CatalogProductPlayButton/, "media zone has Play");
+assert.doesNotMatch(card, /Heart|Избранн/, "heart UI is not in this PR");
+assert.match(card, /href=\{product\.href\}/, "card still links to the product page");
 assert.match(card, /Подарок/, "gift badge is visual");
 
 assert.match(api, /export async function GET/, "GET /api/catalog exists");

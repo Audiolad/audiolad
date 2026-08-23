@@ -1,5 +1,11 @@
 export const PREVIEW_DURATION_MIN_MS = 30_000;
 export const PREVIEW_DURATION_MAX_MS = 90_000;
+export const DEFAULT_PREVIEW_DURATION_MS = 60_000;
+
+export type ResolvedPlaybackPreviewWindow = {
+  startMs: number;
+  endMs: number;
+};
 
 export type AudioPreviewWindow = {
   previewStartMs: number | null;
@@ -82,4 +88,43 @@ export function validateAudioPreviewWindow(
   }
 
   return { ok: true, window };
+}
+
+/**
+ * Resolve the window the player should clip to.
+ * Stored 30–90s windows win; otherwise fall back to the first 60s
+ * (or the whole track when it is shorter).
+ */
+export function resolvePlaybackPreviewWindow(
+  window: AudioPreviewWindow,
+  trackDurationMs?: number | null,
+): ResolvedPlaybackPreviewWindow {
+  const validated = validateAudioPreviewWindow(window);
+
+  if (
+    validated.ok &&
+    window.previewStartMs != null &&
+    window.previewEndMs != null
+  ) {
+    return {
+      startMs: window.previewStartMs,
+      endMs: window.previewEndMs,
+    };
+  }
+
+  const trackMs =
+    typeof trackDurationMs === "number" &&
+    Number.isFinite(trackDurationMs) &&
+    trackDurationMs > 0
+      ? Math.trunc(trackDurationMs)
+      : null;
+  const endMs =
+    trackMs == null
+      ? DEFAULT_PREVIEW_DURATION_MS
+      : Math.min(DEFAULT_PREVIEW_DURATION_MS, Math.max(trackMs, 1));
+
+  return {
+    startMs: 0,
+    endMs,
+  };
 }

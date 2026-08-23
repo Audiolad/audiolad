@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import CatalogProductPlayButton from "@/components/products/CatalogProductPlayButton";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
@@ -15,11 +16,11 @@ export default function CatalogProductGridCard({
 
   return (
     <article data-catalog-grid-card>
-      <Link
-        href={product.href}
-        className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-      >
-        <div className="relative overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+      <div className="relative overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+        <Link
+          href={product.href}
+          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
           <ProductCoverThumbnail
             slug={product.slug}
             title={product.title}
@@ -31,14 +32,21 @@ export default function CatalogProductGridCard({
             displayWidth={360}
             className="aspect-[3/4] w-full rounded-[18px]"
           />
+        </Link>
 
-          {isGift ? (
-            <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-0.5 text-[11px] font-semibold text-[#7042c5] shadow-sm">
-              Подарок
-            </span>
-          ) : null}
-        </div>
+        {isGift ? (
+          <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-0.5 text-[11px] font-semibold text-[#7042c5] shadow-sm">
+            Подарок
+          </span>
+        ) : null}
 
+        <CatalogProductPlayButton product={product} />
+      </div>
+
+      <Link
+        href={product.href}
+        className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
         <p className={`mt-2 ${PRODUCT_FORMAT_LINE_CLASS}`}>{product.kindLabel}</p>
 
         <h3 className="mt-1 line-clamp-2 text-[14px] font-semibold leading-5 text-[#25135c] sm:text-[15px] sm:leading-[22px]">

@@ -41,6 +41,7 @@ export type DesktopPlayerLastSession = {
   positionSeconds?: number;
   playbackMode?: GlobalPlayerPlaybackMode;
   entrySurface?: GlobalPlayerEntrySurface;
+  previewStartMs?: number;
   previewEndMs?: number;
 };
 
@@ -49,7 +50,7 @@ export type DesktopPlayerLastSessionInput = Omit<
   "updatedAt"
 >;
 
-function resolvePreviewEndMs(value: unknown): number | undefined {
+function resolvePreviewMs(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return undefined;
   }
@@ -115,7 +116,12 @@ export function parseDesktopPlayerLastSession(
     parsed.entrySurface = record.entrySurface;
   }
 
-  const previewEndMs = resolvePreviewEndMs(record.previewEndMs);
+  const previewStartMs = resolvePreviewMs(record.previewStartMs);
+  const previewEndMs = resolvePreviewMs(record.previewEndMs);
+
+  if (typeof previewStartMs === "number") {
+    parsed.previewStartMs = previewStartMs;
+  }
 
   if (typeof previewEndMs === "number") {
     parsed.previewEndMs = previewEndMs;
@@ -138,6 +144,10 @@ export function desktopPlayerSnapshotFromSession(
 
   if (session.entrySurface) {
     snapshot.entrySurface = session.entrySurface;
+  }
+
+  if (typeof session.previewStartMs === "number") {
+    snapshot.previewStartMs = session.previewStartMs;
   }
 
   if (typeof session.previewEndMs === "number") {
@@ -171,6 +181,9 @@ export function applyPersistedSessionContract(
     ...session,
     playbackMode: snapshot.playbackMode ?? "full",
     ...(snapshot.entrySurface ? { entrySurface: snapshot.entrySurface } : {}),
+    ...(typeof snapshot.previewStartMs === "number"
+      ? { previewStartMs: snapshot.previewStartMs }
+      : {}),
     ...(typeof snapshot.previewEndMs === "number"
       ? { previewEndMs: snapshot.previewEndMs }
       : {}),

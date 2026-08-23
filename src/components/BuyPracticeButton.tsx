@@ -28,6 +28,7 @@ type BuyPracticeButtonProps = {
   className?: string;
   signInReturnPath?: string;
   pendingLabel?: string;
+  hidePendingNotice?: boolean;
 };
 
 type ApiErrorBody = {
@@ -94,6 +95,7 @@ export default function BuyPracticeButton({
   className,
   signInReturnPath,
   pendingLabel = "Продолжить оплату",
+  hidePendingNotice = false,
 }: BuyPracticeButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -273,7 +275,7 @@ export default function BuyPracticeButton({
 
   return (
     <div>
-      {hasPendingOrder ? (
+      {hasPendingOrder && !hidePendingNotice ? (
         <p className="mb-3 rounded-[16px] border border-[#e7ddf7] bg-[#f8f3ff] px-4 py-3 text-center text-sm leading-5 text-[#5f4a8f]">
           У вас есть незавершённый заказ. Вы можете продолжить оплату.
         </p>
