@@ -192,7 +192,11 @@ function testGridClassStructure() {
     "columns are not viewport breakpoints",
   );
   assert.doesNotMatch(layout, /minmax\(|auto-fit|auto-fill/, "no auto-fit that can collapse 320 to 1");
-  assert.doesNotMatch(grid, /overflow-x-auto|snap-|carousel/);
+  assert.doesNotMatch(
+    grid,
+    /overflow-x-auto|snap-|scroll-snap/,
+    "ProductGrid itself is not a horizontal scroller",
+  );
   assert.match(grid, /CatalogProductTile/, "grid renders the new tile");
   assert.doesNotMatch(grid, /CatalogProductCard/, "grid does not reuse the row card");
 }
@@ -292,7 +296,12 @@ function testPreviewReusesCatalogListing() {
   assert.doesNotMatch(page, /from\("practices"\)/, "preview does not query practices itself");
   assert.match(page, /index:\s*false/, "preview is noindex");
   assert.match(page, /ProductGrid/, "preview renders the new grid");
-  assert.doesNotMatch(page, /CatalogProductCarousel/, "preview is not the production rail");
+  assert.match(page, /getExperimentalCatalogAuthorSlides/, "preview attaches demo author slides");
+  assert.doesNotMatch(
+    page,
+    /from "@\/components\/products\/CatalogProductCarousel"/,
+    "preview is not the production rail",
+  );
 
   assert.match(
     catalogPage,

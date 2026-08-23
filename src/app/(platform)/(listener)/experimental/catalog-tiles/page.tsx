@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import ProductGrid from "@/components/products/ProductGrid";
 import { getPublishedCatalogSections } from "@/lib/products/catalog";
+import { getExperimentalCatalogAuthorSlides } from "@/lib/products/experimental-catalog-author-slides";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,9 @@ export default async function ExperimentalCatalogTilesPage() {
         >
           /catalog
         </Link>
-        . Продакшен-каталог не изменён. Это не поисковая страница.
+        . Продакшен-каталог не изменён. Горизонтальный свайп внутри плитки
+        открывает демо-слайды автора — не база и не /catalog. Это не поисковая
+        страница.
       </p>
 
       {freeProducts.length > 0 ? (
@@ -53,6 +56,7 @@ export default async function ExperimentalCatalogTilesPage() {
           <div className="mt-4">
             <ProductGrid
               products={freeProducts}
+              getAuthorSlides={getExperimentalCatalogAuthorSlides}
               ariaLabel="Слушать в подарок"
             />
           </div>
@@ -70,6 +74,7 @@ export default async function ExperimentalCatalogTilesPage() {
           <div className="mt-4">
             <ProductGrid
               products={paidProducts}
+              getAuthorSlides={getExperimentalCatalogAuthorSlides}
               ariaLabel="Аудиопрактики и программы"
             />
           </div>

@@ -103,7 +103,7 @@
     "test:cdn-asset-prefix": "npx tsx scripts/cdn-asset-prefix-unit.mjs",
     "test:next-static-smoke-assets": "node scripts/next-static-smoke-assets-unit.mjs",
     "test:catalog-default-query": "node scripts/catalog-default-query-unit.mjs",
-    "test:catalog-product-tile": "npx tsx scripts/catalog-product-tile-unit.mjs && npx tsx scripts/catalog-tile-playback-unit.mjs",
+    "test:catalog-product-tile": "npx tsx scripts/catalog-product-tile-unit.mjs && npx tsx scripts/catalog-tile-playback-unit.mjs && npx tsx scripts/catalog-tile-carousel-unit.mjs",
     "test:supabase-auth-cookie": "npx tsx scripts/supabase-auth-cookie-unit.mjs",
     "test:guest-resume-session-gate": "node scripts/guest-resume-session-gate-unit.mjs",
     "run:studio-guest-cleanup": "npx tsx scripts/run-studio-guest-cleanup.mts"

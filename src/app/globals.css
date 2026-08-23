@@ -391,6 +391,26 @@ body {
   scroll-snap-align: start;
 }
 
+/* In-tile experimental catalog slides. Vertical page scroll stays free. */
+.catalog-tile-carousel {
+  -ms-overflow-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.catalog-tile-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.catalog-tile-carousel > [data-catalog-tile-slide] {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
 .home-section-carousel {
   overflow: hidden;
 }
