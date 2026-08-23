@@ -379,7 +379,7 @@ function testCheckoutGetsServerPrice() {
 }
 
 function testDraftSeoOwnershipAndPublish() {
-  const sql = read("supabase/migrations/20260823140000_quick_offers.sql");
+  const sql = read("supabase/migrations/20260823191000_quick_offers.sql");
   assert(sql.includes("CREATE TABLE IF NOT EXISTS public.quick_offers"), "offers table");
   assert(
     sql.includes("CREATE TABLE IF NOT EXISTS public.quick_offer_materials"),

@@ -476,7 +476,7 @@ RLS: публичный SELECT активных акций опубликова�
 
 ### quick_offers / quick_offer_materials (2026-08-23)
 
-Миграция: `20260823140000_quick_offers.sql`.
+Миграция: `20260823191000_quick_offers.sql` (restamp of unapplied `20260823140000_quick_offers.sql`; never present in production history).
 
 Переиспользуемый шаблон продающей страницы «Быстрый оффер» (`template_key = catalog/quick-offer`).
 
