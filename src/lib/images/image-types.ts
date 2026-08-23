@@ -5,7 +5,9 @@ export type ImageProfile =
   | "user-avatar"
   | "author-banner"
   | "playlist-cover"
-  | "diagnostic-image";
+  | "diagnostic-image"
+  | "quick-offer-hero"
+  | "quick-offer-card";
 
 export type ImageVariantKey =
   | "xs"

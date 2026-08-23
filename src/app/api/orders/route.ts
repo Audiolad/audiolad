@@ -5,6 +5,7 @@ import {
   extractExpectedAmountMinor,
   extractOrderAnalyticsClaims,
   extractPracticeSlug,
+  extractQuickOfferId,
   mapRpcErrorMessage,
   parseJsonObject,
   parsePriceChangedDetail,
@@ -12,6 +13,7 @@ import {
   toCreateOrderSuccessBody,
   type CreateOrderRpcRow,
 } from "@/lib/orders/create-order-api";
+import { applyServerQuickOfferAmount } from "@/lib/quick-offers/apply-offer-amount";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { bindPracticePricePromotionStarts } from "@/lib/pricing/rpc";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
@@ -69,6 +71,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
+  const quickOfferId = extractQuickOfferId(parsedBody);
+
   const claims = extractOrderAnalyticsClaims(
     parsedBody,
     sanitizeCheckoutOriginPath,
@@ -88,7 +92,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const expectedAmountMinor = extractExpectedAmountMinor(parsedBody);
+  const expectedAmountMinor = quickOfferId
+    ? null
+    : extractExpectedAmountMinor(parsedBody);
   const priceVisitorId = await readPriceVisitorId();
 
   await bindPracticePricePromotionStarts({
@@ -152,6 +158,24 @@ export async function POST(request: Request) {
   if (!row?.order_id) {
     console.error("create_order_rpc_empty_result");
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (quickOfferId) {
+    const priced = await applyServerQuickOfferAmount({
+      supabase,
+      orderId: row.order_id,
+      quickOfferId,
+      cookieHeader: request.headers.get("cookie"),
+    });
+
+    if (!priced.ok) {
+      return NextResponse.json(
+        { error: priced.error },
+        { status: priced.status },
+      );
+    }
+
+    row.amount_minor = priced.amount.amount_minor;
   }
 
   const confidence = row.attribution_confidence ?? "unknown";

@@ -13,6 +13,7 @@ export type OrderRow = {
   price_minor_snapshot: number;
   created_at: string;
   paid_at: string | null;
+  quick_offer_id?: string | null;
 };
 
 export type PaymentRow = {

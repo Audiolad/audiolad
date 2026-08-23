@@ -474,6 +474,25 @@ RLS: публичный SELECT активных акций опубликова�
 - `bind_practice_price_promotion_starts(visitor_id, user_id)` — вешает `user_id` на самое раннее guest-окно cookie. Не создаёт и не продлевает окно. GRANT authenticated. Вызывается из start/resolve/auth callback.
 - `create_practice_order(..., p_expected_amount_minor, p_price_visitor_id)` — резолвит цену на сервере; при расхождении с `expected` → `price_changed` (не создаёт заказ). Pending reuse фиксирует сумму уже созданного заказа.
 
+### quick_offers / quick_offer_materials (2026-08-23)
+
+Миграция: `20260823140000_quick_offers.sql`.
+
+Переиспользуемый шаблон продающей страницы «Быстрый оффер» (`template_key = catalog/quick-offer`).
+
+Отдельной таблицы скидок в проекте нет. Обычная цена оплаты живёт в `practices.price`. `quick_offers.promo_price` — цена витрины/оффера в рублях, применяется только на этой странице, пока активно окно таймера посетителя. Checkout не принимает сумму от клиента: `create_practice_order` создаёт pending-заказ, затем `apply_quick_offer_amount` переписывает `amount_minor` / `price_minor_snapshot` на сервере.
+
+| Таблица | Назначение |
+|---------|------------|
+| `quick_offers` | Оффер автора: продукт, slug, обложка, описание, promo_price, CTA, timer, status |
+| `quick_offer_materials` | Упорядоченные карточки 3:4. Подпись = автономер + `format_label` (≤ 6 символов, без переносов) |
+
+RLS: `user_can_read_author_promotion(author_id)` (owner/editor или platform admin). Публичное чтение только через `get_public_quick_offer(slug)` — исключительно `status = published`.
+
+Ownership: триггер `enforce_quick_offer_product_owner` запрещает привязать чужой `practices.author_id`.
+
+Публичный маршрут: `/offers/[slug]`.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

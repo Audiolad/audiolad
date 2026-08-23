@@ -4,6 +4,7 @@ export const PURCHASE_SURFACES = [
   "catalog_card",
   "playlist",
   "author_page",
+  "quick_offer",
   "unknown",
 ] as const;
 
