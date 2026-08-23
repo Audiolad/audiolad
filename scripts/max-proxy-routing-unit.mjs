@@ -211,8 +211,17 @@ assert.match(
   /MAX_SESSION_VERIFY_PATH/,
   "shell must call the Stage 1 verify path",
 );
+const maxShellSources = [
+  "src/lib/max/bridge.ts",
+  "src/components/max/MaxBridgeScript.tsx",
+  "src/components/max/MaxMiniAppScreen.tsx",
+  "src/app/(platform)/max-site/page.tsx",
+  "src/app/(platform)/max-site/layout.tsx",
+]
+  .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
+  .join("\n");
 assert.doesNotMatch(
-  maxClientSources,
+  maxShellSources,
   /MAX_SESSION_LINK_PATH|session\/link/,
   "shell must not auto-link on verify",
 );

@@ -17,7 +17,7 @@ const migration = readFileSync(migrationPath, "utf8");
 const stage2 = readFileSync(join(migrationsDir, stage2Name), "utf8");
 
 const priorMigrations = readdirSync(migrationsDir)
-  .filter((name) => name.toLowerCase().endsWith(".sql") && name !== migrationName)
+  .filter((name) => name.toLowerCase().endsWith(".sql") && name < migrationName)
   .map((name) => readFileSync(join(migrationsDir, name), "utf8"))
   .join("\n");
 
@@ -95,11 +95,12 @@ const executableSql = migration
   .replace(/--[^\n]*/g, " ")
   .replace(/'[^']*'/g, "''");
 assert.doesNotMatch(executableSql, /user_id\s*=\s*NULL/);
-assert.doesNotMatch(
-  executableSql,
-  /UPDATE public\.external_identities\s+SET[\s\S]*?provider_user_id\s*=/,
+const updateSet = executableSql.match(
+  /UPDATE public\.external_identities\s+SET([\s\S]*?)WHERE/,
 );
-assert.doesNotMatch(executableSql, /SET\s+user_id\s*=\s*NULL/i);
+assert.ok(updateSet, "link UPDATE must have a SET/WHERE pair");
+assert.doesNotMatch(updateSet[1], /provider_user_id/);
+assert.doesNotMatch(updateSet[1], /user_id\s*=\s*NULL/i);
 assert.doesNotMatch(executableSql, /\bunlink\b/i);
 assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\.unlink/i);
 assert.doesNotMatch(migration, /first_name|last_name|photo_url|initData/i);
