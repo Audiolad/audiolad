@@ -76,17 +76,25 @@ const scriptSource = readFileSync(
   join(repoRoot, "src/components/max/MaxBridgeScript.tsx"),
   "utf8",
 );
+const shellCopySource = readFileSync(
+  join(repoRoot, "src/lib/max/session-shell.ts"),
+  "utf8",
+);
 assert.match(scriptSource, /MAX_WEB_APP_SCRIPT_SRC/);
 assert.match(scriptSource, /afterInteractive/);
-assert.match(scriptSource, /MAX_SESSION_VERIFY_PATH/);
-assert.match(scriptSource, /АудиоЛад открыт внутри MAX/);
-assert.match(scriptSource, /Подключение к MAX…/);
-assert.match(scriptSource, /Подключение к MAX подтверждено/);
+assert.match(scriptSource, /verifyMaxSession/);
+assert.match(shellCopySource, /АудиоЛад открыт внутри MAX/);
+assert.match(shellCopySource, /Подключение к MAX…/);
+assert.match(shellCopySource, /Подключение к MAX подтверждено/);
 assert.doesNotMatch(
   scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /initDataUnsafe/,
 );
 assert.doesNotMatch(scriptSource, /MAX_BOT_TOKEN|NEXT_PUBLIC_MAX/);
+assert.doesNotMatch(
+  scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  /MAX_SESSION_LINK_PATH|session\/link/,
+);
 assert.doesNotMatch(
   scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /\.ready\s*\(/,

@@ -10,9 +10,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   isMaxHostname,
+  isMaxSessionLinkPath,
   isMaxSessionVerifyPath,
   isMaxSitePath,
   MAX_HOSTNAME,
+  MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
   MAX_SITE_PATH,
 } from "../src/lib/max/host.ts";
@@ -71,6 +73,10 @@ assert.equal(isMainSiteHostname(MAX_HOSTNAME), false);
 assert.equal(isMaxSessionVerifyPath(MAX_SESSION_VERIFY_PATH), true);
 assert.equal(isMaxSessionVerifyPath(`${MAX_SESSION_VERIFY_PATH}/`), false);
 assert.equal(isMaxSessionVerifyPath("/api/max"), false);
+assert.equal(isMaxSessionLinkPath(MAX_SESSION_LINK_PATH), true);
+assert.equal(isMaxSessionLinkPath(`${MAX_SESSION_LINK_PATH}/`), false);
+assert.equal(isMaxSessionLinkPath("/api/max"), false);
+assert.equal(isMaxSessionLinkPath("/api/foo"), false);
 
 assertMaxAction(MAX_HOSTNAME, "/", "rewrite_max_landing");
 assertMaxAction(MAX_HOSTNAME, MAX_SITE_PATH, "pass_through");
@@ -78,10 +84,13 @@ assertMaxAction(MAX_HOSTNAME, "/robots.txt", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/sw.js", "pass_through");
 assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/health/build", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max", "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/session", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/foo", "not_found");
 
 for (const pathname of [
   "/catalog",
@@ -93,6 +102,8 @@ for (const pathname of [
   "/become-author",
   "/auth/sign-up",
   "/auth/sign-in",
+  "/auth/forgot-password",
+  "/auth/reset-password",
   "/profile",
   "/sitemap.xml",
   SCHOOL_SITE_PATH,
@@ -111,6 +122,7 @@ assertMaxAction("audiolad.ru", "/catalog", "pass_through");
 assertMaxAction("www.audiolad.ru", "/", "pass_through");
 assertMaxAction(SCHOOL_HOSTNAME, "/", "pass_through");
 assertMaxAction("audiolad.ru", MAX_SESSION_VERIFY_PATH, "pass_through");
+assertMaxAction("audiolad.ru", MAX_SESSION_LINK_PATH, "pass_through");
 
 // School policy still owns school host isolation.
 assertSchoolAction(SCHOOL_HOSTNAME, "/", "rewrite_school_landing");
@@ -179,7 +191,10 @@ const maxClientSources = [
   "src/lib/max/host.ts",
   "src/lib/max/proxy-policy.ts",
   "src/lib/max/seo.ts",
+  "src/lib/max/session-shell.ts",
+  "src/lib/max/session-shell-client.ts",
   "src/components/max/MaxBridgeScript.tsx",
+  "src/components/max/MaxLoginForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/app/(platform)/max-site/page.tsx",
   "src/app/(platform)/max-site/layout.tsx",
@@ -196,10 +211,49 @@ assert.doesNotMatch(
   /NEXT_PUBLIC_MAX/,
   "MAX client/shell sources must not expose MAX secrets",
 );
+assert.doesNotMatch(
+  maxClientSources,
+  /Domain=\.audiolad\.ru|domain:\s*["']\.audiolad\.ru/,
+  "MAX client/shell must not set cookie Domain=.audiolad.ru",
+);
 assert.match(
   maxClientSources,
   /MAX_SESSION_VERIFY_PATH/,
   "shell must call the Stage 1 verify path",
+);
+const maxShellSources = [
+  "src/lib/max/bridge.ts",
+  "src/lib/max/session-shell.ts",
+  "src/components/max/MaxBridgeScript.tsx",
+  "src/components/max/MaxLoginForm.tsx",
+  "src/components/max/MaxMiniAppScreen.tsx",
+  "src/app/(platform)/max-site/page.tsx",
+  "src/app/(platform)/max-site/layout.tsx",
+]
+  .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
+  .join("\n");
+const verifyClientSource = readFileSync(
+  join(repoRoot, "src/lib/max/session-shell-client.ts"),
+  "utf8",
+);
+const verifyFn = verifyClientSource.slice(
+  verifyClientSource.indexOf("export async function verifyMaxSession"),
+  verifyClientSource.indexOf("export async function loginAndLinkMaxSession"),
+);
+assert.doesNotMatch(
+  verifyFn,
+  /MAX_SESSION_LINK_PATH|session\/link/,
+  "verify must not auto-link",
+);
+assert.match(
+  verifyClientSource,
+  /MAX_SESSION_LINK_PATH/,
+  "login+link client may call /link after password success",
+);
+assert.doesNotMatch(
+  maxShellSources,
+  /\/auth\/sign-up|зарегистрир/i,
+  "MAX shell must not open signup",
 );
 
 const verifierSource = readFileSync(
@@ -222,9 +276,14 @@ assert.match(touchSource, /createServiceRoleClient/);
 assert.doesNotMatch(`${routeSource}\n${touchSource}`, /CREATE TABLE|alter table/i);
 assert.doesNotMatch(
   maxClientSources,
-  /зарегистрир|вошли|вход выполнен|logged in|registered/i,
+  /\/auth\/sign-up|signUp\(|зарегистрир/i,
 );
 assert.match(policySource, /isMaxSessionVerifyPath/);
+assert.match(policySource, /isMaxSessionLinkPath/);
+assert.doesNotMatch(
+  policySource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
+  /pathname\.startsWith\(|\/api\/max\/\*/,
+);
 assert.doesNotMatch(
   `${maxClientSources}\n${verifierSource}\n${routeSource}\n${touchSource}`
     .replace(/\/\*[\s\S]*?\*\//g, "")

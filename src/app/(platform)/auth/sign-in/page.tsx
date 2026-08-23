@@ -4,6 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
+import { SIGN_IN_GENERIC_ERROR } from "@/lib/auth/sign-in-messages";
 import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
@@ -41,7 +42,7 @@ function SignInForm() {
 
     if (error) {
       setIsError(true);
-      setMessage("Не удалось войти. Проверьте email и пароль.");
+      setMessage(SIGN_IN_GENERIC_ERROR);
       setIsLoading(false);
       return;
     }
