@@ -56,7 +56,7 @@ import {
 import { hasPracticePublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { PAID_PRICE_OPTIONS } from "@/lib/author-products/types";
+import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { slugifyTitle } from "@/lib/author-products/utils";
 
 type RouteContext = {
@@ -370,7 +370,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         accessStatus,
       );
 
-      if (!PAID_PRICE_OPTIONS.includes(body.price as (typeof PAID_PRICE_OPTIONS)[number])) {
+      if (!validatePaidPriceRubles(body.price).ok) {
         return NextResponse.json({ error: "invalid_price" }, { status: 400 });
       }
 

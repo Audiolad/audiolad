@@ -405,6 +405,66 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
 
+## Прайс и акции (base price + promotions, 2026-08-23)
+
+Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`.
+
+Деньги:
+
+- Базовая цена продукта — `practices.price`, целое число рублей (не float).
+- Платежи и снимки заказа — целое число копеек: `amount_minor = price * 100`.
+- Диапазон платной цены: 49–100 000 ₽. Рекомендованные чипы (199/299/888/…) только подставляют значение.
+
+`practices.price` остаётся базовой/листовой ценой. Вторая цена на продукте не заводится. Акции — отдельная сущность `practice_price_promotions`. Не путать с `promotion_campaigns` (маркетинговые UTM-кампании).
+
+### practice_price_promotions
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `practice_id` | uuid NOT NULL | → `practices(id)` ON DELETE CASCADE |
+| `name` | text | 1–80 символов |
+| `promotion_type` | text | `calendar` \| `personal_countdown` |
+| `sale_price` | integer | 49–100000, должна быть строго ниже `practices.price` на resolve |
+| `starts_at` / `ends_at` | timestamptz | обязательны для `calendar`, `ends_at > starts_at` |
+| `duration_seconds` | integer | обязателен для `personal_countdown`, 60–2 592 000 |
+| `is_active` | boolean | default true |
+| `start_token` | text UNIQUE | универсальный триггер персонального таймера |
+| `created_at` / `updated_at` | timestamptz | |
+
+RLS: публичный SELECT активных акций опубликованных практик; авторы CRUD своих. Купоны / проценты / сегменты / стекинг не реализованы и схемой не блокируются.
+
+### practice_price_promotion_starts
+
+Персональное окно посетителя после триггера. Каталог эти строки не использует.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | |
+| `promotion_id` | uuid | → promotions ON DELETE CASCADE |
+| `visitor_id` | text | cookie `audiolad_price_visitor` (httpOnly UUID) |
+| `user_id` | uuid NULL | → `auth.users`, ON DELETE SET NULL |
+| `started_at` / `expires_at` | timestamptz | `expires_at > started_at` |
+
+Уникальность: `(promotion_id, visitor_id)`. Таблица недоступна anon/authenticated; чтение/запись только через SECURITY DEFINER RPC.
+
+### Снимки заказа
+
+На `orders` при создании:
+
+- `price_minor_snapshot` / `amount_minor` — итоговая сумма к оплате (копейки)
+- `base_price_minor_snapshot` — базовая цена на момент создания (NOT NULL, backfill из старого snapshot)
+- `promotion_price_minor_snapshot` — цена акции или NULL
+- `promotion_id` / `promotion_type` — или оба NULL. FK `promotion_id` ON DELETE SET NULL.
+
+История не переписывается при поздней смене цены/акции.
+
+### RPC
+
+- `resolve_practice_effective_price(practice_id, surface, visitor_id, user_id, now)` — `catalog` игнорирует personal countdown; иначе lowest `sale_price` wins, без стекинга. GRANT anon+authenticated.
+- `start_practice_price_promotion(start_token, visitor_id, user_id)` — старт/reuse/restart персонального окна. GRANT anon+authenticated.
+- `create_practice_order(..., p_expected_amount_minor, p_price_visitor_id)` — резолвит цену на сервере; при расхождении с `expected` → `price_changed` (не создаёт заказ). Pending reuse фиксирует сумму уже созданного заказа.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

@@ -11,7 +11,11 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "@/lib/author-products/product-kind";
-import { getProductPriceLabel, isProductFree } from "@/lib/products/price-format";
+import { getProductPriceLabel } from "@/lib/products/price-format";
+import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
+import { resolvePracticePrice } from "@/lib/pricing/resolve";
+import { PRICE_SURFACES } from "@/lib/pricing/types";
+import { formatRubles } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
@@ -61,6 +65,8 @@ export type CatalogProduct = ProductCoverFields & {
   statsLabel: string | null;
   productTypeLabel: string;
   priceLabel: string;
+  compareAtPriceLabel?: string | null;
+  promotionEndsAt?: string | null;
   sortTimestamp: number;
 };
 
@@ -282,6 +288,11 @@ export async function mapPracticeRowsToCatalogProducts(
     audioSummaryMap = new Map();
   }
 
+  const promotionsByPractice = await loadPricePromotionsForPractices(
+    supabase,
+    practiceRows.map((practice) => practice.id),
+  );
+
   const products = practiceRows.flatMap((practice) => {
     const author = normalizeAuthor(practice.authors);
 
@@ -291,6 +302,18 @@ export async function mapPracticeRowsToCatalogProducts(
 
     const audioSummary = audioSummaryMap.get(practice.id);
     const audioCount = audioSummary?.audioCount ?? 0;
+    const resolved = resolvePracticePrice({
+      isFree: practice.is_free,
+      basePrice: practice.price,
+      promotions: promotionsByPractice.get(practice.id) ?? [],
+      starts: [],
+      surface: PRICE_SURFACES.CATALOG,
+    });
+    const catalogPrice = resolved.isFree ? practice.price : resolved.finalPrice;
+    const compareAtPriceLabel =
+      !resolved.isFree && resolved.promotion
+        ? formatRubles(resolved.basePrice)
+        : null;
 
     return [
       {
@@ -302,8 +325,8 @@ export async function mapPracticeRowsToCatalogProducts(
         description: practice.description?.trim() || null,
         format: practice.format?.trim() || null,
         productKind: normalizeProductKind(practice.product_kind),
-        price: practice.price,
-        isFree: isProductFree(practice.is_free, practice.price),
+        price: catalogPrice,
+        isFree: resolved.isFree,
         ...mapProductCoverFields(practice),
         authorName: author.name,
         authorSlug: author.slug,
@@ -329,7 +352,11 @@ export async function mapPracticeRowsToCatalogProducts(
           ? getProductKindLabel(practice.product_kind)
           : (getDisplayFormat(practice.format) ??
             getProductTypeLabel(audioCount, practice.format, practice.product_kind)),
-        priceLabel: getProductPriceLabel(practice.price, practice.is_free),
+        priceLabel: resolved.isFree
+          ? getProductPriceLabel(practice.price, practice.is_free)
+          : formatRubles(resolved.finalPrice),
+        compareAtPriceLabel,
+        promotionEndsAt: resolved.promotion?.endsAt ?? null,
         sortTimestamp: getSortTimestamp(
           practice.published_at,
           practice.created_at,

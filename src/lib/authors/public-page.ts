@@ -14,9 +14,15 @@ import {
   resolveAuthorAvatarUrl,
   resolveAuthorBannerUrl,
 } from "@/lib/images/resolve-display";
-import { getProductPriceLabel } from "@/lib/products/price-format";
+import { formatRubles, getProductPriceLabel } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { isProgramFormat } from "@/lib/products/practice-access-ui";
+import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
+import { resolvePracticePrice } from "@/lib/pricing/resolve";
+import {
+  PRICE_SURFACES,
+  type PricePromotionRecord,
+} from "@/lib/pricing/types";
 
 import {
   getAuthorBySlug,
@@ -78,8 +84,16 @@ function mapPracticeRow(
   },
   authorSlug: string,
   audioCount = 1,
+  promotions: PricePromotionRecord[] = [],
 ): AuthorPublicProduct {
   const productKind = normalizeProductKind(row.product_kind);
+  const resolved = resolvePracticePrice({
+    isFree: row.is_free,
+    basePrice: row.price,
+    promotions,
+    starts: [],
+    surface: PRICE_SURFACES.CATALOG,
+  });
 
   return {
     id: row.id,
@@ -89,10 +103,16 @@ function mapPracticeRow(
     description: row.description?.trim() || null,
     format: row.format,
     duration_minutes: row.duration_minutes,
-    price: row.price,
-    is_free: row.is_free,
+    price: resolved.isFree ? row.price : resolved.finalPrice,
+    is_free: resolved.isFree,
     href: buildPracticePublicPath(authorSlug, row.slug),
-    priceLabel: getProductPriceLabel(row.price, row.is_free),
+    priceLabel: resolved.isFree
+      ? getProductPriceLabel(row.price, row.is_free)
+      : formatRubles(resolved.finalPrice),
+    compareAtPriceLabel:
+      !resolved.isFree && resolved.promotion
+        ? formatRubles(resolved.basePrice)
+        : null,
     ...mapProductCoverFields(row),
     productKind,
     audioCount,
@@ -134,6 +154,10 @@ export async function loadAuthorPublicPageData(
   }
 
   const practiceIds = (practiceRows ?? []).map((row) => row.id as string);
+  const promotionsByPractice = await loadPricePromotionsForPractices(
+    supabase,
+    practiceIds,
+  );
   const audioCountMap = new Map<string, number>();
 
   if (practiceIds.length > 0) {
@@ -168,6 +192,7 @@ export async function loadAuthorPublicPageData(
       },
       author.slug,
       audioCountMap.get(row.id as string) ?? 1,
+      promotionsByPractice.get(row.id as string) ?? [],
     ),
   );
 
@@ -186,6 +211,8 @@ export async function loadAuthorPublicPageData(
         duration_minutes: null,
       },
       author.slug,
+      1,
+      promotionsByPractice.get(product.id) ?? [],
     ),
   );
 

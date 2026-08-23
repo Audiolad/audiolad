@@ -475,7 +475,7 @@ async function main() {
     method: "PATCH",
     token: ownerToken,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ price: 12345, is_free: false }),
+    body: JSON.stringify({ price: 10, is_free: false }),
   });
   if (badPrice.status === 400) pass("reject_invalid_price");
   else fail("reject_invalid_price", `status=${badPrice.status}`);

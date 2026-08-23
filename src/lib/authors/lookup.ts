@@ -6,7 +6,10 @@ import {
 } from "@/lib/fixtures/test-fixture-marker";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { getProductPriceLabel } from "@/lib/products/price-format";
+import { getProductPriceLabel, formatRubles } from "@/lib/products/price-format";
+import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
+import { resolvePracticePrice } from "@/lib/pricing/resolve";
+import { PRICE_SURFACES } from "@/lib/pricing/types";
 
 export type PublicAuthorRow = {
   id: string;
@@ -31,6 +34,7 @@ export type AuthorPublishedPractice = {
   is_free: boolean | null;
   href: string;
   priceLabel: string;
+  compareAtPriceLabel?: string | null;
 };
 
 export async function getAuthorBySlug(
@@ -83,21 +87,46 @@ export async function getAuthorPublishedPractices(
     return { practices: [], error: true };
   }
 
-  const practices = filterPublicPracticeRows(data ?? []).map((row) => ({
-    id: row.id as string,
-    title: row.title as string,
-    slug: row.slug as string,
-    subtitle: (row.subtitle as string | null) ?? null,
-    format: (row.format as string | null) ?? null,
-    duration_minutes: (row.duration_minutes as number | null) ?? null,
-    price: (row.price as number | null) ?? null,
-    is_free: (row.is_free as boolean | null) ?? null,
-    href: buildPracticePublicPath(authorSlug, row.slug as string),
-    priceLabel: formatPracticePriceLabel(
-      row.price as number | null,
-      row.is_free as boolean | null,
-    ),
-  }));
+  const rows = filterPublicPracticeRows(data ?? []);
+  const promotionsByPractice = await loadPricePromotionsForPractices(
+    supabase,
+    rows.map((row) => row.id as string),
+  );
+
+  const practices = rows.map((row) => {
+    const resolved = resolvePracticePrice({
+      isFree: row.is_free as boolean | null,
+      basePrice: row.price as number | null,
+      promotions: promotionsByPractice.get(row.id as string) ?? [],
+      starts: [],
+      surface: PRICE_SURFACES.CATALOG,
+    });
+    const finalPrice = resolved.isFree
+      ? (row.price as number | null)
+      : resolved.finalPrice;
+
+    return {
+      id: row.id as string,
+      title: row.title as string,
+      slug: row.slug as string,
+      subtitle: (row.subtitle as string | null) ?? null,
+      format: (row.format as string | null) ?? null,
+      duration_minutes: (row.duration_minutes as number | null) ?? null,
+      price: finalPrice,
+      is_free: resolved.isFree,
+      href: buildPracticePublicPath(authorSlug, row.slug as string),
+      priceLabel: resolved.isFree
+        ? formatPracticePriceLabel(
+            row.price as number | null,
+            row.is_free as boolean | null,
+          )
+        : formatRubles(resolved.finalPrice),
+      compareAtPriceLabel:
+        !resolved.isFree && resolved.promotion
+          ? formatRubles(resolved.basePrice)
+          : null,
+    };
+  });
 
   return { practices, error: false };
 }

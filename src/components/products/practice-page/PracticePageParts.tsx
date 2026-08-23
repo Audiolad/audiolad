@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import AuthorLink from "@/components/authors/AuthorLink";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
+import ProductPriceOffer from "@/components/pricing/ProductPriceOffer";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
@@ -341,6 +342,17 @@ export function PracticePrimaryActionSection({
           </button>
         ) : (
           <>
+            {viewModel.priceOffer ? (
+              <div className="mb-4">
+                <ProductPriceOffer
+                  basePrice={viewModel.priceOffer.basePrice}
+                  salePrice={viewModel.priceOffer.salePrice}
+                  endsAt={viewModel.priceOffer.endsAt}
+                  expiresAt={viewModel.priceOffer.expiresAt}
+                  promotionType={viewModel.priceOffer.promotionType}
+                />
+              </div>
+            ) : null}
             <BuyPracticeButton
               practiceSlug={presentation.primaryAction.practiceSlug}
               practiceId={presentation.primaryAction.practiceId}
