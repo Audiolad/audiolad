@@ -168,8 +168,8 @@ assert(
   "PersonalHome renders shared LegalFooter at the bottom",
 );
 assert(
-  legalFooter.includes("PUBLIC_FOOTER_LINKS"),
-  "LegalFooter reuses PUBLIC_FOOTER_LINKS",
+  legalFooter.includes("getVisiblePublicFooterLinks"),
+  "LegalFooter reuses public footer visibility helper",
 );
 assert(
   publicFooterLinks.includes('href: "/about"') &&
