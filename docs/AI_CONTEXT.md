@@ -37,6 +37,7 @@
 |------|------|
 | Регистрация | `src/app/(platform)/auth/sign-up/page.tsx` |
 | Вход | `src/app/(platform)/auth/sign-in/page.tsx` |
+| MAX Mini App | `src/lib/max/`, `src/components/max/`, `/max-site` |
 | Каталог (база) | `src/app/catalog/page.tsx` |
 | Нижняя навигация | `src/components/BottomNav.tsx` |
 | Сессия Supabase | `proxy.ts`, `src/lib/supabase/proxy.ts` |

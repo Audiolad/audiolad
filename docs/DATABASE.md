@@ -405,6 +405,12 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
 
+### RPC `public.link_external_identity` (этап 3A)
+
+Миграция: `supabase/migrations/20260823120000_link_external_identity.sql`.
+Этап 3B **не** добавляет миграцию и не меняет схему: клиент вызывает уже
+существующий `POST /api/max/session/link`.
+
 ## Прайс и акции (base price + promotions, 2026-08-23)
 
 Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`, `20260823183000_price_promotion_oneshot_bind.sql`.

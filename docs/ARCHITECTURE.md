@@ -184,7 +184,7 @@ Timeweb Cloud
 - Каталог и карточки продукта — только общая обложка.
 - Author UI: `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API `POST/DELETE .../audio/[audioId]/cover`.
 
-## MAX Mini App (этапы 1–2)
+## MAX Mini App (этапы 1–3B)
 
 Изолированная оболочка на `max.audiolad.ru` (см. `src/lib/max/`, `/max-site`).
 Каталог, Студия, статьи и прочие маршруты приложения на этом хосте остаются 404.
@@ -195,7 +195,8 @@ Timeweb Cloud
 - Чистый модуль: `src/lib/max/verify-init-data.ts` (только сервер, без Supabase).
 - Эндпоинт: `POST /api/max/session/verify`, тело `{ initData }`.
 - Токен: только `MAX_BOT_TOKEN` на сервере. `NEXT_PUBLIC_MAX_BOT_TOKEN` запрещён.
-- Proxy на MAX-хосте открывает **только** этот API-путь, не `/api/*`.
+- Proxy на MAX-хосте открывает **только** точные пути
+  `/api/max/session/verify` и `/api/max/session/link`, не `/api/*`.
 - `initDataUnsafe`, platform и version не являются доверенной идентичностью.
 - `user.id` хранится как десятичная целочисленная строка из подписанного JSON
   (сырые цифры, не `Number`, не UUID).
@@ -216,9 +217,21 @@ Timeweb Cloud
 - `auth.users` не создаются; вход / регистрация / связка — не этот этап.
 - Replay-таблица не вводится.
 
-Поздние этапы (связь MAX user id с профилем, вход, библиотека) **не реализованы**.
+**Этап 3A (реализован):** `POST /api/max/session/link` после HMAC связывает
+проверенный MAX id с `auth.users.id` текущей сессии через RPC
+`link_external_identity`. Без UI. Конфликты — `409`
+`identity_already_linked` / `user_already_has_max_identity`.
 
-### Планируемая связь идентификаторов (не этап 2)
+**Этап 3B (реализован):** вход существующего аккаунта внутри MAX-оболочки
+(`signInWithPassword` на абсолютный apex `/auth/v1`, затем `POST /link`
+с сырым `initData`). Регистрации нет. Каталога нет. Cookie `Domain`
+не меняется (host-only на `max.audiolad.ru`). Сессия не выпускается
+из одного MAX id. Обычный браузер без `initData` остаётся гостевой
+оболочкой и не пишет БД с клиента.
+
+Поздние этапы (регистрация внутри MAX, библиотека) **не реализованы**.
+
+### Связь идентификаторов
 
 ```
 MAX user_id  ↔  профиль АудиоЛада  ↔  пользователь Supabase Auth
