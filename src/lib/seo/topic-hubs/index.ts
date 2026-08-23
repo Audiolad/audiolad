@@ -29,6 +29,7 @@ export {
 export type {
   TopicHubDefinition,
   TopicHubFaqItem,
+  TopicHubListenCard,
   TopicHubPageData,
   TopicHubRelatedLink,
 } from "./types";

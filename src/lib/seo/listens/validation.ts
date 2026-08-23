@@ -1,4 +1,5 @@
 import { isValidPlaylistPublicSlug } from "@/lib/playlists/public-slug";
+import { getTopicHubBySlug } from "@/lib/seo/topic-hubs/registry";
 
 import { LISTEN_PAGE_TYPE, type ListenPageDefinition } from "./types";
 import { isValidListenPageSlug } from "./paths";
@@ -72,6 +73,16 @@ export function parseListenPageDefinition(
 
   if (!Array.isArray(record.faq)) {
     return { ok: false, reason: "faq_required" };
+  }
+
+  if (record.topicSlug !== undefined) {
+    if (!isNonEmptyString(record.topicSlug) || !isValidListenPageSlug(record.topicSlug)) {
+      return { ok: false, reason: "invalid_topic_slug" };
+    }
+
+    if (!getTopicHubBySlug(record.topicSlug.trim().toLowerCase())) {
+      return { ok: false, reason: "unknown_topic_slug" };
+    }
   }
 
   return { ok: true, definition: value as ListenPageDefinition };

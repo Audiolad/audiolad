@@ -8,6 +8,7 @@ import {
   buildArticlePath,
   listArticlesByTopicSlug,
 } from "@/lib/seo/articles";
+import { listTopicHubListenCards } from "@/lib/seo/listens/topic";
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 import { listActiveTopics } from "@/lib/topics/queries";
 
@@ -100,6 +101,7 @@ export async function loadTopicHubPageData(
     href: buildArticlePath(article.slug),
     description: article.metaDescription,
   }));
+  const listens = listTopicHubListenCards(hub.slug);
 
   return {
     hub,
@@ -109,6 +111,7 @@ export async function loadTopicHubPageData(
     freeProducts,
     paidProducts,
     articles,
+    listens,
     platformTopicTitle: platformTopic?.title ?? null,
   };
 }

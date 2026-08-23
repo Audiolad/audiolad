@@ -82,7 +82,7 @@ export function buildTopicHubJsonLdGraph(
   const breadcrumbs = buildBreadcrumbListJsonLd(
     [
       { name: "Главная", path: "/" },
-      { name: "Каталог", path: "/catalog" },
+      { name: "Темы", path: "/topics" },
       { name: data.hub.title, path: data.path },
     ],
     origin,
