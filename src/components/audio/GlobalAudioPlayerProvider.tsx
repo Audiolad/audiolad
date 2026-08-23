@@ -32,9 +32,11 @@ import {
   getGlobalPlayerSessionKey,
   isCatalogGlobalPlayerSession,
   isPrivateAudioSession,
+  normalizeGlobalPlayerSessionContract,
 } from "@/lib/listen/global-player-types";
 import {
   clearDesktopPlayerLastSession,
+  desktopPlayerSnapshotFromSession,
   mergeDesktopPlaybackIntoSession,
   readDesktopPlayerLastSession,
   writeDesktopPlayerLastSession,
@@ -289,13 +291,12 @@ function GlobalPlayerEngine({
         return;
       }
 
-      writeDesktopPlayerLastSession({
-        practiceId: session.practiceId,
-        authorSlug: session.authorSlug,
-        productSlug: session.productSlug,
-        audioItemId: trackId,
-        positionSeconds: audioRef.current?.currentTime ?? currentTime,
-      });
+      writeDesktopPlayerLastSession(
+        desktopPlayerSnapshotFromSession(session, {
+          audioItemId: trackId,
+          positionSeconds: audioRef.current?.currentTime ?? currentTime,
+        }),
+      );
     };
 
     if (!isPlaying) {
@@ -324,13 +325,12 @@ function GlobalPlayerEngine({
         return;
       }
 
-      writeDesktopPlayerLastSession({
-        practiceId: session.practiceId,
-        authorSlug: session.authorSlug,
-        productSlug: session.productSlug,
-        audioItemId: trackId,
-        positionSeconds: audioRef.current?.currentTime ?? currentTime,
-      });
+      writeDesktopPlayerLastSession(
+        desktopPlayerSnapshotFromSession(session, {
+          audioItemId: trackId,
+          positionSeconds: audioRef.current?.currentTime ?? currentTime,
+        }),
+      );
     };
 
     window.addEventListener("pagehide", handlePageHide);
@@ -537,7 +537,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     requestStopLocalAudioPlayers();
 
     const requestAutoplay = input.requestAutoplay ?? false;
-    const nextSession: LoadSessionInput = { ...input, requestAutoplay };
+    const nextSession: LoadSessionInput = normalizeGlobalPlayerSessionContract({
+      ...input,
+      requestAutoplay,
+    });
     const current = sessionRef.current;
     const inputKey = getGlobalPlayerSessionKey(nextSession);
     const currentKey = current ? getGlobalPlayerSessionKey(current) : null;
@@ -1253,11 +1256,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    writeDesktopPlayerLastSession({
-      practiceId: session.practiceId,
-      authorSlug: session.authorSlug,
-      productSlug: session.productSlug,
-    });
+    writeDesktopPlayerLastSession(desktopPlayerSnapshotFromSession(session));
   }, [session]);
 
   useEffect(() => {
