@@ -16,6 +16,7 @@ import {
   PLATFORM_SEARCH_CATALOG_URL_DEBOUNCE_MS,
   buildPlatformSearchCatalogHref,
   buildPlatformSearchClearHref,
+  readPlatformSearchListingFromParams,
   readPlatformSearchQueryFromParams,
   readPlatformSearchTopicFromParams,
   resolvePlatformSearchEnterAction,
@@ -36,6 +37,7 @@ export default function PlatformCatalogInlineSearch({
 
   const urlQuery = readPlatformSearchQueryFromParams(searchParams);
   const activeTopicKey = readPlatformSearchTopicFromParams(searchParams);
+  const listingState = readPlatformSearchListingFromParams(searchParams);
 
   const [inputValue, setInputValue] = useState(urlQuery);
 
@@ -57,7 +59,11 @@ export default function PlatformCatalogInlineSearch({
   }, []);
 
   function replaceCatalogUrl(rawQuery: string) {
-    const nextHref = buildPlatformSearchCatalogHref(rawQuery, activeTopicKey);
+    const nextHref = buildPlatformSearchCatalogHref(
+      rawQuery,
+      activeTopicKey,
+      listingState,
+    );
     const currentHref = searchParams.toString()
       ? `/catalog?${searchParams.toString()}`
       : "/catalog";
@@ -115,7 +121,7 @@ export default function PlatformCatalogInlineSearch({
       window.clearTimeout(catalogUrlDebounceRef.current);
     }
     isInternalCatalogNavRef.current = true;
-    router.replace(buildPlatformSearchClearHref(activeTopicKey));
+    router.replace(buildPlatformSearchClearHref(activeTopicKey, listingState));
   }
 
   const normalizedInput = normalizeCatalogSearchQuery(inputValue);
@@ -123,6 +129,7 @@ export default function PlatformCatalogInlineSearch({
     mode: "catalog-inline",
     rawQuery: inputValue,
     topicKey: activeTopicKey,
+    listing: listingState,
     activeIndex: -1,
     options: [],
     isDropdownOpen: false,

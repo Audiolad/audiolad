@@ -73,7 +73,7 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         title="Попробуйте в подарок"
         products={data.freeProducts}
         ariaLabel="Попробуйте в подарок"
-        href="/catalog"
+        href="/catalog?access=free"
       />
 
       <HomeTopicNavigation topics={homeTopics} />
@@ -82,7 +82,7 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         title="Новое в АудиоЛаде"
         products={data.newProducts}
         ariaLabel="Новое в АудиоЛаде"
-        href="/catalog"
+        href="/catalog?sort=new"
       />
 
       <ProductRail
