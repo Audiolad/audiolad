@@ -610,6 +610,17 @@ function testMigrationContract() {
   assert(oneshot.includes("ORDER BY s.started_at ASC"), "canonical earliest window");
   assert(oneshot.includes("WHEN unique_violation THEN"), "bind catches unique conflict");
   assert(oneshot.includes("row_number() OVER"), "upgrade detaches duplicate user_id");
+
+  const qualify = readFileSync(
+    join(
+      ROOT,
+      "supabase/migrations/20260823190000_start_practice_price_promotion_qualify_identifiers.sql",
+    ),
+    "utf8",
+  );
+  assert(qualify.includes("CREATE OR REPLACE FUNCTION public.start_practice_price_promotion"), "qualify hotfix");
+  assert(qualify.includes("starts.promotion_id"), "qualified promotion_id");
+  assert(!qualify.includes("RETURNING *"), "no RETURNING * in hotfix");
 }
 
 function testSourceContracts() {
