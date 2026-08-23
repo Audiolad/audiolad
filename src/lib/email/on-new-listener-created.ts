@@ -131,11 +131,15 @@ export async function onNewListenerCreated(
       return { ok: true, status: "already_sent" };
     }
 
-    const send = deps.sendWelcomeEmail ?? sendWelcomeEmail;
-    const welcomeResult = await send({
-      toEmail: email,
-      userName: firstName,
-    });
+    const welcomeResult = deps.sendWelcomeEmail
+      ? await deps.sendWelcomeEmail({
+          toEmail: email,
+          userName: firstName,
+        })
+      : await sendWelcomeEmail({
+          toEmail: email,
+          userName: firstName,
+        });
 
     if (!welcomeResult.ok) {
       await markOperationalEmailDeliveryFailed(

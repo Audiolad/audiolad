@@ -8,20 +8,20 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { signUpAction } from "../src/app/(platform)/auth/sign-up/actions.ts";
+import { signUpAction } from "../src/app/(platform)/auth/sign-up/actions";
 import {
   onNewListenerCreated,
   type OnNewListenerCreatedInput,
-} from "../src/lib/email/on-new-listener-created.ts";
+} from "../src/lib/email/on-new-listener-created";
 import {
   buildListenerWelcomeDedupKey,
   LISTENER_WELCOME_MESSAGE_TYPE,
-} from "../src/lib/email/operational-deliveries.ts";
+} from "../src/lib/email/operational-deliveries";
+import type { SendWelcomeEmailResult } from "../src/lib/email/send-welcome-email";
 import {
   loginAndLinkMaxSession,
   verifyMaxSession,
-} from "../src/lib/max/session-shell-client.ts";
-import type { SendWelcomeEmailResult } from "../src/lib/email/send-welcome-email.ts";
+} from "../src/lib/max/session-shell-client";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -72,7 +72,7 @@ function createDeliveryTable() {
         assert.equal(table, "operational_email_deliveries");
 
         return {
-          select(_columns?: string) {
+          select() {
             return {
               eq(column: string, value: unknown) {
                 const row = resolveBy(column, value);
@@ -446,7 +446,8 @@ function testSourceGuards() {
   assert.match(action, /signup_welcome_email_failed/);
   assert.match(hook, /sendWelcomeEmail/);
   assert.match(hook, /userName: firstName/);
-  assert.match(hook, /listener_welcome:/);
+  assert.match(hook, /buildListenerWelcomeDedupKey/);
+  assert.match(hook, /LISTENER_WELCOME_MESSAGE_TYPE/);
 
   assert.match(bridge, /signUp: signUpAction/);
   assert.doesNotMatch(shell, /onNewListenerCreated|sendWelcomeEmail/);
