@@ -179,11 +179,25 @@ async function testRecoveryTemplateStillWorks() {
 }
 
 function testSignupSendsWelcome() {
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
+  const signUpAction = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "actions.ts",
+  );
+  const welcomeHook = readRepoFile(
+    "src",
+    "lib",
+    "email",
+    "on-new-listener-created.ts",
+  );
 
-  assert.match(signUpAction, /sendWelcomeEmail\(/);
+  assert.match(signUpAction, /onNewListenerCreated/);
   assert.match(signUpAction, /signup_welcome_email_failed/);
-  assert.match(signUpAction, /userName: firstName/);
+  assert.match(welcomeHook, /sendWelcomeEmail\(/);
+  assert.match(welcomeHook, /userName: firstName/);
 }
 
 async function testAuthorApplicationApprovedTemplate() {
@@ -272,6 +286,7 @@ function testApproveAuthorApplicationEmailWiring() {
   const approveAction = readRepoFile(
     "src",
     "app",
+    "(platform)",
     "admin",
     "author-applications",
     "actions.ts",
@@ -324,6 +339,7 @@ function testAuthorApplicationSubmitSendsConfirmationEmail() {
   const submitAction = readRepoFile(
     "src",
     "app",
+    "(platform)",
     "become-author",
     "actions.ts",
   );

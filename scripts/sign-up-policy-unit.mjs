@@ -145,6 +145,14 @@ function testMaxSignupReusesSameBar() {
     "signUpAction still reports hasSession from data.session",
   );
   assert(
+    signUpAction.includes("onNewListenerCreated"),
+    "MAX and Web share the same new-listener welcome hook",
+  );
+  assert(
+    !signUpAction.includes("data.user?.email"),
+    "welcome must not gate on data.user.email",
+  );
+  assert(
     !maxBridge.includes("generateLink") && !maxSignup.includes("generateLink"),
     "MAX signup must not use Admin generateLink",
   );

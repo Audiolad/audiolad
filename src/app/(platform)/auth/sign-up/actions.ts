@@ -15,8 +15,41 @@ import {
   SIGN_UP_DEFAULT_REDIRECT,
 } from "@/lib/auth/routes";
 import { validatePassword } from "@/lib/auth/password";
-import { sendWelcomeEmail } from "@/lib/email/send-welcome-email";
-import { createClient } from "@/lib/supabase/server";
+import {
+  onNewListenerCreated,
+  type OnNewListenerCreatedResult,
+} from "@/lib/email/on-new-listener-created";
+
+type SignUpAuthClient = {
+  auth: {
+    signUp: (args: {
+      email: string;
+      password: string;
+      options?: { data?: Record<string, string> };
+    }) => Promise<{
+      data: {
+        user: { id?: string | null; email?: string | null } | null;
+        session: unknown;
+      };
+      error: { message: string } | null;
+    }>;
+  };
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ error: { message?: string } | null }>;
+};
+
+export type SignUpActionDeps = {
+  createClient?: () => Promise<SignUpAuthClient>;
+  onNewListenerCreated?: (
+    input: {
+      userId: string;
+      email: string;
+      firstName: string;
+    },
+  ) => Promise<OnNewListenerCreatedResult>;
+};
 
 export type SignUpFieldError = {
   field: "firstName" | "lastName" | "email" | "password" | "legalConsent" | "form";
@@ -84,15 +117,18 @@ function mapSignUpAuthError(message: string): SignUpFieldError | null {
   return null;
 }
 
-export async function signUpAction(input: {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  legalConsent: boolean;
-  marketingConsent: boolean;
-  next: string | null;
-}): Promise<SignUpActionResult> {
+export async function signUpAction(
+  input: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    legalConsent: boolean;
+    marketingConsent: boolean;
+    next: string | null;
+  },
+  deps: SignUpActionDeps = {},
+): Promise<SignUpActionResult> {
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
   const password = input.password;
@@ -141,7 +177,9 @@ export async function signUpAction(input: {
     };
   }
 
-  const supabase = await createClient();
+  const supabase = deps.createClient
+    ? await deps.createClient()
+    : await (await import("@/lib/supabase/server")).createClient();
   const destination = getSafeNextPath(input.next, SIGN_UP_DEFAULT_REDIRECT);
 
   const { data, error } = await supabase.auth.signUp({
@@ -182,14 +220,23 @@ export async function signUpAction(input: {
     }
   }
 
-  if (data.user?.email) {
-    const welcomeResult = await sendWelcomeEmail({
-      toEmail: data.user.email,
-      userName: firstName,
-    });
+  if (data.user?.id) {
+    try {
+      const notifyNewListener = deps.onNewListenerCreated ?? onNewListenerCreated;
+      const welcomeResult = await notifyNewListener({
+        userId: data.user.id,
+        email: emailValidation.normalizedEmail,
+        firstName,
+      });
 
-    if (!welcomeResult.ok) {
-      console.error("signup_welcome_email_failed", welcomeResult.code);
+      if (!welcomeResult.ok) {
+        console.error("signup_welcome_email_failed", welcomeResult.code);
+      }
+    } catch (error) {
+      console.error(
+        "signup_welcome_email_failed",
+        error instanceof Error ? error.message : "unknown",
+      );
     }
   }
 

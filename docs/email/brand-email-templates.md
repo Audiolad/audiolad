@@ -36,7 +36,11 @@ npx tsx scripts/build-gotrue-email-templates.ts
 
 ## Welcome email
 
-- Sent from `src/app/(platform)/auth/sign-up/actions.ts` after successful registration only.
+- Canonical send path: `onNewListenerCreated` in `src/lib/email/on-new-listener-created.ts`.
+- `signUpAction` (Web and MAX) calls it once after a successful `auth.signUp` that produced a user id.
+- Recipient is the validated signup email, not `data.user.email` (MAX/session shapes may omit it).
+- One-shot dedup: `operational_email_deliveries` row with `message_type=listener_welcome` and `dedup_key=listener_welcome:{user_id}`. Claim first; already claimed/sent skips SMTP.
+- Login, verify, link, and MAX session-shell-client must not send this email.
 - Renderer: `welcome` template key.
 - Subject: `Добро пожаловать в АудиоЛад 🎉`
 - SMTP env (server-only):

@@ -199,7 +199,7 @@ AUDIOLAD_EMAIL_AUTH_SECURITY_FROM=
 AUDIOLAD_EMAIL_AUTH_SECURITY_REPLY_TO=
 ```
 
-Application welcome email (sent after signup, not via GoTrue):
+Application welcome email (one-shot after successful `signUpAction` via `onNewListenerCreated`, not via GoTrue; not sent on login/verify/link):
 
 ```env
 AUDIOLAD_SMTP_HOST=smtp.timeweb.ru
