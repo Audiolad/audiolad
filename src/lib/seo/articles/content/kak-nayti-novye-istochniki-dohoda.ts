@@ -19,9 +19,9 @@ export const KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE = {
   shortAnswer:
     "Дополнительный заработок не всегда требует полностью менять профессию или начинать бизнес. Иногда новый источник дохода вырастает из уже имеющегося навыка, свободного ресурса, накопленного опыта или задачи, которую человек умеет решать лучше других.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "energiya-denezhnogo-puti",
   },
@@ -1237,8 +1237,8 @@ export const KAK_NAYTI_NOVYE_ISTOCHNIKI_DOHODA_ARTICLE = {
     "Внутреннее состояние может влиять на то, насколько внимательно человек замечает возможности и готов ли он их проверять. Но устойчивый финансовый результат обычно требует соединения внутренней ясности с навыками, действиями, временем и подходящими внешними условиями.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

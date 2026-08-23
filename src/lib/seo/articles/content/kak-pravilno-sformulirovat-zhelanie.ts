@@ -19,9 +19,9 @@ export const KAK_PRAVILNO_SFORMULIROVAT_ZHELANIE_ARTICLE = {
   shortAnswer:
     "Хорошая формулировка желания помогает яснее понять своё направление, но сама по себе не гарантирует результата. Желание становится полезнее, когда относится к нашей жизни, выражено понятными словами и может перейти в реальные действия.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "kod-prityazheniya",
   },
@@ -217,11 +217,7 @@ export const KAK_PRAVILNO_SFORMULIROVAT_ZHELANIE_ARTICLE = {
       title: "Медитация на исполнение желаний",
       description: "Чего реально ждать от такой практики",
     },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
+
   ],
   closingSection: {
     id: "glavnoe",

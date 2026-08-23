@@ -18,9 +18,9 @@ export const ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE = {
   shortAnswer:
     "Если вы ищете ответ на вопрос «женская энергия – что это», важно не воспринимать чужое определение как обязательное правило. Полезнее рассматривать это выражение как приглашение поразмышлять о собственном состоянии: что помогает именно вам чувствовать больше внутренней опоры, живости и контакта с собой.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "zhenskaya-energiya",
+  topicTitle: "Женская энергия",
+  topicHref: "/topics/zhenskaya-energiya",
   primaryPractice: { practiceKey: "zhenskaya-energiya" },
   relatedPractices: [
     { practiceKey: "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily", blurb: "Если хочется мягко вернуть ощущение внутренней живости, тепла и контакта с собой." },
@@ -451,11 +451,6 @@ export const ZHENSKAYA_ENERGIYA_CHTO_ETO_ARTICLE = {
       href: "/articles/kak-razvit-lyubov-k-sebe",
       title: "Как развить любовь к себе",
       description: "Бережное отношение к себе и внутренняя опора",
-    },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
     },
     {
       href: "/topics/zhenskaya-energiya",

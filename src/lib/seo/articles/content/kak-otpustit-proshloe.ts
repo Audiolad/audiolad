@@ -18,9 +18,9 @@ export const KAK_OTPUSTIT_PROSHLOE_ARTICLE = {
   shortAnswer:
     "Отпустить прошлое не значит стереть воспоминания или отказаться от своей истории. Чаще речь идёт о том, чтобы прошлые события перестали определять сегодняшнюю жизнь, а человек смог сохранить опыт, не оставаясь внутри уже завершившегося этапа.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -268,11 +268,6 @@ export const KAK_OTPUSTIT_PROSHLOE_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-perestat-zlitsya-na-cheloveka",
       title: "Как перестать злиться на человека",

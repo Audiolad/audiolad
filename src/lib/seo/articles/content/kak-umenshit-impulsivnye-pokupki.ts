@@ -19,9 +19,9 @@ export const KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE = {
   shortAnswer:
     "Цель осознанного отношения к покупкам – не запретить себе всё необязательное. Она заключается в том, чтобы чаще понимать, что именно вы покупаете, зачем вам это нужно и соответствует ли решение вашим возможностям и приоритетам.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: { practiceKey: "energiya-denezhnogo-puti", },
   relatedPractices: [
     {
@@ -865,8 +865,8 @@ export const KAK_UMENSHIT_IMPULSIVNYE_POKUPKI_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

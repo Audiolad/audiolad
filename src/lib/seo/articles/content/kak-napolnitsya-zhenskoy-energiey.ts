@@ -18,9 +18,9 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
   shortAnswer:
     "Размышляя о том, как наполниться женской энергией, важно помнить: не существует единственно правильного способа быть женщиной. Каждая проживает свою жизнь по-своему. Поэтому речь идёт не о соответствии чужому идеалу, а о поиске того, что помогает именно вам чувствовать себя более живой, устойчивой и внимательной к себе.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "zhenskaya-energiya",
+  topicTitle: "Женская энергия",
+  topicHref: "/topics/zhenskaya-energiya",
   primaryPractice: {
     practiceKey: "bastet-boginya-radosti-lyubvi-i-zhenskoy-sily",
   },
@@ -385,11 +385,6 @@ export const KAK_NAPOLNITSYA_ZHENSKOY_ENERGIEY_ARTICLE = {
       href: "/articles/zhenskaya-energiya-chto-eto",
       title: "Женская энергия: что это",
       description: "Что обычно понимают под этим выражением простыми словами",
-    },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
     },
     {
       href: "/topics/zhenskaya-energiya",

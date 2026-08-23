@@ -19,9 +19,9 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
   shortAnswer:
     "Более внимательное отношение к собственным финансовым привычкам может помочь принимать решения спокойнее и осознаннее. Но оно не гарантирует рост дохода и не отменяет влияние профессии, состояния экономики, здоровья, семейной нагрузки, доступного образования и других объективных условий.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "energiya-denezhnogo-puti",
   },
@@ -740,8 +740,8 @@ export const DENEZHNOE_MYSHLENIE_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

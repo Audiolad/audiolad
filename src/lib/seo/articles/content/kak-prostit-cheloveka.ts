@@ -19,9 +19,9 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
   shortAnswer:
     "Простить человека не значит оправдать его поступок, восстановить доверие или обязательно помириться. Прощение можно рассматривать как внутренний процесс, в котором человек постепенно меняет своё отношение к пережитому и перестаёт связывать собственное облегчение только с извинениями или изменением другого. При этом решение о дальнейшем общении, близости и личных границах принимается отдельно.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -402,11 +402,6 @@ export const KAK_PROSTIT_CHELOVEKA_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-otpustit-obidu",
       title: "Как отпустить обиду",

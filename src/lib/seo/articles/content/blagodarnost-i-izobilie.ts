@@ -19,9 +19,9 @@ export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
   shortAnswer:
     "Благодарность – это не способ заставить обстоятельства измениться. Скорее она может стать способом направлять внимание: замечать доступные ресурсы, признавать помощь, видеть небольшие изменения и не обесценивать то, что уже удалось сделать.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "izobilie",
+  topicTitle: "Изобилие",
+  topicHref: "/topics/izobilie",
   primaryPractice: {
     practiceKey: "klyuch-k-izobiliyu",
   },
@@ -1119,8 +1119,8 @@ export const BLAGODARNOST_I_IZOBILIE_ARTICLE = {
     "Аудиопрактики могут поддерживать внутреннее состояние, внимание и способность замечать опоры, но не заменяют реальные решения, профессиональную помощь, финансовое планирование, поиск дохода, лечение и юридические меры.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/izobilie",
+      title: "Изобилие",
       description: "Тематическая подборка АудиоЛада",
     },
     {

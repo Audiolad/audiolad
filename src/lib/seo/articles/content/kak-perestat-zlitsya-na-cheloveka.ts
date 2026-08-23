@@ -19,9 +19,9 @@ export const KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE = {
   shortAnswer:
     "Перестать постоянно злиться – не значит признать чужое поведение правильным, забыть о причинённом вреде или заставить себя простить. Речь идёт о том, чтобы признать свои чувства, понять, что поддерживает внутреннее напряжение, и постепенно уменьшить влияние этой ситуации на сегодняшнюю жизнь.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -339,11 +339,6 @@ export const KAK_PERESTAT_ZLITSYA_NA_CHELOVEKA_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/pochemu-my-postoyanno-obizhaemsya",
       title: "Почему мы постоянно обижаемся",

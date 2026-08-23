@@ -19,9 +19,9 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
   shortAnswer:
     "Спокойствие не означает перестать смотреть на счета, забыть о долгах или отказаться от планирования. Более спокойное отношение помогает увидеть реальные цифры, определить ближайшие действия и не тратить все силы на попытку заранее решить каждую возможную проблему.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: { practiceKey: "energiya-denezhnogo-puti", },
   relatedPractices: [
     {
@@ -758,8 +758,8 @@ export const KAK_PERESTAT_PEREZHIVAT_IZ_ZA_DENEG_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

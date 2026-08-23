@@ -19,9 +19,9 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
   shortAnswer:
     "Более спокойное внутреннее состояние не создаёт деньги само по себе и не отменяет объективных ограничений. Но оно может помочь яснее видеть ситуацию, принимать решения без лишней спешки и использовать доступные возможности более последовательно.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "izobilie",
+  topicTitle: "Изобилие",
+  topicHref: "/topics/izobilie",
   primaryPractice: {
     practiceKey: "klyuch-k-izobiliyu",
   },
@@ -1268,8 +1268,8 @@ export const KAK_VYYTI_IZ_SOSTOYANIYA_NEHVATKI_ARTICLE = {
     "Аудиопрактики используются как дополнительная поддержка внутреннего состояния и внимания, но не заменяют финансовое планирование, профессиональное развитие, переговоры, юридическую помощь или другие реальные меры.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/izobilie",
+      title: "Изобилие",
       description: "Тематическая подборка АудиоЛада",
     },
     {

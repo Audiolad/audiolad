@@ -19,9 +19,9 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
   shortAnswer:
     "Не всегда отсутствие ответа означает отсутствие желаний. Иногда им просто не хватает спокойного пространства, чтобы проявиться.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "kod-prityazheniya",
   },
@@ -241,11 +241,6 @@ export const KAK_PONYAT_CHEGO_YA_HOCHU_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-otpustit-proshloe",
       title: "Как отпустить прошлое",

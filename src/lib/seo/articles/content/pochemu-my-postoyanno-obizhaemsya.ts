@@ -19,9 +19,9 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
   shortAnswer:
     "Избавиться от привычки постоянно обижаться не значит перестать чувствовать или терпеть неуважительное отношение. Скорее речь идёт о том, чтобы лучше понимать причины своей реакции, отличать реальные нарушения границ от недоразумений и постепенно выбирать более спокойный способ реагировать на происходящее.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -263,11 +263,6 @@ export const POCHEMU_MY_POSTOYANNO_OBIZHAEMSYA_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-perestat-zlitsya-na-cheloveka",
       title: "Как перестать злиться на человека",

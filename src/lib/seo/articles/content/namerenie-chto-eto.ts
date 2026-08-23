@@ -18,9 +18,9 @@ export const NAMERENIE_CHTO_ETO_ARTICLE = {
   shortAnswer:
     "Намерение – это выбранное человеком направление, которое начинает влиять на его решения и подтверждается конкретными действиями. От желания оно отличается готовностью действовать, от цели – отсутствием обязательного конечного результата, а от плана – тем, что задаёт общий смысл движения.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "kod-prityazheniya",
   },
@@ -210,11 +210,7 @@ export const NAMERENIE_CHTO_ETO_ARTICLE = {
       title: "Медитация на исполнение желаний",
       description: "Чего реально ждать от такой практики",
     },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
+
   ],
   closingSection: {
     id: "glavnoe",

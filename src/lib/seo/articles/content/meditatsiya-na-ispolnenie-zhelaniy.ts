@@ -20,9 +20,9 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
   shortAnswer:
     "Медитация на исполнение желаний – это спокойная практика, которая помогает ненадолго отвлечься от повседневной суеты, лучше понять свои настоящие цели и обратить внимание на внутреннее состояние. Она не исполняет желания сама по себе, но может помочь спокойнее оценивать ситуацию и внимательнее относиться к возможным следующим шагам.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "klyuch-k-izobiliyu",
   },
@@ -183,11 +183,6 @@ export const MEDITATSIYA_NA_ISPOLNENIE_ZHELANIY_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-ponyat-chego-ya-hochu",
       title: "Как понять, чего я хочу",

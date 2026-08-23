@@ -45,6 +45,7 @@
     "test:playlists-stage3": "npx tsx scripts/playlists-stage3-validation-smoke.mjs",
     "test:listens-stage4": "npx tsx scripts/listens-stage4-validation-smoke.mjs",
     "test:geo-aeo-stage2a1": "npx tsx scripts/geo-aeo-stage2a1-unit.mjs",
+    "test:geo-aeo-stage2a2": "npx tsx scripts/geo-aeo-stage2a2-unit.mjs",
     "test:playlists-editorial-cover": "npx tsx scripts/playlists-editorial-cover-unit.mjs",
     "test:public-playlist-page": "node scripts/public-playlist-page-shell-unit.mjs",
     "test:playlists-music-tracks": "npx tsx scripts/playlists-music-track-items-unit.mjs",

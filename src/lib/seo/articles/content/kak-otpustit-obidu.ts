@@ -20,9 +20,9 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
   shortAnswer:
     "Отпустить обиду – не значит признать чужой поступок правильным, забыть произошедшее или обязательно восстановить отношения. Чаще речь идёт о постепенном освобождении от постоянного внутреннего диалога, в котором болезненная ситуация снова и снова забирает внимание и силы. Начать можно с признания своих чувств, отделения фактов от повторяющихся мыслей и возвращения внимания к тому, что человек способен изменить сейчас.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -244,11 +244,6 @@ export const KAK_OTPUSTIT_OBIDU_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/pochemu-my-postoyanno-obizhaemsya",
       title: "Почему мы постоянно обижаемся",

@@ -19,9 +19,9 @@ export const KAK_POVYSIT_DOHOD_ARTICLE = {
   shortAnswer:
     "Внутреннее отношение к деньгам может влиять на готовность обсуждать оплату, замечать возможности и принимать решения. Но одного изменения мышления недостаточно, чтобы доход вырос. Финансовый результат зависит также от профессии, квалификации, состояния рынка, доступных ресурсов, здоровья, семейной нагрузки и других обстоятельств.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "prityanut-dengi-legko",
   },
@@ -1078,8 +1078,8 @@ export const KAK_POVYSIT_DOHOD_ARTICLE = {
     "Несколько спокойных минут редко меняют финансовую ситуацию сами по себе. Но они могут помочь человеку яснее увидеть свои мысли, возможности и следующий шаг. Поэтому в АудиоЛаде аудиопрактики рассматриваются как дополнительная поддержка внутреннего состояния, а не как замена реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {
