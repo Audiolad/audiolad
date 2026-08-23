@@ -2,9 +2,16 @@ import Link from "next/link";
 
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
 import { legalLinkClassName } from "@/lib/legal/links";
-import { PUBLIC_FOOTER_LINKS } from "@/lib/navigation/public-footer-links";
+import { getVisiblePublicFooterLinks } from "@/lib/navigation/public-footer-links";
+import { createClient } from "@/lib/supabase/server";
 
-export default function LegalFooter({ className }: { className?: string }) {
+export default async function LegalFooter({ className }: { className?: string }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const footerLinks = getVisiblePublicFooterLinks(user?.email);
+
   return (
     <footer
       className={`border-t border-[#eadff8] pt-6 ${className ?? ""}`}
@@ -15,7 +22,7 @@ export default function LegalFooter({ className }: { className?: string }) {
           <p className="text-lg font-semibold text-[#6234b5]">АудиоЛад</p>
           <nav aria-label="Разделы платформы" className="mt-3">
             <ul className="flex flex-wrap gap-x-4 gap-y-2 text-[15px]">
-              {PUBLIC_FOOTER_LINKS.map((item) => (
+              {footerLinks.map((item) => (
                 <li key={item.href}>
                   <Link href={item.href} className={legalLinkClassName}>
                     {item.title}

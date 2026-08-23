@@ -67,7 +67,10 @@ import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "../src/lib/seo/l
 import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-vosstanovleniya-sil.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
-import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
+import {
+  getVisiblePublicFooterLinks,
+  PUBLIC_FOOTER_LINKS,
+} from "../src/lib/navigation/public-footer-links.ts";
 import { KAK_RAZVIT_LYUBOV_K_SEBE_ARTICLE } from "../src/lib/seo/articles/content/kak-razvit-lyubov-k-sebe.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -304,14 +307,47 @@ function testTopicHubsFromRegistry() {
 
 function testFooterContainsArticlesOnce() {
   const footer = read("src/components/LegalFooter.tsx");
-  assert(footer.includes("PUBLIC_FOOTER_LINKS"), "footer uses public links module");
+  assert(
+    footer.includes("getVisiblePublicFooterLinks"),
+    "footer uses public links visibility helper",
+  );
   assert(footer.includes('aria-label="Разделы платформы"'), "public nav label");
+  assert(
+    footer.includes("auth.getUser()"),
+    "footer reads current user email on the server",
+  );
 
   const articlesLinks = PUBLIC_FOOTER_LINKS.filter(
     (item) => item.href === "/articles",
   );
   assert(articlesLinks.length === 1, "exactly one /articles footer link");
   assert(articlesLinks[0].title === "Статьи", "footer label Статьи");
+
+  const guestLinks = getVisiblePublicFooterLinks(null);
+  const otherUserLinks = getVisiblePublicFooterLinks("user@example.com");
+  const ownerLinks = getVisiblePublicFooterLinks("1@audiolad.ru");
+  assert(
+    guestLinks.every((item) => item.href !== "/articles"),
+    "guest footer omits /articles",
+  );
+  assert(
+    otherUserLinks.every((item) => item.href !== "/articles"),
+    "other signed-in user footer omits /articles",
+  );
+  assert(
+    ownerLinks.filter((item) => item.href === "/articles").length === 1,
+    "owner email keeps one /articles footer link",
+  );
+  assert(
+    ownerLinks.find((item) => item.href === "/articles")?.title === "Статьи",
+    "owner footer keeps label Статьи",
+  );
+  assert(
+    getVisiblePublicFooterLinks("1@Audiolad.ru").every(
+      (item) => item.href !== "/articles",
+    ),
+    "articles footer link uses exact email match",
+  );
 
   const helpLinks = PUBLIC_FOOTER_LINKS.filter((item) => item.href === "/help");
   assert(helpLinks.length === 1, "exactly one /help footer link");

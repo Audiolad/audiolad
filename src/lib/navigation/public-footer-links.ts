@@ -11,3 +11,16 @@ export const PUBLIC_FOOTER_LINKS = [
 ] as const;
 
 export type PublicFooterLinkHref = (typeof PUBLIC_FOOTER_LINKS)[number]["href"];
+
+/** Footer «Статьи» is rendered only for this signed-in email. Exact match. */
+const ARTICLES_FOOTER_VISIBLE_EMAIL = "1@audiolad.ru";
+
+export function getVisiblePublicFooterLinks(
+  currentUserEmail: string | null | undefined,
+) {
+  return PUBLIC_FOOTER_LINKS.filter(
+    (item) =>
+      item.href !== "/articles" ||
+      currentUserEmail === ARTICLES_FOOTER_VISIBLE_EMAIL,
+  );
+}

@@ -673,7 +673,7 @@ const personalHome = read("src/components/home/PersonalHome.tsx");
 assert.match(personalHome, /<LegalFooter/);
 
 const legalFooter = read("src/components/LegalFooter.tsx");
-assert.match(legalFooter, /PUBLIC_FOOTER_LINKS/);
+assert.match(legalFooter, /getVisiblePublicFooterLinks/);
 assert.doesNotMatch(
   legalFooter,
   /href=["']\/help["']/,
