@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
   resolveCatalogCardVisual,
@@ -24,9 +23,20 @@ type CatalogSystemProductSlideProps = {
 /** Canonical first-slide (and later carousel slide) geometry. */
 export const CATALOG_SYSTEM_SLIDE_ASPECT_CLASS = "aspect-[3/4]";
 
-/** Two-line clamp with reserved height so 3:4 rows stay even. */
+/** Two-line clamp. No min-height — the 3:4 leftover strip is only ~45–56px. */
 export const CATALOG_PRODUCT_TILE_TITLE_CLASS =
-  "line-clamp-2 min-h-8 text-[13px] font-semibold leading-4 text-[#25135c]";
+  "line-clamp-2 min-h-0 text-[13px] font-semibold leading-4 text-[#25135c]";
+
+function CatalogSystemTypeChip({ label }: { label: string }) {
+  return (
+    <p
+      className="absolute bottom-1.5 left-1.5 z-[1] max-w-[calc(100%-3.25rem)] truncate rounded-full bg-[#25135c]/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.06em] text-white"
+      data-catalog-tile-type=""
+    >
+      {label}
+    </p>
+  );
+}
 
 function CatalogSystemCover({
   product,
@@ -36,6 +46,7 @@ function CatalogSystemCover({
   visual: CatalogCardVisual;
 }) {
   const alt = product.title;
+  const typeLabel = product.productTypeLabel?.trim() || null;
   const placeholder = visual.image?.placeholderBlurDataUrl ?? null;
 
   if (visual.hasSquareCover && visual.image) {
@@ -65,19 +76,21 @@ function CatalogSystemCover({
           loading="lazy"
           decoding="async"
         />
+        {typeLabel ? <CatalogSystemTypeChip label={typeLabel} /> : null}
       </div>
     );
   }
 
   return (
     <div
-      className={`flex aspect-square w-full shrink-0 items-center justify-center bg-gradient-to-br ${visual.systemFallback.gradientClassName} text-4xl text-white`}
+      className={`relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br ${visual.systemFallback.gradientClassName} text-4xl text-white`}
       data-catalog-tile-cover="system"
       data-catalog-tile-fallback="system"
       role="img"
       aria-label={alt}
     >
       {visual.systemFallback.symbol}
+      {typeLabel ? <CatalogSystemTypeChip label={typeLabel} /> : null}
     </div>
   );
 }
@@ -137,7 +150,7 @@ export default function CatalogSystemProductSlide({
 
   return (
     <div
-      className={`flex w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff] ${
+      className={`relative flex w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff] ${
         fillsParent
           ? "h-full min-h-0 min-w-0"
           : CATALOG_SYSTEM_SLIDE_ASPECT_CLASS
@@ -152,13 +165,10 @@ export default function CatalogSystemProductSlide({
       >
         <CatalogSystemCover product={product} visual={visual} />
 
-        <div className="flex min-h-0 flex-col gap-0.5 px-1.5 pt-1">
-          {product.productTypeLabel ? (
-            <p className={`leading-3 ${PRODUCT_FORMAT_LINE_CLASS}`}>
-              {product.productTypeLabel}
-            </p>
-          ) : null}
-
+        <div
+          className="flex min-h-0 flex-1 flex-col justify-center gap-0.5 px-1.5 py-0.5"
+          data-catalog-tile-info=""
+        >
           <h3 className={CATALOG_PRODUCT_TILE_TITLE_CLASS}>{product.title}</h3>
 
           <CatalogSystemSlideMeta

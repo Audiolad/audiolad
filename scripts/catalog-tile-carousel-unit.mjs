@@ -286,6 +286,7 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
   );
   assert.match(systemSlide, /\{playControl\}/);
   assert.match(control, /runCatalogTilePlayClick/);
+  assert.match(control, /data-catalog-tile-play-overlay=""/, "Play overlay stays on slide 1 cover");
   assert.doesNotMatch(carousel, /loadSession|fetchListenSessionPayload/, "no second player");
 }
 
@@ -385,6 +386,16 @@ function testEachSlideMatchesScrollerViewport() {
     "Play stays inside the system slide frame",
   );
   assert.match(systemSlide, /overflow-hidden/, "frame clips — Play cannot sit below the article");
+  assert.match(
+    systemSlide,
+    /<\/Link>[\s\S]*\{playControl\}/,
+    "overlay Play is a sibling of the PDP Link",
+  );
+  assert.doesNotMatch(
+    systemSlide,
+    /<Link[\s\S]*\{playControl\}[\s\S]*<\/Link>/,
+    "Play is not nested inside the PDP Link",
+  );
 
   const at390 = resolveCatalogTileSlideViewport(169);
   assert.equal(at390.width, 169);

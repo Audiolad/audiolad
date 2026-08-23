@@ -169,7 +169,11 @@ function testLongTitleIsCssClamped() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   assert.match(slide, /CATALOG_PRODUCT_TILE_TITLE_CLASS/);
   assert.match(slide, /line-clamp-2/);
-  assert.match(slide, /min-h-8/, "two-line title keeps reserved height");
+  assert.doesNotMatch(
+    slide,
+    /min-h-8/,
+    "title does not reserve 32px that overflows the 3:4 leftover strip",
+  );
   assert.match(slide, /product\.title/, "full title is rendered");
   assert.doesNotMatch(slide, /title\.slice|substring\(/, "title is not truncated in JS");
 }
@@ -281,6 +285,9 @@ function testTileLinksToCanonicalPdp() {
   assert.match(slide, /data-catalog-tile-meta=""/);
   assert.match(slide, /product\.statsLabel/, "duration uses existing statsLabel");
   assert.match(control, /Слушать/, "Play control reads as Слушать");
+  assert.match(control, /data-catalog-tile-play-overlay=""/, "Play is a cover overlay");
+  assert.match(control, /rounded-full/, "overlay Play is a circle");
+  assert.match(control, /aspect-square/, "overlay matches the 1:1 cover");
 }
 
 function testPreviewReusesCatalogListing() {
@@ -329,6 +336,15 @@ function testSystemSlideIsThreeFourIncludingPlay() {
   assert.match(slide, /aspect-square/, "cover is 1:1");
   assert.match(slide, /data-catalog-tile-cover="square"/);
   assert.match(slide, /\{playControl\}/, "Play lives inside the first-slide geometry");
+  assert.match(slide, /data-catalog-tile-info=""/, "strip is title + author only");
+  assert.match(slide, /data-catalog-tile-type=""/, "type stays as a cover chip");
+  const infoBlock = slide.match(
+    /data-catalog-tile-info=""[\s\S]*?<\/div>/,
+  )?.[0];
+  assert.ok(infoBlock, "info strip is a closed block");
+  assert.match(infoBlock, /CATALOG_PRODUCT_TILE_TITLE_CLASS|product\.title/);
+  assert.match(infoBlock, /CatalogSystemSlideMeta/);
+  assert.doesNotMatch(infoBlock, /productTypeLabel|playControl|CatalogSystemTypeChip/);
   assert.doesNotMatch(tile, /aspect-\[3\/4\]|aspect-\[9\/16\]/, "tile does not add a second aspect box");
   assert.doesNotMatch(slide, /aspect-\[9\/16\]/, "first slide is not 9:16");
   assert.doesNotMatch(slide, /aspect-\[4\/5\]/, "first slide is not forced into 4:5");
