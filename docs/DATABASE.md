@@ -405,6 +405,12 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
 
+### RPC `public.link_external_identity` (этап 3A)
+
+Миграция: `supabase/migrations/20260823120000_link_external_identity.sql`.
+Этап 3B **не** добавляет миграцию и не меняет схему: клиент вызывает уже
+существующий `POST /api/max/session/link`.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.
