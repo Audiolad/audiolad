@@ -215,6 +215,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
       {hasAnyProducts ? (
         <CatalogProductGrid
+          key={[
+            resolvedListingQuery.q,
+            resolvedListingQuery.topic,
+            resolvedListingQuery.access,
+            resolvedListingQuery.kind,
+            resolvedListingQuery.sort,
+          ].join("|")}
           initialItems={listing.items}
           initialNextCursor={listing.nextCursor}
           query={resolvedListingQuery}

@@ -32,12 +32,6 @@ export default function CatalogProductGrid({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const inFlightRef = useRef(false);
 
-  useEffect(() => {
-    setItems(initialItems);
-    setNextCursor(initialNextCursor);
-    setLoadError(null);
-  }, [initialItems, initialNextCursor]);
-
   const loadMore = useCallback(async () => {
     if (!nextCursor || inFlightRef.current) {
       return;
