@@ -61,12 +61,12 @@ function localPostgresAvailable() {
   }
 }
 
-function useDocker() {
+function dockerBackend() {
   return dockerAvailable();
 }
 
 function psql(database, sql, { tuples = false } = {}) {
-  if (useDocker()) {
+  if (dockerBackend()) {
     const args = [
       "exec",
       "-i",
@@ -102,7 +102,7 @@ function psqlFile(database, absolutePath) {
 }
 
 function dropCreateDb(name) {
-  if (useDocker()) {
+  if (dockerBackend()) {
     psql("postgres", `DROP DATABASE IF EXISTS ${name} WITH (FORCE);`);
     psql("postgres", `CREATE DATABASE ${name};`);
     return;
