@@ -58,6 +58,28 @@ export function mapResolvedPriceRpcRow(row: RpcRow): ResolvedPracticePrice {
   };
 }
 
+export async function bindPracticePricePromotionStarts(input: {
+  supabase: SupabaseClient;
+  visitorId?: string | null;
+  userId?: string | null;
+}): Promise<void> {
+  if (!input.visitorId || !input.userId) {
+    return;
+  }
+
+  const { error } = await input.supabase.rpc(
+    "bind_practice_price_promotion_starts",
+    {
+      p_visitor_id: input.visitorId,
+      p_user_id: input.userId,
+    },
+  );
+
+  if (error) {
+    console.error("bind_practice_price_promotion_starts_error", error.message);
+  }
+}
+
 export async function resolvePracticePriceRpc(input: {
   supabase: SupabaseClient;
   practiceId: string;
@@ -66,6 +88,12 @@ export async function resolvePracticePriceRpc(input: {
   userId?: string | null;
   now?: Date;
 }): Promise<ResolvedPracticePrice | null> {
+  await bindPracticePricePromotionStarts({
+    supabase: input.supabase,
+    visitorId: input.visitorId,
+    userId: input.userId,
+  });
+
   const { data, error } = await input.supabase.rpc(
     "resolve_practice_effective_price",
     {

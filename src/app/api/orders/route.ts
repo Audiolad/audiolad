@@ -13,6 +13,7 @@ import {
   type CreateOrderRpcRow,
 } from "@/lib/orders/create-order-api";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
+import { bindPracticePricePromotionStarts } from "@/lib/pricing/rpc";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { formatRubles } from "@/lib/products/price-format";
 import { PRICE_CHANGED_MESSAGE } from "@/lib/pricing/resolve";
@@ -89,6 +90,12 @@ export async function POST(request: Request) {
 
   const expectedAmountMinor = extractExpectedAmountMinor(parsedBody);
   const priceVisitorId = await readPriceVisitorId();
+
+  await bindPracticePricePromotionStarts({
+    supabase,
+    visitorId: priceVisitorId,
+    userId: user.id,
+  });
 
   const { data, error } = await supabase.rpc("create_practice_order", {
     p_practice_slug: practiceSlug,

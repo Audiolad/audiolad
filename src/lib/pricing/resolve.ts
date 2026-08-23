@@ -1,5 +1,9 @@
 import { rublesToMinor } from "@/lib/pricing/money";
 import {
+  chooseCanonicalPersonalStart,
+  isPersonalStartActive,
+} from "@/lib/pricing/personal-start";
+import {
   PRICE_PROMOTION_TYPES,
   PRICE_SURFACES,
   type PersonalPromotionStart,
@@ -61,22 +65,13 @@ function findActivePersonalStart(
   starts: PersonalPromotionStart[],
   nowMs: number,
 ): PersonalPromotionStart | null {
-  const matches = starts.filter((start) => start.promotionId === promotion.id);
+  const canonical = chooseCanonicalPersonalStart(starts, promotion.id);
 
-  for (const start of matches) {
-    const expiresAt = toTime(start.expiresAt);
-    const startedAt = toTime(start.startedAt);
-
-    if (expiresAt === null || startedAt === null) {
-      continue;
-    }
-
-    if (nowMs >= startedAt && nowMs < expiresAt) {
-      return start;
-    }
+  if (!canonical || !isPersonalStartActive(canonical, nowMs)) {
+    return null;
   }
 
-  return null;
+  return canonical;
 }
 
 function toResolvedPromotion(

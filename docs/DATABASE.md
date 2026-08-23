@@ -407,7 +407,7 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 ## Прайс и акции (base price + promotions, 2026-08-23)
 
-Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`.
+Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`, `20260823183000_price_promotion_oneshot_bind.sql`.
 
 Деньги:
 
@@ -446,7 +446,9 @@ RLS: публичный SELECT активных акций опубликова�
 | `user_id` | uuid NULL | → `auth.users`, ON DELETE SET NULL |
 | `started_at` / `expires_at` | timestamptz | `expires_at > started_at` |
 
-Уникальность: `(promotion_id, visitor_id)`. Таблица недоступна anon/authenticated; чтение/запись только через SECURITY DEFINER RPC.
+Уникальность: `(promotion_id, visitor_id)` и частичный unique `(promotion_id, user_id) WHERE user_id IS NOT NULL`. Персональный таймер одноразовый для пары (акция, посетитель/пользователь): повторный `?promo=` / start после expiry не создаёт новое окно и не продлевает `started_at` / `expires_at`. Тот же токен может стартовать другого посетителя. Таблица недоступна anon/authenticated; чтение/запись только через SECURITY DEFINER RPC.
+
+Гость → логин: cookie `audiolad_price_visitor` биндится на `user_id` (`bind_practice_price_promotion_starts`) без нового окна. Resolve/checkout смотрят visitor_id OR user_id, но только исходное окно (самое раннее `started_at`). Истёкшее окно не оживает.
 
 ### Снимки заказа
 
@@ -461,8 +463,9 @@ RLS: публичный SELECT активных акций опубликова�
 
 ### RPC
 
-- `resolve_practice_effective_price(practice_id, surface, visitor_id, user_id, now)` — `catalog` игнорирует personal countdown; иначе lowest `sale_price` wins, без стекинга. GRANT anon+authenticated.
-- `start_practice_price_promotion(start_token, visitor_id, user_id)` — старт/reuse/restart персонального окна. GRANT anon+authenticated.
+- `resolve_practice_effective_price(practice_id, surface, visitor_id, user_id, now)` — `catalog` игнорирует personal countdown; иначе lowest `sale_price` wins, без стекинга. При наличии visitor+user сначала bind. Personal: только исходное окно. GRANT anon+authenticated.
+- `start_practice_price_promotion(start_token, visitor_id, user_id)` — одноразовый старт; если строка уже есть, возвращает исходные `started_at` / `expires_at` (в том числе после expiry). `INSERT … ON CONFLICT DO NOTHING`. GRANT anon+authenticated.
+- `bind_practice_price_promotion_starts(visitor_id, user_id)` — вешает `user_id` на самое раннее guest-окно cookie. Не создаёт и не продлевает окно. GRANT authenticated. Вызывается из start/resolve/auth callback.
 - `create_practice_order(..., p_expected_amount_minor, p_price_visitor_id)` — резолвит цену на сервере; при расхождении с `expected` → `price_changed` (не создаёт заказ). Pending reuse фиксирует сумму уже созданного заказа.
 
 ## Схема, триггеры, RLS
