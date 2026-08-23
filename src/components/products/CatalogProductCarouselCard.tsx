@@ -4,6 +4,7 @@ import {
   useCallback,
   useRef,
   useState,
+  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -19,9 +20,11 @@ import {
   didCatalogTileScrollerMove,
   formatCatalogTilePagerAriaLabel,
   formatCatalogTilePagerLabel,
+  hasCatalogSlideHorizontalIntent,
+  resolveCatalogSlidePointerIntent,
   resolveCatalogTileSlideIndex,
+  shouldAllowCatalogSlidePdpNavigation,
   shouldShowCatalogTilePager,
-  shouldTreatCatalogSlidePointerAsTap,
   type CatalogAuthorSlide as CatalogAuthorSlideModel,
 } from "@/lib/products/catalog-tile-carousel";
 
@@ -35,8 +38,21 @@ type GestureState = {
   startX: number;
   startY: number;
   startScrollLeft: number;
+  horizontalIntent: boolean;
+  scrolled: boolean;
   suppressClick: boolean;
 };
+
+function createIdleGesture(): GestureState {
+  return {
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    horizontalIntent: false,
+    scrolled: false,
+    suppressClick: false,
+  };
+}
 
 /**
  * In-tile 9:16 carousel: Slide 1 = system, Slide 2+ = author.
@@ -48,12 +64,7 @@ export default function CatalogProductCarouselCard({
   playControl,
 }: CatalogProductCarouselCardProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef<GestureState>({
-    startX: 0,
-    startY: 0,
-    startScrollLeft: 0,
-    suppressClick: false,
-  });
+  const gestureRef = useRef<GestureState>(createIdleGesture());
   const totalSlides = 1 + authorSlides.length;
   const showPager = shouldShowCatalogTilePager(totalSlides);
   const [currentIndex, setCurrentIndex] = useState(1);
@@ -65,14 +76,44 @@ export default function CatalogProductCarouselCard({
       return;
     }
 
-    setCurrentIndex(
-      resolveCatalogTileSlideIndex(
+    if (
+      didCatalogTileScrollerMove(
+        gestureRef.current.startScrollLeft,
         scroller.scrollLeft,
-        scroller.clientWidth,
-        totalSlides,
-      ),
+      )
+    ) {
+      gestureRef.current.scrolled = true;
+    }
+
+    const nextIndex = resolveCatalogTileSlideIndex(
+      scroller.scrollLeft,
+      scroller.clientWidth,
+      totalSlides,
     );
+
+    setCurrentIndex((current) => (current === nextIndex ? current : nextIndex));
   }, [totalSlides]);
+
+  const finishGesture = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const scroller = scrollerRef.current;
+    const gesture = gestureRef.current;
+    const currentScrollLeft = scroller?.scrollLeft ?? gesture.startScrollLeft;
+    const scrolled =
+      gesture.scrolled ||
+      didCatalogTileScrollerMove(gesture.startScrollLeft, currentScrollLeft);
+    const intent = resolveCatalogSlidePointerIntent({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      endX: event.clientX,
+      endY: event.clientY,
+      startScrollLeft: gesture.startScrollLeft,
+      currentScrollLeft,
+      scrolled,
+      horizontalIntent: gesture.horizontalIntent,
+    });
+
+    gestureRef.current.suppressClick = !shouldAllowCatalogSlidePdpNavigation(intent);
+  }, []);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const scroller = scrollerRef.current;
@@ -81,25 +122,28 @@ export default function CatalogProductCarouselCard({
       startX: event.clientX,
       startY: event.clientY,
       startScrollLeft: scroller?.scrollLeft ?? 0,
+      horizontalIntent: false,
+      scrolled: false,
       suppressClick: false,
     };
   }, []);
 
-  const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const scroller = scrollerRef.current;
+  const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current;
-    const scrolled = didCatalogTileScrollerMove(
-      gesture.startScrollLeft,
-      scroller?.scrollLeft ?? gesture.startScrollLeft,
-    );
+    const scroller = scrollerRef.current;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
 
-    gestureRef.current.suppressClick = !shouldTreatCatalogSlidePointerAsTap({
-      startX: gesture.startX,
-      startY: gesture.startY,
-      endX: event.clientX,
-      endY: event.clientY,
-      scrolled,
-    });
+    if (hasCatalogSlideHorizontalIntent(dx, dy)) {
+      gesture.horizontalIntent = true;
+    }
+
+    if (
+      scroller &&
+      didCatalogTileScrollerMove(gesture.startScrollLeft, scroller.scrollLeft)
+    ) {
+      gesture.scrolled = true;
+    }
   }, []);
 
   const handleClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
@@ -110,6 +154,10 @@ export default function CatalogProductCarouselCard({
     event.preventDefault();
     event.stopPropagation();
     gestureRef.current.suppressClick = false;
+  }, []);
+
+  const handleDragStartCapture = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
   }, []);
 
   const handleKeyDown = useCallback(
@@ -148,9 +196,11 @@ export default function CatalogProductCarouselCard({
         data-catalog-tile-carousel-scroller=""
         className="catalog-tile-carousel flex h-full w-full"
         onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishGesture}
+        onPointerCancel={finishGesture}
         onClickCapture={handleClickCapture}
+        onDragStartCapture={handleDragStartCapture}
         onScroll={syncIndexFromScroll}
         onKeyDown={handleKeyDown}
       >
@@ -163,7 +213,7 @@ export default function CatalogProductCarouselCard({
             playControl={playControl}
           />
         </div>
-        {authorSlides.map((slide, index) => (
+        {authorSlides.map((slide) => (
           <div
             key={slide.id}
             className="h-full min-w-full shrink-0 snap-start"
@@ -173,7 +223,6 @@ export default function CatalogProductCarouselCard({
               slide={slide}
               productHref={product.href}
               productTitle={product.title}
-              tabIndex={currentIndex === index + 2 ? 0 : -1}
             />
           </div>
         ))}

@@ -4,8 +4,22 @@
  * No max slide count — 0, 1, 3, 8, 15 must all work.
  */
 
-export const CATALOG_SLIDE_TAP_MAX_MOVE_PX = 10;
+/**
+ * Finger-down jitter on a ~134–200px tile. 7×4 (hypot≈8) is a tap,
+ * not a swipe — do not use a single large hypot wall.
+ */
+export const CATALOG_SLIDE_TAP_JITTER_PX = 12;
+
+/** Clear horizontal attempt: |dx| dominates and reaches this, even if snap-back reset scrollLeft. */
+export const CATALOG_SLIDE_HORIZONTAL_INTENT_PX = 12;
+
+/** Vertical-dominant page scroll: not a carousel swipe and not a PDP tap. */
+export const CATALOG_SLIDE_VERTICAL_DOMINANCE_PX = 12;
+
 export const CATALOG_SLIDE_SCROLL_TAP_PX = 2;
+
+/** @deprecated Use CATALOG_SLIDE_TAP_JITTER_PX — kept for existing call sites. */
+export const CATALOG_SLIDE_TAP_MAX_MOVE_PX = CATALOG_SLIDE_TAP_JITTER_PX;
 
 export type CatalogAuthorSlide = {
   id: string;
@@ -13,6 +27,20 @@ export type CatalogAuthorSlide = {
   backgroundClassName: string;
   /** Reserved for later real author images; demo slides omit this. */
   imageSrc?: string | null;
+};
+
+export type CatalogSlidePointerIntent = "tap" | "swipe" | "vertical";
+
+export type CatalogSlidePointerIntentInput = {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  startScrollLeft?: number;
+  currentScrollLeft?: number;
+  scrolled?: boolean;
+  /** Browser started a horizontal pan (pointermove) even if snap-back reset scrollLeft. */
+  horizontalIntent?: boolean;
 };
 
 export function shouldShowCatalogTilePager(totalSlides: number): boolean {
@@ -46,30 +74,64 @@ export function resolveCatalogTileSlideIndex(
   return Math.min(totalSlides, Math.max(1, raw));
 }
 
-/**
- * Tap = little/no pointer movement and the scroller did not move.
- * Horizontal swipe and vertical-dominant page scroll are not taps
- * and must not navigate to the PDP.
- */
-export function shouldTreatCatalogSlidePointerAsTap(input: {
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  scrolled?: boolean;
-}): boolean {
-  if (input.scrolled) {
-    return false;
-  }
-
-  const dx = input.endX - input.startX;
-  const dy = input.endY - input.startY;
-  return Math.hypot(dx, dy) < CATALOG_SLIDE_TAP_MAX_MOVE_PX;
-}
-
 export function didCatalogTileScrollerMove(
   startScrollLeft: number,
   currentScrollLeft: number,
 ): boolean {
   return Math.abs(currentScrollLeft - startScrollLeft) > CATALOG_SLIDE_SCROLL_TAP_PX;
+}
+
+export function hasCatalogSlideHorizontalIntent(dx: number, dy: number): boolean {
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  return absX >= CATALOG_SLIDE_HORIZONTAL_INTENT_PX && absX > absY;
+}
+
+/**
+ * Tap: truly small movement, carousel did not start horizontal scroll,
+ * and there is no clear horizontal intent.
+ * Swipe: |dx| dominates |dy|, or scrollLeft changed, or a horizontal pan started.
+ * Vertical: |dy| dominates — catalog page scroll, not a swipe and not a PDP tap.
+ */
+export function resolveCatalogSlidePointerIntent(
+  input: CatalogSlidePointerIntentInput,
+): CatalogSlidePointerIntent {
+  const dx = input.endX - input.startX;
+  const dy = input.endY - input.startY;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  const scrolled =
+    input.scrolled === true ||
+    (typeof input.startScrollLeft === "number" &&
+      typeof input.currentScrollLeft === "number" &&
+      didCatalogTileScrollerMove(input.startScrollLeft, input.currentScrollLeft));
+
+  if (scrolled || input.horizontalIntent) {
+    return "swipe";
+  }
+
+  if (
+    absY >= CATALOG_SLIDE_VERTICAL_DOMINANCE_PX &&
+    absY >= absX
+  ) {
+    return "vertical";
+  }
+
+  if (hasCatalogSlideHorizontalIntent(dx, dy)) {
+    return "swipe";
+  }
+
+  return "tap";
+}
+
+export function shouldTreatCatalogSlidePointerAsTap(
+  input: CatalogSlidePointerIntentInput,
+): boolean {
+  return resolveCatalogSlidePointerIntent(input) === "tap";
+}
+
+export function shouldAllowCatalogSlidePdpNavigation(
+  intent: CatalogSlidePointerIntent,
+): boolean {
+  return intent === "tap";
 }
