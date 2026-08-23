@@ -195,6 +195,7 @@ const maxClientSources = [
   "src/lib/max/session-shell-client.ts",
   "src/components/max/MaxBridgeScript.tsx",
   "src/components/max/MaxLoginForm.tsx",
+  "src/components/max/MaxSignupForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/app/(platform)/max-site/page.tsx",
   "src/app/(platform)/max-site/layout.tsx",
@@ -226,6 +227,7 @@ const maxShellSources = [
   "src/lib/max/session-shell.ts",
   "src/components/max/MaxBridgeScript.tsx",
   "src/components/max/MaxLoginForm.tsx",
+  "src/components/max/MaxSignupForm.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/app/(platform)/max-site/page.tsx",
   "src/app/(platform)/max-site/layout.tsx",
@@ -248,12 +250,17 @@ assert.doesNotMatch(
 assert.match(
   verifyClientSource,
   /MAX_SESSION_LINK_PATH/,
-  "login+link client may call /link after password success",
+  "login/signup client may call /link after an authenticated session",
+);
+assert.match(
+  verifyClientSource,
+  /signUpAndLinkMaxSession/,
+  "Stage 3C signup-link client exists",
 );
 assert.doesNotMatch(
   maxShellSources,
-  /\/auth\/sign-up|зарегистрир/i,
-  "MAX shell must not open signup",
+  /href=["']\/auth\/sign-up|router\.replace\(|\/auth\/sign-in\?registered/,
+  "MAX shell must not navigate to apex /auth/* routes",
 );
 
 const verifierSource = readFileSync(
@@ -276,7 +283,12 @@ assert.match(touchSource, /createServiceRoleClient/);
 assert.doesNotMatch(`${routeSource}\n${touchSource}`, /CREATE TABLE|alter table/i);
 assert.doesNotMatch(
   maxClientSources,
-  /\/auth\/sign-up|signUp\(|зарегистрир/i,
+  /href=["']\/auth\/sign-up|supabase\.auth\.signUp|generateLink|auth\.admin/,
+);
+assert.match(
+  maxClientSources,
+  /signUpAction/,
+  "MAX signup must reuse the apex server action",
 );
 assert.match(policySource, /isMaxSessionVerifyPath/);
 assert.match(policySource, /isMaxSessionLinkPath/);

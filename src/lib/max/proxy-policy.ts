@@ -26,7 +26,7 @@ export const MAX_PUBLIC_ASSET_PATHS = [
  * - MAX host exposes no catalog, studio, listen, or author-cabinet routes.
  * - `/sitemap.xml` is 404 on MAX (do not leak the apex catalog sitemap).
  * - `/robots.txt` still passes through so the host can emit a disallow-all file.
- * - Stages 3A/3B open only `/api/max/session/verify` and `/api/max/session/link`
+ * - Stages 3A/3B/3C open only `/api/max/session/verify` and `/api/max/session/link`
  *   on the MAX host. Not `/api/*`, not `/api/max/*`, and not `/auth/*`.
  */
 export type MaxProxyAction =
