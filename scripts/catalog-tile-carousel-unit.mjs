@@ -12,6 +12,7 @@ import {
   CATALOG_SLIDE_HORIZONTAL_INTENT_PX,
   CATALOG_SLIDE_TAP_JITTER_PX,
   CATALOG_SLIDE_VERTICAL_DOMINANCE_PX,
+  CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
   beginCatalogTileCarouselGesture,
   consumeCatalogTileCarouselClickSuppress,
   createIdleCatalogTileCarouselGesture,
@@ -24,6 +25,8 @@ import {
   releaseCatalogTilePlayPointerFocus,
   resolveCatalogSlidePointerIntent,
   resolveCatalogTileSlideIndex,
+  resolveCatalogTileSlideViewport,
+  resolveCatalogTileSnapPositions,
   shouldAllowCatalogSlidePdpNavigation,
   shouldBlurCatalogTilePlayAfterPointerClick,
   shouldShowCatalogTilePager,
@@ -261,7 +264,11 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
   assert.match(carousel, /aspect-\[9\/16\]|CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
   assert.match(carousel, /data-catalog-tile-carousel-aspect="9\/16"/);
   assert.match(authorSlide, /data-catalog-author-slide-aspect="9\/16"/);
-  assert.match(authorSlide, /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[9\/16\]/);
+  assert.doesNotMatch(
+    authorSlide,
+    /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[9\/16\]/,
+    "author slide fills the carousel viewport — no second 9:16 box",
+  );
   assert.match(carousel, /catalog-tile-carousel/, "native CSS scroller class");
   assert.match(carousel, /beginCatalogTileCarouselGesture/, "swipe is not a tap");
   assert.match(carousel, /onPointerMove/, "horizontal intent is tracked during the pan");
@@ -280,6 +287,124 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
   assert.match(systemSlide, /\{playControl\}/);
   assert.match(control, /runCatalogTilePlayClick/);
   assert.doesNotMatch(carousel, /loadSession|fetchListenSessionPayload/, "no second player");
+}
+
+function testEachSlideMatchesScrollerViewport() {
+  const carousel = readRoot(
+    "src/components/products/CatalogProductCarouselCard.tsx",
+  );
+  const systemSlide = readRoot(
+    "src/components/products/CatalogSystemProductSlide.tsx",
+  );
+  const authorSlide = readRoot("src/components/products/CatalogAuthorSlide.tsx");
+  const css = readRoot("src/app/globals.css");
+  const tile = readRoot("src/components/products/CatalogProductTile.tsx");
+
+  assert.match(
+    CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
+    /basis-full/,
+    "wrapper flex-basis is 100%, not auto",
+  );
+  assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /w-full/);
+  assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /h-full/);
+  assert.match(
+    CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
+    /min-w-0/,
+    "min-width:0 so intrinsic content cannot expand the flex item",
+  );
+  assert.doesNotMatch(
+    CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
+    /min-w-full/,
+    "min-width:100% is a floor, not a width lock",
+  );
+  assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /grow-0/);
+  assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /shrink-0/);
+
+  const wrapperUses = carousel.match(
+    /className=\{CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME\}/g,
+  );
+  assert.equal(
+    wrapperUses?.length,
+    2,
+    "Slide 1 and author wrappers share the same 100% viewport class",
+  );
+
+  assert.match(
+    css,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*flex:\s*0 0 100%/,
+  );
+  assert.match(
+    css,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*min-width:\s*0/,
+  );
+  assert.match(
+    css,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*width:\s*100%/,
+  );
+  assert.match(
+    css,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*height:\s*100%/,
+  );
+
+  assert.match(carousel, /layout="fill"/, "carousel Slide 1 fills the wrapper");
+  assert.match(systemSlide, /layout === "fill"/);
+  assert.match(systemSlide, /h-full min-h-0 min-w-0/);
+  assert.match(
+    systemSlide,
+    /fillsParent[\s\S]*CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|fillsParent\s*\?[\s\S]*h-full/,
+    "fill mode drops the nested 9:16 sizing context",
+  );
+  assert.match(
+    systemSlide,
+    /layout = "standalone"/,
+    "0-slide tiles keep standalone 9:16",
+  );
+  assert.doesNotMatch(
+    tile,
+    /layout="fill"/,
+    "standalone tile does not use carousel fill layout",
+  );
+
+  assert.match(authorSlide, /h-full w-full min-h-0 min-w-0/);
+  assert.doesNotMatch(
+    authorSlide,
+    /aspect-\[9\/16\]/,
+    "author geometry matches Slide 1 fill — parent 9:16 only",
+  );
+
+  assert.match(carousel, /pointer-events-none absolute/, "pager is overlay");
+  assert.doesNotMatch(
+    carousel,
+    /data-catalog-tile-pager=""[\s\S]*catalog-tile-carousel/,
+    "pager is not a flex slide and cannot resize the track",
+  );
+
+  assert.match(
+    systemSlide,
+    /\{playControl\}/,
+    "Play stays inside the system slide frame",
+  );
+  assert.match(systemSlide, /overflow-hidden/, "frame clips — Play cannot sit below the article");
+
+  const at390 = resolveCatalogTileSlideViewport(169);
+  assert.equal(at390.width, 169);
+  assert.equal(Number(at390.height.toFixed(2)), 300.44);
+
+  const at320 = resolveCatalogTileSlideViewport(134);
+  assert.equal(at320.width, 134);
+  assert.equal(Number(at320.height.toFixed(2)), 238.22);
+
+  const at430 = resolveCatalogTileSlideViewport(189);
+  assert.equal(at430.width, 189);
+  assert.equal(at430.height, 336);
+
+  assert.deepEqual(resolveCatalogTileSnapPositions(169, 3), [0, 169, 338]);
+  assert.deepEqual(resolveCatalogTileSnapPositions(169, 1), [0]);
+  assert.notDeepEqual(
+    resolveCatalogTileSnapPositions(169, 3),
+    [0, 219, 388],
+    "first snap step must be clientWidth, not the old 219 intrinsic width",
+  );
 }
 
 function testPagerOnlyWhenMultipleSlides() {
@@ -658,6 +783,7 @@ testPagerScalesWithoutFatDots();
 testZeroAndManyAuthorSlides();
 testZeroAuthorSlidesKeepCurrentTile();
 testCarouselGeometryAndPlayStayOnSlideOne();
+testEachSlideMatchesScrollerViewport();
 testPagerOnlyWhenMultipleSlides();
 testPointerPlayThenFirstSwipeStartsClean();
 testPlayPointerupLostThenNewSwipeStillStartsClean();

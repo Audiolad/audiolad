@@ -18,6 +18,7 @@ import CatalogSystemProductSlide, {
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
   beginCatalogTileCarouselGesture,
+  CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
   consumeCatalogTileCarouselClickSuppress,
   createIdleCatalogTileCarouselGesture,
   endCatalogTileCarouselGesture,
@@ -184,18 +185,19 @@ export default function CatalogProductCarouselCard({
         onKeyDown={handleKeyDown}
       >
         <div
-          className="h-full min-w-full shrink-0 snap-start"
+          className={CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME}
           data-catalog-tile-slide="system"
         >
           <CatalogSystemProductSlide
             product={product}
             playControl={playControl}
+            layout="fill"
           />
         </div>
         {authorSlides.map((slide) => (
           <div
             key={slide.id}
-            className="h-full min-w-full shrink-0 snap-start"
+            className={CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME}
             data-catalog-tile-slide="author"
           >
             <CatalogAuthorSlide

@@ -61,6 +61,44 @@ export function formatCatalogTilePagerAriaLabel(
   return `Слайд ${current} из ${total}`;
 }
 
+/**
+ * One slide = one scroller viewport. Do not use min-width:100% as the
+ * width lock — that is a floor, so an intrinsically taller 9:16 child
+ * (Slide 1 cover+info+Play) can grow past clientWidth (219px at 390).
+ */
+export const CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME =
+  "h-full w-full min-w-0 shrink-0 grow-0 basis-full snap-start";
+
+/** Width = scroller.clientWidth; height follows the carousel 9:16 frame. */
+export function resolveCatalogTileSlideViewport(scrollerClientWidth: number): {
+  width: number;
+  height: number;
+} {
+  if (scrollerClientWidth <= 0) {
+    return { width: 0, height: 0 };
+  }
+
+  return {
+    width: scrollerClientWidth,
+    height: (scrollerClientWidth * 16) / 9,
+  };
+}
+
+/** Snap offsets must be 0, clientWidth, 2×clientWidth, … — never a 219-then-169 step. */
+export function resolveCatalogTileSnapPositions(
+  scrollerClientWidth: number,
+  totalSlides: number,
+): number[] {
+  if (scrollerClientWidth <= 0 || totalSlides < 1) {
+    return [];
+  }
+
+  return Array.from(
+    { length: totalSlides },
+    (_, index) => index * scrollerClientWidth,
+  );
+}
+
 export function resolveCatalogTileSlideIndex(
   scrollLeft: number,
   viewportWidth: number,

@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { CATALOG_SYSTEM_SLIDE_ASPECT_CLASS } from "@/components/products/CatalogSystemProductSlide";
 import type { CatalogAuthorSlide as CatalogAuthorSlideModel } from "@/lib/products/catalog-tile-carousel";
 
 type CatalogAuthorSlideProps = {
@@ -22,7 +21,7 @@ export default function CatalogAuthorSlide({
 }: CatalogAuthorSlideProps) {
   return (
     <div
-      className={`h-full w-full overflow-hidden ${CATALOG_SYSTEM_SLIDE_ASPECT_CLASS}`}
+      className="h-full w-full min-h-0 min-w-0 overflow-hidden"
       data-catalog-author-slide=""
       data-catalog-author-slide-aspect="9/16"
     >

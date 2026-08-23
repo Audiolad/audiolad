@@ -8,10 +8,17 @@ import {
   type CatalogCardVisual,
 } from "@/lib/products/catalog-card-visual";
 
+type CatalogSystemProductSlideLayout = "standalone" | "fill";
+
 type CatalogSystemProductSlideProps = {
   product: CatalogProduct;
   visual?: CatalogCardVisual;
   playControl?: ReactNode;
+  /**
+   * `standalone` (default): own 9:16 box for 0-slide tiles.
+   * `fill`: 100%×100% of the carousel slide — no second 9:16 sizing context.
+   */
+  layout?: CatalogSystemProductSlideLayout;
 };
 
 /** Canonical first-slide (and later carousel slide) geometry. */
@@ -121,16 +128,23 @@ export default function CatalogSystemProductSlide({
   product,
   visual: visualProp,
   playControl,
+  layout = "standalone",
 }: CatalogSystemProductSlideProps) {
   const visual = visualProp ?? resolveCatalogCardVisual(product);
   const durationLabel = product.statsLabel?.trim() || null;
   const authorName = product.authorName?.trim() || null;
+  const fillsParent = layout === "fill";
 
   return (
     <div
-      className={`flex ${CATALOG_SYSTEM_SLIDE_ASPECT_CLASS} w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff]`}
+      className={`flex w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff] ${
+        fillsParent
+          ? "h-full min-h-0 min-w-0"
+          : CATALOG_SYSTEM_SLIDE_ASPECT_CLASS
+      }`}
       data-catalog-system-slide=""
       data-catalog-system-slide-aspect="9/16"
+      data-catalog-system-slide-layout={layout}
     >
       <Link
         href={product.href}
