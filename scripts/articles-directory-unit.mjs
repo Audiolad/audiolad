@@ -64,6 +64,7 @@ import { MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE } from "../src/
 import { MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-zasypaniya-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-ot-stressa-i-trevogi.ts";
+import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-vosstanovleniya-sil.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import { PUBLIC_FOOTER_LINKS } from "../src/lib/navigation/public-footer-links.ts";
@@ -1301,6 +1302,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirtySeventhListenHref}`,
     ),
     "directory JSON-LD includes thirty-seventh listen href",
+  );
+
+  const thirtyEighthListenHref = "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil";
+  const thirtyEighthListenCard = data.articles.find((card) => card.href === thirtyEighthListenHref);
+  assert(thirtyEighthListenCard, "thirty-eighth indexable listen page is listed");
+  assert(
+    thirtyEighthListenCard.title === "Медитация для сна и восстановления сил | АудиоЛад",
+    "thirty-eighth listen directory title",
+  );
+  assert(
+    thirtyEighthListenCard.description === MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE.description,
+    "thirty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/meditatsiya-dlya-sna-i-vosstanovleniya-sil",
+    ),
+    "no /articles duplicate for thirty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-eighth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
