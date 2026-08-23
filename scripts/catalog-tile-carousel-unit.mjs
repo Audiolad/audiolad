@@ -261,13 +261,17 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
     "src/components/products/CatalogSystemProductSlide.tsx",
   );
 
-  assert.match(carousel, /aspect-\[3\/4\]|CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
-  assert.match(carousel, /data-catalog-tile-carousel-aspect="3\/4"/);
-  assert.match(authorSlide, /data-catalog-author-slide-aspect="3\/4"/);
+  assert.match(carousel, /data-catalog-tile-carousel-height="content"/);
+  assert.doesNotMatch(
+    carousel,
+    /aspect-\[3\/4\]|aspect-\[9\/16\]|CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/,
+    "carousel is not a poster-ratio box",
+  );
+  assert.match(authorSlide, /data-catalog-author-slide-layout="match"/);
   assert.doesNotMatch(
     authorSlide,
-    /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[3\/4\]|aspect-\[9\/16\]/,
-    "author slide fills the carousel viewport — no second aspect box",
+    /aspect-\[3\/4\]|aspect-\[9\/16\]/,
+    "author slide matches the system-card frame — no poster aspect",
   );
   assert.match(carousel, /catalog-tile-carousel/, "native CSS scroller class");
   assert.match(carousel, /beginCatalogTileCarouselGesture/, "swipe is not a tap");
@@ -286,7 +290,7 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
   );
   assert.match(systemSlide, /\{playControl\}/);
   assert.match(control, /runCatalogTilePlayClick/);
-  assert.match(control, /data-catalog-tile-play-overlay=""/, "Play overlay stays on slide 1 cover");
+  assert.doesNotMatch(control, /data-catalog-tile-play-overlay/, "Play is in the info block");
   assert.doesNotMatch(carousel, /loadSession|fetchListenSessionPayload/, "no second player");
 }
 
@@ -307,7 +311,11 @@ function testEachSlideMatchesScrollerViewport() {
     "wrapper flex-basis is 100%, not auto",
   );
   assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /w-full/);
-  assert.match(CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME, /h-full/);
+  assert.doesNotMatch(
+    CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
+    /h-full/,
+    "wrappers do not force a poster height",
+  );
   assert.match(
     CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME,
     /min-w-0/,
@@ -342,9 +350,15 @@ function testEachSlideMatchesScrollerViewport() {
     css,
     /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*width:\s*100%/,
   );
+  assert.doesNotMatch(
+    css,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide\]\s*\{[^}]*height:\s*100%/,
+    "slide height is not a forced 100% poster",
+  );
   assert.match(
     css,
-    /\.catalog-tile-carousel > \[data-catalog-tile-slide\][\s\S]*height:\s*100%/,
+    /\.catalog-tile-carousel > \[data-catalog-tile-slide="author"\][\s\S]*align-self:\s*stretch/,
+    "author slides stretch to the system-card height",
   );
 
   assert.match(carousel, /layout="fill"/, "carousel Slide 1 fills the wrapper");
@@ -352,13 +366,8 @@ function testEachSlideMatchesScrollerViewport() {
   assert.match(systemSlide, /h-full min-h-0 min-w-0/);
   assert.match(
     systemSlide,
-    /fillsParent[\s\S]*CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|fillsParent\s*\?[\s\S]*h-full/,
-    "fill mode drops the nested aspect sizing context",
-  );
-  assert.match(
-    systemSlide,
     /layout = "standalone"/,
-    "0-slide tiles keep standalone 3:4",
+    "0-slide tiles keep the same auto-height card",
   );
   assert.doesNotMatch(
     tile,
@@ -370,7 +379,7 @@ function testEachSlideMatchesScrollerViewport() {
   assert.doesNotMatch(
     authorSlide,
     /aspect-\[3\/4\]|aspect-\[9\/16\]/,
-    "author geometry matches Slide 1 fill — parent 3:4 only",
+    "author geometry matches the system-card frame",
   );
 
   assert.match(carousel, /pointer-events-none absolute/, "pager is overlay");
@@ -389,7 +398,7 @@ function testEachSlideMatchesScrollerViewport() {
   assert.match(
     systemSlide,
     /<\/Link>[\s\S]*\{playControl\}/,
-    "overlay Play is a sibling of the PDP Link",
+    "Play is a sibling of the PDP Link",
   );
   assert.doesNotMatch(
     systemSlide,
@@ -399,15 +408,16 @@ function testEachSlideMatchesScrollerViewport() {
 
   const at390 = resolveCatalogTileSlideViewport(169);
   assert.equal(at390.width, 169);
-  assert.equal(Number(at390.height.toFixed(2)), 225.33);
+  assert.equal(at390.coverSize, 169);
+  assert.equal(at390.heightMode, "content");
 
   const at320 = resolveCatalogTileSlideViewport(134);
   assert.equal(at320.width, 134);
-  assert.equal(Number(at320.height.toFixed(2)), 178.67);
+  assert.equal(at320.coverSize, 134);
 
   const at430 = resolveCatalogTileSlideViewport(189);
   assert.equal(at430.width, 189);
-  assert.equal(at430.height, 252);
+  assert.equal(at430.coverSize, 189);
 
   assert.deepEqual(resolveCatalogTileSnapPositions(169, 3), [0, 169, 338]);
   assert.deepEqual(resolveCatalogTileSnapPositions(169, 1), [0]);
@@ -786,6 +796,11 @@ function testDemoDataStaysExperimental() {
   assert.match(grid, /getAuthorSlides/);
   assert.doesNotMatch(grid, /getExperimentalCatalogAuthorSlides/);
   assert.doesNotMatch(layout, /authorSlides|carousel|snap-/);
+  assert.match(layout, /grid-cols-6/, "shared ProductGrid still documents 6 cols");
+  assert.match(page, /EXPERIMENTAL_CATALOG_TILE_GRID_CLASS_NAME/);
+  const expGrid = readRoot("src/lib/products/experimental-catalog-tile-grid.ts");
+  assert.match(expGrid, /grid-cols-5/, "experimental desktop caps at 5");
+  assert.doesNotMatch(expGrid, /grid-cols-6/);
 }
 
 testTapVersusSwipe();

@@ -168,11 +168,11 @@ function testLongTitleIsCssClamped() {
 
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   assert.match(slide, /CATALOG_PRODUCT_TILE_TITLE_CLASS/);
-  assert.match(slide, /line-clamp-2/);
+  assert.match(slide, /line-clamp-3/, "long titles may use 2–3 readable lines");
   assert.doesNotMatch(
     slide,
     /min-h-8/,
-    "title does not reserve 32px that overflows the 3:4 leftover strip",
+    "title does not reserve a poster leftover strip",
   );
   assert.match(slide, /product\.title/, "full title is rendered");
   assert.doesNotMatch(slide, /title\.slice|substring\(/, "title is not truncated in JS");
@@ -285,9 +285,12 @@ function testTileLinksToCanonicalPdp() {
   assert.match(slide, /data-catalog-tile-meta=""/);
   assert.match(slide, /product\.statsLabel/, "duration uses existing statsLabel");
   assert.match(control, /Слушать/, "Play control reads as Слушать");
-  assert.match(control, /data-catalog-tile-play-overlay=""/, "Play is a cover overlay");
-  assert.match(control, /rounded-full/, "overlay Play is a circle");
-  assert.match(control, /aspect-square/, "overlay matches the 1:1 cover");
+  assert.doesNotMatch(
+    control,
+    /data-catalog-tile-play-overlay/,
+    "Play is in the info block, not a cover overlay",
+  );
+  assert.match(control, /rounded-full/, "Listen is a compact chip");
 }
 
 function testPreviewReusesCatalogListing() {
@@ -303,8 +306,9 @@ function testPreviewReusesCatalogListing() {
   assert.doesNotMatch(page, /from\("practices"\)/, "preview does not query practices itself");
   assert.match(page, /index:\s*false/, "preview is noindex");
   assert.match(page, /ProductGrid/, "preview renders the new grid");
-  assert.match(page, /Карточки каталога 3:4/, "preview labels the 3:4 experiment");
-  assert.doesNotMatch(page, /9:16/, "preview is no longer the 9:16 experiment");
+  assert.match(page, /Карточки каталога/, "preview labels the catalog-tile experiment");
+  assert.doesNotMatch(page, /9:16|3:4/, "preview is not a poster-ratio experiment");
+  assert.match(page, /EXPERIMENTAL_CATALOG_TILE_GRID_CLASS_NAME/, "preview caps desktop at 5 cols");
   assert.match(page, /getExperimentalCatalogAuthorSlides/, "preview attaches demo author slides");
   assert.doesNotMatch(
     page,
@@ -324,33 +328,31 @@ function testPreviewReusesCatalogListing() {
   );
 }
 
-function testSystemSlideIsThreeFourIncludingPlay() {
+function testSystemSlideIsMarketplaceCard() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
   const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
 
-  assert.match(slide, /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
-  assert.match(slide, /aspect-\[3\/4\]/, "system slide is locked to 3:4");
-  assert.match(slide, /data-catalog-system-slide-aspect="3\/4"/);
-  assert.match(slide, /overflow-hidden/, "3:4 frame does not grow or overflow");
+  assert.match(slide, /data-catalog-system-slide-height="content"/);
+  assert.doesNotMatch(slide, /aspect-\[3\/4\]|aspect-\[9\/16\]/, "card is not a poster ratio");
   assert.match(slide, /aspect-square/, "cover is 1:1");
   assert.match(slide, /data-catalog-tile-cover="square"/);
-  assert.match(slide, /\{playControl\}/, "Play lives inside the first-slide geometry");
-  assert.match(slide, /data-catalog-tile-info=""/, "strip is title + author only");
-  assert.match(slide, /data-catalog-tile-type=""/, "type stays as a cover chip");
+  assert.match(slide, /\{playControl\}/, "Play lives inside the card");
+  assert.match(slide, /data-catalog-tile-info=""/);
+  assert.match(slide, /data-catalog-tile-type=""/, "type chip is in the info block");
   const infoBlock = slide.match(
     /data-catalog-tile-info=""[\s\S]*?<\/div>/,
   )?.[0];
-  assert.ok(infoBlock, "info strip is a closed block");
+  assert.ok(infoBlock, "info block is a closed block");
+  assert.match(infoBlock, /CatalogSystemTypeChip|data-catalog-tile-type/);
   assert.match(infoBlock, /CATALOG_PRODUCT_TILE_TITLE_CLASS|product\.title/);
   assert.match(infoBlock, /CatalogSystemSlideMeta/);
-  assert.doesNotMatch(infoBlock, /productTypeLabel|playControl|CatalogSystemTypeChip/);
-  assert.doesNotMatch(tile, /aspect-\[3\/4\]|aspect-\[9\/16\]/, "tile does not add a second aspect box");
-  assert.doesNotMatch(slide, /aspect-\[9\/16\]/, "first slide is not 9:16");
+  assert.doesNotMatch(infoBlock, /playControl/);
+  assert.doesNotMatch(tile, /aspect-\[3\/4\]|aspect-\[9\/16\]/, "tile does not add a poster box");
   assert.doesNotMatch(slide, /aspect-\[4\/5\]/, "first slide is not forced into 4:5");
   assert.doesNotMatch(slide, /blur-background|blur-2xl|square_blur/, "no square-in-blur frame");
   assert.doesNotMatch(tile, /aspect-\[4\/5\]|blur-background|square_blur/);
-  assert.doesNotMatch(control, /aspect-\[4\/5\]/, "Play is not overlaid on a 4:5 frame");
+  assert.doesNotMatch(control, /aspect-\[4\/5\]|data-catalog-tile-play-overlay/);
   assert.doesNotMatch(slide, /next\/image/, "does not use next/image");
   assert.doesNotMatch(slide, /from ["']sharp["']/, "does not import Sharp");
   assert.doesNotMatch(slide, /Подробнее/);
@@ -379,7 +381,7 @@ testGridClassStructure();
 testContainerAwareColumnResolution();
 testTileLinksToCanonicalPdp();
 testPreviewReusesCatalogListing();
-testSystemSlideIsThreeFourIncludingPlay();
+testSystemSlideIsMarketplaceCard();
 testAuthorAndDurationShareOneLine();
 
 console.log("catalog-product-tile-unit: ok");

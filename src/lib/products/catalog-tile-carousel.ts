@@ -1,6 +1,6 @@
 /**
  * In-tile catalog carousel helpers.
- * Slide 1 is the system 3:4 slide; slide 2+ are author slides.
+ * Slide 1 is the auto-height system card; slide 2+ match that height.
  * No max slide count — 0, 1, 3, 8, 15 must all work.
  */
 
@@ -67,20 +67,25 @@ export function formatCatalogTilePagerAriaLabel(
  * (Slide 1 cover+info+Play) can grow past clientWidth (219px at 390).
  */
 export const CATALOG_TILE_SLIDE_WRAPPER_CLASS_NAME =
-  "h-full w-full min-w-0 shrink-0 grow-0 basis-full snap-start";
+  "w-full min-w-0 shrink-0 grow-0 basis-full snap-start";
 
-/** Width = scroller.clientWidth; height follows the carousel 3:4 frame. */
+/**
+ * Slide width = scroller.clientWidth.
+ * Cover is 1:1 of that width. Card height is content, not 3:4 / 9:16.
+ */
 export function resolveCatalogTileSlideViewport(scrollerClientWidth: number): {
   width: number;
-  height: number;
+  coverSize: number;
+  heightMode: "content";
 } {
   if (scrollerClientWidth <= 0) {
-    return { width: 0, height: 0 };
+    return { width: 0, coverSize: 0, heightMode: "content" };
   }
 
   return {
     width: scrollerClientWidth,
-    height: (scrollerClientWidth * 4) / 3,
+    coverSize: scrollerClientWidth,
+    heightMode: "content",
   };
 }
 

@@ -10,8 +10,8 @@ type CatalogAuthorSlideProps = {
 };
 
 /**
- * Author 3:4 slide (carousel slide 2+).
- * Whole slide is one PDP Link. No Play. Images stay lazy-loadable later.
+ * Author demo slide (carousel slide 2+). Matches the system-card frame.
+ * Whole slide is one PDP Link. No Play. Image + short text only.
  */
 export default function CatalogAuthorSlide({
   slide,
@@ -23,7 +23,7 @@ export default function CatalogAuthorSlide({
     <div
       className="h-full w-full min-h-0 min-w-0 overflow-hidden"
       data-catalog-author-slide=""
-      data-catalog-author-slide-aspect="3/4"
+      data-catalog-author-slide-layout="match"
     >
       <Link
         href={productHref}
@@ -52,7 +52,7 @@ export default function CatalogAuthorSlide({
           />
         )}
         <div className="relative z-[1] flex min-h-0 flex-1 flex-col justify-between px-3 py-3 text-white">
-          <p className="text-[28px] font-semibold leading-none tracking-tight">
+          <p className="text-[15px] font-semibold leading-5 tracking-tight">
             {slide.label}
           </p>
           <p className="line-clamp-2 text-[13px] font-medium leading-4">

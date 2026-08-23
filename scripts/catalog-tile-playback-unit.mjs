@@ -275,7 +275,7 @@ function testMarkupSplitsLinkAndPlay() {
   assert.equal(href, "/practice/sergey-petrov/klyuch-k-izobiliyu");
   assert.match(slide, /href=\{product\.href\}/, "Link stays on canonical PDP");
   assert.match(tile, /CatalogTilePlayControl/, "Play control is present");
-  assert.match(tile, /playControl=/, "Play is passed into the 3:4 system slide");
+  assert.match(tile, /playControl=/, "Play is passed into the system slide");
   assert.match(
     slide,
     /<\/Link>[\s\S]*\{playControl\}/,
@@ -294,9 +294,9 @@ function testMarkupSplitsLinkAndPlay() {
   assert.match(control, /<button/, "Play is a button");
   assert.match(control, /type="button"/);
   assert.match(control, /data-catalog-tile-play=""/);
-  assert.match(control, /data-catalog-tile-play-overlay=""/, "Play sits on the cover, not below the clip");
+  assert.doesNotMatch(control, /data-catalog-tile-play-overlay/, "Play is not a cover overlay");
   assert.match(control, /rounded-full/);
-  assert.doesNotMatch(control, /h-9 w-full/, "Play is no longer a full-width bar under the cover");
+  assert.doesNotMatch(control, /h-9 w-full/, "Play is a compact chip, not a full-width bar");
   assert.doesNotMatch(control, /listenHref|\/listen\//, "does not navigate to /listen");
   assert.doesNotMatch(control, /<Link/, "Play is not a Link");
   assert.match(control, /fetchListenSessionPayload/, "uses existing listen-session fetch");

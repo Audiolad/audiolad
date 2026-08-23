@@ -4,6 +4,7 @@ import Link from "next/link";
 import ProductGrid from "@/components/products/ProductGrid";
 import { getPublishedCatalogSections } from "@/lib/products/catalog";
 import { getExperimentalCatalogAuthorSlides } from "@/lib/products/experimental-catalog-author-slides";
+import { EXPERIMENTAL_CATALOG_TILE_GRID_CLASS_NAME } from "@/lib/products/experimental-catalog-tile-grid";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function ExperimentalCatalogTilesPage() {
         Experimental preview
       </p>
       <h1 className="mt-2 text-[28px] font-semibold text-[#25135c]">
-        Карточки каталога 3:4
+        Карточки каталога
       </h1>
       <p className="mt-3 text-[15px] leading-6 text-[#7d70a2]">
         Предпросмотр новой плитки на тех же опубликованных продуктах, что и{" "}
@@ -57,6 +58,7 @@ export default async function ExperimentalCatalogTilesPage() {
             <ProductGrid
               products={freeProducts}
               getAuthorSlides={getExperimentalCatalogAuthorSlides}
+              gridClassName={EXPERIMENTAL_CATALOG_TILE_GRID_CLASS_NAME}
               ariaLabel="Слушать в подарок"
             />
           </div>
@@ -75,6 +77,7 @@ export default async function ExperimentalCatalogTilesPage() {
             <ProductGrid
               products={paidProducts}
               getAuthorSlides={getExperimentalCatalogAuthorSlides}
+              gridClassName={EXPERIMENTAL_CATALOG_TILE_GRID_CLASS_NAME}
               ariaLabel="Аудиопрактики и программы"
             />
           </div>

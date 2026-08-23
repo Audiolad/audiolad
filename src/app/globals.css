@@ -419,13 +419,15 @@ body {
 }
 
 .catalog-tile-carousel > [data-catalog-tile-slide] {
-  /* 100% basis + min-width:0 — not min-width:100%. A floor lets Slide 1
-     grow to an intrinsic taller-than-viewport child (219px at a 169px cell). */
+  /* 100% width lock. Height comes from the system card (content), not a poster. */
   flex: 0 0 100%;
   width: 100%;
   min-width: 0;
-  height: 100%;
   scroll-snap-align: start;
+}
+
+.catalog-tile-carousel > [data-catalog-tile-slide="author"] {
+  align-self: stretch;
 }
 
 .home-section-carousel {

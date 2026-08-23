@@ -12,9 +12,7 @@ import {
 } from "react";
 
 import CatalogAuthorSlide from "@/components/products/CatalogAuthorSlide";
-import CatalogSystemProductSlide, {
-  CATALOG_SYSTEM_SLIDE_ASPECT_CLASS,
-} from "@/components/products/CatalogSystemProductSlide";
+import CatalogSystemProductSlide from "@/components/products/CatalogSystemProductSlide";
 import type { CatalogProduct } from "@/lib/products/catalog";
 import {
   beginCatalogTileCarouselGesture,
@@ -38,7 +36,7 @@ type CatalogProductCarouselCardProps = {
 };
 
 /**
- * In-tile 3:4 carousel: Slide 1 = system, Slide 2+ = author.
+ * In-tile carousel: Slide 1 = auto-height system card, Slide 2+ match that height.
  * Native overflow-x + scroll-snap. No Swiper/Embla.
  */
 export default function CatalogProductCarouselCard({
@@ -163,9 +161,9 @@ export default function CatalogProductCarouselCard({
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-[18px] ${CATALOG_SYSTEM_SLIDE_ASPECT_CLASS}`}
+      className="relative w-full overflow-hidden rounded-[18px]"
       data-catalog-tile-carousel=""
-      data-catalog-tile-carousel-aspect="3/4"
+      data-catalog-tile-carousel-height="content"
     >
       <div
         ref={scrollerRef}
@@ -173,7 +171,7 @@ export default function CatalogProductCarouselCard({
         tabIndex={0}
         aria-label={`Слайды «${product.title}»`}
         data-catalog-tile-carousel-scroller=""
-        className="catalog-tile-carousel flex h-full w-full"
+        className="catalog-tile-carousel flex w-full items-stretch"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={finishGesture}

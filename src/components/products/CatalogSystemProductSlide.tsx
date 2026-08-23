@@ -14,23 +14,20 @@ type CatalogSystemProductSlideProps = {
   visual?: CatalogCardVisual;
   playControl?: ReactNode;
   /**
-   * `standalone` (default): own 3:4 box for 0-slide tiles.
-   * `fill`: 100%×100% of the carousel slide — no second aspect sizing context.
+   * `standalone` (default): auto-height marketplace card.
+   * `fill`: fill the carousel slide wrapper (same content height).
    */
   layout?: CatalogSystemProductSlideLayout;
 };
 
-/** Canonical first-slide (and later carousel slide) geometry. */
-export const CATALOG_SYSTEM_SLIDE_ASPECT_CLASS = "aspect-[3/4]";
-
-/** Two-line clamp. No min-height — the 3:4 leftover strip is only ~45–56px. */
+/** 2–3 readable title lines. Card height is content, not a poster ratio. */
 export const CATALOG_PRODUCT_TILE_TITLE_CLASS =
-  "line-clamp-2 min-h-0 text-[13px] font-semibold leading-4 text-[#25135c]";
+  "line-clamp-3 min-h-0 text-[14px] font-semibold leading-5 text-[#25135c]";
 
 function CatalogSystemTypeChip({ label }: { label: string }) {
   return (
     <p
-      className="absolute bottom-1.5 left-1.5 z-[1] max-w-[calc(100%-3.25rem)] truncate rounded-full bg-[#25135c]/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.06em] text-white"
+      className="inline-flex max-w-full truncate rounded-full bg-[#efe6fb] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-3 tracking-[0.06em] text-[#7042c5]"
       data-catalog-tile-type=""
     >
       {label}
@@ -46,7 +43,6 @@ function CatalogSystemCover({
   visual: CatalogCardVisual;
 }) {
   const alt = product.title;
-  const typeLabel = product.productTypeLabel?.trim() || null;
   const placeholder = visual.image?.placeholderBlurDataUrl ?? null;
 
   if (visual.hasSquareCover && visual.image) {
@@ -76,7 +72,6 @@ function CatalogSystemCover({
           loading="lazy"
           decoding="async"
         />
-        {typeLabel ? <CatalogSystemTypeChip label={typeLabel} /> : null}
       </div>
     );
   }
@@ -90,7 +85,6 @@ function CatalogSystemCover({
       aria-label={alt}
     >
       {visual.systemFallback.symbol}
-      {typeLabel ? <CatalogSystemTypeChip label={typeLabel} /> : null}
     </div>
   );
 }
@@ -108,7 +102,7 @@ function CatalogSystemSlideMeta({
 
   return (
     <p
-      className="flex min-w-0 items-baseline text-[11px] leading-3"
+      className="flex min-w-0 items-baseline text-[12px] leading-4"
       data-catalog-tile-meta=""
     >
       {authorName ? (
@@ -134,8 +128,8 @@ function CatalogSystemSlideMeta({
 }
 
 /**
- * System first slide: one 3:4 frame that includes Play.
- * Later ProductCardCarousel can use this as Slide 1 (author slides also 3:4).
+ * Marketplace system card: 1:1 cover + info + compact Play.
+ * Height follows content. No 3:4 / 9:16 poster box.
  */
 export default function CatalogSystemProductSlide({
   product,
@@ -146,29 +140,30 @@ export default function CatalogSystemProductSlide({
   const visual = visualProp ?? resolveCatalogCardVisual(product);
   const durationLabel = product.statsLabel?.trim() || null;
   const authorName = product.authorName?.trim() || null;
+  const typeLabel = product.productTypeLabel?.trim() || null;
   const fillsParent = layout === "fill";
 
   return (
     <div
-      className={`relative flex w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff] ${
-        fillsParent
-          ? "h-full min-h-0 min-w-0"
-          : CATALOG_SYSTEM_SLIDE_ASPECT_CLASS
+      className={`flex w-full flex-col overflow-hidden rounded-[18px] bg-[#faf7ff] ${
+        fillsParent ? "h-full min-h-0 min-w-0" : ""
       }`}
       data-catalog-system-slide=""
-      data-catalog-system-slide-aspect="3/4"
       data-catalog-system-slide-layout={layout}
+      data-catalog-system-slide-height="content"
     >
       <Link
         href={product.href}
-        className="flex min-h-0 min-w-0 flex-1 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+        className="flex min-w-0 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
       >
         <CatalogSystemCover product={product} visual={visual} />
 
         <div
-          className="flex min-h-0 flex-1 flex-col justify-center gap-0.5 px-1.5 py-0.5"
+          className="flex min-w-0 flex-col gap-1 px-2 pt-2"
           data-catalog-tile-info=""
         >
+          {typeLabel ? <CatalogSystemTypeChip label={typeLabel} /> : null}
+
           <h3 className={CATALOG_PRODUCT_TILE_TITLE_CLASS}>{product.title}</h3>
 
           <CatalogSystemSlideMeta
