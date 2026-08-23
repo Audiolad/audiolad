@@ -9,6 +9,10 @@ import {
 import { PauseIcon, PlayIcon } from "@/components/audio/listen-player-shared";
 import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session";
 import {
+  releaseCatalogTilePlayPointerFocus,
+  shouldBlurCatalogTilePlayAfterPointerClick,
+} from "@/lib/products/catalog-tile-carousel";
+import {
   buildCatalogTilePlaybackErrorMessage,
   isSameCatalogTileSession,
   runCatalogTilePlayClick,
@@ -49,6 +53,13 @@ export default function CatalogTilePlayControl({
     (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       event.stopPropagation();
+
+      // Blur before any loading/disabled render. A focused Play (or focus
+      // dumped onto the tabIndex=0 scroller when the button disables)
+      // makes the first post-Play pan a no-op — scrollLeft never starts.
+      if (shouldBlurCatalogTilePlayAfterPointerClick(event.detail)) {
+        releaseCatalogTilePlayPointerFocus(event.currentTarget);
+      }
 
       if (inflightRef.current) {
         return;
@@ -115,9 +126,10 @@ export default function CatalogTilePlayControl({
         data-catalog-tile-play=""
         aria-label={label}
         aria-busy={loading || undefined}
-        disabled={loading}
         onClick={handlePlayClick}
-        className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-[14px] bg-[#7042c5] px-2 text-[12px] font-semibold leading-4 text-white disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]"
+        className={`inline-flex h-9 w-full items-center justify-center gap-1 rounded-[14px] bg-[#7042c5] px-2 text-[12px] font-semibold leading-4 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5]${
+          loading ? " cursor-not-allowed opacity-70" : ""
+        }`}
       >
         {isPlaying ? (
           <PauseIcon className="h-3.5 w-3.5 shrink-0" />

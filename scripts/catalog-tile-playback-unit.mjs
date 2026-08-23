@@ -302,7 +302,13 @@ function testMarkupSplitsLinkAndPlay() {
   assert.match(helper, /suppressListenUrlSync/);
   assert.match(helper, /requestAutoplay: true/);
   assert.match(control, /prepareSharedAudioGesture/, "reuses iOS gesture warm-up");
-  assert.match(control, /disabled=\{loading\}/);
+  assert.match(control, /releaseCatalogTilePlayPointerFocus/);
+  assert.match(control, /shouldBlurCatalogTilePlayAfterPointerClick/);
+  assert.doesNotMatch(
+    control,
+    /disabled=\{loading\}/,
+    "Play must not disable inside the tabIndex=0 scroller (focus dump)",
+  );
   assert.match(control, /role="alert"/);
 }
 

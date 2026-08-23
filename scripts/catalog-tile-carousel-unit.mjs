@@ -15,9 +15,11 @@ import {
   didCatalogTileScrollerMove,
   formatCatalogTilePagerAriaLabel,
   formatCatalogTilePagerLabel,
+  releaseCatalogTilePlayPointerFocus,
   resolveCatalogSlidePointerIntent,
   resolveCatalogTileSlideIndex,
   shouldAllowCatalogSlidePdpNavigation,
+  shouldBlurCatalogTilePlayAfterPointerClick,
   shouldShowCatalogTilePager,
   shouldTreatCatalogSlidePointerAsTap,
 } from "../src/lib/products/catalog-tile-carousel.ts";
@@ -287,6 +289,63 @@ function testPagerOnlyWhenMultipleSlides() {
   assert.match(carousel, /formatCatalogTilePagerLabel/, "compact 3\/12 progress");
 }
 
+function testFirstSwipeAfterPlayDoesNotTrapOverflowFocus() {
+  const delays = [0, 100, 250, 500, 1000];
+
+  assert.equal(shouldBlurCatalogTilePlayAfterPointerClick(1), true);
+  assert.equal(shouldBlurCatalogTilePlayAfterPointerClick(0), false);
+
+  let blurCount = 0;
+  releaseCatalogTilePlayPointerFocus({
+    blur() {
+      blurCount += 1;
+    },
+  });
+  releaseCatalogTilePlayPointerFocus(null);
+  assert.equal(blurCount, 1);
+
+  for (const delay of delays) {
+    assert.equal(
+      shouldBlurCatalogTilePlayAfterPointerClick(1),
+      true,
+      `pointer Play at +${delay}ms must still blur so the first pan can move scrollLeft`,
+    );
+  }
+
+  const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
+  const tile = readRoot("src/components/products/CatalogProductTile.tsx");
+  const carousel = readRoot(
+    "src/components/products/CatalogProductCarouselCard.tsx",
+  );
+
+  assert.match(
+    control,
+    /shouldBlurCatalogTilePlayAfterPointerClick\(event\.detail\)/,
+  );
+  assert.match(
+    control,
+    /releaseCatalogTilePlayPointerFocus\(event\.currentTarget\)/,
+  );
+  assert.doesNotMatch(
+    control,
+    /disabled=\{loading\}/,
+    "disabled Play dumps focus onto the tabIndex=0 scroller",
+  );
+  assert.doesNotMatch(
+    tile,
+    /key=\{[^}]*(play|loading|session|currentIndex)/,
+    "tile does not remount the carousel when Play goes loading → playing",
+  );
+  assert.doesNotMatch(carousel, /useGlobalAudioPlayer|useOptionalPlayerEngine/);
+  assert.doesNotMatch(
+    carousel,
+    /key=\{[^}]*(playControl|currentIndex|session)/,
+    "scroller DOM identity does not change with Play state",
+  );
+  assert.match(carousel, /tabIndex=\{0\}/, "keyboard scroller tab stop stays");
+  assert.doesNotMatch(control, /setTimeout|scrollBy\(|debounce/);
+}
+
 function testFirstSwipeStabilizers() {
   const css = readRoot("src/app/globals.css");
   const carousel = readRoot(
@@ -358,6 +417,7 @@ testZeroAndManyAuthorSlides();
 testZeroAuthorSlidesKeepCurrentTile();
 testCarouselGeometryAndPlayStayOnSlideOne();
 testPagerOnlyWhenMultipleSlides();
+testFirstSwipeAfterPlayDoesNotTrapOverflowFocus();
 testFirstSwipeStabilizers();
 testDemoDataStaysExperimental();
 

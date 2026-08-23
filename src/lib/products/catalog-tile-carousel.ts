@@ -135,3 +135,22 @@ export function shouldAllowCatalogSlidePdpNavigation(
 ): boolean {
   return intent === "tap";
 }
+
+/**
+ * Play sits inside the overflow-x scroller (`tabIndex={0}`).
+ * A pointer click that leaves focus on Play — or disables Play so the
+ * browser moves focus to that scroller — makes the next touch-drag a
+ * no-op: scrollLeft never starts. The second gesture then works.
+ * Pointer activations must blur to body; keyboard (detail=0) keeps focus.
+ */
+export function shouldBlurCatalogTilePlayAfterPointerClick(
+  clickDetail: number,
+): boolean {
+  return clickDetail !== 0;
+}
+
+export function releaseCatalogTilePlayPointerFocus(
+  target: { blur: () => void } | null | undefined,
+): void {
+  target?.blur();
+}
