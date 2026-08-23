@@ -127,30 +127,30 @@ BEGIN
   v_expires := v_now + make_interval(secs => v_promo.duration_seconds);
 
   BEGIN
-    INSERT INTO public.practice_price_promotion_starts AS starts (
-      promotion_id,
-      visitor_id,
-      user_id,
-      started_at,
-      expires_at
-    )
-    VALUES (
-      v_promo.id,
-      v_visitor,
-      v_user,
-      v_now,
-      v_expires
-    )
-    ON CONFLICT (promotion_id, visitor_id) DO NOTHING
-    RETURNING
-      starts.id,
-      starts.promotion_id,
-      starts.visitor_id,
-      starts.user_id,
-      starts.started_at,
-      starts.expires_at,
-      starts.created_at
-    INTO v_start;
+    -- ON CONFLICT inference columns cannot be table-qualified. Execute the
+    -- statement as SQL so OUT promotion_id is not substituted into the target.
+    EXECUTE
+      $insert$
+        INSERT INTO public.practice_price_promotion_starts AS starts (
+          promotion_id,
+          visitor_id,
+          user_id,
+          started_at,
+          expires_at
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (promotion_id, visitor_id) DO NOTHING
+        RETURNING
+          starts.id,
+          starts.promotion_id,
+          starts.visitor_id,
+          starts.user_id,
+          starts.started_at,
+          starts.expires_at,
+          starts.created_at
+      $insert$
+    INTO v_start
+    USING v_promo.id, v_visitor, v_user, v_now, v_expires;
 
     IF v_start.id IS NOT NULL THEN
       v_inserted := true;

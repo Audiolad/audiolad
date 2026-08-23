@@ -747,7 +747,10 @@ function testStartRpcSemantics() {
   assertEqual(other.reused, "f", "other visitor gets own window");
   assertEqual(countStarts(CLEAN_DB, VISITOR_B), "1", "other visitor row");
   assertEqual(countStarts(CLEAN_DB), "2", "shared token starts two visitors");
-  assert(other.startedAt !== first.startedAt || other.expiresAt !== first.expiresAt, "other visitor window is independent");
+  assert(
+    other.startedAt !== "2026-08-23T10:00:00Z" || other.expiresAt !== "2026-08-23T10:20:00Z",
+    "other visitor is not the first visitor stored window",
+  );
 
   const [parallelA, parallelB] = parallelStart(CLEAN_DB, VISITOR_P);
   assert(Boolean(parallelA) && Boolean(parallelB), "parallel start both returned a row");
@@ -923,6 +926,7 @@ function testMigrationContract() {
   assert(qualify.includes("starts.expires_at"), "hotfix qualifies expires_at");
   assert(!qualify.includes("RETURNING *"), "hotfix does not RETURNING *");
   assert(qualify.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "hotfix keeps visitor upsert");
+  assert(qualify.includes("EXECUTE"), "ON CONFLICT runs as SQL so OUT promotion_id is not substituted");
   assert(!qualify.includes("started_at = v_now"), "hotfix does not restart");
 }
 
