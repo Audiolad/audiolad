@@ -55,6 +55,8 @@ export type AudioItemRow = {
   file_size_bytes: number | null;
   position: number;
   is_preview: boolean;
+  preview_start_ms?: number | null;
+  preview_end_ms?: number | null;
   status: string;
   created_at: string;
   updated_at: string;

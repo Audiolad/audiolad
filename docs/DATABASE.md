@@ -364,6 +364,38 @@ RPC `public.remove_library_practice(p_practice_id uuid)`:
 
 API: `POST /api/library/remove` `{ practice_id }` → success / `not_in_library` / `not_removable` / `unauthorized` / `internal_error`.
 
+## library_saves + preview window (каталог, фундамент Phase 1)
+
+Миграция: `supabase/migrations/20260823200000_library_saves_and_preview_window.sql`.
+
+Save ≠ право слушать. Сердце / bookmark только сохраняет продукт в Аудиотеку.
+Покупка по-прежнему выдаёт доступ через `user_practices` / `orders`.
+Не добавляет `favorites`, не использует `access_source=saved`, не меняет entitlement.
+
+### public.library_saves
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `user_id` | uuid NOT NULL | FK `auth.users(id)` ON DELETE CASCADE |
+| `practice_id` | uuid NOT NULL | FK `practices(id)` ON DELETE CASCADE |
+| `created_at` | timestamptz NOT NULL | default `now()` |
+
+UNIQUE `(user_id, practice_id)`. Индексы: `(user_id, created_at DESC)`, `(practice_id)`.
+
+RLS: пользователь видит / создаёт / удаляет только свои строки.
+`GRANT SELECT, INSERT, DELETE` → `authenticated`. Нет UPDATE. Нет claim RPC.
+
+### audio_items preview window
+
+На существующей таблице `audio_items` (поле `is_preview` уже было):
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `preview_start_ms` | integer NULL | миллисекунды; вместе с `preview_end_ms` или оба NULL |
+| `preview_end_ms` | integer NULL | длительность окна 30 000–90 000 мс включительно |
+
+Существующие строки не ломаются: оба поля NULL. UI выбора preview в этом этапе нет.
+
 ## external_identities (MAX Mini App, этап 2)
 
 Миграция: `supabase/migrations/20260822200000_external_identities.sql`.
