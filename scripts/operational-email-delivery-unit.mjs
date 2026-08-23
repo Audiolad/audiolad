@@ -6,9 +6,11 @@ import { readFileSync } from "node:fs";
 import {
   AUTHOR_ACCESS_GRANTED_MESSAGE_TYPE,
   AUTHOR_APPLICATION_APPROVED_MESSAGE_TYPE,
+  LISTENER_WELCOME_MESSAGE_TYPE,
   PLATFORM_OWNER_SALE_MESSAGE_TYPE,
   buildAuthorAccessGrantedDedupKey,
   buildAuthorApplicationApprovedDedupKey,
+  buildListenerWelcomeDedupKey,
   buildPlatformOwnerSaleDedupKey,
 } from "../src/lib/email/operational-deliveries.ts";
 
@@ -98,6 +100,11 @@ function testMessageTypeConstant() {
   assert.equal(
     buildPlatformOwnerSaleDedupKey(paymentId),
     `platform_owner_sale:${paymentId}`,
+  );
+  assert.equal(LISTENER_WELCOME_MESSAGE_TYPE, "listener_welcome");
+  assert.equal(
+    buildListenerWelcomeDedupKey(paymentId),
+    `listener_welcome:${paymentId}`,
   );
 }
 

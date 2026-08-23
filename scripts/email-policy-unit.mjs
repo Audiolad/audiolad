@@ -212,8 +212,22 @@ function testPolicyIntegrity() {
 }
 
 function testAntiBypass() {
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  const signUpAction = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "actions.ts",
+  );
+  const signUpPage = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "page.tsx",
+  );
   const hookRoute = readRepoFile(
     "src",
     "app",
@@ -245,14 +259,23 @@ function testRecovery() {
   const forgotAction = readRepoFile(
     "src",
     "app",
+    "(platform)",
     "auth",
     "forgot-password",
     "actions.ts",
   );
-  const callback = readRepoFile("src", "app", "auth", "callback", "route.ts");
+  const callback = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "callback",
+    "route.ts",
+  );
   const resetAction = readRepoFile(
     "src",
     "app",
+    "(platform)",
     "auth",
     "reset-password",
     "actions.ts",
@@ -341,8 +364,22 @@ function testEmailFoundationFiles() {
 
 function testPreferencesAndConsents() {
   const preferences = readRepoFile("src", "lib", "email", "preferences.ts");
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  const signUpAction = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "actions.ts",
+  );
+  const signUpPage = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "page.tsx",
+  );
 
   assert(
     preferences.includes("listener_marketing: false"),
@@ -358,7 +395,20 @@ function testPreferencesAndConsents() {
 }
 
 function testWelcomeEmailIntegration() {
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
+  const signUpAction = readRepoFile(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    "actions.ts",
+  );
+  const welcomeHook = readRepoFile(
+    "src",
+    "lib",
+    "email",
+    "on-new-listener-created.ts",
+  );
   const brandLayout = readRepoFile(
     "src",
     "lib",
@@ -374,7 +424,14 @@ function testWelcomeEmailIntegration() {
     "welcome.ts",
   );
 
-  assert(signUpAction.includes("sendWelcomeEmail("), "signup sends welcome email");
+  assert(
+    signUpAction.includes("onNewListenerCreated"),
+    "signup uses canonical new-listener welcome hook",
+  );
+  assert(
+    welcomeHook.includes("sendWelcomeEmail("),
+    "welcome hook sends welcome email",
+  );
   assert(brandLayout.includes("renderBrandEmailShell"), "shared brand layout exists");
   assert(
     welcomeTemplate.includes("WELCOME_EMAIL_SUBJECT"),

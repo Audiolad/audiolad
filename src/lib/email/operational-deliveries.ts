@@ -44,6 +44,9 @@ export const PAYOUT_PROFILE_REJECTED_MESSAGE_TYPE = "payout_profile_rejected";
 export const AUTHOR_PRODUCT_SOLD_MESSAGE_TYPE = "author_product_sold";
 export const PLATFORM_OWNER_SALE_MESSAGE_TYPE = "platform_owner_sale";
 
+/** One-shot listener welcome. Uses this table only; not an author outbox worker. */
+export const LISTENER_WELCOME_MESSAGE_TYPE = "listener_welcome";
+
 const PAYOUT_PROFILE_MESSAGE_TYPES = new Set([
   PAYOUT_PROFILE_SUBMITTED_ADMIN_MESSAGE_TYPE,
   PAYOUT_PROFILE_NEEDS_CHANGES_MESSAGE_TYPE,
@@ -115,6 +118,10 @@ export function buildAuthorProductSoldDedupKey(saleId: string): string {
 
 export function buildPlatformOwnerSaleDedupKey(paymentId: string): string {
   return `platform_owner_sale:${paymentId.trim()}`;
+}
+
+export function buildListenerWelcomeDedupKey(userId: string): string {
+  return `listener_welcome:${userId.trim()}`;
 }
 
 function resolveOperationalEmailDedupKey(

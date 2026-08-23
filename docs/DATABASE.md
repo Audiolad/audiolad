@@ -493,6 +493,20 @@ Ownership: триггер `enforce_quick_offer_product_owner` запрещает
 
 Публичный маршрут: `/offers/[slug]`.
 
+### operational_email_deliveries — listener welcome
+
+Таблица `public.operational_email_deliveries` (миграция `20260722103000_operational_email_deliveries.sql`) хранит прямые SMTP-попытки с уникальным `dedup_key`. `message_type` — свободный text, без CHECK на набор типов.
+
+Одноразовое welcome-письмо слушателя переиспользует эту таблицу:
+
+| Поле | Значение |
+|------|----------|
+| `message_type` | `listener_welcome` |
+| `dedup_key` | `listener_welcome:{user_id}` |
+| `application_id` | NULL (не заявка автора) |
+
+Claim (INSERT) выполняется до SMTP. Повторный вызов с тем же `user_id` не отправляет письмо. Не использовать author sale / moderation outbox workers для welcome.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.
