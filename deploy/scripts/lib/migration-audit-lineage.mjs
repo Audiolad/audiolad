@@ -370,6 +370,25 @@ export const AUDIT_LINEAGE = {
       ),
     ],
   },
+
+  "20260823190000": {
+    extraProbes: [
+      schemaProbe(
+        "function:public.start_practice_price_promotion.qualified_out_columns",
+        "function",
+        `SELECT EXISTS (
+  SELECT 1
+  FROM pg_proc AS p
+  JOIN pg_namespace AS n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'start_practice_price_promotion'
+    AND pg_get_functiondef(p.oid) LIKE '%starts.promotion_id%'
+    AND pg_get_functiondef(p.oid) NOT LIKE '%RETURNING *%'
+)`,
+        "start_practice_price_promotion qualifies OUT-clashing start columns",
+      ),
+    ],
+  },
 };
 
 export function lineageForVersion(version) {
