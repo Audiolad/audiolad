@@ -87,6 +87,7 @@ assert.doesNotMatch(
   /initDataUnsafe/,
 );
 assert.doesNotMatch(scriptSource, /MAX_BOT_TOKEN|NEXT_PUBLIC_MAX/);
+assert.doesNotMatch(scriptSource, /MAX_SESSION_LINK_PATH|session\/link/);
 assert.doesNotMatch(
   scriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /\.ready\s*\(/,

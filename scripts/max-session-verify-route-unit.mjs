@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MAX_HOSTNAME, MAX_ORIGIN, MAX_SESSION_VERIFY_PATH } from "../src/lib/max/host.ts";
+import { setLinkExternalIdentityForTests } from "../src/lib/max/link-external-identity.ts";
 import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "../src/lib/max/touch-external-identity.ts";
 import {
   isAllowedMaxVerifyOrigin,
@@ -76,9 +77,14 @@ const previousToken = process.env.MAX_BOT_TOKEN;
 process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 
 const touchCalls = [];
+const linkCalls = [];
 setTouchExternalIdentityForTests(async (provider, providerUserId) => {
   touchCalls.push({ provider, providerUserId });
   return { ok: true, linked: false };
+});
+setLinkExternalIdentityForTests(async (provider, providerUserId, userId) => {
+  linkCalls.push({ provider, providerUserId, userId });
+  return { ok: true, status: "linked" };
 });
 
 try {
@@ -230,8 +236,10 @@ try {
   });
   assert.equal(storageFail.body.ok === true, false);
   assert.equal(touchCalls.length, touchCountAfterValid + 1);
+  assert.equal(linkCalls.length, 0, "verify must not call link");
 } finally {
   setTouchExternalIdentityForTests(null);
+  setLinkExternalIdentityForTests(null);
   if (previousToken === undefined) {
     delete process.env.MAX_BOT_TOKEN;
   } else {
@@ -249,6 +257,11 @@ assert.match(routeSource, /linked: touch\.linked/);
 assert.doesNotMatch(routeSource, /NEXT_PUBLIC_MAX/);
 assert.doesNotMatch(routeSource, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(routeSource, /createServiceRoleClient|createClient\(/);
+assert.doesNotMatch(routeSource, /createClientFromRequest|getUser\(/);
+assert.doesNotMatch(
+  routeSource,
+  /linkExternalIdentity|link_external_identity|link-external-identity|session\/link/,
+);
 assert.doesNotMatch(routeSource, /auth\.users|signUp|signInWithPassword/);
 
 const maxTree = [
@@ -257,6 +270,7 @@ const maxTree = [
   "src/lib/max/proxy-policy.ts",
   "src/lib/max/bridge.ts",
   "src/lib/max/touch-external-identity.ts",
+  "src/lib/max/session-http.ts",
   "src/components/max/MaxBridgeScript.tsx",
   "src/components/max/MaxMiniAppScreen.tsx",
   "src/app/api/max/session/verify/route.ts",

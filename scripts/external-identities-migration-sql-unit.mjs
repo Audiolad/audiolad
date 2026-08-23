@@ -15,7 +15,7 @@ const migrationPath = join(migrationsDir, migrationName);
 const migration = readFileSync(migrationPath, "utf8");
 
 const priorMigrations = readdirSync(migrationsDir)
-  .filter((name) => name.toLowerCase().endsWith(".sql") && name !== migrationName)
+  .filter((name) => name.toLowerCase().endsWith(".sql") && name < migrationName)
   .map((name) => readFileSync(join(migrationsDir, name), "utf8"))
   .join("\n");
 
