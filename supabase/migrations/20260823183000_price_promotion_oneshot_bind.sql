@@ -6,6 +6,23 @@ BEGIN;
 
 DROP INDEX IF EXISTS public.practice_price_promotion_starts_promo_user_idx;
 
+-- Upgrade-safe: if a user already has two starts (old restart/cookie-loss path),
+-- keep the earliest window and detach user_id from the rest before the unique index.
+UPDATE public.practice_price_promotion_starts AS loser
+SET user_id = NULL
+FROM (
+  SELECT
+    id,
+    row_number() OVER (
+      PARTITION BY promotion_id, user_id
+      ORDER BY started_at ASC, id ASC
+    ) AS rn
+  FROM public.practice_price_promotion_starts
+  WHERE user_id IS NOT NULL
+) AS ranked
+WHERE loser.id = ranked.id
+  AND ranked.rn > 1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS practice_price_promotion_starts_promo_user_uidx
   ON public.practice_price_promotion_starts (promotion_id, user_id)
   WHERE user_id IS NOT NULL;
@@ -51,6 +68,8 @@ BEGIN
       CONTINUE;
     END IF;
 
+    -- Detach first so the partial unique (promotion_id, user_id) cannot fire
+    -- when a later user-row already holds this user_id.
     UPDATE public.practice_price_promotion_starts
     SET user_id = NULL
     WHERE promotion_id = v_promo_id
@@ -58,10 +77,24 @@ BEGIN
       AND id IS DISTINCT FROM v_winner.id;
 
     IF v_winner.user_id IS NULL THEN
-      UPDATE public.practice_price_promotion_starts
-      SET user_id = p_user_id
-      WHERE id = v_winner.id
-        AND user_id IS NULL;
+      BEGIN
+        UPDATE public.practice_price_promotion_starts
+        SET user_id = p_user_id
+        WHERE id = v_winner.id
+          AND user_id IS NULL;
+      EXCEPTION
+        WHEN unique_violation THEN
+          UPDATE public.practice_price_promotion_starts
+          SET user_id = NULL
+          WHERE promotion_id = v_promo_id
+            AND user_id = p_user_id
+            AND id IS DISTINCT FROM v_winner.id;
+
+          UPDATE public.practice_price_promotion_starts
+          SET user_id = p_user_id
+          WHERE id = v_winner.id
+            AND user_id IS NULL;
+      END;
     END IF;
   END LOOP;
 END;

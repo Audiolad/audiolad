@@ -261,6 +261,57 @@ function testOneShotPersonalCountdown() {
   );
 }
 
+function testBindVisitorAndUserRowsKeepsEarliestWindow() {
+  const userId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const visitorRow = start({
+    id: "11111111-bbbb-4bbb-8bbb-111111111111",
+    visitorId: "11111111-1111-4111-8111-111111111111",
+    userId: null,
+    startedAt: "2026-08-23T10:00:00.000Z",
+    expiresAt: "2026-08-23T10:20:00.000Z",
+  });
+  const userRow = start({
+    id: "22222222-bbbb-4bbb-8bbb-222222222222",
+    visitorId: "22222222-2222-4222-8222-222222222222",
+    userId,
+    startedAt: "2026-08-23T10:05:00.000Z",
+    expiresAt: "2026-08-23T10:25:00.000Z",
+  });
+
+  const bound = bindPersonalStarts(
+    [visitorRow, userRow],
+    visitorRow.visitorId,
+    userId,
+  );
+
+  assertEqual(bound.length, 2, "bind does not drop the later start row");
+  const winners = bound.filter((row) => row.userId === userId);
+  assertEqual(winners.length, 1, "partial unique (promotion, user) has one row");
+  assertEqual(winners[0].id, visitorRow.id, "earliest window keeps user_id");
+  assertEqual(winners[0].startedAt, visitorRow.startedAt, "started_at not reset");
+  assertEqual(winners[0].expiresAt, visitorRow.expiresAt, "expires_at not reset");
+  assertEqual(
+    bound.find((row) => row.id === userRow.id)?.userId,
+    null,
+    "losing user-row detaches user_id before attach",
+  );
+
+  const checkout = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promotion()],
+    starts: startsForSubject(bound, visitorRow.visitorId, userId),
+    surface: PRICE_SURFACES.CHECKOUT,
+    now: new Date("2026-08-23T10:10:00.000Z"),
+  });
+  assertEqual(checkout.finalPrice, 499, "guest→login uses original sale");
+  assertEqual(
+    checkout.promotion?.expiresAt,
+    visitorRow.expiresAt,
+    "checkout uses original expiry",
+  );
+}
+
 function testGuestLoginKeepsOriginalWindow() {
   const guestStart = startPersonalCountdown({
     store: [],
@@ -557,6 +608,8 @@ function testMigrationContract() {
   assert(oneshot.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "upsert");
   assert(!oneshot.includes("started_at = v_now"), "no expiry restart");
   assert(oneshot.includes("ORDER BY s.started_at ASC"), "canonical earliest window");
+  assert(oneshot.includes("WHEN unique_violation THEN"), "bind catches unique conflict");
+  assert(oneshot.includes("row_number() OVER"), "upgrade detaches duplicate user_id");
 }
 
 function testSourceContracts() {
@@ -605,6 +658,7 @@ function main() {
   testCalendarPromo();
   testPersonalCountdownAndCatalogIsolation();
   testOneShotPersonalCountdown();
+  testBindVisitorAndUserRowsKeepsEarliestWindow();
   testGuestLoginKeepsOriginalWindow();
   testGuestExpiryThenLoginDoesNotRevive();
   testParallelStartsShareOneWindow();
