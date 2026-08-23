@@ -37,6 +37,19 @@ AS $$
   SELECT false;
 $$;
 
+CREATE TABLE public.authors (
+  id uuid PRIMARY KEY,
+  name text NOT NULL,
+  slug text NOT NULL UNIQUE
+);
+
+CREATE TABLE public.author_members (
+  author_id uuid NOT NULL REFERENCES public.authors (id),
+  user_id uuid NOT NULL REFERENCES auth.users (id),
+  role text NOT NULL,
+  PRIMARY KEY (author_id, user_id)
+);
+
 CREATE OR REPLACE FUNCTION public.user_can_read_author_promotion(
   p_author_id uuid,
   p_user_id uuid DEFAULT auth.uid()
@@ -55,19 +68,6 @@ AS $$
         AND am.role IN ('owner', 'editor')
     );
 $$;
-
-CREATE TABLE public.authors (
-  id uuid PRIMARY KEY,
-  name text NOT NULL,
-  slug text NOT NULL UNIQUE
-);
-
-CREATE TABLE public.author_members (
-  author_id uuid NOT NULL REFERENCES public.authors (id),
-  user_id uuid NOT NULL REFERENCES auth.users (id),
-  role text NOT NULL,
-  PRIMARY KEY (author_id, user_id)
-);
 
 CREATE TABLE public.practices (
   id uuid PRIMARY KEY,

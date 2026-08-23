@@ -1080,7 +1080,8 @@ SELECT public.publish_quick_offer('${OFFER_ID}');
     `
 INSERT INTO public.orders (
   id, user_id, practice_id, status, amount_minor, currency,
-  practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot
+  practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
+  base_price_minor_snapshot
 ) VALUES (
   '${OFFER_ORDER_ID}',
   '${USER_ID}',
@@ -1090,13 +1091,14 @@ INSERT INTO public.orders (
   'RUB',
   'Paid',
   'paid-practice',
+  499900,
   499900
 );
 SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
 SELECT public.apply_quick_offer_amount(
   '${OFFER_ORDER_ID}',
   '${OFFER_ID}',
-  timestamptz '2099-01-01T00:00:00Z'
+  clock_timestamp() + interval '10 minutes'
 );
 `,
   );
