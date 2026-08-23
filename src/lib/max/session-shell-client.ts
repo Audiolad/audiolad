@@ -1,10 +1,14 @@
+import { SIGNUP_GENERIC_ERROR } from "@/lib/auth/email";
 import { createClient } from "@/lib/supabase/client";
 import { readMaxInitData } from "@/lib/max/bridge";
 import {
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_VERIFY_PATH,
 } from "@/lib/max/host";
-import type { MaxShellEvent } from "@/lib/max/session-shell";
+import type {
+  MaxShellEvent,
+  MaxShellSignupError,
+} from "@/lib/max/session-shell";
 
 type AuthUser = { id: string };
 
@@ -19,10 +23,27 @@ export type MaxAuthClient = {
   };
 };
 
+export type MaxSignUpInput = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  legalConsent: boolean;
+  marketingConsent: boolean;
+};
+
+export type MaxSignUpFn = (input: MaxSignUpInput & {
+  next: string | null;
+}) => Promise<
+  | { ok: true; destination: string; hasSession: boolean }
+  | { ok: false; error: MaxShellSignupError }
+>;
+
 export type MaxShellClientDeps = {
   readInitData: () => string | null;
   getAuthClient: () => MaxAuthClient;
   fetch: typeof fetch;
+  signUp?: MaxSignUpFn;
 };
 
 function defaultDeps(): MaxShellClientDeps {
@@ -148,6 +169,65 @@ export async function loginAndLinkMaxSession(
 
   try {
     const response = await deps.fetch(MAX_SESSION_LINK_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData }),
+    });
+    return mapLinkResponseToEvent(response.status, await readJsonBody(response));
+  } catch {
+    return { type: "LINK_SERVER_ERROR" };
+  }
+}
+
+export async function signUpAndLinkMaxSession(
+  input: MaxSignUpInput,
+  deps: Partial<MaxShellClientDeps> = {},
+  hooks: { onSessionCreated?: () => void } = {},
+): Promise<MaxShellEvent> {
+  const resolved = { ...defaultDeps(), ...deps };
+  const initData = resolved.readInitData();
+  if (typeof initData !== "string" || initData.trim().length === 0) {
+    return { type: "INIT_DATA_MISSING" };
+  }
+
+  if (!resolved.signUp) {
+    return {
+      type: "SIGNUP_FAILURE",
+      error: { field: "form", message: SIGNUP_GENERIC_ERROR },
+    };
+  }
+
+  let result: Awaited<ReturnType<MaxSignUpFn>>;
+  try {
+    result = await resolved.signUp({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email,
+      password: input.password,
+      legalConsent: input.legalConsent,
+      marketingConsent: input.marketingConsent,
+      next: null,
+    });
+  } catch {
+    return {
+      type: "SIGNUP_FAILURE",
+      error: { field: "form", message: SIGNUP_GENERIC_ERROR },
+    };
+  }
+
+  if (!result.ok) {
+    return { type: "SIGNUP_FAILURE", error: result.error };
+  }
+
+  if (!result.hasSession) {
+    return { type: "SIGNUP_PENDING" };
+  }
+
+  hooks.onSessionCreated?.();
+
+  try {
+    const response = await resolved.fetch(MAX_SESSION_LINK_PATH, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },

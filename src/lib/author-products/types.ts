@@ -15,7 +15,10 @@ import {
   getVisibleAuthorProductStatusLabel,
 } from "@/lib/author-products/moderation";
 
-export const PAID_PRICE_OPTIONS = [99, 199, 299, 444, 888, 1888, 2888] as const;
+import { RECOMMENDED_PAID_PRICES_RUB } from "@/lib/pricing/money";
+
+/** Recommended chips only. Authors may enter any integer ruble amount in range. */
+export const PAID_PRICE_OPTIONS = RECOMMENDED_PAID_PRICES_RUB;
 
 export type { MusicUsagePermission, ProductKind };
 

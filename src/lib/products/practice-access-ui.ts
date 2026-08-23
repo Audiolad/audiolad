@@ -17,6 +17,11 @@ type PracticePricing = {
   status: string | null;
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
+  /** Effective ruble amount for display/checkout confirmation. */
+  displayPrice?: number | null;
+  compareAtPrice?: number | null;
+  promotionEndsAt?: string | null;
+  promotionExpiresAt?: string | null;
 };
 
 export function isProgramFormat(format: string | null): boolean {
@@ -337,7 +342,13 @@ function buildCommercialPresentation(input: {
     isAuthenticated,
     purchaseSurface = "practice_page",
   } = input;
-  const priceLabel = formatPracticePrice(practice.price);
+  const effectivePrice =
+    typeof practice.displayPrice === "number" &&
+    Number.isInteger(practice.displayPrice) &&
+    practice.displayPrice > 0
+      ? practice.displayPrice
+      : practice.price;
+  const priceLabel = formatPracticePrice(effectivePrice);
   const isGuestListenEntry =
     !isAuthenticated &&
     (access.reason === "free" || access.reason === "guest_promo");
@@ -457,10 +468,10 @@ function buildCommercialPresentation(input: {
       practiceId: practice.id,
       authorId: practice.author_id ?? null,
       productPriceMinorSnapshot:
-        typeof practice.price === "number" &&
-        Number.isFinite(practice.price) &&
-        practice.price > 0
-          ? Math.floor(practice.price) * 100
+        typeof effectivePrice === "number" &&
+        Number.isFinite(effectivePrice) &&
+        effectivePrice > 0
+          ? Math.floor(effectivePrice) * 100
           : null,
       currency: "RUB",
       purchaseSurface,
