@@ -57,6 +57,13 @@ export type TopicHubArticleCard = {
   description: string;
 };
 
+export type TopicHubListenCard = {
+  slug: string;
+  title: string;
+  href: string;
+  description: string;
+};
+
 export type TopicHubPageData = {
   hub: TopicHubDefinition;
   path: string;
@@ -65,5 +72,6 @@ export type TopicHubPageData = {
   freeProducts: CatalogProduct[];
   paidProducts: CatalogProduct[];
   articles: TopicHubArticleCard[];
+  listens: TopicHubListenCard[];
   platformTopicTitle: string | null;
 };

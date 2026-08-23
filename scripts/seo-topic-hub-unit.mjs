@@ -115,6 +115,7 @@ const pageData = {
   freeProducts: [],
   paidProducts: [],
   articles: [],
+  listens: [],
   platformTopicTitle: "Уверенность и самоценность",
 };
 
@@ -162,6 +163,7 @@ const femalePageData = {
   freeProducts: [],
   paidProducts: [],
   articles: [],
+  listens: [],
   platformTopicTitle: "Уверенность и самоценность",
 };
 const femaleMeta = buildTopicHubMetadata(femalePageData);
@@ -504,6 +506,7 @@ const freePageData = {
   freeProducts: pageData.products,
   paidProducts: [],
   articles: [],
+  listens: [],
   platformTopicTitle: null,
 };
 const freeMeta = buildTopicHubMetadata(freePageData);
@@ -662,6 +665,7 @@ const moneyPageData = {
   freeProducts: pageData.products,
   paidProducts: [],
   articles: [],
+  listens: [],
   platformTopicTitle: "Деньги",
 };
 const moneyMeta = buildTopicHubMetadata(moneyPageData);
@@ -800,6 +804,7 @@ const abundancePageData = {
   freeProducts: pageData.products,
   paidProducts: [],
   articles: [],
+  listens: [],
   platformTopicTitle: "Деньги",
 };
 const abundanceMeta = buildTopicHubMetadata(abundancePageData);

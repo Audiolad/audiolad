@@ -21,6 +21,15 @@ export {
   listListenPageDefinitions,
   listListenPageSlugs,
 } from "./registry";
+export {
+  listIndexableListenPagesByTopicSlug,
+  listTopicHubListenCards,
+  resolveListenEditorialTopic,
+} from "./topic";
+export type {
+  ListenEditorialTopicLink,
+  ListenTopicCard,
+} from "./topic";
 export { parseListenPageDefinition } from "./validation";
 export type {
   ListenFaqItem,

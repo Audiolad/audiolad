@@ -49,6 +49,12 @@ export type ListenPageDefinition = {
   h1: string;
   intro: readonly string[];
   playlistSlug: string;
+  /**
+   * Editorial SEO/GEO slug of an existing `/topics/{topicSlug}` hub.
+   * This is not a catalog `topics.key`. Absent means the listen is not
+   * attached to a registered hub yet.
+   */
+  topicSlug?: string;
   sections: readonly ListenSection[];
   faq: readonly ListenFaqItem[];
   internalLinks?: readonly ListenInternalLink[];
