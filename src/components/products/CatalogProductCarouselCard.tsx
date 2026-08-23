@@ -38,7 +38,7 @@ type CatalogProductCarouselCardProps = {
 };
 
 /**
- * In-tile 9:16 carousel: Slide 1 = system, Slide 2+ = author.
+ * In-tile 3:4 carousel: Slide 1 = system, Slide 2+ = author.
  * Native overflow-x + scroll-snap. No Swiper/Embla.
  */
 export default function CatalogProductCarouselCard({
@@ -165,7 +165,7 @@ export default function CatalogProductCarouselCard({
     <div
       className={`relative w-full overflow-hidden rounded-[18px] ${CATALOG_SYSTEM_SLIDE_ASPECT_CLASS}`}
       data-catalog-tile-carousel=""
-      data-catalog-tile-carousel-aspect="9/16"
+      data-catalog-tile-carousel-aspect="3/4"
     >
       <div
         ref={scrollerRef}

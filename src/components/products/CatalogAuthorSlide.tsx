@@ -10,7 +10,7 @@ type CatalogAuthorSlideProps = {
 };
 
 /**
- * Author 9:16 slide (carousel slide 2+).
+ * Author 3:4 slide (carousel slide 2+).
  * Whole slide is one PDP Link. No Play. Images stay lazy-loadable later.
  */
 export default function CatalogAuthorSlide({
@@ -23,7 +23,7 @@ export default function CatalogAuthorSlide({
     <div
       className="h-full w-full min-h-0 min-w-0 overflow-hidden"
       data-catalog-author-slide=""
-      data-catalog-author-slide-aspect="9/16"
+      data-catalog-author-slide-aspect="3/4"
     >
       <Link
         href={productHref}

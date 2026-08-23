@@ -275,7 +275,7 @@ function testMarkupSplitsLinkAndPlay() {
   assert.equal(href, "/practice/sergey-petrov/klyuch-k-izobiliyu");
   assert.match(slide, /href=\{product\.href\}/, "Link stays on canonical PDP");
   assert.match(tile, /CatalogTilePlayControl/, "Play control is present");
-  assert.match(tile, /playControl=/, "Play is passed into the 9:16 system slide");
+  assert.match(tile, /playControl=/, "Play is passed into the 3:4 system slide");
   assert.match(
     slide,
     /<\/Link>[\s\S]*\{playControl\}/,

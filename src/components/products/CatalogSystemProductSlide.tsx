@@ -15,16 +15,16 @@ type CatalogSystemProductSlideProps = {
   visual?: CatalogCardVisual;
   playControl?: ReactNode;
   /**
-   * `standalone` (default): own 9:16 box for 0-slide tiles.
-   * `fill`: 100%×100% of the carousel slide — no second 9:16 sizing context.
+   * `standalone` (default): own 3:4 box for 0-slide tiles.
+   * `fill`: 100%×100% of the carousel slide — no second aspect sizing context.
    */
   layout?: CatalogSystemProductSlideLayout;
 };
 
 /** Canonical first-slide (and later carousel slide) geometry. */
-export const CATALOG_SYSTEM_SLIDE_ASPECT_CLASS = "aspect-[9/16]";
+export const CATALOG_SYSTEM_SLIDE_ASPECT_CLASS = "aspect-[3/4]";
 
-/** Two-line clamp with reserved height so 9:16 rows stay even. */
+/** Two-line clamp with reserved height so 3:4 rows stay even. */
 export const CATALOG_PRODUCT_TILE_TITLE_CLASS =
   "line-clamp-2 min-h-8 text-[13px] font-semibold leading-4 text-[#25135c]";
 
@@ -121,8 +121,8 @@ function CatalogSystemSlideMeta({
 }
 
 /**
- * System first slide: one 9:16 frame that includes Play.
- * Later ProductCardCarousel can use this as Slide 1 (author slides also 9:16).
+ * System first slide: one 3:4 frame that includes Play.
+ * Later ProductCardCarousel can use this as Slide 1 (author slides also 3:4).
  */
 export default function CatalogSystemProductSlide({
   product,
@@ -143,7 +143,7 @@ export default function CatalogSystemProductSlide({
           : CATALOG_SYSTEM_SLIDE_ASPECT_CLASS
       }`}
       data-catalog-system-slide=""
-      data-catalog-system-slide-aspect="9/16"
+      data-catalog-system-slide-aspect="3/4"
       data-catalog-system-slide-layout={layout}
     >
       <Link

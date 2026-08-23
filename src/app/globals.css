@@ -420,7 +420,7 @@ body {
 
 .catalog-tile-carousel > [data-catalog-tile-slide] {
   /* 100% basis + min-width:0 — not min-width:100%. A floor lets Slide 1
-     grow to its intrinsic 9:16 content width (219px at a 169px cell). */
+     grow to an intrinsic taller-than-viewport child (219px at a 169px cell). */
   flex: 0 0 100%;
   width: 100%;
   min-width: 0;

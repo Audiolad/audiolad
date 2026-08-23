@@ -296,6 +296,8 @@ function testPreviewReusesCatalogListing() {
   assert.doesNotMatch(page, /from\("practices"\)/, "preview does not query practices itself");
   assert.match(page, /index:\s*false/, "preview is noindex");
   assert.match(page, /ProductGrid/, "preview renders the new grid");
+  assert.match(page, /Карточки каталога 3:4/, "preview labels the 3:4 experiment");
+  assert.doesNotMatch(page, /9:16/, "preview is no longer the 9:16 experiment");
   assert.match(page, /getExperimentalCatalogAuthorSlides/, "preview attaches demo author slides");
   assert.doesNotMatch(
     page,
@@ -315,19 +317,20 @@ function testPreviewReusesCatalogListing() {
   );
 }
 
-function testSystemSlideIsNineSixteenIncludingPlay() {
+function testSystemSlideIsThreeFourIncludingPlay() {
   const slide = readRoot("src/components/products/CatalogSystemProductSlide.tsx");
   const tile = readRoot("src/components/products/CatalogProductTile.tsx");
   const control = readRoot("src/components/products/CatalogTilePlayControl.tsx");
 
   assert.match(slide, /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
-  assert.match(slide, /aspect-\[9\/16\]/, "system slide is locked to 9:16");
-  assert.match(slide, /data-catalog-system-slide-aspect="9\/16"/);
-  assert.match(slide, /overflow-hidden/, "9:16 frame does not grow or overflow");
+  assert.match(slide, /aspect-\[3\/4\]/, "system slide is locked to 3:4");
+  assert.match(slide, /data-catalog-system-slide-aspect="3\/4"/);
+  assert.match(slide, /overflow-hidden/, "3:4 frame does not grow or overflow");
   assert.match(slide, /aspect-square/, "cover is 1:1");
   assert.match(slide, /data-catalog-tile-cover="square"/);
   assert.match(slide, /\{playControl\}/, "Play lives inside the first-slide geometry");
-  assert.doesNotMatch(tile, /aspect-\[9\/16\]/, "tile does not add a second aspect box");
+  assert.doesNotMatch(tile, /aspect-\[3\/4\]|aspect-\[9\/16\]/, "tile does not add a second aspect box");
+  assert.doesNotMatch(slide, /aspect-\[9\/16\]/, "first slide is not 9:16");
   assert.doesNotMatch(slide, /aspect-\[4\/5\]/, "first slide is not forced into 4:5");
   assert.doesNotMatch(slide, /blur-background|blur-2xl|square_blur/, "no square-in-blur frame");
   assert.doesNotMatch(tile, /aspect-\[4\/5\]|blur-background|square_blur/);
@@ -360,7 +363,7 @@ testGridClassStructure();
 testContainerAwareColumnResolution();
 testTileLinksToCanonicalPdp();
 testPreviewReusesCatalogListing();
-testSystemSlideIsNineSixteenIncludingPlay();
+testSystemSlideIsThreeFourIncludingPlay();
 testAuthorAndDurationShareOneLine();
 
 console.log("catalog-product-tile-unit: ok");

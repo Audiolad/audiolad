@@ -261,13 +261,13 @@ function testCarouselGeometryAndPlayStayOnSlideOne() {
     "src/components/products/CatalogSystemProductSlide.tsx",
   );
 
-  assert.match(carousel, /aspect-\[9\/16\]|CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
-  assert.match(carousel, /data-catalog-tile-carousel-aspect="9\/16"/);
-  assert.match(authorSlide, /data-catalog-author-slide-aspect="9\/16"/);
+  assert.match(carousel, /aspect-\[3\/4\]|CATALOG_SYSTEM_SLIDE_ASPECT_CLASS/);
+  assert.match(carousel, /data-catalog-tile-carousel-aspect="3\/4"/);
+  assert.match(authorSlide, /data-catalog-author-slide-aspect="3\/4"/);
   assert.doesNotMatch(
     authorSlide,
-    /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[9\/16\]/,
-    "author slide fills the carousel viewport — no second 9:16 box",
+    /CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|aspect-\[3\/4\]|aspect-\[9\/16\]/,
+    "author slide fills the carousel viewport — no second aspect box",
   );
   assert.match(carousel, /catalog-tile-carousel/, "native CSS scroller class");
   assert.match(carousel, /beginCatalogTileCarouselGesture/, "swipe is not a tap");
@@ -352,12 +352,12 @@ function testEachSlideMatchesScrollerViewport() {
   assert.match(
     systemSlide,
     /fillsParent[\s\S]*CATALOG_SYSTEM_SLIDE_ASPECT_CLASS|fillsParent\s*\?[\s\S]*h-full/,
-    "fill mode drops the nested 9:16 sizing context",
+    "fill mode drops the nested aspect sizing context",
   );
   assert.match(
     systemSlide,
     /layout = "standalone"/,
-    "0-slide tiles keep standalone 9:16",
+    "0-slide tiles keep standalone 3:4",
   );
   assert.doesNotMatch(
     tile,
@@ -368,8 +368,8 @@ function testEachSlideMatchesScrollerViewport() {
   assert.match(authorSlide, /h-full w-full min-h-0 min-w-0/);
   assert.doesNotMatch(
     authorSlide,
-    /aspect-\[9\/16\]/,
-    "author geometry matches Slide 1 fill — parent 9:16 only",
+    /aspect-\[3\/4\]|aspect-\[9\/16\]/,
+    "author geometry matches Slide 1 fill — parent 3:4 only",
   );
 
   assert.match(carousel, /pointer-events-none absolute/, "pager is overlay");
@@ -388,15 +388,15 @@ function testEachSlideMatchesScrollerViewport() {
 
   const at390 = resolveCatalogTileSlideViewport(169);
   assert.equal(at390.width, 169);
-  assert.equal(Number(at390.height.toFixed(2)), 300.44);
+  assert.equal(Number(at390.height.toFixed(2)), 225.33);
 
   const at320 = resolveCatalogTileSlideViewport(134);
   assert.equal(at320.width, 134);
-  assert.equal(Number(at320.height.toFixed(2)), 238.22);
+  assert.equal(Number(at320.height.toFixed(2)), 178.67);
 
   const at430 = resolveCatalogTileSlideViewport(189);
   assert.equal(at430.width, 189);
-  assert.equal(at430.height, 336);
+  assert.equal(at430.height, 252);
 
   assert.deepEqual(resolveCatalogTileSnapPositions(169, 3), [0, 169, 338]);
   assert.deepEqual(resolveCatalogTileSnapPositions(169, 1), [0]);

@@ -30,7 +30,7 @@ export default async function ExperimentalCatalogTilesPage() {
         Experimental preview
       </p>
       <h1 className="mt-2 text-[28px] font-semibold text-[#25135c]">
-        Карточки каталога 9:16
+        Карточки каталога 3:4
       </h1>
       <p className="mt-3 text-[15px] leading-6 text-[#7d70a2]">
         Предпросмотр новой плитки на тех же опубликованных продуктах, что и{" "}
