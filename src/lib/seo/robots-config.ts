@@ -25,7 +25,6 @@ export const SEO_ROBOTS_DISALLOWED_PATHS = [
   "/personal-materials/",
   "/checkout/",
   "/checkout/result",
-  "/offers/",
 ] as const;
 
 export function buildRobotsRoute(): MetadataRoute.Robots {

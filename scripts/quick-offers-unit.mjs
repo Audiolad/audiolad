@@ -424,7 +424,7 @@ function testDraftSeoOwnershipAndPublish() {
   );
 
   const robots = read("src/lib/seo/robots-config.ts");
-  assert(robots.includes('"/offers/"'), "robots disallow /offers/");
+  assert(!robots.includes('"/offers/"'), "robots does not disallow /offers/");
 
   const sitemap = read("src/lib/seo/sitemap-data.ts");
   assert(!sitemap.includes("quick_offers"), "sitemap does not query quick offers");
