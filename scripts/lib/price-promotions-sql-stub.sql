@@ -10,6 +10,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     CREATE ROLE authenticated NOLOGIN;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
 END
 $$;
 
@@ -26,6 +29,14 @@ AS $$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_platform_admin(p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT false;
+$$;
+
 CREATE TABLE public.authors (
   id uuid PRIMARY KEY,
   name text NOT NULL,
@@ -38,6 +49,25 @@ CREATE TABLE public.author_members (
   role text NOT NULL,
   PRIMARY KEY (author_id, user_id)
 );
+
+CREATE OR REPLACE FUNCTION public.user_can_read_author_promotion(
+  p_author_id uuid,
+  p_user_id uuid DEFAULT auth.uid()
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    p_user_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.author_members AS am
+      WHERE am.author_id = p_author_id
+        AND am.user_id = p_user_id
+        AND am.role IN ('owner', 'editor')
+    );
+$$;
 
 CREATE TABLE public.practices (
   id uuid PRIMARY KEY,

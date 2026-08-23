@@ -200,6 +200,45 @@ function testRepoOneFileOneVersion() {
   assert.ok(listed.files.some((row) => row.filename === "20260716182000_promotion_campaigns.sql"));
   assert.ok(listed.files.some((row) => row.filename === "20260716191000_claim_promo_practice_by_id.sql"));
   assert.ok(listed.files.some((row) => row.filename === "20260728121000_practice_content_sale_lock.sql"));
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260823140000_quick_offers.sql"),
+    false,
+    "unapplied 140000 stamp must leave the active migrations directory",
+  );
+  assert.ok(listed.files.some((row) => row.filename === "20260823191000_quick_offers.sql"));
+}
+
+function testUnappliedOlderStampStillHoles() {
+  const plan = planDatabaseMigrations({
+    localVersions: [
+      "20260823120000",
+      "20260823140000",
+      "20260823183000",
+      "20260823190000",
+    ],
+    remoteVersions: ["20260823120000", "20260823183000"],
+  });
+  assert.equal(plan.action, "abort");
+  assert.equal(plan.code, "database_migration_history_drift");
+  assert.equal(plan.pending.some((version) => version < "20260823183000"), true);
+}
+
+function testProductionLikePendingAfterQuickOffersRestamp() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const maxRemote = "20260823183000";
+  const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions,
+  });
+  const hasHole = plan.pending.some((version) => version < maxRemote);
+  assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.deepEqual(plan.pending, ["20260823190000", "20260823191000"]);
+  assert.equal(plan.database_migrations_pending, 2);
 }
 
 function main() {
@@ -214,6 +253,8 @@ function main() {
   testCliModes();
   testPsqlVersionListAndHistory();
   testRepoOneFileOneVersion();
+  testUnappliedOlderStampStillHoles();
+  testProductionLikePendingAfterQuickOffersRestamp();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 

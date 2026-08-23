@@ -22,6 +22,8 @@ const M190 = join(
   ROOT,
   "supabase/migrations/20260823190000_start_practice_price_promotion_qualify_identifiers.sql",
 );
+const M191 = join(ROOT, "supabase/migrations/20260823191000_quick_offers.sql");
+const M140_GONE = join(ROOT, "supabase/migrations/20260823140000_quick_offers.sql");
 
 const CLEAN_DB = "audiolad_price_promo_clean";
 const UPGRADE_DB = "audiolad_price_promo_upgrade";
@@ -154,6 +156,8 @@ function applyPricingMigrations(database, { through } = {}) {
   psqlFile(database, M183);
   if (through === "183") return;
   psqlFile(database, M190);
+  if (through === "190") return;
+  psqlFile(database, M191);
 }
 
 function seedActorsAndProducts(database) {
@@ -321,6 +325,32 @@ INSERT INTO public.practice_price_promotion_starts (
   assertEqual(upgradeFirst.reused, "f", "upgrade path first start RPC inserts");
   assertEqual(upgradeFirst.promotionId, PROMO_ID, "upgrade path first start promotion_id");
   assertEqual(countStarts(UPGRADE_DB, VISITOR_P), "1", "upgrade path first start one row");
+
+  psqlFile(UPGRADE_DB, M191);
+  assertQuickOffersInstalled(UPGRADE_DB, "upgrade after 191");
+  assertLegacyPricesUntouched(UPGRADE_DB, "after 191");
+  testQuickOffersRpcs(UPGRADE_DB, "upgrade");
+  const afterOffers = startRow(UPGRADE_DB, VISITOR_E, null);
+  assertEqual(afterOffers.reused, "f", "personal start still inserts after Quick Offers");
+  assertEqual(afterOffers.promotionId, PROMO_ID, "personal start promotion_id after Quick Offers");
+  assertEqual(
+    scalar(
+      UPGRADE_DB,
+      `SELECT final_price::text FROM public.resolve_practice_effective_price(
+        'e1111111-1111-4111-8111-111111111111'::uuid,
+        'product',
+        NULL,
+        NULL,
+        timestamptz '2026-08-23T12:00:00Z'
+      )`,
+    ),
+    "990",
+    "upgrade base price unchanged after Quick Offers",
+  );
+
+  seedActorsAndProducts(CLEAN_DB);
+  assertQuickOffersInstalled(CLEAN_DB, "clean install after 191");
+  testQuickOffersRpcs(CLEAN_DB, "clean");
 }
 
 function testBindTwoRowConflict() {
@@ -910,6 +940,192 @@ INSERT INTO public.practice_price_promotions (
   );
 }
 
+const OFFER_ID = "e3333333-3333-4333-8333-333333333333";
+const MATERIAL_ID = "e4444444-4444-4444-8444-444444444444";
+const OFFER_ORDER_ID = "f2222222-2222-4222-8222-222222222222";
+
+function assertQuickOffersInstalled(database, label) {
+  assertEqual(
+    scalar(database, "SELECT to_regclass('public.quick_offers') IS NOT NULL"),
+    "t",
+    `${label}: quick_offers exists`,
+  );
+  assertEqual(
+    scalar(database, "SELECT to_regclass('public.quick_offer_materials') IS NOT NULL"),
+    "t",
+    `${label}: quick_offer_materials exists`,
+  );
+  assertEqual(
+    scalar(
+      database,
+      `SELECT count(*)::text FROM pg_proc
+       WHERE proname IN (
+         'publish_quick_offer',
+         'unpublish_quick_offer',
+         'get_public_quick_offer',
+         'apply_quick_offer_amount',
+         'resolve_quick_offer_charge_rubles'
+       )`,
+    ),
+    "5",
+    `${label}: Quick Offers RPCs`,
+  );
+  assertEqual(
+    scalar(
+      database,
+      `SELECT count(*)::text FROM pg_trigger
+       WHERE tgrelid = 'public.quick_offers'::regclass
+         AND NOT tgisinternal
+         AND tgname IN (
+           'quick_offers_set_updated_at',
+           'quick_offers_product_owner',
+           'quick_offers_status_change_guard'
+         )`,
+    ),
+    "3",
+    `${label}: Quick Offers triggers`,
+  );
+  assertEqual(
+    scalar(
+      database,
+      `SELECT count(*)::text FROM pg_policy
+       WHERE polrelid = 'public.quick_offers'::regclass`,
+    ),
+    "4",
+    `${label}: Quick Offers policies`,
+  );
+  assertEqual(
+    scalar(
+      database,
+      `SELECT count(*)::text FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'orders'
+         AND column_name = 'quick_offer_id'`,
+    ),
+    "1",
+    `${label}: orders.quick_offer_id`,
+  );
+}
+
+function testQuickOffersRpcs(database, label) {
+  psql(
+    database,
+    `
+INSERT INTO public.author_members (author_id, user_id, role)
+VALUES ('${AUTHOR_ID}', '${USER_ID}', 'owner')
+ON CONFLICT DO NOTHING;
+INSERT INTO public.quick_offers (
+  id, author_id, practice_id, title, slug, hero_image_path, short_description,
+  promo_price, cta_text, timer_duration_seconds, status, created_by
+) VALUES (
+  '${OFFER_ID}',
+  '${AUTHOR_ID}',
+  '${PRACTICE_ID}',
+  'Quick Offer',
+  'quick-offer-${label}',
+  'offers/hero.jpg',
+  'Short pitch',
+  777,
+  'Buy now',
+  1200,
+  'draft',
+  '${USER_ID}'
+);
+INSERT INTO public.quick_offer_materials (
+  id, offer_id, image_path, format_label, sort_order
+) VALUES (
+  '${MATERIAL_ID}',
+  '${OFFER_ID}',
+  'offers/card.jpg',
+  'MP3',
+  1
+);
+`,
+  );
+
+  let statusGuard = "";
+  try {
+    psql(database, `UPDATE public.quick_offers SET status = 'published' WHERE id = '${OFFER_ID}';`);
+  } catch (error) {
+    statusGuard = String(error.stdout || "") + String(error.stderr || "") + String(error.message || "");
+  }
+  assert(
+    /quick_offer_status_change_requires_rpc/.test(statusGuard),
+    `${label}: status change requires RPC, got: ${statusGuard || "success"}`,
+  );
+
+  psql(
+    database,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+SELECT public.publish_quick_offer('${OFFER_ID}');
+`,
+  );
+  assertEqual(
+    scalar(database, `SELECT status FROM public.quick_offers WHERE id = '${OFFER_ID}'`),
+    "published",
+    `${label}: publish RPC`,
+  );
+  assertEqual(
+    scalar(
+      database,
+      `SELECT (public.get_public_quick_offer('quick-offer-${label}') ->> 'slug')`,
+    ),
+    `quick-offer-${label}`,
+    `${label}: public RPC`,
+  );
+
+  psql(
+    database,
+    `
+INSERT INTO public.orders (
+  id, user_id, practice_id, status, amount_minor, currency,
+  practice_title_snapshot, practice_slug_snapshot, price_minor_snapshot,
+  base_price_minor_snapshot
+) VALUES (
+  '${OFFER_ORDER_ID}',
+  '${USER_ID}',
+  '${PRACTICE_ID}',
+  'pending',
+  499900,
+  'RUB',
+  'Paid',
+  'paid-practice',
+  499900,
+  499900
+);
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+SELECT public.apply_quick_offer_amount(
+  '${OFFER_ORDER_ID}',
+  '${OFFER_ID}',
+  clock_timestamp() + interval '10 minutes'
+);
+`,
+  );
+  assertEqual(
+    scalar(database, `SELECT amount_minor::text FROM public.orders WHERE id = '${OFFER_ORDER_ID}'`),
+    "77700",
+    `${label}: apply promo amount`,
+  );
+
+  psql(
+    database,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+SELECT public.apply_quick_offer_amount(
+  '${OFFER_ORDER_ID}',
+  '${OFFER_ID}',
+  NULL::timestamptz
+);
+`,
+  );
+  assertEqual(
+    scalar(database, `SELECT amount_minor::text FROM public.orders WHERE id = '${OFFER_ORDER_ID}'`),
+    "499900",
+    `${label}: missing window is regular price`,
+  );
+}
+
 function testMigrationContract() {
   const oneshot = readFileSync(M183, "utf8");
   assert(oneshot.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "conflict");
@@ -917,7 +1133,8 @@ function testMigrationContract() {
   assert(oneshot.includes("bind_practice_price_promotion_starts"), "bind");
   assert(oneshot.includes("WHEN unique_violation THEN"), "bind catches unique conflict");
   assert(oneshot.includes("row_number() OVER"), "upgrade dedupe");
-  assert(existsSync(M180) && existsSync(M181) && existsSync(M183) && existsSync(M190), "four migrations present");
+  assert(existsSync(M180) && existsSync(M181) && existsSync(M183) && existsSync(M190) && existsSync(M191), "five migrations present");
+  assert(!existsSync(M140_GONE), "140000 must not remain in active migrations");
 
   const qualify = readFileSync(M190, "utf8");
   assert(qualify.includes("CREATE OR REPLACE FUNCTION public.start_practice_price_promotion"), "hotfix replaces start");
