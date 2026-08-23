@@ -10,6 +10,7 @@ export const MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE =
       "Слушайте медитации на богатство онлайн на АудиоЛаде. Выберите подходящую практику из подборки и начните прослушивание бесплатно.",
     h1: "Медитация на богатство: слушать онлайн",
     playlistSlug: "meditaciya-na-dengi",
+    topicSlug: "meditatsii-na-dengi",
     indexable: true,
     intro: [
       "На этой странице можно выбрать медитацию на богатство и начать слушать её онлайн прямо на АудиоЛаде.",

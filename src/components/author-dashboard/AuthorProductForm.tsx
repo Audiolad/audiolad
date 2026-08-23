@@ -7,7 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
+import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import TopicSelector from "@/components/author-products/TopicSelector";
+import {
+  MAX_PAID_PRICE_RUB,
+  MIN_PAID_PRICE_RUB,
+} from "@/lib/pricing/money";
 import type { AuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import type {
   AuthorProductDetail,
@@ -2547,22 +2552,65 @@ export default function AuthorProductForm({
           ) : null}
 
           {!form.isFree ? (
-            <select
-              value={form.price}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  price: Number(event.target.value),
-                }))
-              }
-              className="mt-3 w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-            >
-              {PAID_PRICE_OPTIONS.map((price) => (
-                <option key={price} value={price}>
-                  {formatRubles(price)}
-                </option>
-              ))}
-            </select>
+            <div className="mt-3 space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-sm text-[#7d70a2]">
+                  Полная цена, ₽
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_PAID_PRICE_RUB}
+                  max={MAX_PAID_PRICE_RUB}
+                  step={1}
+                  value={form.price}
+                  disabled={!canEditPublicFields}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    setForm((current) => ({
+                      ...current,
+                      price: Number.isInteger(next) ? next : current.price,
+                    }));
+                  }}
+                  className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {PAID_PRICE_OPTIONS.map((price) => (
+                  <button
+                    key={price}
+                    type="button"
+                    disabled={!canEditPublicFields}
+                    onClick={() =>
+                      setForm((current) => ({ ...current, price }))
+                    }
+                    className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                      form.price === price
+                        ? "bg-[#7042c5] text-white"
+                        : "border border-[#c6afe6] text-[#7042c5]"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {formatRubles(price)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-[#7d70a2]">
+                Можно указать любую сумму от {MIN_PAID_PRICE_RUB} до{" "}
+                {MAX_PAID_PRICE_RUB.toLocaleString("ru-RU")} ₽. Подсказки только
+                заполняют поле.
+              </p>
+            </div>
+          ) : null}
+
+          {!form.isFree ? (
+            <div className="mt-5">
+              <span className="mb-2 block text-sm font-medium">Акции</span>
+              <AuthorProductPromotions
+                practiceId={practiceId || null}
+                basePrice={form.price}
+                disabled={!canEditPublicFields || busy}
+              />
+            </div>
           ) : null}
         </div>
         ) : null}

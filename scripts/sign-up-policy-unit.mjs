@@ -2,7 +2,7 @@
 /**
  * Sign-up/email policy checks isolated from email-policy-unit avatar suite.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,21 @@ function readRepoFile(...segments) {
   return readFileSync(repoPath(...segments), "utf8");
 }
 
+function readSignUpFile(filename) {
+  const grouped = repoPath(
+    "src",
+    "app",
+    "(platform)",
+    "auth",
+    "sign-up",
+    filename,
+  );
+  if (existsSync(grouped)) {
+    return readFileSync(grouped, "utf8");
+  }
+  return readRepoFile("src", "app", "auth", "sign-up", filename);
+}
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -26,8 +41,8 @@ function assert(condition, message) {
 }
 
 function testAntiBypass() {
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  const signUpAction = readSignUpFile("actions.ts");
+  const signUpPage = readSignUpFile("page.tsx");
   const hookRoute = readRepoFile(
     "src",
     "app",
@@ -52,8 +67,8 @@ function testAntiBypass() {
 
 function testPreferencesAndConsents() {
   const preferences = readRepoFile("src", "lib", "email", "preferences.ts");
-  const signUpAction = readRepoFile("src", "app", "auth", "sign-up", "actions.ts");
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  const signUpAction = readSignUpFile("actions.ts");
+  const signUpPage = readSignUpFile("page.tsx");
 
   assert(
     preferences.includes("listener_marketing: false"),
@@ -88,9 +103,57 @@ function testPreferencesAndConsents() {
   assert(signUpPage.includes("/privacy"), "legal privacy link");
 }
 
+function testMaxSignupReusesSameBar() {
+  const signUpAction = readSignUpFile("actions.ts");
+  const maxBridge = readRepoFile(
+    "src",
+    "components",
+    "max",
+    "MaxBridgeScript.tsx",
+  );
+  const maxSignup = readRepoFile(
+    "src",
+    "components",
+    "max",
+    "MaxSignupForm.tsx",
+  );
+
+  assert(
+    maxBridge.includes("signUpAction"),
+    "MAX signup calls the same server action",
+  );
+  assert(
+    !maxSignup.includes("supabase.auth.signUp"),
+    "MAX signup UI does not call client signUp",
+  );
+  assert(
+    maxSignup.includes("evaluateSignUpClientFormState"),
+    "MAX signup uses unified client form state",
+  );
+  assert(maxSignup.includes("legalConsent"), "MAX signup requires legal consent");
+  assert(
+    maxSignup.includes("marketingConsent"),
+    "MAX signup keeps optional marketing consent",
+  );
+  assert(
+    maxSignup.includes("MAX_APEX_OFFER_HREF") &&
+      maxSignup.includes("MAX_APEX_PRIVACY_HREF"),
+    "MAX legal links use apex URLs",
+  );
+  assert(
+    signUpAction.includes("hasSession: Boolean(data.session)"),
+    "signUpAction still reports hasSession from data.session",
+  );
+  assert(
+    !maxBridge.includes("generateLink") && !maxSignup.includes("generateLink"),
+    "MAX signup must not use Admin generateLink",
+  );
+}
+
 function main() {
   testAntiBypass();
   testPreferencesAndConsents();
+  testMaxSignupReusesSameBar();
   console.log("sign-up-policy-unit: ok");
 }
 

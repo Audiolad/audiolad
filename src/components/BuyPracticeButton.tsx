@@ -32,6 +32,8 @@ type BuyPracticeButtonProps = {
 
 type ApiErrorBody = {
   error?: string;
+  message?: string;
+  current_amount_minor?: number;
 };
 
 type OrderSuccessBody = {
@@ -193,6 +195,9 @@ export default function BuyPracticeButton({
           buy_click_client_event_id:
             sessionId && practiceId ? buyClickClientEventId : null,
           quick_offer_id: quickOfferId,
+          expected_amount_minor: quickOfferId
+            ? null
+            : productPriceMinorSnapshot,
         }),
       });
 
@@ -209,15 +214,25 @@ export default function BuyPracticeButton({
       const orderBody: unknown = await orderResponse.json().catch(() => null);
 
       if (!orderResponse.ok || !isOrderSuccessBody(orderBody)) {
-        setErrorMessage(
-          mapOrderError(
-            typeof orderBody === "object" &&
-              orderBody !== null &&
-              "error" in orderBody
-              ? (orderBody as ApiErrorBody)
-              : null,
-          ),
-        );
+        const apiError =
+          typeof orderBody === "object" &&
+          orderBody !== null &&
+          "error" in orderBody
+            ? (orderBody as ApiErrorBody)
+            : null;
+
+        if (apiError?.error === "price_changed") {
+          setErrorMessage(
+            apiError.message?.trim() ||
+              "Цена изменилась или акция закончилась. Обновите страницу.",
+          );
+          window.setTimeout(() => {
+            window.location.reload();
+          }, 1200);
+          return;
+        }
+
+        setErrorMessage(mapOrderError(apiError));
         return;
       }
 
@@ -300,6 +315,11 @@ function mapOrderError(body: ApiErrorBody | null): string {
       return "Товар временно недоступен. Напишите нам на 1@audiolad.ru.";
     case "practice_not_for_sale":
       return "Этот продукт сейчас недоступен для покупки.";
+    case "price_changed":
+      return (
+        body.message?.trim() ||
+        "Цена изменилась или акция закончилась. Обновите страницу."
+      );
     default:
       return "Не удалось создать заказ. Попробуйте ещё раз.";
   }

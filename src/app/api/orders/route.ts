@@ -2,17 +2,24 @@ import { NextResponse } from "next/server";
 
 import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import {
+  extractExpectedAmountMinor,
   extractOrderAnalyticsClaims,
   extractPracticeSlug,
   extractQuickOfferId,
   mapRpcErrorMessage,
   parseJsonObject,
+  parsePriceChangedDetail,
   resolveIdempotencyKey,
   toCreateOrderSuccessBody,
   type CreateOrderRpcRow,
 } from "@/lib/orders/create-order-api";
 import { applyServerQuickOfferAmount } from "@/lib/quick-offers/apply-offer-amount";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
+import { bindPracticePricePromotionStarts } from "@/lib/pricing/rpc";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
+import { formatRubles } from "@/lib/products/price-format";
+import { PRICE_CHANGED_MESSAGE } from "@/lib/pricing/resolve";
+import { minorToRubles } from "@/lib/pricing/money";
 
 function truncateId(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -85,6 +92,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const expectedAmountMinor = quickOfferId
+    ? null
+    : extractExpectedAmountMinor(parsedBody);
+  const priceVisitorId = await readPriceVisitorId();
+
+  await bindPracticePricePromotionStarts({
+    supabase,
+    visitorId: priceVisitorId,
+    userId: user.id,
+  });
+
   const { data, error } = await supabase.rpc("create_practice_order", {
     p_practice_slug: practiceSlug,
     p_idempotency_key: idempotencyKey,
@@ -92,10 +110,39 @@ export async function POST(request: Request) {
     p_analytics_anonymous_id: claims.analyticsAnonymousId,
     p_checkout_origin_path: claims.checkoutOriginPath,
     p_buy_click_client_event_id: claims.buyClickClientEventId,
+    p_expected_amount_minor: expectedAmountMinor,
+    p_price_visitor_id: priceVisitorId,
   });
 
   if (error) {
     const mapped = mapRpcErrorMessage(error.message);
+
+    if (mapped.error === "price_changed") {
+      const parsed = parsePriceChangedDetail(
+        (error as { details?: string | null }).details ?? error.message,
+      );
+      const currentMinor = parsed?.current_amount_minor ?? 0;
+      let currentRubLabel = "новая цена";
+
+      try {
+        currentRubLabel = formatRubles(minorToRubles(currentMinor));
+      } catch {
+        currentRubLabel = "новая цена";
+      }
+
+      return NextResponse.json(
+        {
+          error: "price_changed",
+          current_amount_minor: currentMinor || null,
+          base_price_minor: parsed?.base_price_minor ?? null,
+          promotion_price_minor: parsed?.promotion_price_minor ?? null,
+          promotion_id: parsed?.promotion_id ?? null,
+          promotion_type: parsed?.promotion_type ?? null,
+          message: `${PRICE_CHANGED_MESSAGE}${currentRubLabel}.`,
+        },
+        { status: 409 },
+      );
+    }
 
     if (mapped.status >= 500) {
       console.error("create_order_rpc_error", error.message);

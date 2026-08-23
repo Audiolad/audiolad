@@ -20,6 +20,7 @@ import {
 import { minutesFromSeconds } from "./utils";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
+import { validatePaidPriceRubles } from "@/lib/pricing/money";
 
 export type PublishValidationResult =
   | { ok: true }
@@ -304,6 +305,11 @@ function buildCorePublishRequirements(
       priceFailure = {
         code: "invalid_price",
         message: "Укажите цену платного аудиопродукта.",
+      };
+    } else if (!validatePaidPriceRubles(practice.price).ok) {
+      priceFailure = {
+        code: "invalid_price",
+        message: "Цена должна быть целым числом от 49 до 100 000 ₽.",
       };
     }
   }

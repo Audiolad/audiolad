@@ -405,6 +405,75 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
 
+### RPC `public.link_external_identity` (этап 3A)
+
+Миграция: `supabase/migrations/20260823120000_link_external_identity.sql`.
+Этап 3B **не** добавляет миграцию и не меняет схему: клиент вызывает уже
+существующий `POST /api/max/session/link`.
+
+## Прайс и акции (base price + promotions, 2026-08-23)
+
+Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`, `20260823183000_price_promotion_oneshot_bind.sql`.
+
+Деньги:
+
+- Базовая цена продукта — `practices.price`, целое число рублей (не float).
+- Платежи и снимки заказа — целое число копеек: `amount_minor = price * 100`.
+- Диапазон платной цены: 49–100 000 ₽. Рекомендованные чипы (199/299/888/…) только подставляют значение.
+
+`practices.price` остаётся базовой/листовой ценой. Вторая цена на продукте не заводится. Акции — отдельная сущность `practice_price_promotions`. Не путать с `promotion_campaigns` (маркетинговые UTM-кампании).
+
+### practice_price_promotions
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `practice_id` | uuid NOT NULL | → `practices(id)` ON DELETE CASCADE |
+| `name` | text | 1–80 символов |
+| `promotion_type` | text | `calendar` \| `personal_countdown` |
+| `sale_price` | integer | 49–100000, должна быть строго ниже `practices.price` на resolve |
+| `starts_at` / `ends_at` | timestamptz | обязательны для `calendar`, `ends_at > starts_at` |
+| `duration_seconds` | integer | обязателен для `personal_countdown`, 60–2 592 000 |
+| `is_active` | boolean | default true |
+| `start_token` | text UNIQUE | универсальный триггер персонального таймера |
+| `created_at` / `updated_at` | timestamptz | |
+
+RLS: публичный SELECT активных акций опубликованных практик; авторы CRUD своих. Купоны / проценты / сегменты / стекинг не реализованы и схемой не блокируются.
+
+### practice_price_promotion_starts
+
+Персональное окно посетителя после триггера. Каталог эти строки не использует.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | |
+| `promotion_id` | uuid | → promotions ON DELETE CASCADE |
+| `visitor_id` | text | cookie `audiolad_price_visitor` (httpOnly UUID) |
+| `user_id` | uuid NULL | → `auth.users`, ON DELETE SET NULL |
+| `started_at` / `expires_at` | timestamptz | `expires_at > started_at` |
+
+Уникальность: `(promotion_id, visitor_id)` и частичный unique `(promotion_id, user_id) WHERE user_id IS NOT NULL`. Персональный таймер одноразовый для пары (акция, посетитель/пользователь): повторный `?promo=` / start после expiry не создаёт новое окно и не продлевает `started_at` / `expires_at`. Тот же токен может стартовать другого посетителя. Таблица недоступна anon/authenticated; чтение/запись только через SECURITY DEFINER RPC.
+
+Гость → логин: cookie `audiolad_price_visitor` биндится на `user_id` (`bind_practice_price_promotion_starts`) без нового окна. Resolve/checkout смотрят visitor_id OR user_id, но только исходное окно (самое раннее `started_at`). Истёкшее окно не оживает.
+
+### Снимки заказа
+
+На `orders` при создании:
+
+- `price_minor_snapshot` / `amount_minor` — итоговая сумма к оплате (копейки)
+- `base_price_minor_snapshot` — базовая цена на момент создания (NOT NULL, backfill из старого snapshot)
+- `promotion_price_minor_snapshot` — цена акции или NULL
+- `promotion_id` / `promotion_type` — или оба NULL. FK `promotion_id` ON DELETE SET NULL.
+
+История не переписывается при поздней смене цены/акции.
+
+### RPC
+
+- `resolve_practice_effective_price(practice_id, surface, visitor_id, user_id, now)` — `catalog` игнорирует personal countdown; иначе lowest `sale_price` wins, без стекинга. При наличии visitor+user сначала bind. Personal: только исходное окно. GRANT anon+authenticated.
+- `start_practice_price_promotion(start_token, visitor_id, user_id)` — одноразовый старт; если строка уже есть, возвращает исходные `started_at` / `expires_at` (в том числе после expiry). `INSERT … ON CONFLICT DO NOTHING`. GRANT anon+authenticated.
+- `bind_practice_price_promotion_starts(visitor_id, user_id)` — вешает `user_id` на самое раннее guest-окно cookie. Не создаёт и не продлевает окно. GRANT authenticated. Вызывается из start/resolve/auth callback.
+- `create_practice_order(..., p_expected_amount_minor, p_price_visitor_id)` — резолвит цену на сервере; при расхождении с `expected` → `price_changed` (не создаёт заказ). Pending reuse фиксирует сумму уже созданного заказа.
+
 ### quick_offers / quick_offer_materials (2026-08-23)
 
 Миграция: `20260823140000_quick_offers.sql`.

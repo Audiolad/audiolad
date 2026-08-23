@@ -63,7 +63,16 @@ export default function AuthorPublicProductCard({
       <div className="mt-3 flex items-center justify-between gap-3">
         {showPrice ? (
           <span className="text-sm font-semibold text-[#7042c5]">
-            {product.priceLabel}
+            {product.compareAtPriceLabel ? (
+              <>
+                <span className="mr-1.5 font-medium text-[#9a8bb8] line-through">
+                  {product.compareAtPriceLabel}
+                </span>
+                {product.priceLabel}
+              </>
+            ) : (
+              product.priceLabel
+            )}
           </span>
         ) : (
           <span className="text-sm font-medium text-[#3d8d65]">Бесплатно</span>

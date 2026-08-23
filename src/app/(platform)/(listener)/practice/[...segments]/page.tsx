@@ -66,12 +66,22 @@ import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
 import { createClient } from "@/lib/supabase/server";
+import PricePromotionStartHandler from "@/components/pricing/PricePromotionStartHandler";
+import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
+import { PRICE_SURFACES } from "@/lib/pricing/types";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ listen?: string; preview?: string; view?: string }>;
+  searchParams: Promise<{
+    listen?: string;
+    preview?: string;
+    view?: string;
+    promo?: string;
+    price_promo?: string;
+  }>;
 };
 
 const METADATA_DESCRIPTION_FALLBACK =
@@ -240,7 +250,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listen: listenParam,
     preview: previewParam,
     view: viewParam,
+    promo: promoParam,
+    price_promo: pricePromoParam,
   } = await searchParams;
+  const promoStartToken = (promoParam ?? pricePromoParam)?.trim() || null;
   const route = await resolvePracticeRoute(segments);
 
   if (!route) {
@@ -325,9 +338,26 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.slug,
   );
 
+  const visitorId = await readPriceVisitorId();
+  const resolvedPrice = await resolvePracticePriceRpc({
+    supabase,
+    practiceId: practice.id,
+    surface: PRICE_SURFACES.PRODUCT,
+    visitorId,
+    userId: user?.id ?? null,
+  });
+
   const presentation = buildPracticeAccessPresentation({
     access,
-    practice,
+    practice: {
+      ...practice,
+      displayPrice: resolvedPrice?.finalPrice ?? practice.price,
+      compareAtPrice: resolvedPrice?.promotion
+        ? resolvedPrice.basePrice
+        : null,
+      promotionEndsAt: resolvedPrice?.promotion?.endsAt ?? null,
+      promotionExpiresAt: resolvedPrice?.promotion?.expiresAt ?? null,
+    },
     authorSlug: resolvedAuthorSlug,
     paymentsConfigured: isPaymentsConfigured(),
     isAuthenticated: Boolean(user),
@@ -471,6 +501,19 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       symbol,
       displayWidth: DESKTOP_COVER_DISPLAY_WIDTH,
     },
+    priceOffer:
+      !practice.is_free &&
+      typeof (resolvedPrice?.basePrice ?? practice.price) === "number" &&
+      (resolvedPrice?.basePrice ?? practice.price ?? 0) > 0
+        ? {
+            basePrice: resolvedPrice?.basePrice ?? practice.price ?? 0,
+            salePrice: resolvedPrice?.salePrice ?? null,
+            endsAt: resolvedPrice?.promotion?.endsAt ?? null,
+            expiresAt: resolvedPrice?.promotion?.expiresAt ?? null,
+            promotionType: resolvedPrice?.promotion?.promotionType ?? null,
+          }
+        : null,
+    promoStartToken,
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {
@@ -507,7 +550,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
         productSlug: practice.slug,
         imageUrl: practiceCoverUrl,
         isFree: practice.is_free,
-        price: practice.price,
+        price: resolvedPrice?.finalPrice ?? practice.price,
         tracks: publicAudioItems.map((item) => ({
           name: item.title,
           position: item.position,
@@ -518,6 +561,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   return (
     <>
+      {promoStartToken ? (
+        <PricePromotionStartHandler token={promoStartToken} />
+      ) : null}
       <JsonLd data={structuredData} />
       {trackListenerAnalytics && user ? (
         <PromoPostSignupHandler

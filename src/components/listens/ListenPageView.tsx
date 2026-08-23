@@ -8,7 +8,10 @@ import {
 import ListenSignupCta from "@/components/listens/ListenSignupCta";
 import PublicPlaylistEmbed from "@/components/playlists/PublicPlaylistEmbed";
 import JsonLdScript from "@/components/seo/JsonLdScript";
-import { buildListenPageJsonLdGraph } from "@/lib/seo/listens";
+import {
+  buildListenPageJsonLdGraph,
+  resolveListenEditorialTopic,
+} from "@/lib/seo/listens";
 import type {
   ListenInlineSegment,
   ListenPageData,
@@ -111,6 +114,7 @@ export default function ListenPageView({
 }: ListenPageViewProps) {
   const { definition } = data;
   const jsonLd = buildListenPageJsonLdGraph(data);
+  const topicLink = resolveListenEditorialTopic(definition);
 
   return (
     <>
@@ -137,6 +141,14 @@ export default function ListenPageView({
           <h1 className="text-[1.5rem] font-semibold leading-[1.2] tracking-tight text-[#25135c] min-[360px]:text-[1.625rem] sm:text-[1.75rem] sm:leading-tight md:text-[2rem]">
             {definition.h1}
           </h1>
+          {topicLink ? (
+            <p className="mt-3 text-sm leading-6 text-[#5c4f82] sm:text-[15px]">
+              Тема:{" "}
+              <Link href={topicLink.href} className={linkClassName}>
+                {topicLink.title}
+              </Link>
+            </p>
+          ) : null}
         </header>
 
         {definition.intro.length > 0 ? (

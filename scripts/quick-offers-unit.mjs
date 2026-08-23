@@ -348,7 +348,11 @@ function testCheckoutGetsServerPrice() {
   assert(orders.includes("extractQuickOfferId"), "orders read offer id");
   assert(!orders.includes("extractOfferWindowExpiresAt"), "orders ignore body expires_at");
   assert(!orders.includes("offer_window_expires_at"), "orders do not read client timestamp");
-  assert(!orders.includes("amount_minor:"), "orders still do not take client amount");
+  assert(
+    !orders.includes("parsedBody.amount_minor") &&
+      !orders.includes("body.amount_minor"),
+    "orders still do not take client amount",
+  );
 
   const payments = read("src/app/api/payments/route.ts");
   assert(payments.includes("applyServerQuickOfferAmount"), "payments reprice before intent");
@@ -361,7 +365,11 @@ function testCheckoutGetsServerPrice() {
   const button = read("src/components/BuyPracticeButton.tsx");
   assert(button.includes("quickOfferId"), "buy button can pass offer id");
   assert(!button.includes("offer_window_expires_at"), "buy button never sends timer");
-  assert(!button.includes("amount_minor"), "buy button never sends amount");
+  assert(!button.includes("amount_minor: product"), "buy button never sends payable amount");
+  assert(
+    button.includes("expected_amount_minor: quickOfferId"),
+    "offer checkout omits expected catalog amount",
+  );
 
   const apply = read("src/lib/quick-offers/apply-offer-amount.ts");
   assert(

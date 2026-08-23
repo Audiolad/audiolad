@@ -48,5 +48,13 @@ export type PracticePageViewModel = {
   listeningNotice: ResolvedListeningNotice | null;
   mobileCover: PracticePageCoverData;
   desktopCover: PracticePageCoverData;
+  priceOffer: {
+    basePrice: number;
+    salePrice: number | null;
+    endsAt: string | null;
+    expiresAt: string | null;
+    promotionType: "calendar" | "personal_countdown" | null;
+  } | null;
+  promoStartToken: string | null;
   publishPreview: PracticePagePublishPreview | null;
 };

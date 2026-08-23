@@ -10,6 +10,7 @@ export const MEDITATSIYA_NA_DENEZHNYY_POTOK_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
       "Слушайте медитации на денежный поток онлайн бесплатно на АудиоЛаде. Выберите подходящую практику из подборки и начните прослушивание.",
     h1: "Медитация на денежный поток: слушать онлайн бесплатно",
     playlistSlug: "meditaciya-na-dengi",
+    topicSlug: "meditatsii-na-dengi",
     indexable: true,
     intro: [
       "На этой странице можно выбрать медитацию на денежный поток и начать слушать её онлайн бесплатно прямо на АудиоЛаде.",

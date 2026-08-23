@@ -42,7 +42,16 @@ export default function CatalogProductCard({ product }: CatalogProductCardProps)
             ) : null}
             {showPrice ? (
               <p className="text-[15px] font-semibold leading-5 text-[#7042c5] sm:text-base">
-                {product.priceLabel}
+                {product.compareAtPriceLabel ? (
+                  <>
+                    <span className="mr-2 text-sm font-medium text-[#9a8bb8] line-through">
+                      {product.compareAtPriceLabel}
+                    </span>
+                    <span>{product.priceLabel}</span>
+                  </>
+                ) : (
+                  product.priceLabel
+                )}
               </p>
             ) : null}
           </div>
