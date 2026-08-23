@@ -287,6 +287,22 @@ export const MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Медитация для сна для женщин – это не особая физиологическая категория, а вечерний формат, который может быть комфортен благодаря голосу, стилю обращения и общему характеру практики." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Более широкий выбор практик без акцента на аудитории есть на странице " },
+              { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "медитации для сна" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется спокойнее встретить утро, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", label: "медитация для сна и восстановления сил" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Женский голос при этом не является обязательным и не считается объективно более эффективным." },
           { kind: "paragraph", text: "Выберите подходящую медитацию в плейлисте, устройтесь удобно и начните слушать." },
         ],

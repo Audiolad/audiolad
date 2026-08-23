@@ -282,6 +282,22 @@ export const MEDITATSIYA_DLYA_SNA_S_GOLOSOM_SLUSHAT_BESPLATNO_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Медитация для сна с голосом подходит тем, кому комфортнее, когда внимание мягко ведёт спокойная речь." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если речь вечером мешает, можно выбрать " },
+              { href: "/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn", label: "медитацию для сна без голоса" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Тем, кому важнее мягкое обращение и спокойный темп, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn", label: "медитация для сна для женщин" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Не существует универсально лучшего женского или мужского голоса, тембра или скорости." },
           { kind: "paragraph", text: "Выберите подходящую голосовую практику в плейлисте, устройтесь удобно и начните слушать." },
         ],

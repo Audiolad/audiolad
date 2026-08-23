@@ -261,6 +261,22 @@ export const MEDITATSIYA_DLYA_GLUBOKOGO_SNA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Медитация для глубокого сна может стать спокойным переходом от дневной активности к ночному отдыху." },
           { kind: "paragraph", text: "Не нужно ждать гарантированного засыпания или определённой фазы сна." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и позвольте себе постепенно перейти к более спокойному состоянию." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен формат именно для отхода ко сну, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", label: "медитацию для засыпания" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если важнее не глубина сна, а ощущение отдыха к утру, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", label: "медитация для сна и восстановления сил" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

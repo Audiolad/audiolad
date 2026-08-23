@@ -191,6 +191,14 @@ export const MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE =
           { kind: "paragraph", text: "Если вы слушаете практику перед сном и постепенно засыпаете, не нужно специально сохранять бодрствование ради окончания записи." },
           { kind: "paragraph", text: "Медитация не является заданием, которое обязательно нужно завершить до последней секунды." },
           { kind: "paragraph", text: "При этом сама практика не гарантирует засыпание." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если важен сам момент отхода ко сну, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", label: "медитацию для засыпания" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Иногда человек спокойно дослушивает её полностью и только затем засыпает. В другой вечер сон может прийти раньше." },
           { kind: "paragraph", text: "Оба сценария возможны." },
         ],
@@ -232,6 +240,14 @@ export const MEDITATSIYA_DLYA_SNA_BEZ_REKLAMY_SLUSHAT_BESPLATNO_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Когда медитация включается уже перед сном, особенно удобно, если после запуска аудио не нужно снова возвращаться к телефону и отвлекаться на посторонние вставки." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Как более широкий вечерний формат есть также " },
+              { href: "/listens/meditatsiya-na-noch-slushat-pered-snom", label: "медитация на ночь" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, установите комфортную громкость и начните слушать." },
           { kind: "paragraph", text: "Главное – чтобы формат прослушивания и сама медитация были удобны именно вам." },
         ],

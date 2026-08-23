@@ -299,6 +299,22 @@ export const MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE =
           { kind: "paragraph", text: "Медитация для сна от стресса и тревоги может помочь сделать паузу после напряжённого дня, меньше вовлекаться в поток вечерних мыслей и мягко перейти к отдыху." },
           { kind: "paragraph", text: "Она не лечит тревогу, стресс или бессонницу и не заменяет профессиональную помощь при устойчивых или сильных состояниях." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и начните слушать." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для более широкого выбора вечерних практик откройте " },
+              { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "медитацию для сна" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется спокойнее завершить ночь, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna", label: "медитация для хорошего и спокойного сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

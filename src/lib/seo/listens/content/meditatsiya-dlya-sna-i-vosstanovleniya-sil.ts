@@ -301,6 +301,22 @@ export const MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE =
           { kind: "paragraph", text: "Медитация для сна и восстановления сил может помочь завершить насыщенный день, перестать требовать от себя дальнейшей активности и создать более спокойный переход к отдыху." },
           { kind: "paragraph", text: "Она не восстанавливает организм сама по себе, не заменяет полноценный сон и не гарантирует определённого самочувствия утром." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и позвольте себе просто отдыхать." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Более широкий выбор практик есть на странице " },
+              { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "медитации для сна" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если важнее сам момент отхода ко сну, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", label: "медитацию для засыпания" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

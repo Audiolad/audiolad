@@ -233,6 +233,30 @@ export const MEDITATSIYA_DLYA_HOROSHEGO_I_SPOKOYNOGO_SNA_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Медитация для хорошего и спокойного сна может стать частью вечернего перехода от дневной активности к отдыху." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется сделать акцент именно на мягком телесном переходе, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn", label: "медитация для сна и расслабления" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Когда важнее ощущение отдыха после ночи, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", label: "медитацию для сна и восстановления сил" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для более узкого вечернего сценария есть также " },
+              { href: "/listens/meditatsiya-pered-snom-slushat-onlayn-besplatno", label: "медитация перед сном" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Не нужно ожидать от неё идеального сна или гарантированного результата." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и начните слушать." },
         ],

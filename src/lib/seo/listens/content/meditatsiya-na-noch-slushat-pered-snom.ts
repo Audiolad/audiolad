@@ -237,6 +237,22 @@ export const MEDITATSIYA_NA_NOCH_SLUSHAT_PERED_SNOM_PAGE =
           { kind: "paragraph", text: "Медитация на ночь может стать спокойным способом завершить день и постепенно перейти к отдыху." },
           { kind: "paragraph", text: "Не нужно ждать гарантированного засыпания или соблюдать жёсткий вечерний ритуал." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и позвольте себе перейти от дневной активности к более спокойному состоянию." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Когда практика нужна уже в последние минуты перед сном, можно выбрать " },
+              { href: "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", label: "медитацию для засыпания" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если удобнее практика с более мягким обращением, есть " },
+              { href: "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn", label: "медитация для сна для женщин" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

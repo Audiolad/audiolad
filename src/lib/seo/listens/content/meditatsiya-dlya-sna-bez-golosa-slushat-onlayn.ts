@@ -239,6 +239,22 @@ export const MEDITATSIYA_DLYA_SNA_BEZ_GOLOSA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Если речевые инструкции мешают расслабиться, можно выбрать медитацию для сна без голоса – спокойную музыку и медитативное аудио без слов." },
           { kind: "paragraph", text: "Не нужно следить за ведущим или выполнять последовательность инструкций." },
           { kind: "paragraph", text: "Выберите подходящую композицию в подборке, устройтесь удобно и позвольте музыке оставаться спокойным фоном перед отдыхом." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для более широкого выбора голосовых и безголосых практик можно открыть " },
+              { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "медитацию для сна" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен именно инструментальный фон без речи, подойдёт " },
+              { href: "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn", label: "музыка для сна без слов" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

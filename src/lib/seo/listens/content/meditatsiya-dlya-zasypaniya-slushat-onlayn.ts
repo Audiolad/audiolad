@@ -288,6 +288,30 @@ export const MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Медитация для засыпания может помочь перестать активно контролировать момент сна, переключить внимание с мыслей на более спокойные ориентиры и мягко перейти от бодрствования к отдыху." },
           { kind: "paragraph", text: "Она не гарантирует, что вы уснёте за определённое количество минут." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и позвольте себе просто слушать." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Как более широкий вечерний формат можно открыть " },
+              { href: "/listens/meditatsiya-na-noch-slushat-pered-snom", label: "медитацию на ночь" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется сначала снять дневное напряжение, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn", label: "медитация для сна и расслабления" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Когда удобнее спокойный музыкальный фон, есть " },
+              { href: "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn", label: "усыпляющая музыка для сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

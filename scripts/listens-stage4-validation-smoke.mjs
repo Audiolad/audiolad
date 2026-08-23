@@ -6218,7 +6218,7 @@ function testTwentyFirstPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-first page has exactly three internal title-anchors");
+  assert(allLinks.length === 4, "twenty-first page has exactly four internal title-anchors");
   const soothingLinks = allLinks.filter((link) => link.href === TWENTY_FIRST_SOOTHING_HREF);
   assert(soothingLinks.length === 1, "twenty-first page has one soothing phrase link");
   assert(soothingLinks[0].label === TWENTY_FIRST_SOOTHING_LABEL, "twenty-first soothing label is exact phrase");
@@ -6234,10 +6234,14 @@ function testTwentyFirstPage() {
     assert(link.href.startsWith("/listens/"), `twenty-first href is site-relative: ${link.href}`);
   }
   const dests = new Set(allLinks.map((link) => link.href));
-  assert(dests.size === 3, "twenty-first page uses exactly three internal destinations");
+  assert(dests.size === 4, "twenty-first page uses exactly four internal destinations");
   assert(dests.has(TWENTY_FIRST_SOOTHING_HREF), "twenty-first destinations include soothing page");
   assert(dests.has(TWENTY_FIRST_SLEEP_INDUCING_HREF), "twenty-first destinations include sleep-inducing page");
   assert(dests.has(TWENTY_FIRST_NO_LYRICS_HREF), "twenty-first destinations include no-lyrics page");
+  assert(dests.has("/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn"), "twenty-first destinations include no-voice meditation");
+  const noVoiceLinks = allLinks.filter((link) => link.href === "/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn");
+  assert(noVoiceLinks.length === 1, "twenty-first page has one no-voice meditation link");
+  assert(noVoiceLinks[0].label === "медитацию для сна без голоса", "twenty-first no-voice meditation label");
 
   const noLyricsSectionLinks = (noLyricsSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
@@ -6479,7 +6483,7 @@ function testTwentySecondPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-second page has exactly three internal title-anchors");
+  assert(allLinks.length === 4, "twenty-second page has exactly four internal title-anchors");
   const hubLinks = allLinks.filter((link) => link.href === TWENTY_SECOND_HUB_HREF);
   assert(hubLinks.length === 1, "twenty-second page has one hub title-only link");
   assert(hubLinks[0].label === TWENTY_SECOND_HUB_LABEL, "twenty-second hub label is hub title");
@@ -6495,9 +6499,10 @@ function testTwentySecondPage() {
     assert(link.href.startsWith("/listens/"), `twenty-second href is site-relative: ${link.href}`);
   }
   const dests = new Set(allLinks.map((link) => link.href));
-  assert(dests.size === 3, "twenty-second page uses exactly three internal destinations");
+  assert(dests.size === 4, "twenty-second page uses exactly four internal destinations");
   assert(dests.has(TWENTY_SECOND_HUB_HREF), "twenty-second destinations include hub page");
   assert(dests.has(TWENTY_SECOND_SLEEP_INDUCING_HREF), "twenty-second destinations include sleep-inducing page");
+  assert(dests.has("/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn"), "twenty-second destinations include relax meditation");
   assert(dests.has(TWENTY_SECOND_NO_LYRICS_HREF), "twenty-second destinations include no-lyrics page");
 
   const differenceLinks = (differenceSection.blocks ?? [])
@@ -6738,7 +6743,7 @@ function testTwentyThirdPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-third page has exactly three internal title-anchors");
+  assert(allLinks.length === 4, "twenty-third page has exactly four internal title-anchors");
   const soothingLinks = allLinks.filter((link) => link.href === TWENTY_THIRD_SOOTHING_HREF);
   assert(soothingLinks.length === 1, "twenty-third page has exactly one soothing title-only link");
   assert(soothingLinks[0].label === TWENTY_THIRD_SOOTHING_LABEL, "twenty-third soothing label is exact title-only");
@@ -6754,10 +6759,11 @@ function testTwentyThirdPage() {
     assert(link.href.startsWith("/listens/"), `twenty-third href is site-relative: ${link.href}`);
   }
   const dests = new Set(allLinks.map((link) => link.href));
-  assert(dests.size === 3, "twenty-third page uses exactly three internal destinations");
+  assert(dests.size === 4, "twenty-third page uses exactly four internal destinations");
   assert(dests.has(TWENTY_THIRD_SOOTHING_HREF), "twenty-third destinations include soothing page");
   assert(dests.has(TWENTY_THIRD_HUB_HREF), "twenty-third destinations include hub page");
   assert(dests.has(TWENTY_THIRD_NO_LYRICS_HREF), "twenty-third destinations include no-lyrics page");
+  assert(dests.has("/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn"), "twenty-third destinations include falling-asleep meditation");
 
   const mixedLinks = (mixedSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
@@ -7055,7 +7061,7 @@ function testTwentyFourthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-fourth page has exactly three internal title-anchors");
+  assert(allLinks.length === 4, "twenty-fourth page has exactly four internal title-anchors");
   const hubLinks = allLinks.filter((link) => link.href === TWENTY_FOURTH_HUB_HREF);
   assert(hubLinks.length === 1, "twenty-fourth page has one hub phrase link");
   assert(hubLinks[0].label === TWENTY_FOURTH_HUB_LABEL, "twenty-fourth hub label is подборку музыки для сна");
@@ -7071,10 +7077,11 @@ function testTwentyFourthPage() {
     assert(link.href.startsWith("/listens/"), `twenty-fourth href is site-relative: ${link.href}`);
   }
   const dests = new Set(allLinks.map((link) => link.href));
-  assert(dests.size === 3, "twenty-fourth page uses exactly three internal destinations");
+  assert(dests.size === 4, "twenty-fourth page uses exactly four internal destinations");
   assert(dests.has(TWENTY_FOURTH_HUB_HREF), "twenty-fourth destinations include hub page");
   assert(dests.has(TWENTY_FOURTH_SOOTHING_HREF), "twenty-fourth destinations include soothing page");
   assert(dests.has(TWENTY_FOURTH_SLEEP_INDUCING_HREF), "twenty-fourth destinations include sleep-inducing page");
+  assert(dests.has("/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn"), "twenty-fourth destinations include no-voice meditation");
 
   const hubSectionLinks = (hubSection.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
@@ -7310,7 +7317,13 @@ function testTwentyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "twenty-fifth page has no internal title-anchors");
+  assert(allLinks.length === 5, "twenty-fifth page has exactly five internal title-anchors");
+  const twentyFifthDests = new Set(allLinks.map((link) => link.href));
+  assert(twentyFifthDests.has("/listens/meditatsiya-pered-snom-slushat-onlayn-besplatno"), "twenty-fifth links to bedtime page");
+  assert(twentyFifthDests.has("/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn"), "twenty-fifth links to relax page");
+  assert(twentyFifthDests.has("/listens/meditatsiya-dlya-glubokogo-sna-slushat-onlayn"), "twenty-fifth links to deep-sleep page");
+  assert(twentyFifthDests.has("/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn"), "twenty-fifth links to falling-asleep page");
+  assert(twentyFifthDests.has("/listens/meditatsiya-dlya-sna-s-golosom-slushat-besplatno"), "twenty-fifth links to voiced page");
 
   const contentSource = read("src/lib/seo/listens/content/meditatsiya-dlya-sna-slushat-onlayn-besplatno.ts");
   assert(
@@ -7318,7 +7331,7 @@ function testTwentyFifthPage() {
     "twenty-fifth content file has no production listen URLs",
   );
   assert(!contentSource.includes("https://"), "twenty-fifth content file has no https://");
-  assert(!contentSource.includes("href:"), "twenty-fifth content file has no href");
+  assert(contentSource.includes("href:"), "twenty-fifth content file has cluster hrefs");
   assert(
     !contentSource.includes("SEO-самопроверка"),
     "twenty-fifth content file has no SEO-самопроверка",
@@ -7495,9 +7508,12 @@ function testTwentySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "twenty-sixth page has exactly one internal title-anchor");
+  assert(allLinks.length === 4, "twenty-sixth page has exactly four internal title-anchors");
   assert(allLinks[0].href === TWENTY_SIXTH_HUB_HREF, "twenty-sixth hub href exact");
   assert(allLinks[0].label === TWENTY_SIXTH_HUB_LABEL, "twenty-sixth hub label exact");
+  assert(allLinks[1].href === "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", "twenty-sixth new zasypaniya href");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-sna-bez-reklamy-slushat-besplatno", "twenty-sixth new no-ads href");
+  assert(allLinks[3].href === "/listens/meditatsiya-na-noch-slushat-pered-snom", "twenty-sixth new night href");
   assert(!String(allLinks[0].label).includes("https://"), "twenty-sixth link label is not a URL");
   assert(!String(allLinks[0].label).includes("/listens/"), "twenty-sixth link label is not a path");
 
@@ -7700,11 +7716,14 @@ function testTwentySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "twenty-seventh page has exactly two internal title-anchors");
+  assert(allLinks.length === 5, "twenty-seventh page has exactly five internal title-anchors");
   assert(allLinks[0].href === TWENTY_SEVENTH_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === TWENTY_SEVENTH_LINK1_LABEL, "first link label exact");
   assert(allLinks[1].href === TWENTY_SEVENTH_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === TWENTY_SEVENTH_LINK2_LABEL, "second link label exact");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy", "twenty-seventh new nerves href");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-ot-stressa-i-trevogi", "twenty-seventh new stress href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna", "twenty-seventh new good-sleep href");
   assert(!String(allLinks[0].label).includes("/listens/"), "first link label is not a path");
   assert(!String(allLinks[1].label).includes("/listens/"), "second link label is not a path");
 
@@ -7923,13 +7942,15 @@ function testTwentyEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-eighth page has exactly three internal title-anchors");
+  assert(allLinks.length === 5, "twenty-eighth page has exactly five internal title-anchors");
   assert(allLinks[0].href === TWENTY_EIGHTH_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === TWENTY_EIGHTH_LINK1_LABEL, "first link label exact");
   assert(allLinks[1].href === TWENTY_EIGHTH_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === TWENTY_EIGHTH_LINK2_LABEL, "second link label exact");
   assert(allLinks[2].href === TWENTY_EIGHTH_LINK3_HREF, "third link href exact");
   assert(allLinks[2].label === TWENTY_EIGHTH_LINK3_LABEL, "third link label exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", "twenty-eighth new zasypaniya href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", "twenty-eighth new recovery href");
   assert(!String(allLinks[0].label).includes("/listens/"), "first link label is not a path");
   assert(!String(allLinks[1].label).includes("/listens/"), "second link label is not a path");
   assert(!String(allLinks[2].label).includes("/listens/"), "third link label is not a path");
@@ -8169,13 +8190,15 @@ function testTwentyNinthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "twenty-ninth page has exactly three internal title-anchors");
+  assert(allLinks.length === 5, "twenty-ninth page has exactly five internal title-anchors");
   assert(allLinks[0].href === TWENTY_NINTH_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === TWENTY_NINTH_LINK1_LABEL, "first link label exact");
   assert(allLinks[1].href === TWENTY_NINTH_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === TWENTY_NINTH_LINK2_LABEL, "second link label exact");
   assert(allLinks[2].href === TWENTY_NINTH_LINK3_HREF, "third link href exact");
   assert(allLinks[2].label === TWENTY_NINTH_LINK3_LABEL, "third link label exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", "twenty-ninth new zasypaniya href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn", "twenty-ninth new women href");
 
   const differRich = (differSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(differRich.length === 1, "differ section has one rich_paragraph");
@@ -8415,11 +8438,14 @@ function testThirtiethPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "thirtieth page has exactly two internal title-anchors");
+  assert(allLinks.length === 5, "thirtieth page has exactly five internal title-anchors");
   assert(allLinks[0].href === THIRTIETH_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === THIRTIETH_LINK1_LABEL, "first link label exact");
   assert(allLinks[1].href === THIRTIETH_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === THIRTIETH_LINK2_LABEL, "second link label exact");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn", "thirtieth new relax href");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", "thirtieth new recovery href");
+  assert(allLinks[4].href === "/listens/meditatsiya-pered-snom-slushat-onlayn-besplatno", "thirtieth new bedtime href");
 
   const whatRich = (whatSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(whatRich.length === 1, "what-is section has one rich_paragraph");
@@ -8720,13 +8746,15 @@ function testThirtyFirstPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "thirty-first page has exactly three internal anchors");
+  assert(allLinks.length === 5, "thirty-first page has exactly five internal anchors");
   assert(allLinks[0].href === THIRTY_FIRST_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === THIRTY_FIRST_LINK1_LABEL, "first link label exact not page title");
   assert(allLinks[1].href === THIRTY_FIRST_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === THIRTY_FIRST_LINK2_LABEL, "second link label exact not page title");
   assert(allLinks[2].href === THIRTY_FIRST_LINK3_HREF, "third link href exact");
   assert(allLinks[2].label === THIRTY_FIRST_LINK3_LABEL, "third link label exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-bez-golosa-slushat-onlayn", "thirty-first new no-voice href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn", "thirty-first new women href");
 
   const whatRich = (whatSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(whatRich.length === 1, "what-is section has one rich_paragraph");
@@ -9030,11 +9058,13 @@ function testThirtySecondPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "thirty-second page has exactly two internal anchors");
+  assert(allLinks.length === 4, "thirty-second page has exactly four internal anchors");
   assert(allLinks[0].href === THIRTY_SECOND_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === THIRTY_SECOND_LINK1_LABEL, "first link label exact not page title");
   assert(allLinks[1].href === THIRTY_SECOND_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === THIRTY_SECOND_LINK2_LABEL, "second link label exact not page title");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", "thirty-second new hub href");
+  assert(allLinks[3].href === "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn", "thirty-second new no-lyrics music href");
 
   const voiceRich = (voiceSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(voiceRich.length === 1, "voice-diff section has one rich_paragraph");
@@ -9311,11 +9341,13 @@ function testThirtyThirdPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "thirty-third page has exactly two internal anchors");
+  assert(allLinks.length === 4, "thirty-third page has exactly four internal anchors");
   assert(allLinks[0].href === THIRTY_THIRD_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === THIRTY_THIRD_LINK1_LABEL, "first link label exact not page title");
   assert(allLinks[1].href === THIRTY_THIRD_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === THIRTY_THIRD_LINK2_LABEL, "second link label exact not page title");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", "thirty-third new zasypaniya href");
+  assert(allLinks[3].href === "/listens/meditatsiya-na-noch-slushat-pered-snom", "thirty-third new night href");
 
   const freeRich = (freeSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(freeRich.length === 1, "free section has one rich_paragraph");
@@ -9589,11 +9621,13 @@ function testThirtyFourthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "thirty-fourth page has exactly two internal anchors");
+  assert(allLinks.length === 4, "thirty-fourth page has exactly four internal anchors");
   assert(allLinks[0].href === THIRTY_FOURTH_LINK1_HREF, "first link href exact");
   assert(allLinks[0].label === THIRTY_FOURTH_LINK1_LABEL, "first link label exact");
   assert(allLinks[1].href === THIRTY_FOURTH_LINK2_HREF, "second link href exact");
   assert(allLinks[1].label === THIRTY_FOURTH_LINK2_LABEL, "second link label exact");
+  assert(allLinks[2].href === "/listens/meditatsiya-dlya-sna-ot-stressa-i-trevogi", "thirty-fourth new stress href");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", "thirty-fourth new hub href");
 
   const bedtimeRich = (bedtimeSection.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
   assert(bedtimeRich.length === 1, "bedtime section has one rich_paragraph");
@@ -9935,11 +9969,13 @@ function testThirtyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 4, "thirty-fifth page has exactly four internal anchors");
+  assert(allLinks.length === 6, "thirty-fifth page has exactly six internal anchors");
   assert(allLinks[0].href === THIRTY_FIFTH_LINK1_HREF && allLinks[0].label === THIRTY_FIFTH_LINK1_LABEL, "link1 exact");
   assert(allLinks[1].href === THIRTY_FIFTH_LINK2_HREF && allLinks[1].label === THIRTY_FIFTH_LINK2_LABEL, "link2 exact");
   assert(allLinks[2].href === THIRTY_FIFTH_LINK3_HREF && allLinks[2].label === THIRTY_FIFTH_LINK3_LABEL, "link3 exact");
   assert(allLinks[3].href === THIRTY_FIFTH_LINK4_HREF && allLinks[3].label === THIRTY_FIFTH_LINK4_LABEL, "link4 exact");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", "thirty-fifth new hub href");
+  assert(allLinks[5].href === "/listens/meditatsiya-dlya-sna-i-vosstanovleniya-sil", "thirty-fifth new recovery href");
 
   const pairs = [
     ["Медитация перед сном для женщин", THIRTY_FIFTH_LINK1_BEFORE, THIRTY_FIFTH_LINK1_HREF, THIRTY_FIFTH_LINK1_LABEL, "Если главным является именно момент непосредственно перед засыпанием, можно открыть медитацию перед сном."],
@@ -10122,10 +10158,13 @@ function testThirtySixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "thirty-sixth page has exactly three internal anchors");
+  assert(allLinks.length === 6, "thirty-sixth page has exactly six internal anchors");
   assert(allLinks[0].href === THIRTY_SIXTH_LINK1_HREF && allLinks[0].label === THIRTY_SIXTH_LINK1_LABEL, "link1 exact");
   assert(allLinks[1].href === THIRTY_SIXTH_LINK2_HREF && allLinks[1].label === THIRTY_SIXTH_LINK2_LABEL, "link2 exact");
   assert(allLinks[2].href === THIRTY_SIXTH_LINK3_HREF && allLinks[2].label === THIRTY_SIXTH_LINK3_LABEL, "link3 exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-na-noch-slushat-pered-snom", "thirty-sixth new night href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-sna-i-rasslableniya-slushat-onlayn", "thirty-sixth new relax href");
+  assert(allLinks[5].href === "/listens/usyplyayushchaya-muzyka-dlya-sna-slushat-onlayn", "thirty-sixth new sleep-inducing music href");
 
   const pairs = [
     ["Что такое медитация для засыпания", THIRTY_SIXTH_LINK1_BEFORE, THIRTY_SIXTH_LINK1_HREF, THIRTY_SIXTH_LINK1_LABEL, "Если нужен более широкий выбор практик без акцента именно на моменте засыпания, можно открыть медитацию для сна."],
@@ -10376,10 +10415,12 @@ function testThirtySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "thirty-seventh page has exactly three internal anchors");
+  assert(allLinks.length === 5, "thirty-seventh page has exactly five internal anchors");
   assert(allLinks[0].href === THIRTY_SEVENTH_LINK1_HREF && allLinks[0].label === THIRTY_SEVENTH_LINK1_LABEL, "link1 exact");
   assert(allLinks[1].href === THIRTY_SEVENTH_LINK2_HREF && allLinks[1].label === THIRTY_SEVENTH_LINK2_LABEL, "link2 exact");
   assert(allLinks[2].href === THIRTY_SEVENTH_LINK3_HREF && allLinks[2].label === THIRTY_SEVENTH_LINK3_LABEL, "link3 exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", "thirty-seventh new hub href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna", "thirty-seventh new good-sleep href");
 
   const pairs = [
     ["Медитация перед сном от стресса", THIRTY_SEVENTH_LINK1_BEFORE, THIRTY_SEVENTH_LINK1_HREF, THIRTY_SEVENTH_LINK1_LABEL, "Если основной интерес связан именно с вечерней практикой непосредственно перед засыпанием, можно открыть медитацию перед сном."],
@@ -10630,10 +10671,12 @@ function testThirtyEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "thirty-eighth page has exactly three internal anchors");
+  assert(allLinks.length === 5, "thirty-eighth page has exactly five internal anchors");
   assert(allLinks[0].href === THIRTY_EIGHTH_LINK1_HREF && allLinks[0].label === THIRTY_EIGHTH_LINK1_LABEL, "link1 exact");
   assert(allLinks[1].href === THIRTY_EIGHTH_LINK2_HREF && allLinks[1].label === THIRTY_EIGHTH_LINK2_LABEL, "link2 exact");
   assert(allLinks[2].href === THIRTY_EIGHTH_LINK3_HREF && allLinks[2].label === THIRTY_EIGHTH_LINK3_LABEL, "link3 exact");
+  assert(allLinks[3].href === "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", "thirty-eighth new hub href");
+  assert(allLinks[4].href === "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", "thirty-eighth new zasypaniya href");
 
   const pairs = [
     ["Медитация для глубокого сна и восстановления", THIRTY_EIGHTH_LINK1_BEFORE, THIRTY_EIGHTH_LINK1_HREF, THIRTY_EIGHTH_LINK1_LABEL, "Если основной интерес связан с самим понятием более глубокого сна, можно открыть медитацию для глубокого сна."],

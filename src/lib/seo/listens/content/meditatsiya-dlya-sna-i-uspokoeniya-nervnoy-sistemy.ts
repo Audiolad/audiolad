@@ -283,6 +283,22 @@ export const MEDITATSIYA_DLYA_SNA_I_USPOKOENIYA_NERVNOY_SISTEMY_PAGE =
         blocks: [
           { kind: "paragraph", text: "Медитация для сна и успокоения нервной системы может помочь остановить дневной темп, переключить внимание и создать более спокойный переход к отдыху." },
           { kind: "paragraph", text: "Она не лечит нервную систему и не гарантирует засыпание." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если напряжение связано с дневными событиями, можно попробовать " },
+              { href: "/listens/meditatsiya-dlya-sna-ot-stressa-i-trevogi", label: "медитацию для сна от стресса и тревоги" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для более широкого выбора вечерних практик откройте " },
+              { href: "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno", label: "медитацию для сна" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и начните слушать." },
         ],
       },

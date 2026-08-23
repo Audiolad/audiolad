@@ -236,6 +236,30 @@ export const MEDITATSIYA_PERED_SNOM_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           { kind: "paragraph", text: "Медитация перед сном может стать простым переходом между активным днём и спокойным отдыхом." },
           { kind: "paragraph", text: "Не нужно выполнять её идеально или обязательно дослушивать каждую запись до конца." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и начните слушать." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Когда важен именно момент отхода ко сну, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-zasypaniya-slushat-onlayn", label: "медитацию для засыпания" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется слушать вечером без лишних переключений, откройте " },
+              { href: "/listens/meditatsiya-dlya-sna-bez-reklamy-slushat-besplatno", label: "непрерывную ночную практику" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если практика нужна шире, как сопровождение всего вечера, подойдёт " },
+              { href: "/listens/meditatsiya-na-noch-slushat-pered-snom", label: "медитация на ночь" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],

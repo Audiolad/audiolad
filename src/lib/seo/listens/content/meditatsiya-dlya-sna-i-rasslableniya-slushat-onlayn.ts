@@ -241,6 +241,30 @@ export const MEDITATSIYA_DLYA_SNA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Медитация для сна и расслабления может стать мягким переходом от дневной активности к отдыху." },
           { kind: "paragraph", text: "Не нужно добиваться идеальной тишины в голове или полного расслабления всего тела." },
           { kind: "paragraph", text: "Выберите подходящую практику в плейлисте, устройтесь удобно и позвольте себе постепенно перейти к более спокойному вечернему состоянию." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если дневной темп ещё держится и хочется мягче переключить внимание, подойдёт " },
+              { href: "/listens/meditatsiya-dlya-sna-i-uspokoeniya-nervnoy-sistemy", label: "медитация для сна и успокоения нервной системы" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "После напряжённого дня можно также попробовать " },
+              { href: "/listens/meditatsiya-dlya-sna-ot-stressa-i-trevogi", label: "медитацию для сна от стресса и тревоги" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Когда хочется не только расслабиться, но и спокойнее завершить день, можно открыть " },
+              { href: "/listens/meditatsiya-dlya-horoshego-i-spokoynogo-sna", label: "медитацию для хорошего и спокойного сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
     ],
