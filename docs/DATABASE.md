@@ -405,6 +405,25 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 Откат до появления связей этапа 3: `DROP FUNCTION public.touch_external_identity(text, text); DROP TABLE public.external_identities;`. Прикладного destructive rollback нет.
 
+### quick_offers / quick_offer_materials (2026-08-23)
+
+Миграция: `20260823140000_quick_offers.sql`.
+
+Переиспользуемый шаблон продающей страницы «Быстрый оффер» (`template_key = catalog/quick-offer`).
+
+Отдельной таблицы скидок в проекте нет. Обычная цена оплаты живёт в `practices.price`. `quick_offers.promo_price` — цена витрины/оффера в рублях, применяется только на этой странице, пока активно окно таймера посетителя. Checkout не принимает сумму от клиента: `create_practice_order` создаёт pending-заказ, затем `apply_quick_offer_amount` переписывает `amount_minor` / `price_minor_snapshot` на сервере.
+
+| Таблица | Назначение |
+|---------|------------|
+| `quick_offers` | Оффер автора: продукт, slug, обложка, описание, promo_price, CTA, timer, status |
+| `quick_offer_materials` | Упорядоченные карточки 3:4. Подпись = автономер + `format_label` (≤ 6 символов, без переносов) |
+
+RLS: `user_can_read_author_promotion(author_id)` (owner/editor или platform admin). Публичное чтение только через `get_public_quick_offer(slug)` — исключительно `status = published`.
+
+Ownership: триггер `enforce_quick_offer_product_owner` запрещает привязать чужой `practices.author_id`.
+
+Публичный маршрут: `/offers/[slug]`.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

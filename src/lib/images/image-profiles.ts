@@ -165,6 +165,36 @@ export const IMAGE_PROFILES: Record<ImageProfile, ImageProfileConfig> = {
     allowUpscale: false,
     storesOriginal: false,
   },
+  "quick-offer-hero": {
+    profile: "quick-offer-hero",
+    maxUploadBytes: 3 * 1024 * 1024,
+    minSourceWidth: 400,
+    minSourceHeight: 400,
+    requireSquare: false,
+    targetAspectRatio: 1,
+    aspectTolerance: 0.12,
+    variants: SQUARE_COVER_VARIANTS,
+    includePlaceholder: true,
+    allowUpscale: false,
+    storesOriginal: false,
+  },
+  "quick-offer-card": {
+    profile: "quick-offer-card",
+    maxUploadBytes: 3 * 1024 * 1024,
+    minSourceWidth: 300,
+    minSourceHeight: 400,
+    requireSquare: false,
+    targetAspectRatio: 3 / 4,
+    aspectTolerance: 0.12,
+    variants: [
+      { key: "sm", width: 360, height: 480, quality: 84, fit: "cover", required: true },
+      { key: "md", width: 540, height: 720, quality: 83, fit: "cover", required: true },
+      { key: "lg", width: 720, height: 960, quality: 82, fit: "cover", required: true },
+    ],
+    includePlaceholder: true,
+    allowUpscale: false,
+    storesOriginal: false,
+  },
 };
 
 export function profileStoresOriginal(profile: ImageProfile): boolean {

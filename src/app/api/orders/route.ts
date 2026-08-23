@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 
 import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import {
+  extractOfferWindowExpiresAt,
   extractOrderAnalyticsClaims,
   extractPracticeSlug,
+  extractQuickOfferId,
   mapRpcErrorMessage,
   parseJsonObject,
   resolveIdempotencyKey,
@@ -62,6 +64,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
+  const quickOfferId = extractQuickOfferId(parsedBody);
+  const offerWindowExpiresAt = extractOfferWindowExpiresAt(parsedBody);
+
   const claims = extractOrderAnalyticsClaims(
     parsedBody,
     sanitizeCheckoutOriginPath,
@@ -107,6 +112,36 @@ export async function POST(request: Request) {
   if (!row?.order_id) {
     console.error("create_order_rpc_empty_result");
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (quickOfferId) {
+    const { data: priced, error: priceError } = await supabase.rpc(
+      "apply_quick_offer_amount",
+      {
+        p_order_id: row.order_id,
+        p_quick_offer_id: quickOfferId,
+        p_window_expires_at: offerWindowExpiresAt,
+      },
+    );
+
+    if (priceError) {
+      const mapped = mapRpcErrorMessage(priceError.message);
+
+      if (mapped.status >= 500) {
+        console.error("apply_quick_offer_amount_error", priceError.message);
+      }
+
+      return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    }
+
+    const pricedRow =
+      priced && typeof priced === "object"
+        ? (priced as { amount_minor?: number })
+        : null;
+
+    if (typeof pricedRow?.amount_minor === "number") {
+      row.amount_minor = pricedRow.amount_minor;
+    }
   }
 
   const confidence = row.attribution_confidence ?? "unknown";

@@ -681,6 +681,7 @@ function testCustomChannelFormUi() {
   assert(client.includes("buildChannelFormSeedFromStats"), "stats row loads channel form seed");
   assert(client.includes("PromotionCampaignLinksSection"), "links section component wired");
   assert(client.includes("AuthorPromoPagesClient"), "promo pages client wired");
+  assert(client.includes("AuthorQuickOffersClient"), "quick offers client wired");
 }
 
 function testCustomChannelModulesExist() {

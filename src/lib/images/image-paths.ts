@@ -79,6 +79,42 @@ export function buildAuthorAssetOriginalPath(
   return `${buildAuthorAssetVariantBasePath(authorId, kind, versionId)}/original.${extension}`;
 }
 
+export function buildQuickOfferAssetVariantBasePath(
+  authorId: string,
+  offerId: string,
+  kind: "hero" | "material",
+  versionId: string,
+  materialId?: string,
+): string {
+  if (kind === "material" && materialId) {
+    return `authors/${authorId}/quick-offers/${offerId}/materials/${materialId}/variants/${versionId}`;
+  }
+
+  return `authors/${authorId}/quick-offers/${offerId}/${kind}/variants/${versionId}`;
+}
+
+export function buildQuickOfferAssetVariantPath(
+  authorId: string,
+  offerId: string,
+  kind: "hero" | "material",
+  versionId: string,
+  key: ImageVariantKey,
+  materialId?: string,
+): string {
+  return `${buildQuickOfferAssetVariantBasePath(authorId, offerId, kind, versionId, materialId)}/${buildVariantFileName(key)}`;
+}
+
+export function buildQuickOfferAssetOriginalPath(
+  authorId: string,
+  offerId: string,
+  kind: "hero" | "material",
+  versionId: string,
+  extension: "jpg" | "png" | "webp",
+  materialId?: string,
+): string {
+  return `${buildQuickOfferAssetVariantBasePath(authorId, offerId, kind, versionId, materialId)}/original.${extension}`;
+}
+
 export function buildUserAvatarVariantBasePath(
   userId: string,
   versionId: string,
@@ -142,6 +178,9 @@ export function buildVariantPathsForProfile(
     authorKind?: "avatar" | "banner";
     userId?: string;
     playlistId?: string;
+    offerId?: string;
+    offerAssetKind?: "hero" | "material";
+    materialId?: string;
   },
 ): {
   originalPath?: string;
@@ -250,6 +289,36 @@ export function buildVariantPathsForProfile(
             playlistId,
             versionId,
             variant.key,
+          ),
+        );
+      }
+      break;
+    }
+    case "quick-offer-hero":
+    case "quick-offer-card": {
+      const authorId = context.authorId!;
+      const offerId = context.offerId!;
+      const kind = context.offerAssetKind ?? (profile === "quick-offer-card" ? "material" : "hero");
+      const materialId = context.materialId;
+      const { versionId, originalExtension } = processed;
+      originalPath = buildQuickOfferAssetOriginalPath(
+        authorId,
+        offerId,
+        kind,
+        versionId,
+        originalExtension,
+        materialId,
+      );
+      for (const variant of processed.variants) {
+        assign(
+          variant.key,
+          buildQuickOfferAssetVariantPath(
+            authorId,
+            offerId,
+            kind,
+            versionId,
+            variant.key,
+            materialId,
           ),
         );
       }

@@ -44,6 +44,7 @@ export type PublicApiErrorCode =
   | "pending_order_exists"
   | "practice_not_found"
   | "practice_not_for_sale"
+  | "quick_offer_invalid"
   | "internal_error";
 
 export function parseJsonObject(raw: unknown): Record<string, unknown> | null {
@@ -74,6 +75,43 @@ export function extractPracticeSlug(
   }
 
   return trimmed;
+}
+
+export function extractQuickOfferId(
+  body: Record<string, unknown>,
+): string | null {
+  const value = body.quick_offer_id;
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!UUID_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed.toLowerCase();
+}
+
+export function extractOfferWindowExpiresAt(
+  body: Record<string, unknown>,
+): string | null {
+  const value = body.offer_window_expires_at;
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const parsed = Date.parse(trimmed);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return new Date(parsed).toISOString();
 }
 
 /**
@@ -162,6 +200,13 @@ export function mapRpcErrorMessage(message: string): {
     normalized.includes("invalid_practice_price")
   ) {
     return { status: 409, error: "practice_not_for_sale" };
+  }
+
+  if (
+    normalized.includes("quick_offer_invalid") ||
+    normalized.includes("quick_offer_not_found")
+  ) {
+    return { status: 409, error: "quick_offer_invalid" };
   }
 
   return { status: 500, error: "internal_error" };
