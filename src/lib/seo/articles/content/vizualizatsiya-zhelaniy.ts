@@ -19,9 +19,9 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
   shortAnswer:
     "Многие используют визуализацию как способ мысленно представить важную для себя цель. Сама по себе она не меняет обстоятельства и не гарантирует исполнение желаний, но может помочь лучше понять, к чему человек стремится, и внимательнее относиться к своим следующим шагам.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "klyuch-k-izobiliyu",
   },
@@ -178,11 +178,6 @@ export const VIZUALIZATSIYA_ZHELANIY_ARTICLE = {
   brandNote:
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
     {
       href: "/articles/kak-ponyat-chego-ya-hochu",
       title: "Как понять, чего я хочу",

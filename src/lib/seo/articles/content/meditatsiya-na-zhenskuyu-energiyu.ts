@@ -18,9 +18,9 @@ export const MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE = {
   shortAnswer:
     "Медитация на женскую энергию не требует соответствовать определённому образу женщины. Не существует обязательного набора качеств, которыми должна обладать каждая. Цель практики – не стать «правильнее», а создать спокойное пространство для внимания к своему внутреннему состоянию.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "zhenskaya-energiya",
+  topicTitle: "Женская энергия",
+  topicHref: "/topics/zhenskaya-energiya",
   primaryPractice: {
     practiceKey: "zhenskaya-energiya",
   },
@@ -347,11 +347,7 @@ export const MEDITATSIYA_NA_ZHENSKUYU_ENERGIYU_ARTICLE = {
       title: "Женская энергия",
       description: "Практики про женственность, наполнение и мягкую силу",
     },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
+
   ],
   closingSection: {
     id: "glavnoe",

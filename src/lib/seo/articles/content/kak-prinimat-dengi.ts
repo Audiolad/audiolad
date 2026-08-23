@@ -17,9 +17,9 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
   shortAnswer:
     "Спокойно принимать деньги – не значит становиться жадной, меркантильной или ставить материальную выгоду выше отношений. Речь идёт о способности признавать ценность своего труда, уважать договорённости и принимать то, что другой человек добровольно готов дать.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "zhenskie-dengi",
   },
@@ -597,8 +597,8 @@ export const KAK_PRINIMAT_DENGI_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

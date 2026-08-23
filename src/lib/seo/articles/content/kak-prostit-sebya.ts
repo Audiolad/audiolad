@@ -18,9 +18,9 @@ export const KAK_PROSTIT_SEBYA_ARTICLE = {
   shortAnswer:
     "Простить себя не значит объявить любой свой поступок правильным. Это значит признать произошедшее, сделать возможные выводы и перестать использовать прошлую ошибку как бесконечное доказательство собственной плохости.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "lyubov-k-sebe",
+  topicTitle: "Любовь к себе",
+  topicHref: "/topics/lyubov-k-sebe",
   primaryPractice: {
     practiceKey: "13-shagov-radikalnogo-proscheniya",
   },
@@ -310,8 +310,8 @@ export const KAK_PROSTIT_SEBYA_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/lyubov-k-sebe",
+      title: "Любовь к себе",
       description: "Тематическая подборка АудиоЛада",
     },
     {

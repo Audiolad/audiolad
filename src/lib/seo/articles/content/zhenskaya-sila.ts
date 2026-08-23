@@ -18,9 +18,9 @@ export const ZHENSKAYA_SILA_ARTICLE = {
   shortAnswer:
     "Размышляя о женской силе, полезно не искать идеальный образ, которому нужно соответствовать, а лучше понять себя: что помогает чувствовать внутреннюю опору именно вам, какие решения делают жизнь более устойчивой и какие привычки постепенно укрепляют уверенность.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "zhenskaya-energiya",
+  topicTitle: "Женская энергия",
+  topicHref: "/topics/zhenskaya-energiya",
   primaryPractice: {
     practiceKey: "zhenskaya-energiya",
   },
@@ -357,11 +357,6 @@ export const ZHENSKAYA_SILA_ARTICLE = {
       href: "/articles/zhenskaya-energiya-chto-eto",
       title: "Женская энергия: что это",
       description: "Что обычно понимают под этим выражением простыми словами",
-    },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
     },
     {
       href: "/topics/zhenskaya-energiya",

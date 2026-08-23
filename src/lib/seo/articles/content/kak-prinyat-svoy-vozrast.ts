@@ -18,9 +18,9 @@ export const KAK_PRINYAT_SVOY_VOZRAST_ARTICLE = {
   shortAnswer:
     "Принять свой возраст – не значит отказаться от желания хорошо выглядеть, перестать заботиться о себе или забыть о своих мечтах. Скорее речь идёт о том, чтобы перестать воспринимать возраст как постоянного противника и научиться замечать ценность того периода жизни, в котором вы находитесь сейчас.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "lyubov-k-sebe",
+  topicTitle: "Любовь к себе",
+  topicHref: "/topics/lyubov-k-sebe",
   primaryPractice: {
     practiceKey: "elixir-molodosti",
   },
@@ -325,8 +325,8 @@ export const KAK_PRINYAT_SVOY_VOZRAST_ARTICLE = {
       description: "Что обычно понимают под женской силой и как она проявляется",
     },
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/lyubov-k-sebe",
+      title: "Любовь к себе",
       description: "Тематическая подборка АудиоЛада",
     },
   ],

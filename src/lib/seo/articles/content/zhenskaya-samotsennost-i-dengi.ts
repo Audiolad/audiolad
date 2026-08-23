@@ -18,9 +18,9 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
   shortAnswer:
     "Самоценность не определяет доход автоматически. Уважительное отношение к себе не гарантирует финансового роста, а материальные трудности не означают, что женщина недостаточно ценит себя. Но внутреннее отношение к собственному труду и потребностям иногда влияет на финансовые решения, переговоры и личные границы.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "zhenskie-dengi",
   },
@@ -397,8 +397,8 @@ export const ZHENSKAYA_SAMOTSENNOST_I_DENGI_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {

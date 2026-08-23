@@ -1490,11 +1490,11 @@ assert(
   "wish meditation metaDescription is not visual lead",
 );
 assert(
-  wishMeditationArticle.topicSlug === "besplatnye-meditatsii",
-  "wish meditation uses free meditations hub",
+  wishMeditationArticle.topicSlug === "pending-hub-reconciliation",
+  "wish meditation waits for hub reconciliation",
 );
 assert(
-  wishMeditationArticle.topicHref === "/topics/besplatnye-meditatsii",
+  wishMeditationArticle.topicHref === "/articles",
   "wish meditation topic href",
 );
 assert(
@@ -1620,16 +1620,16 @@ assert(
   "wish meditation brand note",
 );
 assert(
-  wishMeditationArticle.seeAlsoLinks.some(
+  !wishMeditationArticle.seeAlsoLinks.some(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
-  "wish meditation see-also includes primary hub",
+  "wish meditation see-also no longer parks on free hub",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "meditatsiya-na-ispolnenie-zhelaniy",
   ),
-  "free hub lists wish meditation article",
+  "pending sentinel lists wish meditation article",
 );
 assert(
   !wishMeditationArticle.leadBeforeAudio.includes("—") &&
@@ -1670,11 +1670,11 @@ assert(
   "wish visualization metaDescription is not visual lead",
 );
 assert(
-  wishVisualizationArticle.topicSlug === "besplatnye-meditatsii",
-  "wish visualization uses free meditations hub",
+  wishVisualizationArticle.topicSlug === "pending-hub-reconciliation",
+  "wish visualization waits for hub reconciliation",
 );
 assert(
-  wishVisualizationArticle.topicHref === "/topics/besplatnye-meditatsii",
+  wishVisualizationArticle.topicHref === "/articles",
   "wish visualization topic href",
 );
 assert(
@@ -1794,16 +1794,16 @@ assert(
   "wish visualization brand note",
 );
 assert(
-  wishVisualizationArticle.seeAlsoLinks.some(
+  !wishVisualizationArticle.seeAlsoLinks.some(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
-  "wish visualization see-also includes primary hub",
+  "wish visualization see-also no longer parks on free hub",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "vizualizatsiya-zhelaniy",
   ),
-  "free hub lists wish visualization article",
+  "pending sentinel lists wish visualization article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -1855,11 +1855,11 @@ assert(
   "release resentment metaDescription is not visual lead",
 );
 assert(
-  releaseResentmentArticle.topicSlug === "besplatnye-meditatsii",
-  "release resentment uses free meditations hub",
+  releaseResentmentArticle.topicSlug === "pending-hub-reconciliation",
+  "release resentment waits for hub reconciliation",
 );
 assert(
-  releaseResentmentArticle.topicHref === "/topics/besplatnye-meditatsii",
+  releaseResentmentArticle.topicHref === "/articles",
   "release resentment topic href",
 );
 assert(
@@ -1979,10 +1979,10 @@ assert(
   "release resentment brand note",
 );
 assert(
-  releaseResentmentArticle.seeAlsoLinks.some(
+  !releaseResentmentArticle.seeAlsoLinks.some(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
-  "release resentment see-also includes primary hub",
+  "release resentment see-also no longer parks on free hub",
 );
 assert(
   releaseResentmentArticle.updatedAt === "2026-07-27T12:00:00.000Z",
@@ -2020,10 +2020,10 @@ assert(
   "release resentment publishedAt unchanged",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "kak-otpustit-obidu",
   ),
-  "free hub lists release resentment article",
+  "pending sentinel lists release resentment article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -2091,11 +2091,11 @@ assert(
   "forgive-a-person and resentment leads differ",
 );
 assert(
-  forgivePersonArticle.topicSlug === "besplatnye-meditatsii",
-  "forgive-a-person uses free meditations hub",
+  forgivePersonArticle.topicSlug === "pending-hub-reconciliation",
+  "forgive-a-person waits for hub reconciliation",
 );
 assert(
-  forgivePersonArticle.topicHref === "/topics/besplatnye-meditatsii",
+  forgivePersonArticle.topicHref === "/articles",
   "forgive-a-person topic href",
 );
 assert(
@@ -2238,10 +2238,10 @@ assert(
   "forgive-a-person see-also includes resentment article",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "kak-prostit-cheloveka",
   ),
-  "free hub lists forgive-a-person article",
+  "pending sentinel lists forgive-a-person article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -2365,8 +2365,8 @@ assert(
   "habitual-offense lead differs from siblings",
 );
 assert(
-  habitualOffenseArticle.topicSlug === "besplatnye-meditatsii",
-  "habitual-offense uses free meditations hub",
+  habitualOffenseArticle.topicSlug === "pending-hub-reconciliation",
+  "habitual-offense waits for hub reconciliation",
 );
 assert(
   habitualOffenseArticle.primaryPractice.practiceKey ===
@@ -2483,10 +2483,10 @@ assert(
   "habitual-offense keeps professional-support safety note",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "pochemu-my-postoyanno-obizhaemsya",
   ),
-  "free hub lists habitual-offense article",
+  "pending sentinel lists habitual-offense article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -2590,11 +2590,11 @@ assert(
   "past-release lead differs from siblings",
 );
 assert(
-  pastReleaseArticle.topicSlug === "besplatnye-meditatsii",
-  "past-release uses free meditations hub",
+  pastReleaseArticle.topicSlug === "pending-hub-reconciliation",
+  "past-release waits for hub reconciliation",
 );
 assert(
-  pastReleaseArticle.topicHref === "/topics/besplatnye-meditatsii",
+  pastReleaseArticle.topicHref === "/articles",
   "past-release topic href",
 );
 assert(
@@ -2736,10 +2736,10 @@ assert(
   "past-release body mentions one-offense sibling",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "kak-otpustit-proshloe",
   ),
-  "free hub lists past-release article",
+  "pending sentinel lists past-release article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -2789,11 +2789,11 @@ assert(
   "clarify-desires metaDescription is not visual lead",
 );
 assert(
-  clarifyDesiresArticle.topicSlug === "besplatnye-meditatsii",
-  "clarify-desires uses free meditations hub",
+  clarifyDesiresArticle.topicSlug === "pending-hub-reconciliation",
+  "clarify-desires waits for hub reconciliation",
 );
 assert(
-  clarifyDesiresArticle.topicHref === "/topics/besplatnye-meditatsii",
+  clarifyDesiresArticle.topicHref === "/articles",
   "clarify-desires topic href",
 );
 assert(
@@ -2878,10 +2878,10 @@ assert(
   "clarify-desires brand note",
 );
 assert(
-  clarifyDesiresArticle.seeAlsoLinks.some(
+  !clarifyDesiresArticle.seeAlsoLinks.some(
     (item) => item.href === "/topics/besplatnye-meditatsii",
   ),
-  "clarify-desires see-also includes hub",
+  "clarify-desires see-also no longer parks on free hub",
 );
 assert(
   clarifyDesiresArticle.seeAlsoLinks.some(
@@ -2896,10 +2896,10 @@ assert(
   "clarify-desires see-also includes wish visualization",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("pending-hub-reconciliation").some(
     (item) => item.slug === "kak-ponyat-chego-ya-hochu",
   ),
-  "free hub lists clarify-desires article",
+  "pending sentinel lists clarify-desires article",
 );
 assert(
   !listArticlesByTopicSlug("meditatsii-na-dengi").some(
@@ -3166,8 +3166,8 @@ assert(
   "formulate-desire primary practice key",
 );
 assert(
-  formulateDesireArticle.topicSlug === "besplatnye-meditatsii",
-  "formulate-desire uses free meditations hub",
+  formulateDesireArticle.topicSlug === "pending-hub-reconciliation",
+  "formulate-desire waits for hub reconciliation",
 );
 assert(
   formulateDesireArticle.finalAudioLead === "",
@@ -3517,8 +3517,8 @@ assert(
   "self-forgiveness metaDescription is not visual lead",
 );
 assert(
-  selfForgivenessArticle.topicSlug === "besplatnye-meditatsii",
-  "self-forgiveness uses free meditations hub",
+  selfForgivenessArticle.topicSlug === "lyubov-k-sebe",
+  "self-forgiveness uses love hub",
 );
 assert(
   selfForgivenessArticle.primaryPractice.practiceKey ===
@@ -3572,10 +3572,10 @@ assert(
   "self-forgiveness brand note",
 );
 assert(
-  listArticlesByTopicSlug("besplatnye-meditatsii").some(
+  listArticlesByTopicSlug("lyubov-k-sebe").some(
     (item) => item.slug === "kak-prostit-sebya",
   ),
-  "free hub lists self-forgiveness article",
+  "love hub lists self-forgiveness article",
 );
 assert(
   !selfForgivenessArticle.leadBeforeAudio.includes("—") &&
@@ -3646,8 +3646,8 @@ assert(
   "anger-at-person SEO title",
 );
 assert(
-  angerAtPersonArticle.topicSlug === "besplatnye-meditatsii",
-  "anger-at-person hub",
+  angerAtPersonArticle.topicSlug === "pending-hub-reconciliation",
+  "anger-at-person waits for hub reconciliation",
 );
 assert(
   angerAtPersonArticle.primaryPractice.practiceKey ===
@@ -3714,8 +3714,8 @@ assert(
   "allow-yourself-money SEO title",
 );
 assert(
-  allowYourselfMoneyArticle.topicSlug === "besplatnye-meditatsii",
-  "allow-yourself-money hub",
+  allowYourselfMoneyArticle.topicSlug === "meditatsii-na-dengi",
+  "allow-yourself-money uses money hub",
 );
 assert(
   allowYourselfMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -3781,8 +3781,8 @@ assert(
   "female-self-worth-money SEO title",
 );
 assert(
-  femaleSelfWorthMoneyArticle.topicSlug === "besplatnye-meditatsii",
-  "female-self-worth-money hub",
+  femaleSelfWorthMoneyArticle.topicSlug === "meditatsii-na-dengi",
+  "female-self-worth-money uses money hub",
 );
 assert(
   femaleSelfWorthMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -3852,8 +3852,8 @@ assert(
   "fear-spend-on-self SEO title",
 );
 assert(
-  fearSpendOnSelfArticle.topicSlug === "besplatnye-meditatsii",
-  "fear-spend-on-self hub",
+  fearSpendOnSelfArticle.topicSlug === "meditatsii-na-dengi",
+  "fear-spend-on-self uses money hub",
 );
 assert(
   fearSpendOnSelfArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -3925,8 +3925,8 @@ assert(
   "stop-saving-on-self SEO title",
 );
 assert(
-  stopSavingOnSelfArticle.topicSlug === "besplatnye-meditatsii",
-  "stop-saving-on-self hub",
+  stopSavingOnSelfArticle.topicSlug === "meditatsii-na-dengi",
+  "stop-saving-on-self uses money hub",
 );
 assert(
   stopSavingOnSelfArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -4002,8 +4002,8 @@ assert(
   "accept-money SEO title",
 );
 assert(
-  acceptMoneyArticle.topicSlug === "besplatnye-meditatsii",
-  "accept-money hub",
+  acceptMoneyArticle.topicSlug === "meditatsii-na-dengi",
+  "accept-money uses money hub",
 );
 assert(
   acceptMoneyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -4085,8 +4085,8 @@ assert(
   "money-beliefs SEO title",
 );
 assert(
-  moneyBeliefsArticle.topicSlug === "besplatnye-meditatsii",
-  "money-beliefs hub",
+  moneyBeliefsArticle.topicSlug === "meditatsii-na-dengi",
+  "money-beliefs uses money hub",
 );
 assert(
   moneyBeliefsArticle.primaryPractice.practiceKey ===
@@ -4167,8 +4167,8 @@ assert(
   "fear-big-money SEO title",
 );
 assert(
-  fearBigMoneyArticle.topicSlug === "besplatnye-meditatsii",
-  "fear-big-money hub",
+  fearBigMoneyArticle.topicSlug === "meditatsii-na-dengi",
+  "fear-big-money uses money hub",
 );
 assert(
   fearBigMoneyArticle.primaryPractice.practiceKey ===
@@ -4260,8 +4260,8 @@ assert(
   "money-thinking SEO title",
 );
 assert(
-  moneyThinkingArticle.topicSlug === "besplatnye-meditatsii",
-  "money-thinking hub",
+  moneyThinkingArticle.topicSlug === "meditatsii-na-dengi",
+  "money-thinking uses money hub",
 );
 assert(
   moneyThinkingArticle.primaryPractice.practiceKey ===
@@ -4358,8 +4358,8 @@ assert(
   "money-worry SEO title",
 );
 assert(
-  moneyWorryArticle.topicSlug === "besplatnye-meditatsii",
-  "money-worry hub",
+  moneyWorryArticle.topicSlug === "meditatsii-na-dengi",
+  "money-worry uses money hub",
 );
 assert(
   moneyWorryArticle.primaryPractice.practiceKey ===
@@ -4437,8 +4437,8 @@ assert(
   "impulse-buying SEO title",
 );
 assert(
-  impulseBuyingArticle.topicSlug === "besplatnye-meditatsii",
-  "impulse-buying hub",
+  impulseBuyingArticle.topicSlug === "meditatsii-na-dengi",
+  "impulse-buying uses money hub",
 );
 assert(
   impulseBuyingArticle.primaryPractice.practiceKey ===
@@ -4532,8 +4532,8 @@ assert(
   "raise-income SEO title",
 );
 assert(
-  raiseIncomeArticle.topicSlug === "besplatnye-meditatsii",
-  "raise-income hub",
+  raiseIncomeArticle.topicSlug === "meditatsii-na-dengi",
+  "raise-income uses money hub",
 );
 assert(
   raiseIncomeArticle.primaryPractice.practiceKey === "prityanut-dengi-legko",
@@ -4611,8 +4611,8 @@ assert(
   "new-income-sources SEO title",
 );
 assert(
-  newIncomeSourcesArticle.topicSlug === "besplatnye-meditatsii",
-  "new-income-sources hub",
+  newIncomeSourcesArticle.topicSlug === "meditatsii-na-dengi",
+  "new-income-sources uses money hub",
 );
 assert(
   newIncomeSourcesArticle.primaryPractice.practiceKey ===
@@ -4686,8 +4686,8 @@ assert(
   "scarcity-state SEO title",
 );
 assert(
-  scarcityStateArticle.topicSlug === "besplatnye-meditatsii",
-  "scarcity-state hub",
+  scarcityStateArticle.topicSlug === "izobilie",
+  "scarcity-state uses izobilie hub",
 );
 assert(
   scarcityStateArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
@@ -4786,8 +4786,8 @@ assert(
   "gratitude-abundance SEO title",
 );
 assert(
-  gratitudeAbundanceArticle.topicSlug === "besplatnye-meditatsii",
-  "gratitude-abundance hub",
+  gratitudeAbundanceArticle.topicSlug === "izobilie",
+  "gratitude-abundance uses izobilie hub",
 );
 assert(
   gratitudeAbundanceArticle.primaryPractice.practiceKey === "klyuch-k-izobiliyu",
@@ -8395,8 +8395,8 @@ assert(
   "female-energy H1",
 );
 assert(
-  femaleEnergyArticle.topicSlug === "besplatnye-meditatsii",
-  "female-energy free hub",
+  femaleEnergyArticle.topicSlug === "zhenskaya-energiya",
+  "female-energy uses female hub",
 );
 assert(
   femaleEnergyArticle.primaryPractice.practiceKey ===
@@ -8475,8 +8475,8 @@ assert(
   "age-acceptance H1",
 );
 assert(
-  ageAcceptanceArticle.topicSlug === "besplatnye-meditatsii",
-  "age-acceptance free hub",
+  ageAcceptanceArticle.topicSlug === "lyubov-k-sebe",
+  "age-acceptance uses love hub",
 );
 assert(
   ageAcceptanceArticle.primaryPractice.practiceKey === "elixir-molodosti",
@@ -8566,8 +8566,8 @@ assert(
   "woman-money-psychology SEO title",
 );
 assert(
-  womanMoneyPsychologyArticle.topicSlug === "besplatnye-meditatsii",
-  "woman-money-psychology free hub",
+  womanMoneyPsychologyArticle.topicSlug === "meditatsii-na-dengi",
+  "woman-money-psychology uses money hub",
 );
 assert(
   womanMoneyPsychologyArticle.primaryPractice.practiceKey === "zhenskie-dengi",
@@ -8613,7 +8613,7 @@ assert(
 );
 assert(
   womanMoneyPsychologyArticle.seeAlsoLinks.some(
-    (item) => item.href === "/topics/besplatnye-meditatsii",
+    (item) => item.href === "/topics/meditatsii-na-dengi",
   ),
   "woman-money-psychology see-also includes hub",
 );
@@ -8685,8 +8685,8 @@ assert(
   "female-strength SEO title",
 );
 assert(
-  femaleStrengthArticle.topicSlug === "besplatnye-meditatsii",
-  "female-strength free hub",
+  femaleStrengthArticle.topicSlug === "zhenskaya-energiya",
+  "female-strength uses female hub",
 );
 assert(
   femaleStrengthArticle.primaryPractice.practiceKey === "zhenskaya-energiya",
@@ -8743,7 +8743,7 @@ assert(
 );
 assert(
   femaleStrengthArticle.seeAlsoLinks.some(
-    (item) => item.href === "/topics/besplatnye-meditatsii",
+    (item) => item.href === "/topics/zhenskaya-energiya",
   ),
   "female-strength see-also includes hub",
 );
@@ -8797,8 +8797,8 @@ assert(
   "female-energy-meditation SEO title",
 );
 assert(
-  femaleEnergyMeditationArticle.topicSlug === "besplatnye-meditatsii",
-  "female-energy-meditation free hub",
+  femaleEnergyMeditationArticle.topicSlug === "zhenskaya-energiya",
+  "female-energy-meditation uses female hub",
 );
 assert(
   femaleEnergyMeditationArticle.primaryPractice.practiceKey ===
@@ -8854,7 +8854,7 @@ assert(
 );
 assert(
   femaleEnergyMeditationArticle.seeAlsoLinks.some(
-    (item) => item.href === "/topics/besplatnye-meditatsii",
+    (item) => item.href === "/topics/zhenskaya-energiya",
   ),
   "female-energy-meditation see-also includes hub",
 );
@@ -8911,8 +8911,8 @@ assert(
   "female-energy-what-is SEO title",
 );
 assert(
-  femaleEnergyWhatIsArticle.topicSlug === "besplatnye-meditatsii",
-  "female-energy-what-is free hub",
+  femaleEnergyWhatIsArticle.topicSlug === "zhenskaya-energiya",
+  "female-energy-what-is uses female hub",
 );
 assert(
   femaleEnergyWhatIsArticle.primaryPractice.practiceKey === "zhenskaya-energiya",
@@ -8970,7 +8970,7 @@ assert(
 );
 assert(
   femaleEnergyWhatIsArticle.seeAlsoLinks.some(
-    (item) => item.href === "/topics/besplatnye-meditatsii",
+    (item) => item.href === "/topics/zhenskaya-energiya",
   ),
   "female-energy-what-is see-also includes hub",
 );

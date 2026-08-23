@@ -17,9 +17,9 @@ export const POCHEMU_ZHELANIYA_NE_ISPOLNYAYUTSYA_ARTICLE = {
   shortAnswer:
     "Желания могут не исполняться из-за отсутствия конкретных действий, слишком общего представления о результате, недостатка времени или ресурсов, изменения обстоятельств и решений других людей. Иногда желание также перестаёт соответствовать нашим настоящим потребностям. Это не означает, что человек недостаточно старался или неправильно думал.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "pending-hub-reconciliation",
+  topicTitle: "Статьи",
+  topicHref: "/articles",
   primaryPractice: {
     practiceKey: "kod-prityazheniya",
   },
@@ -192,11 +192,7 @@ export const POCHEMU_ZHELANIYA_NE_ISPOLNYAYUTSYA_ARTICLE = {
       title: "Медитация на исполнение желаний",
       description: "Чего реально ждать от такой практики",
     },
-    {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
-      description: "Тематическая подборка АудиоЛада",
-    },
+
   ],
   closingSection: {
     id: "glavnoe",

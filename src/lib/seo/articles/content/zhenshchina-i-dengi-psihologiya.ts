@@ -19,9 +19,9 @@ export const ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE = {
   shortAnswer:
     "Размышляя о связи женщины и денег, полезно не искать универсальные объяснения, а внимательнее посмотреть на собственные привычки, установки и способы принимать финансовые решения. Такой подход помогает лучше понять себя и постепенно менять то, что действительно зависит от вас.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "zhenskie-dengi",
   },
@@ -390,8 +390,8 @@ export const ZHENSHCHINA_I_DENGI_PSIHOLOGIYA_ARTICLE = {
       description: "Оплата, подарки и помощь без чувства вины",
     },
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
   ],

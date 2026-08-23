@@ -18,9 +18,9 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
   shortAnswer:
     "Бережное отношение к деньгам не означает, что человек обязан легко расставаться с любой суммой. Разумная экономия помогает сохранять устойчивость и избегать необдуманных решений. Но если даже допустимые расходы на собственные потребности регулярно вызывают сильное чувство вины или страх, полезно внимательнее разобраться в этой реакции.",
   authorLabel: "Редакция АудиоЛада",
-  topicSlug: "besplatnye-meditatsii",
-  topicTitle: "Бесплатные медитации",
-  topicHref: "/topics/besplatnye-meditatsii",
+  topicSlug: "meditatsii-na-dengi",
+  topicTitle: "Медитации на деньги",
+  topicHref: "/topics/meditatsii-na-dengi",
   primaryPractice: {
     practiceKey: "zhenskie-dengi",
   },
@@ -447,8 +447,8 @@ export const STRAH_TRATIT_DENGI_NA_SEBYA_ARTICLE = {
     "Несколько спокойных минут редко меняют жизнь сами по себе. Но они могут изменить состояние, из которого человек принимает решения, строит отношения и делает следующий шаг. Именно поэтому в АудиоЛаде мы рассматриваем аудиопрактики как поддержку внутреннего состояния, а не как замену реальным действиям.",
   seeAlsoLinks: [
     {
-      href: "/topics/besplatnye-meditatsii",
-      title: "Бесплатные медитации",
+      href: "/topics/meditatsii-na-dengi",
+      title: "Медитации на деньги",
       description: "Тематическая подборка АудиоЛада",
     },
     {
