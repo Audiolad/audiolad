@@ -39,6 +39,10 @@ export function mapQuickOfferRpcErrorMessage(message: string): {
     return { error: "quick_offer_product_forbidden", status: 403 };
   }
 
+  if (normalized.includes("quick_offer_product_locked")) {
+    return { error: "quick_offer_product_locked", status: 409 };
+  }
+
   if (normalized.includes("quick_offer_materials_required")) {
     return { error: "quick_offer_materials_required", status: 400 };
   }
@@ -86,6 +90,8 @@ export const QUICK_OFFER_UI_ERROR_MESSAGES: Record<string, string> = {
   quick_offer_product_not_eligible:
     "Можно привязать только свой опубликованный платный продукт.",
   quick_offer_product_forbidden: "Нельзя привязать чужой продукт.",
+  quick_offer_product_locked:
+    "После публикации нельзя сменить привязанный продукт.",
   quick_offer_publish_not_allowed: "Сейчас этот оффер нельзя опубликовать.",
   quick_offer_unpublish_not_allowed: "Оффер уже снят с публикации.",
   quick_offer_template_unsupported: "Этот шаблон пока недоступен.",

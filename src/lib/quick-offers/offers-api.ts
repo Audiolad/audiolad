@@ -523,6 +523,16 @@ export async function PATCHOffer(offerId: string, request: Request) {
     const nextPracticeId =
       validated.payload.practice_id ?? current.practice_id;
 
+    if (
+      current.status === "published" &&
+      nextPracticeId !== current.practice_id
+    ) {
+      return NextResponse.json(
+        { error: "quick_offer_product_locked" },
+        { status: 409 },
+      );
+    }
+
     if (nextPracticeId !== current.practice_id) {
       await assertPracticeOwnedAndEligible(
         supabase,

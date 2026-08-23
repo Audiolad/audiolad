@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import {
-  extractOfferWindowExpiresAt,
   extractOrderAnalyticsClaims,
   extractPracticeSlug,
   extractQuickOfferId,
@@ -12,6 +11,7 @@ import {
   toCreateOrderSuccessBody,
   type CreateOrderRpcRow,
 } from "@/lib/orders/create-order-api";
+import { applyServerQuickOfferAmount } from "@/lib/quick-offers/apply-offer-amount";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 function truncateId(value: string | null | undefined): string | null {
@@ -65,7 +65,6 @@ export async function POST(request: Request) {
   }
 
   const quickOfferId = extractQuickOfferId(parsedBody);
-  const offerWindowExpiresAt = extractOfferWindowExpiresAt(parsedBody);
 
   const claims = extractOrderAnalyticsClaims(
     parsedBody,
@@ -115,33 +114,21 @@ export async function POST(request: Request) {
   }
 
   if (quickOfferId) {
-    const { data: priced, error: priceError } = await supabase.rpc(
-      "apply_quick_offer_amount",
-      {
-        p_order_id: row.order_id,
-        p_quick_offer_id: quickOfferId,
-        p_window_expires_at: offerWindowExpiresAt,
-      },
-    );
+    const priced = await applyServerQuickOfferAmount({
+      supabase,
+      orderId: row.order_id,
+      quickOfferId,
+      cookieHeader: request.headers.get("cookie"),
+    });
 
-    if (priceError) {
-      const mapped = mapRpcErrorMessage(priceError.message);
-
-      if (mapped.status >= 500) {
-        console.error("apply_quick_offer_amount_error", priceError.message);
-      }
-
-      return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    if (!priced.ok) {
+      return NextResponse.json(
+        { error: priced.error },
+        { status: priced.status },
+      );
     }
 
-    const pricedRow =
-      priced && typeof priced === "object"
-        ? (priced as { amount_minor?: number })
-        : null;
-
-    if (typeof pricedRow?.amount_minor === "number") {
-      row.amount_minor = pricedRow.amount_minor;
-    }
+    row.amount_minor = priced.amount.amount_minor;
   }
 
   const confidence = row.attribution_confidence ?? "unknown";

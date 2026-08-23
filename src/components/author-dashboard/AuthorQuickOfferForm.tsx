@@ -161,7 +161,8 @@ export default function AuthorQuickOfferForm({
     try {
       const body = {
         author_id: isCreate ? selectedAuthor.id : undefined,
-        practice_id: practiceId,
+        practice_id:
+          !isCreate && offer?.status === "published" ? undefined : practiceId,
         title,
         slug,
         short_description: description,
@@ -490,6 +491,7 @@ export default function AuthorQuickOfferForm({
             onChange={(event) => setPracticeId(event.target.value)}
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
             required
+            disabled={offer?.status === "published"}
           >
             <option value="">Выберите свой продукт</option>
             {products.map((product) => (
@@ -499,8 +501,9 @@ export default function AuthorQuickOfferForm({
             ))}
           </select>
           <span className="mt-2 block text-xs text-[#7d70a2]">
-            Цена оплаты всегда берётся с продукта. Промо-цена ниже нужна только
-            для витрины и серверного пересчёта, пока действует таймер.
+            {offer?.status === "published"
+              ? "После публикации продукт сменить нельзя."
+              : "Цена оплаты всегда берётся с продукта. Промо-цена ниже нужна только для витрины и серверного пересчёта, пока действует таймер."}
           </span>
         </label>
 

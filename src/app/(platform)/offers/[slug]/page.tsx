@@ -3,16 +3,40 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import QuickOfferPublicPage from "@/components/quick-offers/QuickOfferPublicPage";
-import { buildQuickOfferCanonicalUrl } from "@/lib/quick-offers/paths";
+import {
+  buildOfferWindowCookieName,
+  offerWindowExpiresAtIso,
+  verifySignedOfferWindow,
+} from "@/lib/quick-offers/offer-window-token";
 import { loadPublicQuickOfferCached } from "@/lib/quick-offers/public-page";
-import { buildOfferTimerCookieName } from "@/lib/quick-offers/timer";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+const NOINDEX_ROBOTS = {
+  index: false,
+  follow: false,
+  nocache: true,
+  googleBot: { index: false, follow: false, noimageindex: true },
+} as const;
+
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
+
+function readVerifiedWindowExpiresAt(offerId: string, raw: string | undefined) {
+  if (!raw) {
+    return null;
+  }
+
+  const verified = verifySignedOfferWindow(raw, offerId);
+
+  if (!verified.ok) {
+    return null;
+  }
+
+  return offerWindowExpiresAtIso(verified.payload);
+}
 
 export async function generateMetadata({
   params,
@@ -23,7 +47,7 @@ export async function generateMetadata({
   if (!normalized) {
     return {
       title: "Оффер – АудиоЛад",
-      robots: { index: false, follow: false },
+      robots: NOINDEX_ROBOTS,
     };
   }
 
@@ -33,22 +57,19 @@ export async function generateMetadata({
   if (!loaded.ok) {
     return {
       title: "Оффер – АудиоЛад",
-      robots: { index: false, follow: false },
+      robots: NOINDEX_ROBOTS,
     };
   }
 
-  const canonical = buildQuickOfferCanonicalUrl(loaded.offer.slug);
   const description = loaded.offer.short_description.slice(0, 160);
 
   return {
     title: `${loaded.offer.title} – АудиоЛад`,
     description,
-    alternates: { canonical },
-    robots: { index: true, follow: true },
+    robots: NOINDEX_ROBOTS,
     openGraph: {
       title: loaded.offer.title,
       description,
-      url: canonical,
       images: loaded.offer.hero_image_url
         ? [{ url: loaded.offer.hero_image_url, alt: loaded.offer.title }]
         : undefined,
@@ -66,8 +87,10 @@ export default async function QuickOfferPage({ params }: PageProps) {
   }
 
   const cookieStore = await cookies();
-  const initialExpiresAt =
-    cookieStore.get(buildOfferTimerCookieName(loaded.offer.id))?.value ?? null;
+  const initialExpiresAt = readVerifiedWindowExpiresAt(
+    loaded.offer.id,
+    cookieStore.get(buildOfferWindowCookieName(loaded.offer.id))?.value,
+  );
 
   return (
     <QuickOfferPublicPage

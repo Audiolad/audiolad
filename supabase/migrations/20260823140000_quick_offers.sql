@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public.quick_offer_materials (
       AND char_length(format_label) <= 6
       AND format_label !~ E'[\r\n]'
     )
+  -- char_length counts characters, not bytes. Cyrillic «Аудио» is 5.
 );
 
 CREATE INDEX IF NOT EXISTS quick_offer_materials_offer_id_sort_idx
@@ -195,6 +196,13 @@ BEGIN
 
   IF v_practice_author IS DISTINCT FROM NEW.author_id THEN
     RAISE EXCEPTION 'quick_offer_product_owner_mismatch'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+    AND OLD.status = 'published'
+    AND NEW.practice_id IS DISTINCT FROM OLD.practice_id THEN
+    RAISE EXCEPTION 'quick_offer_product_locked'
       USING ERRCODE = '42501';
   END IF;
 
@@ -640,6 +648,19 @@ GRANT EXECUTE ON FUNCTION public.get_public_quick_offer(text) TO service_role;
 COMMENT ON FUNCTION public.get_public_quick_offer(text) IS
   'audiolad:quick-offer-public:v1; published offers only.';
 
+-- Remember which published offer repriced a pending order so payment
+-- can re-resolve the amount immediately before the payment intent.
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS quick_offer_id uuid NULL
+  REFERENCES public.quick_offers (id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS orders_quick_offer_id_idx
+  ON public.orders (quick_offer_id)
+  WHERE quick_offer_id IS NOT NULL;
+
+COMMENT ON COLUMN public.orders.quick_offer_id IS
+  'Published quick offer that last priced this pending order. Payment re-resolves from the signed visitor window; client amounts are ignored.';
+
 -- ---------------------------------------------------------------------------
 -- Server-side offer amount. Never trusts a client-sent ruble amount.
 -- ---------------------------------------------------------------------------
@@ -666,8 +687,10 @@ BEGIN
     RETURN p_regular_price;
   END IF;
 
+  -- Missing / unproven window is regular price. Promo requires a
+  -- server-verified visitor window that is still in the future.
   IF p_window_expires_at IS NULL THEN
-    RETURN p_promo_price;
+    RETURN p_regular_price;
   END IF;
 
   IF p_window_expires_at <= v_now THEN
@@ -727,25 +750,9 @@ BEGIN
   END IF;
 
   SELECT *
-  INTO v_offer
-  FROM public.quick_offers AS qo
-  WHERE qo.id = p_quick_offer_id
-    AND qo.status = 'published';
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'quick_offer_not_found'
-      USING ERRCODE = 'P0002';
-  END IF;
-
-  IF v_offer.practice_id IS DISTINCT FROM v_order.practice_id THEN
-    RAISE EXCEPTION 'quick_offer_invalid'
-      USING ERRCODE = '22023';
-  END IF;
-
-  SELECT *
   INTO v_practice
   FROM public.practices AS p
-  WHERE p.id = v_offer.practice_id
+  WHERE p.id = v_order.practice_id
     AND p.status = 'published';
 
   IF NOT FOUND THEN
@@ -753,12 +760,23 @@ BEGIN
       USING ERRCODE = 'P0002';
   END IF;
 
-  v_charge := public.resolve_quick_offer_charge_rubles(
-    v_practice.price,
-    v_offer.promo_price,
-    v_offer.timer_duration_seconds,
-    p_window_expires_at
-  );
+  SELECT *
+  INTO v_offer
+  FROM public.quick_offers AS qo
+  WHERE qo.id = p_quick_offer_id;
+
+  IF NOT FOUND
+    OR v_offer.status IS DISTINCT FROM 'published'
+    OR v_offer.practice_id IS DISTINCT FROM v_order.practice_id THEN
+    v_charge := v_practice.price;
+  ELSE
+    v_charge := public.resolve_quick_offer_charge_rubles(
+      v_practice.price,
+      v_offer.promo_price,
+      v_offer.timer_duration_seconds,
+      p_window_expires_at
+    );
+  END IF;
 
   IF v_charge IS NULL OR v_charge <= 0 THEN
     RAISE EXCEPTION 'invalid_practice_price'
@@ -771,6 +789,7 @@ BEGIN
   SET
     amount_minor = v_charge_minor,
     price_minor_snapshot = v_charge_minor,
+    quick_offer_id = p_quick_offer_id,
     updated_at = now()
   WHERE o.id = v_order.id
     AND o.status = 'pending'

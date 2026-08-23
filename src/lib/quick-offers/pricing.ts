@@ -56,7 +56,7 @@ export function isOfferWindowActive(input: {
   const expiresAtMs = parseExpiresAtMs(input.expiresAt);
 
   if (expiresAtMs == null) {
-    return true;
+    return false;
   }
 
   if (expiresAtMs <= input.nowMs) {

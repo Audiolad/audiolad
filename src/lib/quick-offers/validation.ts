@@ -86,6 +86,40 @@ export function normalizeFormatLabel(value: string): string {
   return value.replace(/[\r\n\u2028\u2029]/g, "").trim();
 }
 
+/**
+ * User-visible character count (graphemes), not bytes or UTF-16 code units.
+ * "Аудио" / "Видео" / "Текст" are 5 characters each.
+ */
+export function countVisibleCharacters(value: string): number {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const segmenter = new Intl.Segmenter("ru", { granularity: "grapheme" });
+    return [...segmenter.segment(value)].length;
+  }
+
+  return Array.from(value).length;
+}
+
+export function clipVisibleCharacters(value: string, max: number): string {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const segmenter = new Intl.Segmenter("ru", { granularity: "grapheme" });
+    let clipped = "";
+    let count = 0;
+
+    for (const { segment } of segmenter.segment(value)) {
+      if (count >= max) {
+        break;
+      }
+
+      clipped += segment;
+      count += 1;
+    }
+
+    return clipped;
+  }
+
+  return Array.from(value).slice(0, max).join("");
+}
+
 export function validateFormatLabel(value: string): string | null {
   const normalized = normalizeFormatLabel(value);
 
@@ -97,7 +131,7 @@ export function validateFormatLabel(value: string): string | null {
     return "quick_offer_format_newline";
   }
 
-  if (normalized.length > QUICK_OFFER_FORMAT_LABEL_MAX_LENGTH) {
+  if (countVisibleCharacters(normalized) > QUICK_OFFER_FORMAT_LABEL_MAX_LENGTH) {
     return "quick_offer_format_too_long";
   }
 

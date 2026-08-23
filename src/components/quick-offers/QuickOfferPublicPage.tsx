@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import BuyPracticeButton from "@/components/BuyPracticeButton";
 import PurchaseConsent from "@/components/PurchaseConsent";
@@ -11,13 +11,7 @@ import {
   interpolateCtaText,
   resolveOfferDisplayPricing,
 } from "@/lib/quick-offers/pricing";
-import {
-  persistOfferTimer,
-  readBrowserOfferExpiresAt,
-  readIssuedOfferExpiresAt,
-  rememberIssuedOfferExpiresAt,
-  writeBrowserOfferExpiresAt,
-} from "@/lib/quick-offers/timer";
+import { persistOfferTimer } from "@/lib/quick-offers/timer";
 import type { PublicQuickOfferDto } from "@/lib/quick-offers/types";
 
 type QuickOfferPublicPageProps = {
@@ -25,46 +19,6 @@ type QuickOfferPublicPageProps = {
   preview?: boolean;
   initialExpiresAt?: string | null;
 };
-
-function subscribeOfferTimer(onStoreChange: () => void) {
-  const onStorage = (event: StorageEvent) => {
-    if (event.key?.startsWith("al_qo_")) {
-      onStoreChange();
-    }
-  };
-
-  window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
-}
-
-function readClientOfferExpiresAt(
-  offerId: string,
-  durationSeconds: number,
-  initialExpiresAt: string | null,
-): string {
-  const remembered = readIssuedOfferExpiresAt(offerId, durationSeconds);
-
-  if (remembered) {
-    return remembered;
-  }
-
-  const stored =
-    readBrowserOfferExpiresAt(offerId, durationSeconds) ?? initialExpiresAt;
-  const persisted = persistOfferTimer({
-    offerId,
-    durationSeconds,
-    storedExpiresAt: stored,
-  });
-
-  rememberIssuedOfferExpiresAt(offerId, durationSeconds, persisted.expiresAt);
-  writeBrowserOfferExpiresAt({
-    offerId,
-    durationSeconds,
-    expiresAt: persisted.expiresAt,
-  });
-
-  return persisted.expiresAt;
-}
 
 function resolveMidCtaIndex(total: number, configured: number | null): number {
   if (total < 4) {
@@ -113,13 +67,11 @@ function PriceBlock({
 function OfferCta({
   offer,
   chargePrice,
-  expiresAt,
   disabled,
   className,
 }: {
   offer: PublicQuickOfferDto;
   chargePrice: number;
-  expiresAt: string | null;
   disabled?: boolean;
   className: string;
 }) {
@@ -141,7 +93,6 @@ function OfferCta({
       productPriceMinorSnapshot={chargePrice * 100}
       purchaseSurface="quick_offer"
       quickOfferId={offer.id}
-      offerWindowExpiresAt={expiresAt}
       label={label}
       signInReturnPath={`/offers/${offer.slug}`}
       className={className}
@@ -155,15 +106,9 @@ export default function QuickOfferPublicPage({
   initialExpiresAt = null,
 }: QuickOfferPublicPageProps) {
   const heroRef = useRef<HTMLElement | null>(null);
-  const expiresAt = useSyncExternalStore(
-    subscribeOfferTimer,
-    () =>
-      readClientOfferExpiresAt(
-        offer.id,
-        offer.timer_duration_seconds,
-        initialExpiresAt,
-      ),
-    () => initialExpiresAt,
+  const [expiresAt, setExpiresAt] = useState<string | null>(initialExpiresAt);
+  const [windowReady, setWindowReady] = useState(
+    preview || Boolean(initialExpiresAt),
   );
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [showSticky, setShowSticky] = useState(false);
@@ -175,6 +120,50 @@ export default function QuickOfferPublicPage({
 
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (preview) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncServerWindow() {
+      try {
+        const response = await fetch(
+          `/api/offers/${encodeURIComponent(offer.slug)}/window`,
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+          },
+        );
+        const payload = (await response.json().catch(() => null)) as {
+          expires_at?: string;
+        } | null;
+
+        if (cancelled || !response.ok || !payload?.expires_at) {
+          if (!cancelled && !initialExpiresAt) {
+            setWindowReady(true);
+          }
+          return;
+        }
+
+        setExpiresAt(payload.expires_at);
+        setWindowReady(true);
+      } catch {
+        if (!cancelled) {
+          setWindowReady(Boolean(initialExpiresAt));
+        }
+      }
+    }
+
+    void syncServerWindow();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialExpiresAt, offer.slug, preview]);
 
   useEffect(() => {
     const node = heroRef.current;
@@ -195,32 +184,40 @@ export default function QuickOfferPublicPage({
     return () => observer.disconnect();
   }, []);
 
-  const pricing = useMemo(
-    () =>
-      resolveOfferDisplayPricing({
-        regularPrice: offer.regular_price,
-        promoPrice: offer.promo_price,
-        nowMs,
-        durationSeconds: offer.timer_duration_seconds,
-        expiresAt,
-      }),
-    [
-      expiresAt,
+  const pricing = useMemo(() => {
+    const displayExpiresAt =
+      expiresAt ??
+      (!windowReady
+        ? new Date(nowMs + offer.timer_duration_seconds * 1000).toISOString()
+        : null);
+
+    return resolveOfferDisplayPricing({
+      regularPrice: offer.regular_price,
+      promoPrice: offer.promo_price,
       nowMs,
-      offer.promo_price,
-      offer.regular_price,
-      offer.timer_duration_seconds,
-    ],
-  );
+      durationSeconds: offer.timer_duration_seconds,
+      expiresAt: displayExpiresAt,
+    });
+  }, [
+    expiresAt,
+    nowMs,
+    offer.promo_price,
+    offer.regular_price,
+    offer.timer_duration_seconds,
+    windowReady,
+  ]);
 
   const remainingLabel = formatTimerMmSs(
-    persistOfferTimer({
-      offerId: offer.id,
-      durationSeconds: offer.timer_duration_seconds,
-      storedExpiresAt: expiresAt,
-      nowMs,
-    }).remainingSeconds,
+    expiresAt
+      ? persistOfferTimer({
+          offerId: offer.id,
+          durationSeconds: offer.timer_duration_seconds,
+          storedExpiresAt: expiresAt,
+          nowMs,
+        }).remainingSeconds
+      : offer.timer_duration_seconds,
   );
+  const ctaDisabled = preview || !windowReady;
 
   const midIndex = resolveMidCtaIndex(
     offer.materials.length,
@@ -250,8 +247,7 @@ export default function QuickOfferPublicPage({
         <OfferCta
           offer={offer}
           chargePrice={pricing.chargePrice}
-          expiresAt={expiresAt}
-          disabled={preview}
+          disabled={ctaDisabled}
           className={buyButtonClass}
         />
         <p className="text-center text-xs text-[#9a91b8]">
@@ -262,8 +258,8 @@ export default function QuickOfferPublicPage({
   }
 
   return (
-    <div className="min-h-screen bg-[#fbf8ff] text-[#25135c]">
-      <div className="mx-auto w-full max-w-[430px] px-4 pb-28 pt-5 lg:max-w-[760px] lg:px-6 lg:pb-16">
+    <div className="min-h-screen overflow-x-hidden bg-[#fbf8ff] text-[#25135c]">
+      <div className="mx-auto w-full max-w-[430px] px-4 pb-[max(8.5rem,calc(6.5rem+env(safe-area-inset-bottom)))] pt-5 lg:max-w-[760px] lg:px-6 lg:pb-16">
         <header className="mb-5 flex items-center justify-between">
           <Link
             href="/"
@@ -323,7 +319,7 @@ export default function QuickOfferPublicPage({
                       </div>
                     )}
                   </div>
-                  <p className="mt-2 truncate text-center text-[13px] font-medium tracking-wide text-[#5f5484]">
+                  <p className="mt-2 truncate whitespace-nowrap text-center text-[13px] font-medium tracking-wide text-[#5f5484]">
                     {material.display_label}
                   </p>
                 </article>
@@ -355,15 +351,15 @@ export default function QuickOfferPublicPage({
 
       {showSticky && !preview ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadff8] bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-[430px] items-center gap-3">
-            <span className="shrink-0 text-[18px] font-semibold">
+          <div className="mx-auto flex max-w-[430px] min-w-0 items-center gap-3">
+            <span className="shrink-0 whitespace-nowrap text-[18px] font-semibold">
               {formatRubles(pricing.chargePrice)}
             </span>
             <OfferCta
               offer={offer}
               chargePrice={pricing.chargePrice}
-              expiresAt={expiresAt}
-              className="flex-1 rounded-full bg-[#7042c5] px-4 py-3 text-sm font-semibold text-white"
+              disabled={ctaDisabled}
+              className="min-w-0 flex-1 rounded-full bg-[#7042c5] px-4 py-3 text-sm font-semibold text-white"
             />
           </div>
         </div>
