@@ -9,12 +9,19 @@ export const MAX_SITE_PATH = "/max-site";
 /** HMAC-verify raw `window.WebApp.initData`, then touch external identity. MAX host only. */
 export const MAX_SESSION_VERIFY_PATH = "/api/max/session/verify";
 
+/** HMAC-verify initData, then link the verified MAX id to the session user. MAX host only. */
+export const MAX_SESSION_LINK_PATH = "/api/max/session/link";
+
 export function isMaxHostname(hostname: string): boolean {
   return hostname === MAX_HOSTNAME;
 }
 
 export function isMaxSessionVerifyPath(pathname: string): boolean {
   return pathname === MAX_SESSION_VERIFY_PATH;
+}
+
+export function isMaxSessionLinkPath(pathname: string): boolean {
+  return pathname === MAX_SESSION_LINK_PATH;
 }
 
 export function isMaxSitePath(pathname: string): boolean {
