@@ -44,7 +44,18 @@ export type PublicApiErrorCode =
   | "pending_order_exists"
   | "practice_not_found"
   | "practice_not_for_sale"
+  | "price_changed"
   | "internal_error";
+
+export type PriceChangedBody = {
+  error: "price_changed";
+  current_amount_minor: number;
+  base_price_minor: number | null;
+  promotion_price_minor: number | null;
+  promotion_id: string | null;
+  promotion_type: string | null;
+  message: string;
+};
 
 export function parseJsonObject(raw: unknown): Record<string, unknown> | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
@@ -76,10 +87,19 @@ export function extractPracticeSlug(
   return trimmed;
 }
 
-/**
- * Client analytics claims for order attribution.
- * UTM/referrer/confidence from body are intentionally ignored.
- */
+/** Client confirmation only. Server re-resolves the payable amount. */
+export function extractExpectedAmountMinor(
+  body: Record<string, unknown>,
+): number | null {
+  const value = body.expected_amount_minor;
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
 export function extractOrderAnalyticsClaims(
   body: Record<string, unknown>,
   sanitizeOrigin: (value: string | null | undefined) => string | null,
@@ -164,7 +184,48 @@ export function mapRpcErrorMessage(message: string): {
     return { status: 409, error: "practice_not_for_sale" };
   }
 
+  if (normalized.includes("price_changed")) {
+    return { status: 409, error: "price_changed" };
+  }
+
   return { status: 500, error: "internal_error" };
+}
+
+const PRICE_CHANGED_DETAIL_PATTERN =
+  /current_amount_minor=(\d+);base_price_minor=(\d+);promotion_price_minor=([^;]*);promotion_id=([^;]*);promotion_type=([^;\s]*)/;
+
+export function parsePriceChangedDetail(detail: string | null | undefined): {
+  current_amount_minor: number;
+  base_price_minor: number | null;
+  promotion_price_minor: number | null;
+  promotion_id: string | null;
+  promotion_type: string | null;
+} | null {
+  if (!detail) {
+    return null;
+  }
+
+  const match = PRICE_CHANGED_DETAIL_PATTERN.exec(detail);
+
+  if (!match) {
+    return null;
+  }
+
+  const current = Number(match[1]);
+  const base = Number(match[2]);
+  const promoMinor = match[3] ? Number(match[3]) : NaN;
+
+  if (!Number.isInteger(current) || current <= 0) {
+    return null;
+  }
+
+  return {
+    current_amount_minor: current,
+    base_price_minor: Number.isInteger(base) ? base : null,
+    promotion_price_minor: Number.isInteger(promoMinor) ? promoMinor : null,
+    promotion_id: match[4] && match[4].length > 0 ? match[4] : null,
+    promotion_type: match[5] && match[5].length > 0 ? match[5] : null,
+  };
 }
 
 export function toCreateOrderSuccessBody(
