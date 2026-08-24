@@ -5,7 +5,6 @@ import ProductContentsSection from "@/components/products/ProductContentsSection
 import {
   PracticeAccessBanners,
   PracticeBackLink,
-  PracticeLibraryActionSection,
   PracticeMetaSection,
   PracticePrimaryActionSection,
   PracticeProductCover,
@@ -76,8 +75,6 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         />
 
         <PracticePrimaryActionSection viewModel={viewModel} />
-
-        <PracticeLibraryActionSection viewModel={viewModel} />
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

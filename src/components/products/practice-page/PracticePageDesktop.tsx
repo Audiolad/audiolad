@@ -7,7 +7,6 @@ import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import {
   PracticeAccessBanners,
   PracticeBackLink,
-  PracticeLibraryActionSection,
   PracticeMetaSection,
   PracticePrimaryActionSection,
   PracticeProductCover,
@@ -76,8 +75,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
         </section>
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
-
-        <PracticeLibraryActionSection viewModel={viewModel} className="mt-3" />
 
         {description ? (
           <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
