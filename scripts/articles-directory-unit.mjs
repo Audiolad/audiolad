@@ -72,6 +72,7 @@ import { MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/li
 import { MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-grudnichkov-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn.ts";
 import { KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/kolybelnye-dlya-malyshey-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1550,6 +1551,33 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes forty-fifth listen href",
   );
+
+
+
+  const fortySixthListenHref = "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn";
+  const fortySixthListenCard = data.articles.find((card) => card.href === fortySixthListenHref);
+  assert(fortySixthListenCard, "forty-sixth indexable listen page is listed");
+  assert(
+    fortySixthListenCard.title === "Музыка для сна детям без слов – слушать онлайн бесплатно | АудиоЛад",
+    "forty-sixth listen directory title",
+  );
+  assert(
+    fortySixthListenCard.description === MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortySixthListenHref}`,
+    ),
+    "directory JSON-LD includes forty-sixth listen href",
+  );
+
 
 
 const articleCards = listArticleDirectoryCards();
