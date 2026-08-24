@@ -31,14 +31,20 @@ function testSurfacesUseHomePlayButton() {
   const card = read("src/components/home/HomeProductCard.tsx");
   const hero = read("src/components/home/HeroFeaturedProduct.tsx");
   const cont = read("src/components/home/ContinueListening.tsx");
+  const guest = read("src/components/home/GuestHome.tsx");
+  const programs = read("src/components/home/ActiveProgramsSection.tsx");
 
   assert.match(card, /HomeProductPlayButton/);
   assert.match(hero, /HomeProductPlayButton/);
   assert.match(cont, /HomeProductPlayButton/);
+  assert.match(guest, /HomeProductPlayButton/);
+  assert.match(programs, /HomeProductPlayButton/);
 
   assert.doesNotMatch(card, /href=\{listenHref\}|href=\{product\.listenHref\}/);
   assert.doesNotMatch(hero, /href=\{listenHref\}|href=\{product\.listenHref\}/);
   assert.doesNotMatch(cont, /item\.listenHref/);
+  assert.doesNotMatch(guest, /getPrimaryListenHref|listenHref/);
+  assert.doesNotMatch(programs, /program\.listenHref/);
 }
 
 function testPreviewUsesCatalogPlayApi() {
@@ -99,11 +105,36 @@ function testBoundaries() {
   assert.doesNotMatch(collection, /HomeProductPlayButton|home-play/);
 }
 
+function testGuestHomeStartListenStaysOnHome() {
+  const guest = read("src/components/home/GuestHome.tsx");
+
+  assert.match(guest, /HomeProductPlayButton/);
+  assert.match(guest, /Начать слушать/);
+  assert.match(guest, /featuredFreeProduct/);
+  assert.match(guest, /freeProducts\[0\]/);
+  assert.match(guest, /href="\/catalog"/);
+  assert.doesNotMatch(guest, /getPrimaryListenHref/);
+  assert.doesNotMatch(guest, /listenHref/);
+  assert.doesNotMatch(guest, /buildListenPath|\/listen\?autoplay/);
+}
+
+function testActiveProgramsContinueStaysOnHome() {
+  const programs = read("src/components/home/ActiveProgramsSection.tsx");
+
+  assert.match(programs, /HomeProductPlayButton/);
+  assert.match(programs, /Продолжить/);
+  assert.match(programs, /href=\{program\.product\.href\}/);
+  assert.doesNotMatch(programs, /program\.listenHref/);
+  assert.doesNotMatch(programs, /buildListenPath|\/listen/);
+}
+
 testHomePlayStaysOnHome();
 testSurfacesUseHomePlayButton();
 testPreviewUsesCatalogPlayApi();
 testCardOpensPractice();
 testContinueListeningDoesNotOpenListen();
+testGuestHomeStartListenStaysOnHome();
+testActiveProgramsContinueStaysOnHome();
 testBoundaries();
 
 console.log("home-play-global-player-unit: ok");
