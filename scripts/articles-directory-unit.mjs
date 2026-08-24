@@ -67,6 +67,7 @@ import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "../src/lib/seo/l
 import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-vosstanovleniya-sil.ts";
 import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/detskaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn.ts";
+import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1414,6 +1415,32 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fortiethListenHref}`,
     ),
     "directory JSON-LD includes fortieth listen href",
+  );
+
+
+
+  const fortyFirstListenHref = "/listens/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn";
+  const fortyFirstListenCard = data.articles.find((card) => card.href === fortyFirstListenHref);
+  assert(fortyFirstListenCard, "forty-first indexable listen page is listed");
+  assert(
+    fortyFirstListenCard.title === "Музыка для новорождённых для сна – слушать онлайн бесплатно | АудиоЛад",
+    "forty-first listen directory title",
+  );
+  assert(
+    fortyFirstListenCard.description === MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes forty-first listen href",
   );
 
 

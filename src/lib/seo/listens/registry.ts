@@ -38,6 +38,7 @@ import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "./content/medita
 import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "./content/meditatsiya-dlya-sna-i-vosstanovleniya-sil";
 import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/detskaya-muzyka-dlya-sna-slushat-onlayn";
 import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn";
+import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -85,6 +86,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE,
   DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+  MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
