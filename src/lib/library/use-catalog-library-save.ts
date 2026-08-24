@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
@@ -125,34 +125,37 @@ export function useCatalogLibrarySave({
   fetchImpl,
 }: UseCatalogLibrarySaveInput): UseCatalogLibrarySaveResult {
   const router = useRouter();
-  const [practiceIdKey, setPracticeIdKey] = useState(practiceId);
-  const [isSaved, setIsSaved] = useState(() =>
-    resolveCatalogLibrarySaveState(peekLibrarySave(practiceId), productIsSaved),
-  );
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
   const inFlightRef = useRef(false);
 
-  if (practiceId !== practiceIdKey) {
-    setPracticeIdKey(practiceId);
-    setIsSaved(
-      resolveCatalogLibrarySaveState(peekLibrarySave(practiceId), productIsSaved),
-    );
-    setErrorMessage(null);
-    setIsPending(false);
-  }
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      if (!practiceId) {
+        return () => {};
+      }
+
+      return subscribeLibrarySave(practiceId, () => {
+        onStoreChange();
+      });
+    },
+    [practiceId],
+  );
+
+  const getSnapshot = useCallback(
+    () => resolveCatalogLibrarySaveState(peekLibrarySave(practiceId), productIsSaved),
+    [practiceId, productIsSaved],
+  );
+
+  const storeSaved = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const isSaved = optimisticSaved ?? storeSaved;
 
   useEffect(() => {
-    if (!practiceId) {
-      return;
-    }
-
-    return subscribeLibrarySave(practiceId, (nextSaved) => {
-      setIsSaved(nextSaved);
-      setErrorMessage(null);
-      setIsPending(false);
-      inFlightRef.current = false;
-    });
+    setOptimisticSaved(null);
+    setErrorMessage(null);
+    setIsPending(false);
+    inFlightRef.current = false;
   }, [practiceId]);
 
   function handleClick() {
@@ -165,29 +168,38 @@ export function useCatalogLibrarySave({
       return;
     }
 
-    const previous = isSaved;
-    const nextSaved = !previous;
+    const nextSaved = !isSaved;
 
     inFlightRef.current = true;
     setIsPending(true);
     setErrorMessage(null);
-    setIsSaved(nextSaved);
+    setOptimisticSaved(nextSaved);
     publishLibrarySave(practiceId, nextSaved);
 
-    void persistCatalogLibrarySave({
-      practiceId,
-      nextSaved,
-      fetchImpl,
-    }).then((result) => {
-      if (!result.ok) {
-        setIsSaved(previous);
-        publishLibrarySave(practiceId, previous);
-        setErrorMessage(result.errorMessage);
-      }
+    const persist = () =>
+      persistCatalogLibrarySave({
+        practiceId,
+        nextSaved,
+        fetchImpl,
+      }).then((result) => {
+        if (!result.ok) {
+          publishLibrarySave(practiceId, !nextSaved);
+          setErrorMessage(result.errorMessage);
+        }
 
-      inFlightRef.current = false;
-      setIsPending(false);
-    });
+        setOptimisticSaved(null);
+        inFlightRef.current = false;
+        setIsPending(false);
+      });
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        void persist();
+      });
+      return;
+    }
+
+    void persist();
   }
 
   return {
