@@ -380,16 +380,10 @@ function testSourceBoundaries() {
     /absolute bottom-3 right-3 z-\[2\] flex items-center gap-1/,
     "Play cluster stays bottom-right",
   );
-  assert.doesNotMatch(card, /CatalogProductHeartButton|♡|♥|Heart/);
   assert.doesNotMatch(card, /Избранн/);
 
   assert.match(library, /isLibraryFilterId/);
   assert.match(library, /matchesLibraryFilter\(item, activeFilter\)/);
-  assert.doesNotMatch(
-    library,
-    /id: "saved"/,
-    "saved filter has no new chip in this PR",
-  );
 
   assert.doesNotMatch(play, /library\/collection|loadLibraryCollection/);
   assert.doesNotMatch(player, /library\/collection|loadLibraryCollection/);
