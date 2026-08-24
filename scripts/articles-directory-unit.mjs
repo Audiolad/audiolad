@@ -69,6 +69,7 @@ import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/lis
 import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn.ts";
 import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-mladencev-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-grudnichkov-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1467,6 +1468,33 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes forty-second listen href",
   );
+
+
+  const fortyThirdListenHref = "/listens/muzyka-dlya-sna-grudnichkov-slushat-onlayn";
+  const fortyThirdListenCard = data.articles.find((card) => card.href === fortyThirdListenHref);
+  assert(fortyThirdListenCard, "forty-third indexable listen page is listed");
+  assert(
+    fortyThirdListenCard.title === "Музыка для сна грудничков – слушать онлайн бесплатно | АудиоЛад",
+    "forty-third listen directory title",
+  );
+  assert(
+    fortyThirdListenCard.description === MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-grudnichkov-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes forty-third listen href",
+  );
+
+
 
 
 const articleCards = listArticleDirectoryCards();
