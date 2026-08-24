@@ -110,6 +110,7 @@
     "test:library-audioteka-ui": "npx tsx scripts/library-audioteka-ui-unit.mts",
     "test:product-page-core-ux": "npx tsx scripts/product-page-core-ux-unit.mts",
     "test:home-play-global-player": "npx tsx scripts/home-play-global-player-unit.mts",
+    "test:home-legacy-play-cleanup": "npx tsx scripts/home-legacy-play-cleanup-unit.mts",
     "test:catalog-play": "npx tsx scripts/catalog-play-session-unit.mts && npx tsx scripts/catalog-play-preview-window-unit.mts && node scripts/catalog-play-ui-unit.mjs && node scripts/catalog-grid-ui-unit.mjs && npx tsx scripts/catalog-heart-save-unit.mts && node scripts/catalog-heart-ui-unit.mjs",
     "test:database-migrations": "node scripts/duplicate-migration-versions-unit.mjs && node scripts/database-migrations-plan-unit.mjs && bash deploy/scripts/database-migrations-unit.sh && node scripts/migration-audit-unit.mjs && bash deploy/scripts/baseline-schema-migrations-unit.sh && node scripts/external-identities-migration-sql-unit.mjs && node scripts/link-external-identity-sql-unit.mjs && node scripts/catalog-foundation-sql-unit.mjs",
     "test:next-static-overlay": "bash deploy/scripts/next-static-overlay-unit.sh",
