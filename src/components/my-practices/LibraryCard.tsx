@@ -18,19 +18,13 @@ import {
   resolveLibraryCardBadge,
 } from "@/lib/library/card-ui";
 import {
-  LISTEN_AUTOPLAY_QUERY_PARAM,
-  LISTEN_AUTOPLAY_QUERY_VALUE,
-} from "@/lib/listen/autoplay-intent";
-import {
   formatPracticePrice,
   getProductPriceLabel,
   isProductFree,
 } from "@/lib/products/price-format";
-import {
-  buildListenPath,
-  buildPracticePublicPath,
-} from "@/lib/products/paths";
+import { buildPracticePublicPath } from "@/lib/products/paths";
 
+import LibraryCardPlayButton from "./LibraryCardPlayButton";
 import LibraryCardPreviewPlayButton from "./LibraryCardPreviewPlayButton";
 
 export type LibraryCardItem = {
@@ -154,12 +148,8 @@ export default function LibraryCard({
     practice?.slug && authorSlug
       ? buildPracticePublicPath(authorSlug, practice.slug)
       : null;
-  const listenHref =
-    canFullListen && practice?.slug && audioReady
-      ? authorSlug
-        ? buildListenPath(authorSlug, practice.slug, { autoplay: true })
-        : `/listen/${practice.slug}?${LISTEN_AUTOPLAY_QUERY_PARAM}=${LISTEN_AUTOPLAY_QUERY_VALUE}`
-      : null;
+  const canEntitledPlay =
+    canFullListen && Boolean(practice?.slug && audioReady && authorSlug);
   const badge = resolveLibraryCardBadge(item);
   const showPaidSaveOffer = canShowLibraryPaidSaveOffer(item);
   const paidPriceLabel = showPaidSaveOffer
@@ -265,17 +255,15 @@ export default function LibraryCard({
       </div>
 
       <div className="absolute bottom-3 right-3 z-[2] flex items-center gap-1">
-        {listenHref ? (
-          <Link
-            href={listenHref}
-            aria-label={`Слушать «${title}»`}
-            className={`flex items-center gap-2 font-medium text-[#7042c5] ${focusRingClass}`}
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white">
-              <PlayIcon />
-            </span>
-            {audioStatus}
-          </Link>
+        {canEntitledPlay && authorSlug && practice ? (
+          <LibraryCardPlayButton
+            practiceId={item.practiceId}
+            authorSlug={authorSlug}
+            productSlug={practice.slug}
+            title={title}
+            variant="full"
+            label={audioStatus}
+          />
         ) : canPreviewPlay && authorSlug && practice ? (
           <LibraryCardPreviewPlayButton
             practiceId={item.practiceId}
