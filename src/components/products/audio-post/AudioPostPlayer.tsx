@@ -3,6 +3,7 @@
 import { useProductContentsPlayback } from "@/components/products/useProductContentsPlayback";
 import { formatAudioDuration } from "@/lib/products/duration";
 import type { PublicAudioItem } from "@/lib/products/public-audio-items";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type AudioPostPlayerProps = {
   items: PublicAudioItem[];
@@ -68,14 +69,14 @@ export default function AudioPostPlayer({
       : showAsPlaying
         ? "Пауза"
         : showGestureHint
-          ? "Воспроизвести"
-          : "Слушать";
+          ? PLAY_ACTION_LABEL
+          : PLAY_ACTION_LABEL;
 
   const playButton = (
     <button
       type="button"
       disabled={!enabled || isLoading}
-      aria-label={showAsPlaying ? "Пауза" : "Воспроизвести"}
+      aria-label={showAsPlaying ? "Пауза" : PLAY_ACTION_LABEL}
       onClick={() => {
         clearErrorMessage();
         void playTrack(track.id);

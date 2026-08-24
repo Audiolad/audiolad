@@ -71,8 +71,8 @@ const audioPostPlayer = readFileSync(
 assert.match(audioPostPlayer, /showAsPlaying/);
 assert.match(audioPostPlayer, /needsGesturePlay/);
 assert.match(audioPostPlayer, /"Пауза"/);
-assert.match(audioPostPlayer, /"Слушать"/);
-assert.match(audioPostPlayer, /"Воспроизвести"/);
+assert.match(audioPostPlayer, /PLAY_ACTION_LABEL/);
+assert.doesNotMatch(audioPostPlayer, /Воспроизвести/);
 assert.doesNotMatch(audioPostPlayer, /Слушаю/);
 assert.match(audioPostPlayer, /isPlaying/);
 assert.match(audioPostPlayer, /role="alert"/);

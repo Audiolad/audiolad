@@ -1,5 +1,7 @@
 "use client";
 
+import { PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
+
 import LibraryCardPlayButton from "./LibraryCardPlayButton";
 
 type LibraryCardPreviewPlayButtonProps = {
@@ -23,7 +25,7 @@ export default function LibraryCardPreviewPlayButton({
       productSlug={productSlug}
       title={title}
       variant="preview"
-      label="Слушать"
+      label={PREVIEW_ACTION_LABEL}
     />
   );
 }

@@ -4,6 +4,7 @@ import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
 import type { HomeProduct } from "@/lib/home/types";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 import HomeProductPlayButton from "./HomeProductPlayButton";
 import { PlayIcon } from "./HomeIcons";
@@ -43,7 +44,7 @@ export default function HomeProductCard({
             practiceId={product.id}
             authorSlug={product.authorSlug}
             productSlug={product.slug}
-            ariaLabel={`Слушать ${product.title}`}
+            ariaLabel={`${PLAY_ACTION_LABEL} ${product.title}`}
             className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white shadow-[0_8px_20px_rgba(96,59,168,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
           >
             <PlayIcon />

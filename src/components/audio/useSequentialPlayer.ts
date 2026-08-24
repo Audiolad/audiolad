@@ -15,6 +15,10 @@ import {
   resolveInitialPlayback,
 } from "@/lib/listen/progress";
 import type { ListenProgressEntry, ListenTrack } from "@/lib/listen/types";
+import {
+  AUTOPLAY_RESUME_HINT,
+  AUTOPLAY_START_HINT,
+} from "@/lib/ui/action-labels";
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
 const PROGRESS_SAVE_INTERVAL_MS = 12_000;
@@ -1035,7 +1039,7 @@ export function useSequentialPlayer({
           userWantsPlaybackRef.current = false;
           // Intent was not successfully consumed — allow a later gesture retry
           // via requestAutoplayIntent / manual Play, not a canplay loop.
-          setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+          setAutoplayHint(AUTOPLAY_START_HINT);
         });
       }
     };
@@ -1376,7 +1380,7 @@ export function useSequentialPlayer({
       initialPlaybackBufferingRef.current = false;
       deferResumeSeekForInitialAutoplayRef.current = false;
       userWantsPlaybackRef.current = false;
-      setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+      setAutoplayHint(AUTOPLAY_START_HINT);
     });
   }, [audioRef, debugSnapshot, pendingStartPosition]);
 
@@ -1493,7 +1497,7 @@ export function useSequentialPlayer({
               : "unknown";
           debugSnapshot("play-at-index", `blocked:${name}`);
           userWantsPlaybackRef.current = false;
-          setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+          setAutoplayHint(AUTOPLAY_START_HINT);
         }
       } else if (!src && currentTrack?.id) {
         // Source still preparing — keep play intent for canplay.
@@ -1567,7 +1571,7 @@ export function useSequentialPlayer({
             await audio.play();
           } catch {
             userWantsPlaybackRef.current = false;
-            setAutoplayHint("Нажмите Play, чтобы начать прослушивание");
+            setAutoplayHint(AUTOPLAY_START_HINT);
           }
         }
       } else {
@@ -1772,7 +1776,7 @@ export function useSequentialPlayer({
           !currentTrack ||
           generationAtStart !== (getSessionGenerationRef.current?.() ?? 0)
         ) {
-          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          setAutoplayHint(AUTOPLAY_RESUME_HINT);
           syncMediaSessionPlaybackState(false);
           debugSnapshot("foreground-recovery", "failed-no-retry");
           return false;
@@ -1799,7 +1803,7 @@ export function useSequentialPlayer({
         const refreshedAudio = audioRef.current;
 
         if (!refreshedAudio?.src) {
-          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          setAutoplayHint(AUTOPLAY_RESUME_HINT);
           return false;
         }
 
@@ -1862,7 +1866,7 @@ export function useSequentialPlayer({
         const success = isPlayingRef.current;
 
         if (!success) {
-          setAutoplayHint("Нажмите Play, чтобы продолжить воспроизведение.");
+          setAutoplayHint(AUTOPLAY_RESUME_HINT);
           syncMediaSessionPlaybackState(false);
         }
 

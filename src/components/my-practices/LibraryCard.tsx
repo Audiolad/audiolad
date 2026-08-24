@@ -23,6 +23,7 @@ import {
   isProductFree,
 } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 import LibraryCardPlayButton from "./LibraryCardPlayButton";
 import LibraryCardPreviewPlayButton from "./LibraryCardPreviewPlayButton";
@@ -78,7 +79,7 @@ function hasAudioReady(audioUrl: string | null | undefined): boolean {
 
 function getAudioStatusLabel(audioUrl: string | null | undefined): string {
   if (hasAudioReady(audioUrl)) {
-    return "Слушать";
+    return PLAY_ACTION_LABEL;
   }
 
   return "Аудиоматериал готовится к публикации";
@@ -243,7 +244,7 @@ export default function LibraryCard({
                   practiceSlug={practice.slug}
                   practiceId={item.practiceId}
                   purchaseSurface="catalog_card"
-                  label="Купить"
+                  label={BUY_ACTION_LABEL}
                   signInReturnPath={signInReturnPath}
                   hidePendingNotice
                   className="mt-2 inline-flex min-h-9 items-center justify-center rounded-[14px] bg-[#7042c5] px-3 text-sm font-semibold text-white"
