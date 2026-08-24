@@ -66,6 +66,7 @@ import { MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/
 import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-ot-stressa-i-trevogi.ts";
 import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-vosstanovleniya-sil.ts";
 import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/detskaya-muzyka-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1388,6 +1389,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${thirtyNinthListenHref}`,
     ),
     "directory JSON-LD includes thirty-ninth listen href",
+  );
+
+
+  const fortiethListenHref = "/listens/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn";
+  const fortiethListenCard = data.articles.find((card) => card.href === fortiethListenHref);
+  assert(fortiethListenCard, "fortieth indexable listen page is listed");
+  assert(
+    fortiethListenCard.title === "Музыка для сна для малышей – слушать онлайн бесплатно | АудиоЛад",
+    "fortieth listen directory title",
+  );
+  assert(
+    fortiethListenCard.description === MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.description,
+    "fortieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn",
+    ),
+    "no /articles duplicate for fortieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortiethListenHref}`,
+    ),
+    "directory JSON-LD includes fortieth listen href",
   );
 
 
