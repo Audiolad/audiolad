@@ -50,6 +50,8 @@ function testHeartOnCover() {
   assert.match(parts, /function PracticeLibraryActionSection[\s\S]*LibraryAddButton/);
   assert.match(mobile, /toPracticeHeartProduct\(viewModel\)/);
   assert.match(desktop, /toPracticeHeartProduct\(viewModel\)/);
+  assert.doesNotMatch(mobile, /PracticeLibraryActionSection|LibraryAddButton/);
+  assert.doesNotMatch(desktop, /PracticeLibraryActionSection|LibraryAddButton/);
   assert.match(page, /listSavedPracticeIds/);
   assert.match(page, /isSaved/);
 }

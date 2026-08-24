@@ -6,7 +6,6 @@ import AudioPostListenAnalytics from "@/components/products/audio-post/AudioPost
 import AudioPostPlayer from "@/components/products/audio-post/AudioPostPlayer";
 import {
   PracticeAccessBanners,
-  PracticeLibraryActionSection,
   PracticeProductCover,
   toPracticeHeartProduct,
 } from "@/components/products/practice-page/PracticePageParts";
@@ -152,8 +151,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           </section>
         ) : null}
 
-        <PracticeLibraryActionSection viewModel={viewModel} className="mt-6" />
-
         <AudioPostRecommendation viewModel={viewModel} />
 
         <LegalFooter className="mt-8" />
@@ -216,8 +213,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             </p>
           </section>
         ) : null}
-
-        <PracticeLibraryActionSection viewModel={viewModel} className="mt-6" />
 
         <AudioPostRecommendation viewModel={viewModel} />
 
