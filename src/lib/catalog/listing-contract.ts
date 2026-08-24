@@ -33,6 +33,7 @@ export type CatalogListingItem = {
   durationLabel: string | null;
   priceLabel: string;
   accessState: "free" | "paid";
+  isSaved: boolean;
 };
 
 export type CatalogListingQuery = {

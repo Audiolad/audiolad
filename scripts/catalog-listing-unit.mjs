@@ -4,6 +4,7 @@
  */
 import {
   applyCatalogListingCursor,
+  applyCatalogListingSavedState,
   buildCatalogListingApiUrl,
   CATALOG_LISTING_PAGE_SIZE,
   decodeCatalogCursor,
@@ -249,9 +250,27 @@ const mapped = mapCatalogProductToListingItem(
 );
 assert(mapped.author === "Мария", "card author");
 assert(mapped.accessState === "free", "card accessState");
-assert(!("isSaved" in mapped), "no isSaved");
+assert(mapped.isSaved === false, "mapped default isSaved is false");
 assert(!("playbackMode" in mapped), "no playbackMode");
 assert(!("preview" in mapped), "no preview");
+
+const savedPage = applyCatalogListingSavedState(
+  [
+    { ...mapped, id: "saved-practice", accessState: "paid" },
+    { ...mapped, id: "other-practice", accessState: "free" },
+  ],
+  new Set(["saved-practice"]),
+);
+assert(savedPage[0].isSaved === true, "authorized user isSaved=true");
+assert(savedPage[1].isSaved === false, "unsaved card stays false");
+assert(savedPage[0].accessState === "paid", "isSaved does not change accessState");
+
+const guestPage = applyCatalogListingSavedState(
+  [{ ...mapped, id: "saved-practice" }],
+  null,
+);
+assert(guestPage[0].isSaved === false, "guest always receives isSaved=false");
+assert(guestPage[0].accessState === mapped.accessState, "guest accessState unchanged");
 
 assert(buildCatalogListingApiUrl({ access: "free" }) === "/api/catalog?access=free");
 assert(buildCatalogHref({ sort: "new" }) === "/catalog", "default sort omitted");
