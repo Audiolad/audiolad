@@ -19,6 +19,7 @@ import {
   RewindFifteenIcon,
   useListenPlayer,
 } from "@/components/audio/listen-player-shared";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 export default function ListenPlayerMobile() {
   const {
@@ -99,7 +100,7 @@ export default function ListenPlayerMobile() {
             }
             className="mt-4 min-h-11 rounded-full bg-white px-6 py-2 text-sm font-semibold text-[#4b2f86] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            Воспроизвести
+            {PLAY_ACTION_LABEL}
           </button>
         </section>
       ) : !isEngineReady ? (

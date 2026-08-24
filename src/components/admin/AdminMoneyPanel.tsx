@@ -622,7 +622,7 @@ export default function AdminMoneyPanel({
                   <th className="px-3 py-2">New</th>
                   <th className="px-3 py-2">Repeat</th>
                   <th className="px-3 py-2">Доступ</th>
-                  <th className="px-3 py-2">Play</th>
+                  <th className="px-3 py-2">Слушать</th>
                 </tr>
               </thead>
               <tbody>

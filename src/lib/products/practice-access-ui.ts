@@ -9,6 +9,7 @@ import {
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 import { formatPracticePrice } from "@/lib/products/price-format";
+import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type PracticePricing = {
   price: number | null;
@@ -356,7 +357,7 @@ function buildCommercialPresentation(input: {
     autoplay: true,
   });
   const audioReady = hasAudioReady(practice.audio_url);
-  const listenLabel = isGuestListenEntry ? "Начать слушать" : "Слушать";
+  const listenLabel = isGuestListenEntry ? "Начать слушать" : PLAY_ACTION_LABEL;
 
   if (access.reason === "admin") {
     return {
@@ -366,7 +367,7 @@ function buildCommercialPresentation(input: {
         ? {
             kind: "listen",
             href: listenHref,
-            label: "Слушать",
+            label: PLAY_ACTION_LABEL,
           }
         : {
             kind: "audio_pending",
@@ -425,7 +426,7 @@ function buildCommercialPresentation(input: {
         ? {
             kind: "listen",
             href: listenHref,
-            label: "Слушать",
+            label: PLAY_ACTION_LABEL,
           }
         : {
             kind: "audio_pending",
@@ -435,8 +436,7 @@ function buildCommercialPresentation(input: {
     };
   }
 
-  const buyLabel =
-    priceLabel !== null ? `Купить за ${priceLabel}` : "Купить доступ";
+  const buyLabel = BUY_ACTION_LABEL;
 
   if (access.reason === "unavailable" || !access.canAcquire) {
     const unavailableDetail =

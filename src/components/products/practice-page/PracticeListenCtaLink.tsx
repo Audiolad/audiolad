@@ -8,12 +8,14 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type PracticeListenCtaLinkProps = {
   authorSlug: string;
   productSlug: string;
   practiceId: string;
   className: string;
+  playAriaLabel?: string;
   children: ReactNode;
 };
 
@@ -26,6 +28,7 @@ export default function PracticeListenCtaLink({
   productSlug,
   practiceId,
   className,
+  playAriaLabel = PLAY_ACTION_LABEL,
   children,
 }: PracticeListenCtaLinkProps) {
   const { session, loadSession, prepareSharedAudioGesture, clearPlaylistQueue } =
@@ -102,7 +105,7 @@ export default function PracticeListenCtaLink({
       type="button"
       data-practice-primary-play
       data-practice-primary-play-active={isPlaying ? "true" : "false"}
-      aria-label={isPlaying ? "Пауза" : "Слушать"}
+      aria-label={isPlaying ? "Пауза" : playAriaLabel}
       aria-busy={isStarting}
       disabled={!authorSlug || !productSlug || isStarting}
       className={className}

@@ -10,6 +10,7 @@ import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-sessio
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
 import { parsePracticePublicPath } from "@/lib/products/paths";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 function PlayIcon() {
   return (
@@ -112,7 +113,7 @@ export default function CatalogProductPlayButton({
       type="button"
       data-catalog-play-button
       data-catalog-play-active={isPlaying ? "true" : "false"}
-      aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
+      aria-label={isPlaying ? "Пауза" : PLAY_ACTION_LABEL}
       disabled={!identity || isStarting}
       onClick={(event) => {
         void handleClick(event);

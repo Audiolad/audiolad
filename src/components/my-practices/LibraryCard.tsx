@@ -31,6 +31,8 @@ import {
   buildPracticePublicPath,
 } from "@/lib/products/paths";
 
+import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
+
 import LibraryCardPreviewPlayButton from "./LibraryCardPreviewPlayButton";
 
 export type LibraryCardItem = {
@@ -84,7 +86,7 @@ function hasAudioReady(audioUrl: string | null | undefined): boolean {
 
 function getAudioStatusLabel(audioUrl: string | null | undefined): string {
   if (hasAudioReady(audioUrl)) {
-    return "Слушать";
+    return PLAY_ACTION_LABEL;
   }
 
   return "Аудиоматериал готовится к публикации";
@@ -253,7 +255,7 @@ export default function LibraryCard({
                   practiceSlug={practice.slug}
                   practiceId={item.practiceId}
                   purchaseSurface="catalog_card"
-                  label="Купить"
+                  label={BUY_ACTION_LABEL}
                   signInReturnPath={signInReturnPath}
                   hidePendingNotice
                   className="mt-2 inline-flex min-h-9 items-center justify-center rounded-[14px] bg-[#7042c5] px-3 text-sm font-semibold text-white"
@@ -268,7 +270,7 @@ export default function LibraryCard({
         {listenHref ? (
           <Link
             href={listenHref}
-            aria-label={`Слушать «${title}»`}
+            aria-label={`${PLAY_ACTION_LABEL} «${title}»`}
             className={`flex items-center gap-2 font-medium text-[#7042c5] ${focusRingClass}`}
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white">

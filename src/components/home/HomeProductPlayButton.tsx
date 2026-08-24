@@ -8,6 +8,7 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type HomeProductPlayButtonProps = {
   practiceId: string;
@@ -103,7 +104,7 @@ export default function HomeProductPlayButton({
       type="button"
       data-home-product-play
       data-home-product-play-active={isPlaying ? "true" : "false"}
-      aria-label={ariaLabel ?? (isPlaying ? "Пауза" : "Слушать")}
+      aria-label={ariaLabel ?? (isPlaying ? "Пауза" : PLAY_ACTION_LABEL)}
       aria-busy={isStarting}
       disabled={!authorSlug || !productSlug || isStarting}
       className={className}

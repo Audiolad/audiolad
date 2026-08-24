@@ -3,6 +3,8 @@
  * Keep free of React / DOM side effects so unit tests can import them.
  */
 
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
+
 export type SignedAudioPayload = {
   url: string;
   expiresAt: string;
@@ -13,7 +15,7 @@ export const SIGNED_URL_REFRESH_MARGIN_MS = 60_000;
 
 export const PERSONAL_AUDIO_COPY = {
   preparing: "Подготавливаем аудио…",
-  needsGesture: "Аудио готово. Нажмите Play ещё раз.",
+  needsGesture: `Аудио готово. Нажмите «${PLAY_ACTION_LABEL}» ещё раз.`,
   playFailed: "Не удалось включить аудио",
   notSupported: "Не удалось воспроизвести этот аудиофайл.",
   authRequired: "Нужно снова войти в аккаунт или обновить доступ к материалу.",

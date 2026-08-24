@@ -34,12 +34,12 @@ function testPlayLabels() {
     getPromoProductPlayLabel("p1", "p1", false, {
       isPlaying: false,
       needsGesturePlay: true,
-    }) === "Воспроизвести",
+    }) === "Слушать",
     "blocked autoplay label",
   );
   assert(
     getPromoProductPlayLabel("p1", "p1", false, { isPlaying: false }) ===
-      "Воспроизвести",
+      "Слушать",
     "active but paused shows play CTA",
   );
   assert(
@@ -50,7 +50,7 @@ function testPlayLabels() {
 
 function testAutoplayHintDetection() {
   assert(
-    isPromoAutoplayBlockedHint("Нажмите Play, чтобы начать прослушивание"),
+    isPromoAutoplayBlockedHint("Нажмите «Слушать», чтобы начать прослушивание"),
     "play hint detected",
   );
   assert(

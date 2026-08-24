@@ -10,6 +10,7 @@ import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
+import { PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 import PracticeListenCtaLink from "./PracticeListenCtaLink";
 import PublishPreviewBanner from "./PublishPreviewBanner";
@@ -367,7 +368,7 @@ export function PracticePrimaryActionSection({
   const playLabel =
     presentation.primaryAction.kind === "listen"
       ? presentation.primaryAction.label
-      : "Слушать";
+      : PREVIEW_ACTION_LABEL;
 
   return (
     <section className={className}>
@@ -376,6 +377,7 @@ export function PracticePrimaryActionSection({
           authorSlug={resolvedAuthorSlug}
           productSlug={practice.slug}
           practiceId={practice.id}
+          playAriaLabel={playLabel}
           className={playClassName}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
