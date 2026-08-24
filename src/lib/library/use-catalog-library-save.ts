@@ -5,11 +5,25 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
+  clearPendingLibrarySave,
+  readPendingLibrarySave,
+  resolvePendingLibrarySaveReturnPath,
+  writePendingLibrarySave,
+  type PendingLibrarySave,
+  type PendingLibrarySaveStorage,
+} from "@/lib/library/pending-library-save";
+import {
   peekLibrarySave,
   publishLibrarySave,
+  resetLibrarySaveSyncForTests,
   resolveCatalogLibrarySaveState,
   subscribeLibrarySave,
 } from "@/lib/library/saves-sync";
+
+export {
+  peekLibrarySave as peekCatalogLibrarySaveForTests,
+  resetLibrarySaveSyncForTests as resetCatalogLibrarySaveSyncForTests,
+};
 
 export const CATALOG_LIBRARY_SAVES_PATH = "/api/library/saves";
 
@@ -117,6 +131,119 @@ export type UseCatalogLibrarySaveResult = {
   handleClick: () => void;
 };
 
+export type ConsumePendingLibrarySaveResult = {
+  consumed: boolean;
+  posted: boolean;
+  practiceId: string | null;
+};
+
+type ConsumeInFlight = Promise<ConsumePendingLibrarySaveResult>;
+
+let consumeInFlight: ConsumeInFlight | null = null;
+
+export function startCatalogLibrarySaveSignIn(input: {
+  practiceId: string;
+  signInReturnPath: string;
+  currentPath?: string;
+  now?: number;
+  storage?: PendingLibrarySaveStorage | null;
+}): { href: string; pending: PendingLibrarySave | null } {
+  const returnPath = resolvePendingLibrarySaveReturnPath(
+    input.signInReturnPath,
+    input.currentPath ?? "",
+  );
+  const pending = writePendingLibrarySave({
+    practiceId: input.practiceId,
+    returnPath,
+    ts: input.now,
+    storage: input.storage,
+  });
+
+  return {
+    href: buildAuthRouteHref("/auth/sign-in", returnPath),
+    pending,
+  };
+}
+
+export function resetPendingLibrarySaveConsumeForTests(): void {
+  consumeInFlight = null;
+}
+
+export function useFlushPendingLibrarySave(
+  isAuthenticated: boolean,
+  fetchImpl?: CatalogLibrarySaveFetch,
+): void {
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    void consumePendingLibrarySave({
+      isAuthenticated: true,
+      fetchImpl,
+    });
+  }, [fetchImpl, isAuthenticated]);
+}
+
+export async function consumePendingLibrarySave(input: {
+  isAuthenticated: boolean;
+  fetchImpl?: CatalogLibrarySaveFetch;
+  storage?: PendingLibrarySaveStorage | null;
+  now?: number;
+}): Promise<ConsumePendingLibrarySaveResult> {
+  if (!input.isAuthenticated) {
+    return { consumed: false, posted: false, practiceId: null };
+  }
+
+  if (consumeInFlight) {
+    return consumeInFlight;
+  }
+
+  consumeInFlight = consumePendingLibrarySaveOnce(input).finally(() => {
+    consumeInFlight = null;
+  });
+
+  return consumeInFlight;
+}
+
+async function consumePendingLibrarySaveOnce(input: {
+  fetchImpl?: CatalogLibrarySaveFetch;
+  storage?: PendingLibrarySaveStorage | null;
+  now?: number;
+}): Promise<ConsumePendingLibrarySaveResult> {
+  const pending = readPendingLibrarySave({
+    storage: input.storage,
+    now: input.now,
+  });
+
+  if (!pending) {
+    return { consumed: false, posted: false, practiceId: null };
+  }
+
+  const result = await persistCatalogLibrarySave({
+    practiceId: pending.practiceId,
+    nextSaved: true,
+    fetchImpl: input.fetchImpl,
+  });
+
+  if (!result.ok) {
+    return {
+      consumed: false,
+      posted: true,
+      practiceId: pending.practiceId,
+    };
+  }
+
+  publishLibrarySave(pending.practiceId, true);
+  clearPendingLibrarySave({ storage: input.storage });
+
+  return {
+    consumed: true,
+    posted: true,
+    practiceId: pending.practiceId,
+  };
+}
+
 export function useCatalogLibrarySave({
   practiceId,
   isSaved: productIsSaved,
@@ -158,9 +285,20 @@ export function useCatalogLibrarySave({
     inFlightRef.current = false;
   }, [practiceId]);
 
+  useFlushPendingLibrarySave(isAuthenticated, fetchImpl);
+
   function handleClick() {
     if (resolveCatalogLibrarySaveClick(isAuthenticated) === "sign_in") {
-      router.push(buildAuthRouteHref("/auth/sign-in", signInReturnPath));
+      const currentPath =
+        typeof window === "undefined"
+          ? ""
+          : `${window.location.pathname}${window.location.search}`;
+      const { href } = startCatalogLibrarySaveSignIn({
+        practiceId,
+        signInReturnPath,
+        currentPath,
+      });
+      router.push(href);
       return;
     }
 

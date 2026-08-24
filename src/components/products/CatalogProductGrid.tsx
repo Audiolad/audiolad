@@ -8,6 +8,7 @@ import {
   type CatalogListingItem,
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
+import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-save";
 
 type CatalogProductGridProps = {
   initialItems: CatalogListingItem[];
@@ -35,6 +36,8 @@ export default function CatalogProductGrid({
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const inFlightRef = useRef(false);
+
+  useFlushPendingLibrarySave(isAuthenticated);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || inFlightRef.current) {
