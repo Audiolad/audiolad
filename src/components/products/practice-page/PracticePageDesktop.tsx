@@ -11,6 +11,7 @@ import {
   PracticeMetaSection,
   PracticePrimaryActionSection,
   PracticeProductCover,
+  toPracticeHeartProduct,
 } from "./PracticePageParts";
 import type { PracticePageViewModel } from "./types";
 
@@ -42,7 +43,13 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
         <section className="mt-6 grid min-w-0 grid-cols-[minmax(240px,280px)_minmax(0,1fr)] gap-x-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-x-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           <div className="w-full max-w-[280px] xl:max-w-[300px] 2xl:max-w-[360px]">
-            <PracticeProductCover cover={viewModel.desktopCover} priority />
+            <PracticeProductCover
+              cover={viewModel.desktopCover}
+              priority
+              heartProduct={toPracticeHeartProduct(viewModel)}
+              isAuthenticated={viewModel.isAuthenticated}
+              signInReturnPath={viewModel.practicePagePath}
+            />
           </div>
 
           {/*
