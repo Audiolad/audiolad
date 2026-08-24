@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -13,6 +12,8 @@ import {
   parseCatalogAccessFilter,
   parseCatalogKindFilter,
   parseCatalogSort,
+  type CatalogAccessFilter,
+  type CatalogKindFilter,
 } from "@/lib/catalog/listing-contract";
 import {
   readPlatformSearchListingFromParams,
@@ -29,22 +30,19 @@ type CatalogMobileFiltersProps = {
 };
 
 function FilterChip({
-  href,
   label,
   isActive,
-  onNavigate,
+  onSelect,
 }: {
-  href: string;
   label: string;
   isActive: boolean;
-  onNavigate: () => void;
+  onSelect: () => void;
 }) {
   return (
-    <Link
-      href={href}
-      prefetch={false}
-      aria-current={isActive ? "page" : undefined}
-      onClick={onNavigate}
+    <button
+      type="button"
+      aria-pressed={isActive}
+      onClick={onSelect}
       className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
         isActive
           ? "border-[#7042c5] bg-[#7042c5] text-white"
@@ -52,7 +50,7 @@ function FilterChip({
       }`}
     >
       {label}
-    </Link>
+    </button>
   );
 }
 
@@ -62,6 +60,10 @@ export default function CatalogMobileFilters({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [draftTopic, setDraftTopic] = useState<string | null>(null);
+  const [draftAccess, setDraftAccess] = useState<CatalogAccessFilter>("all");
+  const [draftKind, setDraftKind] = useState<CatalogKindFilter>("all");
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const searchQuery = readPlatformSearchQueryFromParams(searchParams);
@@ -74,7 +76,6 @@ export default function CatalogMobileFilters({
   const access = parseCatalogAccessFilter(listingFromUrl.access);
   const kind = parseCatalogKindFilter(listingFromUrl.kind);
   const sort = parseCatalogSort(listingFromUrl.sort);
-  const listingState = { access, kind, sort };
   const activeFilterCount = [
     activeTopicKey !== null,
     access !== "all",
@@ -148,6 +149,26 @@ export default function CatalogMobileFilters({
     setOpen(false);
   }
 
+  function openSheet() {
+    setDraftTopic(activeTopicKey);
+    setDraftAccess(access);
+    setDraftKind(kind);
+    setOpen(true);
+  }
+
+  function applyDraft() {
+    router.replace(
+      buildCatalogHref({
+        q: searchQuery || null,
+        topic: draftTopic,
+        access: draftAccess,
+        kind: draftKind,
+        sort,
+      }),
+    );
+    close();
+  }
+
   return (
     <>
       <button
@@ -155,7 +176,7 @@ export default function CatalogMobileFilters({
         data-catalog-mobile-filters-button
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
+        onClick={openSheet}
         className="inline-flex h-[52px] shrink-0 items-center rounded-[18px] border border-[#ded1f1] bg-white px-3 text-sm font-medium text-[#7042c5] shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         Фильтры
@@ -171,7 +192,7 @@ export default function CatalogMobileFilters({
 
       {open ? (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0 pb-[env(safe-area-inset-bottom)]"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -206,28 +227,18 @@ export default function CatalogMobileFilters({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <section aria-label="Тематика">
                 <h3 className="text-sm font-semibold text-[#25135c]">Тематика</h3>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
                   <FilterChip
-                    href={buildCatalogHref({
-                      q: searchQuery || null,
-                      topic: null,
-                      ...listingState,
-                    })}
                     label="Все"
-                    isActive={activeTopicKey === null}
-                    onNavigate={close}
+                    isActive={draftTopic === null}
+                    onSelect={() => setDraftTopic(null)}
                   />
                   {topics.map((topic) => (
                     <FilterChip
                       key={topic.key}
-                      href={buildCatalogHref({
-                        q: searchQuery || null,
-                        topic: topic.key,
-                        ...listingState,
-                      })}
                       label={topic.title}
-                      isActive={topic.key === activeTopicKey}
-                      onNavigate={close}
+                      isActive={topic.key === draftTopic}
+                      onSelect={() => setDraftTopic(topic.key)}
                     />
                   ))}
                 </div>
@@ -239,16 +250,9 @@ export default function CatalogMobileFilters({
                   {CATALOG_ACCESS_FILTER_OPTIONS.map((option) => (
                     <FilterChip
                       key={option.value}
-                      href={buildCatalogHref({
-                        q: searchQuery || null,
-                        topic: activeTopicKey,
-                        access: option.value,
-                        kind,
-                        sort,
-                      })}
                       label={option.label}
-                      isActive={option.value === access}
-                      onNavigate={close}
+                      isActive={option.value === draftAccess}
+                      onSelect={() => setDraftAccess(option.value)}
                     />
                   ))}
                 </div>
@@ -260,20 +264,24 @@ export default function CatalogMobileFilters({
                   {CATALOG_KIND_FILTER_OPTIONS.map((option) => (
                     <FilterChip
                       key={option.value}
-                      href={buildCatalogHref({
-                        q: searchQuery || null,
-                        topic: activeTopicKey,
-                        access,
-                        kind: option.value,
-                        sort,
-                      })}
                       label={option.label}
-                      isActive={option.value === kind}
-                      onNavigate={close}
+                      isActive={option.value === draftKind}
+                      onSelect={() => setDraftKind(option.value)}
                     />
                   ))}
                 </div>
               </section>
+            </div>
+
+            <div className="shrink-0 border-t border-[#f0e7fa] bg-white px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                data-catalog-mobile-filters-apply
+                onClick={applyDraft}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              >
+                Применить
+              </button>
             </div>
           </div>
         </div>

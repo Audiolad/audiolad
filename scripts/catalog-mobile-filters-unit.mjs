@@ -50,6 +50,38 @@ assert.match(filterUi, /Посты/, "kind includes posts");
 assert.match(filters, /buildCatalogHref/, "sheet options use buildCatalogHref");
 assert.match(filters, /q: searchQuery/, "sheet keeps the current search query");
 assert.doesNotMatch(filters, /buildCatalogHref\s*=/, "sheet does not redefine hrefs");
+assert.doesNotMatch(filters, /from "next\/link"/, "sheet chips are not links");
+assert.doesNotMatch(filters, /onNavigate/, "chips do not close or navigate on tap");
+assert.doesNotMatch(
+  filters,
+  /href=\{buildCatalogHref/,
+  "chips do not navigate via href",
+);
+assert.match(filters, /setDraftTopic|draftTopic/, "topic chips update draft only");
+assert.match(filters, /grid-rows-2/, "topics stay in two visual rows");
+assert.match(filters, /grid-flow-col/, "topics flow sideways in columns");
+assert.match(filters, /overflow-x-auto/, "topics scroll horizontally");
+assert.match(filters, /Применить/, "Apply button exists");
+assert.match(
+  filters,
+  /router\.replace\(\s*buildCatalogHref/,
+  "Apply uses buildCatalogHref in one replace",
+);
+assert.match(
+  filters,
+  /function close\(\) \{\s*setOpen\(false\);\s*\}/,
+  "close discards draft without applying",
+);
+assert.doesNotMatch(
+  filters,
+  /event\.key === "Escape"[\s\S]{0,200}router\./,
+  "Escape does not apply draft",
+);
+assert.doesNotMatch(
+  filters,
+  /event\.target === event\.currentTarget[\s\S]{0,200}router\./,
+  "overlay close does not apply draft",
+);
 
 assert.match(href, /function buildCatalogHref/, "href helper is unchanged in place");
 assert.match(href, /params.set\("topic"/, "topic query is still topic=");

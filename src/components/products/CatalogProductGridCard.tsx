@@ -105,11 +105,17 @@ export default function CatalogProductGridCard({
         </p>
 
         {durationLabel || priceLabel ? (
-          <p data-catalog-card-meta className="mt-1 text-xs leading-4 text-[#7d70a2]">
+          <p
+            data-catalog-card-meta
+            className="mt-1 flex flex-wrap items-baseline text-xs leading-4 text-[#7d70a2]"
+          >
             {durationLabel ? <span>{durationLabel}</span> : null}
-            {durationLabel && priceLabel ? <span aria-hidden="true"> · </span> : null}
             {priceLabel ? (
-              <span data-catalog-card-price className="font-semibold text-[#7042c5]">
+              <span
+                data-catalog-card-price
+                className="whitespace-nowrap font-semibold text-[#7042c5]"
+              >
+                {durationLabel ? " · " : null}
                 {priceLabel}
               </span>
             ) : null}
