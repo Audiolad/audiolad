@@ -65,6 +65,7 @@ import { MEDITATSIYA_DLYA_SNA_DLYA_ZHENSHCHIN_SLUSHAT_ONLAYN_PAGE } from "../src
 import { MEDITATSIYA_DLYA_ZASYPANIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-zasypaniya-slushat-onlayn.ts";
 import { MEDITATSIYA_DLYA_SNA_OT_STRESSA_I_TREVOGI_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-ot-stressa-i-trevogi.ts";
 import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/listens/content/meditatsiya-dlya-sna-i-vosstanovleniya-sil.ts";
+import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/detskaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1363,6 +1364,32 @@ function testListenPagesAppearInDirectory() {
     ),
     "directory JSON-LD includes thirty-eighth listen href",
   );
+
+
+  const thirtyNinthListenHref = "/listens/detskaya-muzyka-dlya-sna-slushat-onlayn";
+  const thirtyNinthListenCard = data.articles.find((card) => card.href === thirtyNinthListenHref);
+  assert(thirtyNinthListenCard, "thirty-ninth indexable listen page is listed");
+  assert(
+    thirtyNinthListenCard.title === "Детская музыка для сна – слушать онлайн бесплатно | АудиоЛад",
+    "thirty-ninth listen directory title",
+  );
+  assert(
+    thirtyNinthListenCard.description === DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "thirty-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/detskaya-muzyka-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for thirty-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${thirtyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes thirty-ninth listen href",
+  );
+
 
 const articleCards = listArticleDirectoryCards();
   const articleHrefs = new Set(articleCards.map((card) => card.href));
