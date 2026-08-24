@@ -24,7 +24,7 @@ const play = read("src/components/products/CatalogProductPlayButton.tsx");
 const heart = read("src/components/products/CatalogProductHeartButton.tsx");
 const listingApi = read("src/app/api/catalog/route.ts");
 
-assert.match(layout, /CatalogMobileFiltersSlot/, "sticky chrome mounts filters");
+assert.match(layout, /CatalogMobileFiltersSlot/, "fixed chrome mounts filters");
 assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
 assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
 

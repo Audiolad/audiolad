@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Catalog mobile chrome: no title/back row, sticky search, desktop h1 stays.
+ * Catalog mobile chrome: no title/back row, fixed search + spacer, desktop h1 stays.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -17,6 +17,7 @@ const layout = read(
   "src/app/(platform)/(listener)/(catalog)/catalog/layout.tsx",
 );
 const page = read("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx");
+const globals = read("src/app/globals.css");
 
 assert.doesNotMatch(
   layout,
@@ -30,18 +31,39 @@ assert.match(
   /listener-catalog-mobile-search/,
   "mobile search keeps its layout hook",
 );
-assert.match(layout, /sticky/, "mobile search is sticky");
-assert.match(layout, /top-0/, "sticky search pins to the top of the scrollport");
-assert.match(layout, /xl:hidden/, "sticky search stays mobile-only");
+assert.match(layout, /fixed top-0 inset-x-0/, "mobile search is a fixed top layer");
+assert.doesNotMatch(layout, /sticky/, "mobile search is no longer sticky");
+assert.match(layout, /z-30/, "fixed search keeps the chrome stacking layer");
+assert.match(layout, /xl:hidden/, "fixed search stays mobile-only");
+assert.match(
+  layout,
+  /listener-catalog-mobile-search-spacer/,
+  "fixed search has a matching-height spacer",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search-spacer[\s\S]*xl:hidden/,
+  "search spacer stays mobile-only",
+);
 assert.match(
   layout,
   /safe-area-inset-top/,
-  "sticky search respects the top safe-area",
+  "fixed search respects the top safe-area",
 );
 assert.match(
   layout,
   /CatalogMobileFiltersSlot/,
-  "Фильтры sit in the sticky search row",
+  "Фильтры sit in the fixed search row",
+);
+assert.match(
+  globals,
+  /--catalog-mobile-search-height/,
+  "search height and spacer share one CSS variable",
+);
+assert.match(
+  globals,
+  /\.listener-catalog-mobile-search,\s*\n\.listener-catalog-mobile-search-spacer/,
+  "search and spacer use the same min-height rule",
 );
 
 assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1");
