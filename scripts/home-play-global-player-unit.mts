@@ -82,7 +82,7 @@ function testBoundaries() {
     "src/components/products/practice-page/PracticeListenCtaLink.tsx",
   );
   const libraryPlay = read(
-    "src/components/my-practices/LibraryCardPreviewPlayButton.tsx",
+    "src/components/my-practices/LibraryCardPlayButton.tsx",
   );
   const fetchSession = read("src/lib/catalog/fetch-catalog-play-session.ts");
   const provider = read("src/components/audio/GlobalAudioPlayerProvider.tsx");

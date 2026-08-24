@@ -80,24 +80,23 @@ function testLockedPaidHasNoFullListen() {
   const preview = read(
     "src/components/my-practices/LibraryCardPreviewPlayButton.tsx",
   );
+  const play = read("src/components/my-practices/LibraryCardPlayButton.tsx");
 
   assert.match(card, /canUseLibraryFullListen\(item\)/);
   assert.match(card, /LibraryCardPreviewPlayButton/);
-  assert.match(
-    card,
-    /canFullListen && practice\?\.slug && audioReady/,
-    "full /listen href only when canListen",
-  );
+  assert.match(card, /canPreviewPlay && authorSlug && practice/);
   assert.doesNotMatch(
     preview,
     /buildListenPath|href=.*\/listen/,
     "preview play has no /listen link",
   );
-  assert.match(preview, /entrySurface: "library"/);
-  assert.match(preview, /suppressListenUrlSync: true/);
-  assert.match(preview, /fetchCatalogPlaySession/);
-  assert.match(preview, /loadSession/);
-  assert.match(preview, /data-library-preview-play/);
+  assert.match(preview, /variant="preview"/);
+  assert.match(preview, /LibraryCardPlayButton/);
+  assert.match(play, /entrySurface: "library"/);
+  assert.match(play, /suppressListenUrlSync: true/);
+  assert.match(play, /fetchCatalogPlaySession/);
+  assert.match(play, /loadSession/);
+  assert.match(play, /data-library-preview-play/);
 }
 
 function testEmptySaved() {
