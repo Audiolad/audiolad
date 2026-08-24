@@ -126,6 +126,14 @@ export const MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           ]},
           { kind: "paragraph", text: "Например, утром медитация может помочь спокойнее настроиться на день, а вечером – переключить внимание после накопившегося напряжения." },
           { kind: "paragraph", text: "Особого «магического» времени для таких практик нет. Лучше выбрать момент, когда вы можете спокойно пройти медитацию и не торопиться." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Практику можно слушать и перед сном, если она спокойная: есть «" },
+              { href: "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna", label: "медитацию изобилия и богатства для сна" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {
@@ -196,6 +204,14 @@ export const MEDITATSIYA_NA_IZOBILIE_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           ]},
           { kind: "paragraph", text: "Если речь идёт о финансовом результате, особенно важны конкретные действия, связанные с профессией, доходом, расходами и планированием." },
           { kind: "paragraph", text: "Поэтому практика может поддерживать внутреннее состояние, но не заменяет реальные шаги." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если деньги и изобилие нужны вместе, откройте «" },
+              { href: "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn", label: "медитацию для денег и изобилия" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

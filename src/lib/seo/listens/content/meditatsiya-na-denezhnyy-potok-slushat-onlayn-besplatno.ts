@@ -225,6 +225,14 @@ export const MEDITATSIYA_NA_DENEZHNYY_POTOK_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
               { text: "»." },
             ],
           },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если деньги и изобилие нужны вместе, есть «" },
+              { href: "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn", label: "медитация для денег и изобилия" },
+              { text: "»." },
+            ],
+          },
           { kind: "paragraph", text: "Медитация может поддерживать внутреннее состояние, но не заменяет реальные финансовые действия." },
         ],
       },

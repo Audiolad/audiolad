@@ -160,6 +160,30 @@ export const MEDITATSIYA_DLYA_DENEG_I_IZOBILIYA_SLUSHAT_ONLAYN_PAGE =
           { kind: "paragraph", text: "Поэтому после практики полезно спросить себя: какой шаг сейчас действительно зависит от меня?" },
           { kind: "paragraph", text: "Это может быть рабочая задача, пересмотр расходов, разговор о доходе, обучение новому навыку или решение, которое давно откладывалось." },
           { kind: "paragraph", text: "Медитация может поддерживать состояние, но не заменяет сами действия." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен женский контекст, есть «" },
+              { href: "/listens/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin", label: "медитация на деньги и изобилие для женщин" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для утреннего сценария откройте «" },
+              { href: "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie", label: "утреннюю медитацию на деньги и изобилие" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если запрос сформулирован как привлечение, есть «" },
+              { href: "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya", label: "медитация для привлечения денег, богатства и изобилия" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

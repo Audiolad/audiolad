@@ -54,6 +54,22 @@ export const DENEZHNAYA_MEDITATSIYA_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
             "настройкой перед конкретными действиями.",
           ]},
           { kind: "paragraph", text: "Поэтому не существует одной «самой сильной» денежной медитации для всех. Полезнее выбрать практику, которая соответствует вашему текущему состоянию и задаче." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если важнее движение финансов, откройте «" },
+              { href: "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno", label: "медитацию на денежный поток" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для более широкой темы ресурсов есть «" },
+              { href: "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno", label: "медитация на изобилие" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

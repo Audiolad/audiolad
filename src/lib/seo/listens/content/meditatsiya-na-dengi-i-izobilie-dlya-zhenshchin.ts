@@ -197,6 +197,14 @@ export const MEDITATSIYA_NA_DENGI_I_IZOBILIE_DLYA_ZHENSHCHIN_PAGE =
           { kind: "paragraph", text: "Если практика помогает сосредоточиться и подумать о целях, её удобно слушать утром или перед планированием." },
           { kind: "paragraph", text: "Если она более спокойная и рефлексивная, можно выбрать вечер." },
           { kind: "paragraph", text: "Какое-либо время суток само по себе не обладает особой денежной силой." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужна спокойная вечерняя практика, можно открыть «" },
+              { href: "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn", label: "медитацию для сна для женщин" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

@@ -51,6 +51,14 @@ export const MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
               { text: "»." },
             ],
           },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если ближе формулировка без предлога «на», откройте «" },
+              { href: "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno", label: "денежная медитация" },
+              { text: "»." },
+            ],
+          },
           { kind: "paragraph", text: "Выбирать лучше не по самому громкому обещанию, а по тому, что сейчас актуально. Например:" },
           { kind: "list", items: [
             "спокойнее относиться к финансовой теме;",
@@ -101,20 +109,20 @@ export const MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если хочется именно утренний сценарий, есть отдельная страница «" },
-              { href: "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie", label: "утренняя медитация на деньги и изобилие" },
+              { text: "Если нужны сразу деньги и изобилие, есть «" },
+              { href: "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn", label: "медитация для денег и изобилия" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для женского контекста можно открыть «" },
+              { href: "/listens/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin", label: "медитация на деньги и изобилие для женщин" },
               { text: "»." },
             ],
           },
           { kind: "paragraph", text: "Утро или вечер сами по себе не обладают особой силой. Лучше выбрать момент, когда вас меньше отвлекают и не нужно торопиться." },
-          {
-            kind: "rich_paragraph",
-            segments: [
-              { text: "Практику можно слушать и перед сном, если она спокойная. Для такого сценария есть отдельная страница «" },
-              { href: "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna", label: "медитация изобилия и богатства для сна" },
-              { text: "»." },
-            ],
-          },
         ],
       },
       {
@@ -147,8 +155,16 @@ export const MEDITATSIYA_NA_DENGI_SLUSHAT_ONLAYN_BESPLATNO_PAGE =
           {
             kind: "rich_paragraph",
             segments: [
-              { text: "Если запрос сформулирован именно как привлечение денег, богатства и изобилия, есть отдельная страница «" },
-              { href: "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya", label: "медитация для привлечения денег, богатства и изобилия" },
+              { text: "Если акцент на достатке, откройте «" },
+              { href: "/listens/meditatsiya-na-bogatstvo-slushat-onlayn", label: "медитация на богатство" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если важнее движение финансов, есть «" },
+              { href: "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno", label: "медитация на денежный поток" },
               { text: "»." },
             ],
           },

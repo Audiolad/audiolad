@@ -164,6 +164,14 @@ export const MEDITATSIYA_NA_BOGATSTVO_SLUSHAT_ONLAYN_PAGE =
           ]},
           { kind: "paragraph", text: "Ни утро, ни вечер сами по себе не обладают особой силой." },
           { kind: "paragraph", text: "Лучше выбрать момент, когда вас меньше отвлекают и вы можете спокойно пройти практику от начала до конца." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если практика спокойная, её можно слушать вечером: есть «" },
+              { href: "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna", label: "медитацию изобилия и богатства для сна" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

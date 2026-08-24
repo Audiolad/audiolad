@@ -230,6 +230,22 @@ export const MEDITATSIYA_DLYA_PRIVLECHENIYA_DENEG_BOGATSTVA_I_IZOBILIYA_PAGE =
           { kind: "paragraph", text: "Медитация может помочь уменьшить эмоциональный шум, сформулировать намерение или заметить собственные ограничения." },
           { kind: "paragraph", text: "Но она не заменяет сами действия." },
           { kind: "paragraph", text: "Поэтому после прослушивания полезно задать себе вопрос: какой следующий шаг сейчас действительно зависит от меня?" },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если ближе образ движения финансов, откройте «" },
+              { href: "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno", label: "медитацию на денежный поток" },
+              { text: "»." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для связки денег и изобилия есть «" },
+              { href: "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn", label: "медитация для денег и изобилия" },
+              { text: "»." },
+            ],
+          },
         ],
       },
       {

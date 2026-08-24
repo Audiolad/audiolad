@@ -2470,7 +2470,7 @@ function testDefinition() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 4, "first page has exactly 4 outbound listen anchors");
+  assert(allLinks.length === 6, "first page has exactly 6 outbound listen anchors");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `first link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `first href is site-relative: ${link.href}`);
@@ -2486,30 +2486,54 @@ function testDefinition() {
   assert(
     allLinks.some(
       (link) =>
-        link.href === "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya" &&
-        link.label === "медитация для привлечения денег, богатства и изобилия",
+        link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno" &&
+        link.label === "денежная медитация",
     ),
-    "first page links привлечение with short natural label",
+    "first page links денежная медитация with short natural label",
   );
   assert(
     allLinks.some(
       (link) =>
-        link.href === "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie" &&
-        link.label === "утренняя медитация на деньги и изобилие",
+        link.href === "/listens/meditatsiya-na-bogatstvo-slushat-onlayn" &&
+        link.label === "медитация на богатство",
     ),
-    "first page links утренняя with short natural label",
+    "first page links богатство with short natural label",
   );
   assert(
     allLinks.some(
       (link) =>
-        link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna" &&
-        link.label === "медитация изобилия и богатства для сна",
+        link.href === "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno" &&
+        link.label === "медитация на денежный поток",
     ),
-    "first page links sleep-abundance with short natural label",
+    "first page links денежный поток with short natural label",
   );
   assert(
-    !allLinks.some((link) => link.href === "/listens/denezhnaya-meditatsiya-slushat-onlayn-besplatno"),
-    "first page does not link near-duplicate denezhnaya",
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn" &&
+        link.label === "медитация для денег и изобилия",
+    ),
+    "first page links combo with short natural label",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin" &&
+        link.label === "медитация на деньги и изобилие для женщин",
+    ),
+    "first page links women with short natural label",
+  );
+  assert(
+    !allLinks.some((link) => link.href === "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie"),
+    "first page does not link morning",
+  );
+  assert(
+    !allLinks.some((link) => link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna"),
+    "first page does not link sleep-abundance",
+  );
+  assert(
+    !allLinks.some((link) => link.href === "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya"),
+    "first page does not link attraction",
   );
   const firstContent = read("src/lib/seo/listens/content/meditatsiya-na-dengi-slushat-onlayn-besplatno.ts");
   assert(
@@ -2792,6 +2816,19 @@ function testSecondPage() {
     link?.label === "Медитация на деньги: слушать онлайн бесплатно",
     "rich_paragraph label is human first listen title",
   );
+  const secondAllLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(secondAllLinks.length === 3, "second page has exactly 3 outbound listen anchors");
+  assert(
+    secondAllLinks.some((link) => link.href === "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno"),
+    "second page links potok",
+  );
+  assert(
+    secondAllLinks.some((link) => link.href === "/listens/meditatsiya-na-izobilie-slushat-onlayn-besplatno"),
+    "second page links izobilie",
+  );
   const secondContent = read(
     "src/lib/seo/listens/content/denezhnaya-meditatsiya-slushat-onlayn-besplatno.ts",
   );
@@ -2925,6 +2962,23 @@ function testThirdPage() {
         link.label === "Денежная медитация: слушать онлайн бесплатно",
     ),
     "financial section links second listen with human title label",
+  );
+  const thirdAllLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(thirdAllLinks.length === 4, "third page has exactly 4 outbound listen anchors");
+  assert(
+    thirdAllLinks.some((link) => link.href === "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn"),
+    "third page links combo",
+  );
+  assert(
+    thirdAllLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna" &&
+        link.label === "медитацию изобилия и богатства для сна",
+    ),
+    "third page links sleep-abundance",
   );
   const thirdContent = read(
     "src/lib/seo/listens/content/meditatsiya-na-izobilie-slushat-onlayn-besplatno.ts",
@@ -3080,6 +3134,19 @@ function testFourthPage() {
     ),
     "money section links second listen by page title",
   );
+  const fourthAllLinks = parsed.definition.sections
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+  assert(fourthAllLinks.length === 4, "fourth page has exactly 4 outbound listen anchors");
+  assert(
+    fourthAllLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna" &&
+        link.label === "медитацию изобилия и богатства для сна",
+    ),
+    "fourth page links sleep-abundance",
+  );
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(PAGE_SLUG), "registry contains first listen slug");
@@ -3186,7 +3253,7 @@ function testFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 4, "fifth page has four title-anchor links");
+  assert(allLinks.length === 6, "fifth page has six title-anchor links");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `fifth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `fifth href is site-relative: ${link.href}`);
@@ -3222,6 +3289,14 @@ function testFifthPage() {
         link.label === "Медитация на изобилие: слушать онлайн бесплатно",
     ),
     "fifth page links izobilie listen by page title",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/meditatsiya-na-denezhnyy-potok-slushat-onlayn-besplatno"),
+    "fifth page links potok",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn"),
+    "fifth page links combo",
   );
 
   const contentSource = read(
@@ -3327,7 +3402,7 @@ function testSixthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "sixth page has three title-anchor links");
+  assert(allLinks.length === 4, "sixth page has four title-anchor links");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `sixth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `sixth href is site-relative: ${link.href}`);
@@ -3355,6 +3430,10 @@ function testSixthPage() {
         link.label === "Медитация для привлечения денег, богатства и изобилия",
     ),
     "sixth page links privlecheniya listen by page title",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/meditatsiya-dlya-deneg-i-izobiliya-slushat-onlayn"),
+    "sixth page links combo",
   );
 
   const contentSource = read(
@@ -3461,7 +3540,7 @@ function testSeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "seventh page has three title-anchor links");
+  assert(allLinks.length === 6, "seventh page has six title-anchor links");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `seventh link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `seventh href is site-relative: ${link.href}`);
@@ -3489,6 +3568,18 @@ function testSeventhPage() {
         link.label === "Денежная медитация: слушать онлайн бесплатно",
     ),
     "seventh page links denezhnaya listen by page title",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/meditatsiya-na-dengi-i-izobilie-dlya-zhenshchin"),
+    "seventh page links women",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/utrennyaya-meditatsiya-na-dengi-i-izobilie"),
+    "seventh page links morning",
+  );
+  assert(
+    allLinks.some((link) => link.href === "/listens/meditatsiya-dlya-privlecheniya-deneg-bogatstva-i-izobiliya"),
+    "seventh page links attraction",
   );
 
   const contentSource = read(
@@ -3596,7 +3687,7 @@ function testEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph")
     .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "eighth page has three title-anchor links");
+  assert(allLinks.length === 4, "eighth page has four title-anchor links");
   for (const link of allLinks) {
     assert(!String(link.label).includes("https://"), `eighth link label is not a URL: ${link.label}`);
     assert(link.href.startsWith("/listens/"), `eighth href is site-relative: ${link.href}`);
@@ -3624,6 +3715,18 @@ function testEighthPage() {
         link.label === "Медитация для денег и изобилия: слушать онлайн",
     ),
     "eighth page links dengi-i-izobiliya listen by page title",
+  );
+  assert(
+    allLinks.some(
+      (link) =>
+        link.href === "/listens/meditatsiya-dlya-sna-dlya-zhenshchin-slushat-onlayn" &&
+        link.label === "медитацию для сна для женщин",
+    ),
+    "eighth page links sleep-women",
+  );
+  assert(
+    !allLinks.some((link) => link.href === "/listens/meditatsiya-izobiliya-i-bogatstva-dlya-sna"),
+    "eighth page does not link money-sleep",
   );
 
   const contentSource = read(
