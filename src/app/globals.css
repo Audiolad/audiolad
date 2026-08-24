@@ -391,6 +391,45 @@ body {
   scroll-snap-align: start;
 }
 
+/* In-tile experimental catalog slides. Vertical page scroll stays free. */
+.catalog-tile-carousel {
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+/*
+ * Hit-tested children (system Link, Play, author Link) default to touch-action:auto,
+ * so the first pan after Play often never reaches overflow-x. Same pan-x pan-y
+ * policy as the scroller — do not switch to pan-x only (that blocks catalog scroll).
+ */
+.catalog-tile-carousel a,
+.catalog-tile-carousel button {
+  -webkit-user-drag: none;
+  touch-action: pan-x pan-y;
+}
+
+.catalog-tile-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.catalog-tile-carousel > [data-catalog-tile-slide] {
+  /* 100% width lock. Height comes from the system card (content), not a poster. */
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.catalog-tile-carousel > [data-catalog-tile-slide="author"] {
+  align-self: stretch;
+}
+
 .home-section-carousel {
   overflow: hidden;
 }
