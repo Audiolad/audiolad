@@ -116,7 +116,7 @@ export default function PlatformSearchField({
         onFocus={onInputFocus}
         onClick={onInputClick}
         onKeyDown={onInputKeyDown}
-        placeholder="Поиск практик"
+        placeholder="Поиск по каталогу"
         autoComplete="off"
         enterKeyHint="search"
         maxLength={100}

@@ -139,9 +139,9 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
           {activeTopicTitle
             ? activeTopicKeys.length > 1
-              ? `Аудиопрактики и программы по темам «${activeTopicTitle}».`
-              : `Аудиопрактики и программы по теме «${activeTopicTitle}».`
-            : "Опубликованные аудиопрактики и программы авторов платформы."}
+              ? `Аудиопродукты на темы «${activeTopicTitle}».`
+              : `Аудиопродукты на тему «${activeTopicTitle}».`
+            : "Опубликованные аудиопродукты авторов платформы."}
         </p>
       ) : (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">
@@ -280,7 +280,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                   В каталоге пока нет опубликованных аудиопродуктов.
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                  Новые практики и программы скоро появятся.
+                  Новые аудиопродукты скоро появятся.
                 </p>
               </>
             )}
