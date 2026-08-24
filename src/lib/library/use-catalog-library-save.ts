@@ -255,7 +255,16 @@ export function useCatalogLibrarySave({
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
+  const [resetPracticeId, setResetPracticeId] = useState(practiceId);
   const inFlightRef = useRef(false);
+
+  if (resetPracticeId !== practiceId) {
+    setResetPracticeId(practiceId);
+    setOptimisticSaved(null);
+    setErrorMessage(null);
+    setIsPending(false);
+    inFlightRef.current = false;
+  }
 
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
@@ -277,13 +286,6 @@ export function useCatalogLibrarySave({
 
   const storeSaved = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const isSaved = optimisticSaved ?? storeSaved;
-
-  useEffect(() => {
-    setOptimisticSaved(null);
-    setErrorMessage(null);
-    setIsPending(false);
-    inFlightRef.current = false;
-  }, [practiceId]);
 
   useFlushPendingLibrarySave(isAuthenticated, fetchImpl);
 

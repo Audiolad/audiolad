@@ -9,7 +9,7 @@ import {
   BUY_ACTION_LABEL,
   PLAY_ACTION_LABEL,
   PREVIEW_ACTION_LABEL,
-} from "../src/lib/ui/action-labels.ts";
+} from "../src/lib/ui/action-labels";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 

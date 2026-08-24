@@ -29,7 +29,7 @@ function read(relativePath: string) {
 
 function testGuestHeartWritesPendingAndDoesNotPost() {
   const storage = createMemoryPendingLibrarySaveStorage();
-  let fetchCount = 0;
+  const fetchCount = 0;
   const started = startCatalogLibrarySaveSignIn({
     practiceId: PRACTICE,
     signInReturnPath: "/catalog",
