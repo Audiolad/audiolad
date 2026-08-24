@@ -3,11 +3,17 @@
  * Catalog topic filter unit checks (no DB).
  */
 import {
+  buildCatalogHref,
   buildCatalogTopicHref,
+  countCatalogFilterGroups,
   getCatalogTopicFilterLabel,
   normalizeCatalogTopicParam,
   parseCatalogTopicFilter,
+  parseCatalogTopicFilters,
+  parseCatalogTopicKeyList,
   resolveCatalogTopicSearchParam,
+  serializeCatalogTopicParam,
+  toggleCatalogDraftTopics,
 } from "../src/lib/catalog/topic-filter.ts";
 
 function assert(condition, message) {
@@ -60,6 +66,95 @@ assert(
 assert(
   resolveCatalogTopicSearchParam({ topic: "", need: "relationships" }) === "relationships",
   "empty topic falls back to legacy need",
+);
+
+assert(
+  JSON.stringify(parseCatalogTopicKeyList("money")) === JSON.stringify(["money"]),
+  "single topic list",
+);
+assert(
+  JSON.stringify(parseCatalogTopicKeyList("money,sleep,calm")) ===
+    JSON.stringify(["money", "sleep", "calm"]),
+  "comma topic list",
+);
+assert(
+  JSON.stringify(parseCatalogTopicKeyList("money,,sleep,money,bad key")) ===
+    JSON.stringify(["money", "sleep"]),
+  "empty values, duplicates, and invalid format dropped",
+);
+assert(
+  JSON.stringify(parseCatalogTopicKeyList("money,sleep,calm,energy")) ===
+    JSON.stringify(["money", "sleep", "calm"]),
+  "topic list capped at 3",
+);
+assert(
+  JSON.stringify(parseCatalogTopicFilters("money,relationships,unknown", allowedKeys)) ===
+    JSON.stringify(["money", "relationships"]),
+  "unknown keys dropped against allowed set",
+);
+assert(
+  parseCatalogTopicFilter("money,calm,relationships", allowedKeys) === "money",
+  "legacy single parse keeps the first valid key",
+);
+assert(
+  normalizeCatalogTopicParam("MONEY,Sleep,CALM") === "money,sleep,calm",
+  "normalize keeps a comma list",
+);
+assert(
+  serializeCatalogTopicParam(["money", "sleep"]) === "money,sleep",
+  "serialize joins selected keys",
+);
+assert(serializeCatalogTopicParam([]) === null, "empty serialize is null");
+assert(
+  buildCatalogHref({ topic: "money,sleep,calm" }).includes("topic=money"),
+  "buildCatalogHref still writes topic=",
+);
+assert(
+  decodeURIComponent(new URL(buildCatalogHref({ topic: "money,sleep,calm" }), "https://audiolad.test").searchParams.get("topic")) ===
+    "money,sleep,calm",
+  "apply can pass a comma topic string through buildCatalogHref",
+);
+
+let draft = [];
+draft = toggleCatalogDraftTopics(draft, "money");
+assert(JSON.stringify(draft) === JSON.stringify(["money"]), "select first topic");
+draft = toggleCatalogDraftTopics(draft, "sleep");
+assert(JSON.stringify(draft) === JSON.stringify(["money", "sleep"]), "second topic stays with first");
+draft = toggleCatalogDraftTopics(draft, "calm");
+assert(JSON.stringify(draft) === JSON.stringify(["money", "sleep", "calm"]), "third topic stays with first two");
+draft = toggleCatalogDraftTopics(draft, "energy");
+assert(JSON.stringify(draft) === JSON.stringify(["money", "sleep", "calm"]), "fourth topic does not replace");
+draft = toggleCatalogDraftTopics(draft, "sleep");
+assert(JSON.stringify(draft) === JSON.stringify(["money", "calm"]), "deselect one of three");
+draft = toggleCatalogDraftTopics(draft, "energy");
+assert(JSON.stringify(draft) === JSON.stringify(["money", "calm", "energy"]), "can select another after deselect");
+
+assert(
+  countCatalogFilterGroups({ topicKeys: ["money", "sleep", "calm"], access: "all", kind: "all" }) === 1,
+  "3 topics = 1 group",
+);
+assert(
+  countCatalogFilterGroups({ topicKeys: ["money", "sleep", "calm"], access: "paid", kind: "all" }) === 2,
+  "3 topics + access = 2",
+);
+assert(
+  countCatalogFilterGroups({
+    topicKeys: ["money", "sleep", "calm"],
+    access: "paid",
+    kind: "practice",
+  }) === 3,
+  "3 topics + access + kind = 3",
+);
+assert(
+  countCatalogFilterGroups({ topicKeys: [], access: "all", kind: "all" }) === 0,
+  "reset groups = 0",
+);
+assert(
+  getCatalogTopicFilterLabel("money,calm", [
+    { key: "money", title: "Деньги" },
+    { key: "calm", title: "Спокойствие" },
+  ]) === "Деньги, Спокойствие",
+  "multi-topic intro labels",
 );
 
 console.log("catalog-topic-filter-unit: ok");

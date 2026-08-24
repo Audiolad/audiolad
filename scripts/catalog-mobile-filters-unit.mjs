@@ -31,6 +31,23 @@ assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the 
 assert.match(page, /data-catalog-desktop-filters/, "desktop chips stay on the page");
 assert.match(page, /hidden xl:block/, "page chips are desktop-only");
 assert.match(page, /TopicFilterBar/, "desktop still has topic chips");
+assert.match(page, /parseCatalogTopicFilters/, "page parses a topic list");
+assert.match(page, /activeTopicKeys/, "page keeps selected topic keys");
+assert.match(
+  read("src/components/catalog/TopicFilterBar.tsx"),
+  /selectedTopicKeys/,
+  "desktop chips highlight every selected topic from the URL",
+);
+assert.match(
+  read("src/lib/products/catalog.ts"),
+  /\.in\("key", topicKeys\)/,
+  "topic lookup uses .in for multiple keys",
+);
+assert.match(
+  read("src/lib/products/catalog.ts"),
+  /\.in\("topic_id", topicIds\)/,
+  "practice_topics uses .in so multiple topics are OR",
+);
 assert.match(page, /CatalogChipFilterBar/, "desktop still has access/kind chips");
 assert.match(page, /buildCatalogHref/, "desktop chips still use buildCatalogHref");
 
@@ -57,7 +74,29 @@ assert.doesNotMatch(
   /href=\{buildCatalogHref/,
   "chips do not navigate via href",
 );
-assert.match(filters, /setDraftTopic|draftTopic/, "topic chips update draft only");
+assert.match(filters, /draftTopics/, "topic chips keep a multi-select draft");
+assert.match(filters, /toggleCatalogDraftTopics/, "topic chips toggle without replace");
+assert.match(filters, /serializeCatalogTopicParam\(draftTopics\)/, "Apply joins draft topics");
+assert.match(filters, /Сбросить/, "reset action exists");
+assert.match(filters, /data-catalog-mobile-filters-reset/, "reset control is marked");
+assert.match(filters, /function resetFilters/, "reset is a dedicated action");
+assert.match(
+  filters,
+  /topic:\s*null[\s\S]*access:\s*"all"[\s\S]*kind:\s*"all"/,
+  "reset clears topic/access/kind",
+);
+assert.match(
+  filters,
+  /function resetFilters\(\) \{[\s\S]*q: searchQuery[\s\S]*sort,/,
+  "reset keeps q and sort",
+);
+assert.match(
+  filters,
+  /function resetFilters\(\) \{[\s\S]*router\.replace[\s\S]*close\(\);/,
+  "reset applies immediately without a second Apply",
+);
+assert.match(filters, /countCatalogFilterGroups/, "badge still counts groups");
+assert.match(filters, /aria-pressed=\{isActive\}/, "chips expose aria-pressed");
 assert.match(filters, /grid-rows-2/, "topics stay in two visual rows");
 assert.match(filters, /grid-flow-col/, "topics flow sideways in columns");
 assert.match(filters, /overflow-x-auto/, "topics scroll horizontally");

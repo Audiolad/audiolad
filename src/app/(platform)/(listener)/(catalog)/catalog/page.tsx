@@ -22,8 +22,9 @@ import {
   buildCatalogClearSearchHref,
   buildCatalogHref,
   getCatalogTopicFilterLabel,
-  parseCatalogTopicFilter,
+  parseCatalogTopicFilters,
   resolveCatalogTopicSearchParam,
+  serializeCatalogTopicParam,
 } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { buildCatalogMetadata } from "@/lib/seo/public-page-metadata";
@@ -82,17 +83,18 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const filterableTopics = topicsWithCounts.filter(
     (topic) => topic.catalogProductCount > 0,
   );
-  const activeTopicKey = parseCatalogTopicFilter(
+  const activeTopicKeys = parseCatalogTopicFilters(
     topicSearchParam,
     filterableTopics.map((topic) => topic.key),
   );
+  const activeTopicParam = serializeCatalogTopicParam(activeTopicKeys);
   const activeTopicTitle = getCatalogTopicFilterLabel(
-    activeTopicKey,
+    activeTopicParam,
     filterableTopics,
   );
   const resolvedListingQuery = {
     ...listingQuery,
-    topic: activeTopicKey,
+    topic: activeTopicParam,
   };
   const listingState = {
     access: resolvedListingQuery.access,
@@ -104,24 +106,24 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     isSearchActive
       ? searchPublishedCatalogAuthors(supabase, {
           query: searchQuery,
-          topicKey: activeTopicKey,
+          topicKey: activeTopicParam,
         })
       : Promise.resolve([]),
     defaultListing ?? listPublishedCatalog(supabase, resolvedListingQuery),
   ]);
 
   const hasAnyProducts = listing.items.length > 0;
-  const isTopicFiltered = activeTopicKey !== null;
+  const isTopicFiltered = activeTopicKeys.length > 0;
   const isAccessFiltered = resolvedListingQuery.access !== "all";
   const isKindFiltered = resolvedListingQuery.kind !== "all";
   const isListingFiltered = isTopicFiltered || isAccessFiltered || isKindFiltered;
-  const clearSearchHref = buildCatalogClearSearchHref(activeTopicKey, listingState);
+  const clearSearchHref = buildCatalogClearSearchHref(activeTopicParam, listingState);
   const catalogRootHref = buildCatalogHref({
     q: searchQuery || null,
   });
   const signInReturnPath = buildCatalogHref({
     q: searchQuery || null,
-    topic: activeTopicKey,
+    topic: activeTopicParam,
     access: resolvedListingQuery.access,
     kind: resolvedListingQuery.kind,
     sort: resolvedListingQuery.sort,
@@ -136,7 +138,9 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       {!isSearchActive ? (
         <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
           {activeTopicTitle
-            ? `Аудиопрактики и программы по теме «${activeTopicTitle}».`
+            ? activeTopicKeys.length > 1
+              ? `Аудиопрактики и программы по темам «${activeTopicTitle}».`
+              : `Аудиопрактики и программы по теме «${activeTopicTitle}».`
             : "Опубликованные аудиопрактики и программы авторов платформы."}
         </p>
       ) : (
@@ -149,7 +153,9 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           </h2>
           {activeTopicTitle ? (
             <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              В теме «{activeTopicTitle}».
+              {activeTopicKeys.length > 1
+                ? `В темах «${activeTopicTitle}».`
+                : `В теме «${activeTopicTitle}».`}
             </p>
           ) : null}
         </section>
@@ -159,7 +165,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         {filterableTopics.length > 0 ? (
           <TopicFilterBar
             topics={filterableTopics}
-            activeTopicKey={activeTopicKey}
+            activeTopicKey={activeTopicKeys[0] ?? null}
+            activeTopicKeys={activeTopicKeys}
             searchQuery={searchQuery}
             listing={listingState}
           />
@@ -172,7 +179,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           buildHref={(access) =>
             buildCatalogHref({
               q: searchQuery || null,
-              topic: activeTopicKey,
+              topic: activeTopicParam,
               access,
               kind: resolvedListingQuery.kind,
               sort: resolvedListingQuery.sort,
@@ -187,7 +194,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           buildHref={(kind) =>
             buildCatalogHref({
               q: searchQuery || null,
-              topic: activeTopicKey,
+              topic: activeTopicParam,
               access: resolvedListingQuery.access,
               kind,
               sort: resolvedListingQuery.sort,
@@ -253,7 +260,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
               <>
                 <p className="text-[15px] font-medium text-[#5f3f9d]">
                   {activeTopicTitle
-                    ? `В выбранных фильтрах по теме «${activeTopicTitle}» пока нет аудиопродуктов.`
+                    ? `В выбранных фильтрах по ${activeTopicKeys.length > 1 ? "темам" : "теме"} «${activeTopicTitle}» пока нет аудиопродуктов.`
                     : "По выбранным фильтрам пока нет аудиопродуктов."}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[#7d70a2]">

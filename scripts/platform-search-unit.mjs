@@ -49,6 +49,12 @@ assert(
   readPlatformSearchTopicFromParams(catalogParams) === "money",
   "catalog reads topic from URL params",
 );
+assert(
+  readPlatformSearchTopicFromParams(
+    new URLSearchParams("topic=money,sleep,calm"),
+  ) === "money,sleep,calm",
+  "catalog reads a multi-topic URL",
+);
 
 assert(
   buildPlatformSearchClearHref("money") === "/catalog?topic=money",

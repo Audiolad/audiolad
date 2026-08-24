@@ -81,6 +81,19 @@ const parsed = parseCatalogListingQuery({
 });
 assert(parsed.q === "деньги", "q normalized");
 assert(parsed.topic === "money", "topic normalized");
+assert(
+  parseCatalogListingQuery({ topic: "money,sleep,calm" }).topic === "money,sleep,calm",
+  "listing keeps a comma topic list",
+);
+assert(
+  parseCatalogListingQuery({ topic: "money,,sleep,money,energy" }).topic ===
+    "money,sleep,energy",
+  "listing drops empties/duplicates and caps at 3",
+);
+assert(
+  parseCatalogListingQuery({ topic: "Money" }).topic === "money",
+  "legacy single topic URL still works",
+);
 assert(parsed.access === "free", "access parsed");
 assert(parsed.kind === "practice", "kind parsed");
 assert(parsed.sort === "price_desc", "sort parsed");
@@ -273,6 +286,15 @@ assert(guestPage[0].isSaved === false, "guest always receives isSaved=false");
 assert(guestPage[0].accessState === mapped.accessState, "guest accessState unchanged");
 
 assert(buildCatalogListingApiUrl({ access: "free" }) === "/api/catalog?access=free");
+assert(
+  decodeURIComponent(
+    new URL(
+      buildCatalogListingApiUrl({ topic: "money,sleep,calm" }),
+      "https://audiolad.test",
+    ).searchParams.get("topic"),
+  ) === "money,sleep,calm",
+  "listing API URL keeps comma topic without a new param",
+);
 assert(buildCatalogHref({ sort: "new" }) === "/catalog", "default sort omitted");
 assert(
   buildCatalogHref({ access: "free" }) === "/catalog?access=free",

@@ -1,5 +1,7 @@
 const TOPIC_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+export const CATALOG_TOPIC_FILTER_MAX = 3;
+
 /** Legacy home chips used `?need=` before catalog topic keys existed. */
 const LEGACY_NEED_TO_TOPIC_KEY: Readonly<Record<string, string>> = {
   relationships: "relationships",
@@ -24,29 +26,87 @@ export function resolveCatalogTopicSearchParam(params: {
   return LEGACY_NEED_TO_TOPIC_KEY[legacyNeed] ?? undefined;
 }
 
+export function parseCatalogTopicKeyList(
+  value: string | null | undefined,
+): string[] {
+  if (!value) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const keys: string[] = [];
+
+  for (const part of value.split(",")) {
+    const normalized = part.trim().toLowerCase();
+
+    if (!normalized || !TOPIC_KEY_PATTERN.test(normalized) || seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    keys.push(normalized);
+
+    if (keys.length >= CATALOG_TOPIC_FILTER_MAX) {
+      break;
+    }
+  }
+
+  return keys;
+}
+
+export function serializeCatalogTopicParam(
+  keys: readonly string[],
+): string | null {
+  return keys.length > 0 ? keys.join(",") : null;
+}
+
 export function normalizeCatalogTopicParam(
   value: string | null | undefined,
 ): string | null {
-  const normalized = value?.trim().toLowerCase();
+  return serializeCatalogTopicParam(parseCatalogTopicKeyList(value));
+}
 
-  if (!normalized || !TOPIC_KEY_PATTERN.test(normalized)) {
-    return null;
-  }
-
-  return normalized;
+export function parseCatalogTopicFilters(
+  value: string | null | undefined,
+  allowedKeys: readonly string[],
+): string[] {
+  const allowed = new Set(allowedKeys);
+  return parseCatalogTopicKeyList(value).filter((key) => allowed.has(key));
 }
 
 export function parseCatalogTopicFilter(
   value: string | null | undefined,
   allowedKeys: readonly string[],
 ): string | null {
-  const normalized = normalizeCatalogTopicParam(value);
+  return parseCatalogTopicFilters(value, allowedKeys)[0] ?? null;
+}
 
-  if (!normalized) {
-    return null;
+export function toggleCatalogDraftTopics(
+  current: readonly string[],
+  key: string,
+  max = CATALOG_TOPIC_FILTER_MAX,
+): string[] {
+  if (current.includes(key)) {
+    return current.filter((item) => item !== key);
   }
 
-  return allowedKeys.includes(normalized) ? normalized : null;
+  if (current.length >= max) {
+    return [...current];
+  }
+
+  return [...current, key];
+}
+
+export function countCatalogFilterGroups(input: {
+  topicKeys: readonly string[];
+  access: string | null | undefined;
+  kind: string | null | undefined;
+}): number {
+  return [
+    input.topicKeys.length > 0,
+    Boolean(input.access && input.access !== "all"),
+    Boolean(input.kind && input.kind !== "all"),
+  ].filter(Boolean).length;
 }
 
 export type CatalogHrefOptions = {
@@ -142,9 +202,18 @@ export function getCatalogTopicFilterLabel(
   activeTopicKey: string | null,
   topics: ReadonlyArray<{ key: string; title: string }>,
 ): string | null {
-  if (!activeTopicKey) {
+  const keys = parseCatalogTopicFilters(
+    activeTopicKey,
+    topics.map((topic) => topic.key),
+  );
+
+  if (keys.length === 0) {
     return null;
   }
 
-  return topics.find((topic) => topic.key === activeTopicKey)?.title ?? null;
+  const titles = keys
+    .map((key) => topics.find((topic) => topic.key === key)?.title?.trim())
+    .filter((title): title is string => Boolean(title));
+
+  return titles.length > 0 ? titles.join(", ") : null;
 }
