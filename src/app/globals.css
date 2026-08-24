@@ -7,6 +7,13 @@
   --bottom-nav-main-height: 68px;
   --bottom-nav-content-gap: 28px;
   --global-mini-player-height: 0px;
+  --platform-bottom-chrome: calc(
+    var(--global-mini-player-height, 0px) + var(--bottom-nav-main-height) +
+      env(safe-area-inset-bottom, 0px) + var(--bottom-nav-viewport-offset, 0px)
+  );
+  --platform-bottom-content-padding: calc(
+    var(--platform-bottom-chrome) + var(--bottom-nav-content-gap)
+  );
   /*
    * Reserved for stacking chrome above BottomNav (mini-player, consent, PWA).
    * Must stay 0px: do not derive position/height from dynamic vs small viewport
@@ -27,11 +34,9 @@
   padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
 }
 
-.platform-bottom-nav-padding {
-  padding-bottom: calc(
-    var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
-      var(--bottom-nav-content-gap) + var(--global-mini-player-height)
-  );
+.platform-bottom-nav-padding,
+.platform-bottom-content-padding {
+  padding-bottom: var(--platform-bottom-content-padding);
 }
 
 /* Analytics consent sits above BottomNav + mini-player on mobile; desktop has no that chrome. */
@@ -51,10 +56,7 @@
 
 .platform-mobile-shell {
   padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
-  padding-bottom: calc(
-    var(--bottom-nav-main-height) + env(safe-area-inset-bottom, 0px) +
-      var(--bottom-nav-content-gap) + var(--global-mini-player-height)
-  );
+  padding-bottom: var(--platform-bottom-content-padding);
 }
 
 .global-audio-element {
@@ -133,6 +135,10 @@
 }
 
 @media (min-width: 1280px) {
+  .platform-bottom-content-padding {
+    padding-bottom: 0;
+  }
+
   .listener-app-shell__body.platform-mobile-shell,
   .legal-page-shell.platform-mobile-shell,
   .checkout-result-shell.platform-mobile-shell {
@@ -185,6 +191,16 @@
       env(safe-area-inset-bottom, 0px) + var(--bottom-nav-content-gap) +
         var(--global-mini-player-height)
     );
+  }
+
+  /*
+   * Pages that own bottom content padding must not also inherit the shell
+   * reserve — otherwise mini-player + tabbar space is counted twice.
+   */
+  .listener-app-shell__body.platform-mobile-shell:has(
+    .platform-bottom-content-padding
+  ) {
+    padding-bottom: 0;
   }
 }
 

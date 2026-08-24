@@ -19,6 +19,7 @@ import {
   sumDurationSeconds,
 } from "@/lib/products/duration";
 import type { PublicPromoRecommendation } from "@/lib/products/promo-recommendation";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 export type AudioPostPageViewModel = PracticePageViewModel & {
   productKind: typeof PRODUCT_KIND.AUDIO_POST;
@@ -84,7 +85,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
   } as const;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-6 sm:px-6">
+    <div
+      className={`mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6 ${platformBottomContentPaddingClass}`}
+    >
       <AudioPostListenAnalytics
         practiceId={practice.id}
         authorSlug={resolvedAuthorSlug}
