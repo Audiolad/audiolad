@@ -104,6 +104,10 @@ type UseSequentialPlayerOptions = {
    * do not recreate the media element (required for iOS autoplay unlock).
    */
   audioRef: MutableRefObject<HTMLAudioElement | null>;
+  playbackMode?: "full" | "preview";
+  previewStartMs?: number;
+  previewEndMs?: number;
+  onPreviewEnded?: () => void;
 };
 
 type SwitchTrackOptions = {
@@ -136,8 +140,28 @@ export function useSequentialPlayer({
   guestProgressMode = false,
   guestProgressMeta,
   audioRef,
+  playbackMode = "full",
+  previewStartMs,
+  previewEndMs,
+  onPreviewEnded,
 }: UseSequentialPlayerOptions) {
   const isPrivateAudio = sourceType === "private_audio";
+  const isPreviewMode = playbackMode === "preview";
+  const previewStartSeconds =
+    isPreviewMode &&
+    typeof previewStartMs === "number" &&
+    Number.isFinite(previewStartMs) &&
+    previewStartMs >= 0
+      ? previewStartMs / 1000
+      : 0;
+  const previewEndSeconds =
+    isPreviewMode &&
+    typeof previewEndMs === "number" &&
+    Number.isFinite(previewEndMs) &&
+    previewEndMs > previewStartSeconds * 1000
+      ? previewEndMs / 1000
+      : 0;
+  const hasPreviewWindow = isPreviewMode && previewEndSeconds > previewStartSeconds;
   const urlRequestRef = useRef(0);
   const urlAbortRef = useRef<AbortController | null>(null);
   const saveInFlightRef = useRef(false);
@@ -194,6 +218,14 @@ export function useSequentialPlayer({
   }, [onRequestPreviousProduct]);
 
   const initialPlayback = useMemo(() => {
+    if (hasPreviewWindow) {
+      return {
+        trackIndex: 0,
+        positionSeconds: previewStartSeconds,
+        allCompleted: false,
+      };
+    }
+
     if (forceStartAtBeginning) {
       return {
         trackIndex: 0,
@@ -215,7 +247,14 @@ export function useSequentialPlayer({
     }
 
     return resolveInitialPlayback(tracks, initialProgress);
-  }, [forceStartAtBeginning, initialProgress, initialTrackId, tracks]);
+  }, [
+    forceStartAtBeginning,
+    hasPreviewWindow,
+    initialProgress,
+    initialTrackId,
+    previewStartSeconds,
+    tracks,
+  ]);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(
     initialPlayback.trackIndex,
@@ -242,6 +281,8 @@ export function useSequentialPlayer({
   const [pendingStartPosition, setPendingStartPosition] = useState(
     initialPlayback.positionSeconds,
   );
+  const [previewEnded, setPreviewEnded] = useState(false);
+  const previewEndedRef = useRef(false);
 
   const isMultiTrack = tracks.length > 1;
   const currentTrack = tracks[currentTrackIndex] ?? null;
@@ -333,6 +374,11 @@ export function useSequentialPlayer({
     : buildListenApiBase(authorSlug, productSlug);
   const listenApiBaseRef = useRef(listenApiBase);
   const isPrivateAudioRef = useRef(isPrivateAudio);
+  const isPreviewModeRef = useRef(isPreviewMode);
+  const previewStartSecondsRef = useRef(previewStartSeconds);
+  const previewEndSecondsRef = useRef(previewEndSeconds);
+  const hasPreviewWindowRef = useRef(hasPreviewWindow);
+  const onPreviewEndedRef = useRef(onPreviewEnded);
   const saveProgressRef = useRef<
     (
       audioItemId: string,
@@ -350,6 +396,44 @@ export function useSequentialPlayer({
     isPrivateAudioRef.current = isPrivateAudio;
   }, [isPrivateAudio]);
 
+  useEffect(() => {
+    isPreviewModeRef.current = isPreviewMode;
+    previewStartSecondsRef.current = previewStartSeconds;
+    previewEndSecondsRef.current = previewEndSeconds;
+    hasPreviewWindowRef.current = hasPreviewWindow;
+  }, [hasPreviewWindow, isPreviewMode, previewEndSeconds, previewStartSeconds]);
+
+  useEffect(() => {
+    onPreviewEndedRef.current = onPreviewEnded;
+  }, [onPreviewEnded]);
+
+  const finishPreview = useCallback(() => {
+    if (previewEndedRef.current) {
+      return;
+    }
+
+    previewEndedRef.current = true;
+    const audio = audioRef.current;
+    const end = previewEndSecondsRef.current;
+
+    if (audio) {
+      try {
+        audio.pause();
+        if (Number.isFinite(end) && end > 0) {
+          audio.currentTime = end;
+        }
+      } catch {
+        // Ignore seek errors during teardown.
+      }
+    }
+
+    setPlayingState(false);
+    setCurrentTime(Number.isFinite(end) ? end : currentTimeRef.current);
+    setPreviewEnded(true);
+    userWantsPlaybackRef.current = false;
+    onPreviewEndedRef.current?.();
+  }, [audioRef, setPlayingState]);
+
   const saveProgress = useCallback(
     async (
       audioItemId: string,
@@ -358,6 +442,10 @@ export function useSequentialPlayer({
       options?: { force?: boolean },
     ) => {
       if (audioItemId.startsWith("legacy-")) {
+        return;
+      }
+
+      if (isPreviewModeRef.current) {
         return;
       }
 
@@ -547,9 +635,14 @@ export function useSequentialPlayer({
                 signal: abortController.signal,
               },
             )
-          : await fetch(`${fetchApiBase}/audio/${audioItemId}`, {
-              signal: abortController.signal,
-            });
+          : await fetch(
+              `${fetchApiBase}/audio/${audioItemId}${
+                isPreviewModeRef.current ? "?preview=1" : ""
+              }`,
+              {
+                signal: abortController.signal,
+              },
+            );
 
         if (isStale()) {
           console.info("private_audio_session_switch", {
@@ -783,7 +876,13 @@ export function useSequentialPlayer({
       }
 
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        audio.currentTime = clamp(pendingStartPosition, 0, audio.duration);
+        const min = hasPreviewWindowRef.current
+          ? previewStartSecondsRef.current
+          : 0;
+        const max = hasPreviewWindowRef.current
+          ? Math.min(previewEndSecondsRef.current, audio.duration)
+          : audio.duration;
+        audio.currentTime = clamp(pendingStartPosition, min, max);
         setCurrentTime(audio.currentTime);
         setPendingStartPosition(0);
       }
@@ -809,6 +908,13 @@ export function useSequentialPlayer({
 
       currentTimeRef.current = audio.currentTime;
       setCurrentTime(audio.currentTime);
+
+      if (
+        hasPreviewWindowRef.current &&
+        audio.currentTime >= previewEndSecondsRef.current - 0.05
+      ) {
+        finishPreview();
+      }
     };
 
     const handlePlay = () => {
@@ -948,6 +1054,11 @@ export function useSequentialPlayer({
         return;
       }
 
+      if (hasPreviewWindowRef.current) {
+        finishPreview();
+        return;
+      }
+
       setPlayingState(false);
       setCurrentTime(audio.duration || 0);
 
@@ -1060,6 +1171,7 @@ export function useSequentialPlayer({
     src,
     debugSnapshot,
     setPlayingState,
+    finishPreview,
   ]);
 
   useEffect(() => {
@@ -1147,12 +1259,20 @@ export function useSequentialPlayer({
     };
   }, []);
 
-  const hasValidDuration = Number.isFinite(duration) && duration > 0;
-  const displayDuration = hasValidDuration
+  const hasValidDuration =
+    (Number.isFinite(duration) && duration > 0) || hasPreviewWindow;
+  const rawDisplayDuration = Number.isFinite(duration) && duration > 0
     ? duration
     : currentTrack?.durationSeconds && currentTrack.durationSeconds > 0
       ? currentTrack.durationSeconds
       : 0;
+  const previewSpan = hasPreviewWindow
+    ? previewEndSeconds - previewStartSeconds
+    : 0;
+  const displayDuration = hasPreviewWindow ? previewSpan : rawDisplayDuration;
+  const displayCurrentTime = hasPreviewWindow
+    ? clamp(currentTime - previewStartSeconds, 0, previewSpan)
+    : currentTime;
 
   const programProgressPercent = useMemo(() => {
     if (!isMultiTrack || !currentTrack) {
@@ -1177,9 +1297,12 @@ export function useSequentialPlayer({
       return;
     }
 
-    if (audio.ended) {
-      audio.currentTime = 0;
-      setCurrentTime(0);
+    if (audio.ended || previewEnded) {
+      const restartAt = hasPreviewWindow ? previewStartSeconds : 0;
+      audio.currentTime = restartAt;
+      setCurrentTime(restartAt);
+      previewEndedRef.current = false;
+      setPreviewEnded(false);
     }
 
     if (!audio.paused) {
@@ -1264,7 +1387,11 @@ export function useSequentialPlayer({
       return;
     }
 
-    const nextTime = clamp(audio.currentTime + offsetSeconds, 0, duration);
+    const min = hasPreviewWindow ? previewStartSeconds : 0;
+    const max = hasPreviewWindow
+      ? Math.min(previewEndSeconds, duration)
+      : duration;
+    const nextTime = clamp(audio.currentTime + offsetSeconds, min, max);
     audio.currentTime = nextTime;
     setCurrentTime(nextTime);
   };
@@ -1276,8 +1403,14 @@ export function useSequentialPlayer({
       return;
     }
 
-    audio.currentTime = value;
-    setCurrentTime(value);
+    const absolute = hasPreviewWindow ? previewStartSeconds + value : value;
+    const min = hasPreviewWindow ? previewStartSeconds : 0;
+    const max = hasPreviewWindow
+      ? Math.min(previewEndSeconds, duration)
+      : duration;
+    const nextTime = clamp(absolute, min, max);
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
   };
 
   const handlePreviousTrack = async () => {
@@ -1873,7 +2006,8 @@ export function useSequentialPlayer({
     isLoading: isLoading || isUrlLoading || isRecovering,
     hasValidDuration,
     displayDuration,
-    currentTime,
+    currentTime: displayCurrentTime,
+    previewEnded,
     playerError: playerError ?? urlError,
     progressError,
     playbackRate: PLAYBACK_RATES[playbackRateIndex],

@@ -9,8 +9,14 @@ import {
   buildCatalogClearSearchHref,
   buildCatalogHref,
   normalizeCatalogTopicParam,
+  type CatalogHrefOptions,
 } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
+
+export type PlatformSearchListingState = Pick<
+  CatalogHrefOptions,
+  "access" | "kind" | "sort"
+>;
 
 export const PLATFORM_SEARCH_DEBOUNCE_MS = 275;
 export const PLATFORM_SEARCH_CATALOG_URL_DEBOUNCE_MS = 300;
@@ -33,25 +39,41 @@ export function readPlatformSearchTopicFromParams(
   return normalizeCatalogTopicParam(params.get("topic"));
 }
 
+export function readPlatformSearchListingFromParams(
+  params: Pick<URLSearchParams, "get">,
+): PlatformSearchListingState {
+  return {
+    access: params.get("access"),
+    kind: params.get("kind"),
+    sort: params.get("sort"),
+  };
+}
+
 export function buildPlatformSearchCatalogHref(
   rawQuery: string,
   topicKey: string | null,
+  listing?: PlatformSearchListingState,
 ): string {
   return buildCatalogHref({
     q: normalizeCatalogSearchQuery(rawQuery),
     topic: topicKey,
+    ...listing,
   });
 }
 
-export function buildPlatformSearchClearHref(topicKey: string | null): string {
-  return buildCatalogClearSearchHref(topicKey);
+export function buildPlatformSearchClearHref(
+  topicKey: string | null,
+  listing?: PlatformSearchListingState,
+): string {
+  return buildCatalogClearSearchHref(topicKey, listing);
 }
 
 export function buildPlatformSearchResultsHref(
   rawQuery: string,
   topicKey: string | null,
+  listing?: PlatformSearchListingState,
 ): string {
-  return buildCatalogSearchResultsHref(rawQuery, topicKey);
+  return buildCatalogSearchResultsHref(rawQuery, topicKey, listing);
 }
 
 export function flattenPlatformProductSuggestOptions(
@@ -73,11 +95,16 @@ export function resolvePlatformSearchEnterAction(input: {
   activeIndex: number;
   options: ReadonlyArray<{ href: string }>;
   isDropdownOpen: boolean;
+  listing?: PlatformSearchListingState;
 }): { type: "open"; href: string } | { type: "submit"; href: string } {
   if (input.mode === "catalog-inline") {
     return {
       type: "submit",
-      href: buildPlatformSearchCatalogHref(input.rawQuery, input.topicKey),
+      href: buildPlatformSearchCatalogHref(
+        input.rawQuery,
+        input.topicKey,
+        input.listing,
+      ),
     };
   }
 
@@ -92,7 +119,11 @@ export function resolvePlatformSearchEnterAction(input: {
 
   return {
     type: "submit",
-    href: buildPlatformSearchResultsHref(input.rawQuery, input.topicKey),
+    href: buildPlatformSearchResultsHref(
+      input.rawQuery,
+      input.topicKey,
+      input.listing,
+    ),
   };
 }
 

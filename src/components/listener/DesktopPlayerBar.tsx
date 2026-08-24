@@ -8,6 +8,7 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import PreviewEndedBuyCta from "@/components/audio/PreviewEndedBuyCta";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 
@@ -340,6 +341,13 @@ function DesktopPlayerActiveState({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {engine.previewEnded ? (
+            <PreviewEndedBuyCta
+              session={session}
+              className="inline-flex h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+            />
+          ) : null}
+
           {inlineOnly ? null : (
             <button
               type="button"

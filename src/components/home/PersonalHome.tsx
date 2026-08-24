@@ -62,7 +62,7 @@ export default function PersonalHome({ data, homeTopics }: PersonalHomeProps) {
           title="Новые материалы"
           products={data.newProducts}
           ariaLabel="Новые материалы"
-          href="/catalog"
+          href="/catalog?sort=new"
         />
       </HomeSectionBoundary>
 

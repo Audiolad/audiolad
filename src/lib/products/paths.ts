@@ -9,6 +9,30 @@ export function buildPracticePublicPath(
   return `/practice/${authorSlug}/${productSlug}`;
 }
 
+export function parsePracticePublicPath(
+  href: string | null | undefined,
+): { authorSlug: string; productSlug: string } | null {
+  if (!href) {
+    return null;
+  }
+
+  const pathname = href.split("?")[0]?.split("#")[0] ?? "";
+  const parts = pathname.split("/").filter(Boolean);
+
+  if (parts.length < 3 || parts[0] !== "practice") {
+    return null;
+  }
+
+  const authorSlug = parts[1]?.trim() ?? "";
+  const productSlug = parts[2]?.trim() ?? "";
+
+  if (!authorSlug || !productSlug) {
+    return null;
+  }
+
+  return { authorSlug, productSlug };
+}
+
 export function buildPracticeBuyerPreviewPath(
   authorSlug: string,
   productSlug: string,

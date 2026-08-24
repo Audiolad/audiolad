@@ -65,6 +65,7 @@ import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
+import { createSupabaseLibrarySavesStore } from "@/lib/library/saves";
 import { createClient } from "@/lib/supabase/server";
 import PricePromotionStartHandler from "@/components/pricing/PricePromotionStartHandler";
 import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
@@ -458,6 +459,19 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     "lg",
   );
 
+  let isSaved = false;
+
+  if (user) {
+    try {
+      const savedIds = await createSupabaseLibrarySavesStore(
+        supabase,
+      ).listSavedPracticeIds(user.id, [practice.id]);
+      isSaved = savedIds.includes(practice.id);
+    } catch {
+      isSaved = false;
+    }
+  }
+
   const viewModel: PracticePageViewModel = {
     practice: {
       id: practice.id,
@@ -469,6 +483,9 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
       updated_at: practice.updated_at,
       use_shared_cover: practice.use_shared_cover ?? true,
     },
+    isSaved,
+    isAuthenticated: Boolean(user),
+    accessState: practice.is_free === true ? "free" : "paid",
     resolvedAuthorSlug,
     authorName,
     subtitle,

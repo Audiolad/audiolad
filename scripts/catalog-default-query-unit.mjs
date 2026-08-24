@@ -12,24 +12,29 @@ const page = readFileSync(
 
 assert.match(
   page,
-  /canLoadDefaultSectionsInParallel/,
+  /canLoadDefaultListingInParallel/,
   "default catalog path is named",
 );
 assert.match(
   page,
-  /Promise\.all\(\[\s*listTopicsWithCatalogCounts\(supabase\),\s*canLoadDefaultSectionsInParallel\s*\?[\s\S]*getPublishedCatalogSections\(supabase, \{ topicKey: null \}\)/,
-  "default path overlaps topics with unfiltered sections",
+  /Promise\.all\(\[\s*listTopicsWithCatalogCounts\(supabase\),\s*canLoadDefaultListingInParallel\s*\?[\s\S]*listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: null \}\)/,
+  "default path overlaps topics with unfiltered listing",
 );
 assert.match(
   page,
-  /defaultSections \?\?[\s\S]*getPublishedCatalogSections\(supabase, \{ topicKey: activeTopicKey \}\)/,
-  "topic-filtered path still loads sections after validated key",
+  /defaultListing \?\?[\s\S]*listPublishedCatalog\(supabase, resolvedListingQuery\)/,
+  "topic-filtered path still loads listing after validated key",
 );
 assert.match(page, /export const dynamic = "force-dynamic"/, "catalog stays dynamic");
 assert.doesNotMatch(
   page,
-  /getPublishedCatalogSections\(supabase, \{ topicKey: topicSearchParam \}\)/,
-  "raw topic param is never passed to sections",
+  /listPublishedCatalog\(supabase, \{ \.\.\.listingQuery, topic: topicSearchParam \}\)/,
+  "raw topic param is never passed to listing",
+);
+assert.doesNotMatch(
+  page,
+  /getPublishedCatalogSections/,
+  "sections/carousels are no longer the default listing",
 );
 
 console.log("catalog-default-query-unit: ok");

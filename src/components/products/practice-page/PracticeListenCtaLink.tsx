@@ -1,36 +1,116 @@
 "use client";
 
-import Link from "next/link";
-import type { ReactNode } from "react";
+import { useCallback, useState, type MouseEvent, type ReactNode } from "react";
 
-import { useGlobalAudioPlayer } from "@/components/audio/GlobalAudioPlayerProvider";
+import {
+  useGlobalAudioPlayer,
+  useOptionalPlayerEngine,
+} from "@/components/audio/GlobalAudioPlayerProvider";
+import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
+import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 
 type PracticeListenCtaLinkProps = {
-  href: string;
+  authorSlug: string;
+  productSlug: string;
+  practiceId: string;
   className: string;
   children: ReactNode;
 };
 
 /**
- * Product listen CTA: unlock the shared Global Player <audio> inside the tap
- * gesture, then navigate to /listen?autoplay=1.
+ * Product primary Play: stay on /practice and load GlobalAudioPlayer.
+ * Catalog session chooses preview (paid, no access) or full (entitled / free).
  */
 export default function PracticeListenCtaLink({
-  href,
+  authorSlug,
+  productSlug,
+  practiceId,
   className,
   children,
 }: PracticeListenCtaLinkProps) {
-  const { prepareSharedAudioGesture } = useGlobalAudioPlayer();
+  const { session, loadSession, prepareSharedAudioGesture, clearPlaylistQueue } =
+    useGlobalAudioPlayer();
+  const engine = useOptionalPlayerEngine();
+  const [isStarting, setIsStarting] = useState(false);
+
+  const isActive = Boolean(
+    session &&
+      isCatalogGlobalPlayerSession(session) &&
+      (session.practiceId === practiceId ||
+        (session.authorSlug === authorSlug &&
+          session.productSlug === productSlug)),
+  );
+  const isPlaying = Boolean(isActive && engine?.isPlaying);
+
+  const handleClick = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!authorSlug || !productSlug) {
+        return;
+      }
+
+      prepareSharedAudioGesture();
+
+      if (isActive && engine) {
+        clearPlaylistQueue();
+        await engine.handlePlayPause();
+        return;
+      }
+
+      if (isStarting) {
+        return;
+      }
+
+      setIsStarting(true);
+
+      try {
+        const loaded = await fetchCatalogPlaySession(authorSlug, productSlug);
+
+        if (!loaded.ok) {
+          return;
+        }
+
+        clearPlaylistQueue();
+        loadSession({
+          ...loaded.session,
+          sourceType: "catalog",
+          entrySurface: "product",
+          requestAutoplay: true,
+          suppressListenUrlSync: true,
+          forceStartAtBeginning: true,
+        });
+      } finally {
+        setIsStarting(false);
+      }
+    },
+    [
+      authorSlug,
+      clearPlaylistQueue,
+      engine,
+      isActive,
+      isStarting,
+      loadSession,
+      prepareSharedAudioGesture,
+      productSlug,
+    ],
+  );
 
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
+      data-practice-primary-play
+      data-practice-primary-play-active={isPlaying ? "true" : "false"}
+      aria-label={isPlaying ? "Пауза" : "Слушать"}
+      aria-busy={isStarting}
+      disabled={!authorSlug || !productSlug || isStarting}
       className={className}
-      onClick={() => {
-        prepareSharedAudioGesture();
+      onClick={(event) => {
+        void handleClick(event);
       }}
     >
       {children}
-    </Link>
+    </button>
   );
 }

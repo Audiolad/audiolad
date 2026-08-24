@@ -7,6 +7,7 @@ import {
   useGlobalAudioPlayer,
   usePlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import PreviewEndedBuyCta from "@/components/audio/PreviewEndedBuyCta";
 import { isPrivateAudioSession } from "@/lib/listen/global-player-types";
 import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 import { BOTTOM_NAV_MAIN_HEIGHT_PX } from "@/lib/navigation/bottom-nav";
@@ -119,6 +120,7 @@ export default function GlobalMiniPlayer() {
     : activeSession.authorName;
 
   const inlineOnly = isInlineOnlyPlaybackSession(activeSession);
+  const showPreviewCta = Boolean(engine.previewEnded);
 
   function handleOpenFullPlayer() {
     if (inlineOnly) {
@@ -241,7 +243,18 @@ export default function GlobalMiniPlayer() {
               {engine.isPlaying ? <MiniPauseIcon /> : <MiniPlayIcon />}
             </button>
 
-            {queueMode ? (
+            {showPreviewCta ? (
+              <div
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                <PreviewEndedBuyCta
+                  session={activeSession}
+                  className="inline-flex h-9 items-center rounded-full bg-white px-3 text-xs font-semibold text-[#4b2f86]"
+                />
+              </div>
+            ) : queueMode ? (
               <button
                 type="button"
                 aria-label="Следующий трек"

@@ -32,14 +32,17 @@ import {
   getGlobalPlayerSessionKey,
   isCatalogGlobalPlayerSession,
   isPrivateAudioSession,
+  normalizeGlobalPlayerSessionContract,
 } from "@/lib/listen/global-player-types";
 import {
   clearDesktopPlayerLastSession,
+  desktopPlayerSnapshotFromSession,
   mergeDesktopPlaybackIntoSession,
   readDesktopPlayerLastSession,
   writeDesktopPlayerLastSession,
 } from "@/lib/listen/desktop-player-persistence";
 import { isListenPlayerPathname, isWorkspaceDashboardPathname } from "@/lib/navigation/bottom-nav";
+import { isInlineOnlyPlaybackSession } from "@/lib/listen/playback-navigation";
 import {
   guestProgressToListenEntries,
   readGuestPracticeProgress,
@@ -208,6 +211,9 @@ function GlobalPlayerEngine({
     guestProgressMode: Boolean(catalogSession?.guestProgressMode),
     guestProgressMeta: catalogSession?.guestProgressMeta,
     audioRef: persistentAudioRef,
+    playbackMode: catalogSession?.playbackMode ?? "full",
+    previewStartMs: catalogSession?.previewStartMs,
+    previewEndMs: catalogSession?.previewEndMs,
   });
 
   const {
@@ -289,13 +295,12 @@ function GlobalPlayerEngine({
         return;
       }
 
-      writeDesktopPlayerLastSession({
-        practiceId: session.practiceId,
-        authorSlug: session.authorSlug,
-        productSlug: session.productSlug,
-        audioItemId: trackId,
-        positionSeconds: audioRef.current?.currentTime ?? currentTime,
-      });
+      writeDesktopPlayerLastSession(
+        desktopPlayerSnapshotFromSession(session, {
+          audioItemId: trackId,
+          positionSeconds: audioRef.current?.currentTime ?? currentTime,
+        }),
+      );
     };
 
     if (!isPlaying) {
@@ -324,13 +329,12 @@ function GlobalPlayerEngine({
         return;
       }
 
-      writeDesktopPlayerLastSession({
-        practiceId: session.practiceId,
-        authorSlug: session.authorSlug,
-        productSlug: session.productSlug,
-        audioItemId: trackId,
-        positionSeconds: audioRef.current?.currentTime ?? currentTime,
-      });
+      writeDesktopPlayerLastSession(
+        desktopPlayerSnapshotFromSession(session, {
+          audioItemId: trackId,
+          positionSeconds: audioRef.current?.currentTime ?? currentTime,
+        }),
+      );
     };
 
     window.addEventListener("pagehide", handlePageHide);
@@ -537,7 +541,10 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     requestStopLocalAudioPlayers();
 
     const requestAutoplay = input.requestAutoplay ?? false;
-    const nextSession: LoadSessionInput = { ...input, requestAutoplay };
+    const nextSession: LoadSessionInput = normalizeGlobalPlayerSessionContract({
+      ...input,
+      requestAutoplay,
+    });
     const current = sessionRef.current;
     const inputKey = getGlobalPlayerSessionKey(nextSession);
     const currentKey = current ? getGlobalPlayerSessionKey(current) : null;
@@ -812,8 +819,8 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    // audio_post: playback stays inline; never navigate to /listen fullscreen.
-    if (session.playbackNavigation === "inline_only") {
+    // audio_post and catalog Play stay on the current page; never /listen.
+    if (isInlineOnlyPlaybackSession(session)) {
       return;
     }
 
@@ -1253,11 +1260,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       return;
     }
 
-    writeDesktopPlayerLastSession({
-      practiceId: session.practiceId,
-      authorSlug: session.authorSlug,
-      productSlug: session.productSlug,
-    });
+    writeDesktopPlayerLastSession(desktopPlayerSnapshotFromSession(session));
   }, [session]);
 
   useEffect(() => {

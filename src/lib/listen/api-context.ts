@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { ListenAccess } from "@/lib/listen/types";
 import {
+  isPracticeCatalogListed,
+  isPracticePublished,
   resolveProductAccess,
   type ProductAccessReason,
 } from "@/lib/products/access";
@@ -99,7 +101,38 @@ export async function loadListenApiContext(
     };
   }
 
+  const wantsCatalogPreview =
+    new URL(request.url).searchParams.get("preview") === "1";
+
   if (!productAccess.canListen) {
+    if (
+      wantsCatalogPreview &&
+      isPracticePublished(practice.status) &&
+      isPracticeCatalogListed(practice)
+    ) {
+      let storageClient = supabase;
+
+      try {
+        storageClient = createServiceRoleClient();
+      } catch {
+        return {
+          ok: false,
+          response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
+        };
+      }
+
+      return {
+        ok: true,
+        context: {
+          supabase,
+          storageClient,
+          userId: user?.id ?? null,
+          practice,
+          access: { mode: "entitled" },
+        },
+      };
+    }
+
     return {
       ok: false,
       response: NextResponse.json({ error: "forbidden" }, { status: 403 }),

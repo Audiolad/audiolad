@@ -5,6 +5,7 @@ import CoverOverlayCard from "@/components/home/CoverOverlayCard";
 import type { ContinueListeningItem, HomeProduct } from "@/lib/home/types";
 
 import { PlayIcon } from "./HomeIcons";
+import HomeProductPlayButton from "./HomeProductPlayButton";
 import HomeSectionHeader from "./HomeSectionHeader";
 import HomeStartSuggestions from "./HomeStartSuggestions";
 
@@ -98,13 +99,20 @@ export default function ContinueListening({
             </p>
           </div>
 
-          <Link
-            href={item.listenHref}
-            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(37,19,92,0.35)] transition-colors hover:bg-[#6234b5] active:bg-[#5a2fa3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white xl:mt-3.5 xl:min-h-10 xl:rounded-xl xl:px-4 xl:py-2.5 xl:shadow-[0_6px_18px_rgba(37,19,92,0.28)]"
-          >
-            <PlayIcon />
-            {item.isProgram ? "Продолжить программу" : "Продолжить"}
-          </Link>
+          {product.authorSlug && product.slug ? (
+            <HomeProductPlayButton
+              practiceId={product.id}
+              authorSlug={product.authorSlug}
+              productSlug={product.slug}
+              ariaLabel={
+                item.isProgram ? "Продолжить программу" : "Продолжить"
+              }
+              className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(37,19,92,0.35)] transition-colors hover:bg-[#6234b5] active:bg-[#5a2fa3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white xl:mt-3.5 xl:min-h-10 xl:rounded-xl xl:px-4 xl:py-2.5 xl:shadow-[0_6px_18px_rgba(37,19,92,0.28)]"
+            >
+              <PlayIcon />
+              {item.isProgram ? "Продолжить программу" : "Продолжить"}
+            </HomeProductPlayButton>
+          ) : null}
         </div>
       </CoverOverlayCard>
     </section>

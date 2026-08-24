@@ -2,6 +2,27 @@ import type { ListenProgressEntry, ListenTrack } from "@/lib/listen/types";
 
 export type GlobalPlayerSourceType = "catalog" | "private_audio";
 
+export const GLOBAL_PLAYER_ENTRY_SURFACES = [
+  "catalog",
+  "home",
+  "product",
+  "library",
+] as const;
+
+export type GlobalPlayerEntrySurface =
+  (typeof GLOBAL_PLAYER_ENTRY_SURFACES)[number];
+
+export const GLOBAL_PLAYER_PLAYBACK_MODES = ["full", "preview"] as const;
+
+export type GlobalPlayerPlaybackMode =
+  (typeof GLOBAL_PLAYER_PLAYBACK_MODES)[number];
+
+export type GlobalPlayerPreviewCta = {
+  type: "buy";
+  price: number;
+  href: string;
+};
+
 type GlobalPlayerSessionBase = {
   practiceTitle: string;
   authorName: string;
@@ -21,6 +42,24 @@ type GlobalPlayerSessionBase = {
   initialTrackId?: string | null;
   /** Keep the current route when autoplay starts (e.g. product page contents). */
   suppressListenUrlSync?: boolean;
+  /**
+   * Where playback was launched. Independent of sourceType
+   * (`catalog` | `private_audio` still means the audio source).
+   */
+  entrySurface?: GlobalPlayerEntrySurface;
+  /**
+   * full = entitled / author listen. preview = catalog hear-before-buy.
+   * Missing value is treated as full so legacy session payloads keep working.
+   */
+  playbackMode?: GlobalPlayerPlaybackMode;
+  previewStartMs?: number;
+  previewEndMs?: number;
+  previewCta?: GlobalPlayerPreviewCta;
+  /**
+   * True when preview uses the temporary first-60s compatibility clip
+   * because the author has not configured a 30–90s storefront window.
+   */
+  previewNeedsSetup?: boolean;
 };
 
 export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
@@ -85,4 +124,63 @@ export function getGlobalPlayerSessionKey(session: GlobalPlayerSession): string 
   }
 
   return `catalog:${session.practiceId}`;
+}
+
+export function isGlobalPlayerEntrySurface(
+  value: unknown,
+): value is GlobalPlayerEntrySurface {
+  return (
+    value === "catalog" ||
+    value === "home" ||
+    value === "product" ||
+    value === "library"
+  );
+}
+
+export function isGlobalPlayerPlaybackMode(
+  value: unknown,
+): value is GlobalPlayerPlaybackMode {
+  return value === "full" || value === "preview";
+}
+
+export function isGlobalPlayerPreviewCta(
+  value: unknown,
+): value is GlobalPlayerPreviewCta {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const cta = value as Record<string, unknown>;
+
+  return (
+    cta.type === "buy" &&
+    typeof cta.price === "number" &&
+    Number.isFinite(cta.price) &&
+    typeof cta.href === "string" &&
+    cta.href.length > 0
+  );
+}
+
+export function resolveGlobalPlayerPlaybackMode(
+  value: unknown,
+): GlobalPlayerPlaybackMode {
+  return isGlobalPlayerPlaybackMode(value) ? value : "full";
+}
+
+export type GlobalPlayerPlaybackContract = {
+  entrySurface?: GlobalPlayerEntrySurface;
+  playbackMode?: GlobalPlayerPlaybackMode;
+  previewStartMs?: number;
+  previewEndMs?: number;
+  previewCta?: GlobalPlayerPreviewCta;
+  previewNeedsSetup?: boolean;
+};
+
+export function normalizeGlobalPlayerSessionContract<
+  T extends GlobalPlayerPlaybackContract,
+>(session: T): T {
+  return {
+    ...session,
+    playbackMode: resolveGlobalPlayerPlaybackMode(session.playbackMode),
+  };
 }

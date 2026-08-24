@@ -6,8 +6,8 @@ import AudioPostListenAnalytics from "@/components/products/audio-post/AudioPost
 import AudioPostPlayer from "@/components/products/audio-post/AudioPostPlayer";
 import {
   PracticeAccessBanners,
-  PracticeLibraryActionSection,
   PracticeProductCover,
+  toPracticeHeartProduct,
 } from "@/components/products/practice-page/PracticePageParts";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import {
@@ -19,6 +19,7 @@ import {
   sumDurationSeconds,
 } from "@/lib/products/duration";
 import type { PublicPromoRecommendation } from "@/lib/products/promo-recommendation";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 export type AudioPostPageViewModel = PracticePageViewModel & {
   productKind: typeof PRODUCT_KIND.AUDIO_POST;
@@ -84,7 +85,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
   } as const;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-6 sm:px-6">
+    <div
+      className={`mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6 ${platformBottomContentPaddingClass}`}
+    >
       <AudioPostListenAnalytics
         practiceId={practice.id}
         authorSlug={resolvedAuthorSlug}
@@ -108,6 +111,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               cover={viewModel.mobileCover}
               priority
               className="!aspect-auto h-full w-full rounded-none shadow-none"
+              heartProduct={toPracticeHeartProduct(viewModel)}
+              isAuthenticated={viewModel.isAuthenticated}
+              signInReturnPath={viewModel.practicePagePath}
             />
           </div>
 
@@ -148,8 +154,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
           </section>
         ) : null}
 
-        <PracticeLibraryActionSection viewModel={viewModel} className="mt-6" />
-
         <AudioPostRecommendation viewModel={viewModel} />
 
         <LegalFooter className="mt-8" />
@@ -170,6 +174,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             cover={viewModel.desktopCover}
             priority
             className="mx-auto w-full max-w-[220px] sm:mx-0"
+            heartProduct={toPracticeHeartProduct(viewModel)}
+            isAuthenticated={viewModel.isAuthenticated}
+            signInReturnPath={viewModel.practicePagePath}
           />
 
           <div className="min-w-0">
@@ -209,8 +216,6 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             </p>
           </section>
         ) : null}
-
-        <PracticeLibraryActionSection viewModel={viewModel} className="mt-6" />
 
         <AudioPostRecommendation viewModel={viewModel} />
 
