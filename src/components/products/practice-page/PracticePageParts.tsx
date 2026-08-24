@@ -5,7 +5,10 @@ import BuyPracticeButton from "@/components/BuyPracticeButton";
 import ProductPriceOffer from "@/components/pricing/ProductPriceOffer";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
+import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
+import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
+import { getProductPriceLabel } from "@/lib/products/price-format";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 
 import PracticeListenCtaLink from "./PracticeListenCtaLink";
@@ -191,14 +194,44 @@ function PaymentLegalNote() {
   );
 }
 
+export function toPracticeHeartProduct(
+  viewModel: PracticePageViewModel,
+): CatalogListingItem {
+  return {
+    id: viewModel.practice.id,
+    slug: viewModel.practice.slug,
+    href: viewModel.practicePagePath,
+    title: viewModel.practice.title,
+    author: viewModel.authorName ?? "",
+    coverUrl: viewModel.practice.cover_url,
+    coverImage: viewModel.practice.cover_image,
+    updatedAt: viewModel.practice.updated_at,
+    kind: "practice",
+    kindLabel: viewModel.meta ?? "",
+    durationLabel: viewModel.meta,
+    priceLabel: getProductPriceLabel(
+      null,
+      viewModel.accessState === "free",
+    ),
+    accessState: viewModel.accessState,
+    isSaved: viewModel.isSaved,
+  };
+}
+
 export function PracticeProductCover({
   cover,
   priority = false,
   className = "",
+  heartProduct = null,
+  isAuthenticated = false,
+  signInReturnPath = "/catalog",
 }: {
   cover: PracticePageCoverData;
   priority?: boolean;
   className?: string;
+  heartProduct?: CatalogListingItem | null;
+  isAuthenticated?: boolean;
+  signInReturnPath?: string;
 }) {
   return (
     <div
@@ -229,6 +262,14 @@ export function PracticeProductCover({
           </div>
         </>
       )}
+
+      {heartProduct ? (
+        <CatalogProductHeartButton
+          product={heartProduct}
+          isAuthenticated={isAuthenticated}
+          signInReturnPath={signInReturnPath}
+        />
+      ) : null}
     </div>
   );
 }
@@ -316,21 +357,35 @@ export function PracticePrimaryActionSection({
   viewModel: PracticePageViewModel;
   className?: string;
 }) {
-  const { presentation, practicePagePath } = viewModel;
+  const { presentation, practicePagePath, practice, resolvedAuthorSlug } =
+    viewModel;
+  const playClassName =
+    "flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]";
+  const showPrimaryPlay =
+    presentation.primaryAction.kind === "listen" ||
+    presentation.primaryAction.kind === "buy";
+  const playLabel =
+    presentation.primaryAction.kind === "listen"
+      ? presentation.primaryAction.label
+      : "Слушать";
 
   return (
     <section className={className}>
-      {presentation.primaryAction.kind === "listen" ? (
+      {showPrimaryPlay ? (
         <PracticeListenCtaLink
-          href={presentation.primaryAction.href}
-          className="flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]"
+          authorSlug={resolvedAuthorSlug}
+          productSlug={practice.slug}
+          practiceId={practice.id}
+          className={playClassName}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
             <PlayIcon />
           </span>
-          {presentation.primaryAction.label}
+          {playLabel}
         </PracticeListenCtaLink>
-      ) : presentation.primaryAction.kind === "buy" ? (
+      ) : null}
+
+      {presentation.primaryAction.kind === "buy" ? (
         presentation.primaryAction.disabled ? (
           <button
             type="button"
@@ -343,7 +398,7 @@ export function PracticePrimaryActionSection({
         ) : (
           <>
             {viewModel.priceOffer ? (
-              <div className="mb-4">
+              <div className={`${showPrimaryPlay ? "mt-4" : ""} mb-4`}>
                 <ProductPriceOffer
                   basePrice={viewModel.priceOffer.basePrice}
                   salePrice={viewModel.priceOffer.salePrice}
@@ -363,13 +418,13 @@ export function PracticePrimaryActionSection({
               currency={presentation.primaryAction.currency}
               purchaseSurface={presentation.primaryAction.purchaseSurface}
               label={presentation.primaryAction.label}
-              className="w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white"
+              className={`${showPrimaryPlay && !viewModel.priceOffer ? "mt-3" : ""} w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white`}
               signInReturnPath={practicePagePath}
             />
             {presentation.showPaymentLegalNote ? <PaymentLegalNote /> : null}
           </>
         )
-      ) : (
+      ) : !showPrimaryPlay ? (
         <button
           type="button"
           disabled
@@ -381,7 +436,7 @@ export function PracticePrimaryActionSection({
           </span>
           {presentation.primaryAction.label}
         </button>
-      )}
+      ) : null}
     </section>
   );
 }

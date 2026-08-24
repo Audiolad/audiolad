@@ -8,6 +8,7 @@ import {
   PracticeAccessBanners,
   PracticeLibraryActionSection,
   PracticeProductCover,
+  toPracticeHeartProduct,
 } from "@/components/products/practice-page/PracticePageParts";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import {
@@ -108,6 +109,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               cover={viewModel.mobileCover}
               priority
               className="!aspect-auto h-full w-full rounded-none shadow-none"
+              heartProduct={toPracticeHeartProduct(viewModel)}
+              isAuthenticated={viewModel.isAuthenticated}
+              signInReturnPath={viewModel.practicePagePath}
             />
           </div>
 
@@ -170,6 +174,9 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
             cover={viewModel.desktopCover}
             priority
             className="mx-auto w-full max-w-[220px] sm:mx-0"
+            heartProduct={toPracticeHeartProduct(viewModel)}
+            isAuthenticated={viewModel.isAuthenticated}
+            signInReturnPath={viewModel.practicePagePath}
           />
 
           <div className="min-w-0">

@@ -9,6 +9,7 @@ import {
   PracticeMetaSection,
   PracticePrimaryActionSection,
   PracticeProductCover,
+  toPracticeHeartProduct,
 } from "./PracticePageParts";
 import type { PracticePageViewModel } from "./types";
 
@@ -32,7 +33,13 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         />
 
         <section className="mt-6">
-          <PracticeProductCover cover={viewModel.mobileCover} priority />
+          <PracticeProductCover
+            cover={viewModel.mobileCover}
+            priority
+            heartProduct={toPracticeHeartProduct(viewModel)}
+            isAuthenticated={viewModel.isAuthenticated}
+            signInReturnPath={viewModel.practicePagePath}
+          />
         </section>
 
         <section className="mt-6">
