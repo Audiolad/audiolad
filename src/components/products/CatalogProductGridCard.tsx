@@ -12,6 +12,33 @@ type CatalogProductGridCardProps = {
   signInReturnPath?: string;
 };
 
+function readPaidCatalogPriceLabel(
+  accessState: CatalogListingItem["accessState"],
+  rawPriceLabel: string | null | undefined,
+): string | null {
+  if (accessState !== "paid") {
+    return null;
+  }
+
+  const priceLabel = rawPriceLabel?.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim() || null;
+
+  if (!priceLabel) {
+    return null;
+  }
+
+  const normalized = priceLabel.toLowerCase();
+
+  if (normalized === "подарок" || normalized === "бесплатно") {
+    return null;
+  }
+
+  if (/^0\s*₽$/.test(priceLabel)) {
+    return null;
+  }
+
+  return priceLabel;
+}
+
 /**
  * Approved catalog card:
  * media zone = 1:1; info block = static; whole product card = rectangular.
@@ -22,9 +49,11 @@ export default function CatalogProductGridCard({
   isAuthenticated = false,
   signInReturnPath = "/catalog",
 }: CatalogProductGridCardProps) {
-  const isGift = product.accessState === "free";
   const durationLabel = product.durationLabel?.trim() || null;
-  const priceLabel = product.priceLabel?.trim() || null;
+  const priceLabel = readPaidCatalogPriceLabel(
+    product.accessState,
+    product.priceLabel,
+  );
 
   return (
     <article
@@ -80,13 +109,7 @@ export default function CatalogProductGridCard({
             {durationLabel ? <span>{durationLabel}</span> : null}
             {durationLabel && priceLabel ? <span aria-hidden="true"> · </span> : null}
             {priceLabel ? (
-              <span
-                className={
-                  isGift
-                    ? "font-semibold text-[#5f3f9d]"
-                    : "font-semibold text-[#7042c5]"
-                }
-              >
+              <span data-catalog-card-price className="font-semibold text-[#7042c5]">
                 {priceLabel}
               </span>
             ) : null}
