@@ -173,6 +173,9 @@ export default function CatalogMobileFilters({
   }
 
   function resetFilters() {
+    setDraftTopics([]);
+    setDraftAccess("all");
+    setDraftKind("all");
     router.replace(
       buildCatalogHref({
         q: searchQuery || null,
