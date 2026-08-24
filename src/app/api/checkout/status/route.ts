@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { logCheckoutEvent } from "@/lib/payments/checkout-log";
 import {
+  readNestedAuthorSlug,
   toCheckoutStatusBody,
   type CheckoutStatusErrorCode,
 } from "@/lib/payments/checkout-status-api";
@@ -67,6 +68,26 @@ export async function GET(request: Request) {
     return errorResponse("invalid_token", 400, orderId);
   }
 
+  const practiceSlug =
+    typeof order.practice_slug_snapshot === "string"
+      ? order.practice_slug_snapshot
+      : null;
+  let authorSlug: string | null = null;
+
+  if (practiceSlug) {
+    const { data: practice } = await serviceRoleClient
+      .from("practices")
+      .select("authors!practices_author_id_fkey ( slug )")
+      .eq("slug", practiceSlug)
+      .maybeSingle();
+
+    authorSlug = readNestedAuthorSlug(
+      practice && typeof practice === "object"
+        ? (practice as { authors?: unknown }).authors
+        : null,
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -74,14 +95,12 @@ export async function GET(request: Request) {
 
   const body = toCheckoutStatusBody({
     status: order.status,
-    practiceSlug:
-      typeof order.practice_slug_snapshot === "string"
-        ? order.practice_slug_snapshot
-        : null,
+    practiceSlug,
     practiceTitle:
       typeof order.practice_title_snapshot === "string"
         ? order.practice_title_snapshot
         : null,
+    authorSlug,
     authenticated: Boolean(user),
   });
 
