@@ -2,7 +2,10 @@ import {
   CATALOG_AUTHOR_SUGGEST_LIMIT,
   type CatalogAuthorSearchResult,
 } from "@/lib/catalog/author-search";
-import { buildCatalogHref } from "@/lib/catalog/topic-filter";
+import {
+  buildCatalogHref,
+  type CatalogHrefOptions,
+} from "@/lib/catalog/topic-filter";
 import {
   CATALOG_PRODUCT_SUGGEST_LIMIT,
   CATALOG_SEARCH_SUGGEST_MIN_LENGTH,
@@ -94,10 +97,12 @@ export function buildCatalogSuggestApiUrl(
 export function buildCatalogSearchResultsHref(
   rawQuery: string,
   topicKey: string | null,
+  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({
     q: normalizeCatalogSearchQuery(rawQuery),
     topic: topicKey,
+    ...listing,
   });
 }
 

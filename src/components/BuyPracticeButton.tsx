@@ -15,6 +15,7 @@ import {
   normalizePurchaseSurface,
   type PurchaseSurface,
 } from "@/lib/analytics/purchase-surface";
+import { buildBuySignInHref } from "@/lib/auth/buy-sign-in";
 
 type BuyPracticeButtonProps = {
   practiceSlug: string;
@@ -28,6 +29,7 @@ type BuyPracticeButtonProps = {
   className?: string;
   signInReturnPath?: string;
   pendingLabel?: string;
+  hidePendingNotice?: boolean;
 };
 
 type ApiErrorBody = {
@@ -94,6 +96,7 @@ export default function BuyPracticeButton({
   className,
   signInReturnPath,
   pendingLabel = "Продолжить оплату",
+  hidePendingNotice = false,
 }: BuyPracticeButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -202,12 +205,18 @@ export default function BuyPracticeButton({
       });
 
       if (orderResponse.status === 401) {
-        const returnPath =
-          signInReturnPath ??
-          (typeof window !== "undefined" ? window.location.pathname : "/");
-        router.push(
-          `/auth/sign-in?next=${encodeURIComponent(returnPath)}`,
-        );
+        const currentPath =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : "";
+        const href = buildBuySignInHref(signInReturnPath, currentPath);
+
+        if (!href) {
+          setErrorMessage("Не удалось начать оплату. Попробуйте ещё раз.");
+          return;
+        }
+
+        router.push(href);
         return;
       }
 
@@ -273,7 +282,7 @@ export default function BuyPracticeButton({
 
   return (
     <div>
-      {hasPendingOrder ? (
+      {hasPendingOrder && !hidePendingNotice ? (
         <p className="mb-3 rounded-[16px] border border-[#e7ddf7] bg-[#f8f3ff] px-4 py-3 text-center text-sm leading-5 text-[#5f4a8f]">
           У вас есть незавершённый заказ. Вы можете продолжить оплату.
         </p>

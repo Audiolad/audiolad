@@ -231,7 +231,7 @@ function testPlaybackErrors() {
     "active playing label",
   );
   assert(
-    getPromoProductPlayLabel("p1", "p1", false) === "Воспроизвести",
+    getPromoProductPlayLabel("p1", "p1", false) === "Слушать",
     "active paused label invites play",
   );
   assert(

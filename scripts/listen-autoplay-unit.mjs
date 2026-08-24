@@ -107,7 +107,7 @@ function testPlayRejectionHandling() {
   const player = readSource("src/components/audio/useSequentialPlayer.ts");
 
   assert(
-    player.includes('setAutoplayHint("Нажмите Play, чтобы начать прослушивание")'),
+    player.includes("setAutoplayHint(AUTOPLAY_START_HINT)"),
     "autoplay rejection leaves paused hint",
   );
   assert(player.includes("userWantsPlaybackRef.current = false"), "clears playback intent on rejection");

@@ -5,6 +5,7 @@ import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { ActiveProgramItem } from "@/lib/home/types";
 
 import { PlayIcon } from "./HomeIcons";
+import HomeProductPlayButton from "./HomeProductPlayButton";
 import HomeSectionHeader from "./HomeSectionHeader";
 
 type ActiveProgramsSectionProps = {
@@ -75,15 +76,20 @@ export default function ActiveProgramsSection({
                 />
               </div>
 
-              <Link
-                href={program.listenHref}
-                className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
-                  <PlayIcon />
-                </span>
-                Продолжить
-              </Link>
+              {program.product.authorSlug && program.product.slug ? (
+                <HomeProductPlayButton
+                  practiceId={program.product.id}
+                  authorSlug={program.product.authorSlug}
+                  productSlug={program.product.slug}
+                  ariaLabel="Продолжить"
+                  className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7042c5] text-white">
+                    <PlayIcon />
+                  </span>
+                  Продолжить
+                </HomeProductPlayButton>
+              ) : null}
             </div>
           </article>
         ))}

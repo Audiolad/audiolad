@@ -25,7 +25,8 @@ function testContinueListeningUsesOverlayCard() {
   const source = readFileSync("src/components/home/ContinueListening.tsx", "utf8");
 
   assert(source.includes("CoverOverlayCard"), "continue listening uses overlay card");
-  assert(source.includes("item.listenHref"), "continue listening keeps listen href");
+  assert(source.includes("HomeProductPlayButton"), "continue play stays on home");
+  assert(!source.includes("item.listenHref"), "continue play does not use listenHref");
   assert(source.includes("product.href"), "continue listening keeps product href");
   assert(source.includes("item.progressLabel"), "continue listening keeps progress label");
   assert(source.includes("item.progressPercent"), "continue listening keeps progress percent");
@@ -37,7 +38,8 @@ function testContinueListeningLinksAreSeparate() {
   const source = readFileSync("src/components/home/ContinueListening.tsx", "utf8");
 
   const linkCount = (source.match(/<Link/g) ?? []).length;
-  assert(linkCount === 2, "continue card exposes separate product and listen links");
+  assert(linkCount === 1, "continue card keeps a product link and in-page Play");
+  assert(source.includes("HomeProductPlayButton"), "continue play is a button, not /listen");
 
   assert(
     !source.includes("<Link") || !source.match(/<Link[\s\S]*<Link[\s\S]*<\/Link[\s\S]*<\/Link/),

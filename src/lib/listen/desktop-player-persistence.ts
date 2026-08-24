@@ -1,10 +1,19 @@
 import {
   isCatalogGlobalPlayerSession,
+  isGlobalPlayerEntrySurface,
+  normalizeGlobalPlayerSessionContract,
+  resolveGlobalPlayerPlaybackMode,
+  type CatalogGlobalPlayerSession,
+  type GlobalPlayerEntrySurface,
+  type GlobalPlayerPlaybackMode,
   type LoadSessionInput,
 } from "./global-player-types";
 
 const STORAGE_KEY = "audiolad:desktop-player-last-session";
 const COMPLETION_THRESHOLD_SECONDS = 2;
+
+/** Legacy localStorage rows have no version and are treated as 1. */
+export const DESKTOP_PLAYER_PERSIST_SCHEMA_VERSION = 2;
 
 function isStoredTrackCompleted(
   durationSeconds: number | null,
@@ -23,12 +32,17 @@ function isStoredTrackCompleted(
 }
 
 export type DesktopPlayerLastSession = {
+  version?: number;
   practiceId: string;
   authorSlug: string;
   productSlug: string;
   updatedAt: string;
   audioItemId?: string;
   positionSeconds?: number;
+  playbackMode?: GlobalPlayerPlaybackMode;
+  entrySurface?: GlobalPlayerEntrySurface;
+  previewStartMs?: number;
+  previewEndMs?: number;
 };
 
 export type DesktopPlayerLastSessionInput = Omit<
@@ -36,13 +50,21 @@ export type DesktopPlayerLastSessionInput = Omit<
   "updatedAt"
 >;
 
-function isValidRecord(value: unknown): value is DesktopPlayerLastSession {
-  if (typeof value !== "object" || value === null) {
-    return false;
+function resolvePreviewMs(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
   }
 
-  const record = value as Record<string, unknown>;
+  const ms = Math.trunc(value);
 
+  if (ms < 0) {
+    return undefined;
+  }
+
+  return ms;
+}
+
+function hasLegacyIdentity(record: Record<string, unknown>): boolean {
   return (
     typeof record.practiceId === "string" &&
     record.practiceId.length > 0 &&
@@ -52,6 +74,120 @@ function isValidRecord(value: unknown): value is DesktopPlayerLastSession {
     record.productSlug.length > 0 &&
     typeof record.updatedAt === "string"
   );
+}
+
+export function parseDesktopPlayerLastSession(
+  value: unknown,
+): DesktopPlayerLastSession | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (!hasLegacyIdentity(record)) {
+    return null;
+  }
+
+  const parsed: DesktopPlayerLastSession = {
+    practiceId: record.practiceId as string,
+    authorSlug: record.authorSlug as string,
+    productSlug: record.productSlug as string,
+    updatedAt: record.updatedAt as string,
+    playbackMode: resolveGlobalPlayerPlaybackMode(record.playbackMode),
+  };
+
+  if (typeof record.version === "number" && Number.isFinite(record.version)) {
+    parsed.version = Math.trunc(record.version);
+  }
+
+  if (typeof record.audioItemId === "string" && record.audioItemId.length > 0) {
+    parsed.audioItemId = record.audioItemId;
+  }
+
+  if (
+    typeof record.positionSeconds === "number" &&
+    Number.isFinite(record.positionSeconds)
+  ) {
+    parsed.positionSeconds = record.positionSeconds;
+  }
+
+  if (isGlobalPlayerEntrySurface(record.entrySurface)) {
+    parsed.entrySurface = record.entrySurface;
+  }
+
+  const previewStartMs = resolvePreviewMs(record.previewStartMs);
+  const previewEndMs = resolvePreviewMs(record.previewEndMs);
+
+  if (typeof previewStartMs === "number") {
+    parsed.previewStartMs = previewStartMs;
+  }
+
+  if (typeof previewEndMs === "number") {
+    parsed.previewEndMs = previewEndMs;
+  }
+
+  return parsed;
+}
+
+export function desktopPlayerSnapshotFromSession(
+  session: CatalogGlobalPlayerSession,
+  extras?: Pick<DesktopPlayerLastSessionInput, "audioItemId" | "positionSeconds">,
+): DesktopPlayerLastSessionInput {
+  const snapshot: DesktopPlayerLastSessionInput = {
+    version: DESKTOP_PLAYER_PERSIST_SCHEMA_VERSION,
+    practiceId: session.practiceId,
+    authorSlug: session.authorSlug,
+    productSlug: session.productSlug,
+    playbackMode: resolveGlobalPlayerPlaybackMode(session.playbackMode),
+  };
+
+  if (session.entrySurface) {
+    snapshot.entrySurface = session.entrySurface;
+  }
+
+  if (typeof session.previewStartMs === "number") {
+    snapshot.previewStartMs = session.previewStartMs;
+  }
+
+  if (typeof session.previewEndMs === "number") {
+    snapshot.previewEndMs = session.previewEndMs;
+  }
+
+  if (extras?.audioItemId) {
+    snapshot.audioItemId = extras.audioItemId;
+  }
+
+  if (typeof extras?.positionSeconds === "number") {
+    snapshot.positionSeconds = extras.positionSeconds;
+  }
+
+  return snapshot;
+}
+
+export function applyPersistedSessionContract(
+  session: LoadSessionInput,
+  snapshot: DesktopPlayerLastSession | null,
+): LoadSessionInput {
+  if (!isCatalogGlobalPlayerSession(session)) {
+    return normalizeGlobalPlayerSessionContract(session);
+  }
+
+  if (!snapshot || snapshot.practiceId !== session.practiceId) {
+    return normalizeGlobalPlayerSessionContract(session);
+  }
+
+  return normalizeGlobalPlayerSessionContract({
+    ...session,
+    playbackMode: snapshot.playbackMode ?? "full",
+    ...(snapshot.entrySurface ? { entrySurface: snapshot.entrySurface } : {}),
+    ...(typeof snapshot.previewStartMs === "number"
+      ? { previewStartMs: snapshot.previewStartMs }
+      : {}),
+    ...(typeof snapshot.previewEndMs === "number"
+      ? { previewEndMs: snapshot.previewEndMs }
+      : {}),
+  });
 }
 
 export function readDesktopPlayerLastSession(): DesktopPlayerLastSession | null {
@@ -66,13 +202,7 @@ export function readDesktopPlayerLastSession(): DesktopPlayerLastSession | null 
       return null;
     }
 
-    const parsed: unknown = JSON.parse(raw);
-
-    if (!isValidRecord(parsed)) {
-      return null;
-    }
-
-    return parsed;
+    return parseDesktopPlayerLastSession(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -87,6 +217,8 @@ export function mergeDesktopPlaybackIntoSession(
     return session;
   }
 
+  const withContract = applyPersistedSessionContract(session, snapshot);
+
   if (
     !snapshot ||
     snapshot.practiceId !== session.practiceId ||
@@ -94,13 +226,17 @@ export function mergeDesktopPlaybackIntoSession(
     typeof snapshot.positionSeconds !== "number" ||
     !Number.isFinite(snapshot.positionSeconds)
   ) {
-    return session;
+    return withContract;
   }
 
-  const track = session.tracks.find((item) => item.id === snapshot.audioItemId);
+  if (!isCatalogGlobalPlayerSession(withContract)) {
+    return withContract;
+  }
+
+  const track = withContract.tracks.find((item) => item.id === snapshot.audioItemId);
 
   if (!track) {
-    return session;
+    return withContract;
   }
 
   const duration = track.durationSeconds ?? 0;
@@ -110,11 +246,11 @@ export function mergeDesktopPlaybackIntoSession(
     duration > 0 &&
     snapshotPosition >= duration - COMPLETION_THRESHOLD_SECONDS
   ) {
-    return session;
+    return withContract;
   }
 
   const merged = new Map(
-    session.initialProgress.map((entry) => [entry.audioItemId, entry]),
+    withContract.initialProgress.map((entry) => [entry.audioItemId, entry]),
   );
   const existing = merged.get(snapshot.audioItemId);
 
@@ -126,14 +262,14 @@ export function mergeDesktopPlaybackIntoSession(
       existing.completed,
     )
   ) {
-    return session;
+    return withContract;
   }
 
   const dbPosition = existing?.positionSeconds ?? 0;
   const usePosition = Math.max(dbPosition, Math.floor(snapshotPosition));
 
   if (duration > 0 && usePosition >= duration - COMPLETION_THRESHOLD_SECONDS) {
-    return session;
+    return withContract;
   }
 
   merged.set(snapshot.audioItemId, {
@@ -143,7 +279,7 @@ export function mergeDesktopPlaybackIntoSession(
   });
 
   return {
-    ...session,
+    ...withContract,
     initialProgress: [...merged.values()],
   };
 }
@@ -156,11 +292,20 @@ export function writeDesktopPlayerLastSession(
   }
 
   try {
+    const normalized = parseDesktopPlayerLastSession({
+      ...input,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (!normalized) {
+      return;
+    }
+
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        ...input,
-        updatedAt: new Date().toISOString(),
+        ...normalized,
+        version: input.version ?? DESKTOP_PLAYER_PERSIST_SCHEMA_VERSION,
       } satisfies DesktopPlayerLastSession),
     );
   } catch {

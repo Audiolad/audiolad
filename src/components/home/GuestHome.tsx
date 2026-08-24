@@ -1,13 +1,14 @@
 import Link from "next/link";
 
 import type { HomeTopicItem } from "@/lib/home/topic-navigation";
-import type { GuestHomeData } from "@/lib/home/types";
+import type { GuestHomeData, HomeProduct } from "@/lib/home/types";
 
 import BecomeAuthorPromoBanner from "@/components/listener/BecomeAuthorPromoBanner";
 
 import AuthorsRail from "./AuthorsRail";
 import HeroFeaturedProduct from "./HeroFeaturedProduct";
 import { PlayIcon } from "./HomeIcons";
+import HomeProductPlayButton from "./HomeProductPlayButton";
 import HowItWorks from "./HowItWorks";
 import HomeTopicNavigation from "./HomeTopicNavigation";
 import ProductRail from "./ProductRail";
@@ -18,22 +19,18 @@ type GuestHomeProps = {
   homeTopics: HomeTopicItem[];
 };
 
-function getPrimaryListenHref(data: GuestHomeData): string {
-  if (data.featuredFreeProduct?.listenHref) {
-    return data.featuredFreeProduct.listenHref;
+function getPrimaryHomePlayProduct(data: GuestHomeData): HomeProduct | null {
+  const candidate = data.featuredFreeProduct ?? data.freeProducts[0] ?? null;
+
+  if (candidate?.authorSlug && candidate.slug) {
+    return candidate;
   }
 
-  const firstFree = data.freeProducts[0];
-
-  if (firstFree?.listenHref) {
-    return firstFree.listenHref;
-  }
-
-  return "/catalog";
+  return null;
 }
 
 export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
-  const primaryListenHref = getPrimaryListenHref(data);
+  const primaryPlayProduct = getPrimaryHomePlayProduct(data);
 
   return (
     <>
@@ -48,13 +45,26 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Link
-            href={primaryListenHref}
-            className="home-primary-cta home-primary-cta--hero"
-          >
-            <PlayIcon />
-            Начать слушать
-          </Link>
+          {primaryPlayProduct?.authorSlug ? (
+            <HomeProductPlayButton
+              practiceId={primaryPlayProduct.id}
+              authorSlug={primaryPlayProduct.authorSlug}
+              productSlug={primaryPlayProduct.slug}
+              ariaLabel="Начать слушать"
+              className="home-primary-cta home-primary-cta--hero"
+            >
+              <PlayIcon />
+              Начать слушать
+            </HomeProductPlayButton>
+          ) : (
+            <Link
+              href="/catalog"
+              className="home-primary-cta home-primary-cta--hero"
+            >
+              <PlayIcon />
+              Начать слушать
+            </Link>
+          )}
 
           <Link
             href="/catalog"
@@ -73,7 +83,7 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         title="Попробуйте в подарок"
         products={data.freeProducts}
         ariaLabel="Попробуйте в подарок"
-        href="/catalog"
+        href="/catalog?access=free"
       />
 
       <HomeTopicNavigation topics={homeTopics} />
@@ -82,7 +92,7 @@ export default function GuestHome({ data, homeTopics }: GuestHomeProps) {
         title="Новое в АудиоЛаде"
         products={data.newProducts}
         ariaLabel="Новое в АудиоЛаде"
-        href="/catalog"
+        href="/catalog?sort=new"
       />
 
       <ProductRail

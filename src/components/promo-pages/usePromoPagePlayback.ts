@@ -10,8 +10,13 @@ import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session"
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { readGuestPracticeProgress } from "@/lib/promo/guest-progress";
+import {
+  GESTURE_HINT_PLAY_MARKER,
+  PLAY_ACTION_LABEL,
+} from "@/lib/ui/action-labels";
 
 const GESTURE_HINT_MARKERS = [
+  GESTURE_HINT_PLAY_MARKER,
   "Нажмите Play",
   "Нажмите ещё раз",
 ] as const;
@@ -60,7 +65,7 @@ export function getPromoProductPlayLabel(
       return "Слушаете";
     }
 
-    return "Воспроизвести";
+    return PLAY_ACTION_LABEL;
   }
 
   if (hasPromoProductResumeProgress(practiceId)) {

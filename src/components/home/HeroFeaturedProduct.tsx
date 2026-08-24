@@ -3,7 +3,9 @@ import Link from "next/link";
 import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
+import HomeProductPlayButton from "./HomeProductPlayButton";
 import { PlayIcon } from "./HomeIcons";
 
 type HeroFeaturedProductProps = {
@@ -11,7 +13,7 @@ type HeroFeaturedProductProps = {
 };
 
 export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProps) {
-  const listenHref = product.listenHref;
+  const canPlay = Boolean(product.authorSlug && product.slug);
 
   return (
     <article className="featured-card featured-card--guest mt-8 overflow-hidden rounded-[28px]">
@@ -60,14 +62,17 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
         ) : null}
 
         <div className="mt-4 flex flex-wrap gap-3">
-          {listenHref ? (
-            <Link
-              href={listenHref}
+          {canPlay && product.authorSlug ? (
+            <HomeProductPlayButton
+              practiceId={product.id}
+              authorSlug={product.authorSlug}
+              productSlug={product.slug}
+              ariaLabel={`${PLAY_ACTION_LABEL} ${product.title}`}
               className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               <PlayIcon />
-              Слушать
-            </Link>
+              {PLAY_ACTION_LABEL}
+            </HomeProductPlayButton>
           ) : null}
 
           <Link

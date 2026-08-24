@@ -1,14 +1,15 @@
 import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
   PracticeAccessBanners,
   PracticeBackLink,
-  PracticeLibraryActionSection,
   PracticeMetaSection,
   PracticePrimaryActionSection,
   PracticeProductCover,
+  toPracticeHeartProduct,
 } from "./PracticePageParts";
 import type { PracticePageViewModel } from "./types";
 
@@ -21,7 +22,7 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
     viewModel;
 
   return (
-    <div className="xl:hidden">
+    <div className={`xl:hidden ${platformBottomContentPaddingClass}`}>
       <div className="pt-6">
         <PracticeBackLink />
 
@@ -32,7 +33,13 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         />
 
         <section className="mt-6">
-          <PracticeProductCover cover={viewModel.mobileCover} priority />
+          <PracticeProductCover
+            cover={viewModel.mobileCover}
+            priority
+            heartProduct={toPracticeHeartProduct(viewModel)}
+            isAuthenticated={viewModel.isAuthenticated}
+            signInReturnPath={viewModel.practicePagePath}
+          />
         </section>
 
         <section className="mt-6">
@@ -70,16 +77,12 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
 
         <PracticePrimaryActionSection viewModel={viewModel} />
 
-        <PracticeLibraryActionSection viewModel={viewModel} />
-
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />
         ) : null}
       </div>
 
-      <div className="pb-6">
-        <LegalFooter className="mt-8" />
-      </div>
+      <LegalFooter className="mt-8" />
     </div>
   );
 }

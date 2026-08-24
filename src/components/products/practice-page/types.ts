@@ -33,6 +33,9 @@ export type PracticePageViewModel = {
     updated_at: string | null;
     use_shared_cover: boolean | null;
   };
+  isSaved: boolean;
+  isAuthenticated: boolean;
+  accessState: "free" | "paid";
   resolvedAuthorSlug: string;
   authorName: string | null;
   subtitle: string | null;

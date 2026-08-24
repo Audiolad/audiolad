@@ -7,10 +7,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import PrivateAudioCard from "@/components/private-audio/PrivateAudioCard";
 import {
+  getLibraryFilterEmptyCta,
   getLibraryFilterEmptyMessage,
+  isLibraryFilterId,
   matchesLibraryFilter,
   type LibraryFilterId,
 } from "@/lib/library/filters";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 import type { PrivateAudioListItemDto } from "@/lib/private-audio/types";
 
 import LibraryCard, { type LibraryCardItem } from "./LibraryCard";
@@ -22,10 +25,10 @@ type LibraryFilter = {
 
 const FILTERS: LibraryFilter[] = [
   { id: "all", label: "Все" },
-  { id: "purchased", label: "Купленные" },
+  { id: "saved", label: "Сохранённые" },
   { id: "gifts", label: "Подарки" },
-  { id: "uploads", label: "Мои загрузки" },
-  { id: "downloaded", label: "Скачанные" },
+  { id: "purchased", label: "Купленные" },
+  { id: "uploads", label: "Мои записи" },
 ];
 
 /** Survives Suspense/remount so remove confirmation is not lost mid-animation. */
@@ -72,13 +75,51 @@ function formatUploadsCount(count: number): string {
   return `${count} ${word}`;
 }
 
-function isLibraryFilterId(value: string | null): value is LibraryFilterId {
+function LibraryFilterEmpty({
+  filter,
+  onShowAll,
+}: {
+  filter: LibraryFilterId;
+  onShowAll?: () => void;
+}) {
+  const cta = getLibraryFilterEmptyCta(filter);
+  const showAddAudio = filter === "all";
+
   return (
-    value === "all" ||
-    value === "purchased" ||
-    value === "gifts" ||
-    value === "downloaded" ||
-    value === "uploads"
+    <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+      <p className="text-[17px] font-semibold">
+        {filter === "all" ? "В Аудиотеке пока пусто" : "Пока пусто"}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+        {getLibraryFilterEmptyMessage(filter)}
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-3">
+        {cta ? (
+          <Link
+            href={cta.href}
+            className="inline-block rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
+          >
+            {cta.label}
+          </Link>
+        ) : onShowAll ? (
+          <button
+            type="button"
+            onClick={onShowAll}
+            className="mt-0 text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Показать все материалы
+          </button>
+        ) : null}
+        {showAddAudio ? (
+          <Link
+            href="/my-library/private-audio/new"
+            className="inline-block rounded-[18px] border border-[#d9c7f4] bg-white px-5 py-3 text-sm font-semibold text-[#7042c5]"
+          >
+            Добавить своё аудио
+          </Link>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -225,7 +266,7 @@ export default function MyPracticesLibrary({
   const showingUploads = activeFilter === "uploads";
 
   return (
-    <>
+    <div className={platformBottomContentPaddingClass}>
       {purchasedItem ? (
         <div
           role="status"
@@ -331,30 +372,14 @@ export default function MyPracticesLibrary({
               Обновить
             </Link>
           </div>
+        ) : activeFilter !== "all" &&
+          (libraryIsEmpty || filteredItems.length === 0) ? (
+          <LibraryFilterEmpty
+            filter={activeFilter}
+            onShowAll={() => selectFilter("all")}
+          />
         ) : libraryIsEmpty ? (
-          <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-            <p className="text-[17px] font-semibold">
-              В вашей библиотеке пока нет практик
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              Выберите практику в подарок или найдите подходящий материал в
-              каталоге. Также можно добавить свой аудиофайл.
-            </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/catalog"
-                className="inline-block rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
-              >
-                Перейти в каталог
-              </Link>
-              <Link
-                href="/my-library/private-audio/new"
-                className="inline-block rounded-[18px] border border-[#d9c7f4] bg-white px-5 py-3 text-sm font-semibold text-[#7042c5]"
-              >
-                Добавить своё аудио
-              </Link>
-            </div>
-          </div>
+          <LibraryFilterEmpty filter="all" />
         ) : activeFilter === "all" ? (
           error && privateItems.length === 0 ? (
             <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
@@ -366,12 +391,7 @@ export default function MyPracticesLibrary({
               </p>
             </div>
           ) : allEntries.length === 0 ? (
-            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-              <p className="text-[17px] font-semibold">Пока пусто</p>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                {getLibraryFilterEmptyMessage("all")}
-              </p>
-            </div>
+            <LibraryFilterEmpty filter="all" />
           ) : (
             <div className="mt-5 space-y-4">
               {allEntries.map((entry, index) =>
@@ -385,6 +405,8 @@ export default function MyPracticesLibrary({
                     key={`catalog-${entry.item.id}`}
                     item={entry.item}
                     index={index}
+                    isAuthenticated
+                    signInReturnPath="/my-practices"
                     leaving={
                       entry.item.practice?.id
                         ? leavingPracticeIds.has(entry.item.practice.id)
@@ -400,24 +422,6 @@ export default function MyPracticesLibrary({
               )}
             </div>
           )
-        ) : filteredItems.length === 0 ? (
-          <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-            <p className="text-[17px] font-semibold">
-              {activeFilter === "downloaded"
-                ? "Скачанных материалов пока нет"
-                : "Пока пусто"}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              {getLibraryFilterEmptyMessage(activeFilter)}
-            </p>
-            <button
-              type="button"
-              onClick={() => selectFilter("all")}
-              className="mt-4 text-sm font-medium text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              Показать все материалы
-            </button>
-          </div>
         ) : (
           <div className="mt-5 space-y-4">
             {filteredItems.map((item, index) => (
@@ -425,6 +429,8 @@ export default function MyPracticesLibrary({
                 key={item.id}
                 item={item}
                 index={index}
+                isAuthenticated
+                signInReturnPath="/my-practices"
                 leaving={
                   item.practice?.id
                     ? leavingPracticeIds.has(item.practice.id)
@@ -445,8 +451,7 @@ export default function MyPracticesLibrary({
         <div
           className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
           style={{
-            bottom:
-              "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px) + 0.75rem)",
+            bottom: "calc(var(--platform-bottom-chrome) + 0.75rem)",
           }}
           role="status"
         >
@@ -455,6 +460,6 @@ export default function MyPracticesLibrary({
           </p>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

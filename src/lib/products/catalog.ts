@@ -68,6 +68,7 @@ export type CatalogProduct = ProductCoverFields & {
   compareAtPriceLabel?: string | null;
   promotionEndsAt?: string | null;
   sortTimestamp: number;
+  audioCount?: number;
 };
 
 export type CatalogSections = {
@@ -148,6 +149,30 @@ function normalizeAuthor(
   };
 }
 
+const CATALOG_PROGRAM_FORMATS = new Set([
+  "Программа аудиопрактик",
+  "Аудиокурс",
+  "Цикл практик",
+]);
+
+/**
+ * Programs are not a DB product_kind. They are derived from existing
+ * practice data: multi-track products or known program formats.
+ */
+export function isComputedProgramProduct(
+  audioCount: number,
+  format: string | null | undefined,
+  productKind?: string | null,
+): boolean {
+  if (isMusicProductKind(productKind) || isAudioPostProductKind(productKind)) {
+    return false;
+  }
+
+  const trimmedFormat = typeof format === "string" ? format.trim() : "";
+
+  return audioCount >= 2 || CATALOG_PROGRAM_FORMATS.has(trimmedFormat);
+}
+
 function getProductTypeLabel(
   audioCount: number,
   format: string | null,
@@ -161,14 +186,7 @@ function getProductTypeLabel(
     return getProductKindLabel(productKind);
   }
 
-  const trimmedFormat = typeof format === "string" ? format.trim() : "";
-
-  if (
-    audioCount >= 2 ||
-    trimmedFormat === "Программа аудиопрактик" ||
-    trimmedFormat === "Аудиокурс" ||
-    trimmedFormat === "Цикл практик"
-  ) {
+  if (isComputedProgramProduct(audioCount, format, productKind)) {
     return "Программа аудиопрактик";
   }
 
@@ -361,6 +379,7 @@ export async function mapPracticeRowsToCatalogProducts(
           practice.published_at,
           practice.created_at,
         ),
+        audioCount,
       },
     ];
   });

@@ -206,6 +206,11 @@ function testRepoOneFileOneVersion() {
     "unapplied 140000 stamp must leave the active migrations directory",
   );
   assert.ok(listed.files.some((row) => row.filename === "20260823191000_quick_offers.sql"));
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260823200000_library_saves_and_preview_window.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -237,8 +242,12 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
   assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
-  assert.deepEqual(plan.pending, ["20260823190000", "20260823191000"]);
-  assert.equal(plan.database_migrations_pending, 2);
+  assert.deepEqual(plan.pending, [
+    "20260823190000",
+    "20260823191000",
+    "20260823200000",
+  ]);
+  assert.equal(plan.database_migrations_pending, 3);
 }
 
 function main() {
