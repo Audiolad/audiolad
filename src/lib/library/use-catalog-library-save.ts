@@ -256,14 +256,13 @@ export function useCatalogLibrarySave({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
   const [resetPracticeId, setResetPracticeId] = useState(practiceId);
-  const inFlightRef = useRef(false);
+  const inFlightPracticeIdRef = useRef<string | null>(null);
 
   if (resetPracticeId !== practiceId) {
     setResetPracticeId(practiceId);
     setOptimisticSaved(null);
     setErrorMessage(null);
     setIsPending(false);
-    inFlightRef.current = false;
   }
 
   const subscribe = useCallback(
@@ -304,13 +303,13 @@ export function useCatalogLibrarySave({
       return;
     }
 
-    if (inFlightRef.current || isPending || !practiceId) {
+    if (inFlightPracticeIdRef.current === practiceId || isPending || !practiceId) {
       return;
     }
 
     const nextSaved = !isSaved;
 
-    inFlightRef.current = true;
+    inFlightPracticeIdRef.current = practiceId;
     setIsPending(true);
     setErrorMessage(null);
     setOptimisticSaved(nextSaved);
@@ -328,7 +327,9 @@ export function useCatalogLibrarySave({
         }
 
         setOptimisticSaved(null);
-        inFlightRef.current = false;
+        if (inFlightPracticeIdRef.current === practiceId) {
+          inFlightPracticeIdRef.current = null;
+        }
         setIsPending(false);
       });
 
