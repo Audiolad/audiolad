@@ -60,6 +60,7 @@ export default function AudioPostPlayer({
   const isLoading = loadingTrackId === track.id;
   const isCurrentTrack = activeTrackId === track.id;
   const showAsPlaying = isCurrentTrack && isPlaying;
+  const showGestureHint = needsGesturePlay && isCurrentTrack;
 
   const buttonLabel = !enabled
     ? "Недоступно"
@@ -67,7 +68,9 @@ export default function AudioPostPlayer({
       ? "Загрузка…"
       : showAsPlaying
         ? "Пауза"
-        : PLAY_ACTION_LABEL;
+        : showGestureHint
+          ? PLAY_ACTION_LABEL
+          : PLAY_ACTION_LABEL;
 
   const playButton = (
     <button
