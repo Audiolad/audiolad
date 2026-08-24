@@ -81,11 +81,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   });
   const canLoadDefaultListingInParallel = !isSearchActive && !topicSearchParam;
 
-  const [topicsWithCounts, defaultListing] = await Promise.all([
+  const [topicsWithCounts, defaultListing, authUser] = await Promise.all([
     listTopicsWithCatalogCounts(supabase),
     canLoadDefaultListingInParallel
       ? listPublishedCatalog(supabase, { ...listingQuery, topic: null })
       : Promise.resolve(null),
+    supabase.auth.getUser().then(({ data }) => data.user),
   ]);
   const filterableTopics = topicsWithCounts.filter(
     (topic) => topic.catalogProductCount > 0,
@@ -126,6 +127,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const clearSearchHref = buildCatalogClearSearchHref(activeTopicKey, listingState);
   const catalogRootHref = buildCatalogHref({
     q: searchQuery || null,
+  });
+  const signInReturnPath = buildCatalogHref({
+    q: searchQuery || null,
+    topic: activeTopicKey,
+    access: resolvedListingQuery.access,
+    kind: resolvedListingQuery.kind,
+    sort: resolvedListingQuery.sort,
   });
 
   return (
@@ -225,6 +233,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           initialItems={listing.items}
           initialNextCursor={listing.nextCursor}
           query={resolvedListingQuery}
+          isAuthenticated={Boolean(authUser)}
+          signInReturnPath={signInReturnPath}
         />
       ) : isSearchActive && authors.length > 0 ? null : (
         <section className="mt-8">

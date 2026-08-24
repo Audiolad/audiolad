@@ -62,7 +62,8 @@ assert.match(card, /aspect-square/, "media zone is 1:1");
 assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
 assert.match(card, /data-catalog-info-block/, "info block is marked and static");
 assert.match(card, /CatalogProductPlayButton/, "media zone has Play");
-assert.doesNotMatch(card, /Heart|Избранн/, "heart UI is not in this PR");
+assert.match(card, /CatalogProductHeartButton/, "media zone has Heart");
+assert.doesNotMatch(card, /Избранн/, "Heart is not favorites");
 assert.match(card, /href=\{product\.href\}/, "card still links to the product page");
 assert.match(card, /Подарок/, "gift badge is visual");
 
