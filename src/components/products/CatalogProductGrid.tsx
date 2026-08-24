@@ -13,6 +13,8 @@ type CatalogProductGridProps = {
   initialItems: CatalogListingItem[];
   initialNextCursor: string | null;
   query: Omit<CatalogListingQuery, "cursor">;
+  isAuthenticated?: boolean;
+  signInReturnPath?: string;
 };
 
 type CatalogListingResponse = {
@@ -24,6 +26,8 @@ export default function CatalogProductGrid({
   initialItems,
   initialNextCursor,
   query,
+  isAuthenticated = false,
+  signInReturnPath = "/catalog",
 }: CatalogProductGridProps) {
   const [items, setItems] = useState(initialItems);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -103,7 +107,11 @@ export default function CatalogProductGrid({
       <ul data-catalog-product-grid className="catalog-product-grid">
         {items.map((product) => (
           <li key={product.id}>
-            <CatalogProductGridCard product={product} />
+            <CatalogProductGridCard
+              product={product}
+              isAuthenticated={isAuthenticated}
+              signInReturnPath={signInReturnPath}
+            />
           </li>
         ))}
       </ul>

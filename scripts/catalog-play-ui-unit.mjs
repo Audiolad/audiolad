@@ -29,7 +29,8 @@ assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
 assert.match(card, /data-catalog-info-block/, "info block stays static");
 assert.match(card, /absolute bottom-2 right-2|CatalogProductPlayButton/, "Play is on the card");
 assert.doesNotMatch(card, /href=\{?["']\/listen/, "card does not link Play to /listen");
-assert.doesNotMatch(card, /Heart|Избранн/, "Heart UI stays out of this PR");
+assert.match(card, /CatalogProductHeartButton/, "Heart is on the card");
+assert.doesNotMatch(card, /Избранн/, "Heart is not favorites");
 
 assert.match(play, /data-catalog-play-button/, "Play button is marked");
 assert.match(play, /entrySurface:\s*"catalog"/, "catalog Play sets entrySurface");

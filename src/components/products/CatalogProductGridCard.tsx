@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import CatalogProductPlayButton from "@/components/products/CatalogProductPlayButton";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
@@ -7,6 +8,8 @@ import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
 
 type CatalogProductGridCardProps = {
   product: CatalogListingItem;
+  isAuthenticated?: boolean;
+  signInReturnPath?: string;
 };
 
 /**
@@ -16,6 +19,8 @@ type CatalogProductGridCardProps = {
 
 export default function CatalogProductGridCard({
   product,
+  isAuthenticated = false,
+  signInReturnPath = "/catalog",
 }: CatalogProductGridCardProps) {
   const isGift = product.accessState === "free";
 
@@ -47,6 +52,12 @@ export default function CatalogProductGridCard({
             Подарок
           </span>
         ) : null}
+
+        <CatalogProductHeartButton
+          product={product}
+          isAuthenticated={isAuthenticated}
+          signInReturnPath={signInReturnPath}
+        />
 
         <CatalogProductPlayButton product={product} />
       </div>
