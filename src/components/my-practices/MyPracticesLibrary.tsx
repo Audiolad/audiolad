@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PrivateAudioCard from "@/components/private-audio/PrivateAudioCard";
 import {
   getLibraryFilterEmptyMessage,
+  isLibraryFilterId,
   matchesLibraryFilter,
   type LibraryFilterId,
 } from "@/lib/library/filters";
@@ -70,16 +71,6 @@ function formatUploadsCount(count: number): string {
   }
 
   return `${count} ${word}`;
-}
-
-function isLibraryFilterId(value: string | null): value is LibraryFilterId {
-  return (
-    value === "all" ||
-    value === "purchased" ||
-    value === "gifts" ||
-    value === "downloaded" ||
-    value === "uploads"
-  );
 }
 
 export default function MyPracticesLibrary({
