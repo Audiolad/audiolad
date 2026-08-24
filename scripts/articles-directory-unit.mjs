@@ -71,6 +71,7 @@ import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/
 import { MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-mladencev-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-grudnichkov-slushat-onlayn.ts";
 import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn.ts";
+import { KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/kolybelnye-dlya-malyshey-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1521,6 +1522,33 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fortyFourthListenHref}`,
     ),
     "directory JSON-LD includes forty-fourth listen href",
+  );
+
+
+
+
+  const fortyFifthListenHref = "/listens/kolybelnye-dlya-malyshey-slushat-onlayn";
+  const fortyFifthListenCard = data.articles.find((card) => card.href === fortyFifthListenHref);
+  assert(fortyFifthListenCard, "forty-fifth indexable listen page is listed");
+  assert(
+    fortyFifthListenCard.title === "Колыбельные для малышей – слушать онлайн бесплатно | АудиоЛад",
+    "forty-fifth listen directory title",
+  );
+  assert(
+    fortyFifthListenCard.description === KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/kolybelnye-dlya-malyshey-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyFifthListenHref}`,
+    ),
+    "directory JSON-LD includes forty-fifth listen href",
   );
 
 
