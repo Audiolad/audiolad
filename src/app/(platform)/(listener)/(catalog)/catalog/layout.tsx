@@ -10,7 +10,7 @@ export default function CatalogListenerLayout({
 }>) {
   return (
     <>
-      <div className="listener-catalog-mobile-search sticky top-0 z-30 bg-platform-surface px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-3 xl:hidden">
+      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-3 xl:hidden">
         <div className="flex items-start gap-2">
           <div className="min-h-[52px] min-w-0 flex-1">
             <MobileCatalogSearch />
@@ -18,6 +18,10 @@ export default function CatalogListenerLayout({
           <CatalogMobileFiltersSlot />
         </div>
       </div>
+      <div
+        className="listener-catalog-mobile-search-spacer xl:hidden"
+        aria-hidden="true"
+      />
 
       <div className="listener-catalog-content px-5 lg:px-10 xl:px-6 xl:pt-3 xl:pb-5">
         {children}

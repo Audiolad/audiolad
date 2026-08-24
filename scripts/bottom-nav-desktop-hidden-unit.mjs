@@ -106,8 +106,14 @@ assert(
   "ListenerAppShell must not use unstable min-h-dvh on mobile",
 );
 assert(
-  layout.includes("min-h-screen") && !layout.includes("min-h-dvh"),
-  "root body must use stable min-h-screen instead of min-h-dvh",
+  layout.includes("min-h-dvh") && !layout.includes("min-h-screen"),
+  "root body must use min-h-dvh (root/body only)",
+);
+assert(
+  /@media \(display-mode: standalone\)[\s\S]*overscroll-behavior-y:\s*none/.test(
+    globals,
+  ),
+  "standalone PWA must disable vertical overscroll on html/body",
 );
 assert(
   miniPlayer.includes("BOTTOM_NAV_MAIN_HEIGHT_PX") &&
