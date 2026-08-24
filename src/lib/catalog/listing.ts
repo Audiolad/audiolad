@@ -9,6 +9,10 @@ import {
 } from "@/lib/author-products/product-kind";
 import { searchPublishedCatalogProducts } from "@/lib/catalog/search";
 import {
+  createSupabaseLibrarySavesStore,
+  type LibrarySavesAsyncStore,
+} from "@/lib/library/saves";
+import {
   getPublishedCatalogProducts,
   isComputedProgramProduct,
   type CatalogProduct,
@@ -127,6 +131,7 @@ export function mapCatalogProductToListingItem(
     durationLabel: product.statsLabel,
     priceLabel: product.priceLabel,
     accessState: product.isFree ? "free" : "paid",
+    isSaved: false,
     sortTimestamp: product.sortTimestamp,
     price: product.price,
     isFree: product.isFree,
@@ -280,7 +285,34 @@ function toPublicListingItem(
     durationLabel: item.durationLabel,
     priceLabel: item.priceLabel,
     accessState: item.accessState,
+    isSaved: item.isSaved,
   };
+}
+
+export function applyCatalogListingSavedState(
+  items: CatalogListingItem[],
+  savedIds: ReadonlySet<string> | null,
+): CatalogListingItem[] {
+  return items.map((item) => ({
+    ...item,
+    isSaved: savedIds !== null && savedIds.has(item.id),
+  }));
+}
+
+async function resolveCatalogListingUserId(
+  supabase: SupabaseClient,
+  explicitUserId?: string | null,
+): Promise<string | null> {
+  if (explicitUserId !== undefined) {
+    return explicitUserId;
+  }
+
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function listingProductKindHint(
@@ -300,6 +332,10 @@ function listingProductKindHint(
 export async function listPublishedCatalog(
   supabase: SupabaseClient,
   query: CatalogListingQuery,
+  options: {
+    userId?: string | null;
+    savesStore?: LibrarySavesAsyncStore;
+  } = {},
 ): Promise<CatalogListingResult> {
   const productKindHint = listingProductKindHint(query.kind);
 
@@ -319,6 +355,37 @@ export async function listPublishedCatalog(
     query,
   );
   const sorted = sortCatalogListingItems(candidates, query.sort);
+  const page = paginateCatalogListingItems(sorted, query);
+  const userId = await resolveCatalogListingUserId(supabase, options.userId);
 
-  return paginateCatalogListingItems(sorted, query);
+  if (!userId) {
+    return {
+      ...page,
+      items: applyCatalogListingSavedState(page.items, null),
+    };
+  }
+
+  const store = options.savesStore ?? createSupabaseLibrarySavesStore(supabase);
+
+  try {
+    const savedIds = await store.listSavedPracticeIds(
+      userId,
+      page.items.map((item) => item.id),
+    );
+
+    return {
+      ...page,
+      items: applyCatalogListingSavedState(page.items, new Set(savedIds)),
+    };
+  } catch (error) {
+    console.error(
+      "catalog_listing_saves_error",
+      error instanceof Error ? error.message : error,
+    );
+
+    return {
+      ...page,
+      items: applyCatalogListingSavedState(page.items, new Set()),
+    };
+  }
 }

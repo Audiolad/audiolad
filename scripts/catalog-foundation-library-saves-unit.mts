@@ -4,12 +4,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  asAsyncLibrarySavesStore,
   createLibrarySave,
   createMemoryLibrarySavesStore,
+  createSupabaseLibrarySavesStore,
   deleteLibrarySave,
   fromLibrarySaveRow,
   hasLibrarySave,
   LIBRARY_SAVES_TABLE,
+  listSavedPracticeIds,
   toLibrarySaveRow,
 } from "../src/lib/library/saves";
 
@@ -107,7 +110,43 @@ function testNoFavoritesOrEntitlementLeak() {
   assert.doesNotMatch(saves, /CREATE TABLE|from\(["']favorites["']\)/);
   assert.doesNotMatch(saves, /access_source/);
   assert.doesNotMatch(saves, /claim_free_practice/);
+  assert.doesNotMatch(saves, /user_practices/);
+  assert.match(saves, /createSupabaseLibrarySavesStore/, "production adapter exists");
   assert.match(claimApi, /access_source/, "existing claim API stays entitlement-only");
+}
+
+async function testAsyncMemoryAdapterListsSavedIds() {
+  const store = asAsyncLibrarySavesStore(createMemoryLibrarySavesStore());
+  await store.insert({
+    userId: USER,
+    practiceId: PRACTICE,
+    createdAt: "2026-08-23T00:00:00.000Z",
+  });
+
+  const savedIds = await listSavedPracticeIds(store, {
+    userId: USER,
+    practiceIds: [PRACTICE, OTHER],
+  });
+
+  assert.deepEqual(savedIds, [PRACTICE]);
+}
+
+async function testSupabaseAdapterUsesLibrarySavesTable() {
+  const calls: string[] = [];
+  const supabase = {
+    from(table: string) {
+      calls.push(table);
+      throw new Error("adapter_probe");
+    },
+  };
+
+  const store = createSupabaseLibrarySavesStore(supabase as never);
+
+  await assert.rejects(
+    () => store.has(USER, PRACTICE),
+    /adapter_probe/,
+  );
+  assert.deepEqual(calls, [LIBRARY_SAVES_TABLE]);
 }
 
 testCreateSave();
@@ -116,5 +155,7 @@ testDeleteSave();
 testIsolationByUser();
 testRowMapping();
 testNoFavoritesOrEntitlementLeak();
+await testAsyncMemoryAdapterListsSavedIds();
+await testSupabaseAdapterUsesLibrarySavesTable();
 
 console.log("catalog-foundation-library-saves-unit: ok");
