@@ -16,6 +16,7 @@ function read(relativePath) {
 const page = read(
   "src/app/(platform)/(listener)/(catalog)/catalog/page.tsx",
 );
+const filterUi = read("src/lib/catalog/catalog-filter-ui.ts");
 const grid = read("src/components/products/CatalogProductGrid.tsx");
 const card = read("src/components/products/CatalogProductGridCard.tsx");
 const css = read("src/app/globals.css");
@@ -34,11 +35,13 @@ assert.doesNotMatch(
   /getPublishedCatalogSections/,
   "catalog page no longer splits gifts/paid carousels",
 );
-assert.match(page, /Подарки/, "access filter includes gifts");
-assert.match(page, /Продукты/, "access filter includes paid products");
-assert.match(page, /Практики/, "kind filter includes practices");
-assert.match(page, /Музыка/, "kind filter includes music");
-assert.match(page, /Посты/, "kind filter includes posts");
+assert.match(page, /CATALOG_ACCESS_FILTER_OPTIONS/, "page uses shared access options");
+assert.match(page, /CATALOG_KIND_FILTER_OPTIONS/, "page uses shared kind options");
+assert.match(filterUi, /Подарки/, "access filter includes gifts");
+assert.match(filterUi, /Продукты/, "access filter includes paid products");
+assert.match(filterUi, /Практики/, "kind filter includes practices");
+assert.match(filterUi, /Музыка/, "kind filter includes music");
+assert.match(filterUi, /Посты/, "kind filter includes posts");
 assert.match(page, /canLoadDefaultListingInParallel/, "first screen SSR is named");
 assert.match(page, /listPublishedCatalog/, "first screen loads listing on the server");
 
@@ -65,7 +68,25 @@ assert.match(card, /CatalogProductPlayButton/, "media zone has Play");
 assert.match(card, /CatalogProductHeartButton/, "media zone has Heart");
 assert.doesNotMatch(card, /Избранн/, "Heart is not favorites");
 assert.match(card, /href=\{product\.href\}/, "card still links to the product page");
-assert.match(card, /Подарок/, "gift badge is visual");
+assert.match(card, /overflow-hidden/, "card clips to one rounded container");
+assert.match(card, /rounded-\[20px\]/, "card has a shared radius");
+assert.match(card, /border border-\[#eadff8\]/, "card has a light border");
+assert.match(card, /data-catalog-card-meta/, "duration and price share one meta row");
+assert.match(card, / · /, "meta row joins duration and paid price");
+assert.match(card, /hidden xl:block/, "kind label is not on the mobile card");
+assert.match(card, /readPaidCatalogPriceLabel/, "paid price is filtered in the card UI");
+assert.match(card, /accessState !== "paid"/, "free cards do not render a price");
+assert.match(card, /data-catalog-card-price/, "paid price is a visual marker");
+assert.doesNotMatch(card, /Подарок/, "card UI does not show a gift status");
+assert.doesNotMatch(card, /Бесплатно/, "card UI does not show a free status");
+assert.match(card, /normalized === "подарок"/, "gift labels are stripped from the meta row");
+assert.match(card, /normalized === "бесплатно"/, "free labels are stripped from the meta row");
+assert.match(card, /\^0\\s\*₽\$/, "zero prices are stripped from the meta row");
+assert.doesNotMatch(
+  card,
+  /absolute left-2 top-2[\s\S]*Подарок/,
+  "gift badge is not on the cover",
+);
 
 assert.match(api, /export async function GET/, "GET /api/catalog exists");
 assert.match(api, /nextCursor/, "API returns cursor pagination");

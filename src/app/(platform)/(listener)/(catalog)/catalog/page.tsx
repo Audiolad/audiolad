@@ -6,6 +6,10 @@ import CatalogChipFilterBar from "@/components/catalog/CatalogChipFilterBar";
 import TopicFilterBar from "@/components/catalog/TopicFilterBar";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
 import {
+  CATALOG_ACCESS_FILTER_OPTIONS,
+  CATALOG_KIND_FILTER_OPTIONS,
+} from "@/lib/catalog/catalog-filter-ui";
+import {
   mapCatalogAuthorSearchResultToPublicAuthorCard,
   searchPublishedCatalogAuthors,
 } from "@/lib/catalog/author-search";
@@ -27,19 +31,6 @@ import { listTopicsWithCatalogCounts } from "@/lib/topics/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-const ACCESS_FILTER_OPTIONS = [
-  { value: "all", label: "Все" },
-  { value: "free", label: "Подарки" },
-  { value: "paid", label: "Продукты" },
-] as const;
-
-const KIND_FILTER_OPTIONS = [
-  { value: "all", label: "Все" },
-  { value: "practice", label: "Практики" },
-  { value: "music", label: "Музыка" },
-  { value: "audio_post", label: "Посты" },
-] as const;
 
 type CatalogPageProps = {
   searchParams: Promise<{
@@ -138,7 +129,9 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   return (
     <>
-      <h1 className="hidden text-[28px] font-semibold xl:block">Каталог</h1>
+      <h1 className="sr-only text-[28px] font-semibold xl:not-sr-only xl:block">
+        Каталог
+      </h1>
 
       {!isSearchActive ? (
         <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
@@ -162,44 +155,46 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         </section>
       )}
 
-      {filterableTopics.length > 0 ? (
-        <TopicFilterBar
-          topics={filterableTopics}
-          activeTopicKey={activeTopicKey}
-          searchQuery={searchQuery}
-          listing={listingState}
+      <div className="hidden xl:block" data-catalog-desktop-filters>
+        {filterableTopics.length > 0 ? (
+          <TopicFilterBar
+            topics={filterableTopics}
+            activeTopicKey={activeTopicKey}
+            searchQuery={searchQuery}
+            listing={listingState}
+          />
+        ) : null}
+
+        <CatalogChipFilterBar
+          ariaLabel="Фильтр по доступу"
+          options={CATALOG_ACCESS_FILTER_OPTIONS}
+          activeValue={resolvedListingQuery.access}
+          buildHref={(access) =>
+            buildCatalogHref({
+              q: searchQuery || null,
+              topic: activeTopicKey,
+              access,
+              kind: resolvedListingQuery.kind,
+              sort: resolvedListingQuery.sort,
+            })
+          }
         />
-      ) : null}
 
-      <CatalogChipFilterBar
-        ariaLabel="Фильтр по доступу"
-        options={ACCESS_FILTER_OPTIONS}
-        activeValue={resolvedListingQuery.access}
-        buildHref={(access) =>
-          buildCatalogHref({
-            q: searchQuery || null,
-            topic: activeTopicKey,
-            access,
-            kind: resolvedListingQuery.kind,
-            sort: resolvedListingQuery.sort,
-          })
-        }
-      />
-
-      <CatalogChipFilterBar
-        ariaLabel="Фильтр по типу"
-        options={KIND_FILTER_OPTIONS}
-        activeValue={resolvedListingQuery.kind}
-        buildHref={(kind) =>
-          buildCatalogHref({
-            q: searchQuery || null,
-            topic: activeTopicKey,
-            access: resolvedListingQuery.access,
-            kind,
-            sort: resolvedListingQuery.sort,
-          })
-        }
-      />
+        <CatalogChipFilterBar
+          ariaLabel="Фильтр по типу"
+          options={CATALOG_KIND_FILTER_OPTIONS}
+          activeValue={resolvedListingQuery.kind}
+          buildHref={(kind) =>
+            buildCatalogHref({
+              q: searchQuery || null,
+              topic: activeTopicKey,
+              access: resolvedListingQuery.access,
+              kind,
+              sort: resolvedListingQuery.sort,
+            })
+          }
+        />
+      </div>
 
       {isSearchActive && authors.length > 0 ? (
         <section className="mt-6" aria-labelledby="catalog-search-authors-heading">
