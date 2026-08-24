@@ -29,6 +29,11 @@ assert.match(heart, /type="button"/, "Heart is a button");
 assert.doesNotMatch(heart, /<Link|href=/, "Heart is not a Link");
 assert.match(heart, /absolute top-2 right-2 z-10/, "Heart is top-right");
 assert.match(heart, /h-9 w-9/, "Heart matches Play size");
+assert.match(
+  heart,
+  /before:absolute before:-inset-1 before:content-\[''\]/,
+  "Heart hit-area is 44px",
+);
 assert.match(heart, /data-catalog-heart-button/);
 assert.match(heart, /data-catalog-heart-saved/);
 assert.match(heart, /Сохранить в Аудиотеку/);
@@ -38,6 +43,11 @@ assert.match(heart, /aria-live="polite"/, "errors use aria-live");
 assert.match(heart, /buildAuthRouteHref|signInReturnPath/, "guest uses login return path");
 
 assert.match(play, /absolute bottom-2 right-2 z-10/, "Play stays bottom-right");
+assert.match(
+  play,
+  /before:absolute before:-inset-1 before:content-\[''\]/,
+  "Play hit-area is 44px",
+);
 assert.doesNotMatch(play, /library\/saves|Heart|♡|♥/, "Play file is unchanged");
 
 assert.doesNotMatch(
