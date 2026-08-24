@@ -23,7 +23,11 @@ export function applyCatalogPlayContract(
   extras?: Partial<
     Pick<
       CatalogGlobalPlayerSession,
-      "playbackMode" | "previewStartMs" | "previewEndMs" | "previewCta"
+      | "playbackMode"
+      | "previewStartMs"
+      | "previewEndMs"
+      | "previewCta"
+      | "previewNeedsSetup"
     >
   >,
 ): CatalogGlobalPlayerSession {
@@ -42,5 +46,8 @@ export function applyCatalogPlayContract(
       ? { previewEndMs: extras.previewEndMs }
       : {}),
     ...(extras?.previewCta ? { previewCta: extras.previewCta } : {}),
+    ...(typeof extras?.previewNeedsSetup === "boolean"
+      ? { previewNeedsSetup: extras.previewNeedsSetup }
+      : {}),
   };
 }

@@ -191,6 +191,7 @@ async function loadCatalogPreviewSession(
         playbackMode: "preview",
         previewStartMs: previewWindow.startMs,
         previewEndMs: previewWindow.endMs,
+        previewNeedsSetup: previewWindow.needsSetup,
         previewCta: {
           type: "buy",
           price,

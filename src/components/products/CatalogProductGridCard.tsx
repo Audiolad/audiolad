@@ -9,6 +9,11 @@ type CatalogProductGridCardProps = {
   product: CatalogListingItem;
 };
 
+/**
+ * Approved catalog card:
+ * media zone = 1:1; info block = static; whole product card = rectangular.
+ */
+
 export default function CatalogProductGridCard({
   product,
 }: CatalogProductGridCardProps) {
@@ -16,7 +21,10 @@ export default function CatalogProductGridCard({
 
   return (
     <article data-catalog-grid-card>
-      <div className="relative overflow-hidden rounded-[18px] bg-[#f4ecfb]">
+      <div
+        data-catalog-media-zone
+        className="relative overflow-hidden rounded-[18px] bg-[#f4ecfb]"
+      >
         <Link
           href={product.href}
           className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
@@ -30,7 +38,7 @@ export default function CatalogProductGridCard({
             authorName={product.author}
             format={product.kindLabel}
             displayWidth={360}
-            className="aspect-[3/4] w-full rounded-[18px]"
+            className="aspect-square w-full rounded-[18px]"
           />
         </Link>
 
@@ -45,6 +53,7 @@ export default function CatalogProductGridCard({
 
       <Link
         href={product.href}
+        data-catalog-info-block
         className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         <p className={`mt-2 ${PRODUCT_FORMAT_LINE_CLASS}`}>{product.kindLabel}</p>

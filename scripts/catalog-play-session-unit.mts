@@ -75,6 +75,7 @@ function testCatalogPlayContract() {
     playbackMode: "preview",
     previewStartMs: 15_000,
     previewEndMs: 75_000,
+    previewNeedsSetup: false,
     previewCta: {
       type: "buy",
       price: 1490,
@@ -86,7 +87,17 @@ function testCatalogPlayContract() {
   assert.equal(preview.playbackMode, "preview");
   assert.equal(preview.previewStartMs, 15_000);
   assert.equal(preview.previewEndMs, 75_000);
+  assert.equal(preview.previewNeedsSetup, false);
   assert.equal(preview.previewCta?.type, "buy");
+
+  const compatibility = applyCatalogPlayContract(baseSession(), {
+    playbackMode: "preview",
+    previewStartMs: 0,
+    previewEndMs: 60_000,
+    previewNeedsSetup: true,
+  });
+
+  assert.equal(compatibility.previewNeedsSetup, true);
 }
 
 function testPracticePathParse() {

@@ -20,8 +20,13 @@ const desktop = read("src/components/listener/DesktopPlayerBar.tsx");
 const cta = read("src/components/audio/PreviewEndedBuyCta.tsx");
 const provider = read("src/components/audio/GlobalAudioPlayerProvider.tsx");
 const listingApi = read("src/app/api/catalog/route.ts");
+const preview = read("src/lib/listen/preview-window.ts");
+const playLoader = read("src/lib/catalog/catalog-playback.ts");
 
-assert.match(card, /aspect-\[3\/4\]/, "approved 3:4 media zone stays");
+assert.match(card, /data-catalog-media-zone/, "media zone is marked");
+assert.match(card, /aspect-square/, "media zone is 1:1");
+assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
+assert.match(card, /data-catalog-info-block/, "info block stays static");
 assert.match(card, /absolute bottom-2 right-2|CatalogProductPlayButton/, "Play is on the card");
 assert.doesNotMatch(card, /href=\{?["']\/listen/, "card does not link Play to /listen");
 assert.doesNotMatch(card, /Heart|Избранн/, "Heart UI stays out of this PR");
@@ -45,5 +50,13 @@ assert.match(provider, /previewStartMs: catalogSession\?\.previewStartMs/, "engi
 assert.match(provider, /previewEndMs: catalogSession\?\.previewEndMs/, "engine receives preview end");
 
 assert.doesNotMatch(listingApi, /playbackMode|entrySurface|previewStartMs/, "GET /api/catalog is unchanged");
+
+assert.match(preview, /audioPreviewNeedsSetup/, "missing author window is marked as needs setup");
+assert.match(
+  preview,
+  /compatibility_fallback|COMPATIBILITY_FALLBACK/,
+  "first 60s is compatibility only",
+);
+assert.match(playLoader, /previewNeedsSetup: previewWindow.needsSetup/, "play session keeps the setup flag");
 
 console.log("catalog-play-ui-unit: ok");

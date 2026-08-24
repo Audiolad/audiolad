@@ -55,6 +55,11 @@ type GlobalPlayerSessionBase = {
   previewStartMs?: number;
   previewEndMs?: number;
   previewCta?: GlobalPlayerPreviewCta;
+  /**
+   * True when preview uses the temporary first-60s compatibility clip
+   * because the author has not configured a 30–90s storefront window.
+   */
+  previewNeedsSetup?: boolean;
 };
 
 export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
@@ -168,6 +173,7 @@ export type GlobalPlayerPlaybackContract = {
   previewStartMs?: number;
   previewEndMs?: number;
   previewCta?: GlobalPlayerPreviewCta;
+  previewNeedsSetup?: boolean;
 };
 
 export function normalizeGlobalPlayerSessionContract<
