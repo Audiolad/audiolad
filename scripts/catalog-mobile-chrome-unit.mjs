@@ -38,11 +38,22 @@ assert.match(
   /safe-area-inset-top/,
   "sticky search respects the top safe-area",
 );
+assert.match(
+  layout,
+  /CatalogMobileFiltersSlot/,
+  "Фильтры sit in the sticky search row",
+);
 
 assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1");
 assert.match(page, /sr-only/, "mobile h1 is not a visible title");
 assert.match(page, /xl:not-sr-only/, "desktop h1 stays visible");
 assert.match(page, /xl:block/, "desktop h1 is a block heading");
+assert.match(
+  page,
+  /data-catalog-desktop-filters/,
+  "desktop filter chips stay in the page",
+);
+assert.match(page, /hidden xl:block/, "filter chips are not in the mobile page flow");
 
 assert.doesNotMatch(
   page,
