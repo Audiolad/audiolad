@@ -18,6 +18,7 @@ import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { formatRubles } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
+import { parseCatalogTopicKeyList } from "@/lib/catalog/topic-filter";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
 import {
   groupAudioSummariesByPractice,
@@ -86,22 +87,23 @@ export async function getPublishedPracticeIdsForTopicKey(
   supabase: SupabaseClient,
   topicKey: string,
 ): Promise<string[]> {
-  const normalizedKey = topicKey.trim().toLowerCase();
+  const topicKeys = parseCatalogTopicKeyList(topicKey);
 
-  if (!normalizedKey) {
+  if (topicKeys.length === 0) {
     return [];
   }
 
-  const { data: topicRow, error: topicError } = await supabase
+  const { data: topicRows, error: topicError } = await supabase
     .from("topics")
     .select("id")
     .eq("is_active", true)
-    .eq("key", normalizedKey)
-    .maybeSingle();
+    .in("key", topicKeys);
 
-  if (topicError || !topicRow?.id) {
+  if (topicError || !topicRows?.length) {
     return [];
   }
+
+  const topicIds = topicRows.map((row) => row.id as string);
 
   const { data: practiceRows, error: practicesError } = await supabase
     .from("practices")
@@ -124,14 +126,16 @@ export async function getPublishedPracticeIdsForTopicKey(
   const { data: assignmentRows, error: assignmentError } = await supabase
     .from("practice_topics")
     .select("practice_id")
-    .eq("topic_id", topicRow.id)
+    .in("topic_id", topicIds)
     .in("practice_id", [...publishedPracticeIds]);
 
   if (assignmentError) {
     return [];
   }
 
-  return (assignmentRows ?? []).map((row) => row.practice_id as string);
+  return [
+    ...new Set((assignmentRows ?? []).map((row) => row.practice_id as string)),
+  ];
 }
 
 function normalizeAuthor(

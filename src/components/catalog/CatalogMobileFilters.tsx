@@ -22,7 +22,10 @@ import {
 } from "@/lib/catalog/platform-search";
 import {
   buildCatalogHref,
-  parseCatalogTopicFilter,
+  countCatalogFilterGroups,
+  parseCatalogTopicFilters,
+  serializeCatalogTopicParam,
+  toggleCatalogDraftTopics,
 } from "@/lib/catalog/topic-filter";
 
 type CatalogMobileFiltersProps = {
@@ -60,7 +63,7 @@ export default function CatalogMobileFilters({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
-  const [draftTopic, setDraftTopic] = useState<string | null>(null);
+  const [draftTopics, setDraftTopics] = useState<string[]>([]);
   const [draftAccess, setDraftAccess] = useState<CatalogAccessFilter>("all");
   const [draftKind, setDraftKind] = useState<CatalogKindFilter>("all");
   const router = useRouter();
@@ -69,18 +72,18 @@ export default function CatalogMobileFilters({
   const searchQuery = readPlatformSearchQueryFromParams(searchParams);
   const topicFromUrl = readPlatformSearchTopicFromParams(searchParams);
   const listingFromUrl = readPlatformSearchListingFromParams(searchParams);
-  const activeTopicKey = parseCatalogTopicFilter(
+  const activeTopicKeys = parseCatalogTopicFilters(
     topicFromUrl,
     topics.map((topic) => topic.key),
   );
   const access = parseCatalogAccessFilter(listingFromUrl.access);
   const kind = parseCatalogKindFilter(listingFromUrl.kind);
   const sort = parseCatalogSort(listingFromUrl.sort);
-  const activeFilterCount = [
-    activeTopicKey !== null,
-    access !== "all",
-    kind !== "all",
-  ].filter(Boolean).length;
+  const activeFilterCount = countCatalogFilterGroups({
+    topicKeys: activeTopicKeys,
+    access,
+    kind,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -150,7 +153,7 @@ export default function CatalogMobileFilters({
   }
 
   function openSheet() {
-    setDraftTopic(activeTopicKey);
+    setDraftTopics(activeTopicKeys);
     setDraftAccess(access);
     setDraftKind(kind);
     setOpen(true);
@@ -160,9 +163,22 @@ export default function CatalogMobileFilters({
     router.replace(
       buildCatalogHref({
         q: searchQuery || null,
-        topic: draftTopic,
+        topic: serializeCatalogTopicParam(draftTopics),
         access: draftAccess,
         kind: draftKind,
+        sort,
+      }),
+    );
+    close();
+  }
+
+  function resetFilters() {
+    router.replace(
+      buildCatalogHref({
+        q: searchQuery || null,
+        topic: null,
+        access: "all",
+        kind: "all",
         sort,
       }),
     );
@@ -213,14 +229,24 @@ export default function CatalogMobileFilters({
                 <h2 id={titleId} className="text-[22px] font-semibold">
                   Фильтры
                 </h2>
-                <button
-                  type="button"
-                  onClick={close}
-                  className="rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc]"
-                  aria-label="Закрыть"
-                >
-                  Закрыть
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    data-catalog-mobile-filters-reset
+                    onClick={resetFilters}
+                    className="rounded-full px-2 py-1 text-sm font-medium text-[#7042c5] hover:bg-[#f7f1fc]"
+                  >
+                    Сбросить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc]"
+                    aria-label="Закрыть"
+                  >
+                    Закрыть
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -230,15 +256,19 @@ export default function CatalogMobileFilters({
                 <div className="mt-3 grid auto-cols-max grid-flow-col grid-rows-2 gap-2 overflow-x-auto">
                   <FilterChip
                     label="Все"
-                    isActive={draftTopic === null}
-                    onSelect={() => setDraftTopic(null)}
+                    isActive={draftTopics.length === 0}
+                    onSelect={() => setDraftTopics([])}
                   />
                   {topics.map((topic) => (
                     <FilterChip
                       key={topic.key}
                       label={topic.title}
-                      isActive={topic.key === draftTopic}
-                      onSelect={() => setDraftTopic(topic.key)}
+                      isActive={draftTopics.includes(topic.key)}
+                      onSelect={() =>
+                        setDraftTopics((current) =>
+                          toggleCatalogDraftTopics(current, topic.key),
+                        )
+                      }
                     />
                   ))}
                 </div>

@@ -9,6 +9,7 @@ import type { TopicWithCatalogCount } from "@/lib/topics/types";
 type TopicFilterBarProps = {
   topics: TopicWithCatalogCount[];
   activeTopicKey: string | null;
+  activeTopicKeys?: readonly string[];
   searchQuery?: string;
   listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">;
 };
@@ -16,10 +17,12 @@ type TopicFilterBarProps = {
 export default function TopicFilterBar({
   topics,
   activeTopicKey,
+  activeTopicKeys,
   searchQuery = "",
   listing,
 }: TopicFilterBarProps) {
-  const isAllActive = activeTopicKey === null;
+  const selectedTopicKeys = activeTopicKeys ?? (activeTopicKey ? [activeTopicKey] : []);
+  const isAllActive = selectedTopicKeys.length === 0;
 
   return (
     <nav className="mt-6" aria-label="Фильтр по темам">
@@ -38,7 +41,7 @@ export default function TopicFilterBar({
         </Link>
 
         {topics.map((topic) => {
-          const isActive = topic.key === activeTopicKey;
+          const isActive = selectedTopicKeys.includes(topic.key);
 
           return (
             <Link
