@@ -70,6 +70,7 @@ import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/se
 import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-mladencev-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-grudnichkov-slushat-onlayn.ts";
+import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1495,6 +1496,32 @@ function testListenPagesAppearInDirectory() {
   );
 
 
+
+
+
+  const fortyFourthListenHref = "/listens/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn";
+  const fortyFourthListenCard = data.articles.find((card) => card.href === fortyFourthListenHref);
+  assert(fortyFourthListenCard, "forty-fourth indexable listen page is listed");
+  assert(
+    fortyFourthListenCard.title === "Успокаивающая музыка для детей – слушать онлайн бесплатно | АудиоЛад",
+    "forty-fourth listen directory title",
+  );
+  assert(
+    fortyFourthListenCard.description === USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyFourthListenHref}`,
+    ),
+    "directory JSON-LD includes forty-fourth listen href",
+  );
 
 
 const articleCards = listArticleDirectoryCards();
