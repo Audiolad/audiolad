@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  buildLibraryPurchasedHref,
+  buildPaidAuthenticatedPrimaryHref,
+} from "@/lib/payments/checkout-result-cta";
 import {
   isTerminalCheckoutStatus,
   type CheckoutOrderStatus,
@@ -22,19 +26,10 @@ type ViewState =
 
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 45000;
-const AUTO_REDIRECT_MS = 1500;
 const MAX_TRANSIENT_RETRIES = 5;
 
-function buildLibraryHref(practiceSlug: string | null): string {
-  if (practiceSlug) {
-    return `/my-practices?purchased=${encodeURIComponent(practiceSlug)}`;
-  }
-
-  return "/my-practices";
-}
-
 function buildSignInHref(practiceSlug: string | null): string {
-  const nextPath = buildLibraryHref(practiceSlug);
+  const nextPath = buildLibraryPurchasedHref(practiceSlug);
   return `/auth/sign-in?next=${encodeURIComponent(nextPath)}`;
 }
 
@@ -66,7 +61,6 @@ function resolveViewState(
 }
 
 export default function CheckoutResultClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
   const checkoutToken = searchParams.get("token");
@@ -81,11 +75,18 @@ export default function CheckoutResultClient() {
 
   const inFlightRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const libraryHref = useMemo(
-    () => buildLibraryHref(status?.practiceSlug ?? null),
+    () => buildLibraryPurchasedHref(status?.practiceSlug ?? null),
     [status?.practiceSlug],
+  );
+  const listenHref = useMemo(
+    () =>
+      buildPaidAuthenticatedPrimaryHref({
+        authorSlug: status?.authorSlug ?? null,
+        practiceSlug: status?.practiceSlug ?? null,
+      }),
+    [status?.authorSlug, status?.practiceSlug],
   );
   const signInHref = useMemo(
     () => buildSignInHref(status?.practiceSlug ?? null),
@@ -209,26 +210,6 @@ export default function CheckoutResultClient() {
     };
   }, [checkoutToken, hasCheckoutParams, orderId, pollGeneration]);
 
-  useEffect(() => {
-    if (viewState !== "paid_authenticated") {
-      if (autoRedirectRef.current) {
-        clearTimeout(autoRedirectRef.current);
-        autoRedirectRef.current = null;
-      }
-      return;
-    }
-
-    autoRedirectRef.current = setTimeout(() => {
-      router.push(libraryHref);
-    }, AUTO_REDIRECT_MS);
-
-    return () => {
-      if (autoRedirectRef.current) {
-        clearTimeout(autoRedirectRef.current);
-      }
-    };
-  }, [libraryHref, router, viewState]);
-
   if (viewState === "invalid_token") {
     return (
       <ResultCard
@@ -253,10 +234,12 @@ export default function CheckoutResultClient() {
   if (viewState === "paid_authenticated") {
     return (
       <ResultCard
-        title="Оплата получена"
-        description="Практика уже добавлена в вашу Аудиотеку."
-        actionHref={libraryHref}
-        actionLabel="Перейти в Аудиотеку"
+        title="Оплата прошла. Доступ открыт."
+        description="Можно начать слушать прямо сейчас."
+        actionHref={listenHref}
+        actionLabel="Слушать сейчас"
+        secondaryHref={libraryHref}
+        secondaryLabel="Открыть в Аудиотеке"
       />
     );
   }

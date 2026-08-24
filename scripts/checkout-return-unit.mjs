@@ -79,8 +79,11 @@ function testCheckoutResultClientFlow() {
   assert(!client.includes("/api/orders/"), "client no longer polls auth-only orders endpoint");
   assert(!client.includes("/first-audio-course"), "hardcoded first-audio-course CTA removed");
   assert(!client.includes("Вернуться к аудиолекции"), "old error CTA removed");
-  assert(client.includes("Оплата получена"), "paid success title present");
-  assert(client.includes("Перейти в Аудиотеку"), "library CTA present");
+  assert(client.includes("Оплата получена"), "guest paid success title present");
+  assert(client.includes("Оплата прошла. Доступ открыт."), "authenticated paid title present");
+  assert(client.includes("Слушать сейчас"), "authenticated listen CTA present");
+  assert(client.includes("Открыть в Аудиотеке"), "authenticated library CTA present");
+  assert(client.includes("Перейти в Аудиотеку"), "processing library CTA present");
   assert(client.includes("Платёж обрабатывается"), "processing state present");
   assert(client.includes("Не удалось открыть информацию об этом заказе"), "invalid token copy present");
   assert(client.includes("/auth/sign-in?next="), "sign-in redirect to library present");
