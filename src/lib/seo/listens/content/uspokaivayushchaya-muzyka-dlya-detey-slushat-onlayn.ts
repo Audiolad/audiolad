@@ -85,7 +85,22 @@ export const USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE =
             "характер звучания;",
             "реакцию на разные композиции.",
           ]},
-          { kind: "paragraph", text: "Одним детям могут нравиться более мягкие инструментальные мелодии, другим – другие варианты спокойного звучания." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Одним детям могут нравиться более мягкие инструментальные мелодии, другим – другие варианты спокойного звучания. Для инструментального формата подойдёт " },
+              { href: "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn", label: "музыка для сна детям без слов" },
+              { text: "." },
+            ],
+          },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если хочется более нежный вечерний формат, можно посмотреть " },
+              { href: "/listens/kolybelnye-dlya-malyshey-slushat-onlayn", label: "колыбельные для малышей" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Лучше выбирать музыку, которая воспринимается комфортно и подходит для конкретной ситуации." },
         ],
       },
