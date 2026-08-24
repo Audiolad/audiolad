@@ -1,6 +1,7 @@
 import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
   PracticeAccessBanners,
@@ -21,7 +22,7 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
     viewModel;
 
   return (
-    <div className="xl:hidden">
+    <div className={`xl:hidden ${platformBottomContentPaddingClass}`}>
       <div className="pt-6">
         <PracticeBackLink />
 
@@ -81,9 +82,7 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         ) : null}
       </div>
 
-      <div className="pb-6">
-        <LegalFooter className="mt-8" />
-      </div>
+      <LegalFooter className="mt-8" />
     </div>
   );
 }

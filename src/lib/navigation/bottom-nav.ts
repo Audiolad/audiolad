@@ -68,6 +68,10 @@ export const platformTopSafePaddingClass = "platform-top-safe-padding";
 
 export const platformNavPaddingClass = "platform-bottom-nav-padding";
 
+/** Mini player + tabbar + safe-area + content gap. Use on scrollable page roots. */
+export const platformBottomContentPaddingClass =
+  "platform-bottom-content-padding";
+
 export const platformMobileShellClass = "platform-mobile-shell";
 
 /** Единый фон светлой оболочки: html, body, theme-color, safe area, страницы. */

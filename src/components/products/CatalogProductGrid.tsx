@@ -9,6 +9,7 @@ import {
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
 import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-save";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 type CatalogProductGridProps = {
   initialItems: CatalogListingItem[];
@@ -106,7 +107,10 @@ export default function CatalogProductGrid({
   }
 
   return (
-    <section className="mt-5" aria-label="Каталог аудиопродуктов">
+    <section
+      className={`mt-5 ${platformBottomContentPaddingClass}`}
+      aria-label="Каталог аудиопродуктов"
+    >
       <ul data-catalog-product-grid className="catalog-product-grid">
         {items.map((product) => (
           <li key={product.id}>

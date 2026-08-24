@@ -13,6 +13,7 @@ import {
   matchesLibraryFilter,
   type LibraryFilterId,
 } from "@/lib/library/filters";
+import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 import type { PrivateAudioListItemDto } from "@/lib/private-audio/types";
 
 import LibraryCard, { type LibraryCardItem } from "./LibraryCard";
@@ -265,7 +266,7 @@ export default function MyPracticesLibrary({
   const showingUploads = activeFilter === "uploads";
 
   return (
-    <>
+    <div className={platformBottomContentPaddingClass}>
       {purchasedItem ? (
         <div
           role="status"
@@ -450,8 +451,7 @@ export default function MyPracticesLibrary({
         <div
           className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
           style={{
-            bottom:
-              "calc(var(--global-mini-player-height, 0px) + var(--bottom-nav-offset, 96px) + env(safe-area-inset-bottom, 0px) + 0.75rem)",
+            bottom: "calc(var(--platform-bottom-chrome) + 0.75rem)",
           }}
           role="status"
         >
@@ -460,6 +460,6 @@ export default function MyPracticesLibrary({
           </p>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
