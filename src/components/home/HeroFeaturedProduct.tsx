@@ -3,6 +3,7 @@ import Link from "next/link";
 import AuthorLink from "@/components/authors/AuthorLink";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
+import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 import HomeProductPlayButton from "./HomeProductPlayButton";
 import { PlayIcon } from "./HomeIcons";
@@ -66,11 +67,11 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
               practiceId={product.id}
               authorSlug={product.authorSlug}
               productSlug={product.slug}
-              ariaLabel={`Слушать ${product.title}`}
+              ariaLabel={`${PLAY_ACTION_LABEL} ${product.title}`}
               className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
               <PlayIcon />
-              Слушать
+              {PLAY_ACTION_LABEL}
             </HomeProductPlayButton>
           ) : null}
 

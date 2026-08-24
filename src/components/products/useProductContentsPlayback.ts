@@ -9,6 +9,7 @@ import {
 import { fetchListenSessionPayload } from "@/lib/playlists/fetch-listen-session";
 import type { LoadSessionInput } from "@/lib/listen/global-player-types";
 import { resolveProductPlaybackClickAction } from "@/lib/products/product-playback-click";
+import { GESTURE_HINT_PLAY_MARKER } from "@/lib/ui/action-labels";
 
 type UseProductContentsPlaybackOptions = {
   authorSlug: string;
@@ -17,6 +18,7 @@ type UseProductContentsPlaybackOptions = {
 };
 
 const GESTURE_HINT_MARKERS = [
+  GESTURE_HINT_PLAY_MARKER,
   "Нажмите Play",
   "Нажмите ещё раз",
 ] as const;

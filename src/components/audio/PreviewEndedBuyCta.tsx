@@ -5,6 +5,7 @@ import {
   isCatalogGlobalPlayerSession,
   type GlobalPlayerSession,
 } from "@/lib/listen/global-player-types";
+import { BUY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type PreviewEndedBuyCtaProps = {
   session: GlobalPlayerSession;
@@ -29,7 +30,7 @@ export default function PreviewEndedBuyCta({
       practiceSlug={session.productSlug}
       practiceId={session.practiceId}
       purchaseSurface="preview"
-      label="Купить"
+      label={BUY_ACTION_LABEL}
       hidePendingNotice
       signInReturnPath={session.previewCta.href}
       className={className}

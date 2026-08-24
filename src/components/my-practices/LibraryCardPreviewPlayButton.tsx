@@ -8,6 +8,7 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
+import { PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 function PlayIcon() {
   return (
@@ -114,7 +115,9 @@ export default function LibraryCardPreviewPlayButton({
     <button
       type="button"
       data-library-preview-play
-      aria-label={isPlaying ? `Пауза «${title}»` : `Слушать «${title}»`}
+      aria-label={
+        isPlaying ? `Пауза «${title}»` : `${PREVIEW_ACTION_LABEL} «${title}»`
+      }
       aria-busy={isStarting}
       disabled={!authorSlug || !productSlug || isStarting}
       onClick={(event) => {
@@ -125,7 +128,7 @@ export default function LibraryCardPreviewPlayButton({
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white">
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </span>
-      Слушать
+      {PREVIEW_ACTION_LABEL}
     </button>
   );
 }
