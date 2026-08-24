@@ -18,7 +18,10 @@ import {
 
 export type LibraryCardItem = {
   id: string;
-  accessSource: string;
+  practiceId: string;
+  isSaved: boolean;
+  canListen: boolean;
+  accessSource: string | null;
   /** When the practice was added to the library (for All-tab merge sort). */
   grantedAt?: string | null;
   practice: {
@@ -196,7 +199,7 @@ export default function LibraryCard({
             practiceId={practice.id}
             practiceSlug={practice.slug}
             practiceTitle={title}
-            accessSource={item.accessSource}
+            accessSource={item.accessSource ?? ""}
             onRemoved={onRemovedFromLibrary}
           />
         ) : null}

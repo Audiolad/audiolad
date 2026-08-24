@@ -4,6 +4,7 @@ export type LibraryFilterId =
   | "all"
   | "purchased"
   | "gifts"
+  | "saved"
   | "downloaded"
   | "uploads";
 
@@ -13,7 +14,9 @@ export type LibraryFilterPractice = {
 };
 
 export type LibraryFilterItem = {
-  accessSource: string;
+  accessSource: string | null;
+  isSaved?: boolean;
+  canListen?: boolean;
   practice: LibraryFilterPractice | null;
 };
 
@@ -27,6 +30,10 @@ const GIFT_ACCESS_SOURCES = new Set([
 ]);
 
 export function isLibraryGiftItem(item: LibraryFilterItem): boolean {
+  if (!item.accessSource) {
+    return false;
+  }
+
   if (item.accessSource === "purchase") {
     return false;
   }
@@ -55,6 +62,8 @@ export function matchesLibraryFilter(
       return isLibraryPurchasedItem(item);
     case "gifts":
       return isLibraryGiftItem(item);
+    case "saved":
+      return item.isSaved === true;
     case "downloaded":
       return false;
     case "uploads":
@@ -65,12 +74,32 @@ export function matchesLibraryFilter(
   }
 }
 
+const LIBRARY_FILTER_IDS: readonly LibraryFilterId[] = [
+  "all",
+  "purchased",
+  "gifts",
+  "saved",
+  "downloaded",
+  "uploads",
+];
+
+export function isLibraryFilterId(
+  value: string | null | undefined,
+): value is LibraryFilterId {
+  return (
+    typeof value === "string" &&
+    (LIBRARY_FILTER_IDS as readonly string[]).includes(value)
+  );
+}
+
 export function getLibraryFilterEmptyMessage(filter: LibraryFilterId): string {
   switch (filter) {
     case "purchased":
       return "Здесь появятся купленные материалы.";
     case "gifts":
       return "Здесь появятся подарочные материалы из вашей Аудиотеки.";
+    case "saved":
+      return "Здесь появятся сохранённые материалы.";
     case "downloaded":
       return "Скачанных материалов пока нет. Когда офлайн-доступ появится, они будут здесь.";
     case "uploads":
