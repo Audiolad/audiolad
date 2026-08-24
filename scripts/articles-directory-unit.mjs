@@ -1637,6 +1637,60 @@ function testEmptyState() {
   assert(view.includes("опубликованных материалов ещё нет"), "empty state copy");
 }
 
+
+function collectListenLinks(definition) {
+  return (definition.sections ?? [])
+    .flatMap((section) => section.blocks ?? [])
+    .filter((block) => block.kind === "rich_paragraph")
+    .flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+}
+
+function testListenKidsClusterInternalLinks() {
+  const hubHref = "/listens/detskaya-muzyka-dlya-sna-slushat-onlayn";
+  const pages = [
+    DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE,
+    KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const dests = [
+    "/listens/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn",
+    "/listens/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-mladencev-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-grudnichkov-slushat-onlayn",
+    "/listens/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn",
+    "/listens/kolybelnye-dlya-malyshey-slushat-onlayn",
+    "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn",
+  ];
+  const hubLinks = collectListenLinks(DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE);
+  const hubHrefs = new Set(hubLinks.map((link) => link.href));
+  assert(hubHrefs.size === 7, "hub has 7 unique cluster dests");
+  for (const href of dests) {
+    assert(hubHrefs.has(href), `hub links ${href}`);
+  }
+  assert(
+    hubLinks.some((link) => link.href === dests[0] && link.label === "музыка для сна для малышей"),
+    "hub malyshey label",
+  );
+  assert(
+    collectListenLinks(MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE).some(
+      (link) => link.href === hubHref && link.label === "детская музыка для сна",
+    ),
+    "grud links hub",
+  );
+  for (const page of pages) {
+    const hrefs = collectListenLinks(page).map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} no duplicate href`);
+    for (const link of collectListenLinks(page)) {
+      assert(!String(link.label).includes("http") && !String(link.label).includes("/listens/"), `${page.slug} no raw URL label`);
+    }
+  }
+}
+
 function testIndividualArticlesStillWork() {
   assert(
     getArticleBySlug("kak-razvit-lyubov-k-sebe")?.title.includes("любовь к себе"),
@@ -1666,6 +1720,7 @@ const tests = [
   ["sitemap /articles", testSitemapContainsDirectory],
   ["structured data", testStructuredData],
   ["listen pages in directory", testListenPagesAppearInDirectory],
+  ["listen kids cluster internal links", testListenKidsClusterInternalLinks],
   ["empty state", testEmptyState],
   ["individual articles still work", testIndividualArticlesStillWork],
 ];

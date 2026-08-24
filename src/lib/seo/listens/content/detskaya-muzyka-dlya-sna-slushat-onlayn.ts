@@ -22,6 +22,14 @@ export const DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Детская музыка для сна обычно отличается спокойным характером и мягким звучанием. Родители выбирают такие композиции, чтобы создать более тихую и уютную атмосферу перед отдыхом." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Одним из таких форматов могут быть " },
+              { href: "/listens/kolybelnye-dlya-malyshey-slushat-onlayn", label: "колыбельные для малышей" },
+              { text: " – нежное звучание, а не обязательно песни с текстом." },
+            ],
+          },
           { kind: "paragraph", text: "Для такого прослушивания часто подходят:" },
           { kind: "list", items: [
             "плавный темп;",
@@ -46,7 +54,14 @@ export const DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
             "удобство использования вечером;",
             "общее ощущение спокойствия.",
           ]},
-          { kind: "paragraph", text: "Кому-то подходят тихие инструментальные композиции, кому-то – более мелодичные варианты. Универсального формата для всех детей нет, поэтому лучше попробовать разные варианты и выбрать наиболее подходящий." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Кому-то подходят тихие инструментальные композиции, кому-то – более мелодичные варианты. Если хочется именно инструментальный формат, подойдёт " },
+              { href: "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn", label: "музыка для сна детям без слов" },
+              { text: ". Универсального формата для всех детей нет, поэтому лучше попробовать разные варианты и выбрать наиболее подходящий." },
+            ],
+          },
           { kind: "paragraph", text: "Музыка может стать частью вечернего ритуала вместе с другими привычными действиями перед отдыхом." },
         ],
       },
@@ -55,7 +70,20 @@ export const DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         title: "Музыка для сна детям разного возраста",
         paragraphs: [],
         blocks: [
-          { kind: "paragraph", text: "Родители могут искать музыку для сна с разными формулировками – для малышей, новорождённых, младенцев или грудничков." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Родители могут искать музыку для сна с разными формулировками – " },
+              { href: "/listens/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn", label: "музыка для сна для малышей" },
+              { text: ", " },
+              { href: "/listens/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn", label: "музыка для новорождённых для сна" },
+              { text: ", " },
+              { href: "/listens/muzyka-dlya-sna-mladencev-slushat-onlayn", label: "музыка для сна младенцев" },
+              { text: " или " },
+              { href: "/listens/muzyka-dlya-sna-grudnichkov-slushat-onlayn", label: "музыка для сна грудничков" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "При этом основной принцип остаётся одинаковым: выбрать спокойное звучание, которое подходит ребёнку и конкретной ситуации." },
           { kind: "paragraph", text: "У разных детей могут отличаться:" },
           { kind: "list", items: [
@@ -73,6 +101,14 @@ export const DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
         paragraphs: [],
         blocks: [
           { kind: "paragraph", text: "Спокойная музыка для сна детям может помочь создать приятную атмосферу завершения дня." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен именно спокойный сценарий на каждый день, подойдёт страница " },
+              { href: "/listens/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn", label: "успокаивающая музыка для детей" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Её можно включать во время спокойных вечерних занятий, подготовки ко сну или просто как мягкий звуковой фон." },
           { kind: "paragraph", text: "Важно воспринимать музыку как часть окружающей обстановки. Она не гарантирует, что ребёнок сразу уснёт, а реакция на разные композиции может отличаться." },
         ],

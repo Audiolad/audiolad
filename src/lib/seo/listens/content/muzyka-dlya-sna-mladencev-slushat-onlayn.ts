@@ -114,6 +114,14 @@ export const MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE =
               { text: "." },
             ],
           },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Для ещё одного близкого возрастного запроса подойдёт страница " },
+              { href: "/listens/muzyka-dlya-sna-grudnichkov-slushat-onlayn", label: "музыка для сна грудничков" },
+              { text: "." },
+            ],
+          },
           { kind: "paragraph", text: "Возраст может учитываться при выборе, но важно также смотреть на реакцию ребёнка и подбирать комфортное звучание." },
         ],
       },

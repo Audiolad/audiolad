@@ -11023,8 +11023,10 @@ function testThirtyNinthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "thirty-ninth page has no internal anchors");
-  assert(allRich.length === 0, "thirty-ninth page has no rich_paragraph blocks");
+  assert(allLinks.length === 7, "thirty-ninth page has seven cluster internal anchors");
+  assert(allRich.length === 4, "thirty-ninth page has four rich_paragraph blocks");
+  const thirtyNinthHrefs = allLinks.map((link) => link.href);
+  assert(new Set(thirtyNinthHrefs).size === 7, "thirty-ninth cluster hrefs are unique");
 
   const contentSource = read("src/lib/seo/listens/content/detskaya-muzyka-dlya-sna-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru/listens/"), "thirty-ninth content file has no production listen URLs");
@@ -11038,7 +11040,7 @@ function testThirtyNinthPage() {
   assert(!contentSource.includes("primaryPractice"), "thirty-ninth content file has no primaryPractice");
   assert(!contentSource.includes("CreatorPathsCta"), "thirty-ninth content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "thirty-ninth content file does not edit ListenSignupCta");
-  assert(!contentSource.includes("href:"), "thirty-ninth content file has no href");
+  assert((contentSource.match(/href:/g) || []).length === 7, "thirty-ninth content file has seven hrefs");
   assert(contentSource.includes(THIRTY_NINTH_EDITORIAL), "thirty-ninth content file has editorial phrase");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -11236,9 +11238,11 @@ function testFortiethPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "fortieth page has exactly one internal anchor");
-  assert(allLinks[0].href === FORTIETH_HUB_HREF, "fortieth page links kids sleep hub");
-  assert(allLinks[0].label === FORTIETH_HUB_LABEL, "fortieth page hub label exact");
+  assert(allLinks.length === 3, "fortieth page has three internal anchors");
+  assert(allLinks.some((link) => link.href === FORTIETH_HUB_HREF && link.label === FORTIETH_HUB_LABEL), "fortieth page keeps kids sleep hub");
+  assert(allLinks.some((link) => link.href === "/listens/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn" && link.label === "успокаивающая музыка для детей"), "fortieth links uspok");
+  assert(allLinks.some((link) => link.href === "/listens/kolybelnye-dlya-malyshey-slushat-onlayn" && link.label === "колыбельные для малышей"), "fortieth links lullabies");
+  assert(new Set(allLinks.map((link) => link.href)).size === 3, "fortieth hrefs unique");
   assert(Boolean(getListenPageBySlug("detskaya-muzyka-dlya-sna-slushat-onlayn")), "kids hub destination exists");
 
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn.ts");
@@ -11254,7 +11258,7 @@ function testFortiethPage() {
   assert(!contentSource.includes("CreatorPathsCta"), "fortieth content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "fortieth content file does not edit ListenSignupCta");
   assert(contentSource.includes(FORTIETH_EDITORIAL), "fortieth content file has editorial phrase");
-  assert((contentSource.match(/href:/g) || []).length === 1, "fortieth content file has one href");
+  assert((contentSource.match(/href:/g) || []).length === 3, "fortieth content file has three hrefs");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTIETH_PAGE_SLUG), "registry contains fortieth listen slug");
@@ -11683,19 +11687,21 @@ function testFortySecondPage() {
   assert(!parsed.definition.faq.some((item) => item.question.includes(FORTY_SECOND_ABSENT_FAQ)), "forty-second has no malyshey-contrast FAQ");
   assert(allTextChunks.includes("не гарантирует"), "forty-second keeps no-guarantee wording");
   assert(!allTextChunks.includes("трек"), "forty-second has no track-count wording");
-  assert(!allTextChunks.includes("груднич"), "forty-second does not create груднички page copy");
+  assert(allTextChunks.includes("музыка для сна грудничков"), "forty-second links grudnichki by label");
 
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 3, "forty-second page has exactly three internal anchors");
+  assert(allLinks.length === 4, "forty-second page has four internal anchors");
   assert(allLinks[0].href === FORTY_SECOND_HUB_HREF, "forty-second first link is kids hub");
   assert(allLinks[0].label === FORTY_SECOND_HUB_LABEL, "forty-second first link label exact");
   assert(allLinks[1].href === FORTY_SECOND_MALYSHEY_HREF, "forty-second second link is malyshey page");
   assert(allLinks[1].label === FORTY_SECOND_MALYSHEY_LABEL, "forty-second second link label exact");
   assert(allLinks[2].href === FORTY_SECOND_NEWBORN_HREF, "forty-second third link is newborn page");
   assert(allLinks[2].label === FORTY_SECOND_NEWBORN_LABEL, "forty-second third link label exact");
+  assert(allLinks[3].href === "/listens/muzyka-dlya-sna-grudnichkov-slushat-onlayn", "forty-second fourth link is grudnichki");
+  assert(allLinks[3].label === "музыка для сна грудничков", "forty-second fourth link label exact");
   assert(Boolean(getListenPageBySlug("detskaya-muzyka-dlya-sna-slushat-onlayn")), "kids hub destination exists");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-sna-dlya-malyshey-slushat-onlayn")), "malyshey destination exists");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn")), "newborn destination exists");
@@ -11713,7 +11719,7 @@ function testFortySecondPage() {
   assert(!contentSource.includes("CreatorPathsCta"), "forty-second content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "forty-second content file does not edit ListenSignupCta");
   assert(contentSource.includes(FORTY_SECOND_REQUIRED_H2), "forty-second content file has required H2");
-  assert((contentSource.match(/href:/g) || []).length === 3, "forty-second content file has three hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 4, "forty-second content file has four hrefs");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SECOND_PAGE_SLUG), "registry contains forty-second listen slug");
@@ -11914,20 +11920,19 @@ function testFortyThirdPage() {
   assert(allTextChunks.includes("не гарантирует"), "forty-third keeps no-guarantee wording");
   assert(!allTextChunks.includes("трек"), "forty-third has no track-count wording");
   assert(!allTextChunks.toLowerCase().includes("колыбельн"), "forty-third has no lullaby cluster");
-  assert(!allTextChunks.includes("/listens/detskaya-muzyka-dlya-sna-slushat-onlayn"), "forty-third does not link kids hub");
+  assert(allTextChunks.includes("детская музыка для сна"), "forty-third visible label to kids hub");
 
   const allRich = parsed.definition.sections
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "forty-third page has exactly two internal anchors");
-  assert(allLinks[0].href === FORTY_THIRD_NEWBORN_HREF, "forty-third first link is newborn page");
-  assert(allLinks[0].label === FORTY_THIRD_NEWBORN_LABEL, "forty-third first link label exact");
-  assert(allLinks[1].href === FORTY_THIRD_INFANT_HREF, "forty-third second link is infant page");
-  assert(allLinks[1].label === FORTY_THIRD_INFANT_LABEL, "forty-third second link label exact");
+  assert(allLinks.length === 3, "forty-third page has three internal anchors");
+  assert(allLinks.some((link) => link.href === FORTY_THIRD_NEWBORN_HREF && link.label === FORTY_THIRD_NEWBORN_LABEL), "forty-third keeps newborn page");
+  assert(allLinks.some((link) => link.href === FORTY_THIRD_INFANT_HREF && link.label === FORTY_THIRD_INFANT_LABEL), "forty-third keeps infant page");
+  assert(allLinks.some((link) => link.href === "/listens/detskaya-muzyka-dlya-sna-slushat-onlayn" && link.label === "детская музыка для сна"), "forty-third links kids hub");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn")), "newborn destination exists");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-sna-mladencev-slushat-onlayn")), "infant destination exists");
-  assert(!allLinks.some((link) => link.href.includes("detskaya") || link.href.includes("malyshey")), "forty-third does not link detskaya or malyshey");
+  assert(!allLinks.some((link) => link.href.includes("malyshey")), "forty-third does not link malyshey");
 
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-grudnichkov-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru/listens/"), "forty-third content file has no production listen URLs");
@@ -11942,8 +11947,8 @@ function testFortyThirdPage() {
   assert(!contentSource.includes("CreatorPathsCta"), "forty-third content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "forty-third content file does not edit ListenSignupCta");
   assert(contentSource.includes(FORTY_THIRD_REQUIRED_H2), "forty-third content file has required H2");
-  assert((contentSource.match(/href:/g) || []).length === 2, "forty-third content file has two hrefs");
-  assert(!contentSource.includes("detskaya-muzyka-dlya-sna-slushat-onlayn"), "forty-third content file does not link kids hub");
+  assert((contentSource.match(/href:/g) || []).length === 3, "forty-third content file has three hrefs");
+  assert(contentSource.includes("detskaya-muzyka-dlya-sna-slushat-onlayn"), "forty-third content file links kids hub");
   assert(!contentSource.includes("muzyka-dlya-sna-dlya-malyshey-slushat-onlayn"), "forty-third content file does not link malyshey");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
@@ -12141,7 +12146,7 @@ function testFortyFourthPage() {
   assert(!allTextChunks.includes(FORTY_FOURTH_ABSENT_PHRASE), "forty-fourth has no old calm-home-time phrase");
   assert(allTextChunks.includes("не гарантирует"), "forty-fourth keeps no-guarantee wording");
   assert(!allTextChunks.includes("трек"), "forty-fourth has no track-count wording");
-  assert(!allTextChunks.toLowerCase().includes("колыбельн"), "forty-fourth has no lullaby cluster");
+  assert(allTextChunks.includes("колыбельные для малышей"), "forty-fourth lullaby label is present");
   assert(!allTextChunks.includes("тревож"), "forty-fourth has no anxiety-treatment wording");
   assert(!allTextChunks.includes("лечен"), "forty-fourth has no medical-treatment wording");
   assert(!allTextChunks.includes("новорожд"), "forty-fourth does not mention newborns");
@@ -12152,11 +12157,11 @@ function testFortyFourthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "forty-fourth page has exactly two internal anchors");
-  assert(allLinks[0].href === FORTY_FOURTH_KIDS_HREF, "forty-fourth first link is kids sleep page");
-  assert(allLinks[0].label === FORTY_FOURTH_KIDS_LABEL, "forty-fourth first link label exact");
-  assert(allLinks[1].href === FORTY_FOURTH_MALYSHEY_HREF, "forty-fourth second link is malyshey page");
-  assert(allLinks[1].label === FORTY_FOURTH_MALYSHEY_LABEL, "forty-fourth second link label exact");
+  assert(allLinks.length === 4, "forty-fourth page has four internal anchors");
+  assert(allLinks.some((link) => link.href === FORTY_FOURTH_KIDS_HREF && link.label === FORTY_FOURTH_KIDS_LABEL), "forty-fourth keeps kids sleep page");
+  assert(allLinks.some((link) => link.href === FORTY_FOURTH_MALYSHEY_HREF && link.label === FORTY_FOURTH_MALYSHEY_LABEL), "forty-fourth keeps malyshey page");
+  assert(allLinks.some((link) => link.href === "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn" && link.label === "музыка для сна детям без слов"), "forty-fourth links no-lyrics");
+  assert(allLinks.some((link) => link.href === "/listens/kolybelnye-dlya-malyshey-slushat-onlayn" && link.label === "колыбельные для малышей"), "forty-fourth links lullabies");
   assert(Boolean(getListenPageBySlug("detskaya-muzyka-dlya-sna-slushat-onlayn")), "kids destination exists");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-sna-dlya-malyshey-slushat-onlayn")), "malyshey destination exists");
   assert(!allLinks.some((link) => link.href.includes("novorozhden") || link.href.includes("mladenc") || link.href.includes("grudnich")), "forty-fourth does not link age-infant cluster");
@@ -12174,7 +12179,7 @@ function testFortyFourthPage() {
   assert(!contentSource.includes("CreatorPathsCta"), "forty-fourth content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "forty-fourth content file does not edit ListenSignupCta");
   assert(contentSource.includes(FORTY_FOURTH_REQUIRED_H2), "forty-fourth content file has required H2");
-  assert((contentSource.match(/href:/g) || []).length === 2, "forty-fourth content file has two hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 4, "forty-fourth content file has four hrefs");
   assert(!contentSource.includes("muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn"), "forty-fourth content file does not link newborns");
   assert(!contentSource.includes("muzyka-dlya-sna-mladencev-slushat-onlayn"), "forty-fourth content file does not link infants");
   assert(!contentSource.includes("muzyka-dlya-sna-grudnichkov-slushat-onlayn"), "forty-fourth content file does not link grudnichki");
@@ -12386,11 +12391,11 @@ function testFortyFifthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "forty-fifth page has exactly two internal anchors");
-  assert(allLinks[0].href === FORTY_FIFTH_KIDS_HREF, "forty-fifth first link is kids sleep page");
-  assert(allLinks[0].label === FORTY_FIFTH_KIDS_LABEL, "forty-fifth first link label exact");
-  assert(allLinks[1].href === FORTY_FIFTH_MALYSHEY_HREF, "forty-fifth second link is malyshey page");
-  assert(allLinks[1].label === FORTY_FIFTH_MALYSHEY_LABEL, "forty-fifth second link label exact");
+  assert(allLinks.length === 4, "forty-fifth page has four internal anchors");
+  assert(allLinks.some((link) => link.href === FORTY_FIFTH_KIDS_HREF && link.label === FORTY_FIFTH_KIDS_LABEL), "forty-fifth keeps kids sleep page");
+  assert(allLinks.some((link) => link.href === FORTY_FIFTH_MALYSHEY_HREF && link.label === FORTY_FIFTH_MALYSHEY_LABEL), "forty-fifth keeps malyshey page");
+  assert(allLinks.some((link) => link.href === "/listens/uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn" && link.label === "успокаивающая музыка для детей"), "forty-fifth links uspok");
+  assert(allLinks.some((link) => link.href === "/listens/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn" && link.label === "музыка для сна детям без слов"), "forty-fifth links no-lyrics");
   assert(Boolean(getListenPageBySlug("detskaya-muzyka-dlya-sna-slushat-onlayn")), "kids destination exists");
   assert(Boolean(getListenPageBySlug("muzyka-dlya-sna-dlya-malyshey-slushat-onlayn")), "malyshey destination exists");
 
@@ -12407,7 +12412,7 @@ function testFortyFifthPage() {
   assert(!contentSource.includes("CreatorPathsCta"), "forty-fifth content file has no CreatorPathsCta");
   assert(!contentSource.includes("ListenSignupCta"), "forty-fifth content file does not edit ListenSignupCta");
   assert(contentSource.includes(FORTY_FIFTH_REQUIRED_H2), "forty-fifth content file has required H2");
-  assert((contentSource.match(/href:/g) || []).length === 2, "forty-fifth content file has two hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 4, "forty-fifth content file has four hrefs");
   assert(contentSource.includes(FORTY_FIFTH_REQUIRED_PHRASE_A), "forty-fifth content file has required kids-search phrase");
   assert(contentSource.includes(FORTY_FIFTH_REQUIRED_PHRASE_B), "forty-fifth content file has required tender-melodies phrase");
 
@@ -12710,6 +12715,89 @@ function testFortySixthPage() {
   assert(!serialized.includes("🔖"), "forty-sixth JSON-LD has no bookmark emoji");
 }
 
+
+function collectListenLinks(definition) {
+  const rich = (definition.sections ?? []).flatMap((section) => section.blocks ?? []).filter((block) => block.kind === "rich_paragraph");
+  return rich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
+}
+
+function testKidsSleepClusterInternalLinks() {
+  const hub = "detskaya-muzyka-dlya-sna-slushat-onlayn";
+  const mal = "muzyka-dlya-sna-dlya-malyshey-slushat-onlayn";
+  const nov = "muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn";
+  const mlad = "muzyka-dlya-sna-mladencev-slushat-onlayn";
+  const grud = "muzyka-dlya-sna-grudnichkov-slushat-onlayn";
+  const uspok = "uspokaivayushchaya-muzyka-dlya-detey-slushat-onlayn";
+  const kol = "kolybelnye-dlya-malyshey-slushat-onlayn";
+  const bez = "muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn";
+  const pages = [
+    DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_GRUDNICHKOV_SLUSHAT_ONLAYN_PAGE,
+    USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE,
+    KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
+    MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE,
+  ];
+  const slugs = [hub, mal, nov, mlad, grud, uspok, kol, bez];
+  const hrefOf = (slug) => `/listens/${slug}`;
+  const expectedLabels = {
+    [hrefOf(hub)]: "детская музыка для сна",
+    [hrefOf(mal)]: "музыка для сна для малышей",
+    [hrefOf(nov)]: "музыка для новорождённых для сна",
+    [hrefOf(mlad)]: "музыка для сна младенцев",
+    [hrefOf(grud)]: "музыка для сна грудничков",
+    [hrefOf(uspok)]: "успокаивающая музыка для детей",
+    [hrefOf(kol)]: "колыбельные для малышей",
+    [hrefOf(bez)]: "музыка для сна детям без слов",
+  };
+  const clusterHrefs = new Set(slugs.map(hrefOf));
+  const inbound = Object.fromEntries(slugs.map((slug) => [slug, 0]));
+  const matrix = {};
+
+  for (const page of pages) {
+    const links = collectListenLinks(page);
+    const hrefs = links.map((link) => link.href);
+    assert(new Set(hrefs).size === hrefs.length, `${page.slug} has no duplicate href`);
+    assert(!hrefs.includes(hrefOf(page.slug)), `${page.slug} has no self-link`);
+    for (const link of links) {
+      assert(typeof link.label === "string" && link.label.length > 0, `${page.slug} link has visible label`);
+      assert(!link.label.includes("http"), `${page.slug} label is not a raw URL`);
+      assert(!link.label.includes("/listens/"), `${page.slug} label is not a raw path`);
+      if (expectedLabels[link.href]) {
+        assert(link.label === expectedLabels[link.href], `${page.slug} uses canonical label for ${link.href}`);
+      }
+    }
+    const outs = hrefs.filter((href) => clusterHrefs.has(href));
+    matrix[page.slug] = outs;
+    for (const href of outs) {
+      const dest = href.replace("/listens/", "");
+      inbound[dest] += 1;
+    }
+  }
+
+  const hubOuts = new Set(matrix[hub]);
+  const children = [mal, nov, mlad, grud, uspok, kol, bez];
+  for (const child of children) {
+    assert(hubOuts.has(hrefOf(child)), `hub links to ${child}`);
+  }
+  assert(hubOuts.size === 7, "hub has 7 unique cluster destinations");
+
+  for (const child of children) {
+    assert(matrix[child].includes(hrefOf(hub)), `${child} links hub`);
+  }
+  for (const slug of slugs) {
+    assert(inbound[slug] >= 1, `${slug} is not an inbound orphan`);
+  }
+
+  const hubParsed = parseListenPageDefinition(DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE);
+  assert(hubParsed.ok, "hub still valid after cluster links");
+  const ageSection = hubParsed.definition.sections.find((section) => section.id === "muzyka-dlya-sna-detyam-raznogo-vozrasta");
+  const ageLinks = (ageSection.blocks ?? []).flatMap((block) => (block.kind === "rich_paragraph" ? block.segments : [])).filter((segment) => segment.href);
+  assert(ageLinks.length === 4, "hub age paragraph has 4 links");
+}
+
 const tests = [
   ["definition", testDefinition],
   ["registry and sitemap", testRegistryAndSitemap],
@@ -12758,6 +12846,7 @@ const tests = [
   ["forty-fourth listen page", testFortyFourthPage],
   ["forty-fifth listen page", testFortyFifthPage],
   ["forty-sixth listen page", testFortySixthPage],
+  ["kids sleep cluster internal links", testKidsSleepClusterInternalLinks],
   ["ListenPageView order", testListenPageViewOrder],
   ["embed presentation", testEmbedPresentation],
   ["playback", testPlayback],
