@@ -68,6 +68,7 @@ import { MEDITATSIYA_DLYA_SNA_I_VOSSTANOVLENIYA_SIL_PAGE } from "../src/lib/seo/
 import { DETSKAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/detskaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-dlya-malyshey-slushat-onlayn.ts";
 import { MUZYKA_DLYA_NOVOROZHDENNYH_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-novorozhdennyh-dlya-sna-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-mladencev-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1441,6 +1442,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fortyFirstListenHref}`,
     ),
     "directory JSON-LD includes forty-first listen href",
+  );
+
+  const fortySecondListenHref = "/listens/muzyka-dlya-sna-mladencev-slushat-onlayn";
+  const fortySecondListenCard = data.articles.find((card) => card.href === fortySecondListenHref);
+  assert(fortySecondListenCard, "forty-second indexable listen page is listed");
+  assert(
+    fortySecondListenCard.title === "Музыка для сна младенцев – слушать онлайн бесплатно | АудиоЛад",
+    "forty-second listen directory title",
+  );
+  assert(
+    fortySecondListenCard.description === MUZYKA_DLYA_SNA_MLADENCEV_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-mladencev-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortySecondListenHref}`,
+    ),
+    "directory JSON-LD includes forty-second listen href",
   );
 
 
