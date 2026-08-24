@@ -4,7 +4,10 @@ import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
 import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
-import { SIGN_IN_GENERIC_ERROR } from "@/lib/auth/sign-in-messages";
+import {
+  SIGN_IN_GENERIC_ERROR,
+  resolveSignInIntroCopy,
+} from "@/lib/auth/sign-in-messages";
 import { createClient } from "@/lib/supabase/client";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
@@ -66,8 +69,7 @@ function SignInForm() {
           <h1 className="mt-8 text-[30px] font-semibold">Войти</h1>
 
           <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            Войдите в аккаунт, чтобы продолжить слушать практики и управлять
-            своей коллекцией.
+            {resolveSignInIntroCopy(searchParams.get("next"))}
           </p>
         </header>
 

@@ -15,6 +15,7 @@ import {
   normalizePurchaseSurface,
   type PurchaseSurface,
 } from "@/lib/analytics/purchase-surface";
+import { buildBuySignInHref } from "@/lib/auth/buy-sign-in";
 
 type BuyPracticeButtonProps = {
   practiceSlug: string;
@@ -204,12 +205,18 @@ export default function BuyPracticeButton({
       });
 
       if (orderResponse.status === 401) {
-        const returnPath =
-          signInReturnPath ??
-          (typeof window !== "undefined" ? window.location.pathname : "/");
-        router.push(
-          `/auth/sign-in?next=${encodeURIComponent(returnPath)}`,
-        );
+        const currentPath =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : "";
+        const href = buildBuySignInHref(signInReturnPath, currentPath);
+
+        if (!href) {
+          setErrorMessage("Не удалось начать оплату. Попробуйте ещё раз.");
+          return;
+        }
+
+        router.push(href);
         return;
       }
 
