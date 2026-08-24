@@ -91,9 +91,9 @@ async function waitForCatalogDebounce(page) {
   await page.waitForTimeout(CATALOG_DEBOUNCE_MS + 100);
 }
 
-async function assertCatalogSearchBelowHeading(page, contextLabel) {
-  const ok = await page.evaluate(() => {
-    const heading = [...document.querySelectorAll("h1")].find((el) => {
+async function assertCatalogMobileChrome(page, contextLabel) {
+  const result = await page.evaluate(() => {
+    const visibleCatalogHeading = [...document.querySelectorAll("h1")].some((el) => {
       if (!/каталог/i.test(el.textContent ?? "")) {
         return false;
       }
@@ -103,31 +103,41 @@ async function assertCatalogSearchBelowHeading(page, contextLabel) {
       return (
         style.display !== "none" &&
         style.visibility !== "hidden" &&
-        rect.height > 0 &&
-        rect.width > 0
+        rect.height > 8 &&
+        rect.width > 8
       );
     });
-    const form = [...document.querySelectorAll('form[role="search"]')].find((el) => {
-      const style = window.getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      return (
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        rect.height > 0 &&
-        rect.width > 0
-      );
-    });
-    if (!heading || !form) {
-      return false;
-    }
+    const backLink = [...document.querySelectorAll('a[aria-label="Назад"]')].some(
+      (el) => {
+        const style = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return (
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          rect.height > 0 &&
+          rect.width > 0
+        );
+      },
+    );
+    const searchWrap = document.querySelector(".listener-catalog-mobile-search");
+    const searchStyle = searchWrap ? window.getComputedStyle(searchWrap) : null;
 
-    const headingRect = heading.getBoundingClientRect();
-    const formRect = form.getBoundingClientRect();
-    return formRect.top >= headingRect.bottom - 2;
+    return {
+      visibleCatalogHeading,
+      backLink,
+      sticky:
+        searchStyle?.position === "sticky" || searchStyle?.position === "fixed",
+    };
   });
 
-  if (!ok) {
-    throw new Error(`${contextLabel}: catalog search is not below the «Каталог» heading`);
+  if (result.visibleCatalogHeading) {
+    throw new Error(`${contextLabel}: mobile catalog still shows a visible «Каталог» heading`);
+  }
+  if (result.backLink) {
+    throw new Error(`${contextLabel}: mobile catalog still shows a back control`);
+  }
+  if (!result.sticky) {
+    throw new Error(`${contextLabel}: mobile catalog search is not sticky`);
   }
 }
 
@@ -249,7 +259,7 @@ async function runMobileSmoke(browser, viewport, results) {
   await catalogSearchInput(page).waitFor({ state: "visible", timeout: 60_000 });
   await assertDomSearchFormCount(page, 1, `${viewport.name} catalog`);
   await assertVisibleSearchFormCount(page, 1, `${viewport.name} catalog`);
-  await assertCatalogSearchBelowHeading(page, viewport.name);
+  await assertCatalogMobileChrome(page, viewport.name);
 
   if (viewport.name === "390x844") {
     await page.screenshot({

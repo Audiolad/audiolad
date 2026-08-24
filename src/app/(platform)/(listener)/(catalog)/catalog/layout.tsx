@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import CatalogMobileHeader from "@/components/listener/CatalogMobileHeader";
 import MobileCatalogSearch from "@/components/listener/MobileCatalogSearch";
 
 export default function CatalogListenerLayout({
@@ -10,9 +9,7 @@ export default function CatalogListenerLayout({
 }>) {
   return (
     <>
-      <CatalogMobileHeader />
-
-      <div className="listener-catalog-mobile-search mt-5 min-h-[52px] px-5 xl:hidden">
+      <div className="listener-catalog-mobile-search sticky top-0 z-30 min-h-[52px] bg-platform-surface px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-3 xl:hidden">
         <MobileCatalogSearch />
       </div>
 

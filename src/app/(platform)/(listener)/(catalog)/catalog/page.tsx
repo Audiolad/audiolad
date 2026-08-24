@@ -138,7 +138,9 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   return (
     <>
-      <h1 className="hidden text-[28px] font-semibold xl:block">Каталог</h1>
+      <h1 className="sr-only text-[28px] font-semibold xl:not-sr-only xl:block">
+        Каталог
+      </h1>
 
       {!isSearchActive ? (
         <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
