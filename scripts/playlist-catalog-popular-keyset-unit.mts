@@ -30,7 +30,7 @@ const contractSource = readFileSync(
 const listListedPlaylistsSource = listingSource.slice(
   listingSource.indexOf("export async function listListedPlaylists"),
 );
-const migrationName = "20260825162000_playlist_catalog_popular_index.sql";
+const migrationName = "20260825165000_playlist_catalog_popular_index.sql";
 
 assert.equal(
   existsSync(join(repoRoot, "supabase/migrations", migrationName)),

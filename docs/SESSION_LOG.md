@@ -4,15 +4,30 @@
 
 ---
 
+## Сессия — 25 августа 2026 (playlist catalog restamp after prod 25162000)
+
+**Сделано:**
+
+- Повторный restamp трёх catalog-миграций: production `schema_migrations` уже содержит `20260825150000` и `20260825160000` / `20260825161000` / `20260825162000`. При сохранении тех же локальных версий planner либо abort (`database_migration_history_drift`), либо SKIP SQL (pending = local − remote).
+- `git mv` только имён файлов, SQL внутри не менялся:
+  `20260825163000_playlist_catalog_foundation.sql`,
+  `20260825164000_playlist_topics.sql`,
+  `20260825165000_playlist_catalog_popular_index.sql`.
+- `listed_at` writer/backfill, app/UI/API и `deploy.sh` не менялись. SQL на базу не применялся.
+
+**Следующий шаг:** применить три restamped миграции отдельным подтверждённым deploy.
+
+---
+
 ## Сессия — 25 августа 2026 (playlist migrations restamp)
 
 **Сделано:**
 
 - Безопасный restamp трёх неприменённых playlist-миграций: они были ниже production `20260825150000_publication_gallery_slides` и ломали deploy planner (`database_migration_history_drift`).
-- `git mv` только имён файлов, SQL внутри не менялся:
-  `20260825160000_playlist_catalog_foundation.sql`,
-  `20260825161000_playlist_topics.sql`,
-  `20260825162000_playlist_catalog_popular_index.sql`.
+- `git mv` только имён файлов, SQL внутри не менялся. Актуальные имена после следующего restamp:
+  `20260825163000_playlist_catalog_foundation.sql`,
+  `20260825164000_playlist_topics.sql`,
+  `20260825165000_playlist_catalog_popular_index.sql`.
 - Существующие restamp `120000` / `133000` / `150000` не трогались. Production `schema_migrations` не менялась.
 
 **Следующий шаг:** применить три restamped миграции отдельным подтверждённым deploy.
@@ -24,10 +39,10 @@
 **Сделано:**
 
 - Ветка смержена с актуальным `origin/main` (без rebase history rewrite).
-- Миграции PR переставлены после `20260825133000_practice_publication_class.sql`:
-  `20260825160000_playlist_catalog_foundation.sql`,
-  `20260825161000_playlist_topics.sql`,
-  `20260825162000_playlist_catalog_popular_index.sql`.
+- Миграции PR переставлены после `20260825133000_practice_publication_class.sql`. Актуальные имена:
+  `20260825163000_playlist_catalog_foundation.sql`,
+  `20260825164000_playlist_topics.sql`,
+  `20260825165000_playlist_catalog_popular_index.sql`.
 - Содержимое SQL не менялось. Ссылки в docs/tests обновлены.
 - `listed_at`: publish flow его не ставит; зафиксировано в `DECISIONS.md`, логика не добавлялась.
 
@@ -197,7 +212,7 @@
 - Контракт `PlaylistListingItem` (`class: "playlist"`), без внутренних полей.
 - На существующие `playlists` добавлены `items_count`, `duration_seconds`, `saves_count`, `listed_at`.
 - Отдельная модель/таблица `playlist_saves` (не `library_saves`).
-- Миграция `20260825160000_playlist_catalog_foundation.sql`.
+- Миграция `20260825163000_playlist_catalog_foundation.sql`.
 - Без страницы витрины, карточки, фильтров, play-кнопок, миграции `/playlists`.
 
 **Следующий шаг:** Stage 2 — listing query / API `/playlists/catalog` только по отдельному заданию. Production / PM2 не менять без подтверждения.
