@@ -77,7 +77,8 @@ const longTitle =
   "Музыка для сна детям | Колыбельные для малышей | Детская музыка для сна";
 const shortTitle = "Шум воды | Журчание воды | Звуки воды";
 
-function reservedTitleClassFor(_title: string): string {
+function reservedTitleClassFor(title: string): string {
+  assert.equal(typeof title, "string");
   return PLAYLIST_CARD_TITLE_CLASS;
 }
 
