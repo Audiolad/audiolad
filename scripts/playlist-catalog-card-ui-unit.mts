@@ -134,8 +134,8 @@ assert.match(
 
 assert.match(page, /PlaylistGrid/);
 assert.match(page, /PlaylistCatalogSearch/);
-assert.match(page, /PlaylistCatalogSort/);
-assert.match(page, /PlaylistCatalogTopicFilter/);
+assert.doesNotMatch(page, /PlaylistCatalogSort/);
+assert.doesNotMatch(page, /PlaylistCatalogTopicFilter/);
 assert.match(page, /Ничего не нашлось/);
 assert.match(page, /В этой теме пока нет плейлистов/);
 assert.match(page, /loadPlaylistCatalogPage/);

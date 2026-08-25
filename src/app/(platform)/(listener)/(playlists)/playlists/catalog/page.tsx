@@ -1,6 +1,4 @@
 import PlaylistCatalogSearch from "@/components/playlists/catalog/PlaylistCatalogSearch";
-import PlaylistCatalogSort from "@/components/playlists/catalog/PlaylistCatalogSort";
-import PlaylistCatalogTopicFilter from "@/components/playlists/catalog/PlaylistCatalogTopicFilter";
 import PlaylistGrid from "@/components/playlists/catalog/PlaylistGrid";
 import { loadPlaylistCatalogPage } from "@/lib/playlists/catalog-page";
 import { PLAYLIST_CATALOG_SIGN_IN_RETURN_PATH } from "@/lib/playlists/catalog-save";
@@ -23,33 +21,19 @@ export default async function PlaylistCatalogPage({
   searchParams,
 }: PlaylistCatalogPageProps) {
   const params = await searchParams;
-  const { query, listing, topics, isAuthenticated } =
+  const { query, listing, isAuthenticated } =
     await loadPlaylistCatalogPage(params);
   const isSearchActive = query.q.length > 0;
   const activeTopicKey = resolvePlaylistCatalogActiveTopicKey(query.topic);
 
   return (
     <>
-      <h1 className="sr-only text-[28px] font-semibold xl:not-sr-only xl:block">
-        Каталог плейлистов
-      </h1>
+      <h1 className="sr-only">Каталог плейлистов</h1>
 
       <PlaylistCatalogSearch
         query={query.q}
         sort={query.sort}
         topic={activeTopicKey}
-      />
-      <PlaylistCatalogSort
-        query={query.q}
-        sort={query.sort}
-        topic={activeTopicKey}
-      />
-      <PlaylistCatalogTopicFilter
-        key={`${query.q}:${query.sort}:${activeTopicKey ?? ""}`}
-        topics={topics}
-        activeTopicKey={activeTopicKey}
-        q={query.q}
-        sort={query.sort}
       />
 
       {listing.items.length === 0 ? (

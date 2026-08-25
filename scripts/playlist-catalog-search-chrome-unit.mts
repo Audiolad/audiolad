@@ -105,7 +105,21 @@ assert.match(
   /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
   "playlist mobile search uses the catalog safe-area padding",
 );
-assert.match(searchUi, /hidden xl:block/, "desktop playlist search stays in-flow");
+assert.match(
+  searchUi,
+  /sticky top-0[^"]*hidden[^"]*xl:block|hidden[^"]*xl:block[^"]*sticky top-0/,
+  "desktop playlist search is sticky top-0 and hidden xl:block",
+);
+assert.match(
+  searchUi,
+  /sticky top-0[^"]*bg-platform-surface|bg-platform-surface[^"]*sticky top-0/,
+  "sticky desktop search covers cards with the surface color",
+);
+assert.doesNotMatch(
+  searchUi,
+  /listener-catalog-mobile-search[^"]*sticky/,
+  "mobile playlist search stays fixed, not sticky",
+);
 assert.match(
   searchUi,
   /data-playlist-catalog-search/,
@@ -114,6 +128,16 @@ assert.match(
 assert.match(searchUi, /Найти плейлист/, "playlist search keeps its placeholder");
 assert.match(searchUi, /min-h-11/, "playlist field keeps min-h-11");
 assert.match(searchUi, /min-h-\[52px\]/, "mobile field sits in the 52px chrome unit");
+assert.match(
+  searchUi,
+  /text-base|text-\[16px\]/,
+  "search input is at least 16px so iOS does not zoom",
+);
+assert.doesNotMatch(
+  searchUi,
+  /text-sm/,
+  "search input no longer uses text-sm",
+);
 assert.doesNotMatch(
   searchUi,
   /visualViewport|visual-viewport/,
@@ -132,18 +156,32 @@ assert.doesNotMatch(
 assert.doesNotMatch(
   searchUi,
   /PlaylistCatalogSort|PlaylistCatalogTopicFilter/,
-  "sort and topic stay on the page, not in the 52px search row",
+  "sort and topic stay unmounted from the 52px search row",
 );
 
 const page = read(
   "src/app/(platform)/(listener)/(playlists)/playlists/catalog/page.tsx",
 );
 assert.match(page, /PlaylistCatalogSearch/, "catalog page still mounts local search");
-assert.match(page, /PlaylistCatalogSort/, "sort stays on the catalog page");
-assert.match(
+assert.doesNotMatch(
+  page,
+  /PlaylistCatalogSort/,
+  "sort is unmounted from the catalog page",
+);
+assert.doesNotMatch(
   page,
   /PlaylistCatalogTopicFilter/,
-  "topic filter stays on the catalog page",
+  "topic filter is unmounted from the catalog page",
+);
+assert.match(
+  page,
+  /<h1 className="sr-only">\s*Каталог плейлистов\s*<\/h1>/,
+  "catalog keeps a visually hidden h1",
+);
+assert.doesNotMatch(
+  page,
+  /xl:not-sr-only/,
+  "catalog title is no longer shown on desktop",
 );
 
 const playlistsLayout = read(
@@ -159,6 +197,11 @@ assert.doesNotMatch(
   /PlaylistCatalogSearch|fixed top-0/,
   "playlists layout does not mount playlist catalog search chrome",
 );
+assert.doesNotMatch(
+  playlistsLayout,
+  /PlaylistCatalogSort|PlaylistCatalogTopicFilter/,
+  "playlists layout has no sort or topic chrome",
+);
 
 const catalogLayout = read(
   "src/app/(platform)/(listener)/(catalog)/catalog/layout.tsx",
@@ -172,6 +215,11 @@ assert.match(
   catalogLayout,
   /listener-catalog-mobile-search fixed top-0 inset-x-0 z-30/,
   "product catalog layout keeps its fixed mobile search",
+);
+assert.doesNotMatch(
+  catalogLayout,
+  /PlaylistCatalogSort|PlaylistCatalogTopicFilter/,
+  "product catalog layout has no playlist sort or topic chrome",
 );
 
 const globals = read("src/app/globals.css");
