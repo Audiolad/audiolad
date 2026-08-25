@@ -1,3 +1,4 @@
+import { normalizeCatalogTopicParam } from "@/lib/catalog/topic-filter";
 import {
   LISTING_ENTITY_CLASS,
   type ListingEntityClass,
@@ -10,8 +11,15 @@ import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
 
 export const PLAYLIST_LISTING_PAGE_SIZE = 20;
 export const PLAYLIST_LISTING_MAX_LIMIT = 50;
+export const PLAYLIST_LISTING_SEARCH_MAX_LENGTH = 100;
+export const PLAYLIST_LISTING_FETCH_LIMIT = 200;
 
 export const PLAYLIST_LISTING_ACCESS = ["free", "paid", "mixed"] as const;
+export const PLAYLIST_LISTING_ACCESS_FILTERS = [
+  "all",
+  ...PLAYLIST_LISTING_ACCESS,
+] as const;
+export const PLAYLIST_LISTING_SORTS = ["newest", "popular"] as const;
 
 export type PlaylistListingAccess = (typeof PLAYLIST_LISTING_ACCESS)[number];
 
@@ -36,7 +44,15 @@ export type PlaylistListingItem = {
   viewer: PlaylistListingViewer;
 };
 
+export type PlaylistListingSort = (typeof PLAYLIST_LISTING_SORTS)[number];
+export type PlaylistListingAccessFilter =
+  (typeof PLAYLIST_LISTING_ACCESS_FILTERS)[number];
+
 export type PlaylistListingQuery = {
+  q: string;
+  topic: string | null;
+  access: PlaylistListingAccessFilter;
+  sort: PlaylistListingSort;
   cursor: string | null;
   limit: number;
 };
@@ -97,6 +113,53 @@ export function isPlaylistListingAccess(
   return (PLAYLIST_LISTING_ACCESS as readonly string[]).includes(value);
 }
 
+export function isPlaylistListingAccessFilter(
+  value: string,
+): value is PlaylistListingAccessFilter {
+  return (PLAYLIST_LISTING_ACCESS_FILTERS as readonly string[]).includes(value);
+}
+
+export function isPlaylistListingSort(
+  value: string,
+): value is PlaylistListingSort {
+  return (PLAYLIST_LISTING_SORTS as readonly string[]).includes(value);
+}
+
+export function normalizePlaylistListingSearchQuery(
+  value: string | null | undefined,
+): string {
+  if (value == null) {
+    return "";
+  }
+
+  const collapsed = value.trim().replace(/\s+/g, " ");
+
+  if (!collapsed) {
+    return "";
+  }
+
+  return collapsed.slice(0, PLAYLIST_LISTING_SEARCH_MAX_LENGTH);
+}
+
+export function parsePlaylistListingAccessFilter(
+  value: string | null | undefined,
+): PlaylistListingAccessFilter {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return isPlaylistListingAccessFilter(normalized) ? normalized : "all";
+}
+
+export function parsePlaylistListingSort(
+  value: string | null | undefined,
+): PlaylistListingSort {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (normalized === "new") {
+    return "newest";
+  }
+
+  return isPlaylistListingSort(normalized) ? normalized : "newest";
+}
+
 export function parsePlaylistListingLimit(
   value: string | number | null | undefined,
 ): number {
@@ -114,13 +177,57 @@ export function parsePlaylistListingLimit(
 }
 
 export function parsePlaylistListingQuery(params: {
+  q?: string | null;
+  topic?: string | null;
+  access?: string | null;
+  sort?: string | null;
   cursor?: string | null;
   limit?: string | number | null;
 }): PlaylistListingQuery {
   return {
+    q: normalizePlaylistListingSearchQuery(params.q),
+    topic: normalizeCatalogTopicParam(params.topic),
+    access: parsePlaylistListingAccessFilter(params.access),
+    sort: parsePlaylistListingSort(params.sort),
     cursor: params.cursor?.trim() || null,
     limit: parsePlaylistListingLimit(params.limit),
   };
+}
+
+export function buildPlaylistListingApiUrl(
+  query: Partial<PlaylistListingQuery> & { cursor?: string | null },
+): string {
+  const params = new URLSearchParams();
+
+  if (query.q) {
+    params.set("q", query.q);
+  }
+
+  if (query.topic) {
+    params.set("topic", query.topic);
+  }
+
+  if (query.access && query.access !== "all") {
+    params.set("access", query.access);
+  }
+
+  if (query.sort && query.sort !== "newest") {
+    params.set("sort", query.sort);
+  }
+
+  if (query.cursor) {
+    params.set("cursor", query.cursor);
+  }
+
+  if (
+    typeof query.limit === "number" &&
+    query.limit !== PLAYLIST_LISTING_PAGE_SIZE
+  ) {
+    params.set("limit", String(query.limit));
+  }
+
+  const search = params.toString();
+  return search ? `/api/playlists/catalog?${search}` : "/api/playlists/catalog";
 }
 
 export function encodePlaylistListingCursor(

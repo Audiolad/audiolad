@@ -19,8 +19,9 @@
 - Сохранения плейлистов — `playlist_saves`, отдельно от `library_saves`. Save ≠ entitlement.
 - Маршрут витрины: `/playlists/catalog`. `/playlists` и `/playlists/[id]` не мигрировать.
 - Stage 1: контракт + модель + миграция. Без страницы, карточки, фильтров, play-кнопок, SEO.
+- Stage 2: `GET /api/playlists/catalog` + серверная `/playlists/catalog` через тот же listing-слой. В выдаче только listed public published. `/playlists/catalog` публичный; личный редактор остаётся private. UI карточки/сетки нет.
 
-**Принято:** владелец проекта (задание Stage 1).
+**Принято:** владелец проекта (задания Stage 1 и Stage 2).
 
 ---
 

@@ -32,6 +32,9 @@ assert.equal(parsePlaylistListingLimit("20"), 20);
 assert.equal(parsePlaylistListingLimit("99"), 50);
 assert.equal(parsePlaylistListingLimit("0"), 1);
 assert.equal(parsePlaylistListingQuery({ cursor: "  abc  " }).cursor, "abc");
+assert.equal(parsePlaylistListingQuery({ cursor: "  abc  " }).q, "");
+assert.equal(parsePlaylistListingQuery({ cursor: "  abc  " }).sort, "newest");
+assert.equal(parsePlaylistListingQuery({ cursor: "  abc  " }).access, "all");
 assert.equal(
   parsePlaylistListingQuery({ limit: "20" }).limit,
   PLAYLIST_LISTING_PAGE_SIZE,

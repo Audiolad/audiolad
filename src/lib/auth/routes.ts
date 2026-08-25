@@ -38,7 +38,18 @@ function matchesRoutePrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+export function isPublicPlaylistCatalogPath(pathname: string): boolean {
+  return (
+    pathname === "/playlists/catalog" ||
+    pathname.startsWith("/playlists/catalog/")
+  );
+}
+
 export function isPrivateRoute(pathname: string): boolean {
+  if (isPublicPlaylistCatalogPath(pathname)) {
+    return false;
+  }
+
   if (pathname.startsWith("/playlist/")) {
     return true;
   }

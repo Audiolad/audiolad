@@ -4,6 +4,20 @@
 
 ---
 
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 2)
+
+**Сделано:**
+
+- `GET /api/playlists/catalog` и серверный loader `/playlists/catalog`.
+- Listing только public + published + listed. Ответ — `PlaylistListingItem[]`.
+- Поиск по title и публичному creator label. Sort: newest / popular.
+- `/playlists/catalog` исключён из private routes; `/playlists` и `/playlists/[id]` не менялись.
+- Зафиксированы будущие дома UI (карточка, сетка, фильтры, save/play) без реализации.
+
+**Следующий шаг:** Stage 3 — PlaylistCard / PlaylistGrid / фильтры только по отдельному заданию.
+
+---
+
 ## Сессия — 25 августа 2026 (каталог плейлистов, Stage 1)
 
 **Сделано:**
