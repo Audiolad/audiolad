@@ -76,9 +76,9 @@ assert.doesNotMatch(
   /access=|cursor=/,
 );
 
-assert.match(pageSource, /PlaylistCatalogTopicFilter/);
+assert.doesNotMatch(pageSource, /PlaylistCatalogTopicFilter/);
 assert.match(pageSource, /PlaylistCatalogSearch/);
-assert.match(pageSource, /PlaylistCatalogSort/);
+assert.doesNotMatch(pageSource, /PlaylistCatalogSort/);
 assert.match(pageSource, /В этой теме пока нет плейлистов\./);
 assert.match(pageSource, /Ничего не нашлось/);
 assert.match(pageSource, /Пока нет плейлистов в витрине\./);

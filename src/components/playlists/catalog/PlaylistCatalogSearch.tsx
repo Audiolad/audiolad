@@ -103,7 +103,7 @@ export default function PlaylistCatalogSearch({
         className="listener-catalog-mobile-search-spacer xl:hidden"
         aria-hidden="true"
       />
-      <div className="hidden xl:block">
+      <div className="sticky top-0 z-20 hidden xl:block bg-platform-surface pb-3">
         <PlaylistCatalogSearchForm
           id="playlist-catalog-search"
           value={value}
@@ -140,7 +140,7 @@ function PlaylistCatalogSearchForm({
         }}
         placeholder="Найти плейлист"
         autoComplete="off"
-        className="min-h-11 w-full rounded-full border border-[#ddcfef] bg-white px-4 text-sm text-[#25135c] placeholder:text-[#7d70a2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="min-h-11 w-full rounded-full border border-[#ddcfef] bg-white px-4 text-base text-[#25135c] placeholder:text-[#7d70a2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       />
     </form>
   );
