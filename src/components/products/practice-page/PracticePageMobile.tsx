@@ -52,14 +52,6 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
 
         <PracticePrimaryActionSection viewModel={viewModel} />
 
-        {description ? (
-          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
-        ) : null}
-
         <ProductContentsSection
           items={publicAudioItems}
           durationMinutesFallback={practice.duration_minutes}
@@ -76,6 +68,14 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
             productSlug: practice.slug,
           }}
         />
+
+        {description ? (
+          <section className="mt-6 rounded-[26px] border border-[#eadff8] bg-white p-5 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+            <p className="whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
+              {description}
+            </p>
+          </section>
+        ) : null}
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

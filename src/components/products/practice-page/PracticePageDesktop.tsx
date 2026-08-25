@@ -71,14 +71,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
 
-        {description ? (
-          <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="max-w-prose whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
-        ) : null}
-
         <ProductContentsSection
           items={publicAudioItems}
           durationMinutesFallback={practice.duration_minutes}
@@ -95,6 +87,14 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             productSlug: practice.slug,
           }}
         />
+
+        {description ? (
+          <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+            <p className="max-w-prose whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
+              {description}
+            </p>
+          </section>
+        ) : null}
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />

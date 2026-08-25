@@ -151,20 +151,39 @@ function testBeforePurchaseRowKeepsBuy() {
   const mobileContents = mobile.indexOf("<ProductContentsSection");
   assert.ok(mobileCta >= 0, "mobile mounts the primary CTA");
   assert.ok(
+    mobileCta < mobileContents,
+    "mobile CTA appears before ProductContentsSection",
+  );
+  assert.ok(
     mobileCta < mobileDescription,
     "mobile CTA appears before description",
   );
   assert.ok(
-    mobileCta < mobileContents,
-    "mobile CTA appears before ProductContentsSection",
+    mobileContents < mobileDescription,
+    "mobile contents appear before the description block",
   );
 
+  const desktopCta = desktop.indexOf("<PracticePrimaryActionSection");
+  const desktopDescription = desktop.indexOf("description ?");
+  const desktopContents = desktop.indexOf("<ProductContentsSection");
   assert.doesNotMatch(
     desktop,
     /mt-auto/,
     "desktop CTA is not pinned to the cover baseline",
   );
-  assert.match(desktop, /PracticePrimaryActionSection/);
+  assert.ok(desktopCta >= 0, "desktop mounts the primary CTA");
+  assert.ok(
+    desktopCta < desktopContents,
+    "desktop CTA appears before ProductContentsSection",
+  );
+  assert.ok(
+    desktopCta < desktopDescription,
+    "desktop CTA appears before description",
+  );
+  assert.ok(
+    desktopContents < desktopDescription,
+    "desktop contents appear before the description block",
+  );
 
   assert.doesNotMatch(
     audioPost,
