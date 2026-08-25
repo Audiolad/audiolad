@@ -57,7 +57,7 @@ export function ListenerAppShell({
             ].join(" ")}
           >
             {config.showDesktopSearch ? (
-              <div className="hidden shrink-0 xl:block xl:min-h-[58px] xl:px-6 xl:pb-0 xl:pt-0">
+              <div className="hidden shrink-0 xl:block xl:px-6 xl:pb-0 xl:pt-0">
                 <DesktopShellSearch />
               </div>
             ) : null}
