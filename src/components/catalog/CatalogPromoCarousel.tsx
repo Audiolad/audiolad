@@ -77,7 +77,7 @@ export default function CatalogPromoCarousel({
 
   return (
     <section
-      className="catalog-promo mt-5 xl:mt-3"
+      className="catalog-promo mt-2.5 xl:mt-1.5"
       aria-label="Промо каталога"
       data-catalog-promo
     >
@@ -95,14 +95,14 @@ export default function CatalogPromoCarousel({
               data-catalog-promo-position={promo.position}
               className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              <span className="relative block aspect-[3/1] w-full overflow-hidden bg-[#efe6f8]">
+              <span className="relative block aspect-[4.8/1] w-full overflow-hidden bg-[#efe6f8]">
                 {promo.image.endsWith(".svg") ? (
                   // Local SVG slides stay image-only; next/image needs extra config for SVG.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={promo.image}
                     alt={promo.alt}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
                   <Image
@@ -110,7 +110,7 @@ export default function CatalogPromoCarousel({
                     alt={promo.alt}
                     fill
                     sizes="(max-width: 1279px) calc(100vw - 2.5rem), 960px"
-                    className="object-cover"
+                    className="object-contain"
                   />
                 )}
               </span>
