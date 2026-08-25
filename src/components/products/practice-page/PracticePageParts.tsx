@@ -181,7 +181,7 @@ function PaymentLegalNote() {
     "text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
   return (
-    <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+    <p className="mt-2 text-xs leading-5 text-[#7d70a2]">
       Нажимая кнопку оплаты, вы соглашаетесь с условиями{" "}
       <Link href="/offer" className={linkClassName}>
         публичной оферты
@@ -194,6 +194,9 @@ function PaymentLegalNote() {
     </p>
   );
 }
+
+const compactBuyClassName =
+  "inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-[16px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-2.5 text-sm font-semibold text-white";
 
 export function toPracticeHeartProduct(
   viewModel: PracticePageViewModel,
@@ -292,11 +295,15 @@ export function PracticeMetaSection({
   const { presentation, practice, resolvedAuthorSlug, authorName, meta, subtitle, practiceTopics } =
     viewModel;
 
+  const showStatusBadge = presentation.primaryAction.kind !== "buy";
+
   return (
     <>
-      <span className="inline-flex rounded-full bg-[#f4ecfb] px-4 py-2 text-xs font-semibold text-[#7042c5]">
-        {presentation.statusBadge}
-      </span>
+      {showStatusBadge ? (
+        <span className="inline-flex rounded-full bg-[#f4ecfb] px-4 py-2 text-xs font-semibold text-[#7042c5]">
+          {presentation.statusBadge}
+        </span>
+      ) : null}
 
       {presentation.statusDetail ? (
         <p className="mt-1.5 text-sm text-[#7d70a2]">{presentation.statusDetail}</p>
@@ -365,6 +372,10 @@ export function PracticePrimaryActionSection({
   const showPrimaryPlay =
     presentation.primaryAction.kind === "listen" ||
     presentation.primaryAction.kind === "buy";
+  const buyAction =
+    presentation.primaryAction.kind === "buy"
+      ? presentation.primaryAction
+      : null;
   const playLabel =
     presentation.primaryAction.kind === "listen"
       ? presentation.primaryAction.label
@@ -372,13 +383,55 @@ export function PracticePrimaryActionSection({
 
   return (
     <section className={className}>
+      {buyAction ? (
+        <div className="flex items-center justify-between gap-3 rounded-[20px] bg-[#f4ecfb] px-4 py-3">
+          <div className="min-w-0">
+            {viewModel.priceOffer ? (
+              <ProductPriceOffer
+                basePrice={viewModel.priceOffer.basePrice}
+                salePrice={viewModel.priceOffer.salePrice}
+                endsAt={viewModel.priceOffer.endsAt}
+                expiresAt={viewModel.priceOffer.expiresAt}
+                promotionType={viewModel.priceOffer.promotionType}
+              />
+            ) : (
+              <p className="text-[28px] font-semibold leading-8 text-[#25135c]">
+                {presentation.statusBadge}
+              </p>
+            )}
+          </div>
+          {buyAction.disabled ? (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`${compactBuyClassName} opacity-80 ${disabledButtonClasses()}`}
+            >
+              {buyAction.label}
+            </button>
+          ) : (
+            <BuyPracticeButton
+              practiceSlug={buyAction.practiceSlug}
+              practiceId={buyAction.practiceId}
+              authorId={buyAction.authorId}
+              productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
+              currency={buyAction.currency}
+              purchaseSurface={buyAction.purchaseSurface}
+              label={buyAction.label}
+              className={compactBuyClassName}
+              signInReturnPath={practicePagePath}
+            />
+          )}
+        </div>
+      ) : null}
+
       {showPrimaryPlay ? (
         <PracticeListenCtaLink
           authorSlug={resolvedAuthorSlug}
           productSlug={practice.slug}
           practiceId={practice.id}
           playAriaLabel={playLabel}
-          className={playClassName}
+          className={`${buyAction ? "mt-3" : ""} ${playClassName}`.trim()}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
             <PlayIcon />
@@ -387,46 +440,11 @@ export function PracticePrimaryActionSection({
         </PracticeListenCtaLink>
       ) : null}
 
-      {presentation.primaryAction.kind === "buy" ? (
-        presentation.primaryAction.disabled ? (
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className={`w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white opacity-80 ${disabledButtonClasses()}`}
-          >
-            {presentation.primaryAction.label}
-          </button>
-        ) : (
-          <>
-            {viewModel.priceOffer ? (
-              <div className={`${showPrimaryPlay ? "mt-4" : ""} mb-4`}>
-                <ProductPriceOffer
-                  basePrice={viewModel.priceOffer.basePrice}
-                  salePrice={viewModel.priceOffer.salePrice}
-                  endsAt={viewModel.priceOffer.endsAt}
-                  expiresAt={viewModel.priceOffer.expiresAt}
-                  promotionType={viewModel.priceOffer.promotionType}
-                />
-              </div>
-            ) : null}
-            <BuyPracticeButton
-              practiceSlug={presentation.primaryAction.practiceSlug}
-              practiceId={presentation.primaryAction.practiceId}
-              authorId={presentation.primaryAction.authorId}
-              productPriceMinorSnapshot={
-                presentation.primaryAction.productPriceMinorSnapshot
-              }
-              currency={presentation.primaryAction.currency}
-              purchaseSurface={presentation.primaryAction.purchaseSurface}
-              label={presentation.primaryAction.label}
-              className={`${showPrimaryPlay && !viewModel.priceOffer ? "mt-3" : ""} w-full rounded-[22px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-4 text-sm font-semibold text-white`}
-              signInReturnPath={practicePagePath}
-            />
-            {presentation.showPaymentLegalNote ? <PaymentLegalNote /> : null}
-          </>
-        )
-      ) : !showPrimaryPlay ? (
+      {buyAction && presentation.showPaymentLegalNote ? (
+        <PaymentLegalNote />
+      ) : null}
+
+      {!buyAction && !showPrimaryPlay ? (
         <button
           type="button"
           disabled

@@ -51,11 +51,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             />
           </div>
 
-          {/*
-            Grid stretch makes this column at least cover-tall. mt-auto pins the
-            CTA to the cover bottom when meta fits; when title/subtitle/meta are
-            taller, the column grows and the author line is never clipped.
-          */}
           <div className="flex min-w-0 max-w-full flex-col">
             <div className="min-w-0">
               <PracticeMetaSection
@@ -69,20 +64,12 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
             <PracticePrimaryActionSection
               viewModel={viewModel}
-              className="mt-auto shrink-0 pt-3"
+              className="mt-4 shrink-0"
             />
           </div>
         </section>
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />
-
-        {description ? (
-          <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
-            <p className="max-w-prose whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
-              {description}
-            </p>
-          </section>
-        ) : null}
 
         <ProductContentsSection
           items={publicAudioItems}
@@ -100,6 +87,14 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             productSlug: practice.slug,
           }}
         />
+
+        {description ? (
+          <section className="listener-practice-description mt-8 rounded-[26px] border border-[#eadff8] bg-white p-6 shadow-[0_10px_28px_rgba(91,62,145,0.07)]">
+            <p className="max-w-prose whitespace-pre-line text-[15px] leading-7 text-[#65577f]">
+              {description}
+            </p>
+          </section>
+        ) : null}
 
         {listeningNotice ? (
           <ListeningNoticeCard notice={listeningNotice} variant="light" />
