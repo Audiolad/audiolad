@@ -298,13 +298,13 @@ Since `20260818180000_playlist_item_audio_track.sql`:
 | `items_count` | integer NOT NULL DEFAULT 0 | денормализованный count `playlist_items` |
 | `duration_seconds` | integer NOT NULL DEFAULT 0 | сумма длительностей: track → `audio_items.duration_seconds`; whole-product → сумма треков продукта |
 | `saves_count` | integer NOT NULL DEFAULT 0 | денормализованный count `playlist_saves` |
-| `listed_at` | timestamptz NULL | NULL = не в витрине. Существующие публичные плейлисты **не** листятся автоматически |
+| `listed_at` | timestamptz NULL | NULL = не в витрине. Editorial publish (`owner_type=platform`, `is_editorial`) ставит `listed_at = listed_at ?? published_at`. User-owned publish поле не трогает |
 
 Индекс newest: `(listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_listed_at_idx`).
 
 Индекс popular (Stage 5A.2): `(saves_count DESC, listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_saves_count_listed_at_idx`, миграция `20260825165000_playlist_catalog_popular_index.sql`). Trigger `touch_playlist_saves_count` не менялся.
 
-`listed_at` не равен `published_at`. Публикация и попадание в витрину — разные решения. Trigger `playlists_clear_listed_at_when_unlisted` обнуляет `listed_at`, если плейлист перестаёт быть public + published + slug.
+Для platform editorial publish `listed_at` выставляется вместе с публикацией (`listed_at ?? published_at`, helper `resolveListedAtOnPublish`). User-owned publish по-прежнему не ставит `listed_at`. Trigger `playlists_clear_listed_at_when_unlisted` обнуляет `listed_at`, если плейлист перестаёт быть public + published + slug. One-shot backfill уже опубликованных editorial: `20260825166000_editorial_playlist_listed_at_backfill.sql`.
 
 Агрегаты поддерживает `refresh_playlist_listing_aggregates(uuid)` + trigger на `playlist_items`. `saves_count` обновляет trigger на `playlist_saves`. `updated_at` и entitlement не трогаются.
 

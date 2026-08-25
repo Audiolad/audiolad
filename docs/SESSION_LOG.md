@@ -4,6 +4,19 @@
 
 ---
 
+## Сессия — 25 августа 2026 (editorial listed_at on publish)
+
+**Сделано:**
+
+- `PATCH /api/playlists/[id]` при публикации platform editorial пишет `listed_at = listed_at ?? published_at` (`resolveListedAtOnPublish`). User-owned publish не трогает `listed_at`.
+- Unpublish не менялся: `listed_at` по-прежнему чистит триггер `playlists_clear_listed_at_when_unlisted`.
+- One-shot backfill `20260825166000_editorial_playlist_listed_at_backfill.sql` для уже опубликованных platform editorial с пустым `listed_at`.
+- Listing-запросы, DTO и client body не менялись.
+
+**Следующий шаг:** применить backfill-миграцию отдельным подтверждённым deploy; live-проверка, что новый editorial publish появляется в `/playlists/catalog`.
+
+---
+
 ## Сессия — 25 августа 2026 (playlist catalog restamp after prod 25162000)
 
 **Сделано:**

@@ -19,6 +19,7 @@ import {
   loadPlaylistForAccessCheck,
   logPlaylistAudit,
 } from "@/lib/playlists/playlist-access";
+import { resolveListedAtOnPublish } from "@/lib/playlists/listed-at";
 import { allocateUniquePlaylistSlug } from "@/lib/playlists/slug";
 import type { PlaylistRow } from "@/lib/playlists/types";
 import { isUuid, parsePatchPlaylistBody } from "@/lib/playlists/validation";
@@ -281,6 +282,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.published_at = new Date().toISOString();
     updates.first_published_at =
       playlist.first_published_at ?? updates.published_at;
+    const listedAt = resolveListedAtOnPublish({
+      ownerType: playlist.owner_type,
+      isEditorial: playlist.is_editorial === true,
+      currentListedAt: playlist.listed_at,
+      publishedAt: String(updates.published_at),
+    });
+    if (listedAt !== undefined) {
+      updates.listed_at = listedAt;
+    }
   } else if (platform) {
     updates.visibility = "private";
     updates.published_at = null;
