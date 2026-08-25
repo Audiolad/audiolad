@@ -103,7 +103,7 @@ export default function PlaylistCatalogSearch({
         className="listener-catalog-mobile-search-spacer xl:hidden"
         aria-hidden="true"
       />
-      <div className="sticky top-0 z-20 hidden bg-platform-surface pb-3 xl:block">
+      <div className="sticky top-0 z-20 hidden xl:block bg-platform-surface pb-3">
         <PlaylistCatalogSearchForm
           id="playlist-catalog-search"
           value={value}
