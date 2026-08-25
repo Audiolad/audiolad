@@ -96,6 +96,16 @@ assert.match(
   /\.bottom-nav \{\s*position:\s*fixed;/,
   "BottomNav stays position:fixed",
 );
+assert.match(
+  globals,
+  /html\.catalog-sheet-lock,\s*\nhtml\.catalog-sheet-lock body \{\s*\n\s*overflow:\s*hidden;/,
+  "sheet lock class is defined on html, not as inline overflow",
+);
+assert.match(
+  globals,
+  /html:has\(\.listener-app-shell\)[\s\S]*overflow:\s*hidden;/,
+  "xl listener shell keeps html/body from becoming the scrollport",
+);
 
 assert.doesNotMatch(
   page,
@@ -165,8 +175,13 @@ assert.match(
 );
 assert.match(
   filters,
-  /function resetFilters\(\) \{[\s\S]*router\.replace[\s\S]*close\(\);/,
-  "reset applies immediately without a second Apply",
+  /function resetFilters\(\) \{[\s\S]*close\(\);[\s\S]*router\.replace/,
+  "reset closes the sheet before the query replace",
+);
+assert.match(
+  filters,
+  /function applyDraft\(\) \{[\s\S]*close\(\);[\s\S]*router\.replace/,
+  "Apply closes the sheet before the query replace",
 );
 assert.match(filters, /countCatalogFilterGroups/, "badge still counts groups");
 assert.match(filters, /aria-pressed=\{isActive\}/, "chips expose aria-pressed");
@@ -179,6 +194,63 @@ assert.match(
   /router\.replace\(\s*buildCatalogHref/,
   "Apply uses buildCatalogHref in one replace",
 );
+assert.match(
+  filters,
+  /function applyDraft\(\) \{[\s\S]*scroll:\s*false/,
+  "Apply replace does not scroll the document",
+);
+assert.match(
+  filters,
+  /function resetFilters\(\) \{[\s\S]*scroll:\s*false/,
+  "reset replace does not scroll the document",
+);
+assert.doesNotMatch(
+  filters,
+  /document\.body\.style\.overflow/,
+  "sheet does not write inline overflow on body",
+);
+assert.doesNotMatch(
+  filters,
+  /document\.documentElement\.style\.overflow/,
+  "sheet does not write inline overflow on html",
+);
+assert.match(
+  filters,
+  /catalog-sheet-lock/,
+  "sheet lock uses an html class",
+);
+assert.match(
+  filters,
+  /catalogSheetLockCount/,
+  "sheet lock is ref-counted across mounted instances",
+);
+assert.match(
+  filters,
+  /releaseCatalogSheetLock/,
+  "sheet lock has a matching release",
+);
+assert.match(
+  filters,
+  /holdsSheetLockRef/,
+  "sheet lock release is instance-safe on cleanup and unmount",
+);
+
+const inlineSearch = read("src/components/listener/PlatformCatalogInlineSearch.tsx");
+const catalogQueryNavCalls = [
+  ...inlineSearch.matchAll(/router\.(replace|push)\(([\s\S]*?)\);/g),
+  ...filters.matchAll(/router\.(replace|push)\(([\s\S]*?)\);/g),
+];
+assert.ok(
+  catalogQueryNavCalls.length >= 4,
+  "catalog query nav sites are the inline search + filter replaces",
+);
+for (const call of catalogQueryNavCalls) {
+  assert.match(
+    call[0],
+    /scroll:\s*false/,
+    "catalog query router.replace/push includes scroll: false",
+  );
+}
 assert.match(
   filters,
   /function close\(\) \{\s*setOpen\(false\);\s*\}/,
