@@ -285,6 +285,68 @@ Since `20260818180000_playlist_item_audio_track.sql`:
 
 `playlists.description` — optional text for the whole table (user and platform). New limit: `char_length(description) <= 300` (`playlists_description_length_check`). Migration `20260816120000_playlist_description_max_300.sql` is fail-closed: it errors if any existing row is longer than 300 and does not truncate text. **Not applied to production.**
 
+### Playlist catalog foundation (Stage 1, 2026-08-25)
+
+Миграция: `supabase/migrations/20260825140000_playlist_catalog_foundation.sql`.
+
+Плейлист остаётся существующей сущностью `public.playlists`. Это **не** новый `kind` продукта. Витрина `/playlists/catalog` — отдельный listing-поток (`class: "playlist"`). Личные `/playlists` и `/playlists/[id]` не меняются.
+
+Добавлены только поля витрины на `playlists`:
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `items_count` | integer NOT NULL DEFAULT 0 | денормализованный count `playlist_items` |
+| `duration_seconds` | integer NOT NULL DEFAULT 0 | сумма длительностей: track → `audio_items.duration_seconds`; whole-product → сумма треков продукта |
+| `saves_count` | integer NOT NULL DEFAULT 0 | денормализованный count `playlist_saves` |
+| `listed_at` | timestamptz NULL | NULL = не в витрине. Существующие публичные плейлисты **не** листятся автоматически |
+
+Индекс newest: `(listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_listed_at_idx`).
+
+Индекс popular (Stage 5A.2): `(saves_count DESC, listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_saves_count_listed_at_idx`, миграция `20260825142000_playlist_catalog_popular_index.sql`). Trigger `touch_playlist_saves_count` не менялся.
+
+`listed_at` не равен `published_at`. Публикация и попадание в витрину — разные решения. Trigger `playlists_clear_listed_at_when_unlisted` обнуляет `listed_at`, если плейлист перестаёт быть public + published + slug.
+
+Агрегаты поддерживает `refresh_playlist_listing_aggregates(uuid)` + trigger на `playlist_items`. `saves_count` обновляет trigger на `playlist_saves`. `updated_at` и entitlement не трогаются.
+
+#### public.playlist_saves
+
+Отдельно от `library_saves` (сохранение продукта в Аудиотеку). Save плейлиста ≠ право слушать его элементы.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `user_id` | uuid NOT NULL | FK `auth.users(id)` ON DELETE CASCADE |
+| `playlist_id` | uuid NOT NULL | FK `playlists(id)` ON DELETE CASCADE |
+| `created_at` | timestamptz NOT NULL | default `now()` |
+
+UNIQUE `(user_id, playlist_id)`. Индексы: `(user_id, created_at DESC)`, `(playlist_id)`.
+
+RLS: пользователь видит / создаёт / удаляет только свои строки.
+`GRANT SELECT, INSERT, DELETE` → `authenticated`. Нет UPDATE. Нет claim RPC.
+
+Stage 5B: `GET /api/playlists/saved` читает `playlist_saves` с inner join на listed public playlists. Новый индекс не добавлялся — используется `(user_id, created_at DESC)`.
+
+### Playlist topics (Stage 4B.1, 2026-08-25)
+
+Миграция: `supabase/migrations/20260825141000_playlist_topics.sql`.
+
+Плейлисты используют существующий словарь `public.topics`. Новый словарь категорий, свободные tags и `direction_id` не используются.
+
+#### public.playlist_topics
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `playlist_id` | uuid NOT NULL | FK `playlists(id)` ON DELETE CASCADE |
+| `topic_id` | uuid NOT NULL | FK `topics(id)` ON DELETE CASCADE |
+| `created_at` | timestamptz NOT NULL | default `now()` |
+
+PK `(playlist_id, topic_id)`. Индекс: `(topic_id)`.
+
+Темы необязательны: listed/public плейлист без строк в `playlist_topics` остаётся в общей выдаче.
+
+RLS: SELECT для anon/authenticated только у public + published + listed + slug. Прямого INSERT/UPDATE/DELETE у клиентов нет.
+
+Запись только через RPC `set_playlist_topics(playlist_id, topic_keys[])`: полная замена набора, только `is_active` keys, max 3, дубликаты и неизвестный key — ошибка, пустой набор допустим. Authenticated caller должен быть `is_platform_staff`; user-owned editor не реализован.
+
 ### Мутации
 
 Чтение своих/публичных строк возможно через RLS. Безопасные мутации — через **API routes** (`/api/playlists`, `/api/playlists/[id]`, `/api/playlists/membership`, `DELETE /api/playlists/[id]/items/[practiceId]`, `POST .../items/[practiceId]/move`) и SECURITY DEFINER RPC (membership, covers CAS/mosaic, move).

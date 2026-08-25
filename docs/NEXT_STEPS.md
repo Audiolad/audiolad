@@ -24,7 +24,8 @@ PR1–PR5 на production (`6a692a2`). Play All реализован в рабо
 
 1. Review → commit Play All → backup → deploy → **обязательный iPhone smoke** → зафиксировать завершение этапа плейлистов.
 2. После стабильной точки — переход к профилю слушателя (не развитие плейлистов).
-3. Отложено: save чужого, публичный каталог, DnD, audio_item entries, paid public queue, queue persistence.
+3. Отложено: save чужого UI, публичная страница каталога `/playlists/catalog`, DnD, paid public queue, queue persistence.
+4. Stage 2 каталога плейлистов: listing API и серверная `/playlists/catalog` есть. Дальше только по заданию: карточка, сетка, фильтры UI, save/play.
 
 ## 1. Добавить защиту приватных маршрутов (приоритет: высокий)
 

@@ -16,6 +16,8 @@ import {
   canUserManageCollaborators,
   loadPlaylistForAccessCheck,
 } from "@/lib/playlists/playlist-access";
+import { getPlaylistTopicKeys } from "@/lib/playlists/playlist-topics";
+import { listActiveTopics } from "@/lib/topics/queries";
 import { loadProfileSummaries } from "@/lib/playlists/profile-summaries";
 import { getOwnedPlaylistById } from "@/lib/playlists/queries";
 import type { PlaylistRow } from "@/lib/playlists/types";
@@ -100,6 +102,12 @@ export type EditorialWorkspaceDetail = {
   canManageCollaborators: boolean;
   slugLocked: boolean;
   directionName: string | null;
+  topicKeys: string[];
+  topicOptions: Array<{
+    key: string;
+    title: string;
+    isActive: boolean;
+  }>;
   auditEvents: EditorialAuditEventView[];
 };
 
@@ -354,6 +362,32 @@ export async function loadEditorialWorkspaceDetail(
     }
   }
 
+  let topicKeys: string[] = [];
+  let topicOptions: EditorialWorkspaceDetail["topicOptions"] = [];
+
+  try {
+    topicOptions = (await listActiveTopics(supabase)).map((topic) => ({
+      key: topic.key,
+      title: topic.title,
+      isActive: true,
+    }));
+  } catch (error) {
+    console.error(
+      "editorial_workspace_detail_topics_options_error",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  try {
+    const storage = createServiceRoleClient();
+    topicKeys = await getPlaylistTopicKeys(storage, playlistId);
+  } catch (error) {
+    console.error(
+      "editorial_workspace_detail_topics_error",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   let creatorName: string | null = null;
   let auditEvents: EditorialAuditEventView[] = [];
 
@@ -418,6 +452,8 @@ export async function loadEditorialWorkspaceDetail(
       canManageCollaborators,
       slugLocked: Boolean(playlist.first_published_at),
       directionName,
+      topicKeys,
+      topicOptions,
       auditEvents,
     },
   };

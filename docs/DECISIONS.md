@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-08-25 — Каталог плейлистов: отдельный listing-поток
+
+**Контекст:** продуктовый каталог (`/catalog`) построен вокруг универсальной карточки продуктов (`kind`: practice / music / audio_post / program). Нужна витрина плейлистов без превращения плейлиста в новый kind продукта и без поломки личного редактора `/playlists`.
+
+**Решение:**
+
+- Продукты остаются `class: "product"` + `kind`.
+- Плейлисты — отдельная сущность `class: "playlist"` и отдельный listing-поток.
+- Карточка API: `PlaylistListingItem` (без `user_id`, `owner_type`, `created_by`, `cover_path`, `direction_id`, `playlist_items`, entitlement).
+- Существующая таблица `playlists` расширяется только полями витрины: `items_count`, `duration_seconds`, `saves_count`, `listed_at`.
+- Сохранения плейлистов — `playlist_saves`, отдельно от `library_saves`. Save ≠ entitlement.
+- Маршрут витрины: `/playlists/catalog`. `/playlists` и `/playlists/[id]` не мигрировать.
+- Stage 1: контракт + модель + миграция. Без страницы, карточки, фильтров, play-кнопок, SEO.
+- Stage 2: `GET /api/playlists/catalog` + серверная `/playlists/catalog` через тот же listing-слой. В выдаче только listed public published. `/playlists/catalog` публичный; личный редактор остаётся private. UI карточки/сетки нет.
+- Stage 5B: сохранённые публичные плейлисты — отдельная private библиотека `/playlists/saved` на `playlist_saves`. Не смешивать с `library_saves`, `/my-practices` и product catalog. Новый пункт нижней навигации не создавать.
+- `listed_at` не выставляется publish flow. `POST/PATCH /api/playlists` (user и editorial) пишут только `visibility` + `slug` + `published_at`. Триггер `playlists_clear_listed_at_when_unlisted` только обнуляет `listed_at`. Существующие public playlists остаются unlisted. Кто ставит `listed_at` в витрину — отдельный продуктовый выбор, в Stage 1–5B не реализуется.
+
+**Принято:** владелец проекта (задания Stage 1 и Stage 2).
+
+---
+
 ## 2026-08-25 — Author Cabinet foundation, Phase 1
 
 **Контекст:** кабинет должен создавать новые классы публикаций, не ломая

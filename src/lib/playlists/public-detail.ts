@@ -5,6 +5,7 @@ import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentati
 import { createPlaylistCoverSignedUrl } from "@/lib/playlists/covers";
 import { isPracticeEligibleForPublicPlaylist } from "@/lib/playlists/public-content";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
+import { USER_PLAYLIST_OWNER_LABEL } from "@/lib/playlists/listing-labels";
 import { isPlatformOwnedPlaylist } from "@/lib/playlists/public-seo";
 import {
   isValidPlaylistPublicSlug,
@@ -442,7 +443,7 @@ export const loadPublicPlaylistBySlug = cache(
         ),
         ownerLabel: playlist.is_editorial
           ? EDITORIAL_PLAYLIST_LABEL
-          : "Подборка пользователя АудиоЛада",
+          : USER_PLAYLIST_OWNER_LABEL,
       },
     };
   },

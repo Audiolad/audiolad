@@ -35,6 +35,10 @@ export type PlaylistRow = {
   description?: string | null;
   first_published_at?: string | null;
   direction_id?: string | null;
+  items_count?: number;
+  duration_seconds?: number;
+  saves_count?: number;
+  listed_at?: string | null;
 };
 
 export type EditorialPlaylistListItem = {

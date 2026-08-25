@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import PlaylistCover from "@/components/playlists/PlaylistCover";
+import PlaylistLibraryNav from "@/components/playlists/PlaylistLibraryNav";
 import {
   buildPublicPlaylistCanonicalUrl,
   copyTextToClipboard,
@@ -365,6 +366,7 @@ export default function PlaylistsClient({
           <p className="mt-1 text-sm text-[#7d70a2]">
             Ваши подборки для разных состояний
           </p>
+          <PlaylistLibraryNav active="mine" />
         </div>
 
         <button

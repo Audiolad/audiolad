@@ -103,6 +103,16 @@ Many-to-many: `practices` ↔ `topics`. PK `(practice_id, topic_id)`.
 
 Запись **только** через RPC `set_practice_topics(practice_id, topic_keys[])`.
 
+### `public.playlist_topics`
+
+Many-to-many: `playlists` ↔ тот же словарь `topics`. PK `(playlist_id, topic_id)`.
+
+Миграция: `supabase/migrations/20260825141000_playlist_topics.sql`.
+
+Запись **только** через RPC `set_playlist_topics(playlist_id, topic_keys[])`. Темы необязательны. User-owned editor не входит в Stage 4B.1.
+
+Витрина `/playlists/catalog` фильтрует по одной теме (`?topic=key`). UI: `PlaylistCatalogTopicFilter`. Listing Stage 5A.1 применяет topic как SQL EXISTS (`playlist_topics!inner` + `topics`), без prefetch всех playlist id. SEO-страницы плейлистов по темам не входят в этот этап.
+
 ---
 
 ## RLS
@@ -118,6 +128,11 @@ Many-to-many: `practices` ↔ `topics`. PK `(practice_id, topic_id)`.
 - SELECT: published practices, entitled users, author members
 - INSERT/UPDATE/DELETE: **нет** для anon/authenticated (только RPC SECURITY DEFINER)
 
+### `playlist_topics`
+
+- SELECT: listed public playlists (`visibility=public`, `published_at`, `listed_at`, slug)
+- INSERT/UPDATE/DELETE: **нет** для anon/authenticated (только RPC `set_playlist_topics`)
+
 ---
 
 ## RPC
@@ -129,6 +144,15 @@ Many-to-many: `practices` ↔ `topics`. PK `(practice_id, topic_id)`.
 - Count ≤ `resolve_author_topic_limit`
 - Full replace assignment set
 - Draft may pass `[]`
+
+### `set_playlist_topics`
+
+- Replaces the whole playlist assignment set
+- Active keys only → иначе `topic_not_found`
+- Max 3; duplicates rejected
+- Empty set allowed; topics are not required to stay listed
+- Authenticated caller must be platform staff; user-owned writes are later-stage
+- Editorial editor writes through `PUT /api/playlists/[id]/topics` after `canUserEditEditorialPlaylist`, then calls the RPC via service role so direction editors and collaborators can save
 
 ### `publish_audio_product` v4
 
