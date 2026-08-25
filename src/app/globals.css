@@ -181,6 +181,10 @@
     min-height: 0;
   }
 
+  .listener-app-shell__center-scroll:has(.listener-catalog-content) {
+    overflow: hidden;
+  }
+
   .listener-profile-content,
   .listener-author-content {
     min-width: 0;

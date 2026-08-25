@@ -180,6 +180,41 @@ assert.match(
   /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
   "mobile filters slot is hidden from lg",
 );
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:min-h-0/,
+  "catalog content can shrink in the desktop center column",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:overflow-hidden/,
+  "catalog content does not become the desktop page scroller",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:flex-1/,
+  "catalog content fills the remaining desktop center column",
+);
+assert.match(
+  page,
+  /className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto"/,
+  "product grid and empty state share a desktop-only cards scroller",
+);
+assert.match(
+  globals,
+  /\.listener-app-shell__center-scroll:has\(\.listener-catalog-content\)\s*\{\s*overflow:\s*hidden;/,
+  "center-scroll stops being the page scroller when it contains catalog",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*fixed/,
+  "mobile search stays a fixed top layer",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  "fixed search remains hidden from xl",
+);
 
 assert.doesNotMatch(
   page,
