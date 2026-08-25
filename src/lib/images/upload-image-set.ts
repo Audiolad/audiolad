@@ -29,6 +29,7 @@ type StorageBucketClient = {
 
 export type UploadImageSetContext = {
   practiceId?: string;
+  slideId?: string;
   audioItemId?: string;
   authorId?: string;
   authorKind?: "avatar" | "banner";

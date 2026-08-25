@@ -82,6 +82,7 @@ export function mapLegacyCatalogProductToSource(
     href: product.href,
     publishedAt: product.publishedAt ?? null,
     durationSeconds: product.durationSeconds ?? null,
+    gallery: product.gallery ?? [],
   };
 }
 
