@@ -32,12 +32,12 @@ assert.match(
   "mobile search keeps its layout hook",
 );
 assert.match(layout, /fixed top-0 inset-x-0/, "mobile search is a fixed top layer");
-assert.doesNotMatch(layout, /sticky/, "mobile search is no longer sticky");
+assert.doesNotMatch(layout, /xl:fixed/, "desktop search is not fixed");
 assert.match(layout, /z-30/, "fixed search keeps the chrome stacking layer");
 assert.match(
   layout,
-  /xl:static xl:inset-auto xl:z-auto/,
-  "xl search sits in the catalog column, not over the sidebars",
+  /xl:sticky xl:top-0 xl:z-20/,
+  "xl search sticks in the catalog column, not over the sidebars",
 );
 assert.match(
   layout,
@@ -255,8 +255,8 @@ assert.match(
 );
 assert.match(
   layout,
-  /listener-catalog-mobile-search[^"]*xl:static/,
-  "xl search is in-flow instead of a fixed overlay",
+  /listener-catalog-mobile-search[^"]*xl:sticky/,
+  "xl search is in-flow in the catalog column instead of a fixed overlay",
 );
 
 assert.doesNotMatch(
