@@ -144,12 +144,10 @@ export default function PlatformSearchField({
         >
           <ClearIcon />
         </button>
-      ) : (
+      ) : isCompact ? null : (
         <button
           type="submit"
-          className={`inline-flex shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-sm font-medium text-white transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
-            isCompact ? "h-9 px-3" : "h-10 px-3 sm:px-4 xl:h-9"
-          }`}
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[#7042c5] px-3 text-sm font-medium text-white transition hover:bg-[#6338b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:px-4 xl:h-9"
         >
           Найти
         </button>
