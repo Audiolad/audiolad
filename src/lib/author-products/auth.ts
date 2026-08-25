@@ -236,7 +236,7 @@ export async function requirePracticeAccess(practiceId: string) {
   const { data: practice, error: practiceError } = await supabase
     .from("practices")
     .select(
-      "id, author_id, status, moderation_status, deleted_at, slug, published_at, use_shared_cover, product_kind, music_usage_permission, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab",
+      "id, author_id, status, moderation_status, deleted_at, slug, published_at, use_shared_cover, product_kind, publication_class, music_usage_permission, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab",
     )
     .eq("id", practiceId)
     .maybeSingle();
@@ -287,6 +287,7 @@ export async function requirePracticeAccess(practiceId: string) {
       published_at: string | null;
       use_shared_cover: boolean;
       product_kind?: string | null;
+      publication_class?: string | null;
       music_usage_permission?: string | null;
       promo_enabled?: boolean | null;
       promo_title?: string | null;

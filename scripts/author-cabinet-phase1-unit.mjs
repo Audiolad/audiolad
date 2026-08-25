@@ -205,7 +205,7 @@ assert.match(
   /publication_class IN \('practice', 'course', 'audiobook', 'release', 'post'\)/,
 );
 assert.doesNotMatch(migration, /\bUPDATE\b/);
-assert.doesNotMatch(migration, /\bBACKFILL\b/i);
+assert.match(migration, /No backfill/);
 
 const createApi = read("src/app/api/author/products/route.ts");
 assert.match(createApi, /publication_class/);
@@ -221,12 +221,22 @@ assert.match(createDraft, /publication_class: publicationClass/);
 assert.match(createDraft, /product_kind: productKind/);
 
 const wizard = read("src/components/author-dashboard/AuthorCreateWizard.tsx");
-assert.match(wizard, /Продукт/);
-assert.match(wizard, /Музыка/);
-assert.match(wizard, /Аудиопост/);
-assert.match(wizard, /Аудиопрактика/);
-assert.match(wizard, /Аудиокурс/);
-assert.match(wizard, /Аудиокнига/);
+assert.match(wizard, /CABINET_BRANCH_LABELS/);
+assert.match(wizard, /AUTHOR_PUBLICATION_CLASS_LABELS/);
+assert.match(wizard, /CABINET_BRANCH\.PRODUCT/);
+assert.match(wizard, /CABINET_BRANCH\.MUSIC/);
+assert.match(wizard, /CABINET_BRANCH\.POST/);
+assert.match(wizard, /"practice"/);
+assert.match(wizard, /"course"/);
+assert.match(wizard, /"audiobook"/);
+
+const labels = read("src/lib/author-products/publication-class.ts");
+assert.match(labels, /product: "Продукт"/);
+assert.match(labels, /music: "Музыка"/);
+assert.match(labels, /post: "Аудиопост"/);
+assert.match(labels, /practice: "Аудиопрактика"/);
+assert.match(labels, /course: "Аудиокурс"/);
+assert.match(labels, /audiobook: "Аудиокнига"/);
 
 const newPage = read(
   "src/app/(platform)/author-dashboard/products/new/page.tsx",

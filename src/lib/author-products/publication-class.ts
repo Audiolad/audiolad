@@ -200,8 +200,14 @@ export function resolveCreateClassification(input: {
     return { ok: false, error: "invalid_cabinet_branch" };
   }
 
-  if (explicitKindRaw && !isExplicitProductKind(explicitKindRaw)) {
-    return { ok: false, error: "invalid_product_kind" };
+  let explicitKind: ProductKind | null = null;
+
+  if (explicitKindRaw) {
+    if (!isExplicitProductKind(explicitKindRaw)) {
+      return { ok: false, error: "invalid_product_kind" };
+    }
+
+    explicitKind = explicitKindRaw;
   }
 
   if (explicitClass) {
@@ -212,7 +218,7 @@ export function resolveCreateClassification(input: {
       return { ok: false, error: "invalid_cabinet_branch" };
     }
 
-    if (explicitKindRaw && explicitKindRaw !== productKind) {
+    if (explicitKind && explicitKind !== productKind) {
       return { ok: false, error: "invalid_product_kind" };
     }
 
@@ -230,8 +236,8 @@ export function resolveCreateClassification(input: {
     const publicationClass = cabinetBranchToDefaultClass(explicitBranch);
 
     if (
-      explicitKindRaw &&
-      explicitKindRaw !== publicationClassToLegacyKind(publicationClass)
+      explicitKind &&
+      explicitKind !== publicationClassToLegacyKind(publicationClass)
     ) {
       return { ok: false, error: "invalid_product_kind" };
     }
@@ -246,14 +252,14 @@ export function resolveCreateClassification(input: {
     };
   }
 
-  if (explicitKindRaw) {
-    const publicationClass = mapLegacyProductKindToClass(explicitKindRaw);
+  if (explicitKind) {
+    const publicationClass = mapLegacyProductKindToClass(explicitKind);
 
     return {
       ok: true,
       value: {
         publicationClass,
-        productKind: explicitKindRaw,
+        productKind: explicitKind,
         cabinetBranch: publicationClassToCabinetBranch(publicationClass),
       },
     };
