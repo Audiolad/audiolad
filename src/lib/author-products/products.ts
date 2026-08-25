@@ -12,7 +12,9 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "./product-kind";
+import { listAuthorGallerySlides } from "./gallery";
 import {
+  isProductGalleryEligible,
   resolveCreateClassification,
   type CabinetBranch,
   type PublicationClass,
@@ -201,15 +203,23 @@ export async function getAuthorProductDetail(
     throw new Error("audio_items_lookup_failed");
   }
 
-  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase] =
+  const practiceRow = coercePracticeRow(practice as PracticeRow);
+  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase, gallerySlides] =
     await Promise.all([
       resolveContentLockedAfterSale(practiceId),
       resolveDeleteLockedAfterPaidPurchase(practiceId),
+      isProductGalleryEligible(
+        practiceRow.publication_class,
+        practiceRow.product_kind,
+      )
+        ? listAuthorGallerySlides(supabase, practiceId).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
   return {
-    practice: coercePracticeRow(practice as PracticeRow),
+    practice: practiceRow,
     audio_items: (audioItems ?? []) as AudioItemRow[],
+    gallery_slides: gallerySlides,
     contentLockedAfterSale,
     deleteLockedAfterPaidPurchase,
   };
@@ -341,6 +351,7 @@ export async function createDraftProduct(
   return {
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: [audioItem as AudioItemRow],
+    gallery_slides: [],
     contentLockedAfterSale: false,
     deleteLockedAfterPaidPurchase: false,
   };

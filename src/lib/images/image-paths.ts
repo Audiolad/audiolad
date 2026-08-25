@@ -27,6 +27,32 @@ export function buildPracticeCoverOriginalPath(
   return `${buildPracticeCoverVariantBasePath(practiceId, versionId)}/original.${extension}`;
 }
 
+export function buildPublicationGalleryVariantBasePath(
+  practiceId: string,
+  slideId: string,
+  versionId: string,
+): string {
+  return `practices/${practiceId}/gallery/${slideId}/variants/${versionId}`;
+}
+
+export function buildPublicationGalleryVariantPath(
+  practiceId: string,
+  slideId: string,
+  versionId: string,
+  key: ImageVariantKey,
+): string {
+  return `${buildPublicationGalleryVariantBasePath(practiceId, slideId, versionId)}/${buildVariantFileName(key)}`;
+}
+
+export function buildPublicationGalleryOriginalPath(
+  practiceId: string,
+  slideId: string,
+  versionId: string,
+  extension: "jpg" | "png" | "webp",
+): string {
+  return `${buildPublicationGalleryVariantBasePath(practiceId, slideId, versionId)}/original.${extension}`;
+}
+
 export function buildTrackCoverVariantBasePath(
   practiceId: string,
   audioItemId: string,
@@ -173,6 +199,7 @@ export function buildVariantPathsForProfile(
   },
   context: {
     practiceId?: string;
+    slideId?: string;
     audioItemId?: string;
     authorId?: string;
     authorKind?: "avatar" | "banner";
@@ -209,6 +236,29 @@ export function buildVariantPathsForProfile(
         assign(
           variant.key,
           buildPracticeCoverVariantPath(practiceId, versionId, variant.key),
+        );
+      }
+      break;
+    }
+    case "product-gallery": {
+      const practiceId = context.practiceId!;
+      const slideId = context.slideId!;
+      const { versionId, originalExtension } = processed;
+      originalPath = buildPublicationGalleryOriginalPath(
+        practiceId,
+        slideId,
+        versionId,
+        originalExtension,
+      );
+      for (const variant of processed.variants) {
+        assign(
+          variant.key,
+          buildPublicationGalleryVariantPath(
+            practiceId,
+            slideId,
+            versionId,
+            variant.key,
+          ),
         );
       }
       break;

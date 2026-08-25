@@ -253,8 +253,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260823200000",
     "20260825120000",
     "20260825133000",
+    "20260825150000",
   ]);
-  assert.equal(plan.database_migrations_pending, 5);
+  assert.equal(plan.database_migrations_pending, 6);
 }
 
 function main() {

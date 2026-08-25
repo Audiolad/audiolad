@@ -29,6 +29,32 @@
 
 ---
 
+## 2026-08-25 — Product Gallery, Phase 1B
+
+**Контекст:** у `CatalogCard` уже есть `cover + gallery[]`, но слайды
+некуда было сохранять. PR #74 предлагал универсальную галерею на все
+классы и PATCH `{ order }` на коллекции — это откатывает Phase 1
+`publication_class` и не подходит.
+
+**Решение:**
+
+- Одна таблица `publication_gallery_slides` (FK `practices.id`), без
+  колонки класса и без backfill.
+- Eligibility: только `practice` / `course` / `audiobook` через
+  `isProductGalleryEligible` рядом с `resolvePublicationClass`.
+  `release` / `post` (включая legacy music / audio_post) всегда
+  `gallery: []` и 403 на author API.
+- Cover остаётся на `practices`, не становится слайдом.
+- Author API: GET/POST collection, PATCH `/reorder` батчем
+  `{ slides: [{ id, position }] }`, PATCH/DELETE `[slideId]`.
+  Коллекционный PATCH `{ order }` не используется.
+- Кабинет: секция «Галерея продукта» только у eligible классов,
+  native HTML5 drag-and-drop, без второго редактора обложки.
+
+**Принято:** владелец и архитектор (задание Phase 1B Product Gallery).
+
+---
+
 ## 2026-08-25 — Catalog Listing Freeze v2, Phase 0
 
 **Контекст:** новый каталог не должен зависеть от legacy-модели

@@ -56,7 +56,25 @@ RLS включён. Политика SELECT: `Public can read published practice
 - `release` → `music`
 - `post` → `audio_post`
 
-Course / audiobook не выводятся из `format`. Section / Lesson / Chapter / gallery tables не создаются.
+Course / audiobook не выводятся из `format`. Section / Lesson / Chapter tables не создаются.
+
+#### publication_gallery_slides (2026-08-25, Phase 1B Product Gallery)
+
+Миграция: `20260825150000_publication_gallery_slides.sql`.
+
+Одна таблица extra-слайдов 1:1 для Product Gallery. Это не галерея каждого класса публикаций.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `publication_id` | uuid NOT NULL | FK `practices.id` ON DELETE CASCADE |
+| `image_url` | text NOT NULL | публичный URL в `practice-covers` |
+| `image_manifest` | jsonb NOT NULL | тот же shape, что `practices.cover_image` |
+| `position` | integer NOT NULL | 0..29; каталог читает `position ASC, id ASC` |
+| `alt` | text NULL | до 200 символов, без переносов |
+
+Лимит 30 слайдов — CHECK + INSERT trigger. RLS: public SELECT для published; author members CRUD.
+
+Eligibility только в приложении через `isProductGalleryEligible` / `resolvePublicationClass`: `practice` / `course` / `audiobook` (включая legacy NULL+`practice`). `release` и `post` не создают и не показывают слайды. Колонки класса на слайдах нет. Cover остаётся на `practices`. Backfill / `UPDATE practices` нет.
 
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 
