@@ -307,6 +307,99 @@ function testSharedPathHasNoPlatformBranch() {
   );
 }
 
+function testDurationSeedAfterSkipLoadHandoff() {
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+
+  assert(
+    player.includes("function readLiveAudioDuration("),
+    "live element duration helper exists",
+  );
+
+  const applyPlay = sliceBetween(
+    player,
+    "const applyUrlAndPlayNow = useCallback(",
+    "const switchToTrack = useCallback(",
+  );
+  assert(
+    applyPlay.includes("readLiveAudioDuration(audio)"),
+    "applyUrlAndPlayNow seeds duration from the live element",
+  );
+  assert(
+    applyPlay.includes("setDuration(liveDuration)"),
+    "applyUrlAndPlayNow writes React duration when the element already knows it",
+  );
+  assert(
+    !applyPlay.includes("audio.load("),
+    "applyUrlAndPlayNow must not call audio.load()",
+  );
+
+  const handoff = sliceBetween(
+    player,
+    "const handoff = handoffSourceRef?.current;",
+    "if (skipUrlLoadForTrackRef.current === trackId) {",
+  );
+  assert(
+    handoff.includes("readLiveAudioDuration(audio)"),
+    "handoff consume seeds duration from the live element",
+  );
+  assert(
+    handoff.includes("setDuration(liveDuration)"),
+    "handoff consume writes React duration when the element already knows it",
+  );
+
+  const attachListeners = sliceBetween(
+    player,
+    'audio.addEventListener("loadedmetadata", updateDuration);',
+    'audio.addEventListener("timeupdate", handleTimeUpdate);',
+  );
+  assert(
+    attachListeners.includes("updateDuration();"),
+    "listeners effect seeds duration immediately after attach",
+  );
+
+  const hasValid = sliceBetween(
+    player,
+    "const liveDuration = readLiveAudioDuration(audioRef.current);",
+    "const rawDisplayDuration = Number.isFinite(duration) && duration > 0",
+  );
+  assert(
+    hasValid.includes("liveDuration > 0"),
+    "hasValidDuration treats live audio.duration as source of truth",
+  );
+  assert(
+    hasValid.includes("Number.isFinite(duration) && duration > 0"),
+    "hasValidDuration still falls back to React duration",
+  );
+  assert(
+    hasValid.includes("hasPreviewWindow"),
+    "hasValidDuration keeps the preview-window exception",
+  );
+
+  const seekOffset = sliceBetween(
+    player,
+    "const handleSeekOffset = (offsetSeconds: number) => {",
+    "const handleRangeChange = (value: number) => {",
+  );
+  assert(
+    seekOffset.includes("resolveSeekDuration(audio)"),
+    "handleSeekOffset clamps using live element duration",
+  );
+  assert(
+    !seekOffset.includes("if (!audio || !hasValidDuration)"),
+    "handleSeekOffset must not early-return only on React hasValidDuration",
+  );
+
+  const rangeChange = sliceBetween(
+    player,
+    "const handleRangeChange = (value: number) => {",
+    "const handlePreviousTrack = async () => {",
+  );
+  assert(
+    rangeChange.includes("resolveSeekDuration(audio)"),
+    "handleRangeChange clamps using live element duration",
+  );
+}
+
 function testChaptersAndLessonsAreSessionTracks() {
   const sessionLoader = readSource("src/lib/listen/load-session-payload.ts");
   const database = readSource("docs/DATABASE.md");
@@ -369,6 +462,7 @@ function main() {
   testPlayRejectionLogsErrorName();
   testPlaylistExhaustPlaysBeforeRemountOrReplace();
   testSharedPathHasNoPlatformBranch();
+  testDurationSeedAfterSkipLoadHandoff();
   testChaptersAndLessonsAreSessionTracks();
   console.log("ios-lock-screen-auto-advance-unit: ok");
 }
