@@ -423,6 +423,63 @@ body {
   scroll-snap-align: start;
 }
 
+.catalog-promo-carousel {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.catalog-promo-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .catalog-promo-carousel {
+    scroll-behavior: smooth;
+  }
+}
+
+.catalog-promo-carousel__item {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.catalog-promo-carousel__dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 0.9rem;
+  margin-top: 0.65rem;
+}
+
+.catalog-promo-carousel__dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(112, 66, 197, 0.22);
+  transition:
+    width 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.catalog-promo-carousel__dot--active {
+  width: 0.85rem;
+  background: #7042c5;
+}
+
 .catalog-product-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

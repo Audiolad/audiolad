@@ -27,6 +27,21 @@ const personalHome = read("src/components/home/PersonalHome.tsx");
 assert.match(page, /CatalogProductGrid/, "catalog page uses the product grid");
 assert.doesNotMatch(
   page,
+  /Опубликованные аудиопродукты авторов платформы/,
+  "default catalog no longer shows the intro text",
+);
+assert.match(
+  page,
+  /data-catalog-promo|CatalogPromoCarousel/,
+  "catalog page mounts promo with a data attribute hook",
+);
+assert.match(
+  read("src/components/catalog/CatalogPromoCarousel.tsx"),
+  /data-catalog-promo-id/,
+  "promo data attribute is present",
+);
+assert.doesNotMatch(
+  page,
   /CatalogProductCarousel/,
   "catalog page no longer uses carousels as the listing",
 );

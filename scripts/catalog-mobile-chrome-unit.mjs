@@ -73,6 +73,41 @@ assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1
 assert.match(page, /sr-only/, "mobile h1 is not a visible title");
 assert.match(page, /xl:not-sr-only/, "desktop h1 stays visible");
 assert.match(page, /xl:block/, "desktop h1 is a block heading");
+assert.doesNotMatch(
+  page,
+  /Опубликованные аудиопродукты авторов платформы/,
+  "default catalog no longer shows the intro text",
+);
+assert.match(page, /showCatalogPromo/, "unfiltered catalog names the promo gate");
+assert.match(
+  page,
+  /!isSearchActive && !isTopicFiltered/,
+  "promo is hidden during search and topic filters",
+);
+assert.match(page, /CatalogPromoCarousel/, "unfiltered catalog mounts the promo carousel");
+
+const promoCarousel = read("src/components/catalog/CatalogPromoCarousel.tsx");
+const promoConfig = read("src/lib/catalog/catalog-promo.ts");
+assert.match(
+  promoCarousel,
+  /data-catalog-promo-id/,
+  "promo slides expose data-catalog-promo-id",
+);
+assert.match(
+  promoCarousel,
+  /data-catalog-promo-position/,
+  "promo slides expose data-catalog-promo-position",
+);
+assert.match(promoConfig, /export type CatalogPromo/, "CatalogPromo is a typed entity");
+assert.match(promoConfig, /startsAt\?/, "promo config reserves startsAt");
+assert.match(promoConfig, /endsAt\?/, "promo config reserves endsAt");
+assert.match(promoConfig, /audience\?/, "promo config reserves audience");
+assert.match(promoConfig, /experimentKey\?/, "promo config reserves experimentKey");
+assert.doesNotMatch(
+  promoConfig,
+  /createClient|from\(|supabase/i,
+  "promo MVP is typed config, not SQL or API",
+);
 assert.match(
   page,
   /data-catalog-desktop-filters/,

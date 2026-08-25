@@ -3,12 +3,14 @@ import Link from "next/link";
 
 import AuthorListCard from "@/components/authors/AuthorListCard";
 import CatalogChipFilterBar from "@/components/catalog/CatalogChipFilterBar";
+import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
 import TopicFilterBar from "@/components/catalog/TopicFilterBar";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
 import {
   CATALOG_ACCESS_FILTER_OPTIONS,
   CATALOG_KIND_FILTER_OPTIONS,
 } from "@/lib/catalog/catalog-filter-ui";
+import { listCatalogPromos } from "@/lib/catalog/catalog-promo";
 import {
   mapCatalogAuthorSearchResultToPublicAuthorCard,
   searchPublishedCatalogAuthors,
@@ -114,6 +116,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;
+  const showCatalogPromo = !isSearchActive && !isTopicFiltered;
   const isAccessFiltered = resolvedListingQuery.access !== "all";
   const isKindFiltered = resolvedListingQuery.kind !== "all";
   const isListingFiltered = isTopicFiltered || isAccessFiltered || isKindFiltered;
@@ -135,15 +138,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         Каталог
       </h1>
 
-      {!isSearchActive ? (
-        <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
-          {activeTopicTitle
-            ? activeTopicKeys.length > 1
-              ? `Аудиопродукты на темы «${activeTopicTitle}».`
-              : `Аудиопродукты на тему «${activeTopicTitle}».`
-            : "Опубликованные аудиопродукты авторов платформы."}
-        </p>
-      ) : (
+      {isSearchActive ? (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">
           <h2
             id="catalog-search-results-heading"
@@ -159,7 +154,15 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             </p>
           ) : null}
         </section>
-      )}
+      ) : isTopicFiltered ? (
+        <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
+          {activeTopicKeys.length > 1
+            ? `Аудиопродукты на темы «${activeTopicTitle}».`
+            : `Аудиопродукты на тему «${activeTopicTitle}».`}
+        </p>
+      ) : showCatalogPromo ? (
+        <CatalogPromoCarousel promos={listCatalogPromos()} />
+      ) : null}
 
       <div className="hidden xl:block" data-catalog-desktop-filters>
         {filterableTopics.length > 0 ? (
