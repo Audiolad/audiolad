@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-25 — Editorial publish stamps listed_at
+
+**Контекст:** `/playlists/catalog` показывает только строки с `listed_at IS NOT NULL`. Публикация редакционного плейлиста писала `visibility` + `slug` + `published_at`, поэтому новый editorial playlist появлялся в старом блоке «Плейлисты АудиоЛада» и не попадал в витрину.
+
+**Решение:**
+
+- При `PATCH /api/playlists/[id]` на переход в `visibility=public`, если `owner_type=platform` и `is_editorial=true`, писать `listed_at = listed_at ?? published_at` (первая постановка в витрину; republish не сдвигает newest).
+- User-owned / non-editorial publish `listed_at` не трогает.
+- Unpublish не пишет `listed_at`: по-прежнему чистит триггер `playlists_clear_listed_at_when_unlisted`.
+- One-shot backfill `20260825166000_editorial_playlist_listed_at_backfill.sql` для уже опубликованных platform editorial с `listed_at IS NULL`. User-owned не бэкфиллить.
+- Listing-запросы, DTO и client body не менять: `listed_at` по-прежнему не клиентское поле.
+
+**Принято:** владелец продукта (задание на editorial listed_at).
+
+---
+
 ## 2026-08-25 — Каталог плейлистов: отдельный listing-поток
 
 **Контекст:** продуктовый каталог (`/catalog`) построен вокруг универсальной карточки продуктов (`kind`: practice / music / audio_post / program). Нужна витрина плейлистов без превращения плейлиста в новый kind продукта и без поломки личного редактора `/playlists`.

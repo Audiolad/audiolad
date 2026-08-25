@@ -259,6 +259,12 @@ function testRepoOneFileOneVersion() {
       (row) => row.filename === "20260825165000_playlist_catalog_popular_index.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260825166000_editorial_playlist_listed_at_backfill.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -300,8 +306,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825163000",
     "20260825164000",
     "20260825165000",
+    "20260825166000",
   ]);
-  assert.equal(plan.database_migrations_pending, 9);
+  assert.equal(plan.database_migrations_pending, 10);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -322,8 +329,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260825163000",
     "20260825164000",
     "20260825165000",
+    "20260825166000",
   ]);
-  assert.equal(plan.database_migrations_pending, 3);
+  assert.equal(plan.database_migrations_pending, 4);
 }
 
 function main() {
