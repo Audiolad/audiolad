@@ -75,10 +75,11 @@ assert.match(card, /href=\{card\.paths\.pdp\}/, "card still links to the product
 assert.match(card, /overflow-hidden/, "card clips to one rounded container");
 assert.match(card, /rounded-\[20px\]/, "card has a shared radius");
 assert.match(card, /border border-\[#eadff8\]/, "card has a light border");
-assert.match(card, /data-catalog-card-meta/, "duration and price share one meta row");
-assert.match(card, /flex flex-wrap/, "meta row can wrap as a flex row");
-assert.match(card, / · /, "meta row joins duration and paid price");
-assert.match(card, /display_label/, "class display_label is on the first screen");
+assert.match(card, /data-catalog-card-format/, "format label is marked");
+assert.match(card, /display_label/, "format uses CatalogCard.display_label");
+assert.doesNotMatch(card, /hidden xl:block/, "format label stays visible on mobile");
+assert.doesNotMatch(card, /durationLabel/, "card no longer shows duration or audio count");
+assert.match(card, /data-catalog-card-meta/, "paid price keeps a meta row");
 assert.match(card, /readPaidCatalogOfferPriceLabel/, "paid price comes from default_offer");
 assert.match(card, /class === "post"/, "posts never render an offer price");
 assert.match(card, /data-catalog-card-price/, "paid price is a visual marker");
@@ -86,11 +87,6 @@ assert.match(
   card,
   /data-catalog-card-price[\s\S]*whitespace-nowrap|whitespace-nowrap[\s\S]*data-catalog-card-price/,
   "paid price is a nowrap atomic token",
-);
-assert.match(
-  card,
-  /data-catalog-card-price[\s\S]{0,240} · | · [\s\S]{0,80}data-catalog-card-price/,
-  "separator stays with the nowrap price group",
 );
 assert.doesNotMatch(card, /Подарок/, "card UI does not show a gift status");
 assert.doesNotMatch(card, /Бесплатно/, "card UI does not show a free status");

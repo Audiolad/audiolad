@@ -55,6 +55,9 @@ assert.match(
   /CatalogMobileFiltersSlot/,
   "Фильтры sit in the fixed search row",
 );
+const search = read("src/components/listener/PlatformSearchField.tsx");
+assert.match(search, /isCompact \? null/, "compact catalog search has no Найти button");
+assert.match(search, />\s*Найти\s*</, "shell search still has Найти");
 assert.match(
   globals,
   /--catalog-mobile-search-height/,

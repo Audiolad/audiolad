@@ -8,7 +8,6 @@ import {
   type PublicationClass,
 } from "@/lib/catalog/dto";
 import { readPaidCatalogOfferPriceLabel } from "@/lib/catalog/offer";
-import { formatProductDuration } from "@/lib/products/duration";
 import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 import Link from "next/link";
 
@@ -36,8 +35,7 @@ export default function CatalogCardShell({
   signInReturnPath = "/catalog",
 }: CatalogCardLayoutProps) {
   const actionTarget = catalogCardToActionTarget(card);
-  const durationLabel = formatProductDuration(card.duration_seconds);
-  const offerPriceLabel =
+  const paidOfferLabel =
     card.class === "post" ? null : readPaidCatalogOfferPriceLabel(card.default_offer);
   const actionLabel = resolveActionLabel(card);
 
@@ -64,7 +62,9 @@ export default function CatalogCardShell({
         data-catalog-info-block
         className="block px-2.5 pb-2.5 pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        <p className={PRODUCT_FORMAT_LINE_CLASS}>{card.display_label}</p>
+        <p data-catalog-card-format className={PRODUCT_FORMAT_LINE_CLASS}>
+          {card.display_label}
+        </p>
 
         <h3 className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-[#25135c] sm:text-[15px] sm:leading-5">
           {card.title}
@@ -74,21 +74,14 @@ export default function CatalogCardShell({
           {card.author.name || "\u00a0"}
         </p>
 
-        {durationLabel || offerPriceLabel ? (
-          <p
-            data-catalog-card-meta
-            className="mt-1 flex flex-wrap items-baseline text-xs leading-4 text-[#7d70a2]"
-          >
-            {durationLabel ? <span>{durationLabel}</span> : null}
-            {offerPriceLabel ? (
-              <span
-                data-catalog-card-price
-                className="whitespace-nowrap font-semibold text-[#7042c5]"
-              >
-                {durationLabel ? " · " : null}
-                {offerPriceLabel}
-              </span>
-            ) : null}
+        {paidOfferLabel ? (
+          <p data-catalog-card-meta className="mt-1 text-xs leading-4">
+            <span
+              data-catalog-card-price
+              className="whitespace-nowrap font-semibold text-[#7042c5]"
+            >
+              {paidOfferLabel}
+            </span>
           </p>
         ) : null}
 
