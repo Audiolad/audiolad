@@ -176,6 +176,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         ) : null}
 
         <CatalogChipFilterBar
+          title="Доступ"
           ariaLabel="Фильтр по доступу"
           options={CATALOG_ACCESS_FILTER_OPTIONS}
           activeValue={resolvedListingQuery.access}
@@ -191,6 +192,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         />
 
         <CatalogChipFilterBar
+          title="Тип"
           ariaLabel="Фильтр по типу"
           options={CATALOG_CLASS_FILTER_OPTIONS}
           activeValue={resolvedListingQuery.class}

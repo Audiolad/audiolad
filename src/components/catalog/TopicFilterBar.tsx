@@ -26,7 +26,8 @@ export default function TopicFilterBar({
 
   return (
     <nav className="mt-3" aria-label="Фильтр по темам">
-      <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <h3 className="text-sm font-semibold text-[#25135c]">Темы</h3>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Link
           href={buildCatalogTopicHref(null, searchQuery || null, listing)}
           prefetch={false}

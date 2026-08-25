@@ -9,7 +9,7 @@ export const CATALOG_CLASS_FILTER_OPTIONS = [
   { value: "practice", label: "Практики" },
   { value: "course", label: "Курсы" },
   { value: "audiobook", label: "Аудиокниги" },
-  { value: "release", label: "Релизы" },
+  { value: "release", label: "Музыка" },
   { value: "post", label: "Посты" },
 ] as const;
 

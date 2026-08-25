@@ -56,7 +56,8 @@ assert.match(page, /CATALOG_CLASS_FILTER_OPTIONS/, "page uses shared class optio
 assert.match(filterUi, /Подарки/, "access filter includes gifts");
 assert.match(filterUi, /Продукты/, "access filter includes paid products");
 assert.match(filterUi, /Практики/, "class filter includes practices");
-assert.match(filterUi, /Релизы/, "class filter includes releases");
+assert.match(filterUi, /Музыка/, "class filter includes music");
+assert.doesNotMatch(filterUi, /Релизы/, "public class chips never say Релизы");
 assert.match(filterUi, /Посты/, "class filter includes posts");
 assert.doesNotMatch(filterUi, /product_kind/, "gifts/products are not product_kind");
 assert.match(page, /canLoadDefaultListingInParallel/, "first screen SSR is named");

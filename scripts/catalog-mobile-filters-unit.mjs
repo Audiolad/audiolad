@@ -31,6 +31,13 @@ assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the 
 assert.match(page, /data-catalog-desktop-filters/, "desktop chips stay on the page");
 assert.match(page, /hidden xl:block/, "page chips are desktop-only");
 assert.match(page, /TopicFilterBar/, "desktop still has topic chips");
+assert.match(
+  read("src/components/catalog/TopicFilterBar.tsx"),
+  />Темы</,
+  "desktop topic row shows the Темы group title",
+);
+assert.match(page, /title="Доступ"/, "desktop access row is labeled Доступ");
+assert.match(page, /title="Тип"/, "desktop class row is labeled Тип");
 assert.match(page, /parseCatalogTopicFilters/, "page parses a topic list");
 assert.match(page, /activeTopicKeys/, "page keeps selected topic keys");
 assert.match(
@@ -62,7 +69,9 @@ assert.match(filters, /CATALOG_CLASS_FILTER_OPTIONS/, "sheet uses shared class o
 assert.match(filterUi, /Подарки/, "access includes gifts");
 assert.match(filterUi, /Продукты/, "access includes paid");
 assert.match(filterUi, /Практики/, "class includes practices");
-assert.match(filterUi, /Релизы/, "class includes releases");
+assert.match(filterUi, /Музыка/, "class includes music");
+assert.doesNotMatch(filterUi, /Релизы/, "public class chips never say Релизы");
+assert.match(filterUi, /value: "release"/, "internal class value stays release");
 assert.match(filterUi, /Посты/, "class includes posts");
 assert.match(filters, /buildCatalogHref/, "sheet options use buildCatalogHref");
 assert.match(filters, /q: searchQuery/, "sheet keeps the current search query");
