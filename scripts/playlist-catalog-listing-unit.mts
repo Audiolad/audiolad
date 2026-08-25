@@ -124,18 +124,26 @@ assert.equal(
 
 assert.equal(
   matchesPlaylistListingSearch(
-    { title: "Утренний ритуал", creator: EDITORIAL_PLAYLIST_LABEL },
+    { title: "Утренний ритуал", description: "Короткий день" },
     "ритуал",
   ),
   true,
 );
 assert.equal(
   matchesPlaylistListingSearch(
-    { title: "Утро", creator: EDITORIAL_PLAYLIST_LABEL },
-    "аудиолада",
+    { title: "Утро", description: "Практика для ритуала" },
+    "ритуала",
   ),
   true,
-  "creator label is searchable without joining users",
+  "description is searchable",
+);
+assert.equal(
+  matchesPlaylistListingSearch(
+    { title: "Утро", description: "Короткий день", creator: EDITORIAL_PLAYLIST_LABEL },
+    "аудиолада",
+  ),
+  false,
+  "creator label is not part of catalog search",
 );
 assert.equal(
   matchesPlaylistListingSearch(
@@ -240,7 +248,27 @@ assert.ok(leaked);
 assert.equal(leaked.class, LISTING_ENTITY_CLASS.PLAYLIST);
 assert.equal(leaked.href, "/p/secret");
 assert.equal(leaked.coverUrl, "https://cdn.example/cover.jpg");
+assert.deepEqual(leaked.topics, []);
 assert.equal(playlistListingItemHasForbiddenField(leaked), false);
+
+const withTopics = mapPlaylistCatalogRowToCandidate(
+  {
+    id: "pl-money",
+    title: "Деньги",
+    slug: "money",
+    visibility: "public",
+    published_at: "2026-08-25T00:00:00.000Z",
+    listed_at: "2026-08-25T00:00:00.000Z",
+    is_editorial: true,
+    items_count: 1,
+    duration_seconds: 60,
+    saves_count: 0,
+    cover_path: null,
+  },
+  { coverUrl: null, access: "free", topics: ["money", "purpose"] },
+);
+assert.ok(withTopics);
+assert.deepEqual(withTopics.topics, ["money", "purpose"]);
 
 for (const field of PLAYLIST_LISTING_FORBIDDEN_FIELDS) {
   assert.equal(
@@ -256,6 +284,8 @@ assert.equal(saved[0]?.viewer.playing, false);
 
 assert.equal(isPrivateRoute("/playlists"), true);
 assert.equal(isPrivateRoute("/playlists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), true);
+assert.equal(isPrivateRoute("/playlists/saved"), true);
+assert.equal(isPublicPlaylistCatalogPath("/playlists/saved"), false);
 assert.equal(isPublicPlaylistCatalogPath("/playlists/catalog"), true);
 assert.equal(isPrivateRoute("/playlists/catalog"), false);
 assert.equal(isPrivateRoute("/playlists/catalog/"), false);
@@ -266,9 +296,13 @@ assert.equal(
 );
 assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.card)), true);
 assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.grid)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.searchUi)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.sortUi)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.filters)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.topicFilter)), true);
 assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.filterUi)), false);
-assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.saveAction)), false);
-assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.playAction)), false);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.saveAction)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.playAction)), true);
 
 const api = readFileSync(
   join(repoRoot, "src/app/api/playlists/catalog/route.ts"),
@@ -296,10 +330,23 @@ const personalDetail = readFileSync(
 assert.match(api, /listListedPlaylists/);
 assert.doesNotMatch(api, /user_id|owner_type|created_by|cover_path|direction_id/);
 assert.match(page, /loadPlaylistCatalogPage/);
+assert.match(page, /PlaylistCatalogSearch/);
+assert.match(page, /PlaylistCatalogSort/);
+assert.match(page, /PlaylistCatalogTopicFilter/);
 assert.match(page, /PlaylistGrid/);
 assert.doesNotMatch(page, /CatalogProductGrid/);
-assert.doesNotMatch(page, /PlaylistCatalogFilters/);
+assert.doesNotMatch(page, /PlaylistCatalogFilters|TopicFilterBar/);
+assert.doesNotMatch(page, /MobileCatalogSearch|PlatformCatalogInlineSearch/);
 assert.doesNotMatch(page, /трек|материал/);
+
+const listingSource = readFileSync(
+  join(repoRoot, "src/lib/playlists/listing.ts"),
+  "utf8",
+);
+assert.match(listingSource, /playlist_topics!inner/);
+assert.doesNotMatch(listingSource, /listListedPlaylistIdsForTopicKeys/);
+assert.match(listingSource, /listPlaylistTopicKeysByPlaylistIds/);
+assert.doesNotMatch(listingSource, /item\.topics\.includes/);
 assert.doesNotMatch(personalPage, /listListedPlaylists|PlaylistCatalogPage/);
 assert.doesNotMatch(personalDetail, /listListedPlaylists|PlaylistCatalogPage/);
 

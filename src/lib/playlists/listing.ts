@@ -4,21 +4,30 @@
  * Separate from product catalog listing. Do not add playlist as a product kind.
  *
  * Stage 3A UI lives in `src/components/playlists/catalog/` and consumes
- * `PlaylistListingItem` only. Remaining later-stage homes:
- * - filters → src/lib/playlists/listing-filters.ts
- *   and src/components/playlists/catalog/PlaylistCatalogFilters.tsx
- * - save action → src/app/api/playlists/saves/route.ts
- * - play action → src/lib/playlists/catalog-playback.ts
+ * `PlaylistListingItem` only. Stage 3B.1 save lives in
+ * `src/lib/playlists/playlist-saves-api.ts` and `/api/playlists/saves`.
+ * Stage 3B.2 play lives in `src/lib/playlists/catalog-playback.ts`.
+ * Stage 4A search/sort: SQL title+description ILIKE.
+ * Stage 4B.1 topics: playlist_topics assignments; listing filter is SQL EXISTS.
+ * Stage 5A.1: SQL-first page pipeline. WHERE + q + topic + newest keyset +
+ * LIMIT pageSize+1, then hydrate only that page. No FETCH_LIMIT / JS filter.
+ * Stage 5A.2: popular SQL keyset cursor `savesCount:listedAtMs:id`.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { escapeIlikePattern } from "@/lib/catalog/search";
 import { createPlaylistCoverSignedUrlsBatch } from "@/lib/playlists/covers";
+import {
+  listPlaylistTopicKeysByPlaylistIds,
+  normalizePlaylistTopicKeys,
+} from "@/lib/playlists/playlist-topics";
 import {
   decodePlaylistListingCursor,
   encodePlaylistListingCursor,
-  PLAYLIST_LISTING_FETCH_LIMIT,
+  encodePlaylistListingPopularCursor,
   resolvePlaylistListingCreatorName,
+  resolvePlaylistListingCursor,
   toPlaylistListingItem,
   type PlaylistListingAccess,
   type PlaylistListingAccessFilter,
@@ -36,13 +45,15 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export {
   PLAYLIST_LISTING_ACCESS,
   PLAYLIST_LISTING_ACCESS_FILTERS,
-  PLAYLIST_LISTING_FETCH_LIMIT,
   PLAYLIST_LISTING_MAX_LIMIT,
   PLAYLIST_LISTING_PAGE_SIZE,
   PLAYLIST_LISTING_SORTS,
   buildPlaylistListingApiUrl,
   decodePlaylistListingCursor,
+  decodePlaylistListingPopularCursor,
   encodePlaylistListingCursor,
+  encodePlaylistListingPopularCursor,
+  resolvePlaylistListingCursor,
   parsePlaylistListingAccessFilter,
   parsePlaylistListingLimit,
   parsePlaylistListingQuery,
@@ -71,6 +82,19 @@ export const PLAYLIST_CATALOG_LISTING_SELECT = [
   "saves_count",
   "cover_path",
 ].join(", ");
+
+export const PLAYLIST_CATALOG_TOPIC_EXISTS_EMBED =
+  "playlist_topics!inner(topics!inner(key, is_active))";
+
+export function buildPlaylistCatalogListingSelect(
+  topicKey: string | null | undefined,
+): string {
+  if (!normalizePlaylistTopicKeys(topicKey)[0]) {
+    return PLAYLIST_CATALOG_LISTING_SELECT;
+  }
+
+  return `${PLAYLIST_CATALOG_LISTING_SELECT}, ${PLAYLIST_CATALOG_TOPIC_EXISTS_EMBED}`;
+}
 
 export type PlaylistCatalogRow = {
   id: string;
@@ -119,7 +143,10 @@ export function listedAtToMs(listedAt: string): number | null {
 }
 
 export function matchesPlaylistListingSearch(
-  item: Pick<PlaylistListingItem, "title" | "creator">,
+  item: Pick<PlaylistListingItem, "title"> & {
+    description?: string | null;
+    creator?: string | null;
+  },
   query: string,
 ): boolean {
   const needle = query.trim().toLowerCase();
@@ -130,8 +157,76 @@ export function matchesPlaylistListingSearch(
 
   return (
     item.title.toLowerCase().includes(needle) ||
-    item.creator.toLowerCase().includes(needle)
+    (item.description ?? "").toLowerCase().includes(needle)
   );
+}
+
+export function buildPlaylistListingSearchOrFilter(query: string): string | null {
+  const needle = query.trim();
+
+  if (!needle) {
+    return null;
+  }
+
+  const escaped = escapeIlikePattern(needle);
+  const quotedPattern = `"%${escaped.replace(/"/g, '""')}%"`;
+
+  return `title.ilike.${quotedPattern},description.ilike.${quotedPattern}`;
+}
+
+function quoteListingFilterValue(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+export function buildPlaylistListingNewestCursorFilter(cursor: {
+  listedAtMs: number;
+  id: string;
+}): string {
+  const iso = quoteListingFilterValue(new Date(cursor.listedAtMs).toISOString());
+
+  return `listed_at.lt.${iso},and(listed_at.eq.${iso},id.lt.${cursor.id})`;
+}
+
+export function buildPlaylistListingPopularCursorFilter(anchor: {
+  savesCount: number;
+  listedAtMs: number;
+  id: string;
+}): string {
+  const iso = quoteListingFilterValue(new Date(anchor.listedAtMs).toISOString());
+
+  return [
+    `saves_count.lt.${anchor.savesCount}`,
+    `and(saves_count.eq.${anchor.savesCount},listed_at.lt.${iso})`,
+    `and(saves_count.eq.${anchor.savesCount},listed_at.eq.${iso},id.lt.${anchor.id})`,
+  ].join(",");
+}
+
+export function resolvePlaylistListingSqlPlan(query: PlaylistListingQuery): {
+  searchFilter: string | null;
+  topicKeys: string[];
+  select: string;
+  order: Array<{ column: "listed_at" | "saves_count" | "id"; ascending: boolean }>;
+  pageLimit: number;
+} {
+  const topicKeys = normalizePlaylistTopicKeys(query.topic);
+
+  return {
+    searchFilter: buildPlaylistListingSearchOrFilter(query.q),
+    topicKeys,
+    select: buildPlaylistCatalogListingSelect(query.topic),
+    order:
+      query.sort === "newest"
+        ? [
+            { column: "listed_at", ascending: false },
+            { column: "id", ascending: false },
+          ]
+        : [
+            { column: "saves_count", ascending: false },
+            { column: "listed_at", ascending: false },
+            { column: "id", ascending: false },
+          ],
+    pageLimit: query.limit + 1,
+  };
 }
 
 export function matchesPlaylistListingAccessFilter(
@@ -246,7 +341,7 @@ export function paginatePlaylistListingItems(
   };
 }
 
-function toPublicPlaylistListingItem(
+export function toPublicPlaylistListingItem(
   item: PlaylistListingCandidate,
 ): PlaylistListingItem {
   return toPlaylistListingItem({
@@ -334,7 +429,7 @@ async function resolveListingUserId(
   }
 }
 
-async function signPlaylistListingCovers(
+export async function signPlaylistListingCovers(
   rows: PlaylistCatalogRow[],
 ): Promise<Map<string, string | null>> {
   const coverPaths = rows
@@ -426,47 +521,98 @@ export async function listListedPlaylists(
     savesStore?: PlaylistSavesAsyncStore;
   } = {},
 ): Promise<PlaylistListingResult> {
-  const { data, error } = await supabase
+  const plan = resolvePlaylistListingSqlPlan(query);
+  let request = supabase
     .from("playlists")
-    .select(PLAYLIST_CATALOG_LISTING_SELECT)
+    .select(plan.select)
     .eq("visibility", "public")
     .not("published_at", "is", null)
     .not("listed_at", "is", null)
-    .not("slug", "is", null)
-    .order("listed_at", { ascending: false })
-    .limit(PLAYLIST_LISTING_FETCH_LIMIT);
+    .not("slug", "is", null);
+
+  if (plan.topicKeys.length === 1) {
+    request = request
+      .eq("playlist_topics.topics.key", plan.topicKeys[0])
+      .eq("playlist_topics.topics.is_active", true);
+  } else if (plan.topicKeys.length > 1) {
+    request = request
+      .in("playlist_topics.topics.key", plan.topicKeys)
+      .eq("playlist_topics.topics.is_active", true);
+  }
+
+  if (plan.searchFilter) {
+    request = request.or(plan.searchFilter);
+  }
+
+  for (const rule of plan.order) {
+    request = request.order(rule.column, { ascending: rule.ascending });
+  }
+
+  const decoded = resolvePlaylistListingCursor(query.cursor, query.sort);
+
+  if (decoded?.sort === "newest") {
+    request = request.or(buildPlaylistListingNewestCursorFilter(decoded));
+  } else if (decoded?.sort === "popular") {
+    request = request.or(buildPlaylistListingPopularCursorFilter(decoded));
+  }
+
+  const { data, error } = await request.limit(plan.pageLimit);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const rows = ((data as unknown as PlaylistCatalogRow[] | null) ?? []).filter(
-    isPlaylistListedForCatalog,
-  );
-  const [signedByPath, accessById] = await Promise.all([
-    signPlaylistListingCovers(rows),
-    loadPlaylistListingAccessByIds(
-      supabase,
-      rows.map((row) => row.id),
-    ),
+  const fetchedRows = (data as unknown as PlaylistCatalogRow[] | null) ?? [];
+  const hasMore = fetchedRows.length > query.limit;
+  const pageRows = fetchedRows.slice(0, query.limit);
+  const lastPageRow = pageRows[pageRows.length - 1];
+  const lastListedAtMs = lastPageRow
+    ? listedAtToMs(lastPageRow.listed_at ?? "")
+    : null;
+  const nextCursor =
+    hasMore && lastPageRow && lastListedAtMs !== null
+      ? query.sort === "popular"
+        ? encodePlaylistListingPopularCursor(
+            typeof lastPageRow.saves_count === "number"
+              ? lastPageRow.saves_count
+              : 0,
+            lastListedAtMs,
+            lastPageRow.id,
+          )
+        : encodePlaylistListingCursor(lastListedAtMs, lastPageRow.id)
+      : null;
+
+  if (pageRows.length === 0) {
+    return {
+      items: applyPlaylistListingSavedState([], null),
+      nextCursor: null,
+    };
+  }
+
+  const pageIds = pageRows.map((row) => row.id);
+  const [signedByPath, accessById, topicsById] = await Promise.all([
+    signPlaylistListingCovers(pageRows),
+    loadPlaylistListingAccessByIds(supabase, pageIds),
+    listPlaylistTopicKeysByPlaylistIds(supabase, pageIds),
   ]);
 
-  const candidates = rows
+  const items = pageRows
     .map((row) =>
       mapPlaylistCatalogRowToCandidate(row, {
         coverUrl: row.cover_path
           ? (signedByPath.get(row.cover_path) ?? null)
           : null,
         access: accessById.get(row.id) ?? "mixed",
-        topics: [],
+        topics: topicsById.get(row.id) ?? [],
       }),
     )
     .filter((item): item is PlaylistListingCandidate => item !== null)
-    .filter((item) => matchesPlaylistListingSearch(item, query.q))
-    .filter((item) => matchesPlaylistListingAccessFilter(item, query.access));
+    .map(toPublicPlaylistListingItem);
 
-  const sorted = sortPlaylistListingItems(candidates, query.sort);
-  const page = paginatePlaylistListingItems(sorted, query);
+  const page: PlaylistListingResult = {
+    items,
+    nextCursor,
+  };
   const userId = await resolveListingUserId(supabase, options.userId);
 
   if (!userId) {
@@ -479,10 +625,7 @@ export async function listListedPlaylists(
   const store = options.savesStore ?? createSupabasePlaylistSavesStore(supabase);
 
   try {
-    const savedIds = await store.listSavedPlaylistIds(
-      userId,
-      page.items.map((item) => item.id),
-    );
+    const savedIds = await store.listSavedPlaylistIds(userId, pageIds);
 
     return {
       ...page,

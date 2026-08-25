@@ -7,12 +7,12 @@ import {
   EDITORIAL_PLAYLIST_LABEL,
   USER_PLAYLIST_OWNER_LABEL,
 } from "@/lib/playlists/listing-labels";
+import { isUuid } from "@/lib/playlists/validation";
 import { buildPublicPlaylistPath } from "@/lib/playlists/public-url";
 
 export const PLAYLIST_LISTING_PAGE_SIZE = 20;
 export const PLAYLIST_LISTING_MAX_LIMIT = 50;
 export const PLAYLIST_LISTING_SEARCH_MAX_LENGTH = 100;
-export const PLAYLIST_LISTING_FETCH_LIMIT = 200;
 
 export const PLAYLIST_LISTING_ACCESS = ["free", "paid", "mixed"] as const;
 export const PLAYLIST_LISTING_ACCESS_FILTERS = [
@@ -230,11 +230,36 @@ export function buildPlaylistListingApiUrl(
   return search ? `/api/playlists/catalog?${search}` : "/api/playlists/catalog";
 }
 
+export type PlaylistListingNewestCursor = {
+  sort: "newest";
+  listedAtMs: number;
+  id: string;
+};
+
+export type PlaylistListingPopularCursor = {
+  sort: "popular";
+  savesCount: number;
+  listedAtMs: number;
+  id: string;
+};
+
+export type PlaylistListingResolvedCursor =
+  | PlaylistListingNewestCursor
+  | PlaylistListingPopularCursor;
+
 export function encodePlaylistListingCursor(
   listedAtMs: number,
   id: string,
 ): string {
   return `${listedAtMs}:${id}`;
+}
+
+export function encodePlaylistListingPopularCursor(
+  savesCount: number,
+  listedAtMs: number,
+  id: string,
+): string {
+  return `${savesCount}:${listedAtMs}:${id}`;
 }
 
 export function decodePlaylistListingCursor(
@@ -260,6 +285,54 @@ export function decodePlaylistListingCursor(
   }
 
   return { listedAtMs, id };
+}
+
+export function decodePlaylistListingPopularCursor(
+  cursor: string | null | undefined,
+): { savesCount: number; listedAtMs: number; id: string } | null {
+  const raw = cursor?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(":");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const savesCount = Number(parts[0]);
+  const listedAtMs = Number(parts[1]);
+  const id = parts[2]?.trim() ?? "";
+
+  if (
+    !Number.isInteger(savesCount) ||
+    savesCount < 0 ||
+    !Number.isFinite(listedAtMs) ||
+    !isUuid(id)
+  ) {
+    return null;
+  }
+
+  return { savesCount, listedAtMs, id };
+}
+
+export function resolvePlaylistListingCursor(
+  cursor: string | null | undefined,
+  sort: PlaylistListingSort,
+): PlaylistListingResolvedCursor | null {
+  if (sort === "popular") {
+    const popular = decodePlaylistListingPopularCursor(cursor);
+    return popular ? { sort: "popular", ...popular } : null;
+  }
+
+  if (decodePlaylistListingPopularCursor(cursor)) {
+    return null;
+  }
+
+  const newest = decodePlaylistListingCursor(cursor);
+  return newest ? { sort: "newest", ...newest } : null;
 }
 
 export function resolvePlaylistListingCreatorName(isEditorial: boolean): string {

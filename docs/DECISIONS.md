@@ -20,6 +20,7 @@
 - Маршрут витрины: `/playlists/catalog`. `/playlists` и `/playlists/[id]` не мигрировать.
 - Stage 1: контракт + модель + миграция. Без страницы, карточки, фильтров, play-кнопок, SEO.
 - Stage 2: `GET /api/playlists/catalog` + серверная `/playlists/catalog` через тот же listing-слой. В выдаче только listed public published. `/playlists/catalog` публичный; личный редактор остаётся private. UI карточки/сетки нет.
+- Stage 5B: сохранённые публичные плейлисты — отдельная private библиотека `/playlists/saved` на `playlist_saves`. Не смешивать с `library_saves`, `/my-practices` и product catalog. Новый пункт нижней навигации не создавать.
 
 **Принято:** владелец проекта (задания Stage 1 и Stage 2).
 

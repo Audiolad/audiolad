@@ -52,7 +52,7 @@ export default async function EditorialPlaylistEditorPage({
 
   return (
     <EditorialPlaylistEditorClient
-      key={`${loaded.detail.playlist.updated_at}-${loaded.detail.playlist.cover_updated_at ?? ""}-${loaded.detail.itemsCount}-${loaded.detail.playlist.slug ?? ""}`}
+      key={`${loaded.detail.playlist.updated_at}-${loaded.detail.playlist.cover_updated_at ?? ""}-${loaded.detail.itemsCount}-${loaded.detail.playlist.slug ?? ""}-${loaded.detail.topicKeys.join(",")}`}
       detail={loaded.detail}
     />
   );

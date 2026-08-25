@@ -4,6 +4,131 @@
 
 ---
 
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 5B)
+
+**Сделано:**
+
+- `GET /api/playlists/saved` — SQL-first listing из `playlist_saves` + listed public playlists.
+- Cursor `createdAtMs:id`, сортировка `created_at DESC, playlist_id DESC`.
+- `/playlists/saved` — private библиотека сохранённых; empty «Пока нет сохранённых плейлистов» + ссылка в каталог.
+- `/playlists` получил ссылку «Сохранённые» и общий `PlaylistLibraryNav`.
+- Переиспользованы `PlaylistCard`, `PlaylistGrid`, `PlaylistSaveButton`, `PlaylistPlayButton` (`public_playlist` queue).
+- Unsave убирает карточку со страницы saved. Новый nav item, `library_saves` и product library не менялись.
+
+**Следующий шаг:** только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 5A.2)
+
+**Сделано:**
+
+- Popular listing переведён на SQL keyset: `saves_count DESC, listed_at DESC, id DESC`.
+- Cursor `savesCount:listedAtMs:id`; newest `listedAtMs:id` не менялся.
+- Cursor другого sort сбрасывает на первую страницу (без lookup якоря).
+- Partial index `playlists_saves_count_listed_at_idx`.
+- UI, карточка, save/play, topics UX, SEO, product catalog и `saves_count` trigger не менялись.
+
+**Следующий шаг:** только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 5A.1)
+
+**Сделано:**
+
+- `listListedPlaylists` переведён на SQL-first page pipeline: WHERE, q, topic EXISTS, newest keyset, `LIMIT pageSize+1`.
+- Topic фильтрует через `playlist_topics!inner(topics!inner(...))`, без prefetch всех id.
+- Cover, topics hydration, access и viewer.saved считаются только для строк страницы.
+- `PLAYLIST_LISTING_FETCH_LIMIT` и JS search/filter/sort как источник страницы убраны.
+- Popular cursor не развивался (оставлен прежний SQL-path). UI, карточка, save/play, editorial topics и product catalog не менялись.
+
+**Следующий шаг:** только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 4B.3)
+
+**Сделано:**
+
+- `PlaylistCatalogTopicFilter` на `/playlists/catalog`: кнопка «Темы» / название выбранной темы, bottom sheet, single-select.
+- URL `?topic=key` через `buildPlaylistCatalogHref`; поиск и сортировка сохраняют topic; «Все» снимает только topic.
+- Empty state выбранной темы: «В этой теме пока нет плейлистов.»
+- Список активных тем из `listActiveTopics`. Карточка, product catalog, SEO и editorial editor не менялись.
+
+**Следующий шаг:** только по отдельному заданию. Stage 4B.4 не открывать.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 4B.2)
+
+**Сделано:**
+
+- `PUT /api/playlists/[id]/topics` для editorial editor через `set_playlist_topics`.
+- `EditorialWorkspaceDetail.topicKeys` + `TopicSelector` в секции «Данные».
+- Общий Save: PATCH metadata отдельно, PUT topics только если keys изменились.
+- User-owned `/playlists/[id]`, catalog topic UI и SEO не менялись.
+
+**Следующий шаг:** catalog topic filter UI только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 4B.1)
+
+**Сделано:**
+
+- Таблица `playlist_topics` + RPC `set_playlist_topics` (замена набора, active keys, max 3, дубликаты и неизвестный key — ошибка).
+- Domain `src/lib/playlists/playlist-topics.ts`: ids по keys, keys по playlist, mapping keys.
+- Listing `?topic=` фильтрует в SQL; плейлисты без тем остаются в общей выдаче.
+- `PlaylistListingItem.topics` возвращает keys.
+- UI фильтра тем, редактор, SEO `/topics` и user-owned writes не делались.
+
+**Следующий шаг:** UI фильтра тем только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 4A)
+
+**Сделано:**
+
+- Поиск каталога плейлистов перенесён в SQL: `title` + `description`, без creator/topics.
+- Пайплайн: SQL where `q` → order → cursor → `limit + 1`. `FETCH_LIMIT` до фильтра не используется.
+- UI: `PlaylistCatalogSearch` и chips `PlaylistCatalogSort` над сеткой.
+- URL-хелпер `buildPlaylistCatalogHref` в `listing-filters.ts`.
+- Empty state поиска: «Ничего не нашлось».
+- Topic/access/duration filters, recommendations и suggest search не делались.
+
+**Следующий шаг:** topic/access filters только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 3B.2)
+
+**Сделано:**
+
+- Play в `PlaylistCard` через существующий public playlist queue.
+- `catalog-playback` + `usePlaylistCatalogPlayback` + `PlaylistPlayButton`.
+- `GET /api/playlists/public/[slug]` — обёртка `loadPublicPlaylistBySlug`.
+- Повторный Play того же slug — pause/resume без нового GET/queue.
+- Play, queue engine, product catalog и `/p` не создавались заново и не менялись.
+
+**Следующий шаг:** фильтры topic/access только по отдельному заданию.
+
+---
+
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 3B.1)
+
+**Сделано:**
+
+- `POST/DELETE /api/playlists/saves` через `playlist-saves-api` и существующий `playlist_saves`.
+- `PlaylistSaveButton` + `usePlaylistCatalogSave`: optimistic update, rollback, guest → login.
+- Гость не пишет pending save; return path `/playlists/catalog`.
+- Play, queue, player, filters, `library_saves` и product catalog не менялись.
+
+**Следующий шаг:** play/queue и фильтры topic/access только по отдельному заданию.
+
+---
+
 ## Сессия — 25 августа 2026 (каталог плейлистов, Stage 3A)
 
 **Сделано:**

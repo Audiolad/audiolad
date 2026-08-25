@@ -47,8 +47,12 @@ assert.match(card, /Нет обложки/, "placeholder is labeled");
 assert.match(card, /aspect-square/, "cover is 1:1");
 assert.match(card, /line-clamp-3/, "title clamps to 3 lines");
 assert.match(card, /line-clamp-1/, "creator is one line");
-assert.match(card, /data-playlist-catalog-heart-button/, "heart is visual-only");
-assert.match(card, /data-playlist-catalog-play-button/, "play is visual-only");
+assert.match(card, /PlaylistSaveButton/, "heart is a playlist save button");
+assert.match(card, /playlistId=\{item\.id\}/, "card passes listing id only");
+assert.match(card, /saved=\{item\.viewer\.saved\}/, "card passes listing saved state");
+assert.match(card, /PlaylistPlayButton/, "play is a playlist catalog play button");
+assert.match(card, /slug=\{item\.slug\}/, "card passes listing slug only");
+assert.match(card, /title=\{item\.title\}/);
 assert.doesNotMatch(card, /CatalogProductGridCard/);
 assert.doesNotMatch(card, /import PlaylistCover/);
 assert.doesNotMatch(card, /mosaic|collage/i);
@@ -94,6 +98,11 @@ assert.match(
 );
 
 assert.match(page, /PlaylistGrid/);
+assert.match(page, /PlaylistCatalogSearch/);
+assert.match(page, /PlaylistCatalogSort/);
+assert.match(page, /PlaylistCatalogTopicFilter/);
+assert.match(page, /Ничего не нашлось/);
+assert.match(page, /В этой теме пока нет плейлистов/);
 assert.match(page, /loadPlaylistCatalogPage/);
 assert.match(page, /query=\{query\}/);
 assert.doesNotMatch(page, /PlaylistCard/);
@@ -101,6 +110,7 @@ assert.doesNotMatch(page, /CatalogProductGrid/);
 assert.doesNotMatch(page, /материалов/);
 assert.doesNotMatch(page, /трек/);
 assert.doesNotMatch(page, /PlaylistCatalogFilters/);
+assert.doesNotMatch(card, /item\.topics/);
 
 assert.match(contract, /PlaylistListingItem/);
 assert.doesNotMatch(contract, /durationLabel/);

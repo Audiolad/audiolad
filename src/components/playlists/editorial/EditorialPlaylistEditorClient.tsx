@@ -11,6 +11,7 @@ import {
   type ChangeEvent,
 } from "react";
 
+import TopicSelector from "@/components/author-products/TopicSelector";
 import EditorialCollaboratorsSection from "@/components/playlists/editorial/EditorialCollaboratorsSection";
 import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracticePickerSheet";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
@@ -28,6 +29,7 @@ import {
   playlistItemKey,
   playlistItemQuery,
 } from "@/lib/playlists/playlist-item-identity";
+import { PLAYLIST_TOPIC_LIMIT } from "@/lib/playlists/playlist-topics";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
@@ -66,6 +68,7 @@ export default function EditorialPlaylistEditorClient({
   const [title, setTitle] = useState(detail.playlist.title);
   const [slug, setSlug] = useState(detail.playlist.slug ?? "");
   const [description, setDescription] = useState(detail.playlist.description ?? "");
+  const [topicKeys, setTopicKeys] = useState(detail.topicKeys);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [coverUrl, setCoverUrl] = useState(detail.coverUrl);
   const [hasCustomCover, setHasCustomCover] = useState(
@@ -123,6 +126,24 @@ export default function EditorialPlaylistEditorClient({
     });
   }
 
+  function hasMetadataChanges() {
+    const nextDescription = description.trim() || null;
+    const previousDescription = detail.playlist.description?.trim() || null;
+
+    return (
+      title !== detail.playlist.title ||
+      nextDescription !== previousDescription ||
+      (!slugLocked && slug.trim() !== (detail.playlist.slug ?? ""))
+    );
+  }
+
+  function hasTopicChanges() {
+    return (
+      topicKeys.length !== detail.topicKeys.length ||
+      topicKeys.some((key, index) => key !== detail.topicKeys[index])
+    );
+  }
+
   async function saveMetadata() {
     if (submitting) {
       return;
@@ -132,40 +153,64 @@ export default function EditorialPlaylistEditorClient({
     setFormError(null);
 
     try {
-      const body: Record<string, unknown> = {
-        title,
-        description: description.trim() || null,
-      };
+      if (hasMetadataChanges()) {
+        const body: Record<string, unknown> = {
+          title,
+          description: description.trim() || null,
+        };
 
-      if (!slugLocked && slug.trim()) {
-        body.slug = slug.trim();
+        if (!slugLocked && slug.trim()) {
+          body.slug = slug.trim();
+        }
+
+        const response = await fetch(`/api/playlists/${detail.playlist.id}`, {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+
+        if (!response.ok) {
+          if (data.error === "slug_conflict") {
+            setFormError("Такой адрес плейлиста уже занят.");
+            return;
+          }
+
+          if (data.error === "slug_locked") {
+            setFormError("Адрес плейлиста закреплён после первой публикации.");
+            return;
+          }
+
+          setFormError(data.message || "Не удалось сохранить изменения.");
+          return;
+        }
       }
 
-      const response = await fetch(`/api/playlists/${detail.playlist.id}`, {
-        method: "PATCH",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      if (hasTopicChanges()) {
+        const response = await fetch(
+          `/api/playlists/${detail.playlist.id}/topics`,
+          {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topicKeys }),
+          },
+        );
 
-      const data = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-      };
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
 
-      if (!response.ok) {
-        if (data.error === "slug_conflict") {
-          setFormError("Такой адрес плейлиста уже занят.");
+        if (!response.ok) {
+          setFormError(data.message || "Не удалось сохранить темы.");
           return;
         }
-
-        if (data.error === "slug_locked") {
-          setFormError("Адрес плейлиста закреплён после первой публикации.");
-          return;
-        }
-
-        setFormError(data.message || "Не удалось сохранить изменения.");
-        return;
       }
 
       refresh();
@@ -481,6 +526,18 @@ export default function EditorialPlaylistEditorClient({
               {description.length}/{PLAYLIST_DESCRIPTION_MAX_LENGTH}
             </span>
           </label>
+
+          <div>
+            <span className="mb-2 block text-sm font-medium">Темы</span>
+            <TopicSelector
+              options={detail.topicOptions}
+              value={topicKeys}
+              limit={PLAYLIST_TOPIC_LIMIT}
+              hint={`Выберите до ${PLAYLIST_TOPIC_LIMIT} тем, которые лучше всего описывают этот плейлист.`}
+              disabled={submitting}
+              onChange={setTopicKeys}
+            />
+          </div>
         </div>
 
         {formError ? (

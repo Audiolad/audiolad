@@ -4,8 +4,11 @@ import { LISTING_ENTITY_CLASS } from "../src/lib/listing/entity-class";
 import { EDITORIAL_PLAYLIST_LABEL } from "../src/lib/playlists/editorial-content";
 import {
   decodePlaylistListingCursor,
+  decodePlaylistListingPopularCursor,
   encodePlaylistListingCursor,
+  encodePlaylistListingPopularCursor,
   isPlaylistListingClass,
+  resolvePlaylistListingCursor,
   isProductListingClass,
   parsePlaylistListingLimit,
   parsePlaylistListingQuery,
@@ -46,6 +49,22 @@ assert.deepEqual(decodePlaylistListingCursor(cursor), {
   id: "pl-1",
 });
 assert.equal(decodePlaylistListingCursor("nope"), null);
+
+const popularId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+assert.equal(
+  encodePlaylistListingPopularCursor(12, 1_724_572_800_000, popularId),
+  `12:1724572800000:${popularId}`,
+);
+assert.deepEqual(
+  decodePlaylistListingPopularCursor(`12:1724572800000:${popularId}`),
+  { savesCount: 12, listedAtMs: 1_724_572_800_000, id: popularId },
+);
+assert.equal(decodePlaylistListingPopularCursor(cursor), null);
+assert.equal(
+  resolvePlaylistListingCursor(`12:1724572800000:${popularId}`, "newest"),
+  null,
+);
+assert.equal(resolvePlaylistListingCursor(cursor, "popular"), null);
 
 assert.equal(
   resolvePlaylistListingCreatorName(true),

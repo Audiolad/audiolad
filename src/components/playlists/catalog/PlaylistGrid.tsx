@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import PlaylistCard from "@/components/playlists/catalog/PlaylistCard";
 import {
@@ -10,10 +10,20 @@ import {
 } from "@/lib/playlists/listing-contract";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
+type PlaylistGridApiUrlBuilder = (
+  query: Partial<PlaylistListingQuery> & { cursor?: string | null },
+) => string;
+
 type PlaylistGridProps = {
   items: PlaylistListingItem[];
   nextCursor: string | null;
   query: Omit<PlaylistListingQuery, "cursor">;
+  isAuthenticated: boolean;
+  signInReturnPath: string;
+  buildApiUrl?: PlaylistGridApiUrlBuilder;
+  ariaLabel?: string;
+  removeUnsaved?: boolean;
+  emptyContent?: ReactNode;
 };
 
 type PlaylistListingResponse = {
@@ -25,6 +35,12 @@ export default function PlaylistGrid({
   items: initialItems,
   nextCursor: initialNextCursor,
   query,
+  isAuthenticated,
+  signInReturnPath,
+  buildApiUrl = buildPlaylistListingApiUrl,
+  ariaLabel = "Каталог плейлистов",
+  removeUnsaved = false,
+  emptyContent = null,
 }: PlaylistGridProps) {
   const [items, setItems] = useState(initialItems);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -44,7 +60,7 @@ export default function PlaylistGrid({
 
     try {
       const response = await fetch(
-        buildPlaylistListingApiUrl({
+        buildApiUrl({
           ...query,
           cursor: nextCursor,
         }),
@@ -72,7 +88,7 @@ export default function PlaylistGrid({
       inFlightRef.current = false;
       setIsLoading(false);
     }
-  }, [nextCursor, query]);
+  }, [buildApiUrl, nextCursor, query]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -95,19 +111,34 @@ export default function PlaylistGrid({
     return () => observer.disconnect();
   }, [loadMore, nextCursor]);
 
+  function handleViewerSavedChange(playlistId: string, saved: boolean) {
+    if (removeUnsaved && !saved) {
+      setItems((current) => current.filter((item) => item.id !== playlistId));
+    }
+  }
+
   if (items.length === 0) {
-    return null;
+    return emptyContent ? <>{emptyContent}</> : null;
   }
 
   return (
     <section
       className={`mt-5 ${platformBottomContentPaddingClass}`}
-      aria-label="Каталог плейлистов"
+      aria-label={ariaLabel}
     >
       <ul data-playlist-catalog-grid className="catalog-product-grid">
         {items.map((item) => (
           <li key={item.id}>
-            <PlaylistCard item={item} />
+            <PlaylistCard
+              item={item}
+              isAuthenticated={isAuthenticated}
+              signInReturnPath={signInReturnPath}
+              onViewerSavedChange={
+                removeUnsaved
+                  ? (saved) => handleViewerSavedChange(item.id, saved)
+                  : undefined
+              }
+            />
           </li>
         ))}
       </ul>

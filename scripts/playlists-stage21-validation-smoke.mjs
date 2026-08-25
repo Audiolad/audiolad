@@ -285,6 +285,9 @@ assert(!editor.includes("Удалить плейлист"), "no delete playlist 
 assert(editor.includes("Адрес плейлиста закреплён"), "locked address");
 assert(editor.includes("directionName"), "shows direction name");
 assert(editor.includes("Опубликовать"), "publish remains");
+assert(editor.includes("TopicSelector"), "editorial topics use existing selector");
+assert(editor.includes("/topics"), "editorial save can PUT topics");
+assert(!editor.includes("body.topicKeys"), "PATCH metadata does not send topicKeys");
 
 const collabUi = read(
   "src/components/playlists/editorial/EditorialCollaboratorsSection.tsx",
