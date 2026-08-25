@@ -2,7 +2,12 @@
 
 Документ описывает платформенную систему тем (Stage A foundation).
 
-Миграция: `supabase/migrations/20260717140000_topics_foundation.sql`
+Миграции:
+
+- `supabase/migrations/20260717140000_topics_foundation.sql` — таблица и MVP-справочник
+- `supabase/migrations/20260825120000_topics_career_business_learning.sql` — Карьера / Бизнес / Обучение
+
+Тема — отдельная грань каталога. Она не является классом публикации (`practice` | `course` | `audiobook` | `release` | `post`) и не добавляет `product_kind`. «Обучение» (`learning`) не равно `class=course`.
 
 ---
 
@@ -23,6 +28,23 @@
 | `key` | Стабильный системный идентификатор (API, analytics). **Не менять** после создания |
 | `slug` | Публичный URL для будущих `/topics/[slug]`. MVP: совпадает с `key` |
 | `title` | Отображаемое название; переименование без миграции связей |
+
+### Текущий справочник
+
+| `key` / `slug` | `title` | `sort_order` |
+|----------------|---------|--------------|
+| `money` | Деньги | 10 |
+| `relationships` | Отношения | 20 |
+| `calm` | Спокойствие | 30 |
+| `self-worth` | Уверенность и самоценность | 40 |
+| `body-wellbeing` | Тело и самочувствие | 50 |
+| `energy` | Энергия и ресурс | 60 |
+| `purpose` | Предназначение | 70 |
+| `career` | Карьера | 80 |
+| `business` | Бизнес | 90 |
+| `learning` | Обучение | 100 |
+
+Фильтры каталога и кабинет автора читают этот справочник через `listActiveTopics()` / `listTopicsWithCatalogCounts()`. Хардкод массива тем в UI запрещён.
 
 ---
 

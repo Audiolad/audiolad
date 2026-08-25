@@ -13,8 +13,8 @@ BEGIN
   FROM public.topics
   WHERE is_active = true;
 
-  IF v_topic_count <> 7 THEN
-    RAISE EXCEPTION 'smoke failed: expected 7 active topics, got %', v_topic_count;
+  IF v_topic_count < 7 THEN
+    RAISE EXCEPTION 'smoke failed: expected at least 7 active topics, got %', v_topic_count;
   END IF;
 
   SELECT count(*)

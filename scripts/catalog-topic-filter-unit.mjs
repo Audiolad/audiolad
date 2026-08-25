@@ -2,6 +2,8 @@
 /**
  * Catalog topic filter unit checks (no DB).
  */
+import { readFileSync } from "node:fs";
+
 import {
   buildCatalogHref,
   buildCatalogTopicHref,
@@ -22,7 +24,7 @@ function assert(condition, message) {
   }
 }
 
-const allowedKeys = ["money", "relationships", "calm"];
+const allowedKeys = ["money", "relationships", "calm", "career", "business", "learning"];
 
 assert(parseCatalogTopicFilter(undefined, allowedKeys) === null, "missing param -> all");
 assert(parseCatalogTopicFilter("", allowedKeys) === null, "empty param -> all");
@@ -155,6 +157,80 @@ assert(
     { key: "calm", title: "Спокойствие" },
   ]) === "Деньги, Спокойствие",
   "multi-topic intro labels",
+);
+
+assert(
+  parseCatalogTopicFilter("career", allowedKeys) === "career",
+  "career topic key",
+);
+assert(
+  parseCatalogTopicFilter("business", allowedKeys) === "business",
+  "business topic key",
+);
+assert(
+  parseCatalogTopicFilter("learning", allowedKeys) === "learning",
+  "learning topic key is not a publication class",
+);
+assert(
+  getCatalogTopicFilterLabel("career,business,learning", [
+    { key: "career", title: "Карьера" },
+    { key: "business", title: "Бизнес" },
+    { key: "learning", title: "Обучение" },
+  ]) === "Карьера, Бизнес, Обучение",
+  "new topic titles resolve in filter labels",
+);
+
+const topicSeed = readFileSync(
+  "supabase/migrations/20260825120000_topics_career_business_learning.sql",
+  "utf8",
+);
+const catalogFilterUi = readFileSync("src/lib/catalog/catalog-filter-ui.ts", "utf8");
+const listingContract = readFileSync("src/lib/catalog/listing-contract.ts", "utf8");
+const catalogDto = readFileSync("src/lib/catalog/dto.ts", "utf8");
+const topicQueries = readFileSync("src/lib/topics/queries.ts", "utf8");
+
+assert(topicSeed.includes("'career'"), "seed has career key");
+assert(topicSeed.includes("'business'"), "seed has business key");
+assert(topicSeed.includes("'learning'"), "seed has learning key");
+assert(topicSeed.includes("'Карьера'"), "seed has Карьера title");
+assert(topicSeed.includes("'Бизнес'"), "seed has Бизнес title");
+assert(topicSeed.includes("'Обучение'"), "seed has Обучение title");
+assert(topicSeed.includes("ON CONFLICT (key) DO NOTHING"), "seed is insert-if-not-exists");
+assert(
+  topicSeed.includes("INSERT INTO public.topics") &&
+    !topicSeed.includes("product_kind") &&
+    !topicSeed.includes("CREATE TABLE") &&
+    !topicSeed.includes("ALTER TABLE"),
+  "seed only inserts topics and does not add a content class",
+);
+
+assert(
+  topicQueries.includes('from("topics")') && topicQueries.includes("listActiveTopics"),
+  "filters and cabinet still load topics from the directory table",
+);
+assert(
+  !catalogFilterUi.includes("Карьера") &&
+    !catalogFilterUi.includes("Бизнес") &&
+    !catalogFilterUi.includes("Обучение"),
+  "catalog-filter-ui does not hardcode the new topic titles",
+);
+assert(
+  !listingContract.includes('"learning"') &&
+    !listingContract.includes('"career"') &&
+    !listingContract.includes('"business"'),
+  "listing class filters stay independent of the new topic keys",
+);
+assert(
+  catalogDto.includes('"course"') &&
+    !catalogDto.includes('"learning"') &&
+    !catalogDto.includes('"career"') &&
+    !catalogDto.includes('"business"'),
+  "Freeze v2 publication classes unchanged; learning is not a class",
+);
+assert(
+  catalogFilterUi.includes('value: "course"') &&
+    !catalogFilterUi.includes('value: "learning"'),
+  "class chip Курсы stays course; Обучение is not a class option",
 );
 
 console.log("catalog-topic-filter-unit: ok");

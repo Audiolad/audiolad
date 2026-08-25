@@ -211,6 +211,11 @@ function testRepoOneFileOneVersion() {
       (row) => row.filename === "20260823200000_library_saves_and_preview_window.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260825120000_topics_career_business_learning.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -246,8 +251,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260823190000",
     "20260823191000",
     "20260823200000",
+    "20260825120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 3);
+  assert.equal(plan.database_migrations_pending, 4);
 }
 
 function main() {
