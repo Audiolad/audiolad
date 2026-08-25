@@ -64,8 +64,17 @@ import {
   waitForPlayingEvent,
 } from "@/lib/audio/playback-recovery";
 import { logPlayerDebug } from "@/lib/audio/player-debug";
+import {
+  fetchSignedAudioUrl,
+  playErrorName,
+} from "@/lib/audio/signed-audio-url";
 
 type TracksExhaustedResult = "advanced" | "completed" | "none";
+
+type PrefetchedSource = {
+  audioItemId: string;
+  url: string;
+};
 
 type UseSequentialPlayerOptions = {
   /** Discriminator: private_audio uses private signed URL + progress APIs. */
@@ -108,6 +117,11 @@ type UseSequentialPlayerOptions = {
    * do not recreate the media element (required for iOS autoplay unlock).
    */
   audioRef: MutableRefObject<HTMLAudioElement | null>;
+  /**
+   * Queue-advance handoff: URL already applied (and usually playing) on the
+   * persistent <audio>. Consume once — do not remount or refetch before play.
+   */
+  handoffSourceRef?: MutableRefObject<PrefetchedSource | null>;
   playbackMode?: "full" | "preview";
   previewStartMs?: number;
   previewEndMs?: number;
@@ -117,6 +131,8 @@ type UseSequentialPlayerOptions = {
 type SwitchTrackOptions = {
   autoPlay?: boolean;
   startPosition?: number;
+  /** Ended / Next / Media Session next — never await progress I/O before play. */
+  fromEndedOrNext?: boolean;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -144,6 +160,7 @@ export function useSequentialPlayer({
   guestProgressMode = false,
   guestProgressMeta,
   audioRef,
+  handoffSourceRef,
   playbackMode = "full",
   previewStartMs,
   previewEndMs,
@@ -205,6 +222,10 @@ export function useSequentialPlayer({
   const loadSignedUrlRef = useRef<(audioItemId: string) => Promise<void>>(
     async () => {},
   );
+  const prefetchedNextSourceRef = useRef<PrefetchedSource | null>(null);
+  const prefetchAbortRef = useRef<AbortController | null>(null);
+  const skipUrlLoadForTrackRef = useRef<string | null>(null);
+  const skipSrcReloadRef = useRef<string | null>(null);
 
   const PREPARE_AUDIO_MESSAGE = "Подготавливаем аудио…";
   const PREPARE_AUDIO_ERROR = "Не удалось подготовить аудио.";
@@ -292,13 +313,18 @@ export function useSequentialPlayer({
   const currentTrack = tracks[currentTrackIndex] ?? null;
 
   const debugSnapshot = useCallback(
-    (source: string, event: string) => {
+    (
+      source: string,
+      event: string,
+      fields?: Record<string, string | number | boolean | null | undefined>,
+    ) => {
       logPlayerDebug(source, event, {
         audio: audioRef.current,
         isPlaying: isPlayingRef.current,
         isRecovering,
         userWantsPlayback: userWantsPlaybackRef.current,
         sessionGeneration: getSessionGenerationRef.current?.() ?? 0,
+        fields,
       });
     },
     [isRecovering],
@@ -629,25 +655,15 @@ export function useSequentialPlayer({
 
       let settled = false;
 
-      try {
-        const response = fetchAsPrivate
-          ? await fetch(
-              `/api/my-library/private-audio/${encodeURIComponent(audioItemId)}/audio`,
-              {
-                credentials: "same-origin",
-                cache: "no-store",
-                signal: abortController.signal,
-              },
-            )
-          : await fetch(
-              `${fetchApiBase}/audio/${audioItemId}${
-                isPreviewModeRef.current ? "?preview=1" : ""
-              }`,
-              {
-                signal: abortController.signal,
-              },
-            );
+      const result = await fetchSignedAudioUrl({
+        audioItemId,
+        sourceType: fetchAsPrivate ? "private_audio" : "catalog",
+        listenApiBase: fetchApiBase,
+        preview: isPreviewModeRef.current,
+        signal: abortController.signal,
+      });
 
+      try {
         if (isStale()) {
           console.info("private_audio_session_switch", {
             stage: "url_fetch_stale_ignored",
@@ -657,36 +673,35 @@ export function useSequentialPlayer({
           return;
         }
 
-        const payload = (await response.json()) as {
-          url?: string;
-          error?: string;
-        };
+        if (!result.ok) {
+          if (result.aborted) {
+            return;
+          }
 
-        if (isStale()) {
-          return;
-        }
-
-        if (!response.ok || !payload.url) {
           console.error("private_audio_session_switch", {
-            stage: "url_fetch_failed",
-            status: response.status,
+            stage:
+              result.status === null
+                ? "url_fetch_exception"
+                : "url_fetch_failed",
+            status: result.status,
             generation: capturedGeneration,
             private: fetchAsPrivate,
             retries: urlRetryCountRef.current,
           });
 
-          if (response.status === 401 || response.status === 403) {
+          if (result.status === 401 || result.status === 403) {
             setUrlError(
               fetchAsPrivate
                 ? "Нет доступа к этому аудиоматериалу."
                 : "Доступ к прослушиванию не открыт.",
             );
-          } else if (response.status === 404) {
+          } else if (result.status === 404) {
             setUrlError("Аудиофайл не найден.");
           } else {
             setUrlError(PREPARE_AUDIO_ERROR);
           }
 
+          prefetchedNextSourceRef.current = null;
           setSrc(null);
           setIsLoading(false);
           settled = true;
@@ -694,30 +709,7 @@ export function useSequentialPlayer({
         }
 
         urlRetryCountRef.current = 0;
-        setSrc(payload.url);
-        settled = true;
-      } catch (error) {
-        if (
-          abortController.signal.aborted ||
-          (error instanceof DOMException && error.name === "AbortError")
-        ) {
-          return;
-        }
-
-        if (isStale()) {
-          return;
-        }
-
-        console.error("private_audio_session_switch", {
-          stage: "url_fetch_exception",
-          generation: capturedGeneration,
-          private: fetchAsPrivate,
-          error: error instanceof Error ? error.message : "unknown",
-        });
-
-        setUrlError(PREPARE_AUDIO_ERROR);
-        setSrc(null);
-        setIsLoading(false);
+        setSrc(result.url);
         settled = true;
       } finally {
         // Never auto-retry after generation change — that poisoned catalog loads
@@ -738,6 +730,49 @@ export function useSequentialPlayer({
     loadSignedUrlRef.current = loadSignedUrl;
   }, [loadSignedUrl]);
 
+  const applyUrlAndPlayNow = useCallback(
+    (
+      url: string,
+      meta: {
+        usedPrefetch: boolean;
+        currentAudioItemId: string | null;
+        nextAudioItemId: string;
+        advanceKind: "session" | "queue";
+      },
+    ) => {
+      const audio = audioRef.current;
+
+      if (!audio) {
+        return false;
+      }
+
+      if (audio.getAttribute("src") !== url) {
+        audio.src = url;
+      }
+
+      skipSrcReloadRef.current = url;
+      userWantsPlaybackRef.current = true;
+      wasPlayingBeforeSwitchRef.current = false;
+
+      void audio.play().catch((error: unknown) => {
+        const name = playErrorName(error);
+        debugSnapshot("advance-play", `rejected:${name}`, {
+          usedPrefetch: meta.usedPrefetch,
+          currentAudioItemId: meta.currentAudioItemId,
+          nextAudioItemId: meta.nextAudioItemId,
+          advanceKind: meta.advanceKind,
+          errorName: name,
+        });
+        wasPlayingBeforeSwitchRef.current = true;
+        initialPlaybackBufferingRef.current = false;
+        setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
+      });
+
+      return true;
+    },
+    [audioRef, debugSnapshot],
+  );
+
   const switchToTrack = useCallback(
     async (nextIndex: number, options?: SwitchTrackOptions) => {
       if (nextIndex < 0 || nextIndex >= tracks.length) {
@@ -749,20 +784,31 @@ export function useSequentialPlayer({
       if (previousTrack) {
         const previousPosition =
           audioRef.current?.currentTime ?? currentTimeRef.current;
-
-        await saveProgress(
-          previousTrack.id,
-          previousPosition,
-          isTrackCompleted(
-            previousTrack.durationSeconds,
+        const persistOutgoing = () =>
+          saveProgress(
+            previousTrack.id,
             previousPosition,
-            progressRef.current.find(
-              (entry) => entry.audioItemId === previousTrack.id,
-            )?.completed ?? false,
-          ),
-          { force: true },
-        );
+            isTrackCompleted(
+              previousTrack.durationSeconds,
+              previousPosition,
+              progressRef.current.find(
+                (entry) => entry.audioItemId === previousTrack.id,
+              )?.completed ?? false,
+            ),
+            { force: true },
+          );
+
+        if (options?.fromEndedOrNext) {
+          void persistOutgoing();
+        } else {
+          await persistOutgoing();
+        }
       }
+
+      const nextTrack = tracks[nextIndex];
+      const prefetch = prefetchedNextSourceRef.current;
+      const prefetchMatch =
+        Boolean(prefetch) && prefetch?.audioItemId === nextTrack.id;
 
       wasPlayingBeforeSwitchRef.current = options?.autoPlay ?? isPlaying;
       setCurrentTrackIndex(nextIndex);
@@ -773,10 +819,35 @@ export function useSequentialPlayer({
       setProgramCompleted(false);
       setIsLoading(true);
 
-      const nextTrack = tracks[nextIndex];
+      if (prefetchMatch && prefetch) {
+        skipUrlLoadForTrackRef.current = nextTrack.id;
+        prefetchedNextSourceRef.current = null;
+        setSrc(prefetch.url);
+        setIsUrlLoading(false);
+        setIsLoading(false);
+
+        if (options?.autoPlay) {
+          applyUrlAndPlayNow(prefetch.url, {
+            usedPrefetch: true,
+            currentAudioItemId: previousTrack?.id ?? null,
+            nextAudioItemId: nextTrack.id,
+            advanceKind: "session",
+          });
+        }
+
+        return;
+      }
+
       await loadSignedUrl(nextTrack.id);
     },
-    [currentTrackIndex, isPlaying, loadSignedUrl, saveProgress, tracks],
+    [
+      applyUrlAndPlayNow,
+      currentTrackIndex,
+      isPlaying,
+      loadSignedUrl,
+      saveProgress,
+      tracks,
+    ],
   );
 
   useEffect(() => {
@@ -785,11 +856,42 @@ export function useSequentialPlayer({
     }
 
     const trackId = currentTrack.id;
+    const handoff = handoffSourceRef?.current;
+
+    if (handoff && handoff.audioItemId === trackId && handoff.url) {
+      handoffSourceRef.current = null;
+      skipUrlLoadForTrackRef.current = trackId;
+      skipSrcReloadRef.current = handoff.url;
+      setSrc(handoff.url);
+      setIsUrlLoading(false);
+      setIsLoading(false);
+
+      const audio = audioRef.current;
+
+      if (audio && !audio.paused && !audio.ended) {
+        setPlayingState(true);
+        userWantsPlaybackRef.current = true;
+      }
+
+      return;
+    }
+
+    if (skipUrlLoadForTrackRef.current === trackId) {
+      skipUrlLoadForTrackRef.current = null;
+      return;
+    }
 
     queueMicrotask(() => {
       void loadSignedUrl(trackId);
     });
-  }, [currentTrack?.id, sessionGeneration, loadSignedUrl]);
+  }, [
+    audioRef,
+    currentTrack?.id,
+    handoffSourceRef,
+    loadSignedUrl,
+    sessionGeneration,
+    setPlayingState,
+  ]);
 
   const applySrcToAudioElement = useCallback(() => {
     const audio = audioRef.current;
@@ -799,8 +901,22 @@ export function useSequentialPlayer({
     }
 
     // Imperative src — required when <audio> lives outside this component.
-    if (audio.getAttribute("src") !== src) {
+    const alreadyHasSrc = audio.getAttribute("src") === src;
+
+    if (!alreadyHasSrc) {
       audio.src = src;
+    }
+
+    // Prefetch / queue handoff already applied src and called play() on this
+    // element. Calling load() here would cancel that play() on iOS.
+    if (
+      skipSrcReloadRef.current === src ||
+      (alreadyHasSrc && !audio.paused && !audio.ended)
+    ) {
+      skipSrcReloadRef.current = null;
+      setIsLoading(false);
+      setStatusMessage("");
+      return true;
     }
 
     audio.load();
@@ -850,6 +966,73 @@ export function useSequentialPlayer({
       cancelled = true;
     };
   }, [applySrcToAudioElement, src]);
+
+  const trackIdsKey = useMemo(
+    () => tracks.map((track) => track.id).join("\0"),
+    [tracks],
+  );
+
+  useEffect(() => {
+    prefetchedNextSourceRef.current = null;
+    prefetchAbortRef.current?.abort();
+    prefetchAbortRef.current = null;
+
+    if (!src || urlError || playerError) {
+      return;
+    }
+
+    const nextTrack = tracks[currentTrackIndex + 1];
+
+    if (!nextTrack) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    prefetchAbortRef.current = abortController;
+    const nextTrackId = nextTrack.id;
+    const capturedGeneration = getSessionGenerationRef.current?.() ?? 0;
+    const fetchAsPrivate = isPrivateAudioRef.current;
+    const fetchApiBase = listenApiBaseRef.current;
+
+    void (async () => {
+      const result = await fetchSignedAudioUrl({
+        audioItemId: nextTrackId,
+        sourceType: fetchAsPrivate ? "private_audio" : "catalog",
+        listenApiBase: fetchApiBase,
+        preview: isPreviewModeRef.current,
+        signal: abortController.signal,
+      });
+
+      if (
+        abortController.signal.aborted ||
+        capturedGeneration !== (getSessionGenerationRef.current?.() ?? 0)
+      ) {
+        return;
+      }
+
+      if (result.ok) {
+        prefetchedNextSourceRef.current = {
+          audioItemId: nextTrackId,
+          url: result.url,
+        };
+      }
+    })();
+
+    return () => {
+      abortController.abort();
+      if (prefetchedNextSourceRef.current?.audioItemId === nextTrackId) {
+        prefetchedNextSourceRef.current = null;
+      }
+    };
+  }, [
+    currentTrackIndex,
+    playerError,
+    sessionGeneration,
+    src,
+    trackIdsKey,
+    tracks,
+    urlError,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1004,11 +1187,19 @@ export function useSequentialPlayer({
         wasPlayingBeforeSwitchRef.current = false;
         userWantsPlaybackRef.current = true;
         initialPlaybackBufferingRef.current = true;
-        void audio.play().catch(() => {
+        void audio.play().catch((error: unknown) => {
           if (!isHandlerCurrent()) {
             return;
           }
 
+          const name = playErrorName(error);
+          debugSnapshot("advance-play", `rejected:${name}`, {
+            usedPrefetch: false,
+            currentAudioItemId: currentTrack?.id ?? null,
+            nextAudioItemId: currentTrack?.id ?? null,
+            advanceKind: "session",
+            errorName: name,
+          });
           initialPlaybackBufferingRef.current = false;
           setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
         });
@@ -1053,7 +1244,7 @@ export function useSequentialPlayer({
       debugSnapshot("audio-event", "stalled");
     };
 
-    const handleEnded = async () => {
+    const handleEnded = () => {
       if (!isHandlerCurrent() || !currentTrack) {
         return;
       }
@@ -1066,25 +1257,30 @@ export function useSequentialPlayer({
       setPlayingState(false);
       setCurrentTime(audio.duration || 0);
 
-      await saveProgress(currentTrack.id, audio.duration || 0, true, {
+      void saveProgress(currentTrack.id, audio.duration || 0, true, {
         force: true,
       });
 
       if (currentTrackIndex < tracks.length - 1) {
-        await switchToTrack(currentTrackIndex + 1, {
+        void switchToTrack(currentTrackIndex + 1, {
           autoPlay: true,
           startPosition: 0,
+          fromEndedOrNext: true,
         });
         return;
       }
 
       if (onTracksExhaustedRef.current) {
-        const result = await onTracksExhaustedRef.current(practiceId);
+        void onTracksExhaustedRef.current(practiceId).then((result) => {
+          if (result === "advanced" || result === "completed") {
+            userWantsPlaybackRef.current = result === "advanced";
+            return;
+          }
 
-        if (result === "advanced" || result === "completed") {
-          userWantsPlaybackRef.current = result === "advanced";
-          return;
-        }
+          userWantsPlaybackRef.current = false;
+          setProgramCompleted(true);
+        });
+        return;
       }
 
       userWantsPlaybackRef.current = false;
@@ -1455,6 +1651,7 @@ export function useSequentialPlayer({
       await switchToTrack(currentTrackIndex + 1, {
         autoPlay: isPlaying,
         startPosition: 0,
+        fromEndedOrNext: true,
       });
       return;
     }
@@ -1636,6 +1833,11 @@ export function useSequentialPlayer({
     urlAbortRef.current?.abort();
     urlAbortRef.current = null;
     urlRetryCountRef.current = 0;
+    prefetchAbortRef.current?.abort();
+    prefetchAbortRef.current = null;
+    prefetchedNextSourceRef.current = null;
+    skipUrlLoadForTrackRef.current = null;
+    skipSrcReloadRef.current = null;
 
     // Flush with this engine's snapshot (private/catalog) before clearing audio.
     void flushProgress();
