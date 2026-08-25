@@ -74,6 +74,7 @@ import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "../src
 import { KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/kolybelnye-dlya-malyshey-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-dlya-sna-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1603,6 +1604,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fortySeventhListenHref}`,
     ),
     "directory JSON-LD includes forty-seventh listen href",
+  );
+
+  const fortyEighthListenHref = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
+  const fortyEighthListenCard = data.articles.find((card) => card.href === fortyEighthListenHref);
+  assert(fortyEighthListenCard, "forty-eighth indexable listen page is listed");
+  assert(
+    fortyEighthListenCard.title === "Расслабляющая музыка для сна – слушать онлайн бесплатно | АудиоЛад",
+    "forty-eighth listen directory title",
+  );
+  assert(
+    fortyEighthListenCard.description === RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes forty-eighth listen href",
   );
 
 

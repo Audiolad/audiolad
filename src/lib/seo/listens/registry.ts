@@ -45,6 +45,7 @@ import { USPOKAIVAYUSHCHAYA_MUZYKA_DLYA_DETEY_SLUSHAT_ONLAYN_PAGE } from "./cont
 import { KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "./content/kolybelnye-dlya-malyshey-slushat-onlayn";
 import { MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn";
 import { RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/relaks-muzyka-dlya-sna-slushat-onlayn";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -99,6 +100,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE,
   RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
