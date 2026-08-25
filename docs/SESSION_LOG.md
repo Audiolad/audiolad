@@ -4,6 +4,22 @@
 
 ---
 
+## Сессия — 25 августа 2026 (PR #71 merge readiness)
+
+**Сделано:**
+
+- Ветка смержена с актуальным `origin/main` (без rebase history rewrite).
+- Миграции PR переставлены после `20260825133000_practice_publication_class.sql`:
+  `20260825140000_playlist_catalog_foundation.sql`,
+  `20260825141000_playlist_topics.sql`,
+  `20260825142000_playlist_catalog_popular_index.sql`.
+- Содержимое SQL не менялось. Ссылки в docs/tests обновлены.
+- `listed_at`: publish flow его не ставит; зафиксировано в `DECISIONS.md`, логика не добавлялась.
+
+**Следующий шаг:** live-проверка витрины после применения миграций; отдельное решение, кто выставляет `listed_at`.
+
+---
+
 ## Сессия — 25 августа 2026 (каталог плейлистов, Stage 5B)
 
 **Сделано:**
@@ -166,7 +182,7 @@
 - Контракт `PlaylistListingItem` (`class: "playlist"`), без внутренних полей.
 - На существующие `playlists` добавлены `items_count`, `duration_seconds`, `saves_count`, `listed_at`.
 - Отдельная модель/таблица `playlist_saves` (не `library_saves`).
-- Миграция `20260825120000_playlist_catalog_foundation.sql`.
+- Миграция `20260825140000_playlist_catalog_foundation.sql`.
 - Без страницы витрины, карточки, фильтров, play-кнопок, миграции `/playlists`.
 
 **Следующий шаг:** Stage 2 — listing query / API `/playlists/catalog` только по отдельному заданию. Production / PM2 не менять без подтверждения.

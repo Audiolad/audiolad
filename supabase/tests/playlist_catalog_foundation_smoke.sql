@@ -1,7 +1,7 @@
 -- Isolated smoke for playlist listing aggregates + playlist_saves.
 -- Apply only on a stub database after
 -- scripts/lib/playlist-catalog-foundation-sql-stub.sql and
--- 20260825120000_playlist_catalog_foundation.sql.
+-- 20260825140000_playlist_catalog_foundation.sql.
 
 \set ON_ERROR_STOP on
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
-const migrationName = "20260825140000_playlist_catalog_popular_index.sql";
+const migrationName = "20260825142000_playlist_catalog_popular_index.sql";
 const migration = readFileSync(join(migrationsDir, migrationName), "utf8");
 
 const priorMigrations = readdirSync(migrationsDir)

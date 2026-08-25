@@ -21,6 +21,7 @@
 - Stage 1: контракт + модель + миграция. Без страницы, карточки, фильтров, play-кнопок, SEO.
 - Stage 2: `GET /api/playlists/catalog` + серверная `/playlists/catalog` через тот же listing-слой. В выдаче только listed public published. `/playlists/catalog` публичный; личный редактор остаётся private. UI карточки/сетки нет.
 - Stage 5B: сохранённые публичные плейлисты — отдельная private библиотека `/playlists/saved` на `playlist_saves`. Не смешивать с `library_saves`, `/my-practices` и product catalog. Новый пункт нижней навигации не создавать.
+- `listed_at` не выставляется publish flow. `POST/PATCH /api/playlists` (user и editorial) пишут только `visibility` + `slug` + `published_at`. Триггер `playlists_clear_listed_at_when_unlisted` только обнуляет `listed_at`. Существующие public playlists остаются unlisted. Кто ставит `listed_at` в витрину — отдельный продуктовый выбор, в Stage 1–5B не реализуется.
 
 **Принято:** владелец проекта (задания Stage 1 и Stage 2).
 
