@@ -1,4 +1,4 @@
-import { normalizeProductKind } from "@/lib/author-products/product-kind";
+import { getProductKindLabel, normalizeProductKind } from "@/lib/author-products/product-kind";
 import { normalizeDurationSeconds } from "@/lib/products/duration";
 
 import type {
@@ -10,7 +10,6 @@ import type {
   CatalogViewer,
   PublicationClass,
 } from "@/lib/catalog/dto";
-import { getCatalogClassLabel } from "@/lib/catalog/dto";
 import { normalizeCatalogGallery } from "@/lib/catalog/gallery";
 import { catalogMoneyFromRubles } from "@/lib/catalog/offer";
 
@@ -23,6 +22,7 @@ export type LegacyCatalogSource = {
   slug: string;
   title: string;
   subtitle?: string | null;
+  format?: string | null;
   productKind?: string | null;
   price?: number | null;
   isFree?: boolean;
@@ -120,6 +120,20 @@ function resolveDefaultOffer(
   };
 }
 
+/**
+ * Storefront chip: author/product format string, never Publication.class names.
+ * Empty format uses the same defaults the author form already writes.
+ */
+function resolveDisplayLabel(source: LegacyCatalogSource): string {
+  const format = source.format?.trim() || "";
+
+  if (format) {
+    return format;
+  }
+
+  return getProductKindLabel(source.productKind);
+}
+
 function resolveViewer(
   publicationClass: PublicationClass,
   offer: CatalogDefaultOffer,
@@ -162,7 +176,7 @@ export function adaptLegacyCatalogSourceToCard(
     gallery,
     author,
     topics: source.topics ?? [],
-    display_label: getCatalogClassLabel(publicationClass),
+    display_label: resolveDisplayLabel(source),
     duration_seconds: resolveDurationSeconds(source),
     published_at: source.publishedAt?.trim() || null,
     paths: { pdp },
