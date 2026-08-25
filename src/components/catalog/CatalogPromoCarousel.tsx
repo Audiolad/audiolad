@@ -77,7 +77,7 @@ export default function CatalogPromoCarousel({
 
   return (
     <section
-      className="catalog-promo mt-2.5 xl:mt-1.5"
+      className="catalog-promo mt-1 xl:mt-1.5"
       aria-label="Промо каталога"
       data-catalog-promo
     >
