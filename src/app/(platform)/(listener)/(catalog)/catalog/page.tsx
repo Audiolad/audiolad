@@ -152,7 +152,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         <CatalogPromoCarousel promos={listCatalogPromos()} />
       ) : null}
 
-      <div className="hidden xl:block" data-catalog-desktop-filters>
+      <div className="hidden lg:block" data-catalog-desktop-filters>
         {filterableTopics.length > 0 ? (
           <TopicFilterBar
             topics={filterableTopics}

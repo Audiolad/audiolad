@@ -15,7 +15,9 @@ export default function CatalogListenerLayout({
           <div className="min-h-[52px] min-w-0 flex-1">
             <MobileCatalogSearch />
           </div>
-          <CatalogMobileFiltersSlot />
+          <div className="lg:hidden">
+            <CatalogMobileFiltersSlot />
+          </div>
         </div>
       </div>
       <div
