@@ -3,9 +3,8 @@
  *
  * Separate from product catalog listing. Do not add playlist as a product kind.
  *
- * Next-stage UI homes (do not implement here):
- * - PlaylistCard → src/components/playlists/catalog/PlaylistCard.tsx
- * - PlaylistGrid → src/components/playlists/catalog/PlaylistGrid.tsx
+ * Stage 3A UI lives in `src/components/playlists/catalog/` and consumes
+ * `PlaylistListingItem` only. Remaining later-stage homes:
  * - filters → src/lib/playlists/listing-filters.ts
  *   and src/components/playlists/catalog/PlaylistCatalogFilters.tsx
  * - save action → src/app/api/playlists/saves/route.ts

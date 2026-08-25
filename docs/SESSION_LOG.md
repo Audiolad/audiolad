@@ -4,6 +4,21 @@
 
 ---
 
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 3A)
+
+**Сделано:**
+
+- Созданы `PlaylistCard` и `PlaylistGrid` в `src/components/playlists/catalog/`.
+- `/playlists/catalog` рендерит сетку listing items вместо текстового списка.
+- Карточка: обложка 1:1 или placeholder, title/creator/meta «N аудио · X мин», визуальные сердце и Play без действий.
+- Пагинация переиспользует IntersectionObserver-паттерн product catalog, но ходит в `/api/playlists/catalog`.
+- `PlaylistCatalogFilters`, save/play API и mosaic-обложка не созданы.
+- Проверки: `npm run typecheck`, lint изменённых файлов, `git diff --check`, `npm run test:playlist-catalog-listing`.
+
+**Следующий шаг:** save/play API, очередь и фильтры topic/access только по отдельному заданию.
+
+---
+
 ## Сессия — 25 августа 2026 (каталог плейлистов, Stage 2)
 
 **Сделано:**

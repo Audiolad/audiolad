@@ -264,9 +264,11 @@ assert.equal(
   PLAYLIST_CATALOG_UI_HOMES.card,
   "src/components/playlists/catalog/PlaylistCard.tsx",
 );
-assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.card)), false);
-assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.grid)), false);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.card)), true);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.grid)), true);
 assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.filterUi)), false);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.saveAction)), false);
+assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.playAction)), false);
 
 const api = readFileSync(
   join(repoRoot, "src/app/api/playlists/catalog/route.ts"),
@@ -294,7 +296,10 @@ const personalDetail = readFileSync(
 assert.match(api, /listListedPlaylists/);
 assert.doesNotMatch(api, /user_id|owner_type|created_by|cover_path|direction_id/);
 assert.match(page, /loadPlaylistCatalogPage/);
-assert.doesNotMatch(page, /PlaylistCard|PlaylistGrid|CatalogProductGrid/);
+assert.match(page, /PlaylistGrid/);
+assert.doesNotMatch(page, /CatalogProductGrid/);
+assert.doesNotMatch(page, /PlaylistCatalogFilters/);
+assert.doesNotMatch(page, /трек|материал/);
 assert.doesNotMatch(personalPage, /listListedPlaylists|PlaylistCatalogPage/);
 assert.doesNotMatch(personalDetail, /listListedPlaylists|PlaylistCatalogPage/);
 

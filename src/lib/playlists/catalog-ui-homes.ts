@@ -1,6 +1,6 @@
 /**
- * Stage 3+ homes for the playlist catalog UI.
- * Do not create these files in Stage 2. Listing data lives in listing.ts.
+ * Homes for playlist catalog UI.
+ * Stage 3A created `card` and `grid`. Remaining files stay later-stage.
  */
 export const PLAYLIST_CATALOG_UI_HOMES = {
   card: "src/components/playlists/catalog/PlaylistCard.tsx",
