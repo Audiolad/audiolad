@@ -197,7 +197,7 @@ assert.equal(legacyRow.publication_class, null);
 assert.equal(legacyRow.product_kind, "practice");
 
 const migration = read(
-  "supabase/migrations/20260825120000_practice_publication_class.sql",
+  "supabase/migrations/20260825133000_practice_publication_class.sql",
 );
 assert.match(migration, /ADD COLUMN IF NOT EXISTS publication_class text NULL/);
 assert.match(

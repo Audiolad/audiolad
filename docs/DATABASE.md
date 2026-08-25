@@ -44,7 +44,7 @@ RLS включён. Политика SELECT: `Public can read published practice
 
 #### publication_class (2026-08-25, Phase 1)
 
-Миграция: `20260825120000_practice_publication_class.sql`.
+Миграция: `20260825133000_practice_publication_class.sql`.
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
