@@ -105,6 +105,70 @@ const storedPostFormat = adaptLegacyCatalogSourceToCard(
 );
 assertStorefrontDisplayLabel(storedPostFormat, "Аудиопост");
 
+const legacyNullClass = adaptLegacyCatalogSourceToCard(
+  source({ publicationClass: null, productKind: "practice" }),
+);
+assert.equal(
+  legacyNullClass?.class,
+  "practice",
+  "NULL publication_class falls back to product_kind",
+);
+
+const formatIsNotCourse = adaptLegacyCatalogSourceToCard(
+  source({
+    publicationClass: null,
+    productKind: "practice",
+    format: "Аудиокурс",
+  }),
+);
+assert.equal(
+  formatIsNotCourse?.class,
+  "practice",
+  "course is not inferred from format",
+);
+
+const formatIsNotAudiobook = adaptLegacyCatalogSourceToCard(
+  source({
+    publicationClass: null,
+    productKind: "practice",
+    format: "Аудиокнига",
+  }),
+);
+assert.equal(
+  formatIsNotAudiobook?.class,
+  "practice",
+  "audiobook is not inferred from format",
+);
+
+const classBeatsKind = adaptLegacyCatalogSourceToCard(
+  source({
+    publicationClass: "course",
+    productKind: "practice",
+    format: "Аудиопрактика",
+  }),
+);
+assert.equal(
+  classBeatsKind?.class,
+  "course",
+  "publication_class wins over product_kind",
+);
+
+const audiobookClass = adaptLegacyCatalogSourceToCard(
+  source({ publicationClass: "audiobook", productKind: "practice" }),
+);
+assert.equal(audiobookClass?.class, "audiobook");
+
+const explicitPost = adaptLegacyCatalogSourceToCard(
+  source({
+    publicationClass: "post",
+    productKind: "audio_post",
+    isFree: true,
+    price: 490,
+  }),
+);
+assert.equal(explicitPost?.class, "post");
+assert.equal(explicitPost?.default_offer, null, "post has no offer");
+
 const gift = adaptLegacyCatalogSourceToCard(
   source({ isFree: true, price: 0 }),
 );

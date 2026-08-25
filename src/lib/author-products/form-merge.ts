@@ -9,6 +9,10 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import {
+  parsePublicationClass,
+  type PublicationClass,
+} from "@/lib/author-products/publication-class";
+import {
   createDefaultListeningNoticeFormState,
 } from "@/lib/products/listening-notice";
 import type {
@@ -22,6 +26,7 @@ export type ProductFormSnapshot = {
   subtitle: string;
   description: string;
   productKind: ProductKind;
+  publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
   formatPreset: string;
   customFormat: string;
@@ -65,6 +70,7 @@ export function productDetailToFormSnapshot(
     subtitle: practice.subtitle ?? "",
     description: practice.description ?? "",
     productKind,
+    publicationClass: parsePublicationClass(practice.publication_class),
     musicUsagePermission:
       productKind === "music"
         ? (normalizeMusicUsagePermission(practice.music_usage_permission) ??
@@ -119,6 +125,7 @@ export function mergeServerProductIntoForm(
     subtitle: current.subtitle,
     description: current.description,
     productKind: current.productKind || server.productKind,
+    publicationClass: current.publicationClass ?? server.publicationClass,
     musicUsagePermission:
       current.productKind === "music"
         ? (current.musicUsagePermission ?? server.musicUsagePermission)

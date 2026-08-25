@@ -5,7 +5,7 @@ import { searchPublishedCatalogProducts } from "@/lib/catalog/search";
 import type { CatalogCard, PublicationClass } from "@/lib/catalog/dto";
 import {
   adaptLegacyCatalogSourceToCard,
-  mapLegacyProductKindToClass,
+  resolvePublicationClass,
   type LegacyCatalogSource,
 } from "@/lib/catalog/legacy-adapter";
 import { listingOfferAmountMinor } from "@/lib/catalog/offer";
@@ -71,6 +71,7 @@ export function mapLegacyCatalogProductToSource(
     subtitle: product.subtitle,
     format: product.format,
     productKind: product.productKind,
+    publicationClass: product.publicationClass,
     price: product.price,
     isFree: product.isFree,
     coverUrl: product.coverUrl,
@@ -293,7 +294,11 @@ function listingProductKindHint(
     return PRODUCT_KIND.AUDIO_POST;
   }
 
-  if (publicationClass === "practice") {
+  if (
+    publicationClass === "practice" ||
+    publicationClass === "course" ||
+    publicationClass === "audiobook"
+  ) {
     return PRODUCT_KIND.PRACTICE;
   }
 
@@ -301,9 +306,12 @@ function listingProductKindHint(
 }
 
 export function resolveCatalogListingClass(
-  product: Pick<CatalogProduct, "productKind">,
+  product: Pick<CatalogProduct, "productKind" | "publicationClass">,
 ): PublicationClass {
-  return mapLegacyProductKindToClass(product.productKind);
+  return resolvePublicationClass(
+    product.publicationClass,
+    product.productKind,
+  );
 }
 
 export async function listPublishedCatalog(
@@ -314,10 +322,6 @@ export async function listPublishedCatalog(
     savesStore?: LibrarySavesAsyncStore;
   } = {},
 ): Promise<CatalogListingResult> {
-  if (query.class === "course" || query.class === "audiobook") {
-    return { items: [], nextCursor: null };
-  }
-
   const productKindHint = listingProductKindHint(query.class);
 
   const products = query.q

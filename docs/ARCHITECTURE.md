@@ -184,11 +184,16 @@ Timeweb Cloud
 - Каталог Phase 0: карточка читает `cover` + опциональную `gallery`
   (квадратные слайды витрины, не отдельная сущность). Источник данных
   пока legacy `practices`; новые таблицы Course/Offer/Grant не создаются.
+- Phase 1: `practices.publication_class` nullable; adapter
+  `publication_class > product_kind`. Старые NULL-строки читаются по
+  `product_kind`. Course/audiobook не выводятся из `format`.
 - UI карточки переключает layout только по `CatalogCard.class`.
 - Фильтры витрины: `access` (Подарки/Продукты) и `class`
   (`practice|course|audiobook|release|post`). Legacy `?kind=music`
   читается как `class=release`.
-- Author UI: `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API `POST/DELETE .../audio/[audioId]/cover`.
+- Author UI: мастер `AuthorCreateWizard` (Продукт / Музыка / Аудиопост)
+  → `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API
+  `POST/DELETE .../audio/[audioId]/cover`.
 
 ## MAX Mini App (этапы 1–3B)
 
