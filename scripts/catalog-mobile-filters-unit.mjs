@@ -96,6 +96,16 @@ assert.match(
   /\.bottom-nav \{\s*position:\s*fixed;/,
   "BottomNav stays position:fixed",
 );
+assert.match(
+  globals,
+  /html\.catalog-sheet-lock,\s*\nhtml\.catalog-sheet-lock body \{\s*\n\s*overflow:\s*hidden;/,
+  "sheet lock class is defined on html, not as inline overflow",
+);
+assert.match(
+  globals,
+  /html:has\(\.listener-app-shell\)[\s\S]*overflow:\s*hidden;/,
+  "xl listener shell keeps html/body from becoming the scrollport",
+);
 
 assert.doesNotMatch(
   page,
