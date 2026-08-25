@@ -1490,11 +1490,8 @@ export function useSequentialPlayer({
     };
   }, []);
 
-  const liveDuration = readLiveAudioDuration(audioRef.current);
   const hasValidDuration =
-    liveDuration > 0 ||
-    (Number.isFinite(duration) && duration > 0) ||
-    hasPreviewWindow;
+    (Number.isFinite(duration) && duration > 0) || hasPreviewWindow;
   const rawDisplayDuration = Number.isFinite(duration) && duration > 0
     ? duration
     : currentTrack?.durationSeconds && currentTrack.durationSeconds > 0
