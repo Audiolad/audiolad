@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Catalog mobile chrome: no title/back row, fixed search + spacer, desktop h1 stays.
+ * Catalog mobile chrome: no title/back row, fixed search + spacer, SEO h1 stays hidden.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -70,9 +70,13 @@ assert.match(
 );
 
 assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1");
-assert.match(page, /sr-only/, "mobile h1 is not a visible title");
-assert.match(page, /xl:not-sr-only/, "desktop h1 stays visible");
-assert.match(page, /xl:block/, "desktop h1 is a block heading");
+assert.match(page, /sr-only/, "catalog h1 stays visually hidden for SEO");
+assert.doesNotMatch(page, /xl:not-sr-only/, "desktop h1 is no longer visually shown");
+assert.doesNotMatch(
+  page,
+  /<h1[^>]*xl:block/,
+  "desktop h1 is not a visible block heading",
+);
 assert.doesNotMatch(
   page,
   /Опубликованные аудиопродукты авторов платформы/,
