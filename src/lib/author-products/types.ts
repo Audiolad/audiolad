@@ -10,6 +10,10 @@ import type {
 } from "@/lib/author-products/product-kind";
 import { normalizeProductKind } from "@/lib/author-products/product-kind";
 import {
+  parsePublicationClass,
+  type PublicationClass,
+} from "@/lib/author-products/publication-class";
+import {
   getVisibleAuthorProductStatus,
   getVisibleAuthorProductStatusClassName,
   getVisibleAuthorProductStatusLabel,
@@ -20,7 +24,7 @@ import { RECOMMENDED_PAID_PRICES_RUB } from "@/lib/pricing/money";
 /** Recommended chips only. Authors may enter any integer ruble amount in range. */
 export const PAID_PRICE_OPTIONS = RECOMMENDED_PAID_PRICES_RUB;
 
-export type { MusicUsagePermission, ProductKind };
+export type { MusicUsagePermission, ProductKind, PublicationClass };
 
 export const PRACTICE_STATUS = {
   DRAFT: "draft",
@@ -71,6 +75,7 @@ export type PracticeRow = {
   description: string | null;
   format: string | null;
   product_kind: ProductKind;
+  publication_class: PublicationClass | null;
   music_usage_permission: MusicUsagePermission | null;
   duration_minutes: number | null;
   price: number;
@@ -126,6 +131,7 @@ export function coercePracticeRow(
   row: Omit<
     PracticeRow,
     | "product_kind"
+    | "publication_class"
     | "music_usage_permission"
     | "is_catalog_listed"
     | "moderation_status"
@@ -143,6 +149,7 @@ export function coercePracticeRow(
     | "promo_open_in_new_tab"
   > & {
     product_kind?: string | null;
+    publication_class?: string | null;
     music_usage_permission?: string | null;
     moderation_status?: string | null;
     moderation_attempt?: number | null;
@@ -163,6 +170,7 @@ export function coercePracticeRow(
   return {
     ...row,
     product_kind: normalizeProductKind(row.product_kind),
+    publication_class: parsePublicationClass(row.publication_class),
     music_usage_permission:
       row.music_usage_permission === "listen_only" ||
       row.music_usage_permission === "platform_reuse_allowed"

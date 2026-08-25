@@ -8,14 +8,8 @@ import {
   requireAuthorMembership,
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
-import {
-  PRODUCT_KIND,
-  normalizeProductKind,
-} from "@/lib/author-products/product-kind";
-import {
-  createDraftProduct,
-  listAuthorProducts,
-} from "@/lib/author-products/products";
+import { createDraftProduct, listAuthorProducts } from "@/lib/author-products/products";
+import { resolveCreateClassification } from "@/lib/author-products/publication-class";
 
 function parseAuthorId(request: Request): string | null {
   const url = new URL(request.url);
@@ -64,14 +58,24 @@ export async function POST(request: Request) {
     const productKindRaw =
       "product_kind" in body && typeof body.product_kind === "string"
         ? body.product_kind.trim()
-        : PRODUCT_KIND.PRACTICE;
+        : "";
+    const publicationClassRaw =
+      "publication_class" in body && typeof body.publication_class === "string"
+        ? body.publication_class.trim()
+        : "";
+    const cabinetBranchRaw =
+      "cabinet_branch" in body && typeof body.cabinet_branch === "string"
+        ? body.cabinet_branch.trim()
+        : "";
 
-    if (
-      productKindRaw !== PRODUCT_KIND.PRACTICE &&
-      productKindRaw !== PRODUCT_KIND.MUSIC &&
-      productKindRaw !== PRODUCT_KIND.AUDIO_POST
-    ) {
-      return NextResponse.json({ error: "invalid_product_kind" }, { status: 400 });
+    const classification = resolveCreateClassification({
+      publicationClass: publicationClassRaw || null,
+      cabinetBranch: cabinetBranchRaw || null,
+      productKind: productKindRaw || null,
+    });
+
+    if (!classification.ok) {
+      return NextResponse.json({ error: classification.error }, { status: 400 });
     }
 
     if (!authorId || !title) {
@@ -88,7 +92,9 @@ export async function POST(request: Request) {
     const product = await createDraftProduct(supabase, {
       authorId,
       title,
-      productKind: normalizeProductKind(productKindRaw),
+      productKind: classification.value.productKind,
+      publicationClass: classification.value.publicationClass,
+      cabinetBranch: classification.value.cabinetBranch,
     });
 
     return NextResponse.json({ product }, { status: 201 });

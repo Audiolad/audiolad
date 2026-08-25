@@ -51,6 +51,13 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import {
+  AUTHOR_PUBLICATION_CLASS_LABELS,
+  publicationClassToCabinetBranch,
+  publicationClassToLegacyKind,
+  resolveCreateClassification,
+  type PublicationClass,
+} from "@/lib/author-products/publication-class";
+import {
   PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH,
   PROMO_RECOMMENDATION_TEXT_MAX_LENGTH,
   PROMO_RECOMMENDATION_TITLE_MAX_LENGTH,
@@ -115,6 +122,7 @@ type AuthorProductFormProps = {
   authors: AuthorWorkspace[];
   initialAuthorSlug?: string;
   initialProduct?: AuthorProductDetail;
+  initialPublicationClass?: PublicationClass | null;
   topicFormData: AuthorProductTopicFormData;
   mode: "create" | "edit";
 };
@@ -125,6 +133,7 @@ type FormState = {
   subtitle: string;
   description: string;
   productKind: ProductKind;
+  publicationClass: PublicationClass | null;
   musicUsagePermission: MusicUsagePermission | null;
   formatPreset: string;
   customFormat: string;
@@ -234,6 +243,7 @@ function buildInitialForm(
   authors: AuthorWorkspace[],
   initialAuthorSlug: string | undefined,
   initialProduct: AuthorProductDetail | undefined,
+  initialPublicationClass?: PublicationClass | null,
 ): FormState {
   if (initialProduct) {
     return productDetailToFormSnapshot(initialProduct);
@@ -242,14 +252,27 @@ function buildInitialForm(
   const author =
     authors.find((item) => item.slug === initialAuthorSlug) ?? authors[0];
   const listeningDefaults = createDefaultListeningNoticeFormState();
+  const classification = resolveCreateClassification({
+    publicationClass: initialPublicationClass,
+  });
+  const created = classification.ok
+    ? classification.value
+    : {
+        publicationClass: "practice" as const,
+        productKind: PRODUCT_KIND.PRACTICE,
+      };
 
   return {
     authorId: author?.id ?? "",
     title: "",
     subtitle: "",
     description: "",
-    productKind: PRODUCT_KIND.PRACTICE,
-    musicUsagePermission: null,
+    productKind: created.productKind,
+    publicationClass: created.publicationClass,
+    musicUsagePermission:
+      created.productKind === PRODUCT_KIND.MUSIC
+        ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY
+        : null,
     formatPreset: "",
     customFormat: "",
     slug: "",
@@ -338,6 +361,14 @@ function buildProductSavePayload(
     subtitle: form.subtitle.trim() || null,
     description: form.description.trim() || null,
     product_kind: form.productKind,
+    ...(form.publicationClass
+      ? {
+          publication_class: form.publicationClass,
+          cabinet_branch: publicationClassToCabinetBranch(
+            form.publicationClass,
+          ),
+        }
+      : {}),
     music_usage_permission:
       form.productKind === PRODUCT_KIND.MUSIC
         ? form.musicUsagePermission
@@ -375,19 +406,29 @@ export default function AuthorProductForm({
   authors,
   initialAuthorSlug,
   initialProduct,
+  initialPublicationClass,
   topicFormData,
   mode,
 }: AuthorProductFormProps) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() =>
-    buildInitialForm(authors, initialAuthorSlug, initialProduct),
+    buildInitialForm(
+      authors,
+      initialAuthorSlug,
+      initialProduct,
+      initialPublicationClass,
+    ),
   );
   const [audioItems, setAudioItems] = useState<AudioItemRow[]>(
     initialProduct?.audio_items ?? [
       {
         id: "temp-1",
         practice_id: "temp",
-        title: "Аудио 1",
+        title:
+          initialProduct?.practice.product_kind === PRODUCT_KIND.MUSIC ||
+          initialPublicationClass === "release"
+            ? "Трек 1"
+            : "Аудио 1",
         description: null,
         audio_path: null,
         cover_url: null,
@@ -707,6 +748,14 @@ export default function AuthorProductForm({
         author_id: form.authorId,
         title: form.title.trim(),
         product_kind: form.productKind,
+        ...(form.publicationClass
+          ? {
+              publication_class: form.publicationClass,
+              cabinet_branch: publicationClassToCabinetBranch(
+                form.publicationClass,
+              ),
+            }
+          : {}),
       }),
     });
 
@@ -2118,7 +2167,69 @@ export default function AuthorProductForm({
 
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">Тип продукта</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
+          {form.publicationClass ? (
+            publicationClassToCabinetBranch(form.publicationClass) ===
+            "product" ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(
+                  [
+                    {
+                      value: "practice",
+                      description:
+                        "Медитации, практики, программы и другие аудиоматериалы.",
+                    },
+                    {
+                      value: "course",
+                      description:
+                        "Курс из нескольких материалов в одной публикации.",
+                    },
+                    {
+                      value: "audiobook",
+                      description: "Аудиокнига как отдельный продукт.",
+                    },
+                  ] as const
+                ).map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.publicationClass === option.value ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="publication_class"
+                      className="mt-1"
+                      checked={form.publicationClass === option.value}
+                      disabled={
+                        busy || !canChangeProductKind(form.publishedAt)
+                      }
+                      onChange={() => {
+                        setForm((current) => ({
+                          ...current,
+                          publicationClass: option.value,
+                          productKind: publicationClassToLegacyKind(
+                            option.value,
+                          ),
+                          musicUsagePermission: null,
+                        }));
+                      }}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-[#3f3560]">
+                        {AUTHOR_PUBLICATION_CLASS_LABELS[option.value]}
+                      </span>
+                      <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                        {option.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#5f5484]">
+                {AUTHOR_PUBLICATION_CLASS_LABELS[form.publicationClass]}
+              </p>
+            )
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
             <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.productKind === PRODUCT_KIND.PRACTICE ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"} ${!canChangeProductKind(form.publishedAt) ? "opacity-70" : ""}`}>
               <input
                 type="radio"
@@ -2130,6 +2241,7 @@ export default function AuthorProductForm({
                   setForm((current) => ({
                     ...current,
                     productKind: PRODUCT_KIND.PRACTICE,
+                    publicationClass: null,
                     musicUsagePermission: null,
                     formatPreset: "",
                     customFormat: "",
@@ -2154,6 +2266,7 @@ export default function AuthorProductForm({
                   setForm((current) => ({
                     ...current,
                     productKind: PRODUCT_KIND.MUSIC,
+                    publicationClass: null,
                     musicUsagePermission:
                       current.musicUsagePermission ??
                       MUSIC_USAGE_PERMISSION.LISTEN_ONLY,
@@ -2188,6 +2301,7 @@ export default function AuthorProductForm({
                   setForm((current) => ({
                     ...current,
                     productKind: PRODUCT_KIND.AUDIO_POST,
+                    publicationClass: null,
                     musicUsagePermission: null,
                     formatPreset: "",
                     customFormat: "",
@@ -2205,7 +2319,8 @@ export default function AuthorProductForm({
                 </span>
               </span>
             </label>
-          </div>
+            </div>
+          )}
           {!canChangeProductKind(form.publishedAt) ? (
             <p className="mt-2 text-sm text-[#7d70a2]">
               Тип продукта нельзя изменить после первой публикации.

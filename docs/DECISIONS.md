@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-08-25 — Author Cabinet foundation, Phase 1
+
+**Контекст:** кабинет должен создавать новые классы публикаций, не ломая
+старые черновики и витрину Phase 0. Отдельные таблицы Course / Audiobook
+ещё не нужны.
+
+**Решение:**
+
+- В `practices` добавляется nullable `publication_class` с CHECK
+  `practice|course|audiobook|release|post`. Старые строки не обновляются.
+- `product_kind` остаётся legacy shadow для publish RPC и старых форм.
+- Create/update API принимают явный `publication_class` и ветку кабинета
+  `product|music|post`.
+- Мастер создания: Продукт → практика/курс/аудиокнига; Музыка → `release`;
+  Аудиопост → `post`.
+- Adapter читает `publication_class` раньше `product_kind`. Format не
+  определяет course/audiobook. Post без offer.
+- Section / Lesson / Chapter / gallery editor не входят в Phase 1.
+
+**Принято:** владелец и архитектор (задание Phase 1 Author Cabinet).
+
+---
+
 ## 2026-08-25 — Catalog Listing Freeze v2, Phase 0
 
 **Контекст:** новый каталог не должен зависеть от legacy-модели

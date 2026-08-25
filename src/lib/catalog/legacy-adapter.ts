@@ -1,5 +1,11 @@
-import { getProductKindLabel, normalizeProductKind } from "@/lib/author-products/product-kind";
+import { getProductKindLabel } from "@/lib/author-products/product-kind";
+import {
+  mapLegacyProductKindToClass,
+  resolvePublicationClass,
+} from "@/lib/author-products/publication-class";
 import { normalizeDurationSeconds } from "@/lib/products/duration";
+
+export { mapLegacyProductKindToClass, resolvePublicationClass };
 
 import type {
   CatalogCard,
@@ -24,6 +30,7 @@ export type LegacyCatalogSource = {
   subtitle?: string | null;
   format?: string | null;
   productKind?: string | null;
+  publicationClass?: PublicationClass | string | null;
   price?: number | null;
   isFree?: boolean;
   coverUrl?: string | null;
@@ -39,20 +46,6 @@ export type LegacyCatalogSource = {
   topics?: CatalogCard["topics"];
   isSaved?: boolean;
 };
-
-const LEGACY_PRODUCT_KIND_TO_CLASS = {
-  practice: "practice",
-  music: "release",
-  audio_post: "post",
-} as const;
-
-export function mapLegacyProductKindToClass(
-  productKind: string | null | undefined,
-): PublicationClass {
-  const normalized = normalizeProductKind(productKind);
-
-  return LEGACY_PRODUCT_KIND_TO_CLASS[normalized];
-}
 
 function resolveAuthor(
   source: LegacyCatalogSource,
@@ -162,7 +155,10 @@ export function adaptLegacyCatalogSourceToCard(
     return null;
   }
 
-  const publicationClass = mapLegacyProductKindToClass(source.productKind);
+  const publicationClass = resolvePublicationClass(
+    source.publicationClass,
+    source.productKind,
+  );
   const defaultOffer = resolveDefaultOffer(publicationClass, source);
   const gallery = normalizeCatalogGallery(source.gallery);
 

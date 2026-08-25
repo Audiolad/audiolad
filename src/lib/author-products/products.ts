@@ -12,6 +12,11 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "./product-kind";
+import {
+  resolveCreateClassification,
+  type CabinetBranch,
+  type PublicationClass,
+} from "./publication-class";
 import type {
   AuthorProductDetail,
   AuthorProductListItem,
@@ -30,6 +35,7 @@ const PRACTICE_DETAIL_SELECT = `
   description,
   format,
   product_kind,
+  publication_class,
   music_usage_permission,
   duration_minutes,
   price,
@@ -113,7 +119,7 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, product_kind, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at",
+      "id, title, slug, format, product_kind, publication_class, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at",
     )
     .eq("author_id", authorId)
     .is("deleted_at", null)
@@ -261,6 +267,8 @@ export async function createDraftProduct(
     title: string;
     slug?: string;
     productKind?: ProductKind;
+    publicationClass?: PublicationClass | string | null;
+    cabinetBranch?: CabinetBranch | string | null;
   },
 ): Promise<AuthorProductDetail> {
   const title = input.title.trim();
@@ -269,7 +277,18 @@ export async function createDraftProduct(
     throw new Error("missing_title");
   }
 
-  const productKind = normalizeProductKind(input.productKind);
+  const classification = resolveCreateClassification({
+    publicationClass: input.publicationClass,
+    cabinetBranch: input.cabinetBranch,
+    productKind: input.productKind,
+  });
+
+  if (!classification.ok) {
+    throw new Error(classification.error);
+  }
+
+  const productKind = classification.value.productKind;
+  const publicationClass = classification.value.publicationClass;
   const slug =
     input.slug?.trim() ||
     (await generateUniqueSlug(supabase, title, input.authorId, undefined));
@@ -285,6 +304,7 @@ export async function createDraftProduct(
       is_free: true,
       currency: "RUB",
       product_kind: productKind,
+      publication_class: publicationClass,
       music_usage_permission:
         productKind === PRODUCT_KIND.MUSIC
           ? MUSIC_USAGE_PERMISSION.LISTEN_ONLY

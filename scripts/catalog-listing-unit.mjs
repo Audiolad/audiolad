@@ -140,6 +140,47 @@ assert(
   "seven sessions stay practice, not course",
 );
 assert(resolveCatalogListingClass(product()) === "practice", "practice class");
+assert(
+  resolveCatalogListingClass(
+    product({
+      publicationClass: null,
+      format: "Аудиокурс",
+      productTypeLabel: "Аудиокурс",
+    }),
+  ) === "practice",
+  "NULL class + format Аудиокурс stays practice",
+);
+assert(
+  resolveCatalogListingClass(
+    product({
+      publicationClass: "course",
+      productKind: "practice",
+      format: "Аудиопрактика",
+    }),
+  ) === "course",
+  "publication_class wins over product_kind and format",
+);
+assert(
+  resolveCatalogListingClass(
+    product({ publicationClass: "audiobook", productKind: "practice" }),
+  ) === "audiobook",
+  "explicit audiobook class is readable",
+);
+
+const courseCard = candidate({
+  id: "course-1",
+  publicationClass: "course",
+  productKind: "practice",
+  format: "Аудиопрактика",
+});
+assert(courseCard.class === "course", "listing maps explicit course");
+assert(
+  filterCatalogListingItems([courseCard], {
+    access: "all",
+    class: "course",
+  }).map((item) => item.publication_id).join() === "course-1",
+  "class=course listing is not empty when publication_class is set",
+);
 
 const mixed = [
   candidate({
