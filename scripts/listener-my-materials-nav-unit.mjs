@@ -7,7 +7,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { getListenerSidebarNavItems } from "../src/lib/navigation/listener-nav.ts";
+import {
+  getListenerSidebarNavItems,
+  isListenerPrimaryNavItemActive,
+  LISTENER_PRIMARY_NAV_ITEMS,
+  LISTENER_SIDEBAR_NAV_ITEMS,
+} from "../src/lib/navigation/listener-nav.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -134,6 +139,79 @@ assert.equal(
   hidden.filter((item) => item.key === "help").length,
   1,
   "sidebar keeps a single help item when my-materials is hidden",
+);
+
+assert.equal(
+  LISTENER_PRIMARY_NAV_ITEMS.find((item) => item.key === "playlists")?.href,
+  "/playlists/catalog",
+  "primary playlists tab lands on catalog",
+);
+assert.equal(
+  LISTENER_SIDEBAR_NAV_ITEMS.find((item) => item.key === "playlists")?.href,
+  "/playlists/catalog",
+  "sidebar playlists item lands on catalog",
+);
+
+const playlistsHref = "/playlists/catalog";
+const activeOpts = { isNeutralPath: false };
+assert.equal(
+  isListenerPrimaryNavItemActive("/playlists/catalog", playlistsHref, activeOpts),
+  true,
+  "catalog pathname activates playlists",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/playlists/catalog", playlistsHref, activeOpts),
+  true,
+  "catalog search keeps the same pathname and stays active",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/playlists/saved", playlistsHref, activeOpts),
+  true,
+  "saved playlists still activate playlists tab",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive(
+    "/playlists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    playlistsHref,
+    activeOpts,
+  ),
+  true,
+  "playlist detail still activates playlists tab",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/playlists", playlistsHref, activeOpts),
+  true,
+  "mine list still activates playlists tab",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/my-practices", playlistsHref, activeOpts),
+  false,
+  "library does not activate playlists",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/catalog", playlistsHref, activeOpts),
+  false,
+  "catalog practices does not activate playlists",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/catalog", "/catalog", activeOpts),
+  true,
+  "catalog matching is unchanged",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/my-practices", "/my-practices", activeOpts),
+  true,
+  "library matching is unchanged",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/profile", "/profile", activeOpts),
+  true,
+  "profile matching is unchanged",
+);
+assert.equal(
+  isListenerPrimaryNavItemActive("/playlists/catalog", "/catalog", activeOpts),
+  false,
+  "playlists catalog does not activate practices catalog",
 );
 
 console.log("listener-my-materials-nav-unit: ok");
