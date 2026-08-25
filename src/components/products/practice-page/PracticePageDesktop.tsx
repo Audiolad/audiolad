@@ -51,11 +51,6 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
             />
           </div>
 
-          {/*
-            Grid stretch makes this column at least cover-tall. mt-auto pins the
-            CTA to the cover bottom when meta fits; when title/subtitle/meta are
-            taller, the column grows and the author line is never clipped.
-          */}
           <div className="flex min-w-0 max-w-full flex-col">
             <div className="min-w-0">
               <PracticeMetaSection
@@ -69,7 +64,7 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
 
             <PracticePrimaryActionSection
               viewModel={viewModel}
-              className="mt-auto shrink-0 pt-3"
+              className="mt-4 shrink-0"
             />
           </div>
         </section>
