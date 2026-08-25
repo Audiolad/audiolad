@@ -32,6 +32,29 @@ type CatalogMobileFiltersProps = {
   topics: readonly CatalogFilterTopicOption[];
 };
 
+const CATALOG_SHEET_LOCK_CLASS = "catalog-sheet-lock";
+
+let catalogSheetLockCount = 0;
+
+function acquireCatalogSheetLock() {
+  catalogSheetLockCount += 1;
+  if (catalogSheetLockCount === 1) {
+    document.documentElement.classList.add(CATALOG_SHEET_LOCK_CLASS);
+  }
+}
+
+function releaseCatalogSheetLock() {
+  if (catalogSheetLockCount <= 0) {
+    catalogSheetLockCount = 0;
+    return;
+  }
+
+  catalogSheetLockCount -= 1;
+  if (catalogSheetLockCount === 0) {
+    document.documentElement.classList.remove(CATALOG_SHEET_LOCK_CLASS);
+  }
+}
+
 function FilterChip({
   label,
   isActive,
@@ -68,6 +91,7 @@ export default function CatalogMobileFilters({
   const [draftClass, setDraftClass] = useState<CatalogClassFilter>("all");
   const router = useRouter();
   const searchParams = useSearchParams();
+  const holdsSheetLockRef = useRef(false);
 
   const searchQuery = readPlatformSearchQueryFromParams(searchParams);
   const topicFromUrl = readPlatformSearchTopicFromParams(searchParams);
@@ -90,8 +114,10 @@ export default function CatalogMobileFilters({
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (!holdsSheetLockRef.current) {
+      acquireCatalogSheetLock();
+      holdsSheetLockRef.current = true;
+    }
 
     const panel = panelRef.current;
     const focusables = () => {
@@ -143,10 +169,22 @@ export default function CatalogMobileFilters({
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (holdsSheetLockRef.current) {
+        releaseCatalogSheetLock();
+        holdsSheetLockRef.current = false;
+      }
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (holdsSheetLockRef.current) {
+        releaseCatalogSheetLock();
+        holdsSheetLockRef.current = false;
+      }
+    };
+  }, []);
 
   function close() {
     setOpen(false);
@@ -160,6 +198,7 @@ export default function CatalogMobileFilters({
   }
 
   function applyDraft() {
+    close();
     router.replace(
       buildCatalogHref({
         q: searchQuery || null,
@@ -168,14 +207,15 @@ export default function CatalogMobileFilters({
         class: draftClass,
         sort,
       }),
+      { scroll: false },
     );
-    close();
   }
 
   function resetFilters() {
     setDraftTopics([]);
     setDraftAccess("all");
     setDraftClass("all");
+    close();
     router.replace(
       buildCatalogHref({
         q: searchQuery || null,
@@ -184,8 +224,8 @@ export default function CatalogMobileFilters({
         class: "all",
         sort,
       }),
+      { scroll: false },
     );
-    close();
   }
 
   return (

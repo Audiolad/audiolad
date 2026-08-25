@@ -295,6 +295,30 @@ assert.match(
   /\.bottom-nav \{\s*position:\s*fixed;/,
   "BottomNav stays position:fixed",
 );
+assert.match(
+  globals,
+  /html\.catalog-sheet-lock,\s*\nhtml\.catalog-sheet-lock body \{\s*\n\s*overflow:\s*hidden;/,
+  "catalog sheet lock is an html class, not inline overflow",
+);
+assert.match(
+  globals,
+  /@media \(min-width:\s*1280px\) \{[\s\S]*html:has\(\.listener-app-shell\),\s*\n\s*html:has\(\.listener-app-shell\) body \{\s*\n\s*height:\s*100dvh;\s*\n\s*overflow:\s*hidden;/,
+  "xl listener shell locks html/body so center-scroll stays the scrollport",
+);
+const shellLockIndex = globals.indexOf("html:has(.listener-app-shell)");
+assert.ok(shellLockIndex !== -1, "globals names html:has(.listener-app-shell)");
+const lastMin1280BeforeLock = globals.lastIndexOf(
+  "@media (min-width: 1280px)",
+  shellLockIndex,
+);
+const lastMax1279BeforeLock = globals.lastIndexOf(
+  "@media (max-width: 1279px)",
+  shellLockIndex,
+);
+assert.ok(
+  lastMin1280BeforeLock > lastMax1279BeforeLock,
+  "listener html/body overflow lock stays inside xl, not below 1280px",
+);
 assert.doesNotMatch(
   globals,
   /:has\(\.listener-catalog-content\)/,

@@ -73,7 +73,7 @@ export default function PlatformCatalogInlineSearch({
     }
 
     isInternalCatalogNavRef.current = true;
-    router.replace(nextHref);
+    router.replace(nextHref, { scroll: false });
   }
 
   function scheduleCatalogUrlUpdate(rawQuery: string) {
@@ -121,7 +121,9 @@ export default function PlatformCatalogInlineSearch({
       window.clearTimeout(catalogUrlDebounceRef.current);
     }
     isInternalCatalogNavRef.current = true;
-    router.replace(buildPlatformSearchClearHref(activeTopicKey, listingState));
+    router.replace(buildPlatformSearchClearHref(activeTopicKey, listingState), {
+      scroll: false,
+    });
   }
 
   const normalizedInput = normalizeCatalogSearchQuery(inputValue);
