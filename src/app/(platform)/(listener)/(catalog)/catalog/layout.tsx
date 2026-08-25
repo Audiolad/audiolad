@@ -10,7 +10,7 @@ export default function CatalogListenerLayout({
 }>) {
   return (
     <>
-      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-1 xl:hidden">
+      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface px-5 pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
         <div className="flex items-start gap-2">
           <div className="min-h-[52px] min-w-0 flex-1">
             <MobileCatalogSearch />
