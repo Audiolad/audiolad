@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Catalog mobile filters: sheet next to search, desktop chips stay, same hrefs.
+ * Catalog filters: same sheet next to search at every width, same hrefs.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -27,34 +27,26 @@ const listingApi = read("src/app/api/catalog/route.ts");
 assert.match(layout, /CatalogMobileFiltersSlot/, "fixed chrome mounts filters");
 assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
 assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
-
-assert.match(page, /data-catalog-desktop-filters/, "desktop chips stay on the page");
-assert.match(page, /hidden lg:block/, "page chips appear from lg");
-assert.match(
-  page,
-  /className="hidden lg:block" data-catalog-desktop-filters/,
-  "desktop filters wrapper is hidden below lg",
-);
-assert.match(
+assert.doesNotMatch(
   layout,
   /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
-  "mobile filters slot is hidden from lg",
+  "filters slot is not hidden from lg",
 );
-assert.match(page, /TopicFilterBar/, "desktop still has topic chips");
-assert.match(
-  read("src/components/catalog/TopicFilterBar.tsx"),
-  />Темы</,
-  "desktop topic row shows the Темы group title",
+assert.doesNotMatch(layout, /lg:hidden/, "search row does not hide filters on lg");
+
+assert.doesNotMatch(
+  page,
+  /data-catalog-desktop-filters/,
+  "page no longer mounts desktop chip rows",
 );
-assert.match(page, /title="Доступ"/, "desktop access row is labeled Доступ");
-assert.match(page, /title="Тип"/, "desktop class row is labeled Тип");
+assert.doesNotMatch(page, /TopicFilterBar/, "page no longer mounts TopicFilterBar");
+assert.doesNotMatch(
+  page,
+  /CatalogChipFilterBar/,
+  "page no longer mounts CatalogChipFilterBar",
+);
 assert.match(page, /parseCatalogTopicFilters/, "page parses a topic list");
 assert.match(page, /activeTopicKeys/, "page keeps selected topic keys");
-assert.match(
-  read("src/components/catalog/TopicFilterBar.tsx"),
-  /selectedTopicKeys/,
-  "desktop chips highlight every selected topic from the URL",
-);
 assert.match(
   read("src/lib/products/catalog.ts"),
   /\.in\("key", topicKeys\)/,
@@ -65,8 +57,7 @@ assert.match(
   /\.in\("topic_id", topicIds\)/,
   "practice_topics uses .in so multiple topics are OR",
 );
-assert.match(page, /CatalogChipFilterBar/, "desktop still has access/class chips");
-assert.match(page, /buildCatalogHref/, "desktop chips still use buildCatalogHref");
+assert.match(page, /buildCatalogHref/, "page still uses buildCatalogHref");
 
 assert.match(filters, /data-catalog-mobile-filters-button/, "Фильтры button is marked");
 assert.match(filters, /data-catalog-mobile-filters-sheet/, "sheet is marked");

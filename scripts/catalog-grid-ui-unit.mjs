@@ -51,8 +51,16 @@ assert.doesNotMatch(
   /getPublishedCatalogSections/,
   "catalog page no longer splits gifts/paid carousels",
 );
-assert.match(page, /CATALOG_ACCESS_FILTER_OPTIONS/, "page uses shared access options");
-assert.match(page, /CATALOG_CLASS_FILTER_OPTIONS/, "page uses shared class options");
+assert.match(
+  read("src/components/catalog/CatalogMobileFilters.tsx"),
+  /CATALOG_ACCESS_FILTER_OPTIONS/,
+  "sheet uses shared access options",
+);
+assert.match(
+  read("src/components/catalog/CatalogMobileFilters.tsx"),
+  /CATALOG_CLASS_FILTER_OPTIONS/,
+  "sheet uses shared class options",
+);
 assert.match(filterUi, /Подарки/, "access filter includes gifts");
 assert.match(filterUi, /Продукты/, "access filter includes paid products");
 assert.match(filterUi, /Практики/, "class filter includes practices");

@@ -34,7 +34,11 @@ assert.match(
 assert.match(layout, /fixed top-0 inset-x-0/, "mobile search is a fixed top layer");
 assert.doesNotMatch(layout, /sticky/, "mobile search is no longer sticky");
 assert.match(layout, /z-30/, "fixed search keeps the chrome stacking layer");
-assert.match(layout, /xl:hidden/, "fixed search stays mobile-only");
+assert.match(
+  layout,
+  /xl:static xl:inset-auto xl:z-auto/,
+  "xl search sits in the catalog column, not over the sidebars",
+);
 assert.match(
   layout,
   /listener-catalog-mobile-search-spacer/,
@@ -164,21 +168,44 @@ assert.doesNotMatch(
   /createClient|from\(|supabase/i,
   "promo MVP is typed config, not SQL or API",
 );
-assert.match(
+assert.doesNotMatch(
   page,
   /data-catalog-desktop-filters/,
-  "desktop filter chips stay in the page",
+  "page no longer mounts desktop chip rows",
 );
-assert.match(page, /hidden lg:block/, "filter chips appear from lg");
-assert.match(
+assert.doesNotMatch(page, /TopicFilterBar/, "page no longer mounts TopicFilterBar");
+assert.doesNotMatch(
   page,
-  /className="hidden lg:block" data-catalog-desktop-filters/,
-  "desktop filters wrapper is hidden below lg",
+  /CatalogChipFilterBar/,
+  "page no longer mounts CatalogChipFilterBar",
 );
-assert.match(
+assert.doesNotMatch(
   layout,
   /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
-  "mobile filters slot is hidden from lg",
+  "filters slot stays visible on lg and xl",
+);
+const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
+assert.match(shellSearch, /usePathname/, "shell search reads the pathname");
+assert.match(
+  shellSearch,
+  /pathname === ["']\/catalog["'] \|\| pathname\.startsWith\(["']\/catalog["']\)/,
+  "shell search hides on /catalog",
+);
+assert.match(
+  shellSearch,
+  /if \(isCatalogRoute\) \{\s*return null;/,
+  "shell search returns null on catalog",
+);
+const catalogSearch = read("src/components/listener/MobileCatalogSearch.tsx");
+assert.match(
+  catalogSearch,
+  /PlatformCatalogInlineSearch density="compact"/,
+  "catalog search stays compact",
+);
+assert.match(
+  catalogSearch,
+  /isCatalogRoute/,
+  "catalog search mounts on /catalog at every width",
 );
 const shell = read("src/components/listener/ListenerAppShell.tsx");
 const childrenClassMatch = shell.match(
@@ -228,8 +255,8 @@ assert.match(
 );
 assert.match(
   layout,
-  /listener-catalog-mobile-search[^"]*xl:hidden/,
-  "fixed search remains hidden from xl",
+  /listener-catalog-mobile-search[^"]*xl:static/,
+  "xl search is in-flow instead of a fixed overlay",
 );
 
 assert.doesNotMatch(

@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import CatalogChipFilterBar from "@/components/catalog/CatalogChipFilterBar";
 import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
-import TopicFilterBar from "@/components/catalog/TopicFilterBar";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
-import {
-  CATALOG_ACCESS_FILTER_OPTIONS,
-  CATALOG_CLASS_FILTER_OPTIONS,
-} from "@/lib/catalog/catalog-filter-ui";
 import { listCatalogPromos } from "@/lib/catalog/catalog-promo";
 import {
   CATALOG_LISTING_PAGE_SIZE,
@@ -151,50 +145,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       ) : showCatalogPromo ? (
         <CatalogPromoCarousel promos={listCatalogPromos()} />
       ) : null}
-
-      <div className="hidden lg:block" data-catalog-desktop-filters>
-        {filterableTopics.length > 0 ? (
-          <TopicFilterBar
-            topics={filterableTopics}
-            activeTopicKey={activeTopicKeys[0] ?? null}
-            activeTopicKeys={activeTopicKeys}
-            searchQuery={searchQuery}
-            listing={listingState}
-          />
-        ) : null}
-
-        <CatalogChipFilterBar
-          title="Доступ"
-          ariaLabel="Фильтр по доступу"
-          options={CATALOG_ACCESS_FILTER_OPTIONS}
-          activeValue={resolvedListingQuery.access}
-          buildHref={(access) =>
-            buildCatalogHref({
-              q: searchQuery || null,
-              topic: activeTopicParam,
-              access,
-              class: resolvedListingQuery.class,
-              sort: resolvedListingQuery.sort,
-            })
-          }
-        />
-
-        <CatalogChipFilterBar
-          title="Тип"
-          ariaLabel="Фильтр по типу"
-          options={CATALOG_CLASS_FILTER_OPTIONS}
-          activeValue={resolvedListingQuery.class}
-          buildHref={(publicationClass) =>
-            buildCatalogHref({
-              q: searchQuery || null,
-              topic: activeTopicParam,
-              access: resolvedListingQuery.access,
-              class: publicationClass,
-              sort: resolvedListingQuery.sort,
-            })
-          }
-        />
-      </div>
 
       {hasAnyProducts ? (
         <CatalogProductGrid
