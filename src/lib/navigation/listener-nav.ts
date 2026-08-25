@@ -31,7 +31,7 @@ export const LISTENER_PRIMARY_NAV_ITEMS: readonly ListenerPrimaryNavItem[] = [
   {
     key: "playlists",
     title: "Плейлисты",
-    href: "/playlists",
+    href: "/playlists/catalog",
     icon: "playlists",
   },
   { key: "profile", title: "Профиль", href: "/profile", icon: "profile" },
@@ -56,7 +56,7 @@ export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
     href: "/my-materials",
     icon: "lock",
   },
-  { key: "playlists", title: "Плейлисты", href: "/playlists" },
+  { key: "playlists", title: "Плейлисты", href: "/playlists/catalog" },
   { key: "history", title: "Недавно слушали", href: "/history" },
   { key: "profile", title: "Профиль", href: "/profile" },
   { key: "help", title: "Помощь", href: "/help", icon: "help" },
@@ -91,6 +91,11 @@ export function isListenerPrimaryNavItemActive(
 
   if (href === "/") {
     return pathname === "/";
+  }
+
+  // Catalog landing still highlights mine/saved/[id] under /playlists/*.
+  if (href === "/playlists/catalog") {
+    return pathname === "/playlists" || pathname.startsWith("/playlists/");
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

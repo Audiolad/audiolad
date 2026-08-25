@@ -503,11 +503,11 @@ assert.equal(
 );
 assert.equal(
   LISTENER_PRIMARY_NAV_ITEMS.find((item) => item.key === "playlists")?.href,
-  "/playlists",
+  "/playlists/catalog",
 );
 assert.equal(
   LISTENER_SIDEBAR_NAV_ITEMS.find((item) => item.key === "playlists")?.href,
-  "/playlists",
+  "/playlists/catalog",
 );
 assert.doesNotMatch(listenerNav, /\/playlists\/saved/);
 assert.doesNotMatch(listenerNav, /Сохранённые/);
