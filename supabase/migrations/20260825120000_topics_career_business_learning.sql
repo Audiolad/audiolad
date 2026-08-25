@@ -2,8 +2,8 @@ BEGIN;
 
 -- Incremental platform topics: Карьера, Бизнес, Обучение.
 -- Same directory as 20260717140000_topics_foundation.sql.
--- Topic remains a facet independent of publication class / product_kind.
--- «Обучение» is topics.key=learning, not class=course.
+-- Topic remains a facet independent of publication class.
+-- «Обучение» is topics.key=learning, not a course class.
 
 INSERT INTO public.topics (
   key,

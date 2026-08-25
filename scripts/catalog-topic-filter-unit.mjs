@@ -196,8 +196,11 @@ assert(topicSeed.includes("'Бизнес'"), "seed has Бизнес title");
 assert(topicSeed.includes("'Обучение'"), "seed has Обучение title");
 assert(topicSeed.includes("ON CONFLICT (key) DO NOTHING"), "seed is insert-if-not-exists");
 assert(
-  !topicSeed.includes("product_kind") && !topicSeed.includes("class=course"),
-  "seed does not add a content class",
+  topicSeed.includes("INSERT INTO public.topics") &&
+    !topicSeed.includes("product_kind") &&
+    !topicSeed.includes("CREATE TABLE") &&
+    !topicSeed.includes("ALTER TABLE"),
+  "seed only inserts topics and does not add a content class",
 );
 
 assert(
