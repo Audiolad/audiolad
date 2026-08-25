@@ -8,6 +8,7 @@ import PlatformCatalogInlineSearch from "@/components/listener/PlatformCatalogIn
 import PlatformSearchCombobox, {
   PlatformSearchSkeleton,
 } from "@/components/listener/PlatformSearchCombobox";
+import { isPublicPlaylistCatalogPath } from "@/lib/auth/routes";
 import {
   getListenerDesktopViewportServerSnapshot,
   getListenerDesktopViewportSnapshot,
@@ -54,8 +55,9 @@ function CatalogDesktopSearchRow({
  * extra search forms in the DOM.
  *
  * On /catalog this is the compact chrome row: PlatformCatalogInlineSearch
- * plus CatalogMobileFiltersSlot (passed in from the server shell). Other
- * routes keep PlatformSearchCombobox.
+ * plus CatalogMobileFiltersSlot (passed in from the server shell).
+ * On /playlists/catalog the page owns PlaylistCatalogSearch, so this
+ * shell slot stays empty. Other routes keep PlatformSearchCombobox.
  */
 export default function DesktopShellSearch({
   catalogFilters,
@@ -65,6 +67,10 @@ export default function DesktopShellSearch({
   const isDesktop = useListenerDesktopViewport();
   const isCatalogRoute =
     pathname === "/catalog" || pathname.startsWith("/catalog");
+
+  if (isPublicPlaylistCatalogPath(pathname)) {
+    return null;
+  }
 
   if (!mounted) {
     if (isCatalogRoute) {

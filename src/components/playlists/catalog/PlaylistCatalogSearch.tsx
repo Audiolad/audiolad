@@ -77,26 +77,66 @@ export default function PlaylistCatalogSearch({
     replaceHref(value);
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    applyNow();
+  }
+
+  function handleChange(nextValue: string) {
+    setValue(nextValue);
+    scheduleReplace(nextValue);
+  }
+
   return (
-    <form
-      role="search"
-      data-playlist-catalog-search
-      onSubmit={(event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        applyNow();
-      }}
-    >
-      <label className="sr-only" htmlFor="playlist-catalog-search">
+    <>
+      <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface px-5 pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
+        <div className="min-h-[52px] min-w-0">
+          <PlaylistCatalogSearchForm
+            id="playlist-catalog-search-mobile"
+            value={value}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+          />
+        </div>
+      </div>
+      <div
+        className="listener-catalog-mobile-search-spacer xl:hidden"
+        aria-hidden="true"
+      />
+      <div className="hidden xl:block">
+        <PlaylistCatalogSearchForm
+          id="playlist-catalog-search"
+          value={value}
+          onChange={handleChange}
+          onSubmit={handleSubmit}
+        />
+      </div>
+    </>
+  );
+}
+
+function PlaylistCatalogSearchForm({
+  id,
+  value,
+  onChange,
+  onSubmit,
+}: {
+  id: string;
+  value: string;
+  onChange: (nextValue: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form role="search" data-playlist-catalog-search onSubmit={onSubmit}>
+      <label className="sr-only" htmlFor={id}>
         Поиск плейлистов
       </label>
       <input
-        id="playlist-catalog-search"
+        id={id}
         type="search"
         value={value}
         onChange={(event) => {
-          const nextValue = event.target.value;
-          setValue(nextValue);
-          scheduleReplace(nextValue);
+          onChange(event.target.value);
         }}
         placeholder="Найти плейлист"
         autoComplete="off"
