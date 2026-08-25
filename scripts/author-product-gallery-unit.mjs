@@ -68,8 +68,34 @@ assert.match(cabinet, /Добавить слайд/);
 assert.match(cabinet, /Заменить/);
 assert.match(cabinet, /Удалить/);
 assert.match(cabinet, /draggable/);
+assert.match(
+  cabinet,
+  /<ResponsiveCoverImage[\s\S]*?draggable=\{false\}/,
+  "SquarePreview must disable native drag on ResponsiveCoverImage",
+);
+assert.match(
+  cabinet,
+  /<img[\s\S]*?draggable=\{false\}/,
+  "SquarePreview fallback img must set draggable={false}",
+);
 assert.match(cabinet, /onDragStart/);
 assert.match(cabinet, /onDrop/);
+assert.match(cabinet, /draggingIdRef/);
+assert.match(
+  cabinet,
+  /draggingIdRef\.current = slide\.id/,
+  "dragstart stores slide id in a ref for synchronous drop",
+);
+assert.match(
+  cabinet,
+  /const fromId = draggingIdRef\.current \?\? draggingId/,
+  "drop must read draggingIdRef / draggingId, not only getData",
+);
+assert.doesNotMatch(
+  cabinet,
+  /const fromId = event\.dataTransfer\.getData/,
+  "drop must not rely on dataTransfer.getData as the slide id source",
+);
 assert.match(cabinet, /\/gallery\/reorder/);
 assert.match(cabinet, /slides: nextSlides.map/);
 assert.match(cabinet, /validateGallerySlideFile/);
