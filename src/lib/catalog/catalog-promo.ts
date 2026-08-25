@@ -1,6 +1,3 @@
-import { BECOME_AUTHOR_HREF } from "@/lib/profile/constants";
-import { SCHOOL_ORIGIN } from "@/lib/school/host";
-
 export type CatalogPromoAudience = "all" | "guest" | "signed_in";
 
 export type CatalogPromo = {
@@ -18,27 +15,27 @@ export type CatalogPromo = {
 
 export const CATALOG_PROMOS: readonly CatalogPromo[] = [
   {
-    id: "become-author",
-    title: "Стать автором на АудиоЛад",
-    image: "/images/banners/become-author-mobile-banner-v1.webp",
-    href: BECOME_AUTHOR_HREF,
-    alt: "Стать автором на АудиоЛад",
+    id: "sleep-music-2026-08",
+    title: "Музыка и практики для глубокого сна",
+    image: "/images/catalog-promo/catalog-promo-sleep-2026-08.webp",
+    href: "/catalog?topic=sleep",
+    alt: "Музыка и практики для глубокого сна",
     position: 1,
   },
   {
-    id: "school",
-    title: "Школа Аудиопрактик",
-    image: "/images/catalog-promo/school.svg",
-    href: SCHOOL_ORIGIN,
-    alt: "Школа Аудиопрактик",
+    id: "womens-money-2026-08",
+    title: "Женские деньги",
+    image: "/images/catalog-promo/catalog-promo-womens-money-2026-08.webp",
+    href: "/practice/zoya-petrova/zhenskie-dengi",
+    alt: "Женские деньги",
     position: 2,
   },
   {
-    id: "catalog-gifts",
-    title: "Подарки авторов",
-    image: "/images/catalog-promo/gifts.svg",
-    href: "/catalog?access=free",
-    alt: "Подарки авторов платформы",
+    id: "create-audio-2026-08",
+    title: "Создавай свои аудиопрактики",
+    image: "/images/catalog-promo/catalog-promo-create-audio-2026-08.webp",
+    href: "/studio/meditation",
+    alt: "Создавай свои аудиопрактики",
     position: 3,
   },
 ];
