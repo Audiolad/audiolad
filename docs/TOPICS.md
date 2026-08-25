@@ -107,7 +107,7 @@ Many-to-many: `practices` ↔ `topics`. PK `(practice_id, topic_id)`.
 
 Many-to-many: `playlists` ↔ тот же словарь `topics`. PK `(playlist_id, topic_id)`.
 
-Миграция: `supabase/migrations/20260825161000_playlist_topics.sql`.
+Миграция: `supabase/migrations/20260825164000_playlist_topics.sql`.
 
 Запись **только** через RPC `set_playlist_topics(playlist_id, topic_keys[])`. Темы необязательны. User-owned editor не входит в Stage 4B.1.
 

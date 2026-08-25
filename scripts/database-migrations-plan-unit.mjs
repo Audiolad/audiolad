@@ -231,17 +231,32 @@ function testRepoOneFileOneVersion() {
     false,
     "unapplied playlist popular index 142000 stamp must leave the active migrations directory",
   );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825160000_playlist_catalog_foundation.sql"),
+    false,
+    "unapplied playlist foundation 160000 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825161000_playlist_topics.sql"),
+    false,
+    "unapplied playlist topics 161000 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825162000_playlist_catalog_popular_index.sql"),
+    false,
+    "unapplied playlist popular index 162000 stamp must leave the active migrations directory",
+  );
   assert.ok(
     listed.files.some(
-      (row) => row.filename === "20260825160000_playlist_catalog_foundation.sql",
+      (row) => row.filename === "20260825163000_playlist_catalog_foundation.sql",
     ),
   );
   assert.ok(
-    listed.files.some((row) => row.filename === "20260825161000_playlist_topics.sql"),
+    listed.files.some((row) => row.filename === "20260825164000_playlist_topics.sql"),
   );
   assert.ok(
     listed.files.some(
-      (row) => row.filename === "20260825162000_playlist_catalog_popular_index.sql",
+      (row) => row.filename === "20260825165000_playlist_catalog_popular_index.sql",
     ),
   );
 }
@@ -282,9 +297,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825120000",
     "20260825133000",
     "20260825150000",
-    "20260825160000",
-    "20260825161000",
-    "20260825162000",
+    "20260825163000",
+    "20260825164000",
+    "20260825165000",
   ]);
   assert.equal(plan.database_migrations_pending, 9);
 }
@@ -293,7 +308,7 @@ function testProductionLikePendingAfterPlaylistRestamp() {
   const listed = listLocalMigrationFiles(
     join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
   );
-  const maxRemote = "20260825150000";
+  const maxRemote = "20260825162000";
   const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
   const plan = planDatabaseMigrations({
     localVersions: listed.versions,
@@ -304,9 +319,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
   assert.deepEqual(plan.pending, [
-    "20260825160000",
-    "20260825161000",
-    "20260825162000",
+    "20260825163000",
+    "20260825164000",
+    "20260825165000",
   ]);
   assert.equal(plan.database_migrations_pending, 3);
 }
