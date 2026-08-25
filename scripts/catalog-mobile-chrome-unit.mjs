@@ -60,8 +60,33 @@ assert.match(search, /isCompact \? null/, "compact catalog search has no Най�
 assert.match(search, />\s*Найти\s*</, "shell search still has Найти");
 assert.match(
   globals,
-  /--catalog-mobile-search-height/,
-  "search height and spacer share one CSS variable",
+  /--catalog-mobile-search-height:\s*calc\(max\(0\.25rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\)/,
+  "search spacer is safe-area + 52px field only",
+);
+assert.doesNotMatch(
+  globals,
+  /--catalog-mobile-search-height:[^;]*52px\s*\+/,
+  "search height has no rem tail after the 52px field",
+);
+assert.match(
+  layout,
+  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\]/,
+  "search padding-top floor is 0.25rem so Android is not flush",
+);
+assert.match(
+  layout,
+  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
+  "search chrome drops the extra bottom padding",
+);
+assert.doesNotMatch(
+  layout,
+  /pt-\[max\(0\.75rem/,
+  "old 0.75rem top floor is gone",
+);
+assert.doesNotMatch(
+  layout,
+  /listener-catalog-mobile-search[\s\S]*pb-1(?:\s|"|')/,
+  "old pb-1 search tail is gone",
 );
 assert.match(
   globals,
@@ -89,6 +114,21 @@ assert.match(
   "promo is hidden during search and topic filters",
 );
 assert.match(page, /CatalogPromoCarousel/, "unfiltered catalog mounts the promo carousel");
+assert.doesNotMatch(
+  page,
+  /AuthorListCard|searchPublishedCatalogAuthors|catalog-search-authors-heading/,
+  "catalog page search does not fetch or render authors",
+);
+assert.doesNotMatch(
+  page,
+  />\s*Авторы\s*</,
+  "catalog page has no Авторы section heading",
+);
+assert.doesNotMatch(
+  page,
+  /isSearchActive && authors\.length/,
+  "empty catalog search depends only on hasAnyProducts",
+);
 
 const promoCarousel = read("src/components/catalog/CatalogPromoCarousel.tsx");
 const promoConfig = read("src/lib/catalog/catalog-promo.ts");
@@ -102,6 +142,18 @@ assert.match(
   /data-catalog-promo-position/,
   "promo slides expose data-catalog-promo-position",
 );
+assert.match(
+  promoCarousel,
+  /mt-0 xl:mt-1\.5/,
+  "promo has no mobile top slack above the 4.8:1 slide",
+);
+assert.doesNotMatch(
+  promoCarousel,
+  /mt-1 xl:mt-1\.5/,
+  "old mt-1 mobile promo slack is gone",
+);
+assert.match(promoCarousel, /aspect-\[4\.8\/1\]/, "promo slide ratio stays 4.8:1");
+assert.match(promoCarousel, /object-contain/, "promo images stay contain");
 assert.match(promoConfig, /export type CatalogPromo/, "CatalogPromo is a typed entity");
 assert.match(promoConfig, /startsAt\?/, "promo config reserves startsAt");
 assert.match(promoConfig, /endsAt\?/, "promo config reserves endsAt");

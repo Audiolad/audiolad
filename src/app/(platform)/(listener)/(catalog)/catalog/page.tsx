@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import AuthorListCard from "@/components/authors/AuthorListCard";
 import CatalogChipFilterBar from "@/components/catalog/CatalogChipFilterBar";
 import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
 import TopicFilterBar from "@/components/catalog/TopicFilterBar";
@@ -11,10 +10,6 @@ import {
   CATALOG_CLASS_FILTER_OPTIONS,
 } from "@/lib/catalog/catalog-filter-ui";
 import { listCatalogPromos } from "@/lib/catalog/catalog-promo";
-import {
-  mapCatalogAuthorSearchResultToPublicAuthorCard,
-  searchPublishedCatalogAuthors,
-} from "@/lib/catalog/author-search";
 import {
   CATALOG_LISTING_PAGE_SIZE,
   listPublishedCatalog,
@@ -106,15 +101,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     sort: resolvedListingQuery.sort,
   };
 
-  const [authors, listing] = await Promise.all([
-    isSearchActive
-      ? searchPublishedCatalogAuthors(supabase, {
-          query: searchQuery,
-          topicKey: activeTopicParam,
-        })
-      : Promise.resolve([]),
-    defaultListing ?? listPublishedCatalog(supabase, resolvedListingQuery),
-  ]);
+  const listing =
+    defaultListing ?? (await listPublishedCatalog(supabase, resolvedListingQuery));
 
   const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;
@@ -208,26 +196,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         />
       </div>
 
-      {isSearchActive && authors.length > 0 ? (
-        <section className="mt-6" aria-labelledby="catalog-search-authors-heading">
-          <h3
-            id="catalog-search-authors-heading"
-            className="text-[18px] font-semibold leading-7 text-[#25135c]"
-          >
-            Авторы
-          </h3>
-          <ul className="mt-4 grid list-none gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3">
-            {authors.map((author) => (
-              <li key={author.id}>
-                <AuthorListCard
-                  author={mapCatalogAuthorSearchResultToPublicAuthorCard(author)}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       {hasAnyProducts ? (
         <CatalogProductGrid
           key={[
@@ -243,7 +211,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           isAuthenticated={Boolean(authUser)}
           signInReturnPath={signInReturnPath}
         />
-      ) : isSearchActive && authors.length > 0 ? null : (
+      ) : (
         <section className="mt-8">
           <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
             {isSearchActive ? (
