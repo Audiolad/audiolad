@@ -100,12 +100,15 @@ export function toggleCatalogDraftTopics(
 export function countCatalogFilterGroups(input: {
   topicKeys: readonly string[];
   access: string | null | undefined;
-  kind: string | null | undefined;
+  class?: string | null | undefined;
+  kind?: string | null | undefined;
 }): number {
+  const classFilter = input.class ?? input.kind;
+
   return [
     input.topicKeys.length > 0,
     Boolean(input.access && input.access !== "all"),
-    Boolean(input.kind && input.kind !== "all"),
+    Boolean(classFilter && classFilter !== "all"),
   ].filter(Boolean).length;
 }
 
@@ -113,14 +116,21 @@ export type CatalogHrefOptions = {
   q?: string | null;
   topic?: string | null;
   access?: string | null;
+  class?: string | null;
   kind?: string | null;
   sort?: string | null;
 };
 
 const CATALOG_SEARCH_HREF_MAX_LENGTH = 100;
 const DEFAULT_CATALOG_ACCESS = "all";
-const DEFAULT_CATALOG_KIND = "all";
+const DEFAULT_CATALOG_CLASS = "all";
 const DEFAULT_CATALOG_SORT = "new";
+
+const LEGACY_HREF_KIND_TO_CLASS: Record<string, string> = {
+  music: "release",
+  audio_post: "post",
+  program: "practice",
+};
 
 function normalizeCatalogHrefQuery(value: string | null | undefined): string {
   if (value == null) {
@@ -153,7 +163,14 @@ export function buildCatalogHref(options?: CatalogHrefOptions): string {
   const normalizedQuery = normalizeCatalogHrefQuery(options?.q);
   const topicKey = options?.topic?.trim().toLowerCase() || null;
   const access = normalizeCatalogHrefFilter(options?.access, DEFAULT_CATALOG_ACCESS);
-  const kind = normalizeCatalogHrefFilter(options?.kind, DEFAULT_CATALOG_KIND);
+  const rawClass = options?.class ?? options?.kind;
+  const mappedClass = rawClass
+    ? (LEGACY_HREF_KIND_TO_CLASS[rawClass.trim().toLowerCase()] ?? rawClass)
+    : rawClass;
+  const publicationClass = normalizeCatalogHrefFilter(
+    mappedClass,
+    DEFAULT_CATALOG_CLASS,
+  );
   const sort = normalizeCatalogHrefFilter(options?.sort, DEFAULT_CATALOG_SORT);
 
   const params = new URLSearchParams();
@@ -170,8 +187,8 @@ export function buildCatalogHref(options?: CatalogHrefOptions): string {
     params.set("access", access);
   }
 
-  if (kind) {
-    params.set("kind", kind);
+  if (publicationClass) {
+    params.set("class", publicationClass);
   }
 
   if (sort) {
@@ -186,14 +203,14 @@ export function buildCatalogHref(options?: CatalogHrefOptions): string {
 export function buildCatalogTopicHref(
   topicKey: string | null,
   q?: string | null,
-  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">,
+  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({ topic: topicKey, q, ...listing });
 }
 
 export function buildCatalogClearSearchHref(
   topicKey: string | null,
-  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">,
+  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({ topic: topicKey, ...listing });
 }

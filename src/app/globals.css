@@ -431,6 +431,31 @@ body {
   padding: 0;
 }
 
+.catalog-card-gallery {
+  display: flex;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.catalog-card-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.catalog-card-gallery-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  scroll-snap-align: start;
+}
+
 @media (min-width: 768px) {
   .catalog-product-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

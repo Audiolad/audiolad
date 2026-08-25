@@ -15,7 +15,7 @@ function read(relativePath) {
 
 const heart = read("src/components/products/CatalogProductHeartButton.tsx");
 const play = read("src/components/products/CatalogProductPlayButton.tsx");
-const card = read("src/components/products/CatalogProductGridCard.tsx");
+const card = read("src/components/catalog/cards/CatalogCardShell.tsx");
 const grid = read("src/components/products/CatalogProductGrid.tsx");
 const css = read("src/app/globals.css");
 
@@ -32,7 +32,7 @@ assert.match(play, /className="h-4 w-4"/, "Play icon size is unchanged");
 assert.match(play, hitArea, "Play hit-area expands to 44px");
 assert.doesNotMatch(play, /h-11 w-11/, "Play visual is not enlarged to 44px");
 
-assert.match(card, /aspect-square/, "media zone stays 1:1");
+assert.match(card, /CatalogCardGallery/, "media zone stays 1:1");
 assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
 assert.match(card, /CatalogProductHeartButton/, "Heart stays on the card");
 assert.match(card, /CatalogProductPlayButton/, "Play stays on the card");

@@ -11,7 +11,7 @@ type TopicFilterBarProps = {
   activeTopicKey: string | null;
   activeTopicKeys?: readonly string[];
   searchQuery?: string;
-  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">;
+  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">;
 };
 
 export default function TopicFilterBar({

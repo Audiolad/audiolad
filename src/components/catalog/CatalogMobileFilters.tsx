@@ -5,15 +5,15 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import {
   CATALOG_ACCESS_FILTER_OPTIONS,
-  CATALOG_KIND_FILTER_OPTIONS,
+  CATALOG_CLASS_FILTER_OPTIONS,
   type CatalogFilterTopicOption,
 } from "@/lib/catalog/catalog-filter-ui";
 import {
   parseCatalogAccessFilter,
-  parseCatalogKindFilter,
+  parseCatalogClassFilter,
   parseCatalogSort,
   type CatalogAccessFilter,
-  type CatalogKindFilter,
+  type CatalogClassFilter,
 } from "@/lib/catalog/listing-contract";
 import {
   readPlatformSearchListingFromParams,
@@ -65,7 +65,7 @@ export default function CatalogMobileFilters({
   const [open, setOpen] = useState(false);
   const [draftTopics, setDraftTopics] = useState<string[]>([]);
   const [draftAccess, setDraftAccess] = useState<CatalogAccessFilter>("all");
-  const [draftKind, setDraftKind] = useState<CatalogKindFilter>("all");
+  const [draftClass, setDraftClass] = useState<CatalogClassFilter>("all");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -77,12 +77,12 @@ export default function CatalogMobileFilters({
     topics.map((topic) => topic.key),
   );
   const access = parseCatalogAccessFilter(listingFromUrl.access);
-  const kind = parseCatalogKindFilter(listingFromUrl.kind);
+  const publicationClass = parseCatalogClassFilter(listingFromUrl.class);
   const sort = parseCatalogSort(listingFromUrl.sort);
   const activeFilterCount = countCatalogFilterGroups({
     topicKeys: activeTopicKeys,
     access,
-    kind,
+    class: publicationClass,
   });
 
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function CatalogMobileFilters({
   function openSheet() {
     setDraftTopics(activeTopicKeys);
     setDraftAccess(access);
-    setDraftKind(kind);
+    setDraftClass(publicationClass);
     setOpen(true);
   }
 
@@ -165,7 +165,7 @@ export default function CatalogMobileFilters({
         q: searchQuery || null,
         topic: serializeCatalogTopicParam(draftTopics),
         access: draftAccess,
-        kind: draftKind,
+        class: draftClass,
         sort,
       }),
     );
@@ -175,13 +175,13 @@ export default function CatalogMobileFilters({
   function resetFilters() {
     setDraftTopics([]);
     setDraftAccess("all");
-    setDraftKind("all");
+    setDraftClass("all");
     router.replace(
       buildCatalogHref({
         q: searchQuery || null,
         topic: null,
         access: "all",
-        kind: "all",
+        class: "all",
         sort,
       }),
     );
@@ -294,12 +294,12 @@ export default function CatalogMobileFilters({
               <section className="mt-6" aria-label="Тип">
                 <h3 className="text-sm font-semibold text-[#25135c]">Тип</h3>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {CATALOG_KIND_FILTER_OPTIONS.map((option) => (
+                  {CATALOG_CLASS_FILTER_OPTIONS.map((option) => (
                     <FilterChip
                       key={option.value}
                       label={option.label}
-                      isActive={option.value === draftKind}
-                      onSelect={() => setDraftKind(option.value)}
+                      isActive={option.value === draftClass}
+                      onSelect={() => setDraftClass(option.value)}
                     />
                   ))}
                 </div>

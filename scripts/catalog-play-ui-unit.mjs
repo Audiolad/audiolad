@@ -13,7 +13,8 @@ function read(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
 }
 
-const card = read("src/components/products/CatalogProductGridCard.tsx");
+const card = read("src/components/catalog/cards/CatalogCardShell.tsx");
+const gridCard = read("src/components/products/CatalogProductGridCard.tsx");
 const play = read("src/components/products/CatalogProductPlayButton.tsx");
 const mini = read("src/components/audio/GlobalMiniPlayer.tsx");
 const desktop = read("src/components/listener/DesktopPlayerBar.tsx");
@@ -23,8 +24,9 @@ const listingApi = read("src/app/api/catalog/route.ts");
 const preview = read("src/lib/listen/preview-window.ts");
 const playLoader = read("src/lib/catalog/catalog-playback.ts");
 
+assert.match(gridCard, /CatalogCardView/, "grid card uses class layouts");
 assert.match(card, /data-catalog-media-zone/, "media zone is marked");
-assert.match(card, /aspect-square/, "media zone is 1:1");
+assert.match(card, /CatalogCardGallery/, "media zone hosts the 1:1 gallery");
 assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
 assert.match(card, /data-catalog-info-block/, "info block stays static");
 assert.match(card, /absolute bottom-2 right-2|CatalogProductPlayButton/, "Play is on the card");
