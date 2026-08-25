@@ -2482,6 +2482,7 @@ export default function AuthorProductForm({
           coverUrl={form.coverUrl}
           coverImage={form.coverImage}
           coverVersion={form.coverVersion}
+          initialSlides={initialProduct?.gallery_slides ?? []}
           getPracticeId={getPracticeIdForCoverUpload}
           disabled={!canMutateContent || busy}
         />

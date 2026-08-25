@@ -74,8 +74,11 @@ assert.match(deleteApi, /deleteAuthorGallerySlide/);
 assert.match(deleteApi, /requirePracticeMutationAccess/);
 
 const store = read("src/lib/author-products/gallery.ts");
-assert.match(store, /publication_gallery_slides/);
+assert.match(store, /PUBLICATION_GALLERY_TABLE/);
 assert.doesNotMatch(store, /PracticeGallery|CourseGallery/);
+
+const publicationStore = read("src/lib/catalog/publication-gallery.ts");
+assert.match(publicationStore, /publication_gallery_slides/);
 
 const catalog = read("src/lib/products/catalog.ts");
 assert.match(catalog, /loadPublicationGalleriesByIds/);

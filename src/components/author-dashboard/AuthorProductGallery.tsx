@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 import {
@@ -19,6 +19,7 @@ type AuthorProductGalleryProps = {
   coverUrl: string | null;
   coverImage?: unknown;
   coverVersion: string | null;
+  initialSlides?: AuthorGallerySlide[];
   getPracticeId: () => Promise<string | null>;
   disabled?: boolean;
 };
@@ -34,7 +35,7 @@ function SquarePreview({
   src: string | null;
   alt: string;
   manifest?: ImageManifest | null;
-  srcSet?: string;
+  srcSet?: string | null;
   sizes?: string;
   emptyLabel: string;
 }) {
@@ -75,12 +76,12 @@ export default function AuthorProductGallery({
   coverUrl,
   coverImage,
   coverVersion,
+  initialSlides = [],
   getPracticeId,
   disabled = false,
 }: AuthorProductGalleryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [slides, setSlides] = useState<AuthorGallerySlide[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [slides, setSlides] = useState<AuthorGallerySlide[]>(initialSlides);
   const [uploading, setUploading] = useState(false);
   const [busySlideId, setBusySlideId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,44 +92,6 @@ export default function AuthorProductGallery({
     coverVersion,
     80,
   );
-
-  const loadSlides = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/author/products/${id}/gallery`);
-      const payload = (await response.json()) as {
-        slides?: AuthorGallerySlide[];
-        error?: string;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        setError(
-          payload.message ||
-            getAuthorGalleryErrorMessage(payload.error) ||
-            "Не удалось загрузить галерею.",
-        );
-        return;
-      }
-
-      setSlides(payload.slides ?? []);
-    } catch {
-      setError("Не удалось загрузить галерею.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!practiceId) {
-      setSlides([]);
-      return;
-    }
-
-    void loadSlides(practiceId);
-  }, [loadSlides, practiceId]);
 
   const applySlides = useCallback((next: AuthorGallerySlide[]) => {
     setSlides(next);
@@ -312,7 +275,10 @@ export default function AuthorProductGallery({
   const isBusy = uploading || Boolean(busySlideId);
 
   return (
-    <section data-author-product-gallery>
+    <section
+      data-author-product-gallery
+      data-author-product-gallery-id={practiceId ?? ""}
+    >
       <span className="mb-2 block text-sm font-medium">Галерея продукта</span>
       <p className="mb-4 text-sm leading-5 text-[#7d70a2]">
         Дополнительные квадратные слайды для карточки в каталоге. Обложка
@@ -412,13 +378,9 @@ export default function AuthorProductGallery({
               ? "Достигнут лимит 30 слайдов"
               : "Добавить слайд"}
         </button>
-        {loading ? (
-          <span className="text-sm text-[#7d70a2]">Загрузка галереи…</span>
-        ) : (
-          <span className="text-sm text-[#7d70a2]">
-            {slides.length} / {CATALOG_GALLERY_MAX_SLIDES}
-          </span>
-        )}
+        <span className="text-sm text-[#7d70a2]">
+          {slides.length} / {CATALOG_GALLERY_MAX_SLIDES}
+        </span>
       </div>
 
       <input

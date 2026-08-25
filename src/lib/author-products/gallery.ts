@@ -50,22 +50,6 @@ export async function listAuthorGallerySlides(
   return ((data ?? []) as PublicationGallerySlideRow[]).map(toAuthorSlide);
 }
 
-export async function countAuthorGallerySlides(
-  supabase: SupabaseClient,
-  publicationId: string,
-): Promise<number> {
-  const { count, error } = await supabase
-    .from(PUBLICATION_GALLERY_TABLE)
-    .select("id", { count: "exact", head: true })
-    .eq("publication_id", publicationId);
-
-  if (error) {
-    throw new Error("gallery_lookup_failed");
-  }
-
-  return count ?? 0;
-}
-
 export async function insertAuthorGallerySlide(
   supabase: SupabaseClient,
   input: {
