@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { Suspense, useSyncExternalStore } from "react";
 
 import PlatformCatalogInlineSearch from "@/components/listener/PlatformCatalogInlineSearch";
@@ -28,17 +27,14 @@ function useListenerDesktopViewport(): boolean {
 }
 
 /**
- * Compact catalog inline search. Always mounted on /catalog (desktop shell search is hidden).
- * On other pages it stays mobile-only so desktop keeps the shell combobox.
+ * Mobile-only catalog inline search. Desktop catalog chrome lives in
+ * DesktopShellSearch, above center-scroll.
  */
 export default function MobileCatalogSearch() {
-  const pathname = usePathname();
   const mounted = useClientMounted();
   const isDesktop = useListenerDesktopViewport();
-  const isCatalogRoute =
-    pathname === "/catalog" || pathname.startsWith("/catalog");
 
-  if (!isCatalogRoute && (!mounted || isDesktop)) {
+  if (!mounted || isDesktop) {
     return null;
   }
 

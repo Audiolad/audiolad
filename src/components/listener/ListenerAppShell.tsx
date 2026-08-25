@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
+import CatalogMobileFiltersSlot from "@/components/catalog/CatalogMobileFiltersSlot";
 import DesktopShellSearch from "@/components/listener/DesktopShellSearch";
 import DesktopPlayerBar from "@/components/listener/DesktopPlayerBar";
 import DesktopRightColumn from "@/components/listener/DesktopRightColumn";
@@ -48,6 +49,13 @@ export function ListenerAppShell({
         ) : null}
 
         <section className="listener-app-shell__main-column min-w-0 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+          {config.showDesktopSearch ? (
+            <div className="hidden shrink-0 xl:block xl:px-6">
+              <DesktopShellSearch
+                catalogFilters={<CatalogMobileFiltersSlot />}
+              />
+            </div>
+          ) : null}
           <div
             className={[
               "listener-app-shell__center-scroll xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-y-auto",
@@ -56,11 +64,6 @@ export function ListenerAppShell({
                 : "xl:pb-4",
             ].join(" ")}
           >
-            {config.showDesktopSearch ? (
-              <div className="hidden shrink-0 xl:block xl:px-6 xl:pb-0 xl:pt-0">
-                <DesktopShellSearch />
-              </div>
-            ) : null}
             <div className={centerContentClassName}>{children}</div>
           </div>
           {config.showDesktopPlayerBar ? <DesktopPlayerBar /> : null}

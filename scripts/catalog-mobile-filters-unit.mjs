@@ -27,12 +27,75 @@ const listingApi = read("src/app/api/catalog/route.ts");
 assert.match(layout, /CatalogMobileFiltersSlot/, "fixed chrome mounts filters");
 assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
 assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*fixed/,
+  "mobile search stays a fixed top layer",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  "layout search+filters stay mobile-only",
+);
+assert.doesNotMatch(layout, /xl:sticky/, "catalog layout does not use xl:sticky");
 assert.doesNotMatch(
   layout,
   /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
   "filters slot is not hidden from lg",
 );
 assert.doesNotMatch(layout, /lg:hidden/, "search row does not hide filters on lg");
+
+const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
+assert.match(
+  shellSearch,
+  /PlatformCatalogInlineSearch density="compact"/,
+  "desktop catalog chrome uses compact search",
+);
+assert.match(
+  shellSearch,
+  /CatalogMobileFiltersSlot/,
+  "desktop catalog chrome owns CatalogMobileFiltersSlot",
+);
+assert.doesNotMatch(
+  shellSearch,
+  /if \(isCatalogRoute\) \{\s*return null;/,
+  "desktop shell search renders on catalog",
+);
+
+const shell = read("src/components/listener/ListenerAppShell.tsx");
+assert.match(
+  shell,
+  /<DesktopShellSearch[\s\S]*listener-app-shell__center-scroll/,
+  "DesktopShellSearch sits before center-scroll",
+);
+assert.doesNotMatch(
+  shell,
+  /listener-app-shell__center-scroll[\s\S]*<DesktopShellSearch/,
+  "DesktopShellSearch is not nested in center-scroll",
+);
+const childrenClassMatch = shell.match(
+  /const centerContentClassName = \[([\s\S]*?)\]/,
+);
+assert.ok(childrenClassMatch, "shell defines centerContentClassName");
+assert.match(childrenClassMatch[1], /"min-w-0"/, "children wrapper stays min-w-0");
+assert.doesNotMatch(
+  childrenClassMatch[1],
+  /overflow-hidden/,
+  "children wrapper has no overflow-hidden",
+);
+
+const bottomNav = read("src/components/BottomNav.tsx");
+assert.match(
+  bottomNav,
+  /createPortal\(nav, document\.body\)/,
+  "BottomNav still portals to document.body",
+);
+const globals = read("src/app/globals.css");
+assert.match(
+  globals,
+  /\.bottom-nav \{\s*position:\s*fixed;/,
+  "BottomNav stays position:fixed",
+);
 
 assert.doesNotMatch(
   page,

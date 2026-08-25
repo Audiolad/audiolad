@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
+import PlatformCatalogInlineSearch from "@/components/listener/PlatformCatalogInlineSearch";
 import PlatformSearchCombobox, {
   PlatformSearchSkeleton,
 } from "@/components/listener/PlatformSearchCombobox";
@@ -28,28 +30,70 @@ function useListenerDesktopViewport(): boolean {
   );
 }
 
+type DesktopShellSearchProps = {
+  catalogFilters?: ReactNode;
+};
+
+function CatalogDesktopSearchRow({
+  catalogFilters,
+  search,
+}: {
+  catalogFilters?: ReactNode;
+  search: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-h-[52px] min-w-0 flex-1">{search}</div>
+      <div className="shrink-0">{catalogFilters}</div>
+    </div>
+  );
+}
+
 /**
- * Desktop-only shell search. Hidden on /catalog, where the catalog row owns search.
- * Does not mount a search form below the xl breakpoint,
- * so mobile listener pages keep zero search forms in the DOM.
+ * Desktop-only shell search. Hidden below xl so mobile pages keep zero
+ * extra search forms in the DOM.
+ *
+ * On /catalog this is the compact chrome row: PlatformCatalogInlineSearch
+ * plus CatalogMobileFiltersSlot (passed in from the server shell). Other
+ * routes keep PlatformSearchCombobox.
  */
-export default function DesktopShellSearch() {
+export default function DesktopShellSearch({
+  catalogFilters,
+}: DesktopShellSearchProps) {
   const pathname = usePathname();
   const mounted = useClientMounted();
   const isDesktop = useListenerDesktopViewport();
   const isCatalogRoute =
     pathname === "/catalog" || pathname.startsWith("/catalog");
 
-  if (isCatalogRoute) {
-    return null;
-  }
-
   if (!mounted) {
+    if (isCatalogRoute) {
+      return (
+        <CatalogDesktopSearchRow
+          catalogFilters={catalogFilters}
+          search={<PlatformSearchSkeleton density="compact" />}
+        />
+      );
+    }
+
     return <PlatformSearchSkeleton />;
   }
 
   if (!isDesktop) {
     return null;
+  }
+
+  if (isCatalogRoute) {
+    return (
+      <CatalogDesktopSearchRow
+        catalogFilters={catalogFilters}
+        search={
+          <Suspense fallback={<PlatformSearchSkeleton density="compact" />}>
+            <PlatformCatalogInlineSearch density="compact" />
+          </Suspense>
+        }
+      />
+    );
   }
 
   return <PlatformSearchCombobox />;

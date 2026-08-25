@@ -33,11 +33,17 @@ assert.match(
 );
 assert.match(layout, /fixed top-0 inset-x-0/, "mobile search is a fixed top layer");
 assert.doesNotMatch(layout, /sticky/, "mobile search is no longer sticky");
+assert.doesNotMatch(layout, /xl:sticky/, "catalog layout does not use xl:sticky");
 assert.match(layout, /z-30/, "fixed search keeps the chrome stacking layer");
 assert.match(
   layout,
-  /xl:static xl:inset-auto xl:z-auto/,
-  "xl search sits in the catalog column, not over the sidebars",
+  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  "catalog layout search is mobile-only at xl",
+);
+assert.doesNotMatch(
+  layout,
+  /xl:static|xl:inset-auto|xl:z-auto/,
+  "xl search is not in-flow inside catalog children",
 );
 assert.match(
   layout,
@@ -189,12 +195,32 @@ assert.match(shellSearch, /usePathname/, "shell search reads the pathname");
 assert.match(
   shellSearch,
   /pathname === ["']\/catalog["'] \|\| pathname\.startsWith\(["']\/catalog["']\)/,
-  "shell search hides on /catalog",
+  "shell search detects /catalog",
+);
+assert.doesNotMatch(
+  shellSearch,
+  /if \(isCatalogRoute\) \{\s*return null;/,
+  "shell search does not return null on catalog",
 );
 assert.match(
   shellSearch,
-  /if \(isCatalogRoute\) \{\s*return null;/,
-  "shell search returns null on catalog",
+  /PlatformCatalogInlineSearch density="compact"/,
+  "desktop catalog chrome uses compact search",
+);
+assert.match(
+  shellSearch,
+  /CatalogMobileFiltersSlot/,
+  "desktop catalog chrome names CatalogMobileFiltersSlot",
+);
+assert.match(
+  shellSearch,
+  /catalogFilters/,
+  "desktop catalog chrome renders the filters slot",
+);
+assert.match(
+  shellSearch,
+  /PlatformSearchCombobox/,
+  "non-catalog routes keep the shell combobox",
 );
 const catalogSearch = read("src/components/listener/MobileCatalogSearch.tsx");
 assert.match(
@@ -204,8 +230,13 @@ assert.match(
 );
 assert.match(
   catalogSearch,
+  /if \(!mounted \|\| isDesktop\) \{\s*return null;/,
+  "mobile catalog search unmounts at desktop",
+);
+assert.doesNotMatch(
+  catalogSearch,
   /isCatalogRoute/,
-  "catalog search mounts on /catalog at every width",
+  "mobile catalog search no longer force-mounts on desktop catalog",
 );
 const shell = read("src/components/listener/ListenerAppShell.tsx");
 const childrenClassMatch = shell.match(
@@ -233,6 +264,37 @@ assert.match(
   /listener-app-shell__center-scroll[^"]*xl:overflow-y-auto/,
   "center-scroll remains the desktop page scroller",
 );
+assert.match(
+  shell,
+  /<DesktopShellSearch[\s\S]*listener-app-shell__center-scroll/,
+  "DesktopShellSearch wrapper is a sibling before center-scroll",
+);
+assert.doesNotMatch(
+  shell,
+  /listener-app-shell__center-scroll[\s\S]*<DesktopShellSearch/,
+  "DesktopShellSearch is not inside center-scroll",
+);
+assert.match(
+  shell,
+  /catalogFilters=\{<CatalogMobileFiltersSlot/,
+  "shell passes CatalogMobileFiltersSlot into desktop chrome",
+);
+assert.match(
+  shell,
+  /hidden shrink-0 xl:block xl:px-6/,
+  "desktop search chrome is shrink-0 above the scroller",
+);
+const bottomNav = read("src/components/BottomNav.tsx");
+assert.match(
+  bottomNav,
+  /createPortal\(nav, document\.body\)/,
+  "BottomNav still portals to document.body",
+);
+assert.match(
+  globals,
+  /\.bottom-nav \{\s*position:\s*fixed;/,
+  "BottomNav stays position:fixed",
+);
 assert.doesNotMatch(
   globals,
   /:has\(\.listener-catalog-content\)/,
@@ -255,8 +317,13 @@ assert.match(
 );
 assert.match(
   layout,
-  /listener-catalog-mobile-search[^"]*xl:static/,
-  "xl search is in-flow instead of a fixed overlay",
+  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  "mobile search stays hidden at xl so shell chrome owns desktop",
+);
+assert.doesNotMatch(
+  layout,
+  /listener-catalog-mobile-search[^"]*(?:xl:static|xl:sticky|xl:inset-auto|xl:z-auto)/,
+  "catalog layout search has no desktop in-flow overrides",
 );
 
 assert.doesNotMatch(
