@@ -18,7 +18,7 @@ export const CATALOG_PROMOS: readonly CatalogPromo[] = [
     id: "sleep-music-2026-08",
     title: "Музыка и практики для глубокого сна",
     image: "/images/catalog-promo/catalog-promo-sleep-2026-08.webp",
-    href: "/catalog?topic=sleep",
+    href: "/catalog?q=сон",
     alt: "Музыка и практики для глубокого сна",
     position: 1,
   },

@@ -95,7 +95,7 @@ export default function CatalogPromoCarousel({
               data-catalog-promo-position={promo.position}
               className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              <span className="relative block aspect-[2/1] w-full overflow-hidden bg-[#efe6f8]">
+              <span className="relative block aspect-[3/1] w-full overflow-hidden bg-[#efe6f8]">
                 {promo.image.endsWith(".svg") ? (
                   // Local SVG slides stay image-only; next/image needs extra config for SVG.
                   // eslint-disable-next-line @next/next/no-img-element
