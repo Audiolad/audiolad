@@ -92,6 +92,16 @@ assert.match(card, /rounded-\[20px\]/, "card has a shared radius");
 assert.match(card, /border border-\[#eadff8\]/, "card has a light border");
 assert.match(card, /data-catalog-card-format/, "format label is marked");
 assert.match(card, /display_label/, "format uses CatalogCard.display_label");
+assert.doesNotMatch(
+  card,
+  /getCatalogClassLabel|CATALOG_CLASS_LABELS/,
+  "card chip does not fall back to Publication.class labels",
+);
+assert.doesNotMatch(
+  card,
+  /["']Релиз["']|["']Практика["']|["']Пост["']|["']Курс["']/,
+  "card chip does not hardcode class names",
+);
 assert.doesNotMatch(card, /hidden xl:block/, "format label stays visible on mobile");
 assert.doesNotMatch(card, /durationLabel/, "card no longer shows duration or audio count");
 assert.match(card, /data-catalog-card-meta/, "paid price keeps a meta row");

@@ -32,6 +32,8 @@ function assert(condition, message) {
   }
 }
 
+const FORBIDDEN_DISPLAY_LABELS = ["Релиз", "Практика", "Пост", "Курс"];
+
 function product(overrides = {}) {
   return {
     id: "p1",
@@ -174,11 +176,17 @@ const mixed = [
   candidate({
     id: "post",
     productKind: "audio_post",
+    format: "Аудиопост",
     isFree: true,
     price: 0,
     sortTimestamp: 5,
   }),
 ];
+
+assert(
+  mixed.every((item) => !FORBIDDEN_DISPLAY_LABELS.includes(item.display_label)),
+  "mixed listing items never use class names as display_label",
+);
 
 const freeOnly = filterCatalogListingItems(mixed, { access: "free", class: "all" });
 assert(freeOnly.map((item) => item.publication_id).join() === "gift", "access=free keeps gifts");
@@ -290,12 +298,61 @@ assert(
   "bad cursor keeps full list",
 );
 
+function assertStorefrontDisplayLabel(card, expected, message) {
+  assert(card.display_label === expected, message);
+  assert(
+    !FORBIDDEN_DISPLAY_LABELS.includes(card.display_label),
+    `display_label must not be a class name: ${card.display_label}`,
+  );
+}
+
+assertStorefrontDisplayLabel(
+  candidate(),
+  "Аудиопрактика",
+  "practice default format is Аудиопрактика",
+);
+assertStorefrontDisplayLabel(
+  candidate({ format: "Медитация" }),
+  "Медитация",
+  "practice format preset is preserved",
+);
+assertStorefrontDisplayLabel(
+  candidate({ format: "Голос для сна" }),
+  "Голос для сна",
+  "custom author format is preserved",
+);
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "music", format: "Музыка" }),
+  "Музыка",
+  "music uses stored MUSIC_KIND_LABEL",
+);
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "music", format: "  " }),
+  "Музыка",
+  "empty music format falls back to Музыка",
+);
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "audio_post", format: "Аудиопост" }),
+  "Аудиопост",
+  "audio_post uses stored format, not Пост",
+);
+assertStorefrontDisplayLabel(
+  candidate({ productKind: "audio_post", format: "" }),
+  "Аудиопост",
+  "empty audio_post format falls back to Аудиопост",
+);
+
 const mapped = mapCatalogProductToListingItem(
   product({
     isFree: true,
     priceLabel: "Подарок",
     authorName: "Мария",
   }),
+);
+assertStorefrontDisplayLabel(
+  mapped,
+  "Аудиопрактика",
+  "mapped gift keeps practice format label",
 );
 assert(mapped.author.name === "Мария", "card author");
 assert(mapped.default_offer?.access === "free", "card offer access");

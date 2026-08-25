@@ -69,6 +69,7 @@ export function mapLegacyCatalogProductToSource(
     slug: product.slug,
     title: product.title,
     subtitle: product.subtitle,
+    format: product.format,
     productKind: product.productKind,
     price: product.price,
     isFree: product.isFree,
