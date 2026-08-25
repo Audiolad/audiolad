@@ -359,16 +359,20 @@ function testDurationSeedAfterSkipLoadHandoff() {
 
   const hasValid = sliceBetween(
     player,
-    "const liveDuration = readLiveAudioDuration(audioRef.current);",
+    "const hasValidDuration =",
     "const rawDisplayDuration = Number.isFinite(duration) && duration > 0",
   );
   assert(
-    hasValid.includes("liveDuration > 0"),
-    "hasValidDuration treats live audio.duration as source of truth",
+    !hasValid.includes("audioRef.current"),
+    "hasValidDuration must not read audioRef.current at render",
+  );
+  assert(
+    !hasValid.includes("readLiveAudioDuration"),
+    "hasValidDuration must not read live audio duration at render",
   );
   assert(
     hasValid.includes("Number.isFinite(duration) && duration > 0"),
-    "hasValidDuration still falls back to React duration",
+    "hasValidDuration uses React duration state",
   );
   assert(
     hasValid.includes("hasPreviewWindow"),
