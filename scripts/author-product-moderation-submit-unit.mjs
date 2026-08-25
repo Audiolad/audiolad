@@ -15,6 +15,7 @@ import {
   getVisibleAuthorProductStatusLabel,
   isPracticeUnderModerationError,
 } from "../src/lib/author-products/moderation.ts";
+import { assertPublishedTopicMinimum } from "../src/lib/topics/limits.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -149,6 +150,20 @@ assert.match(
 assert.match(
   form,
   /fetch\(\s*`\/api\/author\/products\/\$\{id\}\/submit-for-moderation`,\s*\{\s*method:\s*"POST"\s*\}/,
+);
+
+const noTopic = assertPublishedTopicMinimum(0);
+assert.equal(noTopic.ok, false);
+if (!noTopic.ok) {
+  assert.equal(
+    noTopic.message,
+    "Выберите хотя бы одну тему перед публикацией.",
+  );
+}
+assert.equal(assertPublishedTopicMinimum(1).ok, true);
+assert.match(
+  form,
+  /async function submitForModeration\(\) \{[\s\S]*if \(!topicMinimumCheck\.ok\) \{[\s\S]*setTopicError\(topicMinimumCheck\.message\);[\s\S]*requestScrollToFirstSubmitIssue\(\);[\s\S]*return;[\s\S]*\/api\/author\/products\/\$\{id\}\/submit-for-moderation/,
 );
 
 const dashboard = read(
