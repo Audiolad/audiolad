@@ -456,6 +456,7 @@ export default function AuthorProductForm({
     buildInitialTopicKeys(topicFormData),
   );
   const [topicError, setTopicError] = useState<string | undefined>(undefined);
+  const [submitIssueScrollKey, setSubmitIssueScrollKey] = useState(0);
   const [practiceId, setPracticeId] = useState(initialProduct?.practice.id ?? "");
   const practiceIdRef = useRef(initialProduct?.practice.id ?? "");
   const [contentLockedAfterSale, setContentLockedAfterSale] = useState(
@@ -532,6 +533,10 @@ export default function AuthorProductForm({
     });
   }, []);
 
+  function requestScrollToFirstSubmitIssue() {
+    setSubmitIssueScrollKey((key) => key + 1);
+  }
+
   useEffect(() => {
     const audioId = pendingFocusAudioIdRef.current;
 
@@ -544,6 +549,16 @@ export default function AuthorProductForm({
       focusNewAudioCard(audioId);
     });
   }, [audioItems, focusNewAudioCard]);
+
+  useEffect(() => {
+    if (submitIssueScrollKey === 0) {
+      return;
+    }
+
+    document
+      .querySelector<HTMLElement>("[data-submit-issue]")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [submitIssueScrollKey]);
 
   const {
     moveAudioItem,
@@ -1444,6 +1459,7 @@ export default function AuthorProductForm({
         setFieldErrors({
           formatCustom: "Укажите название своего формата",
         });
+        requestScrollToFirstSubmitIssue();
         setBusy(false);
         return;
       }
@@ -1458,6 +1474,7 @@ export default function AuthorProductForm({
 
     if (!topicMinimumCheck.ok) {
       setTopicError(topicMinimumCheck.message);
+      requestScrollToFirstSubmitIssue();
       setBusy(false);
       return;
     }
@@ -1465,11 +1482,13 @@ export default function AuthorProductForm({
     try {
       const ensured = await ensurePracticeId();
       if (!ensured) {
+        requestScrollToFirstSubmitIssue();
         return;
       }
       const id = ensured.practiceId;
       const saved = await saveProduct();
       if (!saved) {
+        requestScrollToFirstSubmitIssue();
         return;
       }
 
@@ -1497,6 +1516,7 @@ export default function AuthorProductForm({
             payload.message ?? "Не удалось отправить продукт на модерацию.",
           );
         }
+        requestScrollToFirstSubmitIssue();
         return;
       }
 
@@ -1506,6 +1526,7 @@ export default function AuthorProductForm({
       setMessage(payload.message ?? "Продукт отправлен на модерацию.");
     } catch {
       setError("Не удалось отправить продукт на модерацию.");
+      requestScrollToFirstSubmitIssue();
     } finally {
       setBusy(false);
     }
@@ -2330,7 +2351,10 @@ export default function AuthorProductForm({
           ) : null}
         </fieldset>
 
-        <label className="block">
+        <label
+          className="block"
+          data-submit-issue={fieldErrors.title ? "" : undefined}
+        >
           <span className="mb-2 block text-sm font-medium">Название</span>
           <input
             value={form.title}
@@ -2351,7 +2375,10 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
-        <label className="block">
+        <label
+          className="block"
+          data-submit-issue={fieldErrors.subtitle ? "" : undefined}
+        >
           <span className="mb-2 block text-sm font-medium">Подзаголовок</span>
           <input
             value={form.subtitle}
@@ -2374,7 +2401,10 @@ export default function AuthorProductForm({
           ) : null}
         </label>
 
-        <label className="block">
+        <label
+          className="block"
+          data-submit-issue={fieldErrors.description ? "" : undefined}
+        >
           <span className="mb-2 block text-sm font-medium">
             {form.productKind === PRODUCT_KIND.AUDIO_POST
               ? "Описание (необязательно)"
@@ -2450,7 +2480,10 @@ export default function AuthorProductForm({
           }`}
         >
           <div className="min-h-0 overflow-hidden">
-            <label className="block">
+            <label
+              className="block"
+              data-submit-issue={fieldErrors.formatCustom ? "" : undefined}
+            >
               <span className="mb-2 block text-sm font-medium">
                 Название формата
               </span>
@@ -2542,7 +2575,7 @@ export default function AuthorProductForm({
           </fieldset>
         ) : null}
 
-        <div>
+        <div data-submit-issue={topicError ? "" : undefined}>
           <span className="mb-2 block text-sm font-medium">Темы</span>
           <TopicSelector
             options={mapTopicOptionsForSelector(topicOptions)}
@@ -2821,7 +2854,12 @@ export default function AuthorProductForm({
         <div
           className={`space-y-4 ${form.listeningNoticeEnabled ? "" : "pointer-events-none opacity-50"}`}
         >
-          <label className="block">
+          <label
+            className="block"
+            data-submit-issue={
+              fieldErrors.listeningNoticeTitle ? "" : undefined
+            }
+          >
             <span className="mb-2 block text-sm font-medium">Заголовок</span>
             <input
               value={form.listeningNoticeTitle}
@@ -2850,7 +2888,12 @@ export default function AuthorProductForm({
             ) : null}
           </label>
 
-          <label className="block">
+          <label
+            className="block"
+            data-submit-issue={
+              fieldErrors.listeningNoticeText ? "" : undefined
+            }
+          >
             <span className="mb-2 block text-sm font-medium">
               Текст рекомендаций
             </span>
@@ -2998,6 +3041,13 @@ export default function AuthorProductForm({
             <article
               key={audioItem.id}
               ref={(element) => setItemElement(audioItem.id, element)}
+              data-submit-issue={
+                audioFieldErrors[audioItem.id]?.title ||
+                audioFieldErrors[audioItem.id]?.description ||
+                audioUploadErrors[audioItem.id]
+                  ? ""
+                  : undefined
+              }
               className={`rounded-[20px] border bg-[#fbf8ff] p-4 transition ${
                 draggingAudioId === audioItem.id
                   ? "border-[#9a74d8] opacity-70 shadow-sm"
@@ -3434,6 +3484,16 @@ export default function AuthorProductForm({
           >
             Повторно отправить на модерацию
           </button>
+        ) : null}
+
+        {error &&
+        ((isDraft && !canBypassProductModeration) || needsChanges) ? (
+          <p
+            data-submit-issue
+            className="w-full rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]"
+          >
+            {error}
+          </p>
         ) : null}
 
         {isSubmitted &&

@@ -139,6 +139,17 @@ assert.doesNotMatch(form, /В архиве/);
 assert.doesNotMatch(form, /archiveProduct/);
 assert.match(form, /canBypassProductModeration/);
 assert.match(form, /Опубликовать/);
+assert.match(form, /requestScrollToFirstSubmitIssue/);
+assert.match(form, /data-submit-issue=\{topicError \? "" : undefined\}/);
+assert.match(form, /error=\{topicError\}/);
+assert.match(
+  form,
+  /Отправить на модерацию[\s\S]*error &&[\s\S]*data-submit-issue/,
+);
+assert.match(
+  form,
+  /fetch\(\s*`\/api\/author\/products\/\$\{id\}\/submit-for-moderation`,\s*\{\s*method:\s*"POST"\s*\}/,
+);
 
 const dashboard = read(
   "src/components/author-dashboard/AuthorDashboardClient.tsx",
