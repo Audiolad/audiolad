@@ -48,7 +48,7 @@ assert.match(
   /\.in\("topic_id", topicIds\)/,
   "practice_topics uses .in so multiple topics are OR",
 );
-assert.match(page, /CatalogChipFilterBar/, "desktop still has access/kind chips");
+assert.match(page, /CatalogChipFilterBar/, "desktop still has access/class chips");
 assert.match(page, /buildCatalogHref/, "desktop chips still use buildCatalogHref");
 
 assert.match(filters, /data-catalog-mobile-filters-button/, "Фильтры button is marked");
@@ -58,12 +58,12 @@ assert.match(filters, /Тематика/, "sheet has topic group");
 assert.match(filters, /Доступ/, "sheet has access group");
 assert.match(filters, /Тип/, "sheet has kind group");
 assert.match(filters, /CATALOG_ACCESS_FILTER_OPTIONS/, "sheet uses shared access options");
-assert.match(filters, /CATALOG_KIND_FILTER_OPTIONS/, "sheet uses shared kind options");
+assert.match(filters, /CATALOG_CLASS_FILTER_OPTIONS/, "sheet uses shared class options");
 assert.match(filterUi, /Подарки/, "access includes gifts");
 assert.match(filterUi, /Продукты/, "access includes paid");
-assert.match(filterUi, /Практики/, "kind includes practices");
-assert.match(filterUi, /Музыка/, "kind includes music");
-assert.match(filterUi, /Посты/, "kind includes posts");
+assert.match(filterUi, /Практики/, "class includes practices");
+assert.match(filterUi, /Релизы/, "class includes releases");
+assert.match(filterUi, /Посты/, "class includes posts");
 assert.match(filters, /buildCatalogHref/, "sheet options use buildCatalogHref");
 assert.match(filters, /q: searchQuery/, "sheet keeps the current search query");
 assert.doesNotMatch(filters, /buildCatalogHref\s*=/, "sheet does not redefine hrefs");
@@ -82,8 +82,8 @@ assert.match(filters, /data-catalog-mobile-filters-reset/, "reset control is mar
 assert.match(filters, /function resetFilters/, "reset is a dedicated action");
 assert.match(
   filters,
-  /topic:\s*null[\s\S]*access:\s*"all"[\s\S]*kind:\s*"all"/,
-  "reset clears topic/access/kind",
+  /topic:\s*null[\s\S]*access:\s*"all"[\s\S]*class:\s*"all"/,
+  "reset clears topic/access/class",
 );
 assert.match(
   filters,
@@ -125,7 +125,7 @@ assert.doesNotMatch(
 assert.match(href, /function buildCatalogHref/, "href helper is unchanged in place");
 assert.match(href, /params.set\("topic"/, "topic query is still topic=");
 assert.match(href, /params.set\("access"/, "access query is still access=");
-assert.match(href, /params.set\("kind"/, "kind query is still kind=");
+assert.match(href, /params.set\("class"/, "class query is class=");
 assert.match(href, /params.set\("q"/, "search query is still q=");
 
 assert.match(play, /fetchCatalogPlaySession/, "Play still loads the catalog session");

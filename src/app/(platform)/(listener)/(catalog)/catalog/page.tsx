@@ -7,7 +7,7 @@ import TopicFilterBar from "@/components/catalog/TopicFilterBar";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
 import {
   CATALOG_ACCESS_FILTER_OPTIONS,
-  CATALOG_KIND_FILTER_OPTIONS,
+  CATALOG_CLASS_FILTER_OPTIONS,
 } from "@/lib/catalog/catalog-filter-ui";
 import {
   mapCatalogAuthorSearchResultToPublicAuthorCard,
@@ -39,6 +39,7 @@ type CatalogPageProps = {
     topic?: string;
     need?: string;
     access?: string;
+    class?: string;
     kind?: string;
     sort?: string;
   }>;
@@ -67,6 +68,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     q: searchQuery,
     topic: topicSearchParam,
     access: params.access,
+    class: params.class,
     kind: params.kind,
     sort: params.sort,
     limit: CATALOG_LISTING_PAGE_SIZE,
@@ -98,7 +100,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   };
   const listingState = {
     access: resolvedListingQuery.access,
-    kind: resolvedListingQuery.kind,
+    class: resolvedListingQuery.class,
     sort: resolvedListingQuery.sort,
   };
 
@@ -115,8 +117,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;
   const isAccessFiltered = resolvedListingQuery.access !== "all";
-  const isKindFiltered = resolvedListingQuery.kind !== "all";
-  const isListingFiltered = isTopicFiltered || isAccessFiltered || isKindFiltered;
+  const isClassFiltered = resolvedListingQuery.class !== "all";
+  const isListingFiltered = isTopicFiltered || isAccessFiltered || isClassFiltered;
   const clearSearchHref = buildCatalogClearSearchHref(activeTopicParam, listingState);
   const catalogRootHref = buildCatalogHref({
     q: searchQuery || null,
@@ -125,7 +127,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     q: searchQuery || null,
     topic: activeTopicParam,
     access: resolvedListingQuery.access,
-    kind: resolvedListingQuery.kind,
+    class: resolvedListingQuery.class,
     sort: resolvedListingQuery.sort,
   });
 
@@ -181,7 +183,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
               q: searchQuery || null,
               topic: activeTopicParam,
               access,
-              kind: resolvedListingQuery.kind,
+              class: resolvedListingQuery.class,
               sort: resolvedListingQuery.sort,
             })
           }
@@ -189,14 +191,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
         <CatalogChipFilterBar
           ariaLabel="Фильтр по типу"
-          options={CATALOG_KIND_FILTER_OPTIONS}
-          activeValue={resolvedListingQuery.kind}
-          buildHref={(kind) =>
+          options={CATALOG_CLASS_FILTER_OPTIONS}
+          activeValue={resolvedListingQuery.class}
+          buildHref={(publicationClass) =>
             buildCatalogHref({
               q: searchQuery || null,
               topic: activeTopicParam,
               access: resolvedListingQuery.access,
-              kind,
+              class: publicationClass,
               sort: resolvedListingQuery.sort,
             })
           }
@@ -229,7 +231,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             resolvedListingQuery.q,
             resolvedListingQuery.topic,
             resolvedListingQuery.access,
-            resolvedListingQuery.kind,
+            resolvedListingQuery.class,
             resolvedListingQuery.sort,
           ].join("|")}
           initialItems={listing.items}

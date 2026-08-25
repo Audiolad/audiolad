@@ -70,6 +70,8 @@ export type CatalogProduct = ProductCoverFields & {
   promotionEndsAt?: string | null;
   sortTimestamp: number;
   audioCount?: number;
+  durationSeconds?: number | null;
+  publishedAt?: string | null;
 };
 
 export type CatalogSections = {
@@ -384,6 +386,11 @@ export async function mapPracticeRowsToCatalogProducts(
           practice.created_at,
         ),
         audioCount,
+        durationSeconds:
+          (audioSummary?.totalDurationSeconds ?? 0) > 0
+            ? audioSummary?.totalDurationSeconds ?? null
+            : null,
+        publishedAt: practice.published_at,
       },
     ];
   });

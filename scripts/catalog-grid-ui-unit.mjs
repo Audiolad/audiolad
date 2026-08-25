@@ -18,7 +18,8 @@ const page = read(
 );
 const filterUi = read("src/lib/catalog/catalog-filter-ui.ts");
 const grid = read("src/components/products/CatalogProductGrid.tsx");
-const card = read("src/components/products/CatalogProductGridCard.tsx");
+const card = read("src/components/catalog/cards/CatalogCardShell.tsx");
+const gridCard = read("src/components/products/CatalogProductGridCard.tsx");
 const css = read("src/app/globals.css");
 const api = read("src/app/api/catalog/route.ts");
 const guestHome = read("src/components/home/GuestHome.tsx");
@@ -36,12 +37,13 @@ assert.doesNotMatch(
   "catalog page no longer splits gifts/paid carousels",
 );
 assert.match(page, /CATALOG_ACCESS_FILTER_OPTIONS/, "page uses shared access options");
-assert.match(page, /CATALOG_KIND_FILTER_OPTIONS/, "page uses shared kind options");
+assert.match(page, /CATALOG_CLASS_FILTER_OPTIONS/, "page uses shared class options");
 assert.match(filterUi, /Подарки/, "access filter includes gifts");
 assert.match(filterUi, /Продукты/, "access filter includes paid products");
-assert.match(filterUi, /Практики/, "kind filter includes practices");
-assert.match(filterUi, /Музыка/, "kind filter includes music");
-assert.match(filterUi, /Посты/, "kind filter includes posts");
+assert.match(filterUi, /Практики/, "class filter includes practices");
+assert.match(filterUi, /Релизы/, "class filter includes releases");
+assert.match(filterUi, /Посты/, "class filter includes posts");
+assert.doesNotMatch(filterUi, /product_kind/, "gifts/products are not product_kind");
 assert.match(page, /canLoadDefaultListingInParallel/, "first screen SSR is named");
 assert.match(page, /listPublishedCatalog/, "first screen loads listing on the server");
 
@@ -60,23 +62,25 @@ assert.match(
   "listing contract points at GET /api/catalog",
 );
 
+assert.match(gridCard, /CatalogCardView/, "grid card renders the class layout switch");
 assert.match(card, /data-catalog-media-zone/, "media zone is marked");
-assert.match(card, /aspect-square/, "media zone is 1:1");
+assert.match(card, /data-catalog-class=\{card\.class\}/, "card layout is keyed by class");
+assert.match(card, /aspect-square|CatalogCardGallery/, "media zone is 1:1");
 assert.doesNotMatch(card, /aspect-\[3\/4\]/, "media zone is not 3:4");
 assert.match(card, /data-catalog-info-block/, "info block is marked and static");
 assert.match(card, /CatalogProductPlayButton/, "media zone has Play");
 assert.match(card, /CatalogProductHeartButton/, "media zone has Heart");
 assert.doesNotMatch(card, /Избранн/, "Heart is not favorites");
-assert.match(card, /href=\{product\.href\}/, "card still links to the product page");
+assert.match(card, /href=\{card\.paths\.pdp\}/, "card still links to the product page");
 assert.match(card, /overflow-hidden/, "card clips to one rounded container");
 assert.match(card, /rounded-\[20px\]/, "card has a shared radius");
 assert.match(card, /border border-\[#eadff8\]/, "card has a light border");
 assert.match(card, /data-catalog-card-meta/, "duration and price share one meta row");
 assert.match(card, /flex flex-wrap/, "meta row can wrap as a flex row");
 assert.match(card, / · /, "meta row joins duration and paid price");
-assert.match(card, /hidden xl:block/, "kind label is not on the mobile card");
-assert.match(card, /readPaidCatalogPriceLabel/, "paid price is filtered in the card UI");
-assert.match(card, /accessState !== "paid"/, "free cards do not render a price");
+assert.match(card, /display_label/, "class display_label is on the first screen");
+assert.match(card, /readPaidCatalogOfferPriceLabel/, "paid price comes from default_offer");
+assert.match(card, /class === "post"/, "posts never render an offer price");
 assert.match(card, /data-catalog-card-price/, "paid price is a visual marker");
 assert.match(
   card,
@@ -90,9 +94,7 @@ assert.match(
 );
 assert.doesNotMatch(card, /Подарок/, "card UI does not show a gift status");
 assert.doesNotMatch(card, /Бесплатно/, "card UI does not show a free status");
-assert.match(card, /normalized === "подарок"/, "gift labels are stripped from the meta row");
-assert.match(card, /normalized === "бесплатно"/, "free labels are stripped from the meta row");
-assert.match(card, /\^0\\s\*₽\$/, "zero prices are stripped from the meta row");
+assert.doesNotMatch(card, /product_kind|accessState|priceLabel/, "card UI uses the DTO");
 assert.doesNotMatch(
   card,
   /absolute left-2 top-2[\s\S]*Подарок/,

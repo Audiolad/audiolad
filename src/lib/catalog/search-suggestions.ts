@@ -97,7 +97,7 @@ export function buildCatalogSuggestApiUrl(
 export function buildCatalogSearchResultsHref(
   rawQuery: string,
   topicKey: string | null,
-  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">,
+  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">,
 ): string {
   return buildCatalogHref({
     q: normalizeCatalogSearchQuery(rawQuery),

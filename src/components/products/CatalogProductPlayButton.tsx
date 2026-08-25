@@ -8,7 +8,7 @@ import {
 } from "@/components/audio/GlobalAudioPlayerProvider";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
-import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
+import type { CatalogCardActionTarget } from "@/lib/catalog/dto";
 import { parsePracticePublicPath } from "@/lib/products/paths";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
@@ -29,7 +29,7 @@ function PauseIcon() {
 }
 
 type CatalogProductPlayButtonProps = {
-  product: CatalogListingItem;
+  product: CatalogCardActionTarget;
 };
 
 export default function CatalogProductPlayButton({

@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     q: searchParams.get("q"),
     topic: searchParams.get("topic"),
     access: searchParams.get("access"),
+    class: searchParams.get("class"),
     kind: searchParams.get("kind"),
     sort: searchParams.get("sort"),
     cursor: searchParams.get("cursor"),

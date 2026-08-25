@@ -15,7 +15,7 @@ import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 
 export type PlatformSearchListingState = Pick<
   CatalogHrefOptions,
-  "access" | "kind" | "sort"
+  "access" | "class" | "sort"
 >;
 
 export const PLATFORM_SEARCH_DEBOUNCE_MS = 275;
@@ -44,7 +44,7 @@ export function readPlatformSearchListingFromParams(
 ): PlatformSearchListingState {
   return {
     access: params.get("access"),
-    kind: params.get("kind"),
+    class: params.get("class") ?? params.get("kind"),
     sort: params.get("sort"),
   };
 }

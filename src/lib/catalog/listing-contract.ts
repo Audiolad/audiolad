@@ -1,3 +1,9 @@
+import {
+  CATALOG_PUBLICATION_CLASSES,
+  isPublicationClass,
+  type CatalogCard,
+  type PublicationClass,
+} from "@/lib/catalog/dto";
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { normalizeCatalogTopicParam } from "@/lib/catalog/topic-filter";
 
@@ -5,19 +11,30 @@ export const CATALOG_LISTING_PAGE_SIZE = 20;
 export const CATALOG_LISTING_MAX_LIMIT = 50;
 
 export const CATALOG_ACCESS_FILTERS = ["all", "free", "paid"] as const;
-export const CATALOG_KIND_FILTERS = [
-  "all",
-  "practice",
-  "music",
-  "audio_post",
-  "program",
-] as const;
+export const CATALOG_CLASS_FILTERS = ["all", ...CATALOG_PUBLICATION_CLASSES] as const;
+
+/** @deprecated Use CATALOG_CLASS_FILTERS. Kept for URL/query aliases. */
+export const CATALOG_KIND_FILTERS = CATALOG_CLASS_FILTERS;
+
 export const CATALOG_SORTS = ["new", "price_asc", "price_desc"] as const;
 
 export type CatalogAccessFilter = (typeof CATALOG_ACCESS_FILTERS)[number];
-export type CatalogKindFilter = (typeof CATALOG_KIND_FILTERS)[number];
+export type CatalogClassFilter = (typeof CATALOG_CLASS_FILTERS)[number];
+/** @deprecated Use CatalogClassFilter. */
+export type CatalogKindFilter = CatalogClassFilter;
 export type CatalogSort = (typeof CATALOG_SORTS)[number];
-export type CatalogListingKind = Exclude<CatalogKindFilter, "all">;
+export type CatalogListingClass = PublicationClass;
+
+const LEGACY_KIND_TO_CLASS: Record<string, PublicationClass> = {
+  practice: "practice",
+  course: "course",
+  audiobook: "audiobook",
+  release: "release",
+  post: "post",
+  music: "release",
+  audio_post: "post",
+  program: "practice",
+};
 
 export type CatalogListingItem = {
   id: string;
@@ -28,7 +45,7 @@ export type CatalogListingItem = {
   coverUrl: string | null;
   coverImage?: unknown;
   updatedAt?: string | null;
-  kind: CatalogListingKind;
+  kind: "practice" | "music" | "audio_post" | "program";
   kindLabel: string;
   durationLabel: string | null;
   priceLabel: string;
@@ -40,23 +57,19 @@ export type CatalogListingQuery = {
   q: string;
   topic: string | null;
   access: CatalogAccessFilter;
-  kind: CatalogKindFilter;
+  class: CatalogClassFilter;
   sort: CatalogSort;
   cursor: string | null;
   limit: number;
 };
 
 export type CatalogListingResult = {
-  items: CatalogListingItem[];
+  items: CatalogCard[];
   nextCursor: string | null;
 };
 
 function isCatalogAccessFilter(value: string): value is CatalogAccessFilter {
   return (CATALOG_ACCESS_FILTERS as readonly string[]).includes(value);
-}
-
-function isCatalogKindFilter(value: string): value is CatalogKindFilter {
-  return (CATALOG_KIND_FILTERS as readonly string[]).includes(value);
 }
 
 function isCatalogSort(value: string): value is CatalogSort {
@@ -70,11 +83,27 @@ export function parseCatalogAccessFilter(
   return isCatalogAccessFilter(normalized) ? normalized : "all";
 }
 
+export function parseCatalogClassFilter(
+  value: string | null | undefined,
+): CatalogClassFilter {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (normalized === "all") {
+    return "all";
+  }
+
+  if (isPublicationClass(normalized)) {
+    return normalized;
+  }
+
+  return LEGACY_KIND_TO_CLASS[normalized] ?? "all";
+}
+
+/** @deprecated Use parseCatalogClassFilter. Maps music/audio_post/program. */
 export function parseCatalogKindFilter(
   value: string | null | undefined,
-): CatalogKindFilter {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return isCatalogKindFilter(normalized) ? normalized : "all";
+): CatalogClassFilter {
+  return parseCatalogClassFilter(value);
 }
 
 export function parseCatalogSort(
@@ -104,6 +133,7 @@ export function parseCatalogListingQuery(params: {
   q?: string | null;
   topic?: string | null;
   access?: string | null;
+  class?: string | null;
   kind?: string | null;
   sort?: string | null;
   cursor?: string | null;
@@ -115,7 +145,7 @@ export function parseCatalogListingQuery(params: {
     q: normalizeCatalogSearchQuery(params.q).slice(0, CATALOG_SEARCH_MAX_LENGTH),
     topic: normalizeCatalogTopicParam(params.topic),
     access: parseCatalogAccessFilter(params.access),
-    kind: parseCatalogKindFilter(params.kind),
+    class: parseCatalogClassFilter(params.class ?? params.kind),
     sort: parseCatalogSort(params.sort),
     cursor,
     limit: parseCatalogListingLimit(params.limit),
@@ -171,8 +201,8 @@ export function buildCatalogListingApiUrl(
     params.set("access", query.access);
   }
 
-  if (query.kind && query.kind !== "all") {
-    params.set("kind", query.kind);
+  if (query.class && query.class !== "all") {
+    params.set("class", query.class);
   }
 
   if (query.sort && query.sort !== "new") {
