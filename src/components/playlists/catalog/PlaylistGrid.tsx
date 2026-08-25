@@ -128,7 +128,7 @@ export default function PlaylistGrid({
     >
       <ul data-playlist-catalog-grid className="catalog-product-grid">
         {items.map((item) => (
-          <li key={item.id}>
+          <li key={item.id} className="h-full min-w-0">
             <PlaylistCard
               item={item}
               isAuthenticated={isAuthenticated}

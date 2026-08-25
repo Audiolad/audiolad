@@ -3,7 +3,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { formatPlaylistCatalogMeta } from "../src/lib/playlists/format-item-count";
+import {
+  formatPlaylistCardCreatorName,
+  formatPlaylistCatalogMeta,
+  PLAYLIST_CARD_TITLE_CLASS,
+} from "../src/lib/playlists/format-item-count";
 import { PLAYLIST_LISTING_FORBIDDEN_FIELDS } from "../src/lib/playlists/listing-contract";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,15 +42,16 @@ assert.equal(
 
 assert.match(card, /item:\s*PlaylistListingItem/, "card accepts listing item only");
 assert.match(card, /\{item\.title\}/, "card renders title");
-assert.match(card, /\{item\.creator/, "card renders creator");
+assert.match(card, /formatPlaylistCardCreatorName\(item\.creator\)/, "card formats creator at UI only");
 assert.match(card, /href=\{item\.href\}/, "card links to listing href");
 assert.match(card, /formatPlaylistCatalogMeta/, "card uses existing count/duration formatters");
 assert.match(card, /item\.coverUrl/, "card reads listing coverUrl only");
 assert.match(card, /data-playlist-catalog-cover-placeholder/, "missing cover uses placeholder");
 assert.match(card, /Нет обложки/, "placeholder is labeled");
 assert.match(card, /aspect-square/, "cover is 1:1");
-assert.match(card, /line-clamp-3/, "title clamps to 3 lines");
-assert.match(card, /line-clamp-1/, "creator is one line");
+assert.match(card, /PLAYLIST_CARD_TITLE_CLASS/, "title uses reserved 3-line class");
+assert.match(card, /flex h-full min-w-0 flex-col/, "card stretches as a column");
+assert.match(card, /line-clamp-1 min-h-5/, "creator is one reserved line");
 assert.match(card, /PlaylistSaveButton/, "heart is a playlist save button");
 assert.match(card, /playlistId=\{item\.id\}/, "card passes listing id only");
 assert.match(card, /saved=\{item\.viewer\.saved\}/, "card passes listing saved state");
@@ -63,6 +68,31 @@ assert.doesNotMatch(card, /материалов/);
 assert.doesNotMatch(card, /трек/);
 assert.doesNotMatch(card, /практик|программ|аудиопост/i);
 assert.doesNotMatch(card, /kindLabel|priceLabel/);
+assert.doesNotMatch(card, /savesCount/, "card markup does not show savesCount");
+assert.doesNotMatch(card, /resolvePlaylistListingCreatorName/);
+assert.doesNotMatch(card, /EDITORIAL_PLAYLIST_LABEL/);
+assert.doesNotMatch(card, /Плейлист АудиоЛада/);
+
+const longTitle =
+  "Музыка для сна детям | Колыбельные для малышей | Детская музыка для сна";
+const shortTitle = "Шум воды | Журчание воды | Звуки воды";
+
+function reservedTitleClassFor(_title: string): string {
+  return PLAYLIST_CARD_TITLE_CLASS;
+}
+
+assert.equal(reservedTitleClassFor(longTitle), reservedTitleClassFor(shortTitle));
+assert.match(reservedTitleClassFor(longTitle), /line-clamp-3/);
+assert.match(reservedTitleClassFor(longTitle), /min-h-\[3\.75rem\]/);
+assert.match(reservedTitleClassFor(shortTitle), /min-h-\[3\.75rem\]/);
+assert.match(format, /line-clamp-3 min-h-\[3\.75rem\]/);
+assert.doesNotMatch(card, /item\.title\.(length|slice|split)/);
+
+assert.equal(formatPlaylistCardCreatorName("Плейлист АудиоЛада"), "АудиоЛад");
+assert.equal(formatPlaylistCardCreatorName("Сергей Петров"), "Сергей Петров");
+assert.equal(formatPlaylistCardCreatorName("Ольга Невская"), "Ольга Невская");
+assert.equal(formatPlaylistCardCreatorName("Автор: Ольга Невская"), "Ольга Невская");
+assert.equal(formatPlaylistCardCreatorName("Создано: Сергей Петров"), "Сергей Петров");
 
 for (const field of PLAYLIST_LISTING_FORBIDDEN_FIELDS) {
   assert.doesNotMatch(
@@ -74,13 +104,17 @@ for (const field of PLAYLIST_LISTING_FORBIDDEN_FIELDS) {
 
 assert.equal(formatPlaylistCatalogMeta(3, 125), "3 аудио · 3 мин");
 assert.equal(formatPlaylistCatalogMeta(1, 0), "1 аудио");
+assert.equal(formatPlaylistCatalogMeta(10, 600), "10 аудио · 10 мин");
 assert.match(formatPlaylistCatalogMeta(5, 60), /5 аудио/);
 assert.doesNotMatch(formatPlaylistCatalogMeta(5, 60), /трек|материал/);
+assert.doesNotMatch(formatPlaylistCatalogMeta(10, 600), /savesCount|сохран/);
 assert.match(format, /formatProductDuration/);
 assert.doesNotMatch(format, /трек|материал/);
+assert.doesNotMatch(format, /resolvePlaylistListingCreatorName/);
 
 assert.match(grid, /PlaylistCard/);
 assert.match(grid, /catalog-product-grid/);
+assert.match(grid, /h-full min-w-0/, "grid items stretch to equal card height");
 assert.match(grid, /buildPlaylistListingApiUrl/);
 assert.match(grid, /IntersectionObserver/);
 assert.match(grid, /Загрузить ещё/);
@@ -114,6 +148,12 @@ assert.doesNotMatch(card, /item\.topics/);
 
 assert.match(contract, /PlaylistListingItem/);
 assert.doesNotMatch(contract, /durationLabel/);
+assert.match(contract, /resolvePlaylistListingCreatorName/);
+assert.doesNotMatch(
+  contract,
+  /formatPlaylistCardCreatorName/,
+  "listing mapper keeps the raw creator string",
+);
 assert.match(productCard, /CatalogProductGridCard/);
 
 console.log("playlist-catalog-card-ui-unit: ok");
