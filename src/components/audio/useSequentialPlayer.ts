@@ -139,6 +139,17 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function readLiveAudioDuration(
+  audio: HTMLAudioElement | null | undefined,
+): number {
+  if (!audio) {
+    return 0;
+  }
+
+  const live = audio.duration;
+  return Number.isFinite(live) && live > 0 ? live : 0;
+}
+
 export function useSequentialPlayer({
   sourceType = "catalog",
   authorSlug,
@@ -771,6 +782,12 @@ export function useSequentialPlayer({
         setPlayerError("Нажмите ещё раз, чтобы начать прослушивание.");
       });
 
+      const liveDuration = readLiveAudioDuration(audio);
+
+      if (liveDuration > 0) {
+        setDuration(liveDuration);
+      }
+
       return true;
     },
     [audioRef, debugSnapshot],
@@ -874,6 +891,12 @@ export function useSequentialPlayer({
       if (audio && !audio.paused && !audio.ended) {
         setPlayingState(true);
         userWantsPlaybackRef.current = true;
+      }
+
+      const liveDuration = readLiveAudioDuration(audio);
+
+      if (liveDuration > 0) {
+        setDuration(liveDuration);
       }
 
       return;
@@ -1338,6 +1361,8 @@ export function useSequentialPlayer({
 
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("durationchange", updateDuration);
+    // Remount after skip-load play can miss one-shot loadedmetadata.
+    updateDuration();
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("playing", handlePlaying);
@@ -1465,8 +1490,11 @@ export function useSequentialPlayer({
     };
   }, []);
 
+  const liveDuration = readLiveAudioDuration(audioRef.current);
   const hasValidDuration =
-    (Number.isFinite(duration) && duration > 0) || hasPreviewWindow;
+    liveDuration > 0 ||
+    (Number.isFinite(duration) && duration > 0) ||
+    hasPreviewWindow;
   const rawDisplayDuration = Number.isFinite(duration) && duration > 0
     ? duration
     : currentTrack?.durationSeconds && currentTrack.durationSeconds > 0
@@ -1586,17 +1614,27 @@ export function useSequentialPlayer({
     });
   }, [audioRef, debugSnapshot, pendingStartPosition]);
 
+  const resolveSeekDuration = (audio: HTMLAudioElement) => {
+    const live = readLiveAudioDuration(audio);
+    if (live > 0) {
+      return live;
+    }
+
+    return Number.isFinite(duration) && duration > 0 ? duration : 0;
+  };
+
   const handleSeekOffset = (offsetSeconds: number) => {
     const audio = audioRef.current;
+    const seekDuration = audio ? resolveSeekDuration(audio) : 0;
 
-    if (!audio || !hasValidDuration) {
+    if (!audio || (seekDuration <= 0 && !hasPreviewWindow)) {
       return;
     }
 
     const min = hasPreviewWindow ? previewStartSeconds : 0;
     const max = hasPreviewWindow
-      ? Math.min(previewEndSeconds, duration)
-      : duration;
+      ? Math.min(previewEndSeconds, seekDuration)
+      : seekDuration;
     const nextTime = clamp(audio.currentTime + offsetSeconds, min, max);
     audio.currentTime = nextTime;
     setCurrentTime(nextTime);
@@ -1604,16 +1642,17 @@ export function useSequentialPlayer({
 
   const handleRangeChange = (value: number) => {
     const audio = audioRef.current;
+    const seekDuration = audio ? resolveSeekDuration(audio) : 0;
 
-    if (!audio || !hasValidDuration) {
+    if (!audio || (seekDuration <= 0 && !hasPreviewWindow)) {
       return;
     }
 
     const absolute = hasPreviewWindow ? previewStartSeconds + value : value;
     const min = hasPreviewWindow ? previewStartSeconds : 0;
     const max = hasPreviewWindow
-      ? Math.min(previewEndSeconds, duration)
-      : duration;
+      ? Math.min(previewEndSeconds, seekDuration)
+      : seekDuration;
     const nextTime = clamp(absolute, min, max);
     audio.currentTime = nextTime;
     setCurrentTime(nextTime);
