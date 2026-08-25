@@ -53,6 +53,7 @@ function SquarePreview({
           srcSet={srcSet}
           sizes={sizes}
           displayWidth={80}
+          draggable={false}
         />
       </div>
     );
@@ -61,7 +62,12 @@ function SquarePreview({
   return (
     <div className="h-20 w-20 overflow-hidden rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="block h-full w-full object-cover" />
+      <img
+        src={src}
+        alt={alt}
+        className="block h-full w-full object-cover"
+        draggable={false}
+      />
     </div>
   );
 }
@@ -79,6 +85,7 @@ export default function AuthorProductGallery({
   const [busySlideId, setBusySlideId] = useState<string | null>(null);
   const [replaceSlideId, setReplaceSlideId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -382,6 +389,7 @@ export default function AuthorProductGallery({
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", slide.id);
+                draggingIdRef.current = slide.id;
                 setDraggingId(slide.id);
               }}
               onDragOver={(event) => {
@@ -391,7 +399,8 @@ export default function AuthorProductGallery({
               }}
               onDrop={(event) => {
                 event.preventDefault();
-                const fromId = event.dataTransfer.getData("text/plain");
+                const fromId = draggingIdRef.current ?? draggingId;
+                draggingIdRef.current = null;
                 setDraggingId(null);
                 setDragOverId(null);
 
@@ -417,6 +426,7 @@ export default function AuthorProductGallery({
                 );
               }}
               onDragEnd={() => {
+                draggingIdRef.current = null;
                 setDraggingId(null);
                 setDragOverId(null);
               }}
