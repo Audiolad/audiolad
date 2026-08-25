@@ -180,30 +180,46 @@ assert.match(
   /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
   "mobile filters slot is hidden from lg",
 );
+const shell = read("src/components/listener/ListenerAppShell.tsx");
+const childrenClassMatch = shell.match(
+  /const centerContentClassName = \[([\s\S]*?)\]/,
+);
+assert.ok(childrenClassMatch, "shell defines centerContentClassName");
+const childrenClassBlock = childrenClassMatch[1];
 assert.match(
-  layout,
-  /listener-catalog-content[^"]*xl:min-h-0/,
-  "catalog content can shrink in the desktop center column",
+  childrenClassBlock,
+  /"min-w-0"/,
+  "shell children class string includes min-w-0",
+);
+assert.doesNotMatch(
+  childrenClassBlock,
+  /xl:flex-1/,
+  "shell children class string does not include xl:flex-1",
+);
+assert.doesNotMatch(
+  childrenClassBlock,
+  /overflow-hidden/,
+  "shell children class string does not include overflow-hidden",
 );
 assert.match(
+  shell,
+  /listener-app-shell__center-scroll[^"]*xl:overflow-y-auto/,
+  "center-scroll remains the desktop page scroller",
+);
+assert.doesNotMatch(
+  globals,
+  /:has\(\.listener-catalog-content\)/,
+  "globals has no catalog :has overflow-hidden rule",
+);
+assert.doesNotMatch(
   layout,
   /listener-catalog-content[^"]*xl:overflow-hidden/,
-  "catalog content does not become the desktop page scroller",
+  "catalog content does not clip the desktop page scroller",
 );
-assert.match(
-  layout,
-  /listener-catalog-content[^"]*xl:flex-1/,
-  "catalog content fills the remaining desktop center column",
-);
-assert.match(
+assert.doesNotMatch(
   page,
-  /className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto"/,
-  "product grid and empty state share a desktop-only cards scroller",
-);
-assert.match(
-  globals,
-  /\.listener-app-shell__center-scroll:has\(\.listener-catalog-content\)\s*\{\s*overflow:\s*hidden;/,
-  "center-scroll stops being the page scroller when it contains catalog",
+  /xl:overflow-y-auto/,
+  "catalog page has no nested cards scroller",
 );
 assert.match(
   layout,
