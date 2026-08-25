@@ -11,7 +11,7 @@ type TopicFilterBarProps = {
   activeTopicKey: string | null;
   activeTopicKeys?: readonly string[];
   searchQuery?: string;
-  listing?: Pick<CatalogHrefOptions, "access" | "kind" | "sort">;
+  listing?: Pick<CatalogHrefOptions, "access" | "class" | "kind" | "sort">;
 };
 
 export default function TopicFilterBar({
@@ -25,8 +25,9 @@ export default function TopicFilterBar({
   const isAllActive = selectedTopicKeys.length === 0;
 
   return (
-    <nav className="mt-6" aria-label="Фильтр по темам">
-      <div className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav className="mt-3" aria-label="Фильтр по темам">
+      <h3 className="text-sm font-semibold text-[#25135c]">Темы</h3>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Link
           href={buildCatalogTopicHref(null, searchQuery || null, listing)}
           prefetch={false}

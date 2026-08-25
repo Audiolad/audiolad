@@ -66,7 +66,7 @@ Timeweb Cloud
 |---------|-----|------------|
 | `/auth/sign-up` | client | `supabase.auth.signUp()` |
 | `/auth/sign-in` | client | `supabase.auth.signInWithPassword()` |
-| `/catalog` | server | Получение опубликованных практик через Supabase REST |
+| `/catalog` | server | Listing через adapter → CatalogCard; legacy fetch всё ещё `practices` |
 | `/profile` | server | `getUser()` + чтение `public.profiles` |
 | `/profile/edit` | server + action | Чтение профиля, сохранение через Server Action |
 
@@ -193,8 +193,19 @@ Timeweb Cloud
 - Общая обложка: `practices.cover_url` (обязательна для публикации), bucket `practice-covers`, path `practices/{id}/cover.{ext}`.
 - Режим: `practices.use_shared_cover` (default `true`). При `false` — необязательные обложки треков в `audio_items.cover_url`, path `practices/{id}/track-covers/{audioItemId}.{ext}`.
 - Резолв для плеера: `resolvePlaybackCoverUrl()` в `src/lib/products/cover-display.ts` → `ListenTrack.coverImageUrl` (сервер).
-- Каталог и карточки продукта — только общая обложка.
-- Author UI: `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API `POST/DELETE .../audio/[audioId]/cover`.
+- Каталог Phase 0: карточка читает `cover` + опциональную `gallery`
+  (квадратные слайды витрины, не отдельная сущность). Источник данных
+  пока legacy `practices`; новые таблицы Course/Offer/Grant не создаются.
+- Phase 1: `practices.publication_class` nullable; adapter
+  `publication_class > product_kind`. Старые NULL-строки читаются по
+  `product_kind`. Course/audiobook не выводятся из `format`.
+- UI карточки переключает layout только по `CatalogCard.class`.
+- Фильтры витрины: `access` (Подарки/Продукты) и `class`
+  (`practice|course|audiobook|release|post`). Legacy `?kind=music`
+  читается как `class=release`.
+- Author UI: мастер `AuthorCreateWizard` (Продукт / Музыка / Аудиопост)
+  → `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API
+  `POST/DELETE .../audio/[audioId]/cover`.
 
 ## MAX Mini App (этапы 1–3B)
 

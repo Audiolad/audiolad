@@ -26,6 +26,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   description,
   format,
   product_kind,
+  publication_class,
   duration_minutes,
   price,
   is_free,
@@ -117,6 +118,7 @@ type CatalogPracticeSearchRow = {
   description: string | null;
   format: string | null;
   product_kind?: string | null;
+  publication_class?: string | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;

@@ -26,6 +26,52 @@
 
 ---
 
+## 2026-08-25 — Author Cabinet foundation, Phase 1
+
+**Контекст:** кабинет должен создавать новые классы публикаций, не ломая
+старые черновики и витрину Phase 0. Отдельные таблицы Course / Audiobook
+ещё не нужны.
+
+**Решение:**
+
+- В `practices` добавляется nullable `publication_class` с CHECK
+  `practice|course|audiobook|release|post`. Старые строки не обновляются.
+- `product_kind` остаётся legacy shadow для publish RPC и старых форм.
+- Create/update API принимают явный `publication_class` и ветку кабинета
+  `product|music|post`.
+- Мастер создания: Продукт → практика/курс/аудиокнига; Музыка → `release`;
+  Аудиопост → `post`.
+- Adapter читает `publication_class` раньше `product_kind`. Format не
+  определяет course/audiobook. Post без offer.
+- Section / Lesson / Chapter / gallery editor не входят в Phase 1.
+
+**Принято:** владелец и архитектор (задание Phase 1 Author Cabinet).
+
+---
+
+## 2026-08-25 — Catalog Listing Freeze v2, Phase 0
+
+**Контекст:** новый каталог не должен зависеть от legacy-модели
+`practices` / `product_kind` / `format` / `program` / `price` / `is_free`.
+Нужен READ-контракт и витрина, без SQL-миграций новых сущностей.
+
+**Решение:**
+
+- Frontend нового каталога читает только `CatalogCard` (`class`, `access`
+  через `default_offer` / `viewer`, `summary`, `gallery`).
+- Legacy adapter временно маппит `practice → practice`, `music → release`,
+  `audio_post → post`. Семь аудиосессий остаются `practice`, не course.
+- «Подарки» = `default_offer.access=free` + `free_claim`. «Продукты» =
+  paid offer. Post не получает offer и может слушаться без grant.
+- Цена в DTO только как `amount_minor` + `currency` (RUB, копейки).
+- `gallery` — витрина слайдов 1:1 (до 30), не сущность контента.
+- Course / Audiobook / Offer / Grant / прогресс / редактор галереи —
+  не создаются в Phase 0.
+
+**Принято:** владелец и архитектор (утверждённый Catalog Listing Freeze v2).
+
+---
+
 ## 2026-08-23 — MAX Mini App этап 3B: вход существующего аккаунта
 
 **Контекст:** этап 3A дал серверный `POST /link`, но без UI. Нужен вход

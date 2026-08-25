@@ -25,7 +25,7 @@
 
 Единая сущность аудиопродукта (практика, музыка или аудиопост). Используется в `/catalog` и кабинете автора.
 
-Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `music_usage_permission`, `is_catalog_listed`.
+Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `is_catalog_listed`.
 
 Фильтр публичных витрин: `status=eq.published` и `is_catalog_listed=eq.true`. Режим «По ссылке» = `published` + `is_catalog_listed=false` (прямой URL, без каталога/главной/поиска/sitemap; `noindex`). `approve_and_publish_practice` / `publish_audio_product` сохраняют выбранное `is_catalog_listed` (миграция `20260805194500_preserve_catalog_listed_on_publish.sql`); starters остаются unlisted.
 
@@ -39,8 +39,24 @@ RLS включён. Политика SELECT: `Public can read published practice
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
-| `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music` \| `audio_post`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером |
+| `product_kind` | text NOT NULL DEFAULT `practice` | `practice` \| `music` \| `audio_post`; после первой публикации (`published_at IS NOT NULL`) смена запрещена триггером. Phase 1: legacy shadow рядом с `publication_class`. |
 | `music_usage_permission` | text NULL | для `practice` и `audio_post` всегда NULL; для `music` при публикации обязательно `listen_only` \| `platform_reuse_allowed` |
+
+#### publication_class (2026-08-25, Phase 1)
+
+Миграция: `20260825133000_practice_publication_class.sql`.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `publication_class` | text NULL | `practice` \| `course` \| `audiobook` \| `release` \| `post`; NULL = старая запись, класс читается из `product_kind`. Backfill нет. |
+
+Новые черновики кабинета пишут оба поля. Тень `product_kind`:
+
+- `practice` / `course` / `audiobook` → `practice`
+- `release` → `music`
+- `post` → `audio_post`
+
+Course / audiobook не выводятся из `format`. Section / Lesson / Chapter / gallery tables не создаются.
 
 Трек vs альбом для музыки не хранится отдельным полем: 1 `audio_item` → «Музыкальный трек», ≥2 → «Музыкальный альбом».
 

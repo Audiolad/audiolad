@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Catalog mobile chrome: no title/back row, fixed search + spacer, desktop h1 stays.
+ * Catalog mobile chrome: no title/back row, fixed search + spacer, SEO h1 stays hidden.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -60,8 +60,33 @@ assert.match(search, /isCompact \? null/, "compact catalog search has no Най�
 assert.match(search, />\s*Найти\s*</, "shell search still has Найти");
 assert.match(
   globals,
-  /--catalog-mobile-search-height/,
-  "search height and spacer share one CSS variable",
+  /--catalog-mobile-search-height:\s*calc\(max\(0\.25rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\)/,
+  "search spacer is safe-area + 52px field only",
+);
+assert.doesNotMatch(
+  globals,
+  /--catalog-mobile-search-height:[^;]*52px\s*\+/,
+  "search height has no rem tail after the 52px field",
+);
+assert.match(
+  layout,
+  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\]/,
+  "search padding-top floor is 0.25rem so Android is not flush",
+);
+assert.match(
+  layout,
+  /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
+  "search chrome drops the extra bottom padding",
+);
+assert.doesNotMatch(
+  layout,
+  /pt-\[max\(0\.75rem/,
+  "old 0.75rem top floor is gone",
+);
+assert.doesNotMatch(
+  layout,
+  /listener-catalog-mobile-search[\s\S]*pb-1(?:\s|"|')/,
+  "old pb-1 search tail is gone",
 );
 assert.match(
   globals,
@@ -70,15 +95,126 @@ assert.match(
 );
 
 assert.match(page, /<h1[\s\S]*Каталог[\s\S]*<\/h1>/, "catalog keeps an h1");
-assert.match(page, /sr-only/, "mobile h1 is not a visible title");
-assert.match(page, /xl:not-sr-only/, "desktop h1 stays visible");
-assert.match(page, /xl:block/, "desktop h1 is a block heading");
+assert.match(page, /sr-only/, "catalog h1 stays visually hidden for SEO");
+assert.doesNotMatch(page, /xl:not-sr-only/, "desktop h1 is no longer visually shown");
+assert.doesNotMatch(
+  page,
+  /<h1[^>]*xl:block/,
+  "desktop h1 is not a visible block heading",
+);
+assert.doesNotMatch(
+  page,
+  /Опубликованные аудиопродукты авторов платформы/,
+  "default catalog no longer shows the intro text",
+);
+assert.match(page, /showCatalogPromo/, "unfiltered catalog names the promo gate");
+assert.match(
+  page,
+  /!isSearchActive && !isTopicFiltered/,
+  "promo is hidden during search and topic filters",
+);
+assert.match(page, /CatalogPromoCarousel/, "unfiltered catalog mounts the promo carousel");
+assert.doesNotMatch(
+  page,
+  /AuthorListCard|searchPublishedCatalogAuthors|catalog-search-authors-heading/,
+  "catalog page search does not fetch or render authors",
+);
+assert.doesNotMatch(
+  page,
+  />\s*Авторы\s*</,
+  "catalog page has no Авторы section heading",
+);
+assert.doesNotMatch(
+  page,
+  /isSearchActive && authors\.length/,
+  "empty catalog search depends only on hasAnyProducts",
+);
+
+const promoCarousel = read("src/components/catalog/CatalogPromoCarousel.tsx");
+const promoConfig = read("src/lib/catalog/catalog-promo.ts");
+assert.match(
+  promoCarousel,
+  /data-catalog-promo-id/,
+  "promo slides expose data-catalog-promo-id",
+);
+assert.match(
+  promoCarousel,
+  /data-catalog-promo-position/,
+  "promo slides expose data-catalog-promo-position",
+);
+assert.match(
+  promoCarousel,
+  /mt-0 xl:mt-1\.5/,
+  "promo has no mobile top slack above the 4.8:1 slide",
+);
+assert.doesNotMatch(
+  promoCarousel,
+  /mt-1 xl:mt-1\.5/,
+  "old mt-1 mobile promo slack is gone",
+);
+assert.match(promoCarousel, /aspect-\[4\.8\/1\]/, "promo slide ratio stays 4.8:1");
+assert.match(promoCarousel, /object-contain/, "promo images stay contain");
+assert.match(promoConfig, /export type CatalogPromo/, "CatalogPromo is a typed entity");
+assert.match(promoConfig, /startsAt\?/, "promo config reserves startsAt");
+assert.match(promoConfig, /endsAt\?/, "promo config reserves endsAt");
+assert.match(promoConfig, /audience\?/, "promo config reserves audience");
+assert.match(promoConfig, /experimentKey\?/, "promo config reserves experimentKey");
+assert.doesNotMatch(
+  promoConfig,
+  /createClient|from\(|supabase/i,
+  "promo MVP is typed config, not SQL or API",
+);
 assert.match(
   page,
   /data-catalog-desktop-filters/,
   "desktop filter chips stay in the page",
 );
-assert.match(page, /hidden xl:block/, "filter chips are not in the mobile page flow");
+assert.match(page, /hidden lg:block/, "filter chips appear from lg");
+assert.match(
+  page,
+  /className="hidden lg:block" data-catalog-desktop-filters/,
+  "desktop filters wrapper is hidden below lg",
+);
+assert.match(
+  layout,
+  /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
+  "mobile filters slot is hidden from lg",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:min-h-0/,
+  "catalog content can shrink in the desktop center column",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:overflow-hidden/,
+  "catalog content does not become the desktop page scroller",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:flex-1/,
+  "catalog content fills the remaining desktop center column",
+);
+assert.match(
+  page,
+  /className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto"/,
+  "product grid and empty state share a desktop-only cards scroller",
+);
+assert.match(
+  globals,
+  /\.listener-app-shell__center-scroll:has\(\.listener-catalog-content\)\s*\{\s*overflow:\s*hidden;/,
+  "center-scroll stops being the page scroller when it contains catalog",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*fixed/,
+  "mobile search stays a fixed top layer",
+);
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*xl:hidden/,
+  "fixed search remains hidden from xl",
+);
 
 assert.doesNotMatch(
   page,

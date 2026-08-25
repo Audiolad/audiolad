@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import CatalogProductGridCard from "@/components/products/CatalogProductGridCard";
+import type { CatalogCard } from "@/lib/catalog/dto";
 import {
   buildCatalogListingApiUrl,
-  type CatalogListingItem,
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
 import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-save";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 type CatalogProductGridProps = {
-  initialItems: CatalogListingItem[];
+  initialItems: CatalogCard[];
   initialNextCursor: string | null;
   query: Omit<CatalogListingQuery, "cursor">;
   isAuthenticated?: boolean;
@@ -20,7 +20,7 @@ type CatalogProductGridProps = {
 };
 
 type CatalogListingResponse = {
-  items?: CatalogListingItem[];
+  items?: CatalogCard[];
   nextCursor?: string | null;
 };
 
@@ -66,10 +66,10 @@ export default function CatalogProductGrid({
       const nextItems = Array.isArray(payload.items) ? payload.items : [];
 
       setItems((current) => {
-        const seen = new Set(current.map((item) => item.id));
+        const seen = new Set(current.map((item) => item.publication_id));
         return [
           ...current,
-          ...nextItems.filter((item) => !seen.has(item.id)),
+          ...nextItems.filter((item) => !seen.has(item.publication_id)),
         ];
       });
       setNextCursor(payload.nextCursor ?? null);
@@ -113,7 +113,7 @@ export default function CatalogProductGrid({
     >
       <ul data-catalog-product-grid className="catalog-product-grid">
         {items.map((product) => (
-          <li key={product.id}>
+          <li key={product.publication_id} className="min-w-0">
             <CatalogProductGridCard
               product={product}
               isAuthenticated={isAuthenticated}

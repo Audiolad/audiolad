@@ -11,6 +11,10 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "@/lib/author-products/product-kind";
+import {
+  parsePublicationClass,
+  type PublicationClass,
+} from "@/lib/author-products/publication-class";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
@@ -34,6 +38,7 @@ type CatalogPracticeRow = {
   description: string | null;
   format: string | null;
   product_kind?: string | null;
+  publication_class?: string | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -57,6 +62,8 @@ export type CatalogProduct = ProductCoverFields & {
   format: string | null;
   /** Defaults to practice when absent (legacy callers / partial maps). */
   productKind?: ProductKind;
+  /** NULL on legacy rows. Adapter prefers this over productKind. */
+  publicationClass?: PublicationClass | null;
   price: number | null;
   isFree: boolean;
   authorName: string | null;
@@ -70,6 +77,8 @@ export type CatalogProduct = ProductCoverFields & {
   promotionEndsAt?: string | null;
   sortTimestamp: number;
   audioCount?: number;
+  durationSeconds?: number | null;
+  publishedAt?: string | null;
 };
 
 export type CatalogSections = {
@@ -245,6 +254,7 @@ export async function getPublishedCatalogProducts(
       description,
       format,
       product_kind,
+      publication_class,
       duration_minutes,
       price,
       is_free,
@@ -347,6 +357,7 @@ export async function mapPracticeRowsToCatalogProducts(
         description: practice.description?.trim() || null,
         format: practice.format?.trim() || null,
         productKind: normalizeProductKind(practice.product_kind),
+        publicationClass: parsePublicationClass(practice.publication_class),
         price: catalogPrice,
         isFree: resolved.isFree,
         ...mapProductCoverFields(practice),
@@ -384,6 +395,11 @@ export async function mapPracticeRowsToCatalogProducts(
           practice.created_at,
         ),
         audioCount,
+        durationSeconds:
+          (audioSummary?.totalDurationSeconds ?? 0) > 0
+            ? audioSummary?.totalDurationSeconds ?? null
+            : null,
+        publishedAt: practice.published_at,
       },
     ];
   });

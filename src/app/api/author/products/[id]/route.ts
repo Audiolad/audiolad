@@ -31,6 +31,13 @@ import {
   PRODUCT_KIND,
   PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
 } from "@/lib/author-products/product-kind";
+import {
+  mapLegacyProductKindToClass,
+  parseCabinetBranch,
+  parsePublicationClass,
+  publicationClassToCabinetBranch,
+  publicationClassToLegacyKind,
+} from "@/lib/author-products/publication-class";
 import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
 import {
   generateUniqueSlug,
@@ -232,11 +239,53 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    let nextProductKind = normalizeProductKind(
-      "product_kind" in body && typeof body.product_kind === "string"
-        ? body.product_kind
-        : practice.product_kind,
+    const currentPublicationClass = parsePublicationClass(
+      practice.publication_class,
     );
+    let nextPublicationClass = currentPublicationClass;
+    let nextProductKind = normalizeProductKind(practice.product_kind);
+
+    if ("publication_class" in body) {
+      const requestedClass =
+        typeof body.publication_class === "string"
+          ? parsePublicationClass(body.publication_class)
+          : null;
+
+      if (!requestedClass) {
+        return NextResponse.json(
+          { error: "invalid_publication_class" },
+          { status: 400 },
+        );
+      }
+
+      if (
+        requestedClass !== currentPublicationClass &&
+        !canChangeProductKind(practice.published_at)
+      ) {
+        return NextResponse.json(
+          {
+            error: PRODUCT_KIND_LOCKED_AFTER_PUBLISH,
+            message:
+              "Тип продукта нельзя изменить после первой публикации.",
+          },
+          { status: 409 },
+        );
+      }
+
+      nextPublicationClass = requestedClass;
+      nextProductKind = publicationClassToLegacyKind(requestedClass);
+      updates.publication_class = requestedClass;
+      updates.product_kind = nextProductKind;
+
+      if (nextProductKind !== PRODUCT_KIND.MUSIC) {
+        updates.music_usage_permission = null;
+      } else if (
+        !("music_usage_permission" in body) &&
+        !practice.music_usage_permission
+      ) {
+        updates.music_usage_permission = MUSIC_USAGE_PERMISSION.LISTEN_ONLY;
+      }
+    }
 
     if ("product_kind" in body) {
       if (
@@ -251,10 +300,17 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
 
-      nextProductKind = normalizeProductKind(body.product_kind);
+      const requestedKind = normalizeProductKind(body.product_kind);
+
+      if ("publication_class" in body && requestedKind !== nextProductKind) {
+        return NextResponse.json(
+          { error: "invalid_product_kind" },
+          { status: 400 },
+        );
+      }
 
       if (
-        nextProductKind !== normalizeProductKind(practice.product_kind) &&
+        requestedKind !== normalizeProductKind(practice.product_kind) &&
         !canChangeProductKind(practice.published_at)
       ) {
         return NextResponse.json(
@@ -267,7 +323,18 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
 
+      nextProductKind = requestedKind;
       updates.product_kind = nextProductKind;
+
+      if (
+        !("publication_class" in body) &&
+        currentPublicationClass &&
+        publicationClassToLegacyKind(currentPublicationClass) !==
+          nextProductKind
+      ) {
+        nextPublicationClass = mapLegacyProductKindToClass(nextProductKind);
+        updates.publication_class = nextPublicationClass;
+      }
 
       if (nextProductKind !== PRODUCT_KIND.MUSIC) {
         updates.music_usage_permission = null;
@@ -276,6 +343,31 @@ export async function PATCH(request: Request, context: RouteContext) {
         !practice.music_usage_permission
       ) {
         updates.music_usage_permission = MUSIC_USAGE_PERMISSION.LISTEN_ONLY;
+      }
+    }
+
+    if ("cabinet_branch" in body) {
+      const requestedBranch =
+        typeof body.cabinet_branch === "string"
+          ? parseCabinetBranch(body.cabinet_branch)
+          : null;
+
+      if (!requestedBranch) {
+        return NextResponse.json(
+          { error: "invalid_cabinet_branch" },
+          { status: 400 },
+        );
+      }
+      const classForBranch =
+        nextPublicationClass ?? mapLegacyProductKindToClass(nextProductKind);
+
+      if (
+        requestedBranch !== publicationClassToCabinetBranch(classForBranch)
+      ) {
+        return NextResponse.json(
+          { error: "invalid_cabinet_branch" },
+          { status: 400 },
+        );
       }
     }
 

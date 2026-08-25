@@ -2,11 +2,11 @@
 
 import type { MouseEvent } from "react";
 
-import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
+import type { CatalogCardActionTarget } from "@/lib/catalog/dto";
 import { useCatalogLibrarySave } from "@/lib/library/use-catalog-library-save";
 
 type CatalogProductHeartButtonProps = {
-  product: CatalogListingItem;
+  product: CatalogCardActionTarget;
   isAuthenticated: boolean;
   signInReturnPath: string;
 };

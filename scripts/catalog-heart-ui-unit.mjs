@@ -13,13 +13,13 @@ function read(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
 }
 
-const card = read("src/components/products/CatalogProductGridCard.tsx");
+const card = read("src/components/catalog/cards/CatalogCardShell.tsx");
 const heart = read("src/components/products/CatalogProductHeartButton.tsx");
 const play = read("src/components/products/CatalogProductPlayButton.tsx");
 const listingApi = read("src/app/api/catalog/route.ts");
 
 assert.match(card, /data-catalog-media-zone/, "media zone is marked");
-assert.match(card, /aspect-square/, "media zone is 1:1");
+assert.match(card, /CatalogCardGallery/, "media zone is 1:1");
 assert.match(card, /CatalogProductHeartButton/, "Heart is on the card");
 assert.match(card, /CatalogProductPlayButton/, "Play stays on the card");
 assert.match(card, /data-catalog-info-block/, "info block stays marked");

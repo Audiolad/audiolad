@@ -33,7 +33,7 @@ export function ListenerAppShell({
 
   const centerContentClassName = [
     config.centerColumnClassName,
-    "min-w-0",
+    "min-w-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden",
   ]
     .filter(Boolean)
     .join(" ");
