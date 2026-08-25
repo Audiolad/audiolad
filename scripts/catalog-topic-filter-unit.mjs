@@ -186,6 +186,7 @@ const topicSeed = readFileSync(
 );
 const catalogFilterUi = readFileSync("src/lib/catalog/catalog-filter-ui.ts", "utf8");
 const listingContract = readFileSync("src/lib/catalog/listing-contract.ts", "utf8");
+const catalogDto = readFileSync("src/lib/catalog/dto.ts", "utf8");
 const topicQueries = readFileSync("src/lib/topics/queries.ts", "utf8");
 
 assert(topicSeed.includes("'career'"), "seed has career key");
@@ -214,11 +215,22 @@ assert(
   "catalog-filter-ui does not hardcode the new topic titles",
 );
 assert(
-  !listingContract.includes('"course"') &&
-    !listingContract.includes('"learning"') &&
+  !listingContract.includes('"learning"') &&
     !listingContract.includes('"career"') &&
     !listingContract.includes('"business"'),
-  "listing kind filters stay independent of the new topic keys",
+  "listing class filters stay independent of the new topic keys",
+);
+assert(
+  catalogDto.includes('"course"') &&
+    !catalogDto.includes('"learning"') &&
+    !catalogDto.includes('"career"') &&
+    !catalogDto.includes('"business"'),
+  "Freeze v2 publication classes unchanged; learning is not a class",
+);
+assert(
+  catalogFilterUi.includes('value: "course"') &&
+    !catalogFilterUi.includes('value: "learning"'),
+  "class chip Курсы stays course; Обучение is not a class option",
 );
 
 console.log("catalog-topic-filter-unit: ok");
