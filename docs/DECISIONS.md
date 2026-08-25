@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-08-25 — Catalog Phase 1A: Product Gallery
+
+**Контекст:** Phase 0 уже читает `CatalogCard.gallery`, но адаптер всегда
+отдавал `[]`, потому что автор не мог загрузить слайды.
+
+**Решение:**
+
+- Одна таблица `publication_gallery_slides` на все классы публикаций.
+  `publication_id` = `practices.id`. Отдельных PracticeGallery / CourseGallery
+  и новой модели Product нет.
+- Хранение как у обложки: bucket `practice-covers`, ImageManifest + public URL,
+  профиль `product-gallery` (квадрат 1:1, те же MIME и 3 МБ).
+- Путь: `practices/{publicationId}/gallery/{slideId}/variants/{versionId}/`.
+- Кабинет автора: секция «Галерея продукта» на форме продукта — загрузка,
+  выше/ниже, удаление, максимум 30. Обложка остаётся отдельным полем.
+- API: `GET/POST/PATCH /api/author/products/[id]/gallery`,
+  `DELETE /api/author/products/[id]/gallery/[slideId]`.
+- Каталог читает строки и кладёт их в `CatalogCard.gallery`. Пустая галерея
+  не меняет карточку. Gallery не меняет class / offer / summary.
+
+**Принято:** владелец и архитектор (задание Phase 1A Product Gallery).
+
+---
+
 ## 2026-08-25 — Catalog Listing Freeze v2, Phase 0
 
 **Контекст:** новый каталог не должен зависеть от legacy-модели

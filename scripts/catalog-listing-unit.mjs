@@ -300,7 +300,24 @@ const mapped = mapCatalogProductToListingItem(
 assert(mapped.author.name === "Мария", "card author");
 assert(mapped.default_offer?.access === "free", "card offer access");
 assert(mapped.viewer.is_saved === false, "mapped default is_saved is false");
-assert(mapped.gallery.length === 0, "legacy gallery is empty");
+assert(mapped.gallery.length === 0, "missing gallery stays empty");
+
+const mappedWithGallery = mapCatalogProductToListingItem(
+  product({
+    gallery: [
+      { id: "g2", image_url: "/g2.jpg", position: 2, alt: "Второй" },
+      { id: "g1", image_url: "/g1.jpg", position: 1, alt: "Первый" },
+    ],
+  }),
+);
+assert(mappedWithGallery.gallery.length === 2, "listing maps stored slides");
+assert(mappedWithGallery.gallery[0].id === "g1", "listing keeps slide order");
+assert(mappedWithGallery.class === "practice", "gallery does not change class");
+assert(
+  mappedWithGallery.default_offer?.access === "paid",
+  "gallery does not invent or change offer",
+);
+assert(mappedWithGallery.default_offer?.price?.amount_minor === 90000);
 assert(mapped.progress === null, "progress reserved");
 assert(!("price" in mapped), "public card has no legacy price");
 assert(!("isFree" in mapped), "public card has no is_free");

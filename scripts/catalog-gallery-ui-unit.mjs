@@ -49,4 +49,16 @@ assert.doesNotMatch(
   "gallery width is not multiplied by slide count",
 );
 
+const listing = read("src/lib/catalog/listing.ts");
+assert.match(
+  listing,
+  /gallery:\s*product\.gallery\s*\?\?\s*\[\]/,
+  "listing source forwards stored publication gallery",
+);
+assert.doesNotMatch(
+  listing,
+  /gallery:\s*\[\]/,
+  "listing no longer hardcodes an empty gallery",
+);
+
 console.log("catalog-gallery-ui-unit: ok");
