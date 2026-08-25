@@ -126,33 +126,35 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     <>
       <h1 className="sr-only">Каталог</h1>
 
-      {isSearchActive ? (
-        <section className="mt-5" aria-labelledby="catalog-search-results-heading">
-          <h2
-            id="catalog-search-results-heading"
-            className="text-[20px] font-semibold leading-7 text-[#25135c] sm:text-[22px]"
-          >
-            Результаты по запросу «{searchQuery}»
-          </h2>
-          {activeTopicTitle ? (
-            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-              {activeTopicKeys.length > 1
-                ? `В темах «${activeTopicTitle}».`
-                : `В теме «${activeTopicTitle}».`}
-            </p>
-          ) : null}
-        </section>
-      ) : isTopicFiltered ? (
-        <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
-          {activeTopicKeys.length > 1
-            ? `Аудиопродукты на темы «${activeTopicTitle}».`
-            : `Аудиопродукты на тему «${activeTopicTitle}».`}
-        </p>
-      ) : showCatalogPromo ? (
-        <CatalogPromoCarousel promos={listCatalogPromos()} />
-      ) : null}
+      <div className="xl:shrink-0">
+        {isSearchActive ? (
+          <section className="mt-5" aria-labelledby="catalog-search-results-heading">
+            <h2
+              id="catalog-search-results-heading"
+              className="text-[20px] font-semibold leading-7 text-[#25135c] sm:text-[22px]"
+            >
+              Результаты по запросу «{searchQuery}»
+            </h2>
+            {activeTopicTitle ? (
+              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                {activeTopicKeys.length > 1
+                  ? `В темах «${activeTopicTitle}».`
+                  : `В теме «${activeTopicTitle}».`}
+              </p>
+            ) : null}
+          </section>
+        ) : isTopicFiltered ? (
+          <p className="mt-5 text-[15px] leading-6 text-[#7d70a2] xl:mt-3">
+            {activeTopicKeys.length > 1
+              ? `Аудиопродукты на темы «${activeTopicTitle}».`
+              : `Аудиопродукты на тему «${activeTopicTitle}».`}
+          </p>
+        ) : showCatalogPromo ? (
+          <CatalogPromoCarousel promos={listCatalogPromos()} />
+        ) : null}
+      </div>
 
-      <div className="hidden lg:block" data-catalog-desktop-filters>
+      <div className="hidden lg:block xl:shrink-0" data-catalog-desktop-filters>
         {filterableTopics.length > 0 ? (
           <TopicFilterBar
             topics={filterableTopics}

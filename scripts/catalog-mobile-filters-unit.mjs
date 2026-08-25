@@ -32,7 +32,7 @@ assert.match(page, /data-catalog-desktop-filters/, "desktop chips stay on the pa
 assert.match(page, /hidden lg:block/, "page chips appear from lg");
 assert.match(
   page,
-  /className="hidden lg:block" data-catalog-desktop-filters/,
+  /className="hidden lg:block xl:shrink-0" data-catalog-desktop-filters/,
   "desktop filters wrapper is hidden below lg",
 );
 assert.match(

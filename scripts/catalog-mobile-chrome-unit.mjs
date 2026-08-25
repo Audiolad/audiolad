@@ -172,8 +172,8 @@ assert.match(
 assert.match(page, /hidden lg:block/, "filter chips appear from lg");
 assert.match(
   page,
-  /className="hidden lg:block" data-catalog-desktop-filters/,
-  "desktop filters wrapper is hidden below lg",
+  /className="hidden lg:block xl:shrink-0" data-catalog-desktop-filters/,
+  "desktop filters wrapper is hidden below lg and does not shrink at xl",
 );
 assert.match(
   layout,
@@ -214,6 +214,27 @@ assert.match(
   layout,
   /listener-catalog-mobile-search[^"]*xl:hidden/,
   "fixed search remains hidden from xl",
+);
+const shell = read("src/components/listener/ListenerAppShell.tsx");
+assert.match(
+  shell,
+  /centerColumnClassName,\s*"min-w-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col"/,
+  "shell children still pass catalog height to the center column",
+);
+assert.doesNotMatch(
+  shell,
+  /centerColumnClassName,[\s\S]{0,120}overflow-hidden/,
+  "ListenerAppShell children class string does not include overflow-hidden",
+);
+assert.match(
+  layout,
+  /listener-catalog-content[^"]*xl:overflow-hidden/,
+  "catalog content still clamps overflow at xl",
+);
+assert.match(
+  page,
+  /xl:shrink-0" data-catalog-desktop-filters/,
+  "filters wrapper includes xl:shrink-0",
 );
 
 assert.doesNotMatch(
