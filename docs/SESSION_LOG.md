@@ -4,6 +4,21 @@
 
 ---
 
+## Сессия — 25 августа 2026 (каталог плейлистов, Stage 1)
+
+**Сделано:**
+
+- Read-only аудит catalog listing, модели playlist и library_saves.
+- Контракт `PlaylistListingItem` (`class: "playlist"`), без внутренних полей.
+- На существующие `playlists` добавлены `items_count`, `duration_seconds`, `saves_count`, `listed_at`.
+- Отдельная модель/таблица `playlist_saves` (не `library_saves`).
+- Миграция `20260825120000_playlist_catalog_foundation.sql`.
+- Без страницы витрины, карточки, фильтров, play-кнопок, миграции `/playlists`.
+
+**Следующий шаг:** Stage 2 — listing query / API `/playlists/catalog` только по отдельному заданию. Production / PM2 не менять без подтверждения.
+
+---
+
 ## Сессия — 23 августа 2026 (MAX Mini App этап 3B)
 
 **Сделано:**

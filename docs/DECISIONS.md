@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-08-25 — Каталог плейлистов: отдельный listing-поток
+
+**Контекст:** продуктовый каталог (`/catalog`) построен вокруг универсальной карточки продуктов (`kind`: practice / music / audio_post / program). Нужна витрина плейлистов без превращения плейлиста в новый kind продукта и без поломки личного редактора `/playlists`.
+
+**Решение:**
+
+- Продукты остаются `class: "product"` + `kind`.
+- Плейлисты — отдельная сущность `class: "playlist"` и отдельный listing-поток.
+- Карточка API: `PlaylistListingItem` (без `user_id`, `owner_type`, `created_by`, `cover_path`, `direction_id`, `playlist_items`, entitlement).
+- Существующая таблица `playlists` расширяется только полями витрины: `items_count`, `duration_seconds`, `saves_count`, `listed_at`.
+- Сохранения плейлистов — `playlist_saves`, отдельно от `library_saves`. Save ≠ entitlement.
+- Маршрут витрины: `/playlists/catalog`. `/playlists` и `/playlists/[id]` не мигрировать.
+- Stage 1: контракт + модель + миграция. Без страницы, карточки, фильтров, play-кнопок, SEO.
+
+**Принято:** владелец проекта (задание Stage 1).
+
+---
+
 ## 2026-08-23 — MAX Mini App этап 3B: вход существующего аккаунта
 
 **Контекст:** этап 3A дал серверный `POST /link`, но без UI. Нужен вход
