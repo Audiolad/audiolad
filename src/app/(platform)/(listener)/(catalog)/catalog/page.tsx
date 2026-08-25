@@ -136,9 +136,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 
   return (
     <>
-      <h1 className="sr-only text-[28px] font-semibold xl:not-sr-only xl:block">
-        Каталог
-      </h1>
+      <h1 className="sr-only">Каталог</h1>
 
       {isSearchActive ? (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">

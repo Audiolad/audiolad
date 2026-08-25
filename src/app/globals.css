@@ -21,9 +21,9 @@
    */
   --bottom-nav-viewport-offset: 0px;
   --home-page-gutter: 1.25rem;
-  /* Fixed catalog search + matching spacer (safe-area-top + 0.75rem + 52px row + pb-3). */
+  /* Fixed catalog search + matching spacer (safe-area-top + 0.75rem + 52px row + pb-1.5). */
   --catalog-mobile-search-height: calc(
-    max(0.75rem, env(safe-area-inset-top, 0px)) + 52px + 0.75rem
+    max(0.75rem, env(safe-area-inset-top, 0px)) + 52px + 0.375rem
   );
 
   /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
