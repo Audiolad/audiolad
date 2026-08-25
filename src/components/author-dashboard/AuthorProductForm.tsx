@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
+import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGallery";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
@@ -2474,6 +2475,16 @@ export default function AuthorProductForm({
           hint={`${PRODUCT_LANGUAGE_GUIDELINES.coverTechnicalHint}. ${PRODUCT_LANGUAGE_GUIDELINES.fieldHints.cover}`}
           uploadLabel="Загрузить обложку"
           replaceLabel="Заменить обложку"
+        />
+
+        <AuthorProductGallery
+          practiceId={practiceId || null}
+          coverUrl={form.coverUrl}
+          coverImage={form.coverImage}
+          coverVersion={form.coverVersion}
+          initialSlides={initialProduct?.gallery_slides ?? []}
+          getPracticeId={getPracticeIdForCoverUpload}
+          disabled={!canMutateContent || busy}
         />
 
         {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (

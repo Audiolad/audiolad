@@ -17,6 +17,8 @@ import { resolvePracticePrice } from "@/lib/pricing/resolve";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { formatRubles } from "@/lib/products/price-format";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import type { CatalogSlide } from "@/lib/catalog/dto";
+import { loadPublicationGalleriesByIds } from "@/lib/catalog/publication-gallery";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
 import { parseCatalogTopicKeyList } from "@/lib/catalog/topic-filter";
 import { formatCatalogProductStats, formatProductMeta } from "@/lib/products/duration";
@@ -72,6 +74,7 @@ export type CatalogProduct = ProductCoverFields & {
   audioCount?: number;
   durationSeconds?: number | null;
   publishedAt?: string | null;
+  gallery?: CatalogSlide[];
 };
 
 export type CatalogSections = {
@@ -317,6 +320,17 @@ export async function mapPracticeRowsToCatalogProducts(
     practiceRows.map((practice) => practice.id),
   );
 
+  let galleriesByPublication = new Map<string, CatalogSlide[]>();
+
+  try {
+    galleriesByPublication = await loadPublicationGalleriesByIds(
+      supabase,
+      practiceRows.map((practice) => practice.id),
+    );
+  } catch {
+    galleriesByPublication = new Map();
+  }
+
   const products = practiceRows.flatMap((practice) => {
     const author = normalizeAuthor(practice.authors);
 
@@ -391,6 +405,7 @@ export async function mapPracticeRowsToCatalogProducts(
             ? audioSummary?.totalDurationSeconds ?? null
             : null,
         publishedAt: practice.published_at,
+        gallery: galleriesByPublication.get(practice.id) ?? [],
       },
     ];
   });

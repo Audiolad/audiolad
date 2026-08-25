@@ -1,4 +1,5 @@
 import { getProductPriceLabel } from "@/lib/products/price-format";
+import type { AuthorGallerySlide } from "@/lib/author-products/gallery-shared";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import {
   authorAccessAllowsContentMutations,
@@ -188,6 +189,7 @@ export function coercePracticeRow(
 export type AuthorProductDetail = {
   practice: PracticeRow;
   audio_items: AudioItemRow[];
+  gallery_slides: AuthorGallerySlide[];
   /** True when entitlements or paid orders lock destructive content edits. */
   contentLockedAfterSale: boolean;
   /** True when a paid order blocks soft delete (narrower than content lock). */

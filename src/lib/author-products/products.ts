@@ -12,6 +12,7 @@ import {
   normalizeProductKind,
   type ProductKind,
 } from "./product-kind";
+import { listAuthorGallerySlides } from "./gallery";
 import type {
   AuthorProductDetail,
   AuthorProductListItem,
@@ -195,15 +196,17 @@ export async function getAuthorProductDetail(
     throw new Error("audio_items_lookup_failed");
   }
 
-  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase] =
+  const [contentLockedAfterSale, deleteLockedAfterPaidPurchase, gallerySlides] =
     await Promise.all([
       resolveContentLockedAfterSale(practiceId),
       resolveDeleteLockedAfterPaidPurchase(practiceId),
+      listAuthorGallerySlides(supabase, practiceId).catch(() => []),
     ]);
 
   return {
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: (audioItems ?? []) as AudioItemRow[],
+    gallery_slides: gallerySlides,
     contentLockedAfterSale,
     deleteLockedAfterPaidPurchase,
   };
@@ -321,6 +324,7 @@ export async function createDraftProduct(
   return {
     practice: coercePracticeRow(practice as PracticeRow),
     audio_items: [audioItem as AudioItemRow],
+    gallery_slides: [],
     contentLockedAfterSale: false,
     deleteLockedAfterPaidPurchase: false,
   };

@@ -99,16 +99,69 @@ const thirtyPlus = normalizeCatalogGallery(
 );
 assert.equal(thirtyPlus.length, 30, "gallery caps at 30");
 
-const withGallery = adaptLegacyCatalogSourceToCard(
+const emptyGallery = adaptLegacyCatalogSourceToCard(source({ gallery: [] }));
+assert.deepEqual(emptyGallery?.gallery, [], "empty gallery maps to []");
+assert.equal(emptyGallery?.class, "practice");
+assert.equal(emptyGallery?.default_offer?.access, "paid");
+
+const oneSlide = adaptLegacyCatalogSourceToCard(
   source({
     gallery: [
       { id: "inside", image_url: "/inside.jpg", position: 1, alt: "Что внутри" },
     ],
   }),
 );
-assert.equal(withGallery?.class, "practice");
-assert.equal(withGallery?.gallery.length, 1);
-assert.equal(withGallery?.default_offer?.price?.amount_minor, 49000);
+assert.equal(oneSlide?.class, "practice");
+assert.equal(oneSlide?.gallery.length, 1);
+assert.equal(oneSlide?.gallery[0].id, "inside");
+assert.equal(oneSlide?.default_offer?.price?.amount_minor, 49000);
+assert.deepEqual(oneSlide?.summary, {});
+
+const severalSlides = adaptLegacyCatalogSourceToCard(
+  source({
+    gallery: [
+      { id: "c", image_url: "/c.jpg", position: 3, alt: "C" },
+      { id: "a", image_url: "/a.jpg", position: 1, alt: "A" },
+      { id: "b", image_url: "/b.jpg", position: 2, alt: "B" },
+    ],
+  }),
+);
+assert.equal(severalSlides?.gallery.length, 3);
+assert.deepEqual(
+  severalSlides?.gallery.map((slide) => slide.id),
+  ["a", "b", "c"],
+  "several slides keep stored order",
+);
+assert.equal(severalSlides?.class, "practice");
+assert.equal(severalSlides?.default_offer?.access, "paid");
+
+const postWithSlides = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "audio_post",
+    isFree: true,
+    price: 0,
+    gallery: [
+      { id: "p1", image_url: "/post-1.jpg", position: 0, alt: "Пост" },
+    ],
+  }),
+);
+assert.equal(postWithSlides?.class, "post", "gallery does not change class");
+assert.equal(postWithSlides?.default_offer, null, "adapter does not invent offers");
+assert.equal(postWithSlides?.gallery.length, 1);
+assert.deepEqual(postWithSlides?.summary, {});
+
+const cappedCard = adaptLegacyCatalogSourceToCard(
+  source({
+    gallery: Array.from({ length: 35 }, (_, index) => ({
+      id: `cap-${index}`,
+      image_url: `/cap-${index}.jpg`,
+      position: index,
+      alt: `Cap ${index}`,
+    })),
+  }),
+);
+assert.equal(cappedCard?.gallery.length, 30, "adapter gallery caps at 30");
+assert.equal(cappedCard?.default_offer?.price?.amount_minor, 49000);
 
 const frontendFiles = [
   "src/app/(platform)/(listener)/(catalog)/catalog/page.tsx",

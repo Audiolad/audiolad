@@ -525,6 +525,35 @@ Ownership: триггер `enforce_quick_offer_product_owner` запрещает
 
 Публичный маршрут: `/offers/[slug]`.
 
+### publication_gallery_slides — витрина продукта (2026-08-25)
+
+Миграция: `20260825120000_publication_gallery_slides.sql`.
+
+Одна таблица слайдов для всех классов публикаций. `publication_id` =
+`practices.id`. Это не новый тип контента и не отдельные
+PracticeGallery / CourseGallery.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `publication_id` | uuid NOT NULL | FK → `practices.id` ON DELETE CASCADE |
+| `image_url` | text NOT NULL | публичный URL в bucket `practice-covers` |
+| `image_manifest` | jsonb NOT NULL | тот же ImageManifest, что `practices.cover_image` |
+| `position` | integer NOT NULL | 0-based, `0..29` |
+| `alt` | text NULL | ≤ 200 символов, без переносов |
+| `created_at` / `updated_at` | timestamptz | `now()` / trigger |
+
+Лимит 30 слайдов на публикацию — триггер
+`enforce_publication_gallery_slide_limit` на INSERT.
+
+Storage path: `practices/{publicationId}/gallery/{slideId}/variants/{versionId}/`.
+Тот же bucket и storage RLS, что у обложек (`practices/{id}/...`).
+
+RLS: public SELECT для `practices.status = published AND deleted_at IS NULL`;
+author members (owner/editor) — SELECT/INSERT/UPDATE/DELETE своих публикаций.
+
+Каталог: `loadPublicationGalleriesByIds` → `CatalogCard.gallery`.
+
 ### operational_email_deliveries — listener welcome
 
 Таблица `public.operational_email_deliveries` (миграция `20260722103000_operational_email_deliveries.sql`) хранит прямые SMTP-попытки с уникальным `dedup_key`. `message_type` — свободный text, без CHECK на набор типов.

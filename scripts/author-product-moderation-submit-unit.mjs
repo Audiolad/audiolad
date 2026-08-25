@@ -169,6 +169,13 @@ assert.match(audioRoute, /assertPracticePublicContentEditable/);
 const coverRoute = read("src/app/api/author/products/[id]/cover/route.ts");
 assert.match(coverRoute, /assertPracticePublicContentEditable/);
 
+const galleryRoute = read("src/app/api/author/products/[id]/gallery/route.ts");
+assert.match(galleryRoute, /assertPracticePublicContentEditable/);
+const gallerySlideRoute = read(
+  "src/app/api/author/products/[id]/gallery/[slideId]/route.ts",
+);
+assert.match(gallerySlideRoute, /assertPracticePublicContentEditable/);
+
 const topicsRoute = read("src/app/api/author/products/[id]/topics/route.ts");
 assert.match(topicsRoute, /assertPracticePublicContentEditable/);
 
