@@ -19,7 +19,7 @@ import {
 } from "../src/lib/playlists/playlist-topics";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20260825141000_playlist_topics.sql";
+const migrationName = "20260825161000_playlist_topics.sql";
 const migration = readFileSync(
   join(repoRoot, "supabase/migrations", migrationName),
   "utf8",

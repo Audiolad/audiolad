@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
-const migrationName = "20260825140000_playlist_catalog_foundation.sql";
+const migrationName = "20260825160000_playlist_catalog_foundation.sql";
 const migrationPath = join(migrationsDir, migrationName);
 const stubPath = join(repoRoot, "scripts/lib/playlist-catalog-foundation-sql-stub.sql");
 const migration = readFileSync(migrationPath, "utf8");

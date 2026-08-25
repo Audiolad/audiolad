@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
-const migrationName = "20260825141000_playlist_topics.sql";
+const migrationName = "20260825161000_playlist_topics.sql";
 const migrationPath = join(migrationsDir, migrationName);
 const stubPath = join(repoRoot, "scripts/lib/playlist-topics-sql-stub.sql");
 const migration = readFileSync(migrationPath, "utf8");

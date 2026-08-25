@@ -1,7 +1,7 @@
 -- Isolated smoke for playlist_topics + set_playlist_topics.
 -- Apply only on a stub database after
 -- scripts/lib/playlist-topics-sql-stub.sql and
--- 20260825141000_playlist_topics.sql.
+-- 20260825161000_playlist_topics.sql.
 
 \set ON_ERROR_STOP on
 
