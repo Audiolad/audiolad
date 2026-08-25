@@ -27,13 +27,23 @@ import {
   STUDIO_AUDIO_CONTROL_CHANNEL,
   STUDIO_AUDIO_STOP_STORAGE_KEY,
 } from "@/lib/audio/studio-audio-coordination";
-import type { LoadSessionInput } from "@/lib/listen/global-player-types";
+import { waitForPlayingEvent } from "@/lib/audio/playback-recovery";
+import { logPlayerDebug } from "@/lib/audio/player-debug";
+import {
+  fetchSignedAudioUrl,
+  playErrorName,
+} from "@/lib/audio/signed-audio-url";
+import type {
+  CatalogGlobalPlayerSession,
+  LoadSessionInput,
+} from "@/lib/listen/global-player-types";
 import {
   getGlobalPlayerSessionKey,
   isCatalogGlobalPlayerSession,
   isPrivateAudioSession,
   normalizeGlobalPlayerSessionContract,
 } from "@/lib/listen/global-player-types";
+import { buildListenApiBase } from "@/lib/products/paths";
 import {
   clearDesktopPlayerLastSession,
   desktopPlayerSnapshotFromSession,
@@ -75,7 +85,10 @@ export type DesktopPlayerRestoreState = "pending" | "restoring" | "ready";
 type SessionContextValue = {
   session: LoadSessionInput | null;
   dismissedPracticeId: string | null;
-  loadSession: (input: LoadSessionInput) => void;
+  loadSession: (
+    input: LoadSessionInput,
+    options?: { preservePlayback?: boolean },
+  ) => void;
   stopAndClear: () => void;
   openFullPlayer: () => void;
   /**
@@ -110,6 +123,120 @@ type PendingQueueNavigation = {
   targetPracticeId: string;
 };
 
+type PlaybackHandoff = {
+  audioItemId: string;
+  url: string;
+};
+
+type QueueAdvancePrefetch = {
+  queueId: string;
+  fromIndex: number;
+  index: number;
+  entryKey: string;
+  session: CatalogGlobalPlayerSession;
+  audioItemId: string;
+  url: string;
+  runtimeSkipped: number;
+};
+
+async function resolveQueueEntryPlayback(
+  entry: PlaylistQueueEntry,
+  options: { fromStart: boolean; signal?: AbortSignal },
+): Promise<{
+  session: CatalogGlobalPlayerSession;
+  audioItemId: string;
+  url: string;
+} | null> {
+  const slugs = getQueueEntryListenSlugs(entry);
+
+  if (!slugs || (entry.kind !== "product" && entry.kind !== "audio_item")) {
+    return null;
+  }
+
+  const loaded = await fetchListenSessionPayload(
+    slugs.authorSlug,
+    slugs.productSlug,
+    { fromStart: options.fromStart },
+  );
+
+  if (!loaded.ok) {
+    return null;
+  }
+
+  let session = loaded.session;
+  const track =
+    entry.kind === "audio_item"
+      ? session.tracks.find((item) => item.id === entry.audioItemId)
+      : session.tracks[0];
+
+  if (!track) {
+    return null;
+  }
+
+  if (entry.kind === "audio_item") {
+    session = {
+      ...session,
+      tracks: [track],
+      initialTrackId: track.id,
+    };
+  }
+
+  const signed = await fetchSignedAudioUrl({
+    audioItemId: track.id,
+    sourceType: "catalog",
+    listenApiBase: buildListenApiBase(slugs.authorSlug, slugs.productSlug),
+    signal: options.signal,
+  });
+
+  if (!signed.ok) {
+    return null;
+  }
+
+  return {
+    session,
+    audioItemId: track.id,
+    url: signed.url,
+  };
+}
+
+async function playQueueAdvanceOnSharedAudio(
+  audio: HTMLAudioElement | null,
+  url: string,
+  meta: {
+    usedPrefetch: boolean;
+    currentAudioItemId: string | null;
+    nextAudioItemId: string;
+  },
+): Promise<void> {
+  if (!audio) {
+    return;
+  }
+
+  if (audio.getAttribute("src") !== url) {
+    audio.src = url;
+  }
+
+  try {
+    // Shared next-track path (iOS / Android / desktop): play on the
+    // persistent element first; callers must not remount or replace yet.
+    await audio.play();
+    await waitForPlayingEvent(audio, 2000);
+  } catch (error: unknown) {
+    const name = playErrorName(error);
+    logPlayerDebug("queue-advance", `rejected:${name}`, {
+      audio,
+      fields: {
+        usedPrefetch: meta.usedPrefetch,
+        prefetch: meta.usedPrefetch ? "hit" : "miss",
+        currentAudioItemId: meta.currentAudioItemId,
+        nextAudioItemId: meta.nextAudioItemId,
+        advanceKind: "queue",
+        errorName: name,
+      },
+    });
+  }
+}
+
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 const PlayerEngineContext = createContext<PlayerEngineApi | null>(null);
@@ -120,6 +247,7 @@ function GlobalPlayerEngine({
   sessionGenerationRef,
   stopEngineRef,
   persistentAudioRef,
+  handoffSourceRef,
   requestAutoplayIntentRef,
   queueHasNext,
   queueHasPrevious,
@@ -133,6 +261,7 @@ function GlobalPlayerEngine({
   sessionGenerationRef: MutableRefObject<number>;
   stopEngineRef: MutableRefObject<(() => void) | null>;
   persistentAudioRef: MutableRefObject<HTMLAudioElement | null>;
+  handoffSourceRef: MutableRefObject<PlaybackHandoff | null>;
   requestAutoplayIntentRef: MutableRefObject<(() => void) | null>;
   queueHasNext: boolean;
   queueHasPrevious: boolean;
@@ -211,6 +340,7 @@ function GlobalPlayerEngine({
     guestProgressMode: Boolean(catalogSession?.guestProgressMode),
     guestProgressMeta: catalogSession?.guestProgressMeta,
     audioRef: persistentAudioRef,
+    handoffSourceRef,
     playbackMode: catalogSession?.playbackMode ?? "full",
     previewStartMs: catalogSession?.previewStartMs,
     previewEndMs: catalogSession?.previewEndMs,
@@ -494,6 +624,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
   const requestAutoplayIntentRef = useRef<(() => void) | null>(null);
   /** Survives engine remounts so iOS keeps the unlocked media element. */
   const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackHandoffRef = useRef<PlaybackHandoff | null>(null);
+  const queueAdvancePrefetchRef = useRef<QueueAdvancePrefetch | null>(null);
+  const queuePrefetchAbortRef = useRef<AbortController | null>(null);
   const sessionRef = useRef<LoadSessionInput | null>(null);
   const activeQueueRef = useRef<PlaylistQueue | null>(null);
   const transitionLockRef = useRef(false);
@@ -531,16 +664,24 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     activeQueueRef.current = null;
     setQueueCompleted(false);
     queueDrivenPracticeIdsRef.current = new Set();
+    queuePrefetchAbortRef.current?.abort();
+    queuePrefetchAbortRef.current = null;
+    queueAdvancePrefetchRef.current = null;
+    playbackHandoffRef.current = null;
     clearPendingQueueNavigation();
     lastExhaustedPracticeIdRef.current = null;
   }, [clearPendingQueueNavigation]);
 
-  const loadSession = useCallback((input: LoadSessionInput) => {
+  const loadSession = useCallback((
+    input: LoadSessionInput,
+    options?: { preservePlayback?: boolean },
+  ) => {
     setDismissedPracticeId(null);
     // Stop any page-level PersonalMaterialAudioPlayer before owning the single audio element.
     requestStopLocalAudioPlayers();
 
     const requestAutoplay = input.requestAutoplay ?? false;
+    const preservePlayback = options?.preservePlayback === true;
     const nextSession: LoadSessionInput = normalizeGlobalPlayerSessionContract({
       ...input,
       requestAutoplay,
@@ -555,7 +696,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         input.initialTrackId !== current.initialTrackId;
       const autoplayBump = requestAutoplay && !current.requestAutoplay;
 
-      if (!trackSelectionChanged && !autoplayBump) {
+      if (!trackSelectionChanged && !autoplayBump && !preservePlayback) {
         // Same session key, no material change — bail without setState to avoid
         // ListenPageClient effect loops (new object identity every call).
         return;
@@ -563,7 +704,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
       // Autoplay-only bump: keep the mounted engine and shared media element.
       // Remount + audio.load() on iOS drops user activation and restarts buffer.
-      if (autoplayBump && !trackSelectionChanged) {
+      if (autoplayBump && !trackSelectionChanged && !preservePlayback) {
         const merged: LoadSessionInput = {
           ...current,
           ...nextSession,
@@ -587,10 +728,6 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         return;
       }
 
-      sessionGenerationRef.current += 1;
-      setSessionGeneration(sessionGenerationRef.current);
-      setPlaybackInstanceId((value) => value + 1);
-
       const merged: LoadSessionInput = {
         ...current,
         ...nextSession,
@@ -598,6 +735,23 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       // Sync ref immediately so nested effects don't see a stale private key.
       sessionRef.current = merged;
       setSession(merged);
+
+      if (preservePlayback) {
+        if (process.env.NODE_ENV !== "production") {
+          console.info("private_audio_session_switch", {
+            from: currentKey,
+            to: inputKey,
+            generation: sessionGenerationRef.current,
+            mode: "preserve_playback",
+          });
+        }
+
+        return;
+      }
+
+      sessionGenerationRef.current += 1;
+      setSessionGeneration(sessionGenerationRef.current);
+      setPlaybackInstanceId((value) => value + 1);
 
       if (process.env.NODE_ENV !== "production") {
         console.info("private_audio_session_switch", {
@@ -616,29 +770,41 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     sessionGenerationRef.current += 1;
     setSessionGeneration(sessionGenerationRef.current);
 
-    try {
-      stopEngineRef.current?.();
-    } catch (error) {
-      console.error("private_audio_session_switch", {
-        stage: "stop_engine",
-        from: currentKey,
-        to: inputKey,
-        generation: sessionGenerationRef.current,
-        error: error instanceof Error ? error.message : "unknown",
-      });
+    if (!preservePlayback) {
+      try {
+        stopEngineRef.current?.();
+      } catch (error) {
+        console.error("private_audio_session_switch", {
+          stage: "stop_engine",
+          from: currentKey,
+          to: inputKey,
+          generation: sessionGenerationRef.current,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+      }
+
+      stopEngineRef.current = null;
+      setPlaybackInstanceId((value) => value + 1);
     }
 
-    stopEngineRef.current = null;
-    setPlaybackInstanceId((value) => value + 1);
     sessionRef.current = nextSession;
     setSession(nextSession);
 
-    console.info("private_audio_session_switch", {
-      from: currentKey,
-      to: inputKey,
-      generation: sessionGenerationRef.current,
-      mode: "replace",
-    });
+    if (preservePlayback) {
+      console.info("private_audio_session_switch", {
+        from: currentKey,
+        to: inputKey,
+        generation: sessionGenerationRef.current,
+        mode: "preserve_playback",
+      });
+    } else {
+      console.info("private_audio_session_switch", {
+        from: currentKey,
+        to: inputKey,
+        generation: sessionGenerationRef.current,
+        mode: "replace",
+      });
+    }
   }, []);
 
   const hardStop = useCallback(() => {
@@ -896,6 +1062,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
         autoplay: boolean;
         fromStart: boolean;
         direction?: "forward" | "backward";
+        playBeforeNavigate?: boolean;
       },
     ): Promise<"advanced" | "completed" | "failed"> => {
       if (transitionLockRef.current) {
@@ -904,10 +1071,166 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
       transitionLockRef.current = true;
       const direction = options.direction ?? "forward";
+      const playBeforeNavigate = options.playBeforeNavigate === true;
 
       try {
         let index = startIndex;
         let runtimeSkipped = queue.runtimeSkippedCount;
+        let playFirstSession: CatalogGlobalPlayerSession | null = null;
+        let playFirstEntry: PlaylistQueueEntry | null = null;
+        let playFirstUrl: string | null = null;
+        let playFirstAudioItemId: string | null = null;
+        let usedPrefetch = false;
+
+        if (playBeforeNavigate) {
+          const prefetch = queueAdvancePrefetchRef.current;
+          const prefetchEntry =
+            prefetch && prefetch.index >= 0
+              ? queue.entries[prefetch.index]
+              : null;
+
+          if (
+            prefetch &&
+            prefetch.queueId === queue.id &&
+            prefetch.fromIndex === startIndex &&
+            prefetch.url &&
+            prefetchEntry &&
+            queueEntryIdentityKey(prefetchEntry) === prefetch.entryKey
+          ) {
+            index = prefetch.index;
+            runtimeSkipped = prefetch.runtimeSkipped;
+            playFirstSession = prefetch.session;
+            playFirstEntry = prefetchEntry;
+            playFirstUrl = prefetch.url;
+            playFirstAudioItemId = prefetch.audioItemId;
+            usedPrefetch = true;
+            queueAdvancePrefetchRef.current = null;
+          } else {
+            while (index >= 0 && index < queue.entries.length) {
+              const entry = queue.entries[index];
+              const resolved = await resolveQueueEntryPlayback(entry, {
+                fromStart: options.fromStart,
+              });
+
+              if (!resolved) {
+                runtimeSkipped += 1;
+                index += direction === "forward" ? 1 : -1;
+                continue;
+              }
+
+              playFirstSession = resolved.session;
+              playFirstEntry = entry;
+              playFirstUrl = resolved.url;
+              playFirstAudioItemId = resolved.audioItemId;
+              break;
+            }
+          }
+
+          if (
+            playFirstSession &&
+            playFirstEntry &&
+            playFirstUrl &&
+            playFirstAudioItemId
+          ) {
+            const audio = persistentAudioRef.current;
+            const currentSession = sessionRef.current;
+            const currentAudioItemId =
+              currentSession && currentSession.tracks.length > 0
+                ? currentSession.tracks[currentSession.tracks.length - 1]?.id ??
+                  null
+                : null;
+
+            playbackHandoffRef.current = {
+              audioItemId: playFirstAudioItemId,
+              url: playFirstUrl,
+            };
+
+            await playQueueAdvanceOnSharedAudio(audio, playFirstUrl, {
+              usedPrefetch,
+              currentAudioItemId,
+              nextAudioItemId: playFirstAudioItemId,
+            });
+
+            const nextQueue: PlaylistQueue = {
+              ...queue,
+              currentIndex: index,
+              runtimeSkippedCount: runtimeSkipped,
+            };
+            const fromPracticeId =
+              (currentSession && isCatalogGlobalPlayerSession(currentSession)
+                ? currentSession.practiceId
+                : null) ??
+              (queue.entries[queue.currentIndex]
+                ? getQueueEntryPracticeId(queue.entries[queue.currentIndex])
+                : null);
+
+            beginPendingQueueNavigation(
+              fromPracticeId,
+              playFirstSession.practiceId,
+            );
+
+            setActiveQueue(nextQueue);
+            activeQueueRef.current = nextQueue;
+            setQueueCompleted(false);
+            queueDrivenPracticeIdsRef.current = new Set(
+              nextQueue.entries.map((item) => getQueueEntryPracticeId(item)),
+            );
+
+            const stayOnSource = !shouldNavigateOnQueueAdvance(nextQueue);
+
+            loadSession(
+              {
+                ...playFirstSession,
+                requestAutoplay: options.autoplay,
+                forceStartAtBeginning: options.fromStart,
+                suppressListenUrlSync:
+                  stayOnSource || playFirstSession.suppressListenUrlSync,
+              },
+              { preservePlayback: true },
+            );
+
+            const path = buildSafeListenReplacePath(
+              playFirstSession.authorSlug,
+              playFirstSession.productSlug,
+            );
+
+            if (path && !stayOnSource) {
+              router.replace(path, { scroll: false });
+            }
+
+            if (
+              lastExhaustedPracticeIdRef.current ===
+              queueEntryIdentityKey(playFirstEntry)
+            ) {
+              lastExhaustedPracticeIdRef.current = null;
+            }
+
+            if (runtimeSkipped > queue.runtimeSkippedCount) {
+              setNoticeMessage(
+                runtimeSkipped - queue.runtimeSkippedCount === 1 &&
+                  queue.skippedCount === 0
+                  ? "Один материал пропущен, потому что сейчас недоступен."
+                  : "Некоторые материалы пропущены, потому что сейчас недоступны.",
+              );
+            }
+
+            return "advanced";
+          }
+
+          if (direction === "backward") {
+            return "failed";
+          }
+
+          const finishedPrefetchQueue: PlaylistQueue = {
+            ...queue,
+            currentIndex: Math.max(queue.entries.length - 1, 0),
+            runtimeSkippedCount: runtimeSkipped,
+          };
+          setActiveQueue(finishedPrefetchQueue);
+          activeQueueRef.current = finishedPrefetchQueue;
+          setQueueCompleted(true);
+          return "completed";
+        }
 
         while (index >= 0 && index < queue.entries.length) {
           const entry = queue.entries[index];
@@ -1175,6 +1498,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
       const result = await activateEntryAtIndex(queue, queue.currentIndex + 1, {
         autoplay: true,
         fromStart: true,
+        playBeforeNavigate: true,
       });
 
       if (result === "failed") {
@@ -1211,6 +1535,71 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
     return result === "advanced";
   }, [activateEntryAtIndex]);
+
+  useEffect(() => {
+    if (!activeQueue || !session || !isCatalogGlobalPlayerSession(session)) {
+      queueAdvancePrefetchRef.current = null;
+      return;
+    }
+
+    const startIndex = activeQueue.currentIndex + 1;
+
+    if (startIndex >= activeQueue.entries.length) {
+      queueAdvancePrefetchRef.current = null;
+      return;
+    }
+
+    const abort = new AbortController();
+    queuePrefetchAbortRef.current?.abort();
+    queuePrefetchAbortRef.current = abort;
+
+    const queue = activeQueue;
+    const queueId = queue.id;
+    const fromIndex = startIndex;
+    let runtimeSkipped = queue.runtimeSkippedCount;
+
+    void (async () => {
+      let index = startIndex;
+
+      while (index < queue.entries.length && !abort.signal.aborted) {
+        const entry = queue.entries[index];
+        const resolved = await resolveQueueEntryPlayback(entry, {
+          fromStart: true,
+          signal: abort.signal,
+        });
+
+        if (abort.signal.aborted) {
+          return;
+        }
+
+        if (!resolved) {
+          runtimeSkipped += 1;
+          index += 1;
+          continue;
+        }
+
+        queueAdvancePrefetchRef.current = {
+          queueId,
+          fromIndex,
+          index,
+          entryKey: queueEntryIdentityKey(entry),
+          session: resolved.session,
+          audioItemId: resolved.audioItemId,
+          url: resolved.url,
+          runtimeSkipped,
+        };
+        return;
+      }
+
+      if (!abort.signal.aborted) {
+        queueAdvancePrefetchRef.current = null;
+      }
+    })();
+
+    return () => {
+      abort.abort();
+    };
+  }, [activeQueue, session]);
 
   const currentQueueEntry =
     activeQueue && activeQueue.entries[activeQueue.currentIndex]
@@ -1439,6 +1828,7 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
           sessionGenerationRef={sessionGenerationRef}
           stopEngineRef={stopEngineRef}
           persistentAudioRef={persistentAudioRef}
+          handoffSourceRef={playbackHandoffRef}
           requestAutoplayIntentRef={requestAutoplayIntentRef}
           queueHasNext={queueHasNext}
           queueHasPrevious={queueHasPrevious}
