@@ -754,10 +754,13 @@ export function useSequentialPlayer({
       userWantsPlaybackRef.current = true;
       wasPlayingBeforeSwitchRef.current = false;
 
+      // Shared next-track path (iOS / Android / desktop). play() stays in this
+      // turn so lock-screen / screen-off Media Session can continue.
       void audio.play().catch((error: unknown) => {
         const name = playErrorName(error);
         debugSnapshot("advance-play", `rejected:${name}`, {
           usedPrefetch: meta.usedPrefetch,
+          prefetch: meta.usedPrefetch ? "hit" : "miss",
           currentAudioItemId: meta.currentAudioItemId,
           nextAudioItemId: meta.nextAudioItemId,
           advanceKind: meta.advanceKind,
@@ -1195,6 +1198,7 @@ export function useSequentialPlayer({
           const name = playErrorName(error);
           debugSnapshot("advance-play", `rejected:${name}`, {
             usedPrefetch: false,
+            prefetch: "miss",
             currentAudioItemId: currentTrack?.id ?? null,
             nextAudioItemId: currentTrack?.id ?? null,
             advanceKind: "session",
@@ -1245,6 +1249,8 @@ export function useSequentialPlayer({
     };
 
     const handleEnded = () => {
+      // Do not gate ended on visibility — lock-screen / screen-off still
+      // need this listener on iOS, Android, and desktop.
       if (!isHandlerCurrent() || !currentTrack) {
         return;
       }
@@ -1647,6 +1653,7 @@ export function useSequentialPlayer({
   };
 
   const handleNextTrack = async () => {
+    // Media Session nexttrack and in-app Next share this path on every platform.
     if (currentTrackIndex < tracks.length - 1) {
       await switchToTrack(currentTrackIndex + 1, {
         autoPlay: isPlaying,

@@ -2,6 +2,8 @@
 
 Проверять на реальном iPhone (Safari) после deploy кандидата.
 
+Кросс-платформенная матрица (iPhone / Android / desktop, плейлист / альбом / курс / аудиокнига) и **expected PASS** после общего next-track path: [`docs/background-playback-ios-android-checklist.md`](./background-playback-ios-android-checklist.md). Этот файл остаётся ручным iPhone smoke; не ставить live PASS без устройства.
+
 ## Подготовка
 
 1. Owner playlist с: одиночная практика → программа (≥2 аудио) → одиночная практика.
@@ -30,6 +32,6 @@
 
 ## Ожидаемые ограничения MVP
 
-- Короткая пауза между продуктами (remount `<audio>`).
+- `<audio>` больше не пересоздаётся на смене продукта; короткая пауза возможна, если prefetch не успел (не gapless).
 - После F5 queue не восстанавливается.
-- Gapless / preload нет.
+- Gapless / MediaSource нет.

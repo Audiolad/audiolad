@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * iOS lock-screen auto-advance — source-level unit checks, no device required.
+ * Lock-screen / background auto-advance — source-level unit checks.
+ * Shared iOS / Android / desktop path. No device required.
  */
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -173,6 +174,15 @@ function testPlayRejectionLogsErrorName() {
     provider.includes('advanceKind: "queue"'),
     "queue rejection marks advanceKind=queue",
   );
+  assert(
+    player.includes('prefetch: meta.usedPrefetch ? "hit" : "miss"') ||
+      (player.includes('prefetch: "miss"') && player.includes('prefetch: meta.usedPrefetch ? "hit" : "miss"')),
+    "in-session rejection logs prefetch hit/miss",
+  );
+  assert(
+    provider.includes('prefetch: meta.usedPrefetch ? "hit" : "miss"'),
+    "queue rejection logs prefetch hit/miss",
+  );
 }
 
 function testPlaylistExhaustPlaysBeforeRemountOrReplace() {
@@ -205,6 +215,10 @@ function testPlaylistExhaustPlaysBeforeRemountOrReplace() {
   assert(
     helper.includes("await audio.play()"),
     "shared-audio helper plays on the persistent element",
+  );
+  assert(
+    helper.includes("waitForPlayingEvent"),
+    "queue helper waits for playing (or play accepted) before callers remount/replace",
   );
   assert(
     !helper.includes("router.replace") &&
@@ -242,12 +256,120 @@ function testPlaylistExhaustPlaysBeforeRemountOrReplace() {
   );
 }
 
+function testSharedPathHasNoPlatformBranch() {
+  const player = readSource("src/components/audio/useSequentialPlayer.ts");
+  const provider = readSource(
+    "src/components/audio/GlobalAudioPlayerProvider.tsx",
+  );
+  const handleEnded = sliceBetween(
+    player,
+    "const handleEnded = () => {",
+    "const handleError = () => {",
+  );
+  const handleNext = sliceBetween(
+    player,
+    "const handleNextTrack = async () => {",
+    "const handleSelectTrack = async (index: number) => {",
+  );
+  const playHelper = sliceBetween(
+    provider,
+    "async function playQueueAdvanceOnSharedAudio(",
+    "const SessionContext = createContext",
+  );
+  const applyPlay = sliceBetween(
+    player,
+    "const applyUrlAndPlayNow = useCallback(",
+    "const switchToTrack = useCallback(",
+  );
+
+  const platformBranch = /userAgent|isIosDevice|isAndroidDevice|isLikelyIos|navigator\.userAgent/;
+
+  for (const [name, source] of [
+    ["handleEnded", handleEnded],
+    ["handleNextTrack", handleNext],
+    ["applyUrlAndPlayNow", applyPlay],
+    ["playQueueAdvanceOnSharedAudio", playHelper],
+  ]) {
+    assert(
+      !platformBranch.test(source),
+      `${name} must not special-case iOS/Android via UA`,
+    );
+  }
+
+  assert(
+    !handleEnded.includes("visibilityState") &&
+      !handleEnded.includes("document.hidden"),
+    "ended must not be gated on visibility",
+  );
+  assert(
+    player.includes('audio.addEventListener("ended", handleEnded)'),
+    "ended listener stays attached",
+  );
+}
+
+function testChaptersAndLessonsAreSessionTracks() {
+  const sessionLoader = readSource("src/lib/listen/load-session-payload.ts");
+  const database = readSource("docs/DATABASE.md");
+  const publication = readSource(
+    "src/lib/author-products/publication-class.ts",
+  );
+  const checklist = readSource(
+    "docs/background-playback-ios-android-checklist.md",
+  );
+
+  assert(
+    sessionLoader.includes('from("audio_items")'),
+    "listen session loads audio_items as tracks",
+  );
+  assert(
+    sessionLoader.includes("async function loadListenTracks"),
+    "shared track loader exists",
+  );
+  assert(
+    !sessionLoader.includes("chapters") &&
+      !sessionLoader.includes("lessons") &&
+      !sessionLoader.includes("from(\"sections\")"),
+    "session loader has no chapter/lesson/section tables",
+  );
+  assert(
+    database.includes("Section / Lesson / Chapter tables не создаются"),
+    "schema documents no chapter/lesson tables",
+  );
+  assert(
+    publication.includes('"course"') && publication.includes('"audiobook"'),
+    "course and audiobook are publication classes on practices",
+  );
+  assert(
+    checklist.includes("expected PASS") && checklist.includes("N/A (FACT)"),
+    "checklist uses expected PASS / FACT, not invented live results",
+  );
+  assert(
+    checklist.includes("not** live-device PASS") ||
+      checklist.includes("not** live-device") ||
+      checklist.includes("They are **not** live-device PASS"),
+    "checklist does not claim live-device PASS",
+  );
+  assert(
+    checklist.includes("in-session prefetch") &&
+      checklist.includes("queue prefetch"),
+    "checklist documents both advance paths",
+  );
+  assert(
+    checklist.includes("Android Chrome") &&
+      checklist.includes("Android PWA") &&
+      checklist.includes("Desktop"),
+    "checklist covers Android and desktop, not only iPhone",
+  );
+}
+
 function main() {
   testEndedDoesNotAwaitProgressBeforeAdvance();
   testNextTrackUsesSameFastPath();
   testPrefetchNextSignedUrl();
   testPlayRejectionLogsErrorName();
   testPlaylistExhaustPlaysBeforeRemountOrReplace();
+  testSharedPathHasNoPlatformBranch();
+  testChaptersAndLessonsAreSessionTracks();
   console.log("ios-lock-screen-auto-advance-unit: ok");
 }
 

@@ -27,6 +27,7 @@ import {
   STUDIO_AUDIO_CONTROL_CHANNEL,
   STUDIO_AUDIO_STOP_STORAGE_KEY,
 } from "@/lib/audio/studio-audio-coordination";
+import { waitForPlayingEvent } from "@/lib/audio/playback-recovery";
 import { logPlayerDebug } from "@/lib/audio/player-debug";
 import {
   fetchSignedAudioUrl,
@@ -216,13 +217,17 @@ async function playQueueAdvanceOnSharedAudio(
   }
 
   try {
+    // Shared next-track path (iOS / Android / desktop): play on the
+    // persistent element first; callers must not remount or replace yet.
     await audio.play();
+    await waitForPlayingEvent(audio, 2000);
   } catch (error: unknown) {
     const name = playErrorName(error);
     logPlayerDebug("queue-advance", `rejected:${name}`, {
       audio,
       fields: {
         usedPrefetch: meta.usedPrefetch,
+        prefetch: meta.usedPrefetch ? "hit" : "miss",
         currentAudioItemId: meta.currentAudioItemId,
         nextAudioItemId: meta.nextAudioItemId,
         advanceKind: "queue",
