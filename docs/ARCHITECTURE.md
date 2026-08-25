@@ -206,6 +206,12 @@ Timeweb Cloud
 - Author UI: мастер `AuthorCreateWizard` (Продукт / Музыка / Аудиопост)
   → `AuthorProductForm` + `CoverUploadBlock` / `useCoverUpload`; API
   `POST/DELETE .../audio/[audioId]/cover`.
+- Phase 1B Product Gallery: `publication_gallery_slides` +
+  `isProductGalleryEligible` (`practice` / `course` / `audiobook`).
+  Author API `GET/POST .../gallery`, `PATCH .../gallery/reorder`,
+  `PATCH/DELETE .../gallery/[slideId]`. Каталог кладёт слайды в
+  `CatalogCard.gallery` только для product-классов; `release` / `post`
+  всегда `[]`. Cover не является слайдом.
 
 ## MAX Mini App (этапы 1–3B)
 

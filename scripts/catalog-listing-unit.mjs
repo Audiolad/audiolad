@@ -277,6 +277,39 @@ const posts = filterCatalogListingItems(mixed, {
 assert(posts.map((item) => item.publication_id).join() === "post", "class=post");
 assert(posts[0].default_offer === null, "post has no offer");
 assert(posts[0].viewer.can_listen === true, "public post can listen without grant");
+assert(
+  candidate({
+    productKind: "music",
+    publicationClass: "release",
+    format: "Музыка",
+    gallery: [{ id: "x", image_url: "/x.jpg", position: 0, alt: "" }],
+  }).gallery.length === 0,
+  "release listing gallery is always empty",
+);
+assert(
+  candidate({
+    productKind: "audio_post",
+    publicationClass: "post",
+    format: "Аудиопост",
+    isFree: true,
+    price: 0,
+    gallery: [{ id: "x", image_url: "/x.jpg", position: 0, alt: "" }],
+  }).gallery.length === 0,
+  "post listing gallery is always empty",
+);
+assert(
+  candidate({
+    publicationClass: "course",
+    productKind: "practice",
+    gallery: [
+      { id: "b", image_url: "/b.jpg", position: 1, alt: "" },
+      { id: "a", image_url: "/a.jpg", position: 0, alt: "" },
+    ],
+  })
+    .gallery.map((slide) => slide.id)
+    .join() === "a,b",
+  "product listing gallery stays ordered by position",
+);
 assert(posts[0].viewer.has_grant === false, "public post has no grant");
 
 const newest = sortCatalogListingItems(mixed, "new");

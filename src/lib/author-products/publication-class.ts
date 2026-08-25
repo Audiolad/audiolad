@@ -146,6 +146,25 @@ export function resolvePublicationClass(
   );
 }
 
+/**
+ * Product Gallery is for product classes only: practice, course, audiobook.
+ * Release (Music) and post (AudioPost) are never eligible.
+ */
+export function isProductGalleryClass(
+  publicationClass: PublicationClass,
+): boolean {
+  return isProductPublicationClass(publicationClass);
+}
+
+export function isProductGalleryEligible(
+  publicationClass: string | null | undefined,
+  productKind: string | null | undefined,
+): boolean {
+  return isProductGalleryClass(
+    resolvePublicationClass(publicationClass, productKind),
+  );
+}
+
 export type CreateClassification = {
   publicationClass: PublicationClass;
   productKind: ProductKind;

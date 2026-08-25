@@ -1,5 +1,6 @@
 import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import {
+  isProductGalleryClass,
   mapLegacyProductKindToClass,
   resolvePublicationClass,
 } from "@/lib/author-products/publication-class";
@@ -160,7 +161,9 @@ export function adaptLegacyCatalogSourceToCard(
     source.productKind,
   );
   const defaultOffer = resolveDefaultOffer(publicationClass, source);
-  const gallery = normalizeCatalogGallery(source.gallery);
+  const gallery = isProductGalleryClass(publicationClass)
+    ? normalizeCatalogGallery(source.gallery)
+    : [];
 
   return {
     publication_id: publicationId,

@@ -213,6 +213,49 @@ assert.equal(withGallery?.class, "practice");
 assert.equal(withGallery?.gallery.length, 1);
 assert.equal(withGallery?.default_offer?.price?.amount_minor, 49000);
 
+const leftoverReleaseGallery = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "music",
+    publicationClass: "release",
+    gallery: [
+      { id: "leftover", image_url: "/leftover.jpg", position: 0, alt: "x" },
+    ],
+  }),
+);
+assert.equal(leftoverReleaseGallery?.class, "release");
+assert.deepEqual(leftoverReleaseGallery?.gallery, []);
+
+const leftoverPostGallery = adaptLegacyCatalogSourceToCard(
+  source({
+    productKind: "audio_post",
+    publicationClass: "post",
+    isFree: true,
+    price: 0,
+    gallery: [
+      { id: "leftover", image_url: "/leftover.jpg", position: 0, alt: "x" },
+    ],
+  }),
+);
+assert.equal(leftoverPostGallery?.class, "post");
+assert.equal(leftoverPostGallery?.default_offer, null);
+assert.deepEqual(leftoverPostGallery?.gallery, []);
+
+const orderedCourseGallery = adaptLegacyCatalogSourceToCard(
+  source({
+    publicationClass: "course",
+    productKind: "practice",
+    gallery: [
+      { id: "second", image_url: "/2.jpg", position: 1, alt: "" },
+      { id: "first", image_url: "/1.jpg", position: 0, alt: "" },
+    ],
+  }),
+);
+assert.equal(orderedCourseGallery?.class, "course");
+assert.deepEqual(
+  orderedCourseGallery?.gallery.map((slide) => slide.id),
+  ["first", "second"],
+);
+
 const frontendFiles = [
   "src/app/(platform)/(listener)/(catalog)/catalog/page.tsx",
   "src/components/products/CatalogProductGrid.tsx",

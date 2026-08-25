@@ -204,6 +204,9 @@ export function imageProcessErrorMessage(
       if (profile === "author-avatar" || profile === "user-avatar") {
         return "Не удалось сохранить фотографию. Попробуйте ещё раз.";
       }
+      if (profile === "product-gallery") {
+        return "Загрузите квадратное изображение 1:1 не меньше 400 × 400 пикселей.";
+      }
       return "Минимальный размер изображения — 400 × 400 пикселей.";
     case "image_too_large":
       return "Изображение слишком большое. Выберите файл меньшего разрешения.";

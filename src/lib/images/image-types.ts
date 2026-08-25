@@ -1,5 +1,6 @@
 export type ImageProfile =
   | "product-cover"
+  | "product-gallery"
   | "track-cover"
   | "author-avatar"
   | "user-avatar"

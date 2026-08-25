@@ -12,9 +12,12 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import {
+  isProductGalleryEligible,
   parsePublicationClass,
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
+import type { CatalogSlide } from "@/lib/catalog/dto";
+import { loadPublicationGalleriesByIds } from "@/lib/catalog/publication-gallery";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
@@ -79,6 +82,7 @@ export type CatalogProduct = ProductCoverFields & {
   audioCount?: number;
   durationSeconds?: number | null;
   publishedAt?: string | null;
+  gallery?: CatalogSlide[];
 };
 
 export type CatalogSections = {
@@ -325,6 +329,17 @@ export async function mapPracticeRowsToCatalogProducts(
     practiceRows.map((practice) => practice.id),
   );
 
+  let galleriesByPublication = new Map<string, CatalogSlide[]>();
+
+  try {
+    galleriesByPublication = await loadPublicationGalleriesByIds(
+      supabase,
+      practiceRows.map((practice) => practice.id),
+    );
+  } catch {
+    galleriesByPublication = new Map();
+  }
+
   const products = practiceRows.flatMap((practice) => {
     const author = normalizeAuthor(practice.authors);
 
@@ -400,6 +415,12 @@ export async function mapPracticeRowsToCatalogProducts(
             ? audioSummary?.totalDurationSeconds ?? null
             : null,
         publishedAt: practice.published_at,
+        gallery: isProductGalleryEligible(
+          practice.publication_class,
+          practice.product_kind,
+        )
+          ? galleriesByPublication.get(practice.id) ?? []
+          : [],
       },
     ];
   });
