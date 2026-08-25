@@ -49,7 +49,6 @@ export default function CatalogProductGridCard({
   isAuthenticated = false,
   signInReturnPath = "/catalog",
 }: CatalogProductGridCardProps) {
-  const durationLabel = product.durationLabel?.trim() || null;
   const priceLabel = readPaidCatalogPriceLabel(
     product.accessState,
     product.priceLabel,
@@ -92,7 +91,7 @@ export default function CatalogProductGridCard({
         data-catalog-info-block
         className="block px-2.5 pb-2.5 pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
-        <p className={`hidden xl:block ${PRODUCT_FORMAT_LINE_CLASS}`}>
+        <p data-catalog-card-format className={PRODUCT_FORMAT_LINE_CLASS}>
           {product.kindLabel}
         </p>
 
@@ -104,21 +103,14 @@ export default function CatalogProductGridCard({
           {product.author || "\u00a0"}
         </p>
 
-        {durationLabel || priceLabel ? (
-          <p
-            data-catalog-card-meta
-            className="mt-1 flex flex-wrap items-baseline text-xs leading-4 text-[#7d70a2]"
-          >
-            {durationLabel ? <span>{durationLabel}</span> : null}
-            {priceLabel ? (
-              <span
-                data-catalog-card-price
-                className="whitespace-nowrap font-semibold text-[#7042c5]"
-              >
-                {durationLabel ? " · " : null}
-                {priceLabel}
-              </span>
-            ) : null}
+        {priceLabel ? (
+          <p data-catalog-card-meta className="mt-1 text-xs leading-4">
+            <span
+              data-catalog-card-price
+              className="whitespace-nowrap font-semibold text-[#7042c5]"
+            >
+              {priceLabel}
+            </span>
           </p>
         ) : null}
       </Link>
