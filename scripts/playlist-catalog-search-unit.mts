@@ -304,6 +304,17 @@ assert.equal(existsSync(join(repoRoot, PLAYLIST_CATALOG_UI_HOMES.filterUi)), fal
 assert.match(searchUiSource, /debounce/i);
 assert.match(searchUiSource, /buildPlaylistCatalogHref/);
 assert.match(searchUiSource, /PLAYLIST_CATALOG_SEARCH_DEBOUNCE_MS/);
+assert.match(searchUiSource, /data-playlist-catalog-search/);
+assert.match(searchUiSource, /Найти плейлист/);
+assert.match(
+  searchUiSource,
+  /listener-catalog-mobile-search[^"]*fixed top-0/,
+);
+assert.match(
+  searchUiSource,
+  /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
+);
+assert.match(searchUiSource, /hidden xl:block/);
 assert.doesNotMatch(
   searchUiSource,
   /from ["']@\/components\/catalog\/MobileCatalogSearch["']/,
@@ -312,6 +323,7 @@ assert.doesNotMatch(
   searchUiSource,
   /from ["']@\/components\/platform\/PlatformCatalogInlineSearch["']/,
 );
+assert.doesNotMatch(searchUiSource, /MobileCatalogSearch|PlatformCatalogInlineSearch/);
 assert.doesNotMatch(searchUiSource, /useSearchParams/);
 assert.doesNotMatch(searchUiSource, /playlist_topics|access=/);
 assert.match(searchUiSource, /topic/);
