@@ -169,7 +169,17 @@ assert.match(
   /data-catalog-desktop-filters/,
   "desktop filter chips stay in the page",
 );
-assert.match(page, /hidden xl:block/, "filter chips are not in the mobile page flow");
+assert.match(page, /hidden lg:block/, "filter chips appear from lg");
+assert.match(
+  page,
+  /className="hidden lg:block" data-catalog-desktop-filters/,
+  "desktop filters wrapper is hidden below lg",
+);
+assert.match(
+  layout,
+  /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
+  "mobile filters slot is hidden from lg",
+);
 
 assert.doesNotMatch(
   page,

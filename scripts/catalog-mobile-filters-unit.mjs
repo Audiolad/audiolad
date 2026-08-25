@@ -29,7 +29,17 @@ assert.match(layout, /MobileCatalogSearch/, "search stays next to filters");
 assert.match(layout, /Фильтры|CatalogMobileFilters/, "filters sit in the search row");
 
 assert.match(page, /data-catalog-desktop-filters/, "desktop chips stay on the page");
-assert.match(page, /hidden xl:block/, "page chips are desktop-only");
+assert.match(page, /hidden lg:block/, "page chips appear from lg");
+assert.match(
+  page,
+  /className="hidden lg:block" data-catalog-desktop-filters/,
+  "desktop filters wrapper is hidden below lg",
+);
+assert.match(
+  layout,
+  /className="lg:hidden"[\s\S]*CatalogMobileFiltersSlot/,
+  "mobile filters slot is hidden from lg",
+);
 assert.match(page, /TopicFilterBar/, "desktop still has topic chips");
 assert.match(
   read("src/components/catalog/TopicFilterBar.tsx"),
