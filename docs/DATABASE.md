@@ -287,7 +287,7 @@ Since `20260818180000_playlist_item_audio_track.sql`:
 
 ### Playlist catalog foundation (Stage 1, 2026-08-25)
 
-Миграция: `supabase/migrations/20260825140000_playlist_catalog_foundation.sql`.
+Миграция: `supabase/migrations/20260825160000_playlist_catalog_foundation.sql`.
 
 Плейлист остаётся существующей сущностью `public.playlists`. Это **не** новый `kind` продукта. Витрина `/playlists/catalog` — отдельный listing-поток (`class: "playlist"`). Личные `/playlists` и `/playlists/[id]` не меняются.
 
@@ -302,7 +302,7 @@ Since `20260818180000_playlist_item_audio_track.sql`:
 
 Индекс newest: `(listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_listed_at_idx`).
 
-Индекс popular (Stage 5A.2): `(saves_count DESC, listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_saves_count_listed_at_idx`, миграция `20260825142000_playlist_catalog_popular_index.sql`). Trigger `touch_playlist_saves_count` не менялся.
+Индекс popular (Stage 5A.2): `(saves_count DESC, listed_at DESC, id DESC) WHERE listed_at IS NOT NULL` (`playlists_saves_count_listed_at_idx`, миграция `20260825162000_playlist_catalog_popular_index.sql`). Trigger `touch_playlist_saves_count` не менялся.
 
 `listed_at` не равен `published_at`. Публикация и попадание в витрину — разные решения. Trigger `playlists_clear_listed_at_when_unlisted` обнуляет `listed_at`, если плейлист перестаёт быть public + published + slug.
 
@@ -327,7 +327,7 @@ Stage 5B: `GET /api/playlists/saved` читает `playlist_saves` с inner join
 
 ### Playlist topics (Stage 4B.1, 2026-08-25)
 
-Миграция: `supabase/migrations/20260825141000_playlist_topics.sql`.
+Миграция: `supabase/migrations/20260825161000_playlist_topics.sql`.
 
 Плейлисты используют существующий словарь `public.topics`. Новый словарь категорий, свободные tags и `direction_id` не используются.
 

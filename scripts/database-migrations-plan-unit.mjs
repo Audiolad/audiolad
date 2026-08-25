@@ -216,6 +216,34 @@ function testRepoOneFileOneVersion() {
       (row) => row.filename === "20260825120000_topics_career_business_learning.sql",
     ),
   );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825140000_playlist_catalog_foundation.sql"),
+    false,
+    "unapplied playlist foundation 140000 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825141000_playlist_topics.sql"),
+    false,
+    "unapplied playlist topics 141000 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some((row) => row.filename === "20260825142000_playlist_catalog_popular_index.sql"),
+    false,
+    "unapplied playlist popular index 142000 stamp must leave the active migrations directory",
+  );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260825160000_playlist_catalog_foundation.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some((row) => row.filename === "20260825161000_playlist_topics.sql"),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260825162000_playlist_catalog_popular_index.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -254,8 +282,33 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825120000",
     "20260825133000",
     "20260825150000",
+    "20260825160000",
+    "20260825161000",
+    "20260825162000",
   ]);
-  assert.equal(plan.database_migrations_pending, 6);
+  assert.equal(plan.database_migrations_pending, 9);
+}
+
+function testProductionLikePendingAfterPlaylistRestamp() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const maxRemote = "20260825150000";
+  const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions,
+  });
+  const hasHole = plan.pending.some((version) => version < maxRemote);
+  assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.deepEqual(plan.pending, [
+    "20260825160000",
+    "20260825161000",
+    "20260825162000",
+  ]);
+  assert.equal(plan.database_migrations_pending, 3);
 }
 
 function main() {
@@ -272,6 +325,7 @@ function main() {
   testRepoOneFileOneVersion();
   testUnappliedOlderStampStillHoles();
   testProductionLikePendingAfterQuickOffersRestamp();
+  testProductionLikePendingAfterPlaylistRestamp();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 
