@@ -37,7 +37,7 @@ export default function MeditationSolutionsOfferCta({
     >
       {display.showPromo ? (
         <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-          <p className="text-[16px] font-medium text-[#9a8bb8] line-through">
+          <p className="text-[20px] font-medium text-[#9a8bb8] line-through">
             <span className="sr-only">Обычная цена </span>
             {formatRubles(display.regularPrice)}
           </p>

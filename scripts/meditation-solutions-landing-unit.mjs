@@ -319,6 +319,7 @@ function testCheckoutWiring() {
   assert.match(cta, /MEDITATION_SOLUTIONS_ONCE_NOTE/);
   assert.match(cta, /MEDITATION_SOLUTIONS_TIMER_CAPTION/);
   assert.match(cta, /MEDITATION_SOLUTIONS_TIMER_UNIT/);
+  assert.match(cta, /text-\[20px\] font-medium text-\[#9a8bb8\] line-through/);
   assert.match(cta, /text-\[16px\]/);
   assert.doesNotMatch(cta, /в ближайшие 20 минут/);
   assert.doesNotMatch(cta, /setInterval/);
