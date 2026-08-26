@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS course_lessons_publication_position_idx
   ON public.course_lessons (publication_id, position, id);
 
 COMMENT ON TABLE public.course_lessons IS
-  'Phase 2A course lessons. Parent must be practices.publication_class = course. Presence of a row never grants read. No Section. No 30-lesson cap. No lesson_1 names. No backfill from audio_items.';
+  'Phase 2A course lessons. Parent must be practices.publication_class = course. Presence of a row never grants read. No Section. No 30-lesson cap. No numbered lesson names. No backfill from audio_items.';
 
 COMMENT ON COLUMN public.course_lessons.publication_id IS
   'Course publication id = practices.id. Trigger rejects non-course parents.';

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
-import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { isCoursePublication } from "@/lib/course-content/validators";
 
 export type ProductAccessReason =
@@ -320,7 +319,9 @@ export async function canAccessCourseContent(
     return true;
   }
 
-  const checkAdmin = options?.isPlatformAdmin ?? isPlatformAdmin;
+  const checkAdmin =
+    options?.isPlatformAdmin ??
+    (await import("@/lib/auth/platform-admin")).isPlatformAdmin;
   const platformAdmin = await checkAdmin(supabase, userId);
 
   return evaluateCourseContentAccess({

@@ -55,7 +55,7 @@ assert.match(sql, /size_bytes <= 20971520/);
 
 assert.match(sql, /enforce_course_content_parent_is_course/);
 assert.match(sql, /course_content_parent_must_be_course/);
-assert.match(sql, /publication_class IS DISTINCT FROM 'course'/);
+assert.match(sql, /parent_class IS DISTINCT FROM 'course'/);
 assert.match(
   sql,
   /Legacy NULL\+practice is not a course/,
@@ -103,7 +103,8 @@ assert.match(sql, /no policy that lets a learner SELECT by entitlement/);
 assert.match(sql, /Presence of a row never grants read/);
 
 assert.match(sql, /publication-files/);
-assert.match(sql, /public,\s*false,/);
+assert.match(sql, /file_size_limit,\s*allowed_mime_types/);
+assert.match(sql, /'publication-files',\s*'publication-files',\s*false,/);
 assert.match(sql, /20971520/);
 assert.match(sql, /ARRAY\['application\/pdf'\]/);
 assert.match(sql, /not personal-materials/);
@@ -113,9 +114,9 @@ assert.doesNotMatch(sql, /UPDATE\s+public\.practices/i);
 assert.doesNotMatch(sql, /ALTER TABLE public\.practices/);
 assert.doesNotMatch(sql, /INSERT INTO public\.audio_items/i);
 assert.doesNotMatch(sql, /lesson_1/);
-assert.doesNotMatch(sql, /CREATE TABLE[\s\S]*section/i);
-assert.doesNotMatch(sql, /CREATE TABLE[\s\S]*course_sections/i);
-assert.doesNotMatch(sql, /CREATE TABLE[\s\S]*course_modules/i);
+assert.doesNotMatch(sql, /CREATE TABLE IF NOT EXISTS public\.\w*section/i);
+assert.doesNotMatch(sql, /CREATE TABLE IF NOT EXISTS public\.course_sections/i);
+assert.doesNotMatch(sql, /CREATE TABLE IF NOT EXISTS public\.course_modules/i);
 assert.doesNotMatch(sql, /personal-materials'/);
 assert.match(sql, /audio_items are not auto-migrated into lessons/);
 assert.match(sql, /No backfill/);

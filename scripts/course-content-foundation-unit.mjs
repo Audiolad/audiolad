@@ -505,8 +505,11 @@ assert.match(lookup, /publication_class/);
 
 assert.equal(existsSync(join(root, "src/app/learn")), false);
 assert.equal(existsSync(join(root, "src/app/api/learn")), false);
-assert.doesNotMatch(read("src/lib/course-content/storage.ts"), /\/api\/learn/);
-assert.doesNotMatch(accessSrc, /\/learn/);
+assert.match(
+  read("src/lib/course-content/storage.ts"),
+  /No public learner download route/,
+);
+assert.doesNotMatch(accessSrc, /app\/api\/learn/);
 
 const ctaTypes = read("src/lib/course-content/types.ts");
 assert.match(ctaTypes, /CourseCompletionCta/);

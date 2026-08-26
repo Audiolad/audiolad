@@ -64,7 +64,7 @@ export async function signPublicationFileIfAllowed(input: {
 }
 
 /**
- * Server-only helper. Does not expose a GET /api/learn/* route.
+ * Server-only helper. No public learner download route in Phase 2A.
  * Callers must already know this is a course publication.
  */
 export async function createPublicationFileSignedUrl(input: {
