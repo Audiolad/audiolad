@@ -12776,10 +12776,20 @@ const FORTY_SEVENTH_EXPECTED_FAQ = [
 const FORTY_SEVENTH_REQUIRED_H2 = "Расслабляющая музыка для вечернего отдыха";
 const FORTY_SEVENTH_REQUIRED_FAQ = "Можно ли использовать релакс музыку каждый вечер?";
 const FORTY_SEVENTH_REQUIRED_PHRASE = "стать частью спокойного вечернего ритма";
+const FORTY_SEVENTH_HREF_2 = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
+const FORTY_SEVENTH_HREF_3 = "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn";
+const FORTY_SEVENTH_HREF_4 = "/listens/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn";
+const FORTY_SEVENTH_HREF_5 = "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
+const FORTY_SEVENTH_HREF_6 = "/listens/muzyka-dlya-sna-i-meditacii-slushat-onlayn";
+const FORTY_SEVENTH_REQUIRED_HREFS = [
+  FORTY_SEVENTH_HREF_2,
+  FORTY_SEVENTH_HREF_3,
+  FORTY_SEVENTH_HREF_4,
+  FORTY_SEVENTH_HREF_5,
+  FORTY_SEVENTH_HREF_6,
+];
 const FORTY_SEVENTH_FORBIDDEN_HREFS = [
   "/listens/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn",
-  "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn",
-  "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn",
   "/listens/meditatsiya-dlya-sna-ot-stressa-i-trevogi",
   "/listens/meditatsiya-dlya-sna-slushat-onlayn-besplatno",
   "/topics/",
@@ -12874,8 +12884,13 @@ function testFortySeventhPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "forty-seventh page has no internal anchors");
-  assert(!allLinks.some((link) => FORTY_SEVENTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-seventh has no forbidden neighbor/stress/meditation hrefs");
+  assert(allLinks.length === 5, "forty-seventh page has exactly five cluster hrefs");
+  const fortySeventhHrefs = allLinks.map((link) => link.href);
+  assert(new Set(fortySeventhHrefs).size === 5, "forty-seventh cluster hrefs are unique");
+  for (const href of FORTY_SEVENTH_REQUIRED_HREFS) {
+    assert(fortySeventhHrefs.includes(href), `forty-seventh has required href ${href}`);
+  }
+  assert(!allLinks.some((link) => FORTY_SEVENTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-seventh has no forbidden uspokaivayushchaya/meditation/topic hrefs");
 
   const contentSource = read("src/lib/seo/listens/content/relaks-muzyka-dlya-sna-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru/listens/"), "forty-seventh content file has no production listen URLs");
@@ -12892,14 +12907,16 @@ function testFortySeventhPage() {
   assert(contentSource.includes(FORTY_SEVENTH_REQUIRED_H2), "forty-seventh content file has required H2");
   assert(contentSource.includes(FORTY_SEVENTH_REQUIRED_FAQ), "forty-seventh content file has required FAQ");
   assert(contentSource.includes(FORTY_SEVENTH_REQUIRED_PHRASE), "forty-seventh content file has required phrase");
-  assert(!contentSource.includes("href:"), "forty-seventh content file has no hrefs");
-  assert(!contentSource.includes("/listens/"), "forty-seventh content file has no listen paths");
+  assert((contentSource.match(/href:/g) || []).length === 5, "forty-seventh content file has exactly five hrefs");
+  assert(contentSource.includes(FORTY_SEVENTH_HREF_2), "forty-seventh content file has relaxing-sleep href");
+  assert(contentSource.includes(FORTY_SEVENTH_HREF_3), "forty-seventh content file has calm-sleep href");
+  assert(contentSource.includes(FORTY_SEVENTH_HREF_4), "forty-seventh content file has stress-relief href");
+  assert(contentSource.includes(FORTY_SEVENTH_HREF_5), "forty-seventh content file has no-lyrics href");
+  assert(contentSource.includes(FORTY_SEVENTH_HREF_6), "forty-seventh content file has sleep-meditation href");
   assert(!contentSource.includes("/topics/"), "forty-seventh content file has no topic hub hrefs");
   assert(!contentSource.includes("uspokaivayushchaya"), "forty-seventh content file has no uspokaivayushchaya href");
   assert(!contentSource.includes("meditatsiya"), "forty-seventh content file has no meditation href");
-  assert(!contentSource.includes("stress"), "forty-seventh content file has no stress href");
-  assert(!contentSource.includes("rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn"), "forty-seventh content file has no unpublished neighbor slug");
-  assert(!contentSource.includes("spokoynaya-muzyka-dlya-sna-slushat-onlayn"), "forty-seventh content file has no unpublished calm-neighbor slug");
+  assert(!contentSource.includes("meditatsiya-dlya-sna-ot-stressa"), "forty-seventh content file has no meditation-stress href");
 
   const slugs = listListenPageDefinitions().map((page) => page.slug);
   assert(slugs.includes(FORTY_SEVENTH_PAGE_SLUG), "registry contains forty-seventh listen slug");
@@ -13013,10 +13030,19 @@ const FORTY_EIGHTH_REQUIRED_H2_A = "Расслабляющая музыка дл
 const FORTY_EIGHTH_REQUIRED_H2_B = "Как расслабляющая музыка используется после насыщенного дня";
 const FORTY_EIGHTH_REQUIRED_H2_C = "Музыка для расслабления вечером";
 const FORTY_EIGHTH_REQUIRED_FAQ = "Чем расслабляющая музыка отличается от релакс музыки?";
+const FORTY_EIGHTH_HREF_HUB = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FORTY_EIGHTH_HREF_3 = "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn";
+const FORTY_EIGHTH_HREF_4 = "/listens/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn";
+const FORTY_EIGHTH_HREF_5 = "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
+const FORTY_EIGHTH_REQUIRED_HREFS = [
+  FORTY_EIGHTH_HREF_HUB,
+  FORTY_EIGHTH_HREF_3,
+  FORTY_EIGHTH_HREF_4,
+  FORTY_EIGHTH_HREF_5,
+];
 const FORTY_EIGHTH_FORBIDDEN_HREFS = [
-  "/listens/relaks-muzyka-dlya-sna-slushat-onlayn",
-  "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn",
   "/listens/uspokaivayushchaya-muzyka-dlya-sna-slushat-onlayn",
+  "/listens/muzyka-dlya-sna-i-meditacii-slushat-onlayn",
   "/topics/",
 ];
 
@@ -13109,8 +13135,13 @@ function testFortyEighthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 0, "forty-eighth page has no internal anchors");
-  assert(!allLinks.some((link) => FORTY_EIGHTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-eighth has no forbidden relaks/calm/topic hrefs");
+  assert(allLinks.length === 4, "forty-eighth page has exactly four cluster hrefs");
+  const fortyEighthHrefs = allLinks.map((link) => link.href);
+  assert(new Set(fortyEighthHrefs).size === 4, "forty-eighth cluster hrefs are unique");
+  for (const href of FORTY_EIGHTH_REQUIRED_HREFS) {
+    assert(fortyEighthHrefs.includes(href), `forty-eighth has required href ${href}`);
+  }
+  assert(!allLinks.some((link) => FORTY_EIGHTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-eighth has no forbidden uspokaivayushchaya/meditation/topic hrefs");
 
   const contentSource = read("src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru/listens/"), "forty-eighth content file has no production listen URLs");
@@ -13128,11 +13159,14 @@ function testFortyEighthPage() {
   assert(contentSource.includes(FORTY_EIGHTH_REQUIRED_H2_B), "forty-eighth content file has required H2 B");
   assert(contentSource.includes(FORTY_EIGHTH_REQUIRED_H2_C), "forty-eighth content file has required H2 C");
   assert(contentSource.includes(FORTY_EIGHTH_REQUIRED_FAQ), "forty-eighth content file has required FAQ");
-  assert(!contentSource.includes("href:"), "forty-eighth content file has no hrefs");
-  assert(!contentSource.includes("/listens/"), "forty-eighth content file has no listen paths");
+  assert((contentSource.match(/href:/g) || []).length === 4, "forty-eighth content file has exactly four hrefs");
+  assert(contentSource.includes(FORTY_EIGHTH_HREF_HUB), "forty-eighth content file has hub href");
+  assert(contentSource.includes(FORTY_EIGHTH_HREF_3), "forty-eighth content file has calm-sleep href");
+  assert(contentSource.includes(FORTY_EIGHTH_HREF_4), "forty-eighth content file has stress-relief href");
+  assert(contentSource.includes(FORTY_EIGHTH_HREF_5), "forty-eighth content file has no-lyrics href");
   assert(!contentSource.includes("/topics/"), "forty-eighth content file has no topic hub hrefs");
-  assert(!contentSource.includes("relaks-muzyka-dlya-sna-slushat-onlayn"), "forty-eighth content file has no relaks listen href");
-  assert(!contentSource.includes("spokoynaya-muzyka-dlya-sna-slushat-onlayn"), "forty-eighth content file has no unpublished calm-neighbor slug");
+  assert(!contentSource.includes("uspokaivayushchaya"), "forty-eighth content file has no uspokaivayushchaya href");
+  assert(!contentSource.includes("muzyka-dlya-sna-i-meditacii-slushat-onlayn"), "forty-eighth content file has no sleep-meditation href");
   assert(!contentSource.includes("practice-player"), "forty-eighth content file has no practice-player");
   assert(!contentSource.includes("primaryPractice"), "forty-eighth content file has no primaryPractice twice");
   assert(!contentSource.includes("Studio"), "forty-eighth content file has no Studio");
@@ -13259,8 +13293,9 @@ const FORTY_NINTH_REQUIRED_H2_C = "Спокойная музыка и рассл
 const FORTY_NINTH_REQUIRED_FAQ = "Нужно ли слушать музыку до конца?";
 const FORTY_NINTH_CLUSTER_HREF = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
 const FORTY_NINTH_CLUSTER_LABEL = "расслабляющую музыку для сна";
+const FORTY_NINTH_HUB_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FORTY_NINTH_HUB_LABEL = "Релакс музыка";
 const FORTY_NINTH_FORBIDDEN_HREFS = [
-  "/listens/relaks-muzyka-dlya-sna-slushat-onlayn",
   "/topics/",
 ];
 
@@ -13371,11 +13406,13 @@ function testFortyNinthPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 1, "forty-ninth page has exactly one cluster href");
+  assert(allLinks.length === 2, "forty-ninth page has exactly two cluster hrefs");
   assert(allLinks[0].href === FORTY_NINTH_CLUSTER_HREF, "forty-ninth cluster href is rasslablyayushchaya");
   assert(allLinks[0].label === FORTY_NINTH_CLUSTER_LABEL, "forty-ninth cluster label is phrase-anchor");
-  assert(!allLinks.some((link) => FORTY_NINTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-ninth has no relaks listen or topic href");
-  assert(allRich.length === 1, "forty-ninth page has exactly one rich_paragraph");
+  assert(allLinks[1].href === FORTY_NINTH_HUB_HREF, "forty-ninth second href is hub");
+  assert(allLinks[1].label === FORTY_NINTH_HUB_LABEL, "forty-ninth hub label is phrase-anchor");
+  assert(!allLinks.some((link) => FORTY_NINTH_FORBIDDEN_HREFS.some((href) => String(link.href).includes(href))), "forty-ninth has no topic href");
+  assert(allRich.length === 2, "forty-ninth page has exactly two rich_paragraphs");
 
   const contentSource = read("src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru/listens/"), "forty-ninth content file has no production listen URLs");
@@ -13394,9 +13431,9 @@ function testFortyNinthPage() {
   assert(contentSource.includes(FORTY_NINTH_REQUIRED_H2_B), "forty-ninth content file has required H2 B");
   assert(contentSource.includes(FORTY_NINTH_REQUIRED_H2_C), "forty-ninth content file has required H2 C");
   assert(contentSource.includes(FORTY_NINTH_REQUIRED_FAQ), "forty-ninth content file has required FAQ");
-  assert((contentSource.match(/href:/g) || []).length === 1, "forty-ninth content file has exactly one href");
+  assert((contentSource.match(/href:/g) || []).length === 2, "forty-ninth content file has exactly two hrefs");
   assert(contentSource.includes(FORTY_NINTH_CLUSTER_HREF), "forty-ninth content file has rasslablyayushchaya href");
-  assert(!contentSource.includes("relaks-muzyka-dlya-sna-slushat-onlayn"), "forty-ninth content file has no relaks listen href");
+  assert(contentSource.includes(FORTY_NINTH_HUB_HREF), "forty-ninth content file has hub href");
   assert(!contentSource.includes("/topics/"), "forty-ninth content file has no topic hub hrefs");
   assert(!contentSource.includes("practice-player"), "forty-ninth content file has no practice-player");
   assert(!contentSource.includes("primaryPractice"), "forty-ninth content file has no primaryPractice twice");
@@ -13480,7 +13517,8 @@ const FIFTIETH_HREF_A = "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn";
 const FIFTIETH_LABEL_A = "спокойная музыка для сна";
 const FIFTIETH_HREF_B = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
 const FIFTIETH_LABEL_B = "расслабляющая музыка для сна";
-const FIFTIETH_FORBIDDEN_RELAKS_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTIETH_HUB_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTIETH_HUB_LABEL = "Релакс музыка для сна";
 const FIFTIETH_REQUIRED_FAQ = "Можно ли включать такую музыку перед сном?";
 const FIFTIETH_HOW_TO_H2 = "Как слушать музыку для расслабления";
 const FIFTIETH_VISUAL_SUBHEADS = [
@@ -13559,19 +13597,19 @@ function testFiftiethPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "fiftieth page has exactly two hrefs");
+  assert(allLinks.length === 3, "fiftieth page has exactly three hrefs");
   assert(allLinks[0].href === FIFTIETH_HREF_A && allLinks[0].label === FIFTIETH_LABEL_A, "first href is calm sleep phrase-anchor");
   assert(allLinks[1].href === FIFTIETH_HREF_B && allLinks[1].label === FIFTIETH_LABEL_B, "second href is relaxing sleep phrase-anchor");
-  assert(!allLinks.some((link) => String(link.href).includes(FIFTIETH_FORBIDDEN_RELAKS_HREF)), "fiftieth has no relaks listen href");
+  assert(allLinks[2].href === FIFTIETH_HUB_HREF && allLinks[2].label === FIFTIETH_HUB_LABEL, "third href is hub phrase-anchor");
   assert(!allLinks.some((link) => String(link.href).includes("/topics/")), "fiftieth has no topic href");
 
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "fiftieth content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "fiftieth content file has no https://");
-  assert((contentSource.match(/href:/g) || []).length === 2, "fiftieth content file has exactly two hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 3, "fiftieth content file has exactly three hrefs");
   assert(contentSource.includes(FIFTIETH_HREF_A), "fiftieth content file has calm sleep href");
   assert(contentSource.includes(FIFTIETH_HREF_B), "fiftieth content file has relaxing sleep href");
-  assert(!contentSource.includes("relaks-muzyka-dlya-sna-slushat-onlayn"), "fiftieth content file has no relaks listen href");
+  assert(contentSource.includes(FIFTIETH_HUB_HREF), "fiftieth content file has hub href");
   assert(!contentSource.includes("ListenSignupCta"), "fiftieth content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "fiftieth content file has no primaryPractice");
   assert(!contentSource.includes("practice-player"), "fiftieth content file has no practice-player");
@@ -13633,7 +13671,8 @@ const FIFTY_FIRST_HREF_A = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat
 const FIFTY_FIRST_LABEL_A = "расслабляющая музыка для сна";
 const FIFTY_FIRST_HREF_B = "/listens/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn";
 const FIFTY_FIRST_LABEL_B = "музыка для снятия стресса и расслабления";
-const FIFTY_FIRST_FORBIDDEN_RELAKS_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTY_FIRST_HUB_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTY_FIRST_HUB_LABEL = "Релакс музыка для сна";
 const FIFTY_FIRST_FORBIDDEN_NO_LYRICS_SLEEP_HREF = "/listens/muzyka-dlya-sna-bez-slov-slushat-onlayn";
 const FIFTY_FIRST_REQUIRED_FAQ = "Чем расслабляющая музыка без слов отличается от музыки для сна без слов?";
 const FIFTY_FIRST_INSTRUMENTAL_PHRASE = "не утверждается, что вся подборка состоит исключительно из инструментальной музыки";
@@ -13733,20 +13772,20 @@ function testFiftyFirstPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "fifty-first page has exactly two hrefs");
-  assert(allLinks[0].href === FIFTY_FIRST_HREF_A && allLinks[0].label === FIFTY_FIRST_LABEL_A, "first href is relaxing sleep phrase-anchor");
-  assert(allLinks[1].href === FIFTY_FIRST_HREF_B && allLinks[1].label === FIFTY_FIRST_LABEL_B, "second href is stress-relief phrase-anchor");
-  assert(!allLinks.some((link) => String(link.href).includes(FIFTY_FIRST_FORBIDDEN_RELAKS_HREF)), "fifty-first has no relaks listen href");
+  assert(allLinks.length === 3, "fifty-first page has exactly three hrefs");
+  assert(allLinks[0].href === FIFTY_FIRST_HUB_HREF && allLinks[0].label === FIFTY_FIRST_HUB_LABEL, "first href is hub phrase-anchor");
+  assert(allLinks[1].href === FIFTY_FIRST_HREF_A && allLinks[1].label === FIFTY_FIRST_LABEL_A, "second href is relaxing sleep phrase-anchor");
+  assert(allLinks[2].href === FIFTY_FIRST_HREF_B && allLinks[2].label === FIFTY_FIRST_LABEL_B, "third href is stress-relief phrase-anchor");
   assert(!allLinks.some((link) => String(link.href).includes(FIFTY_FIRST_FORBIDDEN_NO_LYRICS_SLEEP_HREF)), "fifty-first has no muzyka-dlya-sna-bez-slov href");
   assert(!allLinks.some((link) => String(link.href).includes("/topics/")), "fifty-first has no topic href");
 
   const contentSource = read("src/lib/seo/listens/content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "fifty-first content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "fifty-first content file has no https://");
-  assert((contentSource.match(/href:/g) || []).length === 2, "fifty-first content file has exactly two hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 3, "fifty-first content file has exactly three hrefs");
+  assert(contentSource.includes(FIFTY_FIRST_HUB_HREF), "fifty-first content file has hub href");
   assert(contentSource.includes(FIFTY_FIRST_HREF_A), "fifty-first content file has relaxing sleep href");
   assert(contentSource.includes(FIFTY_FIRST_HREF_B), "fifty-first content file has stress-relief href");
-  assert(!contentSource.includes("relaks-muzyka-dlya-sna-slushat-onlayn"), "fifty-first content file has no relaks listen href");
   assert(!contentSource.includes("muzyka-dlya-sna-bez-slov-slushat-onlayn"), "fifty-first content file has no muzyka-dlya-sna-bez-slov href");
   assert(!contentSource.includes("ListenSignupCta"), "fifty-first content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "fifty-first content file has no primaryPractice");
@@ -13809,7 +13848,8 @@ const FIFTY_SECOND_HREF_A = "/listens/rasslablyayushchaya-muzyka-dlya-sna-slusha
 const FIFTY_SECOND_LABEL_A = "расслабляющая музыка для сна";
 const FIFTY_SECOND_HREF_B = "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
 const FIFTY_SECOND_LABEL_B = "расслабляющая музыка без слов";
-const FIFTY_SECOND_FORBIDDEN_RELAKS_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTY_SECOND_HUB_HREF = "/listens/relaks-muzyka-dlya-sna-slushat-onlayn";
+const FIFTY_SECOND_HUB_LABEL = "Релакс музыка для сна";
 const FIFTY_SECOND_REQUIRED_FAQ = "Нужно ли использовать специальные частоты для медитации?";
 const FIFTY_SECOND_STATE_PHRASE = "не создаёт определённое состояние автоматически";
 const FIFTY_SECOND_HOW_TO_CHOOSE_H2 = "Как выбрать музыку для сна и медитации";
@@ -13894,19 +13934,19 @@ function testFiftySecondPage() {
     .flatMap((section) => section.blocks ?? [])
     .filter((block) => block.kind === "rich_paragraph");
   const allLinks = allRich.flatMap((block) => (block.segments ?? []).filter((segment) => "href" in segment));
-  assert(allLinks.length === 2, "fifty-second page has exactly two hrefs");
-  assert(allLinks[0].href === FIFTY_SECOND_HREF_A && allLinks[0].label === FIFTY_SECOND_LABEL_A, "first href is relaxing sleep phrase-anchor");
-  assert(allLinks[1].href === FIFTY_SECOND_HREF_B && allLinks[1].label === FIFTY_SECOND_LABEL_B, "second href is no-lyrics relax phrase-anchor");
-  assert(!allLinks.some((link) => String(link.href).includes(FIFTY_SECOND_FORBIDDEN_RELAKS_HREF)), "fifty-second has no relaks listen href");
+  assert(allLinks.length === 3, "fifty-second page has exactly three hrefs");
+  assert(allLinks[0].href === FIFTY_SECOND_HUB_HREF && allLinks[0].label === FIFTY_SECOND_HUB_LABEL, "first href is hub phrase-anchor");
+  assert(allLinks[1].href === FIFTY_SECOND_HREF_A && allLinks[1].label === FIFTY_SECOND_LABEL_A, "second href is relaxing sleep phrase-anchor");
+  assert(allLinks[2].href === FIFTY_SECOND_HREF_B && allLinks[2].label === FIFTY_SECOND_LABEL_B, "third href is no-lyrics relax phrase-anchor");
   assert(!allLinks.some((link) => String(link.href).includes("/topics/")), "fifty-second has no topic href");
 
   const contentSource = read("src/lib/seo/listens/content/muzyka-dlya-sna-i-meditacii-slushat-onlayn.ts");
   assert(!contentSource.includes("https://audiolad.ru"), "fifty-second content file has no raw audiolad.ru URL");
   assert(!contentSource.includes("https://"), "fifty-second content file has no https://");
-  assert((contentSource.match(/href:/g) || []).length === 2, "fifty-second content file has exactly two hrefs");
+  assert((contentSource.match(/href:/g) || []).length === 3, "fifty-second content file has exactly three hrefs");
+  assert(contentSource.includes(FIFTY_SECOND_HUB_HREF), "fifty-second content file has hub href");
   assert(contentSource.includes(FIFTY_SECOND_HREF_A), "fifty-second content file has relaxing sleep href");
   assert(contentSource.includes(FIFTY_SECOND_HREF_B), "fifty-second content file has no-lyrics href");
-  assert(!contentSource.includes("relaks-muzyka-dlya-sna-slushat-onlayn"), "fifty-second content file has no relaks listen href");
   assert(!contentSource.includes("ListenSignupCta"), "fifty-second content file does not edit ListenSignupCta");
   assert(!contentSource.includes("primaryPractice"), "fifty-second content file has no primaryPractice");
   assert(!contentSource.includes("practice-player"), "fifty-second content file has no practice-player");
