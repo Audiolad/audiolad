@@ -27,6 +27,7 @@ export const MEDITATION_SOLUTIONS_BASE_PRICE_RUB = 4999;
 export const MEDITATION_SOLUTIONS_SALE_PRICE_RUB = 499;
 export const MEDITATION_SOLUTIONS_TIMER_SECONDS = 20 * 60;
 export const MEDITATION_SOLUTIONS_TIMER_CAPTION = "Предложение действует ещё:";
+export const MEDITATION_SOLUTIONS_TIMER_UNIT = "мин.";
 export const MEDITATION_SOLUTIONS_ONCE_NOTE =
   "Это предложение показывается вам один раз. После окончания таймера продукт останется доступен по полной цене 4 999 ₽.";
 export const MEDITATION_SOLUTIONS_BUY_LABEL = "Купить";

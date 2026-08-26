@@ -21,6 +21,7 @@ import {
   MEDITATION_SOLUTIONS_ONCE_NOTE,
   MEDITATION_SOLUTIONS_TIMER_CAPTION,
   MEDITATION_SOLUTIONS_TIMER_SECONDS,
+  MEDITATION_SOLUTIONS_TIMER_UNIT,
   assertMeditationSolutionsCopyLock,
 } from "../src/lib/landings/25-meditation-solutions/content.ts";
 import { resolveMeditationSolutionsOfferDisplay } from "../src/lib/landings/25-meditation-solutions/offer.ts";
@@ -57,6 +58,7 @@ function testCopyLock() {
   assert.equal(MEDITATION_SOLUTIONS_SALE_PRICE_RUB, 499);
   assert.equal(MEDITATION_SOLUTIONS_TIMER_SECONDS, 1200);
   assert.equal(MEDITATION_SOLUTIONS_TIMER_CAPTION, "Предложение действует ещё:");
+  assert.equal(MEDITATION_SOLUTIONS_TIMER_UNIT, "мин.");
   assert.equal(
     MEDITATION_SOLUTIONS_ONCE_NOTE,
     "Это предложение показывается вам один раз. После окончания таймера продукт останется доступен по полной цене 4 999 ₽.",
@@ -85,6 +87,7 @@ function testCopyLock() {
     MEDITATION_SOLUTIONS_OFFER_LINE,
     MEDITATION_SOLUTIONS_SEO_TITLE,
     MEDITATION_SOLUTIONS_TIMER_CAPTION,
+    MEDITATION_SOLUTIONS_TIMER_UNIT,
     MEDITATION_SOLUTIONS_ONCE_NOTE,
     ...MEDITATION_SOLUTIONS_CARDS.flatMap((card) => [
       card.title,
@@ -315,6 +318,8 @@ function testCheckoutWiring() {
   assert.match(cta, /data-meditation-solutions-countdown/);
   assert.match(cta, /MEDITATION_SOLUTIONS_ONCE_NOTE/);
   assert.match(cta, /MEDITATION_SOLUTIONS_TIMER_CAPTION/);
+  assert.match(cta, /MEDITATION_SOLUTIONS_TIMER_UNIT/);
+  assert.match(cta, /text-\[16px\]/);
   assert.doesNotMatch(cta, /в ближайшие 20 минут/);
   assert.doesNotMatch(cta, /setInterval/);
   assert.match(cta, /useMeditationSolutionsOffer/);

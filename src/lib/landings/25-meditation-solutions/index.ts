@@ -18,6 +18,7 @@ export {
   MEDITATION_SOLUTIONS_ONCE_NOTE,
   MEDITATION_SOLUTIONS_TIMER_CAPTION,
   MEDITATION_SOLUTIONS_TIMER_SECONDS,
+  MEDITATION_SOLUTIONS_TIMER_UNIT,
   assertMeditationSolutionsCopyLock,
   type MeditationSolutionsCard,
   type MeditationSolutionsCardFormat,

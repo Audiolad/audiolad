@@ -8,6 +8,7 @@ import {
   MEDITATION_SOLUTIONS_PRACTICE_SLUG,
   MEDITATION_SOLUTIONS_PUBLIC_PATH,
   MEDITATION_SOLUTIONS_TIMER_CAPTION,
+  MEDITATION_SOLUTIONS_TIMER_UNIT,
 } from "@/lib/landings/25-meditation-solutions/content";
 import { formatRubles } from "@/lib/products/price-format";
 
@@ -59,9 +60,14 @@ export default function MeditationSolutionsOfferCta({
           <p
             data-meditation-solutions-countdown
             aria-hidden="true"
-            className="mt-1 text-[28px] font-semibold tabular-nums leading-none tracking-wide text-[#25135c]"
+            className="mt-1 flex items-baseline justify-center text-[#25135c]"
           >
-            {display.remainingLabel}
+            <span className="text-[28px] font-semibold tabular-nums leading-none tracking-wide">
+              {display.remainingLabel}
+            </span>
+            <span className="ml-1.5 text-[16px] font-medium leading-none">
+              {MEDITATION_SOLUTIONS_TIMER_UNIT}
+            </span>
           </p>
         </div>
       ) : null}

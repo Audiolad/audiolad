@@ -70,7 +70,7 @@ const html = `<!doctype html>
         <div class="cta" data-meditation-solutions-cta="top">
           <p class="price">499 ₽</p>
           <p>Предложение действует ещё:</p>
-          <p>20:00</p>
+          <p>20:00 мин.</p>
           <button class="buy" type="button">Купить</button>
         </div>
         <ul data-catalog-product-grid data-meditation-solutions-grid class="catalog-product-grid catalog-product-grid--fixed-2">
@@ -87,7 +87,7 @@ const html = `<!doctype html>
         <div class="cta" data-meditation-solutions-cta="bottom">
           <p class="price">499 ₽</p>
           <p>Предложение действует ещё:</p>
-          <p>20:00</p>
+          <p>20:00 мин.</p>
           <button class="buy" type="button">Купить</button>
         </div>
       </article>
