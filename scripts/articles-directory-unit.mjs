@@ -78,6 +78,7 @@ import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn.ts";
+import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-i-meditacii-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1706,6 +1707,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftyFirstListenHref}`,
     ),
     "directory JSON-LD includes fifty-first listen href",
+  );
+
+  const fiftySecondListenHref = "/listens/muzyka-dlya-sna-i-meditacii-slushat-onlayn";
+  const fiftySecondListenCard = data.articles.find((card) => card.href === fiftySecondListenHref);
+  assert(fiftySecondListenCard, "fifty-second indexable listen page is listed");
+  assert(
+    fiftySecondListenCard.title === "Музыка для сна и медитации – слушать онлайн бесплатно | АудиоЛад",
+    "fifty-second listen directory title",
+  );
+  assert(
+    fiftySecondListenCard.description === MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE.description,
+    "fifty-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/muzyka-dlya-sna-i-meditacii-slushat-onlayn",
+    ),
+    "no /articles duplicate for fifty-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftySecondListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-second listen href",
   );
 
 
