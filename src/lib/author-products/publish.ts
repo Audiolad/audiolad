@@ -5,6 +5,12 @@ import { mapTopicRpcError } from "@/lib/topics/errors";
 
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import { authorAccessAllowsPaidProducts } from "@/lib/authors/access";
+import {
+  evaluateCoursePublishContentGate,
+  shouldSkipFlatAudioPublishRequirement,
+  type CoursePublishContentSnapshot,
+} from "@/lib/author-products/course-builder-shared";
+import { isCoursePublication } from "@/lib/author-products/publication-class";
 
 import type { AudioItemRow, PracticeRow } from "./types";
 import { LEGACY_OTHER_FORMAT } from "./format";
@@ -37,7 +43,8 @@ export type PublishReadinessRequirementKey =
   | "price"
   | "topics"
   | "music_usage"
-  | "promo";
+  | "promo"
+  | "course_content";
 
 export type PublishReadinessRequirement = {
   key: PublishReadinessRequirementKey;
@@ -59,6 +66,7 @@ export type EvaluatePublishReadinessOptions = {
   accessStatus?: AuthorAccessStatus;
   /** Active practice topics; required for the shared publish + onboarding gate. */
   activeTopicCount: number;
+  courseContent?: CoursePublishContentSnapshot;
 };
 
 function sortAudioItemsByPosition(audioItems: AudioItemRow[]): AudioItemRow[] {
@@ -212,6 +220,7 @@ function buildCorePublishRequirements(
   practice: PracticeRow,
   audioItems: AudioItemRow[],
   accessStatus?: AuthorAccessStatus,
+  courseContent?: CoursePublishContentSnapshot,
 ): PublishReadinessRequirement[] {
   const productKind = normalizeProductKind(practice.product_kind);
   const isMusic = productKind === PRODUCT_KIND.MUSIC;
@@ -269,12 +278,33 @@ function buildCorePublishRequirements(
       }
     : null;
 
-  const structureValidation = validateAudioItemsStructure(practice, audioItems);
+  const blockCount = courseContent?.blockCount ?? 0;
+  const skipFlatAudio = shouldSkipFlatAudioPublishRequirement({
+    publicationClass: practice.publication_class,
+    productKind: practice.product_kind,
+    blockCount,
+  });
+  const structureValidation = skipFlatAudio
+    ? ({ ok: true } as const)
+    : validateAudioItemsStructure(practice, audioItems);
   const audioFailure = structureValidation.ok
     ? null
     : {
         code: structureValidation.code,
         message: structureValidation.message,
+      };
+  const courseContentCheck = evaluateCoursePublishContentGate({
+    publicationClass: practice.publication_class,
+    productKind: practice.product_kind,
+    publishedAt: practice.published_at,
+    lessonCount: courseContent?.lessonCount ?? 0,
+    blockCount,
+  });
+  const courseContentFailure = courseContentCheck.ok
+    ? null
+    : {
+        code: courseContentCheck.code,
+        message: courseContentCheck.message,
       };
 
   let priceFailure: { code: string; message: string } | null = null;
@@ -341,6 +371,12 @@ function buildCorePublishRequirements(
     requirement("price", "Цена и доступ", priceFailure),
   ];
 
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    requirements.push(
+      requirement("course_content", "Содержание курса", courseContentFailure),
+    );
+  }
+
   if (isMusic || musicUsageFailure) {
     requirements.push(
       requirement("music_usage", "Условия использования музыки", musicUsageFailure),
@@ -373,6 +409,7 @@ export function evaluatePublishReadiness(
       practice,
       audioItems,
       options.accessStatus,
+      options.courseContent,
     ),
     requirement("topics", "Темы", topicFailure),
   ]);

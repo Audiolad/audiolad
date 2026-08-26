@@ -75,6 +75,34 @@ Foundation).
 
 ---
 
+## 2026-08-26 — Author Course Builder, Phase 2A PR2
+
+**Контекст:** схема уроков/блоков уже есть, но автор не мог собирать
+курс в кабинете. Публикация курса всё ещё требовала плоский
+`audio_items` как у практики.
+
+**Решение:**
+
+- Конструктор только при явном `publication_class=course`. Список
+  уроков + один открытый редактор урока. Блоки text / audio / file.
+- Мутации проверяют цепочку: автор может менять публикацию, класс
+  course, `lesson.publication_id`, `block.lesson_id`.
+- Аудио блока — существующий `audio_items` + upload pipeline.
+  PDF — `publication_files` + private `publication-files`.
+- CTA только в `course_completion_ctas`.
+- Новое правило публикации только если `published_at` IS NULL:
+  ≥1 урок и ≥1 блок. Черновик без уроков можно сохранить.
+  Плоское аудио не требуется, если у курса есть любой блок.
+
+**Вне scope:** `/learn`, learner API, progress, Section/Module,
+homework, quizzes, drip, certificates. PDP / CatalogCard / offer /
+free_claim / purchase не менялись.
+
+**Принято:** владелец и архитектор (задание Phase 2A PR2 Author Course
+Builder).
+
+---
+
 ## 2026-08-25 — Author Cabinet foundation, Phase 1
 
 **Контекст:** кабинет должен создавать новые классы публикаций, не ломая

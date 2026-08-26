@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
+import AuthorCourseBuilder from "@/components/author-dashboard/AuthorCourseBuilder";
 import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGallery";
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
@@ -53,6 +54,7 @@ import {
 } from "@/lib/author-products/product-kind";
 import {
   AUTHOR_PUBLICATION_CLASS_LABELS,
+  isCoursePublication,
   isProductGalleryEligible,
   publicationClassToCabinetBranch,
   publicationClassToLegacyKind,
@@ -106,6 +108,11 @@ import {
 } from "@/lib/products/listening-notice";
 import type { AssignedTopic, TopicOption } from "@/lib/topics/types";
 import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
+import {
+  COURSE_PUBLISH_MISSING_CONTENT_MESSAGE,
+  evaluateCoursePublishContentGate,
+  type CoursePublishContentSnapshot,
+} from "@/lib/author-products/course-builder-shared";
 
 type PracticeContext = {
   practiceId: string;
@@ -467,6 +474,8 @@ export default function AuthorProductForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [courseContentSnapshot, setCourseContentSnapshot] =
+    useState<CoursePublishContentSnapshot>({ lessonCount: 0, blockCount: 0 });
   const [publishing, setPublishing] = useState(false);
   const publishInFlightRef = useRef(false);
   const [uploadingAudioId, setUploadingAudioId] = useState<string | null>(null);
@@ -712,6 +721,7 @@ export default function AuthorProductForm({
     (isDraft ||
       needsChanges ||
       (canBypassProductModeration && (isPublished || isUnpublished)));
+  const isCourse = isCoursePublication(form.publicationClass, form.productKind);
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
   );
@@ -1275,6 +1285,22 @@ export default function AuthorProductForm({
       return;
     }
 
+    const courseContentCheck = evaluateCoursePublishContentGate({
+      publicationClass: form.publicationClass,
+      productKind: form.productKind,
+      publishedAt: form.publishedAt,
+      lessonCount: courseContentSnapshot.lessonCount,
+      blockCount: courseContentSnapshot.blockCount,
+    });
+
+    if (!courseContentCheck.ok) {
+      setError(COURSE_PUBLISH_MISSING_CONTENT_MESSAGE);
+      publishInFlightRef.current = false;
+      setPublishing(false);
+      setBusy(false);
+      return;
+    }
+
     try {
       const ensured = await ensurePracticeId();
 
@@ -1474,6 +1500,21 @@ export default function AuthorProductForm({
 
     if (!topicMinimumCheck.ok) {
       setTopicError(topicMinimumCheck.message);
+      requestScrollToFirstSubmitIssue();
+      setBusy(false);
+      return;
+    }
+
+    const courseContentCheck = evaluateCoursePublishContentGate({
+      publicationClass: form.publicationClass,
+      productKind: form.productKind,
+      publishedAt: form.publishedAt,
+      lessonCount: courseContentSnapshot.lessonCount,
+      blockCount: courseContentSnapshot.blockCount,
+    });
+
+    if (!courseContentCheck.ok) {
+      setError(COURSE_PUBLISH_MISSING_CONTENT_MESSAGE);
       requestScrollToFirstSubmitIssue();
       setBusy(false);
       return;
@@ -2819,6 +2860,15 @@ export default function AuthorProductForm({
         ) : null}
       </section>
 
+      {isCourse ? (
+        <AuthorCourseBuilder
+          practiceId={practiceId || null}
+          getPracticeId={getPracticeIdForCoverUpload}
+          disabled={!canMutateContent || busy}
+          onContentSnapshotChange={setCourseContentSnapshot}
+        />
+      ) : null}
+
       {form.productKind === PRODUCT_KIND.PRACTICE ? (
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
@@ -3025,6 +3075,7 @@ export default function AuthorProductForm({
         </section>
       ) : null}
 
+      {isCourse ? null : (
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
           {form.productKind === PRODUCT_KIND.MUSIC
@@ -3370,6 +3421,7 @@ export default function AuthorProductForm({
           ) : null}
         </div>
       </section>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button

@@ -1,4 +1,4 @@
-import { resolvePublicationClass } from "@/lib/author-products/publication-class";
+import { isCoursePublication } from "@/lib/author-products/publication-class";
 import {
   hasPdfMagicBytes,
   isAllowedPdfMimeType,
@@ -27,12 +27,7 @@ export function isCourseLessonBlockType(
   return COURSE_LESSON_BLOCK_TYPES.includes(value as CourseLessonBlockType);
 }
 
-export function isCoursePublication(
-  publicationClass: string | null | undefined,
-  productKind: string | null | undefined,
-): boolean {
-  return resolvePublicationClass(publicationClass, productKind) === "course";
-}
+export { isCoursePublication };
 
 export function isPublicationFilePdfMime(
   mime: string | null | undefined,

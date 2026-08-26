@@ -226,6 +226,14 @@ Timeweb Cloud
   не использует `promo_*`. `audio_items` не мигрируются в уроки.
   Learner API `/learn` в этом этапе нет: будущий API сначала резолвит
   родительский курс, затем `canAccessCourseContent`, затем читает.
+- Phase 2A Author Course Builder: кабинет `AuthorCourseBuilder` только
+  при явном `publication_class=course`. API
+  `/api/author/products/[id]/course/*` (уроки, блоки, reorder, CTA,
+  author signed PDF). Плоский список `audio_items` для курса скрыт;
+  аудио урока идёт через существующий `/audio*` pipeline.
+  `course_completion_ctas` не пишет `practices.promo_*`. Публикация
+  неопубликованного курса требует ≥1 урок и ≥1 блок; уже
+  опубликованные курсы без уроков новым правилом не блокируются.
 
 ## MAX Mini App (этапы 1–3B)
 
