@@ -81,6 +81,7 @@ import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/
 import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-i-meditacii-slushat-onlayn.ts";
 import { TARO_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-dengi.ts";
 import { TARO_BOLSHIH_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-bolshih-deneg.ts";
+import { TARO_BOGATSTVA_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-bogatstva-i-dengi.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1781,6 +1782,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftyFourthListenHref}`,
     ),
     "directory JSON-LD includes fifty-fourth listen href",
+  );
+
+  const fiftyFifthListenHref = "/listens/taro-bogatstva-i-dengi";
+  const fiftyFifthListenCard = data.articles.find((card) => card.href === fiftyFifthListenHref);
+  assert(fiftyFifthListenCard, "fifty-fifth indexable listen page is listed");
+  assert(
+    fiftyFifthListenCard.title === "Таро богатства и деньги – достаток и благополучие | АудиоЛад",
+    "fifty-fifth listen directory title",
+  );
+  assert(
+    fiftyFifthListenCard.description === TARO_BOGATSTVA_I_DENGI_PAGE.description,
+    "fifty-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-bogatstva-i-dengi",
+    ),
+    "no /articles duplicate for fifty-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyFifthListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-fifth listen href",
   );
 
 
