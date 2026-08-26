@@ -24,50 +24,58 @@ type PracticeRow = {
   price: number | null;
 };
 
+const EMPTY_OFFER: MeditationSolutionsOfferState = {
+  practice: null,
+  initialExpiresAt: null,
+  salePrice: null,
+  basePrice: null,
+};
+
 export async function loadMeditationSolutionsOffer(): Promise<MeditationSolutionsOfferState> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("practices")
-    .select("id, slug, author_id, price")
-    .eq("slug", MEDITATION_SOLUTIONS_PRACTICE_SLUG)
-    .maybeSingle();
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("practices")
+      .select("id, slug, author_id, price")
+      .eq("slug", MEDITATION_SOLUTIONS_PRACTICE_SLUG)
+      .maybeSingle();
 
-  const row = data as PracticeRow | null;
-  const practice = row
-    ? {
-        id: row.id,
-        slug: row.slug,
-        authorId: row.author_id,
-        basePrice: typeof row.price === "number" ? row.price : null,
-      }
-    : null;
+    const row = data as PracticeRow | null;
+    const practice = row
+      ? {
+          id: row.id,
+          slug: row.slug,
+          authorId: row.author_id,
+          basePrice: typeof row.price === "number" ? row.price : null,
+        }
+      : null;
 
-  if (!practice) {
+    if (!practice) {
+      return EMPTY_OFFER;
+    }
+
+    const visitorId = await readPriceVisitorId();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const resolved = await resolvePracticePriceRpc({
+      supabase,
+      practiceId: practice.id,
+      surface: PRICE_SURFACES.PRODUCT,
+      visitorId,
+      userId: user?.id ?? null,
+    });
+
     return {
-      practice: null,
-      initialExpiresAt: null,
-      salePrice: null,
-      basePrice: null,
+      practice,
+      initialExpiresAt: resolved?.promotion?.expiresAt ?? null,
+      salePrice: resolved?.salePrice ?? null,
+      basePrice: resolved?.basePrice ?? practice.basePrice,
     };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("meditation_solutions_offer_load_error", message);
+    return EMPTY_OFFER;
   }
-
-  const visitorId = await readPriceVisitorId();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const resolved = await resolvePracticePriceRpc({
-    supabase,
-    practiceId: practice.id,
-    surface: PRICE_SURFACES.PRODUCT,
-    visitorId,
-    userId: user?.id ?? null,
-  });
-
-  return {
-    practice,
-    initialExpiresAt: resolved?.promotion?.expiresAt ?? null,
-    salePrice: resolved?.salePrice ?? null,
-    basePrice: resolved?.basePrice ?? practice.basePrice,
-  };
 }
