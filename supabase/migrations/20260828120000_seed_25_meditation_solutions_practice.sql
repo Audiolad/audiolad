@@ -26,6 +26,11 @@ BEGIN
 END;
 $$;
 
+-- Trusted publication RPCs enable this GUC transaction-locally so
+-- guard_practices_publication_moderation allows status='published'.
+-- is_local=true: custom GUC does not need to be pre-registered.
+SELECT set_config('audiolad.allow_practice_publish', 'on', true);
+
 INSERT INTO public.practices (
   id,
   author_id,
