@@ -21,7 +21,8 @@ const authorDashboardPage = read("src/app/(platform)/author-dashboard/page.tsx")
 const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
 const bottomNav = read("src/lib/navigation/bottom-nav.ts");
 const listenerLayout = read("src/app/(platform)/(listener)/layout.tsx");
-const publicPlaylistLayout = read("src/app/(platform)/p/layout.tsx");
+const publicPlaylistGroupLayout = read("src/app/(platform)/p/layout.tsx");
+const publicPlaylistLayout = read("src/app/(platform)/p/[slug]/layout.tsx");
 const publicPlaylistPage = read("src/app/(platform)/p/[slug]/page.tsx");
 
 assert(
@@ -108,9 +109,13 @@ assert(
 );
 
 assert(
+  !publicPlaylistGroupLayout.includes("ListenerAppShell"),
+  "public /p group layout must not mount ListenerAppShell",
+);
+assert(
   publicPlaylistLayout.includes("ListenerAppShell") &&
     publicPlaylistLayout.includes('mode="default"'),
-  "public /p layout must reuse ListenerAppShell in default mode",
+  "public /p/[slug] layout must reuse ListenerAppShell in default mode",
 );
 
 assert(

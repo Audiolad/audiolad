@@ -15,7 +15,8 @@ function read(path) {
 }
 
 const page = read("src/app/(platform)/p/[slug]/page.tsx");
-const layout = read("src/app/(platform)/p/layout.tsx");
+const groupLayout = read("src/app/(platform)/p/layout.tsx");
+const layout = read("src/app/(platform)/p/[slug]/layout.tsx");
 const view = read("src/components/playlists/PublicPlaylistPageView.tsx");
 const itemCountFormat = read("src/lib/playlists/format-item-count.ts");
 const ownerList = read("src/components/playlists/PlaylistsClient.tsx");
@@ -36,18 +37,26 @@ const listenPage = read(
 );
 const listenEmbed = read("src/components/playlists/PublicPlaylistEmbed.tsx");
 
-assert(existsSync("src/app/(platform)/p/layout.tsx"), "public /p layout exists");
+assert(existsSync("src/app/(platform)/p/layout.tsx"), "public /p group layout exists");
+assert(
+  existsSync("src/app/(platform)/p/[slug]/layout.tsx"),
+  "public /p/[slug] playlist layout exists",
+);
+assert(
+  !groupLayout.includes("ListenerAppShell"),
+  "/p group layout must not wrap every /p page in ListenerAppShell",
+);
 assert(
   layout.includes("ListenerAppShell") && layout.includes('mode="default"'),
-  "/p layout reuses ListenerAppShell default mode",
+  "/p/[slug] layout reuses ListenerAppShell default mode",
 );
 assert(
   layout.includes("getListenerShellData"),
-  "/p layout uses shared listener shell data",
+  "/p/[slug] layout uses shared listener shell data",
 );
 assert(
   !layout.includes("max-w-[430px]"),
-  "/p layout does not fork a mobile-width desktop column",
+  "/p/[slug] layout does not fork a mobile-width desktop column",
 );
 
 assert(page.includes("PublicPlaylistPageView"), "/p still renders public view");
