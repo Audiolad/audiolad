@@ -74,11 +74,28 @@ function testCopyLock() {
   assert.equal(MEDITATION_SOLUTIONS_CARDS[25].id, "bonus-26");
   assert.equal(
     MEDITATION_SOLUTIONS_CARDS[0].title,
-    "Как сделать медитацию: пошаговый план от идеи до готового MP3",
+    "1. Как сделать медитацию: пошаговый план от идеи до готового MP3",
+  );
+  assert.equal(
+    MEDITATION_SOLUTIONS_CARDS[24].title,
+    "25. Как из одной медитации создать серию из 7 аудиопрактик",
   );
   assert.equal(
     MEDITATION_SOLUTIONS_CARDS[25].title,
-    "Как использовать медитации и аудиопрактики для привлечения клиентов",
+    "Бонус. Как использовать медитации и аудиопрактики для привлечения клиентов",
+  );
+
+  for (const [index, card] of MEDITATION_SOLUTIONS_CARDS.slice(0, 25).entries()) {
+    assert.equal(
+      card.title.startsWith(`${index + 1}. `),
+      true,
+      `card ${index + 1} title must start with "${index + 1}. "`,
+    );
+  }
+  assert.equal(
+    MEDITATION_SOLUTIONS_CARDS[25].title.startsWith("Бонус. "),
+    true,
+    "bonus card title must start with «Бонус. »",
   );
 
   const locked = [
@@ -157,7 +174,9 @@ function testGridAndCardsReuseCatalogGeometry() {
   assert.doesNotMatch(cards, /БОНУС/);
   assert.match(view, /priority/);
   assert.match(cards, /loading="lazy"/);
-  assert.match(view, /platformBottomContentPaddingClass/);
+  assert.match(view, /max-w-\[560px\]/);
+  assert.doesNotMatch(view, /max-w-\[720px\]/);
+  assert.doesNotMatch(view, /platformBottomContentPaddingClass/);
 }
 
 function testCardFormats() {
@@ -422,6 +441,33 @@ function testSeoAndShell() {
   );
 }
 
+function testDedicatedLandingShell() {
+  const parentLayout = read("src/app/(platform)/p/layout.tsx");
+  const playlistLayout = read("src/app/(platform)/p/[slug]/layout.tsx");
+  const landingLayout = read(
+    "src/app/(platform)/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy/layout.tsx",
+  );
+  const landingPage = read(
+    "src/app/(platform)/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy/page.tsx",
+  );
+  const view = read(
+    "src/components/landings/25-meditation-solutions/MeditationSolutionsLandingView.tsx",
+  );
+
+  assert.doesNotMatch(parentLayout, /ListenerAppShell/);
+  assert.match(playlistLayout, /ListenerAppShell/);
+  assert.match(playlistLayout, /mode="default"/);
+  assert.match(playlistLayout, /getListenerShellData/);
+  assert.match(playlistLayout, /px-5 pt-6 pb-4 lg:px-10 xl:px-6 xl:pt-3 xl:pb-5/);
+  assert.doesNotMatch(landingLayout, /ListenerAppShell/);
+  assert.doesNotMatch(landingLayout, /DesktopSidebar/);
+  assert.doesNotMatch(landingLayout, /DesktopRightColumn/);
+  assert.doesNotMatch(landingPage, /ListenerAppShell/);
+  assert.doesNotMatch(view, /ListenerAppShell/);
+  assert.match(landingLayout, /data-meditation-solutions-shell/);
+  assert.match(landingLayout, /min-h-dvh/);
+}
+
 function testHeroProductCard() {
   const view = read(
     "src/components/landings/25-meditation-solutions/MeditationSolutionsLandingView.tsx",
@@ -435,6 +481,17 @@ function testHeroProductCard() {
   assert.match(view, /rounded-\[22px\]/);
   assert.match(view, /rounded-\[28px\]/);
   assert.match(view, /border-\[#e8def5\]/);
+  assert.match(view, /max-w-\[300px\]/);
+  assert.match(view, /sm:max-w-\[340px\]/);
+  assert.match(view, /text-center/);
+  assert.match(
+    view,
+    /data-meditation-solutions-hero-title[\s\S]*pt-10/,
+  );
+  assert.doesNotMatch(
+    view,
+    /data-meditation-solutions-hero-title[\s\S]*pt-4/,
+  );
   assert.doesNotMatch(view, /aspect-\[4\/5\]/);
   assert.doesNotMatch(view, /object-cover/);
 
@@ -484,6 +541,7 @@ testExpiryUi();
 testCheckoutWiring();
 testProductImagesOnBranch();
 testSeoAndShell();
+testDedicatedLandingShell();
 testHeroProductCard();
 testNoPageBuilder();
 

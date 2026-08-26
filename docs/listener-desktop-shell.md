@@ -27,7 +27,7 @@
 | `profile` | `/profile`, `/profile/edit` | да | нет | да | да |
 | `author` | `/author-dashboard/**` | да | нет | да | нет |
 
-Подключение через route-level layouts (`src/app/(platform)/profile/layout.tsx`, `src/app/(platform)/author-dashboard/layout.tsx`, `src/app/(platform)/p/layout.tsx`), без переноса URL. `/p/[slug]` использует тот же `ListenerAppShell` в режиме `default`, без собственной узкой колонки.
+Подключение через route-level layouts (`src/app/(platform)/profile/layout.tsx`, `src/app/(platform)/author-dashboard/layout.tsx`, `src/app/(platform)/p/[slug]/layout.tsx`), без переноса URL. `/p/[slug]` использует тот же `ListenerAppShell` в режиме `default`, без собственной узкой колонки. Продающий лендинг `/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy` живёт в отдельном корне без listener-колонок.
 
 ## Отдельные пространства (вне listener-shell)
 
@@ -35,6 +35,7 @@
 - `/auth/*` — вход и регистрация
 - `/checkout/*` — оплата
 - `/listen/*` — полноэкранный мобильный плеер
+- `/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy` — продающий лендинг без listener-колонок
 - `/settings` — пока отдельная страница (решение отложено)
 
 ## Технические принципы

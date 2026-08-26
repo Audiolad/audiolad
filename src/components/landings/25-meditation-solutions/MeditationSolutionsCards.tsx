@@ -22,14 +22,14 @@ export default function MeditationSolutionsCards() {
                     src={card.imageSrc}
                     alt={card.title}
                     fill
-                    sizes="(max-width: 430px) 46vw, (max-width: 720px) 44vw, 340px"
+                    sizes="(max-width: 430px) 42vw, (max-width: 560px) 40vw, 250px"
                     className="object-cover"
                     loading="lazy"
                   />
                 </div>
               </div>
-              <div className="flex flex-1 flex-col px-2 pb-2 pt-1.5 xl:px-2 xl:pb-1.5 xl:pt-1.5">
-                <h2 className="text-[14px] font-semibold leading-5 text-[#25135c] sm:text-[15px] sm:leading-5">
+              <div className="flex flex-1 flex-col px-2 pb-2 pt-1.5 sm:px-2.5 sm:pb-2.5">
+                <h2 className="text-[13px] font-semibold leading-[1.35] text-[#25135c] sm:text-[14px] sm:leading-5">
                   {card.title}
                 </h2>
                 <p className="mt-auto pt-1.5">
