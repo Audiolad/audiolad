@@ -26,7 +26,9 @@ import {
 import type { ListenTrack } from "@/lib/listen/types";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 import { shouldShowPromoConversionFlow, shouldUseGuestProgressPersistence } from "@/lib/promo/access";
+import { isCoursePublication } from "@/lib/course-content/validators";
 import {
+  canAccessCourseContent,
   resolveProductAccess,
 } from "@/lib/products/access";
 import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
@@ -339,6 +341,7 @@ export async function renderListenPage(
       is_catalog_listed,
       guest_access_enabled,
       product_kind,
+      publication_class,
       listening_notice_enabled,
       listening_notice_title,
       listening_notice_text,
@@ -405,7 +408,36 @@ export async function renderListenPage(
     );
   }
 
-  if (!productAccess.canListen || options?.accessDenied) {
+  const isCourse = isCoursePublication(
+    practiceRow.publication_class,
+    practiceRow.product_kind,
+  );
+  let courseAllowed = !isCourse;
+
+  if (isCourse) {
+    try {
+      courseAllowed = await canAccessCourseContent(
+        supabase,
+        practiceRow,
+        user?.id ?? null,
+        { access: productAccess },
+      );
+    } catch {
+      return (
+        <ListenMessageState
+          title="Не удалось проверить доступ"
+          description="Попробуйте открыть практику ещё раз."
+          backHref={practiceHref}
+          backLabel="К странице практики"
+        />
+      );
+    }
+  }
+
+  if (
+    options?.accessDenied ||
+    (isCourse ? !courseAllowed : !productAccess.canListen)
+  ) {
     const deniedHref = `${practiceHref}?listen=required`;
     return (
       <ListenMessageState

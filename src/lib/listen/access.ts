@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isCoursePublication } from "@/lib/course-content/validators";
 import {
+  canAccessCourseContent,
   resolveProductAccess,
   type ProductAccessResult,
 } from "@/lib/products/access";
@@ -14,6 +16,7 @@ type PracticeAccessRow = {
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
+  publication_class?: string | null;
 };
 
 export async function resolveListenAccess(
@@ -22,6 +25,25 @@ export async function resolveListenAccess(
   practice: PracticeAccessRow,
 ): Promise<ListenAccess | null> {
   const access = await resolveProductAccess(supabase, practice, userId);
+
+  if (isCoursePublication(practice.publication_class, practice.product_kind)) {
+    const allowed = await canAccessCourseContent(
+      supabase,
+      practice,
+      userId,
+      { access },
+    );
+
+    if (!allowed) {
+      return null;
+    }
+
+    if (access.reason === "author_owner") {
+      return { mode: "author_preview" };
+    }
+
+    return { mode: "entitled" };
+  }
 
   if (!access.canListen) {
     return null;

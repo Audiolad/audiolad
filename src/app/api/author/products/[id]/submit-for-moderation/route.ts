@@ -6,6 +6,7 @@ import {
 } from "@/lib/author-products/auth";
 import { canSubmitPracticeForModeration } from "@/lib/author-products/moderation";
 import { submitPracticeForModeration } from "@/lib/author-products/moderation-actions";
+import { countCoursePublishContent } from "@/lib/author-products/course-builder";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { evaluatePublishReadiness } from "@/lib/author-products/publish";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
@@ -44,12 +45,14 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     const activeTopicCount = await countActivePracticeTopics(supabase, id);
+    const courseContent = await countCoursePublishContent(supabase, id);
     const readiness = evaluatePublishReadiness(
       detail.practice,
       detail.audio_items,
       {
         accessStatus,
         activeTopicCount,
+        courseContent,
       },
     );
 

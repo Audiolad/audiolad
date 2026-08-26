@@ -65,7 +65,14 @@ export const RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
             "плавные музыкальные переходы;",
             "ненавязчивый фон.",
           ]},
-          { kind: "paragraph", text: "Если нужен именно формат музыки для вечернего отдыха перед сном, можно также посмотреть подборку расслабляющей музыки для сна." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если нужен именно формат музыки для вечернего отдыха перед сном, можно также посмотреть " },
+              { href: "/listens/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn", label: "расслабляющую музыку для сна" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {
@@ -115,10 +122,20 @@ export const RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
             "создавать свой комфортный сценарий прослушивания.",
           ]},
           { kind: "paragraph", text: "Если хочется сравнить похожие форматы, можно также посмотреть:" },
-          { kind: "list", items: [
-            "расслабляющую музыку для сна;",
-            "спокойную музыку для сна.",
-          ]},
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "расслабляющую музыку для сна, " },
+              { href: "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn", label: "спокойную музыку для сна" },
+              { text: ", " },
+              { href: "/listens/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn", label: "музыку для снятия стресса и расслабления" },
+              { text: ", " },
+              { href: "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn", label: "расслабляющую музыку без слов" },
+              { text: " и " },
+              { href: "/listens/muzyka-dlya-sna-i-meditacii-slushat-onlayn", label: "музыку для сна и медитации" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {

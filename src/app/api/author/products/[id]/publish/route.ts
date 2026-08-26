@@ -7,6 +7,7 @@ import {
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { assertPublishModerationAllowed } from "@/lib/author-products/moderation";
+import { countCoursePublishContent } from "@/lib/author-products/course-builder";
 import {
   evaluatePublishReadiness,
   publishPracticeProduct,
@@ -84,12 +85,14 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     const activeTopicCount = await countActivePracticeTopics(supabase, id);
+    const courseContent = await countCoursePublishContent(supabase, id);
     const readiness = evaluatePublishReadiness(
       detail.practice,
       detail.audio_items,
       {
         accessStatus,
         activeTopicCount,
+        courseContent,
       },
     );
 

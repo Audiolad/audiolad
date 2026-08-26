@@ -4,11 +4,21 @@ import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracti
 import PlayAllButton from "@/components/playlists/PlayAllButton";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
-import type { PlaylistDetailView } from "@/lib/playlists/detail";
+import PlaylistItemsSortableList from "@/components/playlists/PlaylistItemsSortableList";
+import type {
+  PlaylistDetailItemView,
+  PlaylistDetailView,
+} from "@/lib/playlists/detail";
 import {
   playlistItemKey,
   playlistItemQuery,
 } from "@/lib/playlists/playlist-item-identity";
+import {
+  movePlaylistItems,
+  playlistItemReorderRequest,
+  visiblePlaylistItems,
+  type PlaylistItemsDraft,
+} from "@/lib/playlists/playlist-item-reorder";
 import { formatPlaylistItemCount } from "@/lib/playlists/format-item-count";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { EDITORIAL_PLAYLIST_LABEL } from "@/lib/playlists/editorial-content";
@@ -59,7 +69,17 @@ export default function PlaylistDetailClient({
   detail,
 }: PlaylistDetailClientProps) {
   const router = useRouter();
-  const [items, setItems] = useState(detail.items);
+  const serverItems = detail.items;
+  const serverOrderKey = serverItems
+    .map(
+      (item) =>
+        `${playlistItemKey(item.practiceId, item.audioItemId)}:${item.position}`,
+    )
+    .join("|");
+  const [draft, setDraft] = useState<PlaylistItemsDraft<PlaylistDetailItemView> | null>(
+    null,
+  );
+  const items = visiblePlaylistItems(serverItems, serverOrderKey, draft);
   const [coverUrl, setCoverUrl] = useState(detail.coverUrl);
   const [hasCustomCover, setHasCustomCover] = useState(
     Boolean(detail.coverUrl || detail.playlist.cover_path),
@@ -360,8 +380,9 @@ export default function PlaylistDetailClient({
         return;
       }
 
-      setItems((current) =>
-        current.filter(
+      setDraft({
+        orderKey: serverOrderKey,
+        items: items.filter(
           (item) =>
             playlistItemKey(item.practiceId, item.audioItemId) !==
             playlistItemKey(
@@ -369,7 +390,7 @@ export default function PlaylistDetailClient({
               pendingDelete.audioItemId,
             ),
         ),
-      );
+      });
       setPendingDelete(null);
       setMenuId(null);
       setToast("Материал удалён из плейлиста.");
@@ -381,6 +402,57 @@ export default function PlaylistDetailClient({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function moveErrorMessage(status: number, message?: string) {
+    if (status === 404) {
+      return "Материал не найден в этом плейлисте.";
+    }
+
+    if (status === 409) {
+      return (
+        message ||
+        "Порядок уже изменился. Обновите страницу и попробуйте ещё раз."
+      );
+    }
+
+    return message || "Не удалось изменить порядок. Попробуйте ещё раз.";
+  }
+
+  async function persistMove(
+    practiceId: string,
+    audioItemId: string | null,
+    direction: "up" | "down",
+    targetPosition?: number,
+  ) {
+    const response = await fetch(
+      `/api/playlists/${detail.playlist.id}/items/${practiceId}/move`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          direction,
+          audioItemId,
+          ...(targetPosition != null ? { targetPosition } : {}),
+        }),
+      },
+    );
+
+    const data = (await response.json().catch(() => ({}))) as {
+      moved?: boolean;
+      error?: string;
+      message?: string;
+    };
+
+    if (!response.ok) {
+      return {
+        ok: false as const,
+        message: moveErrorMessage(response.status, data.message),
+      };
+    }
+
+    return { ok: true as const, moved: Boolean(data.moved) };
   }
 
   async function moveItem(
@@ -398,45 +470,64 @@ export default function PlaylistDetailClient({
     setMenuId(null);
 
     try {
-      const response = await fetch(
-        `/api/playlists/${detail.playlist.id}/items/${practiceId}/move`,
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction, audioItemId }),
-        },
-      );
+      const result = await persistMove(practiceId, audioItemId, direction);
 
-      const data = (await response.json().catch(() => ({}))) as {
-        moved?: boolean;
-        error?: string;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setListError("Материал не найден в этом плейлисте.");
-        } else if (response.status === 409) {
-          setListError(
-            data.message ||
-              "Порядок уже изменился. Обновите страницу и попробуйте ещё раз.",
-          );
-        } else {
-          setListError(
-            data.message ||
-              "Не удалось изменить порядок. Попробуйте ещё раз.",
-          );
-        }
+      if (!result.ok) {
+        setListError(result.message);
         return;
       }
 
-      if (data.moved) {
+      if (result.moved) {
         startTransition(() => {
           router.refresh();
         });
       }
     } catch {
+      setListError("Не удалось изменить порядок. Попробуйте ещё раз.");
+    } finally {
+      moveInFlightRef.current = false;
+      setMovingPracticeId(null);
+    }
+  }
+
+  async function reorderItems(fromIndex: number, toIndex: number) {
+    const request = playlistItemReorderRequest(items, fromIndex, toIndex);
+
+    if (!request || moveInFlightRef.current || submitting) {
+      return;
+    }
+
+    const previous = items;
+    moveInFlightRef.current = true;
+    setDraft({
+      orderKey: serverOrderKey,
+      items: movePlaylistItems(items, fromIndex, toIndex),
+    });
+    setMovingPracticeId(
+      playlistItemKey(request.item.practiceId, request.item.audioItemId),
+    );
+    setListError(null);
+    setMenuId(null);
+
+    try {
+      const result = await persistMove(
+        request.item.practiceId,
+        request.item.audioItemId,
+        request.direction,
+        request.targetPosition,
+      );
+
+      if (!result.ok) {
+        setDraft({ orderKey: serverOrderKey, items: previous });
+        setListError(result.message);
+        return;
+      }
+
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setDraft({ orderKey: serverOrderKey, items: previous });
       setListError("Не удалось изменить порядок. Попробуйте ещё раз.");
     } finally {
       moveInFlightRef.current = false;
@@ -514,7 +605,7 @@ export default function PlaylistDetailClient({
             variant="owner"
             playlistId={detail.playlist.id}
             title={detail.playlist.title}
-            items={detail.items}
+            items={items}
           />
         </div>
       </header>
@@ -569,111 +660,123 @@ export default function PlaylistDetailClient({
               {listError}
             </p>
           ) : null}
-          {items.map((item, index) => {
-            const isFirst = index === 0;
-            const isLast = index === items.length - 1;
-            const itemKey = playlistItemKey(item.practiceId, item.audioItemId);
-            const rowMoving = movingPracticeId === itemKey;
+          <PlaylistItemsSortableList
+            items={items}
+            className="space-y-1.5"
+            disabled={reorderBusy}
+            onReorder={({ fromIndex, toIndex }) => {
+              void reorderItems(fromIndex, toIndex);
+            }}
+            renderRow={({ item, index, dragHandle }) => {
+              const isFirst = index === 0;
+              const isLast = index === items.length - 1;
+              const itemKey = playlistItemKey(item.practiceId, item.audioItemId);
+              const rowMoving = movingPracticeId === itemKey;
 
-            return (
-              <PlaylistItemRow
-                key={itemKey}
-                index={index}
-                item={{
-                  practiceId: item.practiceId,
-                  audioItemId: item.audioItemId,
-                  title: item.title,
-                  authorName: item.authorName,
-                  authorSlug: item.authorSlug,
-                  coverUrl: item.coverUrl,
-                  coverImage: item.coverImage,
-                  updatedAt: item.updatedAt,
-                  formatLabel: item.formatLabel,
-                  metaLabel: item.metaLabel,
-                  available: item.available,
-                  href: item.listenHref,
-                  listenHref: item.listenHref,
-                }}
-                trailingControls={
-                  <>
-                    <div className="flex flex-col">
-                      <button
-                        type="button"
-                        aria-label="Переместить выше"
-                        disabled={isFirst || reorderBusy}
-                        className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        onClick={() =>
-                          void moveItem(item.practiceId, item.audioItemId, "up")
-                        }
-                      >
-                        <span aria-hidden>{rowMoving ? "…" : "↑"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Переместить ниже"
-                        disabled={isLast || reorderBusy}
-                        className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        onClick={() =>
-                          void moveItem(
-                            item.practiceId,
-                            item.audioItemId,
-                            "down",
-                          )
-                        }
-                      >
-                        <span aria-hidden>↓</span>
-                      </button>
-                    </div>
-
-                    <div
-                      className="relative"
-                      ref={menuId === itemKey ? menuRef : null}
-                    >
-                      <button
-                        type="button"
-                        aria-label="Действия с материалом"
-                        aria-expanded={menuId === itemKey}
-                        aria-haspopup="menu"
-                        disabled={reorderBusy}
-                        className="flex h-10 w-10 items-center justify-center text-xl leading-none text-[#8f82ad] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                        onClick={() =>
-                          setMenuId((current) =>
-                            current === itemKey ? null : itemKey,
-                          )
-                        }
-                      >
-                        <span aria-hidden>···</span>
-                      </button>
-
-                      {menuId === itemKey ? (
-                        <div
-                          role="menu"
-                          className="absolute bottom-full right-0 z-20 mb-2 min-w-[200px] overflow-hidden rounded-[16px] border border-[#eadff8] bg-white shadow-[0_12px_28px_rgba(91,62,145,0.16)]"
+              return (
+                <PlaylistItemRow
+                  index={index}
+                  item={{
+                    practiceId: item.practiceId,
+                    audioItemId: item.audioItemId,
+                    title: item.title,
+                    authorName: item.authorName,
+                    authorSlug: item.authorSlug,
+                    coverUrl: item.coverUrl,
+                    coverImage: item.coverImage,
+                    updatedAt: item.updatedAt,
+                    formatLabel: item.formatLabel,
+                    metaLabel: item.metaLabel,
+                    available: item.available,
+                    href: item.listenHref,
+                    listenHref: item.listenHref,
+                  }}
+                  leadingControls={dragHandle}
+                  trailingControls={
+                    <>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          aria-label="Переместить выше"
+                          disabled={isFirst || reorderBusy}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                          onClick={() =>
+                            void moveItem(
+                              item.practiceId,
+                              item.audioItemId,
+                              "up",
+                            )
+                          }
                         >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full px-4 py-3 text-left text-sm text-[#b34f63] hover:bg-[#fff8f9]"
-                            onClick={() => {
-                              setMenuId(null);
-                              setFormError(null);
-                              setPendingDelete({
-                                practiceId: item.practiceId,
-                                audioItemId: item.audioItemId,
-                                title: item.title,
-                              });
-                            }}
+                          <span aria-hidden>{rowMoving ? "…" : "↑"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Переместить ниже"
+                          disabled={isLast || reorderBusy}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-base text-[#7042c5] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                          onClick={() =>
+                            void moveItem(
+                              item.practiceId,
+                              item.audioItemId,
+                              "down",
+                            )
+                          }
+                        >
+                          <span aria-hidden>↓</span>
+                        </button>
+                      </div>
+
+                      <div
+                        className="relative"
+                        ref={menuId === itemKey ? menuRef : null}
+                      >
+                        <button
+                          type="button"
+                          aria-label="Действия с материалом"
+                          aria-expanded={menuId === itemKey}
+                          aria-haspopup="menu"
+                          disabled={reorderBusy}
+                          className="flex h-10 w-10 items-center justify-center text-xl leading-none text-[#8f82ad] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                          onClick={() =>
+                            setMenuId((current) =>
+                              current === itemKey ? null : itemKey,
+                            )
+                          }
+                        >
+                          <span aria-hidden>···</span>
+                        </button>
+
+                        {menuId === itemKey ? (
+                          <div
+                            role="menu"
+                            className="absolute bottom-full right-0 z-20 mb-2 min-w-[200px] overflow-hidden rounded-[16px] border border-[#eadff8] bg-white shadow-[0_12px_28px_rgba(91,62,145,0.16)]"
                           >
-                            Удалить из плейлиста
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                }
-              />
-            );
-          })}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-4 py-3 text-left text-sm text-[#b34f63] hover:bg-[#fff8f9]"
+                              onClick={() => {
+                                setMenuId(null);
+                                setFormError(null);
+                                setPendingDelete({
+                                  practiceId: item.practiceId,
+                                  audioItemId: item.audioItemId,
+                                  title: item.title,
+                                });
+                              }}
+                            >
+                              Удалить из плейлиста
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  }
+                />
+              );
+            }}
+          />
         </section>
         </>
       )}

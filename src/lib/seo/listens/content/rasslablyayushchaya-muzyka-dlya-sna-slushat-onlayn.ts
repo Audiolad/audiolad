@@ -49,6 +49,14 @@ export const RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
           ]},
           { kind: "paragraph", text: "Музыка может стать частью атмосферы спокойствия и привычного сценария завершения дня." },
           { kind: "paragraph", text: "Разные варианты звучания подходят разным людям. Можно выбирать композиции по темпу, настроению и собственному восприятию." },
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { text: "Если после насыщенного дня нужен именно бытовой фон отдыха, можно также посмотреть " },
+              { href: "/listens/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn", label: "музыку для снятия стресса и расслабления" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {
@@ -115,9 +123,17 @@ export const RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE =
             "создавать свой комфортный сценарий прослушивания.",
           ]},
           { kind: "paragraph", text: "Если хочется посмотреть похожие направления, можно также обратить внимание на:" },
-          { kind: "list", items: [
-            "спокойную музыку для сна.",
-          ]},
+          {
+            kind: "rich_paragraph",
+            segments: [
+              { href: "/listens/relaks-muzyka-dlya-sna-slushat-onlayn", label: "релакс музыку для сна" },
+              { text: ", " },
+              { href: "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn", label: "спокойную музыку для сна" },
+              { text: " и " },
+              { href: "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn", label: "расслабляющую музыку без слов" },
+              { text: "." },
+            ],
+          },
         ],
       },
       {

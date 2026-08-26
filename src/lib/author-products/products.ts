@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { shouldCreateDefaultAudioItem } from "@/lib/author-products/course-builder-shared";
 import { getPracticeDeleteLock } from "@/lib/author-products/delete-lock";
 import { getPracticeSaleLock } from "@/lib/author-products/sale-lock";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -331,6 +332,16 @@ export async function createDraftProduct(
 
   if (practiceError || !practice?.id) {
     throw new Error("draft_create_failed");
+  }
+
+  if (!shouldCreateDefaultAudioItem(publicationClass)) {
+    return {
+      practice: coercePracticeRow(practice as PracticeRow),
+      audio_items: [],
+      gallery_slides: [],
+      contentLockedAfterSale: false,
+      deleteLockedAfterPaidPurchase: false,
+    };
   }
 
   const { data: audioItem, error: audioError } = await supabase

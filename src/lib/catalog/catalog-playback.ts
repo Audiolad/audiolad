@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
+import { resolvePublicationClass } from "@/lib/author-products/publication-class";
 import { resolveProductCoverUrl } from "@/lib/images/resolve-display";
 import {
   fromAudioPreviewWindowColumns,
+  isConfiguredStorefrontPreviewWindow,
   resolvePlaybackPreviewWindow,
 } from "@/lib/listen/preview-window";
 import {
@@ -112,16 +114,20 @@ async function loadCatalogPreviewSession(
     Boolean(item.audio_path?.trim()),
   );
 
-  let chosen = rows.find((item) => {
-    const window = fromAudioPreviewWindowColumns(item);
-    return (
-      window.previewStartMs != null &&
-      window.previewEndMs != null
-    );
-  });
+  const isCourse =
+    resolvePublicationClass(practice.publication_class, practice.product_kind) ===
+    "course";
 
-  if (!chosen) {
+  let chosen = rows.find((item) =>
+    isConfiguredStorefrontPreviewWindow(fromAudioPreviewWindowColumns(item)),
+  );
+
+  if (!chosen && !isCourse) {
     chosen = rows.find((item) => item.is_preview === true) ?? rows[0];
+  }
+
+  if (isCourse && !chosen) {
+    return { ok: false, reason: "unavailable" };
   }
 
   let track = chosen

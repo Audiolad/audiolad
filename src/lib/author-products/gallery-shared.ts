@@ -1,3 +1,8 @@
+import {
+  validatePositionReorderBatch,
+  type ReorderBatchItem,
+} from "@/lib/author-products/reorder-batch";
+
 export type AuthorGallerySlide = {
   id: string;
   publication_id: string;
@@ -8,10 +13,7 @@ export type AuthorGallerySlide = {
   created_at: string;
 };
 
-export type GalleryReorderSlideInput = {
-  id: string;
-  position: number;
-};
+export type GalleryReorderSlideInput = ReorderBatchItem;
 
 export function nextGalleryPosition(
   existing: ReadonlyArray<{ position: number }>,
@@ -29,71 +31,7 @@ export function validateGalleryReorderBatch(
 ):
   | { ok: true; ordered: GalleryReorderSlideInput[] }
   | { ok: false } {
-  if (slides.length !== existingIds.length) {
-    return { ok: false };
-  }
-
-  const uniqueExisting = new Set(existingIds);
-
-  if (uniqueExisting.size !== existingIds.length) {
-    return { ok: false };
-  }
-
-  const ids = slides.map((slide) => slide.id);
-
-  if (ids.some((id) => typeof id !== "string" || !id.trim())) {
-    return { ok: false };
-  }
-
-  if (new Set(ids).size !== ids.length) {
-    return { ok: false };
-  }
-
-  for (const id of ids) {
-    if (!uniqueExisting.has(id)) {
-      return { ok: false };
-    }
-  }
-
-  for (const id of existingIds) {
-    if (!ids.includes(id)) {
-      return { ok: false };
-    }
-  }
-
-  const positions = slides.map((slide) => slide.position);
-
-  if (
-    positions.some(
-      (position) =>
-        !Number.isInteger(position) ||
-        position < 0 ||
-        position >= existingIds.length,
-    )
-  ) {
-    return { ok: false };
-  }
-
-  if (new Set(positions).size !== positions.length) {
-    return { ok: false };
-  }
-
-  const expectedPositions = new Set(existingIds.map((_, index) => index));
-
-  if (positions.some((position) => !expectedPositions.has(position))) {
-    return { ok: false };
-  }
-
-  return {
-    ok: true,
-    ordered: [...slides].sort((left, right) => {
-      if (left.position !== right.position) {
-        return left.position - right.position;
-      }
-
-      return left.id.localeCompare(right.id);
-    }),
-  };
+  return validatePositionReorderBatch(existingIds, slides);
 }
 
 export function buildGallerySlideReplacePatch(input: {

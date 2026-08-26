@@ -47,6 +47,12 @@ import { MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "./content/m
 import { RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/relaks-muzyka-dlya-sna-slushat-onlayn";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn";
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "./content/spokoynaya-muzyka-dlya-sna-slushat-onlayn";
+import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
+import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-i-meditacii-slushat-onlayn";
+import { TARO_DENGI_PAGE } from "./content/taro-dengi";
+import { TARO_BOLSHIH_DENEG_PAGE } from "./content/taro-bolshih-deneg";
+import { TARO_BOGATSTVA_I_DENGI_PAGE } from "./content/taro-bogatstva-i-dengi";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -103,6 +109,12 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
   SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE,
+  MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE,
+  RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE,
+  MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE,
+  TARO_DENGI_PAGE,
+  TARO_BOLSHIH_DENEG_PAGE,
+  TARO_BOGATSTVA_I_DENGI_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

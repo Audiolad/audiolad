@@ -24,7 +24,7 @@ function assert(condition, message) {
   }
 }
 
-const allowedKeys = ["money", "relationships", "calm", "career", "business", "learning"];
+const allowedKeys = ["money", "relationships", "calm", "career", "business", "learning", "spirituality"];
 
 assert(parseCatalogTopicFilter(undefined, allowedKeys) === null, "missing param -> all");
 assert(parseCatalogTopicFilter("", allowedKeys) === null, "empty param -> all");
@@ -179,11 +179,24 @@ assert(
   ]) === "Карьера, Бизнес, Обучение",
   "new topic titles resolve in filter labels",
 );
+assert(
+  parseCatalogTopicFilter("spirituality", allowedKeys) === "spirituality",
+  "spirituality topic key is not a publication class",
+);
+assert(
+  getCatalogTopicFilterLabel("spirituality", [
+    { key: "spirituality", title: "Духовность" },
+  ]) === "Духовность",
+  "spirituality title resolves in filter labels",
+);
 
 const topicSeed = readFileSync(
   "supabase/migrations/20260825120000_topics_career_business_learning.sql",
   "utf8",
 );
+const spiritualitySeedPath =
+  "supabase/migrations/20260826120000_topics_spirituality.sql";
+const spiritualitySeed = readFileSync(spiritualitySeedPath, "utf8");
 const catalogFilterUi = readFileSync("src/lib/catalog/catalog-filter-ui.ts", "utf8");
 const listingContract = readFileSync("src/lib/catalog/listing-contract.ts", "utf8");
 const catalogDto = readFileSync("src/lib/catalog/dto.ts", "utf8");
@@ -203,6 +216,22 @@ assert(
     !topicSeed.includes("ALTER TABLE"),
   "seed only inserts topics and does not add a content class",
 );
+assert(
+  spiritualitySeedPath.includes("20260826120000"),
+  "spirituality seed timestamp is 20260826120000",
+);
+assert(spiritualitySeed.includes("'spirituality'"), "spirituality seed has key");
+assert(spiritualitySeed.includes("'Духовность'"), "spirituality seed has Духовность title");
+assert(spiritualitySeed.includes("ON CONFLICT (key) DO NOTHING"), "spirituality seed is insert-if-not-exists");
+assert(
+  spiritualitySeed.includes("INSERT INTO public.topics") &&
+    !spiritualitySeed.includes("publication_class") &&
+    !spiritualitySeed.includes("product_kind") &&
+    !spiritualitySeed.includes("CREATE TABLE") &&
+    !spiritualitySeed.includes("ALTER TABLE") &&
+    !/UPDATE\s+public\.practices/i.test(spiritualitySeed),
+  "spirituality seed only inserts a topic facet and does not add a publication class",
+);
 
 assert(
   topicQueries.includes('from("topics")') && topicQueries.includes("listActiveTopics"),
@@ -211,21 +240,24 @@ assert(
 assert(
   !catalogFilterUi.includes("Карьера") &&
     !catalogFilterUi.includes("Бизнес") &&
-    !catalogFilterUi.includes("Обучение"),
+    !catalogFilterUi.includes("Обучение") &&
+    !catalogFilterUi.includes("Духовность"),
   "catalog-filter-ui does not hardcode the new topic titles",
 );
 assert(
   !listingContract.includes('"learning"') &&
     !listingContract.includes('"career"') &&
-    !listingContract.includes('"business"'),
+    !listingContract.includes('"business"') &&
+    !listingContract.includes('"spirituality"'),
   "listing class filters stay independent of the new topic keys",
 );
 assert(
   catalogDto.includes('"course"') &&
     !catalogDto.includes('"learning"') &&
     !catalogDto.includes('"career"') &&
-    !catalogDto.includes('"business"'),
-  "Freeze v2 publication classes unchanged; learning is not a class",
+    !catalogDto.includes('"business"') &&
+    !catalogDto.includes('"spirituality"'),
+  "Freeze v2 publication classes unchanged; learning/spirituality are not classes",
 );
 assert(
   catalogFilterUi.includes('value: "course"') &&

@@ -63,12 +63,24 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const { data, error } = await supabase.rpc("move_playlist_item", {
+  const rpcArgs: {
+    p_playlist_id: string;
+    p_practice_id: string;
+    p_direction: "up" | "down";
+    p_audio_item_id: string | null;
+    p_target_position?: number;
+  } = {
     p_playlist_id: id,
     p_practice_id: practiceId,
     p_direction: parsed.direction,
     p_audio_item_id: parsed.audioItemId,
-  });
+  };
+
+  if (parsed.targetPosition != null) {
+    rpcArgs.p_target_position = parsed.targetPosition;
+  }
+
+  const { data, error } = await supabase.rpc("move_playlist_item", rpcArgs);
 
   if (error) {
     const message = error.message ?? "";
@@ -83,7 +95,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (
       code === "22023" ||
-      message.includes("invalid_direction")
+      message.includes("invalid_direction") ||
+      message.includes("invalid_target_position")
     ) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }

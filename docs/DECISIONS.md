@@ -43,6 +43,74 @@
 
 ---
 
+## 2026-08-26 — Course Content Foundation, Phase 2A PR1
+
+**Контекст:** у курса уже есть `publication_class=course`, но нет модели
+содержимого и слишком широкий listen-доступ: бесплатный опубликованный
+курс открывался по `canListen` / `is_free` как практика.
+
+**Решение:**
+
+- Модель `Course → Lesson → LessonBlock`. Section / Module нет.
+  Таблицы `course_lessons`, `course_lesson_blocks`, `publication_files`,
+  `course_completion_ctas`. Parent только явный `publication_class=course`.
+- Доступ к содержимому: `canAccessCourseContent` рядом с
+  `resolveProductAccess`. Разрешено только entitlement
+  (`user_practices`, включая `free_claim` и `purchase`), author member
+  или platform admin (`isPlatformAdmin` / `admin_panel.access`).
+  `canListen` из-за `is_free` / `free` / `guest_promo` недостаточно.
+  `reason: admin` у `resolveProductAccess` по-прежнему значит
+  `access_source=admin`; helper также принимает реального platform admin.
+- Listen signed audio / треки / catalog play full session для course
+  требуют helper. Free-by-link других классов не меняется. Catalog
+  `?preview=1` не обходит курс. Preview-окно витрины для курса — только
+  если оно уже задано и это не тело урока.
+- RLS без public SELECT и без learner SELECT. Bucket `publication-files`
+  private. CTA независим от `promo_*`. `audio_items` не мигрируются.
+- Вне scope этого PR: кабинет курса, `/learn`, learner API с payload
+  урока/блока/файла, progress, homework, quizzes, drip, certificates.
+
+**Принято:** владелец и архитектор (задание Phase 2A PR1 Course Content
+Foundation).
+
+---
+
+## 2026-08-26 — Author Course Builder, Phase 2A PR2
+
+**Контекст:** схема уроков/блоков уже есть, но автор не мог собирать
+курс в кабинете. Публикация курса всё ещё требовала плоский
+`audio_items` как у практики.
+
+**Решение:**
+
+- Конструктор только при явном `publication_class=course`. Список
+  уроков + один открытый редактор урока. Блоки text / audio / file.
+- Мутации проверяют цепочку: автор может менять публикацию, класс
+  course, `lesson.publication_id`, `block.lesson_id`.
+- Аудио блока — существующий `audio_items` + upload pipeline.
+  PDF — `publication_files` + private `publication-files`.
+- CTA только в `course_completion_ctas`.
+- Новое правило публикации только если `published_at` IS NULL:
+  ≥1 урок и ≥1 блок. Черновик без уроков можно сохранить.
+  Плоское аудио не требуется, если у курса есть любой блок.
+- Новый `publication_class=course` не создаёт пустой слот
+  `audio_items` («Аудио 1»). Practice / audiobook / release / post
+  без изменений. Существующие course `audio_items` не мигрируются
+  и не удаляются.
+- «Рекомендации перед прослушиванием» и «общая обложка для всех
+  треков» скрыты у курса; у практики остаются. Audiobook не меняли.
+- Mobile Course Builder: один флаг `mobileEditorOpen` — список XOR
+  редактор; desktop по-прежнему list + editor рядом.
+
+**Вне scope:** `/learn`, learner API, progress, Section/Module,
+homework, quizzes, drip, certificates. PDP / CatalogCard / offer /
+free_claim / purchase не менялись.
+
+**Принято:** владелец и архитектор (задание Phase 2A PR2 Author Course
+Builder).
+
+---
+
 ## 2026-08-25 — Author Cabinet foundation, Phase 1
 
 **Контекст:** кабинет должен создавать новые классы публикаций, не ломая

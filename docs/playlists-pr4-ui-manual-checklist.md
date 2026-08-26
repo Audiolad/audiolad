@@ -1,4 +1,4 @@
-# Playlists PR4 — UI manual checklist (reorder ↑↓)
+# Playlists PR4 — UI manual checklist (reorder ↑↓ + shared DnD)
 
 Ручная проверка на `/playlists/[id]` после deploy PR4 (или локально с применённой migration).
 
@@ -26,7 +26,8 @@
 
 - [ ] Клик «↑»/«↓» блокирует reorder до ответа (нет double-submit).
 - [ ] Быстрые повторные клики не ломают порядок и не дают 500.
-- [ ] Нет optimistic swap: до ответа сервера порядок визуально прежний.
+- [ ] Стрелки: нет optimistic swap до ответа сервера.
+- [ ] DnD: optimistic только на drop, не во время pointermove.
 - [ ] После успеха список обновляется (`router.refresh`).
 - [ ] Loading на активной строке понятен.
 - [ ] Error: «Не удалось изменить порядок…» / «Материал не найден…» / «Порядок уже изменился…».
@@ -52,10 +53,21 @@
 - [ ] `aria-label`: «Переместить выше/ниже: {title}».
 - [ ] Screen reader озвучивает disabled.
 
+## Drag-and-drop (общий слой в обоих редакторах)
+
+- [ ] Editorial и user-owned используют один `PlaylistItemsSortableList`.
+- [ ] Ручка 6 точек; drag стартует с ручки, не со всей строки.
+- [ ] Desktop mouse + mobile finger. Page scroll не начинает drag (distance / delay+tolerance).
+- [ ] Play / Слушать всё не срабатывают на pointerdown по ручке.
+- [ ] Во время drag видно место вставки.
+- [ ] Drop: один вызов `POST .../move` с `targetPosition`; ошибка откатывает порядок.
+- [ ] После reload порядок тот же.
+- [ ] Стрелки ↑/↓ остаются как fallback.
+- [ ] Editorial 15 items: 15→1, 1→15, 8→3, reload persists.
+- [ ] User playlist: то же.
+- [ ] После reorder: Слушать всё и `/p/[slug]` читают новый порядок; каталог не затронут.
+
 ## Не в scope (не проверять как готовое)
 
-- Drag-and-drop
-- Play All
-- `/p/[slug]`
 - Сортировка по названию/дате
 - Ручной ввод позиции

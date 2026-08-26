@@ -213,6 +213,28 @@ Timeweb Cloud
   `PATCH/DELETE .../gallery/[slideId]`. Каталог кладёт слайды в
   `CatalogCard.gallery` только для product-классов; `release` / `post`
   всегда `[]`. Cover не является слайдом.
+- Phase 2A Course Content Foundation: `Course → Lesson → LessonBlock`.
+  Section / Module нет. Таблицы `course_lessons`, `course_lesson_blocks`,
+  `publication_files`, `course_completion_ctas`. Доступ к содержимому
+  курса — только `canAccessCourseContent` в `src/lib/products/access.ts`:
+  активный `user_practices` / автор-участник / platform admin
+  (`src/lib/auth/platform-admin.ts`). `is_free` / `reason: free` /
+  `guest_promo` / `canListen` недостаточно. Listen signed audio и
+  загрузка треков для `publication_class=course` требуют этот helper;
+  free-by-link для practice / release / post / audiobook не меняется.
+  Bucket `publication-files` — private, без public SELECT. CTA курса
+  не использует `promo_*`. `audio_items` не мигрируются в уроки.
+  Learner API `/learn` в этом этапе нет: будущий API сначала резолвит
+  родительский курс, затем `canAccessCourseContent`, затем читает.
+- Phase 2A Author Course Builder: кабинет `AuthorCourseBuilder` только
+  при явном `publication_class=course`. API
+  `/api/author/products/[id]/course/*` (уроки, блоки, reorder, CTA,
+  author signed PDF). Новый курс не получает автоматический слот
+  `audio_items`. Плоский список `audio_items` для курса скрыт;
+  аудио урока идёт через существующий `/audio*` pipeline.
+  `course_completion_ctas` не пишет `practices.promo_*`. Публикация
+  неопубликованного курса требует ≥1 урок и ≥1 блок; уже
+  опубликованные курсы без уроков новым правилом не блокируются.
 
 ## MAX Mini App (этапы 1–3B)
 
