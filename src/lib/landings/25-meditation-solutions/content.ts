@@ -39,11 +39,22 @@ export type MeditationSolutionsPractice = {
   basePrice: number | null;
 };
 
+export const MEDITATION_SOLUTIONS_CARD_FORMATS = [
+  "PDF + аудио",
+  "PDF",
+  "Аудио",
+  "Аудио + PDF",
+] as const;
+
+export type MeditationSolutionsCardFormat =
+  (typeof MEDITATION_SOLUTIONS_CARD_FORMATS)[number];
+
 export type MeditationSolutionsCard = {
   id: string;
   imageSrc: string;
   title: string;
   description: string;
+  format: MeditationSolutionsCardFormat;
   bonus?: boolean;
 };
 
@@ -54,6 +65,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как сделать медитацию: пошаговый план от идеи до готового MP3",
     description:
       "Пошаговая карта всего процесса – от первой идеи до готовой записи с голосом и музыкой.",
+    format: "PDF + аудио",
   },
   {
     id: "item-02",
@@ -61,6 +73,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как создать свою медитацию: 50 готовых тем",
     description:
       "50 идей для медитаций, чтобы быстро выбрать тему и начать создавать свою практику.",
+    format: "PDF",
   },
   {
     id: "item-03",
@@ -68,6 +81,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Текст для медитации: готовая структура из 7 частей",
     description:
       "Готовый каркас, который помогает собрать текст медитации от вступления до завершения.",
+    format: "PDF",
   },
   {
     id: "item-04",
@@ -75,6 +89,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как написать текст для медитации: пошаговый конструктор",
     description:
       "Последовательно соберите собственный сценарий, даже если раньше никогда не писали медитации.",
+    format: "PDF",
   },
   {
     id: "item-05",
@@ -82,6 +97,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Паспорт будущей медитации: готовый шаблон",
     description:
       "Определите тему, аудиторию, результат, настроение, голос и музыку ещё до начала записи.",
+    format: "PDF",
   },
   {
     id: "item-06",
@@ -89,6 +105,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "20 готовых начал для текста медитации",
     description:
       "Готовые варианты первых фраз, чтобы красиво и естественно начать свою медитацию.",
+    format: "PDF",
   },
   {
     id: "item-07",
@@ -96,6 +113,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как записать медитацию самостоятельно",
     description:
       "Простая инструкция для самостоятельной записи без сложной студии и лишнего оборудования.",
+    format: "Аудио",
   },
   {
     id: "item-08",
@@ -103,6 +121,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как записать медитацию голосом",
     description:
       "Как говорить естественно, спокойно и убедительно, не превращая практику в чтение текста.",
+    format: "Аудио",
   },
   {
     id: "item-09",
@@ -110,6 +129,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как записать медитацию с музыкой",
     description:
       "Как соединить голос и музыкальный фон и получить цельную готовую аудиопрактику.",
+    format: "Аудио",
   },
   {
     id: "item-10",
@@ -117,6 +137,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Музыка для записи медитаций: как выбрать правильный фон",
     description:
       "Разберитесь, какая музыка поддерживает голос и атмосферу, а какая начинает мешать практике.",
+    format: "PDF",
   },
   {
     id: "item-11",
@@ -124,6 +145,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "10 красивых способов завершить медитацию",
     description:
       "Готовые варианты мягкого завершения практики и возвращения слушателя к обычному состоянию.",
+    format: "PDF",
   },
   {
     id: "item-12",
@@ -131,6 +153,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как создать и записать свою медитацию в Студии АудиоЛад",
     description:
       "Практический путь от записи голоса до готового MP3 прямо в Студии АудиоЛада.",
+    format: "Аудио + PDF",
   },
   {
     id: "item-13",
@@ -138,6 +161,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "30 готовых названий для медитаций",
     description:
       "Примеры и формулы, которые помогут быстро придумать понятное и привлекательное название.",
+    format: "PDF",
   },
   {
     id: "item-14",
@@ -145,6 +169,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Формула сильной темы для медитации",
     description:
       "Превратите общую идею в конкретную тему с понятным состоянием и результатом для слушателя.",
+    format: "PDF",
   },
   {
     id: "item-15",
@@ -152,6 +177,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Аффирмации для медитации: готовые формулы и примеры",
     description:
       "Готовые конструкции и примеры, которые можно адаптировать под разные темы медитаций.",
+    format: "PDF",
   },
   {
     id: "item-16",
@@ -159,6 +185,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Конструктор основной части медитации",
     description:
       "Соберите центральную часть практики из понятных элементов и не теряйте логику сценария.",
+    format: "PDF",
   },
   {
     id: "item-17",
@@ -166,6 +193,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Медитация «из точки А в точку Б»: готовая формула результата",
     description:
       "Определите исходное и желаемое состояние слушателя и постройте практику между ними.",
+    format: "PDF",
   },
   {
     id: "item-18",
@@ -173,6 +201,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "10 форматов медитаций и аудиопрактик, которые можно создавать",
     description:
       "Выберите подходящий формат – от классической медитации до визуализации, настроя и аудиопрактики.",
+    format: "PDF",
   },
   {
     id: "item-19",
@@ -180,6 +209,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "15 способов быстро расслабить человека в начале медитации",
     description:
       "Готовые приёмы для дыхания, внимания и расслабления, которые можно использовать во вступлении.",
+    format: "Аудио + PDF",
   },
   {
     id: "item-20",
@@ -187,6 +217,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Конструктор визуализации для медитации",
     description:
       "Создавайте образы, пространства и внутренние путешествия по простой готовой структуре.",
+    format: "PDF",
   },
   {
     id: "item-21",
@@ -194,6 +225,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как подготовить голос к записи медитации за 5 минут",
     description:
       "Короткая подготовка перед записью, чтобы голос звучал свободнее, спокойнее и естественнее.",
+    format: "Аудио",
   },
   {
     id: "item-22",
@@ -201,6 +233,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "5 вариантов голоса и интонации для разных медитаций",
     description:
       "Сравните разные способы подачи и подберите интонацию под тему и настроение своей практики.",
+    format: "Аудио",
   },
   {
     id: "item-23",
@@ -208,6 +241,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как записать чистый голос для медитации",
     description:
       "Практические настройки записи, которые помогают получить более аккуратный и понятный голос.",
+    format: "PDF",
   },
   {
     id: "item-24",
@@ -215,6 +249,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Голос и музыка в медитации: формула правильного баланса",
     description:
       "Настройте соотношение голоса и музыки так, чтобы фон создавал атмосферу и не перекрывал слова.",
+    format: "Аудио",
   },
   {
     id: "item-25",
@@ -222,6 +257,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
     title: "Как из одной медитации создать серию из 7 аудиопрактик",
     description:
       "Превратите одну удачную тему в целую последовательность взаимосвязанных аудиопрактик.",
+    format: "PDF",
   },
   {
     id: "bonus-26",
@@ -230,6 +266,7 @@ export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
       "Как использовать медитации и аудиопрактики для привлечения клиентов",
     description:
       "15 готовых способов встроить аудио в свою работу, продвижение, консультации, программы и продукты.",
+    format: "PDF + аудио",
     bonus: true,
   },
 ] as const;

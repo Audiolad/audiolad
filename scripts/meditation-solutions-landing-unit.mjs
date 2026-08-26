@@ -133,10 +133,55 @@ function testGridAndCardsReuseCatalogGeometry() {
   );
   assert.doesNotMatch(cards, /BuyPracticeButton/);
   assert.doesNotMatch(cards, /CatalogProductHeartButton/);
+  assert.doesNotMatch(cards, /CatalogProductPlayButton/);
   assert.doesNotMatch(cards, /href=.*practice/);
+  assert.doesNotMatch(cards, /card\.description/);
+  assert.match(cards, /rounded-\[20px\]/);
+  assert.match(cards, /border-\[#eadff8\]/);
+  assert.match(cards, /data-meditation-solutions-format/);
+  assert.match(cards, /card\.format/);
   assert.match(view, /priority/);
   assert.match(cards, /loading="lazy"/);
   assert.match(view, /platformBottomContentPaddingClass/);
+}
+
+function testCardFormats() {
+  const expected = [
+    "PDF + аудио",
+    "PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "Аудио",
+    "Аудио",
+    "Аудио",
+    "PDF",
+    "PDF",
+    "Аудио + PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "PDF",
+    "Аудио + PDF",
+    "PDF",
+    "Аудио",
+    "Аудио",
+    "PDF",
+    "Аудио",
+    "PDF",
+    "PDF + аудио",
+  ];
+
+  assert.equal(MEDITATION_SOLUTIONS_CARDS.length, expected.length);
+  assert.deepEqual(
+    MEDITATION_SOLUTIONS_CARDS.map((card) => card.format),
+    expected,
+  );
+  assert.equal(MEDITATION_SOLUTIONS_CARDS[25].bonus, true);
+  assert.equal(MEDITATION_SOLUTIONS_CARDS[25].format, "PDF + аудио");
 }
 
 function testPromotionWindowReuse() {
@@ -284,6 +329,7 @@ function testNoPageBuilder() {
 testCopyLock();
 testRouteIsolation();
 testGridAndCardsReuseCatalogGeometry();
+testCardFormats();
 testPromotionWindowReuse();
 testExpiryUi();
 testCheckoutWiring();
