@@ -4,6 +4,7 @@ import BuyPracticeButton from "@/components/BuyPracticeButton";
 import PurchaseConsent from "@/components/PurchaseConsent";
 import {
   MEDITATION_SOLUTIONS_BUY_LABEL,
+  MEDITATION_SOLUTIONS_ONCE_NOTE,
   MEDITATION_SOLUTIONS_PRACTICE_SLUG,
   MEDITATION_SOLUTIONS_PUBLIC_PATH,
   MEDITATION_SOLUTIONS_TIMER_CAPTION,
@@ -51,10 +52,18 @@ export default function MeditationSolutionsOfferCta({
       )}
 
       {display.showPromo ? (
-        <p className="text-sm font-medium text-[#5f4a8f]">
-          {MEDITATION_SOLUTIONS_TIMER_CAPTION}{" "}
-          <span aria-hidden="true">{display.remainingLabel}</span>
-        </p>
+        <div className="text-center">
+          <p className="text-sm font-medium text-[#5f4a8f]">
+            {MEDITATION_SOLUTIONS_TIMER_CAPTION}
+          </p>
+          <p
+            data-meditation-solutions-countdown
+            aria-hidden="true"
+            className="mt-1 text-[28px] font-semibold tabular-nums leading-none tracking-wide text-[#25135c]"
+          >
+            {display.remainingLabel}
+          </p>
+        </div>
       ) : null}
 
       {display.canPurchase ? (
@@ -82,6 +91,13 @@ export default function MeditationSolutionsOfferCta({
           {MEDITATION_SOLUTIONS_BUY_LABEL}
         </button>
       )}
+
+      {display.showPromo ? (
+        <p className="text-center text-[13px] leading-5 text-[#7d70a2]">
+          {MEDITATION_SOLUTIONS_ONCE_NOTE}
+        </p>
+      ) : null}
+
       {placement === "bottom" ? <PurchaseConsent /> : null}
     </section>
   );

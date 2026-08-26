@@ -18,6 +18,7 @@ import {
   MEDITATION_SOLUTIONS_SEO_DESCRIPTION,
   MEDITATION_SOLUTIONS_SEO_TITLE,
   MEDITATION_SOLUTIONS_SUBTITLE,
+  MEDITATION_SOLUTIONS_ONCE_NOTE,
   MEDITATION_SOLUTIONS_TIMER_CAPTION,
   MEDITATION_SOLUTIONS_TIMER_SECONDS,
   assertMeditationSolutionsCopyLock,
@@ -55,7 +56,12 @@ function testCopyLock() {
   assert.equal(MEDITATION_SOLUTIONS_BASE_PRICE_RUB, 4999);
   assert.equal(MEDITATION_SOLUTIONS_SALE_PRICE_RUB, 499);
   assert.equal(MEDITATION_SOLUTIONS_TIMER_SECONDS, 1200);
-  assert.equal(MEDITATION_SOLUTIONS_TIMER_CAPTION, "в ближайшие 20 минут");
+  assert.equal(MEDITATION_SOLUTIONS_TIMER_CAPTION, "Предложение действует ещё:");
+  assert.equal(
+    MEDITATION_SOLUTIONS_ONCE_NOTE,
+    "Это предложение показывается вам один раз. После окончания таймера продукт останется доступен по полной цене 4 999 ₽.",
+  );
+  assert.doesNotMatch(MEDITATION_SOLUTIONS_TIMER_CAPTION, /в ближайшие 20 минут/);
   assert.equal(MEDITATION_SOLUTIONS_BUY_LABEL, "Купить");
   assert.equal(MEDITATION_SOLUTIONS_BONUS_BADGE, "БОНУС");
   assert.equal(MEDITATION_SOLUTIONS_CARDS.length, 26);
@@ -78,6 +84,8 @@ function testCopyLock() {
     MEDITATION_SOLUTIONS_SUBTITLE,
     MEDITATION_SOLUTIONS_OFFER_LINE,
     MEDITATION_SOLUTIONS_SEO_TITLE,
+    MEDITATION_SOLUTIONS_TIMER_CAPTION,
+    MEDITATION_SOLUTIONS_ONCE_NOTE,
     ...MEDITATION_SOLUTIONS_CARDS.flatMap((card) => [
       card.title,
       card.description,
@@ -254,6 +262,15 @@ function testExpiryUi() {
   assert.equal(active.remainingLabel, "15:00");
   assert.equal(active.canPurchase, true);
 
+  const oneSecondLater = resolveMeditationSolutionsOfferDisplay({
+    nowMs: Date.parse("2026-08-26T10:05:01.000Z"),
+    expiresAt: "2026-08-26T10:20:00.000Z",
+    windowSynced: true,
+  });
+  assert.equal(oneSecondLater.showPromo, true);
+  assert.equal(oneSecondLater.remainingLabel, "14:59");
+  assert.equal(oneSecondLater.chargePrice, 499);
+
   const expired = resolveMeditationSolutionsOfferDisplay({
     nowMs: Date.parse("2026-08-26T10:20:00.000Z"),
     expiresAt: "2026-08-26T10:20:00.000Z",
@@ -286,8 +303,26 @@ function testCheckoutWiring() {
     "supabase/migrations/20260826120000_seed_25_meditation_solutions_practice.sql",
   );
 
+  const provider = read(
+    "src/components/landings/25-meditation-solutions/MeditationSolutionsOfferProvider.tsx",
+  );
+  const view = read(
+    "src/components/landings/25-meditation-solutions/MeditationSolutionsLandingView.tsx",
+  );
+
   assert.match(cta, /BuyPracticeButton/);
   assert.match(cta, /display.canPurchase/);
+  assert.match(cta, /data-meditation-solutions-countdown/);
+  assert.match(cta, /MEDITATION_SOLUTIONS_ONCE_NOTE/);
+  assert.match(cta, /MEDITATION_SOLUTIONS_TIMER_CAPTION/);
+  assert.doesNotMatch(cta, /в ближайшие 20 минут/);
+  assert.doesNotMatch(cta, /setInterval/);
+  assert.match(cta, /useMeditationSolutionsOffer/);
+  assert.equal((provider.match(/setInterval/g) ?? []).length, 1);
+  assert.match(provider, /if \(!expiresAt\)/);
+  assert.match(view, /MeditationSolutionsOfferProvider/);
+  assert.match(view, /placement="top"/);
+  assert.match(view, /placement="bottom"/);
   assert.match(cta, /purchaseSurface="sales_landing"/);
   assert.match(cta, /productPriceMinorSnapshot=\{display.chargePriceMinor\}/);
   assert.match(cta, /ctaPlacement=\{placement\}/);

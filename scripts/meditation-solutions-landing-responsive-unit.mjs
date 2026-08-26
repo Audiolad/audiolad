@@ -69,7 +69,8 @@ const html = `<!doctype html>
         <p class="copy">25 готовых тем, текстов, шаблонов, инструкций и практических инструментов – от первой идеи до готовой медитации с голосом и музыкой.</p>
         <div class="cta" data-meditation-solutions-cta="top">
           <p class="price">499 ₽</p>
-          <p>в ближайшие 20 минут 20:00</p>
+          <p>Предложение действует ещё:</p>
+          <p>20:00</p>
           <button class="buy" type="button">Купить</button>
         </div>
         <ul data-catalog-product-grid data-meditation-solutions-grid class="catalog-product-grid catalog-product-grid--fixed-2">
@@ -85,7 +86,8 @@ const html = `<!doctype html>
         </ul>
         <div class="cta" data-meditation-solutions-cta="bottom">
           <p class="price">499 ₽</p>
-          <p>в ближайшие 20 минут 20:00</p>
+          <p>Предложение действует ещё:</p>
+          <p>20:00</p>
           <button class="buy" type="button">Купить</button>
         </div>
       </article>
