@@ -51,6 +51,7 @@ import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from
 import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "./content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
 import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "./content/muzyka-dlya-sna-i-meditacii-slushat-onlayn";
 import { TARO_DENGI_PAGE } from "./content/taro-dengi";
+import { TARO_BOLSHIH_DENEG_PAGE } from "./content/taro-bolshih-deneg";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -111,6 +112,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE,
   MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE,
   TARO_DENGI_PAGE,
+  TARO_BOLSHIH_DENEG_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

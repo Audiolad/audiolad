@@ -80,6 +80,7 @@ import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from
 import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-i-meditacii-slushat-onlayn.ts";
 import { TARO_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-dengi.ts";
+import { TARO_BOLSHIH_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-bolshih-deneg.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1756,6 +1757,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftyThirdListenHref}`,
     ),
     "directory JSON-LD includes fifty-third listen href",
+  );
+
+  const fiftyFourthListenHref = "/listens/taro-bolshih-deneg";
+  const fiftyFourthListenCard = data.articles.find((card) => card.href === fiftyFourthListenHref);
+  assert(fiftyFourthListenCard, "fifty-fourth indexable listen page is listed");
+  assert(
+    fiftyFourthListenCard.title === "Таро больших денег – крупные финансовые цели | АудиоЛад",
+    "fifty-fourth listen directory title",
+  );
+  assert(
+    fiftyFourthListenCard.description === TARO_BOLSHIH_DENEG_PAGE.description,
+    "fifty-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-bolshih-deneg",
+    ),
+    "no /articles duplicate for fifty-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyFourthListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-fourth listen href",
   );
 
 
