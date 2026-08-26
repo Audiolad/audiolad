@@ -481,12 +481,12 @@ function testHeroProductCard() {
   assert.match(view, /rounded-\[22px\]/);
   assert.match(view, /rounded-\[28px\]/);
   assert.match(view, /border-\[#e8def5\]/);
-  assert.match(view, /max-w-\[240px\]/);
-  assert.match(view, /sm:max-w-\[280px\]/);
+  assert.match(view, /max-w-\[300px\]/);
+  assert.match(view, /sm:max-w-\[340px\]/);
   assert.match(view, /text-center/);
   assert.match(
     view,
-    /data-meditation-solutions-hero-title[\s\S]*pt-8/,
+    /data-meditation-solutions-hero-title[\s\S]*pt-10/,
   );
   assert.doesNotMatch(
     view,

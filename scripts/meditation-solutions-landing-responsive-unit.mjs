@@ -35,18 +35,19 @@ const html = `<!doctype html>
         border: 1px solid #e8def5;
         border-radius: 28px;
         background: #fff;
-        padding: 1.25rem 1.25rem 1.25rem;
+        padding: 14px;
+        max-width: 300px;
+        margin: 0 auto;
       }
       .hero-cover {
         aspect-ratio: 1 / 1;
         width: 100%;
-        max-width: 240px;
         margin: 0 auto;
         border-radius: 22px;
         background: #efe6fb;
         object-fit: contain;
       }
-      .hero-title { padding: 2rem 2px 4px; }
+      .hero-title { padding: 2.5rem 4px 4px; }
       h1 {
         margin: 0;
         font-size: 22px;
@@ -70,7 +71,7 @@ const html = `<!doctype html>
       }
       .catalog-product-grid--fixed-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       @media (min-width: 768px) {
-        .hero-cover { max-width: 280px; }
+        .hero-card { max-width: 340px; }
         .catalog-product-grid,
         .catalog-product-grid--fixed-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.125rem; }
       }
@@ -183,14 +184,14 @@ try {
     assert.equal(metrics.hasListenerShell, false, `${width}px: no ListenerAppShell`);
     assert.equal(metrics.headingInsideCard, true, `${width}px: H1 in hero card`);
     assert.equal(metrics.headingAlign, "center", `${width}px: H1 centered`);
-    assert.ok(metrics.coverTitleGap >= 28, `${width}px: extra gap under cover`);
+    assert.ok(metrics.coverTitleGap >= 36, `${width}px: extra gap under cover`);
     assert.equal(metrics.coverSquare, true, `${width}px: hero cover is square`);
     assert.ok(
       metrics.coverWidth <= metrics.heroCardWidth,
       `${width}px: hero cover stays inside the card`,
     );
     assert.ok(
-      metrics.coverWidth <= 281,
+      metrics.coverWidth <= 341,
       `${width}px: hero cover stays compact (${metrics.coverWidth})`,
     );
     assert.ok(
