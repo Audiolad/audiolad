@@ -53,6 +53,7 @@ import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "./content/muzyk
 import { TARO_DENGI_PAGE } from "./content/taro-dengi";
 import { TARO_BOLSHIH_DENEG_PAGE } from "./content/taro-bolshih-deneg";
 import { TARO_BOGATSTVA_I_DENGI_PAGE } from "./content/taro-bogatstva-i-dengi";
+import { KARTA_TARO_NA_DENGI_PAGE } from "./content/karta-taro-na-dengi";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -115,6 +116,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   TARO_DENGI_PAGE,
   TARO_BOLSHIH_DENEG_PAGE,
   TARO_BOGATSTVA_I_DENGI_PAGE,
+  KARTA_TARO_NA_DENGI_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

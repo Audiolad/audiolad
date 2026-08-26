@@ -82,6 +82,7 @@ import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/
 import { TARO_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-dengi.ts";
 import { TARO_BOLSHIH_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-bolshih-deneg.ts";
 import { TARO_BOGATSTVA_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-bogatstva-i-dengi.ts";
+import { KARTA_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/karta-taro-na-dengi.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1806,6 +1807,32 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftyFifthListenHref}`,
     ),
     "directory JSON-LD includes fifty-fifth listen href",
+  );
+
+
+
+  const fiftySixthListenHref = "/listens/karta-taro-na-dengi";
+  const fiftySixthListenCard = data.articles.find((card) => card.href === fiftySixthListenHref);
+  assert(fiftySixthListenCard, "fifty-sixth indexable listen page is listed");
+  assert(
+    fiftySixthListenCard.title === "Карта Таро на деньги – какие карты означают финансы | АудиоЛад",
+    "fifty-sixth listen directory title",
+  );
+  assert(
+    fiftySixthListenCard.description === KARTA_TARO_NA_DENGI_PAGE.description,
+    "fifty-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/karta-taro-na-dengi",
+    ),
+    "no /articles duplicate for fifty-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftySixthListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-sixth listen href",
   );
 
 
