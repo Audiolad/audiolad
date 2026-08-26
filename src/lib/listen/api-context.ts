@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isCoursePublication } from "@/lib/course-content/validators";
 import { resolveListenAccess } from "@/lib/listen/access";
 import type { ListenAccess } from "@/lib/listen/types";
 import {
+  canAccessCourseContent,
   isPracticeCatalogListed,
   isPracticePublished,
   resolveProductAccess,
@@ -24,6 +26,7 @@ type PracticeAccessRow = {
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
+  publication_class?: string | null;
 };
 
 export type ListenApiContext = {
@@ -103,8 +106,37 @@ export async function loadListenApiContext(
 
   const wantsCatalogPreview =
     new URL(request.url).searchParams.get("preview") === "1";
+  const isCourse = isCoursePublication(
+    practice.publication_class,
+    practice.product_kind,
+  );
 
-  if (!productAccess.canListen) {
+  if (isCourse) {
+    let courseAllowed = false;
+
+    try {
+      courseAllowed = await canAccessCourseContent(
+        supabase,
+        practice,
+        user?.id ?? null,
+        { access: productAccess },
+      );
+    } catch {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "internal_error" }, { status: 500 }),
+      };
+    }
+
+    if (!courseAllowed) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "forbidden" }, { status: 403 }),
+      };
+    }
+  }
+
+  if (!isCourse && !productAccess.canListen) {
     if (
       wantsCatalogPreview &&
       isPracticePublished(practice.status) &&
