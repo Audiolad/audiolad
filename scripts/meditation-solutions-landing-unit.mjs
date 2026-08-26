@@ -340,6 +340,12 @@ function testCheckoutWiring() {
   assert.match(seed, /AND sale_price = 499/);
   assert.match(seed, /1200/);
   assert.match(seed, /is_catalog_listed = false/);
+  assert.match(seed, /ON CONFLICT \(author_id, slug\) DO UPDATE/);
+  assert.doesNotMatch(seed, /ON CONFLICT \(slug\) DO UPDATE/);
+  assert.match(
+    seed,
+    /slug 25-meditation-solutions is already owned by another practice id/,
+  );
   const lineage = read("deploy/scripts/lib/migration-audit-lineage.mjs");
   assert.match(lineage, /"20260828120000"/);
   assert.doesNotMatch(

@@ -3,6 +3,7 @@ BEGIN;
 -- Paid practice + personal 20-minute 499 ₽ offer for the
 -- /p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy landing.
 -- Idempotent: safe to re-run. Unlisted in catalog; checkout uses slug.
+-- Upsert on UNIQUE (author_id, slug). Production has no UNIQUE(slug).
 
 DO $$
 BEGIN
@@ -12,6 +13,15 @@ BEGIN
     WHERE id = '50ee125c-8951-4ac6-819a-3f6b11150008'
   ) THEN
     RAISE EXCEPTION 'Author sergey-and-zoya is required before seeding 25-meditation-solutions';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.practices
+    WHERE slug = '25-meditation-solutions'
+      AND id <> 'b7c1e4a0-2d5f-4e8b-9c3a-6f1d8e2a4b70'
+  ) THEN
+    RAISE EXCEPTION 'slug 25-meditation-solutions is already owned by another practice id';
   END IF;
 END;
 $$;
@@ -50,7 +60,7 @@ VALUES (
   false,
   'practice'
 )
-ON CONFLICT (slug) DO UPDATE
+ON CONFLICT (author_id, slug) DO UPDATE
 SET
   title = EXCLUDED.title,
   description = EXCLUDED.description,
