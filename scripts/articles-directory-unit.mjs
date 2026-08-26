@@ -79,6 +79,7 @@ import { SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/l
 import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNA_I_MEDITACII_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-i-meditacii-slushat-onlayn.ts";
+import { TARO_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-dengi.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1731,6 +1732,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftySecondListenHref}`,
     ),
     "directory JSON-LD includes fifty-second listen href",
+  );
+
+  const fiftyThirdListenHref = "/listens/taro-dengi";
+  const fiftyThirdListenCard = data.articles.find((card) => card.href === fiftyThirdListenHref);
+  assert(fiftyThirdListenCard, "fifty-third indexable listen page is listed");
+  assert(
+    fiftyThirdListenCard.title === "Таро деньги – карты и финансовая ситуация | АудиоЛад",
+    "fifty-third listen directory title",
+  );
+  assert(
+    fiftyThirdListenCard.description === TARO_DENGI_PAGE.description,
+    "fifty-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-dengi",
+    ),
+    "no /articles duplicate for fifty-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-third listen href",
   );
 
 
