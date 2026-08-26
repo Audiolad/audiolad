@@ -275,6 +275,13 @@ function testRepoOneFileOneVersion() {
       (row) => row.filename === "20260827120000_course_content_foundation.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260828120000_seed_25_meditation_solutions_practice.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -318,9 +325,11 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825165000",
     "20260825166000",
     "20260826120000",
+    "20260826180000",
     "20260827120000",
+    "20260828120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 12);
+  assert.equal(plan.database_migrations_pending, 14);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -343,9 +352,11 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260825165000",
     "20260825166000",
     "20260826120000",
+    "20260826180000",
     "20260827120000",
+    "20260828120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 6);
+  assert.equal(plan.database_migrations_pending, 8);
 }
 
 function main() {

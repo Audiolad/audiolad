@@ -1,3 +1,5 @@
+import { MEDITATION_SOLUTIONS_PUBLIC_PATH } from "@/lib/landings/25-meditation-solutions/content";
+
 /** Маршруты без подсветки активной вкладки (юридические и информационные). */
 const BOTTOM_NAV_NEUTRAL_EXACT = new Set([
   "/offer",
@@ -60,7 +62,8 @@ export function isBottomNavNeutralPathname(pathname: string): boolean {
     pathname.startsWith("/help/") ||
     pathname === "/about" ||
     pathname === "/philosophy" ||
-    pathname === "/for-authors"
+    pathname === "/for-authors" ||
+    pathname === MEDITATION_SOLUTIONS_PUBLIC_PATH
   );
 }
 

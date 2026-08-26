@@ -16,6 +16,7 @@ export const BUY_CLICKED_PROPERTY_KEYS = [
   "path",
   "purchase_surface",
   "client_event_id",
+  "cta_placement",
 ] as const;
 
 export type BuyClickedProperties = {
@@ -25,6 +26,7 @@ export type BuyClickedProperties = {
   path?: string | null;
   purchase_surface: PurchaseSurface;
   client_event_id?: string | null;
+  cta_placement?: "top" | "bottom";
 };
 
 const UUID_PATTERN =
@@ -41,6 +43,7 @@ export function buildBuyClickedProperties(input: {
   path?: string | null;
   purchaseSurface?: string | null;
   clientEventId?: string | null;
+  ctaPlacement?: "top" | "bottom" | null;
 }): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {
     purchase_surface: normalizePurchaseSurface(input.purchaseSurface),
@@ -79,6 +82,10 @@ export function buildBuyClickedProperties(input: {
     out.client_event_id = input.clientEventId.trim().toLowerCase();
   }
 
+  if (input.ctaPlacement === "top" || input.ctaPlacement === "bottom") {
+    out.cta_placement = input.ctaPlacement;
+  }
+
   return out;
 }
 
@@ -109,6 +116,10 @@ export function filterBuyClickedProperties(
     } else {
       delete next.path;
     }
+  }
+
+  if (next.cta_placement !== "top" && next.cta_placement !== "bottom") {
+    delete next.cta_placement;
   }
 
   return next;
