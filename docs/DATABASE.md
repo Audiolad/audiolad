@@ -56,7 +56,38 @@ RLS включён. Политика SELECT: `Public can read published practice
 - `release` → `music`
 - `post` → `audio_post`
 
-Course / audiobook не выводятся из `format`. Section / Lesson / Chapter tables не создаются.
+Course / audiobook не выводятся из `format`. Section / Module tables в Phase 2A нет.
+
+#### Course content foundation (2026-08-26, Phase 2A)
+
+Миграция: `20260827120000_course_content_foundation.sql`.
+
+Одна публикация → уроки → блоки. `publication_id = practices.id`. Parent
+обязан иметь явный `publication_class = 'course'` (BEFORE INSERT/UPDATE
+trigger `enforce_course_content_parent_is_course`). Legacy NULL+practice
+не считается курсом. Backfill / `UPDATE practices` / смена
+`publication_class` / авто-уроки из `audio_items` — нет.
+
+| Таблица | Назначение |
+|---------|------------|
+| `course_lessons` | Уроки курса: `title`, `position >= 0`. Индекс `(publication_id, position, id)`. Лимита 30 нет. |
+| `course_lesson_blocks` | Блоки `audio` \| `text` \| `file`. `asset_id` полиморфный (audio → `audio_items.id` того же курса, file → `publication_files.id`). text: `asset_id IS NULL`, payload `{ text: string }`. |
+| `publication_files` | Приватные файлы. Phase 2A: `mime = 'application/pdf'`, `size_bytes <= 20MiB`. Колонки публичного URL нет. |
+| `course_completion_ctas` | 1:1 CTA курса (`publication_id` PK). `title`, `description`, `button_text`, `url`, `enabled`. Не `promo_*` и не блок урока. |
+
+**Доступ:** наличие строки урока / блока / файла / CTA **никогда** не даёт
+чтение. Learner SELECT policy нет. RLS: ENABLE, REVOKE PUBLIC/anon, нет
+public SELECT, author members (`owner`/`editor`) CRUD, `service_role` ALL.
+Чтение слушателем — только server + service role после
+`canAccessCourseContent` (`user_practices` entitlement / автор / platform
+admin). Будущий learner API обязан сначала резолвить родительский курс,
+затем helper, затем читать. GET-by-lesson-id без parent check запрещён;
+эндпоинта в этом PR нет.
+
+**Storage:** private bucket `publication-files` (не `personal-materials`,
+не `practice-audio`, не public). Нет storage SELECT для anon/authenticated.
+Валидация PDF переиспользует magic `%PDF-` / MIME / 20MB cap из
+personal-materials, но объекты пишутся только в `publication-files`.
 
 #### publication_gallery_slides (2026-08-25, Phase 1B Product Gallery)
 

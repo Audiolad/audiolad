@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAudioPostProductKind } from "@/lib/author-products/product-kind";
+import { isCoursePublication } from "@/lib/course-content/validators";
 
 export type ProductAccessReason =
   | "free"
@@ -21,6 +22,17 @@ export type ProductAccessInput = {
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
+  publication_class?: string | null;
+};
+
+export type CourseContentAccessInput = ProductAccessInput;
+
+export type CourseContentAccessOptions = {
+  access?: ProductAccessResult;
+  isPlatformAdmin?: (
+    supabase: SupabaseClient,
+    userId: string,
+  ) => Promise<boolean>;
 };
 
 export type ProductAccessResult = {
@@ -238,4 +250,85 @@ export async function resolveProductAccess(
     accessSource: null,
     hasEntitlement: false,
   };
+}
+
+/**
+ * Course content is never opened by price / is_free / guest_promo / canListen.
+ * Presence of a lesson/block/file row also never grants read.
+ *
+ * Allowed only when the publication resolves to class=course AND:
+ *   hasEntitlement (free_claim / purchase / admin grant / other active
+ *   user_practices row) OR author_owner OR access_source=admin OR
+ *   real platform admin via isPlatformAdmin (admin_panel.access).
+ *
+ * resolveProductAccess reason "admin" means user_practices.access_source=admin
+ * only. This helper also treats a real platform admin as allowed.
+ */
+export function evaluateCourseContentAccess(input: {
+  userId: string | null;
+  publicationClass?: string | null;
+  productKind?: string | null;
+  access: ProductAccessResult;
+  isPlatformAdmin: boolean;
+}): boolean {
+  if (!input.userId) {
+    return false;
+  }
+
+  if (!isCoursePublication(input.publicationClass, input.productKind)) {
+    return false;
+  }
+
+  if (input.access.hasEntitlement) {
+    return true;
+  }
+
+  if (input.access.reason === "author_owner") {
+    return true;
+  }
+
+  if (input.access.accessSource === "admin") {
+    return true;
+  }
+
+  return input.isPlatformAdmin;
+}
+
+export async function canAccessCourseContent(
+  supabase: SupabaseClient,
+  practice: CourseContentAccessInput,
+  userId: string | null,
+  options?: CourseContentAccessOptions,
+): Promise<boolean> {
+  if (!userId) {
+    return false;
+  }
+
+  if (!isCoursePublication(practice.publication_class, practice.product_kind)) {
+    return false;
+  }
+
+  const access =
+    options?.access ?? (await resolveProductAccess(supabase, practice, userId));
+
+  if (
+    access.hasEntitlement ||
+    access.reason === "author_owner" ||
+    access.accessSource === "admin"
+  ) {
+    return true;
+  }
+
+  const checkAdmin =
+    options?.isPlatformAdmin ??
+    (await import("@/lib/auth/platform-admin")).isPlatformAdmin;
+  const platformAdmin = await checkAdmin(supabase, userId);
+
+  return evaluateCourseContentAccess({
+    userId,
+    publicationClass: practice.publication_class,
+    productKind: practice.product_kind,
+    access,
+    isPlatformAdmin: platformAdmin,
+  });
 }

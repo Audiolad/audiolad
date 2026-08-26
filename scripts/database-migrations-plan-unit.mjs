@@ -270,6 +270,11 @@ function testRepoOneFileOneVersion() {
       (row) => row.filename === "20260826120000_topics_spirituality.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260827120000_course_content_foundation.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -313,8 +318,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825165000",
     "20260825166000",
     "20260826120000",
+    "20260827120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 11);
+  assert.equal(plan.database_migrations_pending, 12);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -337,8 +343,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260825165000",
     "20260825166000",
     "20260826120000",
+    "20260827120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 5);
+  assert.equal(plan.database_migrations_pending, 6);
 }
 
 function main() {

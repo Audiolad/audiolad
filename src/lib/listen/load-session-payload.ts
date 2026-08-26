@@ -11,7 +11,11 @@ import {
   mapRowToListenTrack,
 } from "@/lib/listen/track-cover";
 import type { ListenTrack } from "@/lib/listen/types";
-import { resolveProductAccess } from "@/lib/products/access";
+import { isCoursePublication } from "@/lib/course-content/validators";
+import {
+  canAccessCourseContent,
+  resolveProductAccess,
+} from "@/lib/products/access";
 import {
   getPracticeAuthorSlug,
   type PublicPracticeRow,
@@ -186,6 +190,7 @@ export async function loadListenSessionPayload(
       is_catalog_listed,
       guest_access_enabled,
       product_kind,
+      publication_class,
       authors!practices_author_id_fkey (
         id,
         name,
@@ -215,7 +220,18 @@ export async function loadListenSessionPayload(
       userId,
     );
 
-    if (!productAccess.canListen) {
+    if (isCoursePublication(practiceRow.publication_class, practiceRow.product_kind)) {
+      const courseAllowed = await canAccessCourseContent(
+        supabase,
+        practiceRow,
+        userId,
+        { access: productAccess },
+      );
+
+      if (!courseAllowed) {
+        return { ok: false, reason: "unavailable" };
+      }
+    } else if (!productAccess.canListen) {
       return { ok: false, reason: "unavailable" };
     }
 
