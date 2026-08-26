@@ -346,6 +346,18 @@ function testCheckoutWiring() {
     seed,
     /slug 25-meditation-solutions is already owned by another practice id/,
   );
+  assert.match(
+    seed,
+    /set_config\('audiolad\.allow_practice_publish',\s*'on',\s*true\)/,
+  );
+  const publishGucIndex = seed.search(
+    /set_config\('audiolad\.allow_practice_publish',\s*'on',\s*true\)/,
+  );
+  const publishedInsertIndex = seed.indexOf("INSERT INTO public.practices");
+  assert.ok(
+    publishGucIndex >= 0 && publishGucIndex < publishedInsertIndex,
+    "publication GUC must be enabled before the published practice INSERT/UPSERT",
+  );
   const lineage = read("deploy/scripts/lib/migration-audit-lineage.mjs");
   assert.match(lineage, /"20260828120000"/);
   assert.doesNotMatch(
