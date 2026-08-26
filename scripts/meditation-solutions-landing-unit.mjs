@@ -303,7 +303,7 @@ function testCheckoutWiring() {
     "src/app/api/landings/25-meditation-solutions/window/route.ts",
   );
   const seed = read(
-    "supabase/migrations/20260826120000_seed_25_meditation_solutions_practice.sql",
+    "supabase/migrations/20260828120000_seed_25_meditation_solutions_practice.sql",
   );
 
   const provider = read(
@@ -339,7 +339,49 @@ function testCheckoutWiring() {
   assert.doesNotMatch(seed, /4099/);
   assert.match(seed, /AND sale_price = 499/);
   assert.match(seed, /1200/);
+  assert.match(seed, /is_catalog_listed = false/);
+  const lineage = read("deploy/scripts/lib/migration-audit-lineage.mjs");
+  assert.match(lineage, /"20260828120000"/);
+  assert.doesNotMatch(
+    lineage,
+    /"20260826120000": \{\s*extraProbes: \[\s*dataProbe\(\s*"data:practices.25_meditation_solutions_seed"/,
+  );
   assert.equal(MEDITATION_SOLUTIONS_PRACTICE_SLUG, "25-meditation-solutions");
+}
+
+function testProductImagesOnBranch() {
+  const imageDir = join(ROOT, "public/products/25-meditation-solutions");
+  const expected = [
+    "hero.jpg",
+    ...Array.from({ length: 25 }, (_, index) =>
+      `item-${String(index + 1).padStart(2, "0")}.jpg`,
+    ),
+    "bonus-26.jpg",
+  ];
+
+  assert.equal(expected.length, 27);
+  for (const name of expected) {
+    const absolute = join(imageDir, name);
+    assert.equal(existsSync(absolute), true, `missing image ${name}`);
+    const header = readFileSync(absolute).subarray(0, 3);
+    assert.deepEqual(
+      [...header],
+      [0xff, 0xd8, 0xff],
+      `${name} is not a JPEG`,
+    );
+  }
+
+  for (const card of MEDITATION_SOLUTIONS_CARDS) {
+    assert.equal(
+      existsSync(join(ROOT, "public", card.imageSrc.slice(1))),
+      true,
+      card.imageSrc,
+    );
+  }
+
+  const robots = read("src/lib/seo/robots-config.ts");
+  assert.doesNotMatch(robots, /25-gotovyh-resheniy/);
+  assert.doesNotMatch(robots, /"\/p\/"/);
 }
 
 function testSeoAndShell() {
@@ -378,6 +420,7 @@ testCardFormats();
 testPromotionWindowReuse();
 testExpiryUi();
 testCheckoutWiring();
+testProductImagesOnBranch();
 testSeoAndShell();
 testNoPageBuilder();
 
