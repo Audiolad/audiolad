@@ -94,7 +94,7 @@
     "test:free-author-first-step": "npx tsx scripts/free-author-first-step-unit.mjs",
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
     "test:quick-offers": "npx tsx scripts/quick-offers-unit.mjs",
-    "test:meditation-solutions-landing": "npx tsx scripts/meditation-solutions-landing-unit.mjs",
+    "test:meditation-solutions-landing": "npx tsx scripts/meditation-solutions-landing-unit.mjs && node scripts/meditation-solutions-landing-responsive-unit.mjs",
     "test:listener-welcome": "npx tsx scripts/listener-welcome-unit.mts",
     "test:help-center-support": "npx tsx scripts/help-center-support-unit.mjs",
     "test:author-dashboard-stats": "node scripts/author-dashboard-stats-unit.mjs && node scripts/author-dashboard-stats-sql-unit.mjs",

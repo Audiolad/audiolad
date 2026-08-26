@@ -127,6 +127,10 @@ function testGridAndCardsReuseCatalogGeometry() {
   assert.match(cards, /data-catalog-product-grid/);
   assert.match(cards, /catalog-product-grid--fixed-2/);
   assert.match(css, /catalog-product-grid--fixed-2/);
+  assert.match(
+    css,
+    /\.catalog-product-grid--fixed-2 \{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
+  );
   assert.doesNotMatch(cards, /BuyPracticeButton/);
   assert.doesNotMatch(cards, /CatalogProductHeartButton/);
   assert.doesNotMatch(cards, /href=.*practice/);
