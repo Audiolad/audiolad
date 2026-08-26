@@ -12,6 +12,7 @@ import {
   COURSE_BUILDER_SECTION_TITLE,
   countCoursePublishContentFromLessons,
   getCourseBuilderErrorMessage,
+  resolveCourseBuilderPanes,
   type CourseBuilderBlockDto,
   type CourseBuilderLessonDto,
   type CourseBuilderSnapshot,
@@ -332,8 +333,10 @@ export default function AuthorCourseBuilder({
     setMobileEditorOpen(true);
   }
 
-  const showList = !mobileEditorOpen || Boolean(!selectedLesson);
-  const showEditor = Boolean(selectedLesson);
+  const { showList, showEditor } = resolveCourseBuilderPanes({
+    mobileEditorOpen,
+    selectedLessonId: selectedLesson?.id ?? null,
+  });
 
   return (
     <section

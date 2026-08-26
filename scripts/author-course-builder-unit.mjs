@@ -19,6 +19,10 @@ import {
   defaultCourseLessonTitle,
   evaluateCoursePublishContentGate,
   nextCoursePosition,
+  resolveCourseBuilderPanes,
+  shouldCreateDefaultAudioItem,
+  shouldShowPracticeListeningNotice,
+  shouldShowSharedTrackCoverToggle,
   shouldSkipFlatAudioPublishRequirement,
   validateCourseCompletionCtaInput,
 } from "../src/lib/author-products/course-builder-shared.ts";
@@ -59,6 +63,19 @@ assert.doesNotMatch(
   /AuthorCourseBuilder[\s\S]{0,80}productKind === PRODUCT_KIND.PRACTICE/,
 );
 assert.doesNotMatch(form, /convert.*audio_items|Автоматически перенести/);
+assert.match(form, /shouldShowPracticeListeningNotice/);
+assert.match(form, /shouldShowSharedTrackCoverToggle/);
+assert.match(form, /shouldCreateDefaultAudioItem/);
+assert.doesNotMatch(
+  form,
+  /productKind === PRODUCT_KIND\.PRACTICE \? \([\s\S]{0,220}Рекомендации перед прослушиванием/,
+  "listening recommendations must not use the raw PRACTICE gate",
+);
+assert.doesNotMatch(
+  form,
+  /productKind !== PRODUCT_KIND\.AUDIO_POST \? \([\s\S]{0,220}Использовать общую обложку для всех треков/,
+  "shared-cover toggle must not use the raw non-post gate",
+);
 
 const builder = read("src/components/author-dashboard/AuthorCourseBuilder.tsx");
 assert.match(builder, /data-author-course-builder/);
@@ -73,6 +90,8 @@ assert.equal(COURSE_BUILDER_ADD_LESSON_LABEL, "Добавить урок");
 assert.equal(COURSE_BUILDER_COMPLETION_CTA_TITLE, "Что дальше");
 assert.match(builder, /lg:grid-cols-\[minmax\(240px,320px\)_minmax\(0,1fr\)\]/);
 assert.match(builder, /hidden lg:block/);
+assert.match(builder, /resolveCourseBuilderPanes/);
+assert.match(builder, /setMobileEditorOpen\(false\)/);
 assert.match(builder, /К списку уроков/);
 assert.match(builder, /usePointerReorder/);
 assert.match(builder, /AudioDragHandle/);
@@ -275,6 +294,90 @@ assert.equal(
   }),
   false,
 );
+
+assert.equal(shouldCreateDefaultAudioItem("course"), false);
+assert.equal(shouldCreateDefaultAudioItem("practice"), true);
+assert.equal(shouldCreateDefaultAudioItem("audiobook"), true);
+assert.equal(shouldCreateDefaultAudioItem("release"), true);
+assert.equal(shouldCreateDefaultAudioItem("post"), true);
+assert.equal(shouldCreateDefaultAudioItem(null), true);
+
+assert.equal(
+  shouldShowPracticeListeningNotice("practice", "practice"),
+  true,
+);
+assert.equal(
+  shouldShowPracticeListeningNotice("course", "practice"),
+  false,
+);
+assert.equal(
+  shouldShowPracticeListeningNotice("audiobook", "practice"),
+  true,
+  "audiobook keeps the current PRACTICE listening-notice semantics",
+);
+assert.equal(shouldShowPracticeListeningNotice("release", "music"), false);
+assert.equal(shouldShowPracticeListeningNotice("post", "audio_post"), false);
+
+assert.equal(
+  shouldShowSharedTrackCoverToggle("practice", "practice"),
+  true,
+);
+assert.equal(shouldShowSharedTrackCoverToggle("course", "practice"), false);
+assert.equal(
+  shouldShowSharedTrackCoverToggle("audiobook", "practice"),
+  true,
+);
+assert.equal(shouldShowSharedTrackCoverToggle("release", "music"), true);
+assert.equal(shouldShowSharedTrackCoverToggle("post", "audio_post"), false);
+
+assert.deepEqual(
+  resolveCourseBuilderPanes({
+    mobileEditorOpen: false,
+    selectedLessonId: null,
+  }),
+  { showList: true, showEditor: false },
+  "empty course / no selection: list only",
+);
+assert.deepEqual(
+  resolveCourseBuilderPanes({
+    mobileEditorOpen: false,
+    selectedLessonId: "lesson-1",
+  }),
+  { showList: true, showEditor: false },
+  "entering the builder or returning to the list keeps the editor closed",
+);
+assert.deepEqual(
+  resolveCourseBuilderPanes({
+    mobileEditorOpen: true,
+    selectedLessonId: "lesson-1",
+  }),
+  { showList: false, showEditor: true },
+  "tapping a lesson opens only that editor on mobile",
+);
+assert.deepEqual(
+  resolveCourseBuilderPanes({
+    mobileEditorOpen: false,
+    selectedLessonId: "lesson-2",
+  }),
+  { showList: true, showEditor: false },
+  "deleting the open lesson returns to the list without a dangling editor",
+);
+assert.deepEqual(
+  resolveCourseBuilderPanes({
+    mobileEditorOpen: true,
+    selectedLessonId: null,
+  }),
+  { showList: true, showEditor: false },
+  "editor cannot stay open without a selected lesson",
+);
+
+const products = read("src/lib/author-products/products.ts");
+assert.match(products, /shouldCreateDefaultAudioItem/);
+assert.match(
+  products,
+  /if \(!shouldCreateDefaultAudioItem\(publicationClass\)\)/,
+);
+assert.match(products, /audio_items: \[\]/);
 
 function coursePractice(overrides = {}) {
   return {

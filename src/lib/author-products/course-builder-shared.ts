@@ -1,3 +1,7 @@
+import {
+  PRODUCT_KIND,
+  normalizeProductKind,
+} from "@/lib/author-products/product-kind";
 import { isCoursePublication } from "@/lib/author-products/publication-class";
 import type { CourseLessonBlockType } from "@/lib/course-content/types";
 
@@ -151,6 +155,50 @@ export function shouldSkipFlatAudioPublishRequirement(input: {
     isCoursePublication(input.publicationClass, input.productKind) &&
     input.blockCount > 0
   );
+}
+
+/** New `publication_class=course` drafts do not get the shared empty audio slot. */
+export function shouldCreateDefaultAudioItem(
+  publicationClass: string | null | undefined,
+): boolean {
+  return publicationClass !== "course";
+}
+
+/** Practice-only listening recommendations. Audiobook keeps current PRACTICE gate. */
+export function shouldShowPracticeListeningNotice(
+  publicationClass: string | null | undefined,
+  productKind: string | null | undefined,
+): boolean {
+  return (
+    normalizeProductKind(productKind) === PRODUCT_KIND.PRACTICE &&
+    !isCoursePublication(publicationClass, productKind)
+  );
+}
+
+/** Flat-tracklist shared-cover toggle. Hidden for course; unchanged for audiobook. */
+export function shouldShowSharedTrackCoverToggle(
+  publicationClass: string | null | undefined,
+  productKind: string | null | undefined,
+): boolean {
+  return (
+    normalizeProductKind(productKind) !== PRODUCT_KIND.AUDIO_POST &&
+    !isCoursePublication(publicationClass, productKind)
+  );
+}
+
+/**
+ * Mobile: list XOR editor via a single `mobileEditorOpen` flag.
+ * Desktop CSS still shows both panes (`hidden lg:block` when the other is active).
+ */
+export function resolveCourseBuilderPanes(input: {
+  mobileEditorOpen: boolean;
+  selectedLessonId: string | null | undefined;
+}): { showList: boolean; showEditor: boolean } {
+  const showEditor =
+    Boolean(input.selectedLessonId) && input.mobileEditorOpen;
+  const showList = !showEditor;
+
+  return { showList, showEditor };
 }
 
 export function countCoursePublishContentFromLessons(

@@ -93,6 +93,14 @@ Foundation).
 - Новое правило публикации только если `published_at` IS NULL:
   ≥1 урок и ≥1 блок. Черновик без уроков можно сохранить.
   Плоское аудио не требуется, если у курса есть любой блок.
+- Новый `publication_class=course` не создаёт пустой слот
+  `audio_items` («Аудио 1»). Practice / audiobook / release / post
+  без изменений. Существующие course `audio_items` не мигрируются
+  и не удаляются.
+- «Рекомендации перед прослушиванием» и «общая обложка для всех
+  треков» скрыты у курса; у практики остаются. Audiobook не меняли.
+- Mobile Course Builder: один флаг `mobileEditorOpen` — список XOR
+  редактор; desktop по-прежнему list + editor рядом.
 
 **Вне scope:** `/learn`, learner API, progress, Section/Module,
 homework, quizzes, drip, certificates. PDP / CatalogCard / offer /

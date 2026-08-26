@@ -111,6 +111,9 @@ import { assertPublishedTopicMinimum } from "@/lib/topics/limits";
 import {
   COURSE_PUBLISH_MISSING_CONTENT_MESSAGE,
   evaluateCoursePublishContentGate,
+  shouldCreateDefaultAudioItem,
+  shouldShowPracticeListeningNotice,
+  shouldShowSharedTrackCoverToggle,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
 
@@ -428,8 +431,16 @@ export default function AuthorProductForm({
       initialPublicationClass,
     ),
   );
-  const [audioItems, setAudioItems] = useState<AudioItemRow[]>(
-    initialProduct?.audio_items ?? [
+  const [audioItems, setAudioItems] = useState<AudioItemRow[]>(() => {
+    if (initialProduct?.audio_items) {
+      return initialProduct.audio_items;
+    }
+
+    if (!shouldCreateDefaultAudioItem(initialPublicationClass)) {
+      return [];
+    }
+
+    return [
       {
         id: "temp-1",
         practice_id: "temp",
@@ -450,8 +461,8 @@ export default function AuthorProductForm({
         created_at: "",
         updated_at: "",
       },
-    ],
-  );
+    ];
+  });
   const [topicOptions, setTopicOptions] = useState<TopicOption[]>(
     topicFormData.topicOptions,
   );
@@ -2676,7 +2687,10 @@ export default function AuthorProductForm({
           />
         ) : null}
 
-        {form.productKind !== PRODUCT_KIND.AUDIO_POST ? (
+        {shouldShowSharedTrackCoverToggle(
+          form.publicationClass,
+          form.productKind,
+        ) ? (
         <div className="mt-4 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
           <label className="flex cursor-pointer items-start gap-3">
             <input
@@ -2869,7 +2883,10 @@ export default function AuthorProductForm({
         />
       ) : null}
 
-      {form.productKind === PRODUCT_KIND.PRACTICE ? (
+      {shouldShowPracticeListeningNotice(
+        form.publicationClass,
+        form.productKind,
+      ) ? (
       <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
         <h2 className="text-[20px] font-semibold">
           Рекомендации перед прослушиванием

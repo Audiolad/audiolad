@@ -229,7 +229,8 @@ Timeweb Cloud
 - Phase 2A Author Course Builder: кабинет `AuthorCourseBuilder` только
   при явном `publication_class=course`. API
   `/api/author/products/[id]/course/*` (уроки, блоки, reorder, CTA,
-  author signed PDF). Плоский список `audio_items` для курса скрыт;
+  author signed PDF). Новый курс не получает автоматический слот
+  `audio_items`. Плоский список `audio_items` для курса скрыт;
   аудио урока идёт через существующий `/audio*` pipeline.
   `course_completion_ctas` не пишет `practices.promo_*`. Публикация
   неопубликованного курса требует ≥1 урок и ≥1 блок; уже
