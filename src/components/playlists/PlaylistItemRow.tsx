@@ -37,6 +37,8 @@ type PlaylistItemRowProps = {
   index: number;
   showPosition?: boolean;
   showMetaOnDesktop?: boolean;
+  /** Shared playlist drag handle. */
+  leadingControls?: ReactNode;
   /** Owner reorder / menu controls. */
   trailingControls?: ReactNode;
   /**
@@ -71,6 +73,7 @@ export default function PlaylistItemRow({
   index,
   showPosition = true,
   showMetaOnDesktop = true,
+  leadingControls,
   trailingControls,
   coverPlayback,
 }: PlaylistItemRowProps) {
@@ -85,6 +88,7 @@ export default function PlaylistItemRow({
       data-audio-item-id={item.audioItemId ?? undefined}
       data-playlist-row-play={coverPlayback ? "cover" : "circle"}
     >
+      {leadingControls}
       {showPosition ? (
         <span
           className="hidden w-5 shrink-0 text-center text-[11px] font-medium text-[#8f82ad] sm:block"

@@ -30,7 +30,12 @@ assert(!isUuid("not-a-uuid"), "invalid uuid");
 assert(!isUuid(""), "empty uuid");
 
 let parsed = parseMovePlaylistItemBody({ direction: "up" });
-assert(parsed.ok === true && parsed.direction === "up", "valid up");
+assert(
+  parsed.ok === true &&
+    parsed.direction === "up" &&
+    parsed.targetPosition === null,
+  "valid up",
+);
 
 parsed = parseMovePlaylistItemBody({ direction: "down" });
 assert(parsed.ok === true && parsed.direction === "down", "valid down");
@@ -43,6 +48,15 @@ assert(parsed.ok === false, "invalid direction");
 
 parsed = parseMovePlaylistItemBody({ direction: "up", position: 2 });
 assert(parsed.ok === false, "unknown fields / position rejected");
+
+parsed = parseMovePlaylistItemBody({ direction: "up", targetPosition: 3 });
+assert(
+  parsed.ok === true && parsed.targetPosition === 3,
+  "optional targetPosition accepted",
+);
+
+parsed = parseMovePlaylistItemBody({ direction: "up", targetPosition: 0 });
+assert(parsed.ok === false, "targetPosition 0 rejected");
 
 parsed = parseMovePlaylistItemBody({
   direction: "up",
@@ -103,6 +117,8 @@ assert(detail.includes("router.refresh()"), "refresh after move");
 assert(detail.includes("moveItem"), "move handler present");
 assert(detail.includes("movingPracticeId"), "busy state");
 assert(detail.includes("reorderBusy"), "row lock state");
+assert(detail.includes("PlaylistItemsSortableList"), "shared sortable list");
+assert(detail.includes("Переместить выше"), "arrows remain after dnd");
 
 assert(existsSync("supabase/tests/playlists_pr4_reorder_smoke.sql"), "sql smoke");
 assert(

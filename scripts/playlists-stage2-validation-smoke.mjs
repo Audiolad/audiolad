@@ -230,7 +230,18 @@ assert(editor.includes("Адрес плейлиста закреплён"), "loc
 assert(editor.includes("рекомендуется не менее 7"), "soft 7 warning");
 assert(editor.includes("первых 7 позиций"), "diversity hint");
 assert(editor.includes("Заменить"), "replace action");
-assert(!editor.includes("onDrag") && !editor.includes("dnd"), "no drag-and-drop");
+assert(
+  editor.includes("PlaylistItemsSortableList"),
+  "editorial uses the shared sortable list",
+);
+assert(
+  !editor.includes("DndContext") && !editor.includes("onDragEnd"),
+  "dnd sensors stay in the shared playlist layer",
+);
+assert(
+  !existsSync("src/components/playlists/editorial/EditorialPlaylistSortableList.tsx"),
+  "no editorial-only sortable list",
+);
 
 const listUi = read(
   "src/components/playlists/editorial/EditorialPlaylistsListClient.tsx",

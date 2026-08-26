@@ -26,6 +26,7 @@ DECLARE
   gap_c uuid;
   single_id uuid;
   single_pl uuid;
+  target_pl uuid;
   move_row record;
   ua_before timestamptz;
   ua_after timestamptz;
@@ -582,10 +583,97 @@ BEGIN
     RAISE EXCEPTION 'anon must not EXECUTE move_playlist_item';
   END IF;
 
+  IF to_regprocedure('public.move_playlist_item(uuid,uuid,text,uuid,integer)') IS NULL THEN
+    RAISE EXCEPTION '5-arg move_playlist_item missing';
+  END IF;
+
+  INSERT INTO public.playlists (user_id, title, visibility)
+  VALUES (v_owner_id, 'PR4 target pos', 'private')
+  RETURNING id INTO target_pl;
+
+  INSERT INTO public.playlist_items (playlist_id, practice_id, position) VALUES
+    (target_pl, p1, 1),
+    (target_pl, p2, 2),
+    (target_pl, p3, 3),
+    (target_pl, p4, 4),
+    (target_pl, p5, 5);
+
+  SELECT * INTO move_row FROM public.move_playlist_item(target_pl, p5, 'up', NULL, 1);
+  IF move_row.moved IS DISTINCT FROM true
+     OR move_row.from_position <> 5
+     OR move_row.to_position <> 1 THEN
+    RAISE EXCEPTION 'target 5->1 failed: %', move_row;
+  END IF;
+  SELECT array_agg(practice_id ORDER BY position) INTO order_ids
+  FROM public.playlist_items WHERE playlist_id = target_pl;
+  IF order_ids IS DISTINCT FROM ARRAY[p5, p1, p2, p3, p4] THEN
+    RAISE EXCEPTION 'target 5->1 order %, expected p5 p1 p2 p3 p4', order_ids;
+  END IF;
+
+  SELECT * INTO move_row FROM public.move_playlist_item(target_pl, p5, 'down', NULL, 5);
+  IF move_row.moved IS DISTINCT FROM true
+     OR move_row.from_position <> 1
+     OR move_row.to_position <> 5 THEN
+    RAISE EXCEPTION 'target 1->5 failed: %', move_row;
+  END IF;
+  SELECT array_agg(practice_id ORDER BY position) INTO order_ids
+  FROM public.playlist_items WHERE playlist_id = target_pl;
+  IF order_ids IS DISTINCT FROM ARRAY[p1, p2, p3, p4, p5] THEN
+    RAISE EXCEPTION 'target 1->5 order %, expected p1 p2 p3 p4 p5', order_ids;
+  END IF;
+
+  SELECT * INTO move_row FROM public.move_playlist_item(target_pl, p4, 'up', NULL, 2);
+  IF move_row.moved IS DISTINCT FROM true
+     OR move_row.from_position <> 4
+     OR move_row.to_position <> 2 THEN
+    RAISE EXCEPTION 'target 4->2 failed: %', move_row;
+  END IF;
+  SELECT array_agg(practice_id ORDER BY position) INTO order_ids
+  FROM public.playlist_items WHERE playlist_id = target_pl;
+  IF order_ids IS DISTINCT FROM ARRAY[p1, p4, p2, p3, p5] THEN
+    RAISE EXCEPTION 'target 4->2 order %, expected p1 p4 p2 p3 p5', order_ids;
+  END IF;
+
+  SELECT * INTO move_row FROM public.move_playlist_item(target_pl, p1, 'down', NULL);
+  IF move_row.moved IS DISTINCT FROM true THEN
+    RAISE EXCEPTION '4-arg neighbour swap should still work';
+  END IF;
+
+  SELECT position INTO up_before
+  FROM public.playlist_items
+  WHERE playlist_id = target_pl AND practice_id = p3;
+  SELECT * INTO move_row
+  FROM public.move_playlist_item(target_pl, p3, 'up', NULL, up_before);
+  IF move_row.moved IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'same target position must be no-op';
+  END IF;
+
+  raised := false;
+  BEGIN
+    PERFORM public.move_playlist_item(target_pl, p5, 'up', NULL, 99);
+  EXCEPTION WHEN others THEN
+    raised := true;
+    err := SQLERRM;
+  END;
+  IF NOT raised OR err NOT LIKE '%invalid_target_position%' THEN
+    RAISE EXCEPTION 'missing target should fail, got %', err;
+  END IF;
+
+  raised := false;
+  BEGIN
+    PERFORM public.move_playlist_item(target_pl, p5, 'down', NULL, 1);
+  EXCEPTION WHEN others THEN
+    raised := true;
+    err := SQLERRM;
+  END;
+  IF NOT raised OR err NOT LIKE '%invalid_direction%' THEN
+    RAISE EXCEPTION 'direction mismatch should fail, got %', err;
+  END IF;
+
   RESET ROLE;
   DELETE FROM public.playlist_items
-  WHERE playlist_id IN (pl_id, foreign_pl, single_pl);
-  DELETE FROM public.playlists WHERE id IN (pl_id, foreign_pl, single_pl);
+  WHERE playlist_id IN (pl_id, foreign_pl, single_pl, target_pl);
+  DELETE FROM public.playlists WHERE id IN (pl_id, foreign_pl, single_pl, target_pl);
   DELETE FROM public.user_practices WHERE user_id = v_owner_id AND practice_id = paid_id;
   DELETE FROM public.practices
   WHERE id IN (
@@ -598,7 +686,7 @@ END;
 $$;
 
 -- Lock-order note (not true parallel workers):
--- move_playlist_item: playlists FOR UPDATE → current item → neighbour.
+-- move_playlist_item: playlists FOR UPDATE → (optional all items by id) → current → neighbour.
 -- membership RPC: locks owned playlists ORDER BY id FOR UPDATE first.
 -- cover CAS: playlist FOR UPDATE.
 -- delete item API: does NOT take parent FOR UPDATE before DELETE; concurrent
@@ -621,6 +709,22 @@ BEGIN
     'EXECUTE'
   ) THEN
     RAISE EXCEPTION 'authenticated must EXECUTE move_playlist_item';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'public.move_playlist_item(uuid,uuid,text,uuid,integer)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'anon must not EXECUTE 5-arg move_playlist_item';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'public.move_playlist_item(uuid,uuid,text,uuid,integer)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated must EXECUTE 5-arg move_playlist_item';
   END IF;
 
   RAISE NOTICE 'PR4_REORDER_GRANTS_SMOKE_PASS';
