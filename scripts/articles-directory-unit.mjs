@@ -77,6 +77,7 @@ import { RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/liste
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { MUZYKA_DLYA_SNYATIYA_STRESSA_I_RASSLABLENIYA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-snyatiya-stressa-i-rasslableniya-slushat-onlayn.ts";
+import { RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1681,6 +1682,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftiethListenHref}`,
     ),
     "directory JSON-LD includes fiftieth listen href",
+  );
+
+  const fiftyFirstListenHref = "/listens/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn";
+  const fiftyFirstListenCard = data.articles.find((card) => card.href === fiftyFirstListenHref);
+  assert(fiftyFirstListenCard, "fifty-first indexable listen page is listed");
+  assert(
+    fiftyFirstListenCard.title === "Расслабляющая музыка без слов – слушать онлайн бесплатно | АудиоЛад",
+    "fifty-first listen directory title",
+  );
+  assert(
+    fiftyFirstListenCard.description === RASSLABLYAYUSHCHAYA_MUZYKA_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE.description,
+    "fifty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/rasslablyayushchaya-muzyka-bez-slov-slushat-onlayn",
+    ),
+    "no /articles duplicate for fifty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-first listen href",
   );
 
 
