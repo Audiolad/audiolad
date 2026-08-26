@@ -75,6 +75,7 @@ import { KOLYBELNYE_DLYA_MALYSHEY_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/lis
 import { MUZYKA_DLYA_SNA_DETYAM_BEZ_SLOV_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/muzyka-dlya-sna-detyam-bez-slov-slushat-onlayn.ts";
 import { RELAKS_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/relaks-muzyka-dlya-sna-slushat-onlayn.ts";
 import { RASSLABLYAYUSHCHAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/rasslablyayushchaya-muzyka-dlya-sna-slushat-onlayn.ts";
+import { SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE } from "../src/lib/seo/listens/content/spokoynaya-muzyka-dlya-sna-slushat-onlayn.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1628,6 +1629,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fortyEighthListenHref}`,
     ),
     "directory JSON-LD includes forty-eighth listen href",
+  );
+
+  const fortyNinthListenHref = "/listens/spokoynaya-muzyka-dlya-sna-slushat-onlayn";
+  const fortyNinthListenCard = data.articles.find((card) => card.href === fortyNinthListenHref);
+  assert(fortyNinthListenCard, "forty-ninth indexable listen page is listed");
+  assert(
+    fortyNinthListenCard.title === "Спокойная музыка для сна – слушать онлайн бесплатно | АудиоЛад",
+    "forty-ninth listen directory title",
+  );
+  assert(
+    fortyNinthListenCard.description === SPOKOYNAYA_MUZYKA_DLYA_SNA_SLUSHAT_ONLAYN_PAGE.description,
+    "forty-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/spokoynaya-muzyka-dlya-sna-slushat-onlayn",
+    ),
+    "no /articles duplicate for forty-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fortyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes forty-ninth listen href",
   );
 
 
