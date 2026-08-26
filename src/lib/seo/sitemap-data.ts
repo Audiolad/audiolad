@@ -29,6 +29,7 @@ import {
   getPublishedCatalogProducts,
   getPublishedPracticeIdsForTopicKey,
 } from "@/lib/products/catalog";
+import { MEDITATION_SOLUTIONS_PUBLIC_PATH } from "@/lib/landings/25-meditation-solutions/content";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -51,6 +52,11 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/help", changeFrequency: "weekly", priority: 0.5 },
   { path: "/become-author", changeFrequency: "monthly", priority: 0.5 },
   { path: "/first-audio-course", changeFrequency: "monthly", priority: 0.6 },
+  {
+    path: MEDITATION_SOLUTIONS_PUBLIC_PATH,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  },
   { path: "/offer", changeFrequency: "yearly", priority: 0.3 },
   { path: "/author-terms", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },

@@ -24,6 +24,7 @@ type BuyPracticeButtonProps = {
   productPriceMinorSnapshot?: number | null;
   currency?: string | null;
   purchaseSurface?: PurchaseSurface | string | null;
+  ctaPlacement?: "top" | "bottom" | null;
   quickOfferId?: string | null;
   label: string;
   className?: string;
@@ -91,6 +92,7 @@ export default function BuyPracticeButton({
   productPriceMinorSnapshot = null,
   currency = "RUB",
   purchaseSurface = "practice_page",
+  ctaPlacement = null,
   quickOfferId = null,
   label,
   className,
@@ -164,6 +166,7 @@ export default function BuyPracticeButton({
           path,
           purchaseSurface: surface,
           clientEventId: buyClickClientEventId,
+          ctaPlacement,
         });
 
         await trackPlatformEvent({

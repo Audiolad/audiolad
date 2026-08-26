@@ -18,6 +18,10 @@ export const STARTER_SLUGS = [
 ];
 
 export const FIRST_AUDIO_COURSE_ID = "a8f4c2e1-9b3d-4f6a-8c7e-1d2f3a4b5c6d";
+export const MEDITATION_SOLUTIONS_PRACTICE_ID =
+  "b7c1e4a0-2d5f-4e8b-9c3a-6f1d8e2a4b70";
+export const MEDITATION_SOLUTIONS_PROMOTION_ID =
+  "c8d2f5b1-3e6a-4f9c-8d4b-7a2e9f3b5c81";
 export const SERGEY_AND_ZOYA_AUTHOR_ID = "50ee125c-8951-4ac6-819a-3f6b11150008";
 export const AURAFON_AUTHOR_ID = "59c7e5b8-eae4-4394-82fb-b815a10be6c2";
 export const PLATFORM_OWNER_EMAIL = "1@audiolad.ru";
@@ -367,6 +371,33 @@ export const AUDIT_LINEAGE = {
     AND d.description LIKE '%Max 300%'
 )`,
         "playlists.description comment records max 300",
+      ),
+    ],
+  },
+
+  "20260826120000": {
+    extraProbes: [
+      dataProbe(
+        "data:practices.25_meditation_solutions_seed",
+        `SELECT EXISTS (
+  SELECT 1
+  FROM public.practices
+  WHERE id = '${MEDITATION_SOLUTIONS_PRACTICE_ID}'
+    AND slug = '25-meditation-solutions'
+    AND author_id = '${SERGEY_AND_ZOYA_AUTHOR_ID}'
+    AND price = 4999
+    AND is_catalog_listed = false
+) AND EXISTS (
+  SELECT 1
+  FROM public.practice_price_promotions
+  WHERE id = '${MEDITATION_SOLUTIONS_PROMOTION_ID}'
+    AND practice_id = '${MEDITATION_SOLUTIONS_PRACTICE_ID}'
+    AND promotion_type = 'personal_countdown'
+    AND sale_price = 499
+    AND duration_seconds = 1200
+    AND is_active = true
+)`,
+        "25-meditation-solutions practice 4999 + 20-min 499 personal countdown",
       ),
     ],
   },

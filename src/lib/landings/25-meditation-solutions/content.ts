@@ -1,0 +1,239 @@
+export const MEDITATION_SOLUTIONS_PUBLIC_PATH =
+  "/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy";
+
+export const MEDITATION_SOLUTIONS_PRACTICE_SLUG = "25-meditation-solutions";
+
+export const MEDITATION_SOLUTIONS_IMAGE_DIR =
+  "/products/25-meditation-solutions";
+
+export const MEDITATION_SOLUTIONS_HERO_IMAGE = `${MEDITATION_SOLUTIONS_IMAGE_DIR}/hero.jpg`;
+
+export const MEDITATION_SOLUTIONS_H1 =
+  "25 готовых решений для создания своих медитаций";
+
+export const MEDITATION_SOLUTIONS_SUBTITLE =
+  "Как создать свою медитацию с нуля: выбрать тему, написать текст для медитации, записать медитацию самостоятельно, добавить музыку и получить готовый MP3.";
+
+export const MEDITATION_SOLUTIONS_OFFER_LINE =
+  "25 готовых тем, текстов, шаблонов, инструкций и практических инструментов – от первой идеи до готовой медитации с голосом и музыкой.";
+
+export const MEDITATION_SOLUTIONS_SEO_TITLE =
+  "25 готовых решений для создания своих медитаций | АудиоЛад";
+
+export const MEDITATION_SOLUTIONS_SEO_DESCRIPTION =
+  MEDITATION_SOLUTIONS_SUBTITLE;
+
+export const MEDITATION_SOLUTIONS_BASE_PRICE_RUB = 4999;
+export const MEDITATION_SOLUTIONS_SALE_PRICE_RUB = 499;
+export const MEDITATION_SOLUTIONS_TIMER_SECONDS = 20 * 60;
+export const MEDITATION_SOLUTIONS_TIMER_CAPTION = "в ближайшие 20 минут";
+export const MEDITATION_SOLUTIONS_BUY_LABEL = "Купить";
+export const MEDITATION_SOLUTIONS_BONUS_BADGE = "БОНУС";
+
+export const MEDITATION_SOLUTIONS_FORBIDDEN_PHRASE = "своей медитации";
+
+export type MeditationSolutionsPractice = {
+  id: string;
+  slug: string;
+  authorId: string | null;
+  basePrice: number | null;
+};
+
+export type MeditationSolutionsCard = {
+  id: string;
+  imageSrc: string;
+  title: string;
+  description: string;
+  bonus?: boolean;
+};
+
+export const MEDITATION_SOLUTIONS_CARDS: readonly MeditationSolutionsCard[] = [
+  {
+    id: "item-01",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-01.jpg`,
+    title: "Как сделать медитацию: пошаговый план от идеи до готового MP3",
+    description:
+      "Пошаговая карта всего процесса – от первой идеи до готовой записи с голосом и музыкой.",
+  },
+  {
+    id: "item-02",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-02.jpg`,
+    title: "Как создать свою медитацию: 50 готовых тем",
+    description:
+      "50 идей для медитаций, чтобы быстро выбрать тему и начать создавать свою практику.",
+  },
+  {
+    id: "item-03",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-03.jpg`,
+    title: "Текст для медитации: готовая структура из 7 частей",
+    description:
+      "Готовый каркас, который помогает собрать текст медитации от вступления до завершения.",
+  },
+  {
+    id: "item-04",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-04.jpg`,
+    title: "Как написать текст для медитации: пошаговый конструктор",
+    description:
+      "Последовательно соберите собственный сценарий, даже если раньше никогда не писали медитации.",
+  },
+  {
+    id: "item-05",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-05.jpg`,
+    title: "Паспорт будущей медитации: готовый шаблон",
+    description:
+      "Определите тему, аудиторию, результат, настроение, голос и музыку ещё до начала записи.",
+  },
+  {
+    id: "item-06",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-06.jpg`,
+    title: "20 готовых начал для текста медитации",
+    description:
+      "Готовые варианты первых фраз, чтобы красиво и естественно начать свою медитацию.",
+  },
+  {
+    id: "item-07",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-07.jpg`,
+    title: "Как записать медитацию самостоятельно",
+    description:
+      "Простая инструкция для самостоятельной записи без сложной студии и лишнего оборудования.",
+  },
+  {
+    id: "item-08",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-08.jpg`,
+    title: "Как записать медитацию голосом",
+    description:
+      "Как говорить естественно, спокойно и убедительно, не превращая практику в чтение текста.",
+  },
+  {
+    id: "item-09",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-09.jpg`,
+    title: "Как записать медитацию с музыкой",
+    description:
+      "Как соединить голос и музыкальный фон и получить цельную готовую аудиопрактику.",
+  },
+  {
+    id: "item-10",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-10.jpg`,
+    title: "Музыка для записи медитаций: как выбрать правильный фон",
+    description:
+      "Разберитесь, какая музыка поддерживает голос и атмосферу, а какая начинает мешать практике.",
+  },
+  {
+    id: "item-11",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-11.jpg`,
+    title: "10 красивых способов завершить медитацию",
+    description:
+      "Готовые варианты мягкого завершения практики и возвращения слушателя к обычному состоянию.",
+  },
+  {
+    id: "item-12",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-12.jpg`,
+    title: "Как создать и записать свою медитацию в Студии АудиоЛад",
+    description:
+      "Практический путь от записи голоса до готового MP3 прямо в Студии АудиоЛада.",
+  },
+  {
+    id: "item-13",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-13.jpg`,
+    title: "30 готовых названий для медитаций",
+    description:
+      "Примеры и формулы, которые помогут быстро придумать понятное и привлекательное название.",
+  },
+  {
+    id: "item-14",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-14.jpg`,
+    title: "Формула сильной темы для медитации",
+    description:
+      "Превратите общую идею в конкретную тему с понятным состоянием и результатом для слушателя.",
+  },
+  {
+    id: "item-15",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-15.jpg`,
+    title: "Аффирмации для медитации: готовые формулы и примеры",
+    description:
+      "Готовые конструкции и примеры, которые можно адаптировать под разные темы медитаций.",
+  },
+  {
+    id: "item-16",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-16.jpg`,
+    title: "Конструктор основной части медитации",
+    description:
+      "Соберите центральную часть практики из понятных элементов и не теряйте логику сценария.",
+  },
+  {
+    id: "item-17",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-17.jpg`,
+    title: "Медитация «из точки А в точку Б»: готовая формула результата",
+    description:
+      "Определите исходное и желаемое состояние слушателя и постройте практику между ними.",
+  },
+  {
+    id: "item-18",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-18.jpg`,
+    title: "10 форматов медитаций и аудиопрактик, которые можно создавать",
+    description:
+      "Выберите подходящий формат – от классической медитации до визуализации, настроя и аудиопрактики.",
+  },
+  {
+    id: "item-19",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-19.jpg`,
+    title: "15 способов быстро расслабить человека в начале медитации",
+    description:
+      "Готовые приёмы для дыхания, внимания и расслабления, которые можно использовать во вступлении.",
+  },
+  {
+    id: "item-20",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-20.jpg`,
+    title: "Конструктор визуализации для медитации",
+    description:
+      "Создавайте образы, пространства и внутренние путешествия по простой готовой структуре.",
+  },
+  {
+    id: "item-21",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-21.jpg`,
+    title: "Как подготовить голос к записи медитации за 5 минут",
+    description:
+      "Короткая подготовка перед записью, чтобы голос звучал свободнее, спокойнее и естественнее.",
+  },
+  {
+    id: "item-22",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-22.jpg`,
+    title: "5 вариантов голоса и интонации для разных медитаций",
+    description:
+      "Сравните разные способы подачи и подберите интонацию под тему и настроение своей практики.",
+  },
+  {
+    id: "item-23",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-23.jpg`,
+    title: "Как записать чистый голос для медитации",
+    description:
+      "Практические настройки записи, которые помогают получить более аккуратный и понятный голос.",
+  },
+  {
+    id: "item-24",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-24.jpg`,
+    title: "Голос и музыка в медитации: формула правильного баланса",
+    description:
+      "Настройте соотношение голоса и музыки так, чтобы фон создавал атмосферу и не перекрывал слова.",
+  },
+  {
+    id: "item-25",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/item-25.jpg`,
+    title: "Как из одной медитации создать серию из 7 аудиопрактик",
+    description:
+      "Превратите одну удачную тему в целую последовательность взаимосвязанных аудиопрактик.",
+  },
+  {
+    id: "bonus-26",
+    imageSrc: `${MEDITATION_SOLUTIONS_IMAGE_DIR}/bonus-26.jpg`,
+    title:
+      "Как использовать медитации и аудиопрактики для привлечения клиентов",
+    description:
+      "15 готовых способов встроить аудио в свою работу, продвижение, консультации, программы и продукты.",
+    bonus: true,
+  },
+] as const;
+
+export function assertMeditationSolutionsCopyLock(value: string): boolean {
+  return !value.includes(MEDITATION_SOLUTIONS_FORBIDDEN_PHRASE);
+}
