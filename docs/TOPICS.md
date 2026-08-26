@@ -6,6 +6,7 @@
 
 - `supabase/migrations/20260717140000_topics_foundation.sql` — таблица и MVP-справочник
 - `supabase/migrations/20260825120000_topics_career_business_learning.sql` — Карьера / Бизнес / Обучение
+- `supabase/migrations/20260826120000_topics_spirituality.sql` — Духовность
 
 Тема — отдельная грань каталога. Она не является классом публикации (`practice` | `course` | `audiobook` | `release` | `post`) и не добавляет `product_kind`. «Обучение» (`learning`) не равно `class=course`.
 
@@ -43,6 +44,7 @@
 | `career` | Карьера | 80 |
 | `business` | Бизнес | 90 |
 | `learning` | Обучение | 100 |
+| `spirituality` | Духовность | 110 |
 
 Фильтры каталога и кабинет автора читают этот справочник через `listActiveTopics()` / `listTopicsWithCatalogCounts()`. Хардкод массива тем в UI запрещён.
 

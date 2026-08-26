@@ -265,6 +265,11 @@ function testRepoOneFileOneVersion() {
         row.filename === "20260825166000_editorial_playlist_listed_at_backfill.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260826120000_topics_spirituality.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -307,8 +312,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260825164000",
     "20260825165000",
     "20260825166000",
+    "20260826120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 10);
+  assert.equal(plan.database_migrations_pending, 11);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -330,8 +336,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260825164000",
     "20260825165000",
     "20260825166000",
+    "20260826120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 4);
+  assert.equal(plan.database_migrations_pending, 5);
 }
 
 function main() {
