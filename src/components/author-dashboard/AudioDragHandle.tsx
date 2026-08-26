@@ -3,6 +3,7 @@
 type AudioDragHandleProps = {
   disabled?: boolean;
   isDragging?: boolean;
+  ariaLabel?: string;
   onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
@@ -30,6 +31,7 @@ function DragHandleIcon() {
 export function AudioDragHandle({
   disabled = false,
   isDragging = false,
+  ariaLabel = "Перетащить аудио",
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -38,7 +40,7 @@ export function AudioDragHandle({
   return (
     <button
       type="button"
-      aria-label="Перетащить аудио"
+      aria-label={ariaLabel}
       disabled={disabled}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

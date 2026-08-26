@@ -147,6 +147,17 @@ export function resolvePublicationClass(
 }
 
 /**
+ * Explicit `publication_class=course` only. Legacy NULL + practice
+ * is not a course — mapLegacyProductKindToClass never yields "course".
+ */
+export function isCoursePublication(
+  publicationClass: string | null | undefined,
+  productKind: string | null | undefined,
+): boolean {
+  return resolvePublicationClass(publicationClass, productKind) === "course";
+}
+
+/**
  * Product Gallery is for product classes only: practice, course, audiobook.
  * Release (Music) and post (AudioPost) are never eligible.
  */
