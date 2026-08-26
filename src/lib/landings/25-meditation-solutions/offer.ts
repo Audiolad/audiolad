@@ -15,6 +15,8 @@ export type MeditationSolutionsOfferDisplay = OfferDisplayPricing & {
   remainingSeconds: number;
   remainingLabel: string;
   chargePriceMinor: number;
+  windowSynced: boolean;
+  canPurchase: boolean;
 };
 
 export function resolveMeditationSolutionsOfferDisplay(input: {
@@ -22,6 +24,7 @@ export function resolveMeditationSolutionsOfferDisplay(input: {
   expiresAt: string | null | undefined;
   basePrice?: number;
   salePrice?: number;
+  windowSynced?: boolean;
 }): MeditationSolutionsOfferDisplay {
   const basePrice =
     typeof input.basePrice === "number" && Number.isInteger(input.basePrice)
@@ -31,6 +34,7 @@ export function resolveMeditationSolutionsOfferDisplay(input: {
     typeof input.salePrice === "number" && Number.isInteger(input.salePrice)
       ? input.salePrice
       : MEDITATION_SOLUTIONS_SALE_PRICE_RUB;
+  const windowSynced = input.windowSynced === true;
 
   const pricing = resolveOfferDisplayPricing({
     regularPrice: basePrice,
@@ -40,17 +44,26 @@ export function resolveMeditationSolutionsOfferDisplay(input: {
     expiresAt: input.expiresAt,
   });
 
-  const remainingSeconds = pricing.showPromo
-    ? Math.max(
-        0,
-        Math.ceil((Date.parse(input.expiresAt ?? "") - input.nowMs) / 1000),
-      )
-    : 0;
+  const awaitingFirstWindow = !windowSynced && !input.expiresAt;
+  const showPromo = awaitingFirstWindow ? true : pricing.showPromo;
+  const chargePrice = showPromo ? salePrice : pricing.chargePrice;
+  const remainingSeconds = awaitingFirstWindow
+    ? MEDITATION_SOLUTIONS_TIMER_SECONDS
+    : pricing.showPromo
+      ? Math.max(
+          0,
+          Math.ceil((Date.parse(input.expiresAt ?? "") - input.nowMs) / 1000),
+        )
+      : 0;
 
   return {
     ...pricing,
+    showPromo,
+    chargePrice,
     remainingSeconds,
     remainingLabel: formatTimerMmSs(remainingSeconds),
-    chargePriceMinor: rublesToMinor(pricing.chargePrice),
+    chargePriceMinor: rublesToMinor(chargePrice),
+    windowSynced,
+    canPurchase: windowSynced,
   };
 }

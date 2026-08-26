@@ -57,20 +57,31 @@ export default function MeditationSolutionsOfferCta({
         </p>
       ) : null}
 
-      <BuyPracticeButton
-        practiceSlug={
-          offer.practice?.slug ?? MEDITATION_SOLUTIONS_PRACTICE_SLUG
-        }
-        practiceId={offer.practice?.id ?? null}
-        authorId={offer.practice?.authorId ?? null}
-        productPriceMinorSnapshot={display.chargePriceMinor}
-        currency="RUB"
-        purchaseSurface="sales_landing"
-        ctaPlacement={placement}
-        label={MEDITATION_SOLUTIONS_BUY_LABEL}
-        signInReturnPath={MEDITATION_SOLUTIONS_PUBLIC_PATH}
-        className={buyButtonClass}
-      />
+      {display.canPurchase ? (
+        <BuyPracticeButton
+          practiceSlug={
+            offer.practice?.slug ?? MEDITATION_SOLUTIONS_PRACTICE_SLUG
+          }
+          practiceId={offer.practice?.id ?? null}
+          authorId={offer.practice?.authorId ?? null}
+          productPriceMinorSnapshot={display.chargePriceMinor}
+          currency="RUB"
+          purchaseSurface="sales_landing"
+          ctaPlacement={placement}
+          label={MEDITATION_SOLUTIONS_BUY_LABEL}
+          signInReturnPath={MEDITATION_SOLUTIONS_PUBLIC_PATH}
+          className={buyButtonClass}
+        />
+      ) : (
+        <button
+          type="button"
+          disabled
+          aria-busy="true"
+          className={buyButtonClass}
+        >
+          {MEDITATION_SOLUTIONS_BUY_LABEL}
+        </button>
+      )}
       {placement === "bottom" ? <PurchaseConsent /> : null}
     </section>
   );

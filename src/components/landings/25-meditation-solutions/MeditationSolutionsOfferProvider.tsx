@@ -61,15 +61,20 @@ export default function MeditationSolutionsOfferProvider({
   const [expiresAt, setExpiresAt] = useState<string | null>(initialExpiresAt);
   const [salePrice, setSalePrice] = useState<number | null>(initialSalePrice);
   const [basePrice, setBasePrice] = useState<number | null>(initialBasePrice);
+  const [windowSynced, setWindowSynced] = useState(Boolean(initialExpiresAt));
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
+    if (!expiresAt) {
+      return;
+    }
+
     const interval = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [expiresAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,25 +93,31 @@ export default function MeditationSolutionsOfferProvider({
           | WindowResponse
           | null;
 
-        if (cancelled || !response.ok || !payload) {
+        if (cancelled) {
           return;
         }
 
-        if (typeof payload.expires_at === "string") {
-          setExpiresAt(payload.expires_at);
-        } else if (payload.expires_at === null) {
-          setExpiresAt(null);
-        }
+        if (response.ok && payload) {
+          if (typeof payload.expires_at === "string") {
+            setExpiresAt(payload.expires_at);
+          } else if (payload.expires_at === null) {
+            setExpiresAt(null);
+          }
 
-        if (typeof payload.sale_price === "number") {
-          setSalePrice(payload.sale_price);
-        }
+          if (typeof payload.sale_price === "number") {
+            setSalePrice(payload.sale_price);
+          }
 
-        if (typeof payload.base_price === "number") {
-          setBasePrice(payload.base_price);
+          if (typeof payload.base_price === "number") {
+            setBasePrice(payload.base_price);
+          }
         }
       } catch {
         // Keep the last known server window. Do not invent a local timer.
+      } finally {
+        if (!cancelled) {
+          setWindowSynced(true);
+        }
       }
     }
 
@@ -124,8 +135,9 @@ export default function MeditationSolutionsOfferProvider({
         expiresAt,
         basePrice: basePrice ?? MEDITATION_SOLUTIONS_BASE_PRICE_RUB,
         salePrice: salePrice ?? MEDITATION_SOLUTIONS_SALE_PRICE_RUB,
+        windowSynced,
       }),
-    [basePrice, expiresAt, nowMs, salePrice],
+    [basePrice, expiresAt, nowMs, salePrice, windowSynced],
   );
 
   const value = useMemo(

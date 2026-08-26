@@ -179,23 +179,47 @@ function testPromotionWindowReuse() {
 }
 
 function testExpiryUi() {
+  const pendingFirstOpen = resolveMeditationSolutionsOfferDisplay({
+    nowMs: Date.parse("2026-08-26T10:00:00.000Z"),
+    expiresAt: null,
+    windowSynced: false,
+  });
+  assert.equal(pendingFirstOpen.showPromo, true);
+  assert.equal(pendingFirstOpen.chargePrice, 499);
+  assert.equal(pendingFirstOpen.remainingLabel, "20:00");
+  assert.equal(pendingFirstOpen.canPurchase, false);
+  assert.equal(pendingFirstOpen.windowSynced, false);
+
   const active = resolveMeditationSolutionsOfferDisplay({
     nowMs: Date.parse("2026-08-26T10:05:00.000Z"),
     expiresAt: "2026-08-26T10:20:00.000Z",
+    windowSynced: true,
   });
   assert.equal(active.showPromo, true);
   assert.equal(active.chargePrice, 499);
   assert.equal(active.chargePriceMinor, 49900);
   assert.equal(active.remainingLabel, "15:00");
+  assert.equal(active.canPurchase, true);
 
   const expired = resolveMeditationSolutionsOfferDisplay({
     nowMs: Date.parse("2026-08-26T10:20:00.000Z"),
     expiresAt: "2026-08-26T10:20:00.000Z",
+    windowSynced: true,
   });
   assert.equal(expired.showPromo, false);
   assert.equal(expired.chargePrice, 4999);
   assert.equal(expired.chargePriceMinor, 499900);
   assert.equal(expired.remainingLabel, "00:00");
+  assert.equal(expired.canPurchase, true);
+
+  const syncedWithoutWindow = resolveMeditationSolutionsOfferDisplay({
+    nowMs: Date.parse("2026-08-26T10:00:00.000Z"),
+    expiresAt: null,
+    windowSynced: true,
+  });
+  assert.equal(syncedWithoutWindow.showPromo, false);
+  assert.equal(syncedWithoutWindow.chargePrice, 4999);
+  assert.equal(syncedWithoutWindow.canPurchase, true);
 }
 
 function testCheckoutWiring() {
@@ -210,6 +234,7 @@ function testCheckoutWiring() {
   );
 
   assert.match(cta, /BuyPracticeButton/);
+  assert.match(cta, /display.canPurchase/);
   assert.match(cta, /purchaseSurface="sales_landing"/);
   assert.match(cta, /productPriceMinorSnapshot=\{display.chargePriceMinor\}/);
   assert.match(cta, /ctaPlacement=\{placement\}/);
