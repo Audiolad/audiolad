@@ -611,15 +611,17 @@ function AuthorCourseLessonEditor({
       return null;
     }
 
+    const nextBlock = payload.block;
+
     onLessonChange({
       ...lesson,
       blocks: lesson.blocks.map((block) =>
         block.id === blockId
           ? {
-              ...payload.block,
+              ...nextBlock,
               position: block.position,
-              audio: payload.block.audio ?? block.audio,
-              file: payload.block.file ?? block.file,
+              audio: nextBlock.audio ?? block.audio,
+              file: nextBlock.file ?? block.file,
             }
           : block,
       ),
