@@ -582,12 +582,15 @@ export type MovePlaylistItemInput =
       ok: true;
       direction: MovePlaylistItemDirection;
       audioItemId: string | null;
+      targetPosition: number | null;
     }
   | { ok: false; error: "invalid_request" };
 
 /**
  * POST /api/playlists/[id]/items/[practiceId]/move body:
- * { direction: "up" | "down", audioItemId?: uuid | null } — no unknown keys.
+ * { direction: "up" | "down", audioItemId?: uuid | null, targetPosition?: int }
+ * — no unknown keys. targetPosition is the existing playlist_items.position
+ * of the drop target; omitted for one-step ↑/↓.
  */
 export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput {
   const parsed = parseJsonObject(body);
@@ -596,7 +599,7 @@ export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput 
     return { ok: false, error: "invalid_request" };
   }
 
-  const allowedKeys = new Set(["direction", "audioItemId"]);
+  const allowedKeys = new Set(["direction", "audioItemId", "targetPosition"]);
 
   for (const key of Object.keys(parsed)) {
     if (!allowedKeys.has(key)) {
@@ -614,15 +617,35 @@ export function parseMovePlaylistItemBody(body: unknown): MovePlaylistItemInput 
     return { ok: false, error: "invalid_request" };
   }
 
+  let targetPosition: number | null = null;
+
+  if ("targetPosition" in parsed && parsed.targetPosition != null) {
+    if (
+      typeof parsed.targetPosition !== "number" ||
+      !Number.isInteger(parsed.targetPosition) ||
+      parsed.targetPosition < 1 ||
+      parsed.targetPosition > 2147483647
+    ) {
+      return { ok: false, error: "invalid_request" };
+    }
+
+    targetPosition = parsed.targetPosition;
+  }
+
   if (!("audioItemId" in parsed) || parsed.audioItemId == null) {
-    return { ok: true, direction, audioItemId: null };
+    return { ok: true, direction, audioItemId: null, targetPosition };
   }
 
   if (typeof parsed.audioItemId !== "string" || !isUuid(parsed.audioItemId)) {
     return { ok: false, error: "invalid_request" };
   }
 
-  return { ok: true, direction, audioItemId: parsed.audioItemId };
+  return {
+    ok: true,
+    direction,
+    audioItemId: parsed.audioItemId,
+    targetPosition,
+  };
 }
 
 export type CollaboratorMutationInput =

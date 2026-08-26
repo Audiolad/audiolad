@@ -16,10 +16,12 @@ import EditorialCollaboratorsSection from "@/components/playlists/editorial/Edit
 import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracticePickerSheet";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
+import PlaylistItemsSortableList from "@/components/playlists/PlaylistItemsSortableList";
 import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import {
   editorialAuditActionLabel,
   type EditorialWorkspaceDetail,
+  type EditorialWorkspaceItemView,
 } from "@/lib/playlists/editorial-workspace-detail";
 import {
   formatEditorialDateTime,
@@ -29,6 +31,12 @@ import {
   playlistItemKey,
   playlistItemQuery,
 } from "@/lib/playlists/playlist-item-identity";
+import {
+  movePlaylistItems,
+  playlistItemReorderRequest,
+  visiblePlaylistItems,
+  type PlaylistItemsDraft,
+} from "@/lib/playlists/playlist-item-reorder";
 import { PLAYLIST_TOPIC_LIMIT } from "@/lib/playlists/playlist-topics";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
@@ -88,9 +96,24 @@ export default function EditorialPlaylistEditorClient({
 
   const published = detail.playlist.visibility === "public";
   const slugLocked = detail.slugLocked;
-  const items = detail.items.filter(
-    (item) => !removedIds.has(playlistItemKey(item.practiceId, item.audioItemId)),
+  const serverItems = useMemo(
+    () =>
+      detail.items.filter(
+        (item) =>
+          !removedIds.has(playlistItemKey(item.practiceId, item.audioItemId)),
+      ),
+    [detail.items, removedIds],
   );
+  const serverOrderKey = serverItems
+    .map(
+      (item) =>
+        `${playlistItemKey(item.practiceId, item.audioItemId)}:${item.position}`,
+    )
+    .join("|");
+  const [draft, setDraft] = useState<PlaylistItemsDraft<EditorialWorkspaceItemView> | null>(
+    null,
+  );
+  const items = visiblePlaylistItems(serverItems, serverOrderKey, draft);
   const mosaicCoverUrls = useMemo(
     () =>
       takeFirstPlaylistItemCoverUrls(
@@ -339,6 +362,31 @@ export default function EditorialPlaylistEditorClient({
     }
   }
 
+  async function persistMove(
+    practiceId: string,
+    audioItemId: string | null,
+    direction: "up" | "down",
+    targetPosition?: number,
+  ) {
+    const response = await fetch(
+      `/api/playlists/${detail.playlist.id}/items/${practiceId}/move`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          direction,
+          audioItemId,
+          ...(targetPosition != null ? { targetPosition } : {}),
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("move_failed");
+    }
+  }
+
   async function moveItem(
     practiceId: string,
     audioItemId: string | null,
@@ -352,23 +400,44 @@ export default function EditorialPlaylistEditorClient({
     setListError(null);
 
     try {
-      const response = await fetch(
-        `/api/playlists/${detail.playlist.id}/items/${practiceId}/move`,
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction, audioItemId }),
-        },
-      );
-
-      if (!response.ok) {
-        setListError("Не удалось изменить порядок.");
-        return;
-      }
-
+      await persistMove(practiceId, audioItemId, direction);
       refresh();
     } catch {
+      setListError("Не удалось изменить порядок.");
+    } finally {
+      setMovingPracticeId(null);
+    }
+  }
+
+  async function reorderItems(fromIndex: number, toIndex: number) {
+    const absoluteFrom = page * PAGE_SIZE + fromIndex;
+    const absoluteTo = page * PAGE_SIZE + toIndex;
+    const request = playlistItemReorderRequest(items, absoluteFrom, absoluteTo);
+
+    if (!request || movingPracticeId) {
+      return;
+    }
+
+    const previous = items;
+    setDraft({
+      orderKey: serverOrderKey,
+      items: movePlaylistItems(items, absoluteFrom, absoluteTo),
+    });
+    setMovingPracticeId(
+      playlistItemKey(request.item.practiceId, request.item.audioItemId),
+    );
+    setListError(null);
+
+    try {
+      await persistMove(
+        request.item.practiceId,
+        request.item.audioItemId,
+        request.direction,
+        request.targetPosition,
+      );
+      refresh();
+    } catch {
+      setDraft({ orderKey: serverOrderKey, items: previous });
       setListError("Не удалось изменить порядок.");
     } finally {
       setMovingPracticeId(null);
@@ -605,81 +674,89 @@ export default function EditorialPlaylistEditorClient({
           </p>
         ) : null}
 
-        <div className="mt-4 space-y-2">
-          {pageItems.map((item, index) => {
-            const absoluteIndex = page * PAGE_SIZE + index;
+        <div className="mt-4">
+          <PlaylistItemsSortableList
+            items={pageItems}
+            className="space-y-2"
+            disabled={movingPracticeId !== null}
+            onReorder={({ fromIndex, toIndex }) => {
+              void reorderItems(fromIndex, toIndex);
+            }}
+            renderRow={({ item, index, dragHandle }) => {
+              const absoluteIndex = page * PAGE_SIZE + index;
 
-            return (
-              <PlaylistItemRow
-                key={playlistItemKey(item.practiceId, item.audioItemId)}
-                item={{
-                  practiceId: item.practiceId,
-                  audioItemId: item.audioItemId,
-                  title: item.title,
-                  authorName: item.authorName,
-                  authorSlug: item.authorSlug,
-                  coverUrl: item.coverUrl,
-                  coverImage: item.coverImage,
-                  updatedAt: item.updatedAt,
-                  formatLabel: `${item.productKindLabel}${item.metaLabel ? ` · ${item.metaLabel}` : ""}`,
-                  metaLabel: item.available ? "Доступен" : "Недоступен",
-                  available: item.available,
-                  href: item.listenHref,
-                  listenHref: item.listenHref,
-                }}
-                index={absoluteIndex}
-                trailingControls={
-                  <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplacePracticeId(item.practiceId);
-                        setReplaceAudioItemId(item.audioItemId);
-                        setPickerOpen(true);
-                      }}
-                      className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5]"
-                    >
-                      Заменить
-                    </button>
-                    <button
-                      type="button"
-                      disabled={absoluteIndex === 0 || movingPracticeId !== null}
-                      onClick={() =>
-                        void moveItem(item.practiceId, item.audioItemId, "up")
-                      }
-                      className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
-                      aria-label="Выше"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        absoluteIndex === items.length - 1 ||
-                        movingPracticeId !== null
-                      }
-                      onClick={() =>
-                        void moveItem(item.practiceId, item.audioItemId, "down")
-                      }
-                      className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
-                      aria-label="Ниже"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void removeItem(item.practiceId, item.audioItemId)
-                      }
-                      className="rounded-full px-2 py-1 text-[11px] font-medium text-[#b34f63]"
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                }
-              />
-            );
-          })}
+              return (
+                <PlaylistItemRow
+                  item={{
+                    practiceId: item.practiceId,
+                    audioItemId: item.audioItemId,
+                    title: item.title,
+                    authorName: item.authorName,
+                    authorSlug: item.authorSlug,
+                    coverUrl: item.coverUrl,
+                    coverImage: item.coverImage,
+                    updatedAt: item.updatedAt,
+                    formatLabel: `${item.productKindLabel}${item.metaLabel ? ` · ${item.metaLabel}` : ""}`,
+                    metaLabel: item.available ? "Доступен" : "Недоступен",
+                    available: item.available,
+                    href: item.listenHref,
+                    listenHref: item.listenHref,
+                  }}
+                  index={absoluteIndex}
+                  leadingControls={dragHandle}
+                  trailingControls={
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplacePracticeId(item.practiceId);
+                          setReplaceAudioItemId(item.audioItemId);
+                          setPickerOpen(true);
+                        }}
+                        className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5]"
+                      >
+                        Заменить
+                      </button>
+                      <button
+                        type="button"
+                        disabled={absoluteIndex === 0 || movingPracticeId !== null}
+                        onClick={() =>
+                          void moveItem(item.practiceId, item.audioItemId, "up")
+                        }
+                        className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
+                        aria-label="Выше"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          absoluteIndex === items.length - 1 ||
+                          movingPracticeId !== null
+                        }
+                        onClick={() =>
+                          void moveItem(item.practiceId, item.audioItemId, "down")
+                        }
+                        className="rounded-full px-2 py-1 text-[11px] font-medium text-[#7042c5] disabled:opacity-30"
+                        aria-label="Ниже"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void removeItem(item.practiceId, item.audioItemId)
+                        }
+                        className="rounded-full px-2 py-1 text-[11px] font-medium text-[#b34f63]"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  }
+                />
+              );
+            }}
+          />
         </div>
 
         {pageCount > 1 ? (
