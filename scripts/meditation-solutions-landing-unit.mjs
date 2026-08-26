@@ -140,6 +140,10 @@ function testGridAndCardsReuseCatalogGeometry() {
   assert.match(cards, /border-\[#eadff8\]/);
   assert.match(cards, /data-meditation-solutions-format/);
   assert.match(cards, /card\.format/);
+  assert.match(cards, /mt-auto/);
+  assert.doesNotMatch(cards, /min-h-20/);
+  assert.doesNotMatch(cards, /MEDITATION_SOLUTIONS_BONUS_BADGE/);
+  assert.doesNotMatch(cards, /БОНУС/);
   assert.match(view, /priority/);
   assert.match(cards, /loading="lazy"/);
   assert.match(view, /platformBottomContentPaddingClass/);
