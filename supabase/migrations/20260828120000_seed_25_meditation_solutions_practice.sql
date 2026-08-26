@@ -3,8 +3,7 @@ BEGIN;
 -- Paid practice + personal 20-minute 499 ₽ offer for the
 -- /p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy landing.
 -- Idempotent: safe to re-run. Unlisted in catalog; checkout uses slug.
--- Upsert on practices.id (PK). Production has no UNIQUE(slug); only
--- PRIMARY KEY (id) and UNIQUE (author_id, slug).
+-- Upsert on UNIQUE (author_id, slug). Production has no UNIQUE(slug).
 
 DO $$
 BEGIN
@@ -61,11 +60,9 @@ VALUES (
   false,
   'practice'
 )
-ON CONFLICT (id) DO UPDATE
+ON CONFLICT (author_id, slug) DO UPDATE
 SET
-  author_id = EXCLUDED.author_id,
   title = EXCLUDED.title,
-  slug = EXCLUDED.slug,
   description = EXCLUDED.description,
   format = EXCLUDED.format,
   price = EXCLUDED.price,
