@@ -161,7 +161,7 @@ function testQueryBuilderIncludesSelectedForAllowlist() {
   assert.equal(calls[1][0], "or");
   assert.match(String(calls[1][1]), /catalog_visibility\.eq\.listed/);
   assert.match(String(calls[1][1]), /selected_users/);
-  assert.match(String(calls[1][1]), SELECTED_ID);
+  assert.match(String(calls[1][1]), new RegExp(SELECTED_ID));
 
   calls.length = 0;
   applyOrdinaryCatalogEligibility(query, GUEST_ORDINARY_CATALOG_VIEWER);
