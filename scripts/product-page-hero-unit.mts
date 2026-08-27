@@ -355,8 +355,28 @@ function testDesktopHeroHeightFollowsSquareCover() {
   );
   assert.match(
     css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*nowrap/,
+    "mobile Buy + Listen stay on one row",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*align-items:\s*stretch/,
+    "mobile CTA row stretches both buttons to one height",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions > :first-child\s*\{[^}]*flex:\s*0 0 auto/,
+    "mobile Buy stays compact",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\][\s\S]*\[data-practice-primary-play\]:not\(:only-child\)\s*\{[^}]*flex:\s*1 1 0/,
+    "mobile Listen takes leftover width",
+  );
+  assert.doesNotMatch(
+    css,
     /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*wrap/,
-    "mobile buttons may wrap when the row is tight",
+    "mobile CTA row must not wrap",
   );
   assert.match(
     desktopBlock,
