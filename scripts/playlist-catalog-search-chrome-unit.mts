@@ -41,6 +41,11 @@ assert.match(
   /if \(isPublicPlaylistCatalogPath\(pathname\)\) \{\s*return null;/,
   "playlist catalog hides the shell product combobox",
 );
+assert.match(
+  shellSearch,
+  /pathname === ["']\/my-practices["'] \|\| pathname\.startsWith\(["']\/my-practices\//,
+  "audioteka hides the shell product combobox",
+);
 assert.doesNotMatch(
   shellSearch,
   /pathname === ["']\/playlists["'] \|\| pathname\.startsWith\(["']\/playlists["']\)/,
@@ -64,7 +69,7 @@ assert.match(
 assert.match(
   shellSearch,
   /PlatformSearchCombobox/,
-  "non-catalog routes such as / and /my-practices keep the combobox",
+  "non-catalog routes such as home still keep the combobox",
 );
 
 const searchUi = read(

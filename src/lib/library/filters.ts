@@ -6,7 +6,24 @@ export type LibraryFilterId =
   | "gifts"
   | "saved"
   | "downloaded"
-  | "uploads";
+  | "uploads"
+  | "playlists"
+  | "personal";
+
+export type LibraryCollectionFilterId = Exclude<LibraryFilterId, "downloaded">;
+
+export const LIBRARY_COLLECTION_FILTERS: readonly {
+  id: LibraryCollectionFilterId;
+  label: string;
+}[] = [
+  { id: "all", label: "Все" },
+  { id: "saved", label: "Сохранённые" },
+  { id: "purchased", label: "Купленные" },
+  { id: "gifts", label: "Подарки" },
+  { id: "playlists", label: "Плейлисты" },
+  { id: "uploads", label: "Моё аудио" },
+  { id: "personal", label: "Личное" },
+];
 
 export type LibraryFilterPractice = {
   isFree: boolean | null;
@@ -67,7 +84,9 @@ export function matchesLibraryFilter(
     case "downloaded":
       return false;
     case "uploads":
-      // Catalog entitlement rows never match; uploads render from a separate source.
+    case "playlists":
+    case "personal":
+      // Catalog entitlement rows never match; these collections use kinds.
       return false;
     default:
       return true;
@@ -81,6 +100,8 @@ const LIBRARY_FILTER_IDS: readonly LibraryFilterId[] = [
   "saved",
   "downloaded",
   "uploads",
+  "playlists",
+  "personal",
 ];
 
 export function isLibraryFilterId(
@@ -104,6 +125,10 @@ export function getLibraryFilterEmptyMessage(filter: LibraryFilterId): string {
       return "Скачанных материалов пока нет. Когда офлайн-доступ появится, они будут здесь.";
     case "uploads":
       return "Добавьте свой аудиофайл – он будет доступен только в вашем аккаунте.";
+    case "playlists":
+      return "Здесь появятся плейлисты, которые вы сохраните.";
+    case "personal":
+      return "Личные материалы появятся здесь, когда автор отправит их вам.";
     default:
       return "В Аудиотеке пока пусто. Начните с каталога или добавьте своё аудио.";
   }
@@ -124,6 +149,8 @@ export function getLibraryFilterEmptyCta(filter: LibraryFilterId): {
         href: "/my-library/private-audio/new",
         label: "Добавить своё аудио",
       };
+    case "playlists":
+      return { href: "/playlists/catalog", label: "Перейти к плейлистам" };
     case "all":
       return { href: "/catalog", label: "Перейти в каталог" };
     default:

@@ -154,7 +154,9 @@ function testSourceGuards() {
   );
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
-  assert(library.includes("Мои записи"), "uploads filter");
+  const libraryFilters = read("src/lib/library/filters.ts");
+  assert(libraryFilters.includes('label: "Моё аудио"'), "uploads filter label");
+  assert(libraryFilters.includes('"uploads"'), "uploads filter id");
   assert(library.includes("Добавить своё аудио"), "add CTA");
 
   const offer = read("src/app/(platform)/offer/page.tsx");

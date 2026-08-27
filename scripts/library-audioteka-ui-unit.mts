@@ -17,6 +17,8 @@ import {
 import {
   getLibraryFilterEmptyCta,
   getLibraryFilterEmptyMessage,
+  isLibraryFilterId,
+  LIBRARY_COLLECTION_FILTERS,
 } from "../src/lib/library/filters";
 import { unifiedCatalogEntryToCatalogCard } from "../src/lib/library/unified-catalog-card";
 import {
@@ -26,6 +28,14 @@ import {
   mapPrivateAudioLibraryEntry,
 } from "../src/lib/library/unified-entry";
 import { matchesUnifiedLibraryFilter } from "../src/lib/library/unified-filter";
+import {
+  applyUnifiedLibraryView,
+  buildMyPracticesHref,
+  compareUnifiedLibrarySort,
+  formatLibraryMaterialsCount,
+  matchesUnifiedLibrarySearch,
+  parseLibrarySort,
+} from "../src/lib/library/unified-query";
 import type { MyPersonalMaterialListItemDto } from "../src/lib/personal-materials/client-library/types";
 import type { PrivateAudioListItemDto } from "../src/lib/private-audio/types";
 import { LIBRARY_FALLBACK_COVER_SRC } from "../src/components/my-practices/LibraryFallbackCover";
@@ -160,18 +170,78 @@ function personalEntry() {
   return mapPersonalLibraryEntry(item);
 }
 
-function testChips() {
-  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+function testCollectionFilters() {
+  assert.deepEqual(
+    LIBRARY_COLLECTION_FILTERS.map((filter) => filter.id),
+    ["all", "saved", "purchased", "gifts", "playlists", "uploads", "personal"],
+  );
+  assert.deepEqual(
+    LIBRARY_COLLECTION_FILTERS.map((filter) => filter.label),
+    [
+      "Все",
+      "Сохранённые",
+      "Купленные",
+      "Подарки",
+      "Плейлисты",
+      "Моё аудио",
+      "Личное",
+    ],
+  );
+  assert.equal(isLibraryFilterId("playlists"), true);
+  assert.equal(isLibraryFilterId("personal"), true);
+  assert.equal(isLibraryFilterId("uploads"), true);
+  assert.equal(isLibraryFilterId("downloaded"), true);
 
-  assert.match(library, /id: "all", label: "Все"/);
-  assert.match(library, /id: "saved", label: "Сохранённые"/);
-  assert.match(library, /id: "gifts", label: "Подарки"/);
-  assert.match(library, /id: "purchased", label: "Купленные"/);
-  assert.match(library, /id: "uploads", label: "Мои записи"/);
-  assert.doesNotMatch(library, /id: "downloaded"/);
-  assert.doesNotMatch(library, /Скачанные/);
-  assert.match(library, /params.set\("filter", filter\)/);
-  assert.match(library, /-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-2/);
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const filters = read("src/components/my-practices/MyPracticesLibraryFilters.tsx");
+  const search = read("src/components/my-practices/MyPracticesLibrarySearch.tsx");
+  const page = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
+  );
+  const mobileHeader = read("src/components/listener/LibraryMobileHeader.tsx");
+  const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
+
+  assert.match(library, /MyPracticesLibrarySearch/);
+  assert.match(library, /MyPracticesLibraryFilters/);
+  assert.match(library, /MyPracticesLibrarySort/);
+  assert.match(library, /buildMyPracticesHref/);
+  assert.match(library, /scroll:\s*false/);
+  assert.doesNotMatch(library, /Мои записи/);
+  assert.doesNotMatch(library, /В библиотеке/);
+  assert.doesNotMatch(library, /overflow-x-auto px-5 pb-2/);
+  assert.doesNotMatch(library, /PlatformSearchCombobox/);
+  assert.doesNotMatch(library, /buildCatalogHref|\/api\/catalog\/search/);
+  assert.match(library, /В аудиотеке:/);
+  assert.match(library, /formatLibraryMaterialsCount/);
+
+  assert.match(search, /Поиск по аудиотеке/);
+  assert.match(filters, /Коллекция/);
+  assert.match(filters, /Фильтры/);
+  assert.match(filters, /LIBRARY_COLLECTION_FILTERS/);
+  assert.match(filters, /createPortal/);
+  assert.match(filters, /catalog-sheet-lock/);
+  assert.doesNotMatch(filters, /document\.body\.style\.overflow/);
+  assert.doesNotMatch(filters, /topic=|access=/);
+  assert.doesNotMatch(filters, /CatalogMobileFilters|buildCatalogHref/);
+
+  assert.match(
+    page,
+    /Всё, что вы сохранили, купили, получили или добавили/,
+  );
+  assert.match(page, /Аудиотека/);
+  assert.match(
+    mobileHeader,
+    /Всё, что вы сохранили, купили, получили или добавили/,
+  );
+  assert.doesNotMatch(page, /Ваши подарки, купленные и личные материалы/);
+  assert.doesNotMatch(mobileHeader, /Ваши подарки и купленные материалы/);
+
+  assert.match(
+    shellSearch,
+    /pathname === ["']\/my-practices["'] \|\| pathname\.startsWith\(["']\/my-practices\//,
+  );
+  assert.match(shellSearch, /PlatformSearchCombobox/);
+  assert.match(shellSearch, /isPublicPlaylistCatalogPath/);
 }
 
 function testBadges() {
@@ -330,26 +400,122 @@ function testFilterRules() {
 
   assert.equal(matchesUnifiedLibraryFilter(playlist, "all"), true);
   assert.equal(matchesUnifiedLibraryFilter(playlist, "saved"), true);
+  assert.equal(matchesUnifiedLibraryFilter(playlist, "playlists"), true);
   assert.equal(matchesUnifiedLibraryFilter(playlist, "purchased"), false);
   assert.equal(matchesUnifiedLibraryFilter(playlist, "gifts"), false);
   assert.equal(matchesUnifiedLibraryFilter(playlist, "uploads"), false);
+  assert.equal(matchesUnifiedLibraryFilter(playlist, "personal"), false);
 
   assert.equal(matchesUnifiedLibraryFilter(privateAudio, "all"), true);
   assert.equal(matchesUnifiedLibraryFilter(privateAudio, "uploads"), true);
   assert.equal(matchesUnifiedLibraryFilter(privateAudio, "purchased"), false);
   assert.equal(matchesUnifiedLibraryFilter(privateAudio, "gifts"), false);
   assert.equal(matchesUnifiedLibraryFilter(privateAudio, "saved"), false);
+  assert.equal(matchesUnifiedLibraryFilter(privateAudio, "playlists"), false);
+  assert.equal(matchesUnifiedLibraryFilter(privateAudio, "personal"), false);
 
   assert.equal(matchesUnifiedLibraryFilter(personal, "all"), true);
+  assert.equal(matchesUnifiedLibraryFilter(personal, "personal"), true);
   assert.equal(matchesUnifiedLibraryFilter(personal, "uploads"), false);
   assert.equal(matchesUnifiedLibraryFilter(personal, "purchased"), false);
   assert.equal(matchesUnifiedLibraryFilter(personal, "gifts"), false);
   assert.equal(matchesUnifiedLibraryFilter(personal, "saved"), false);
+  assert.equal(matchesUnifiedLibraryFilter(personal, "playlists"), false);
 
   assert.equal(matchesUnifiedLibraryFilter(paidSave, "saved"), true);
+  assert.equal(matchesUnifiedLibraryFilter(paidSave, "playlists"), false);
+  assert.equal(matchesUnifiedLibraryFilter(paidSave, "personal"), false);
   assert.equal(matchesUnifiedLibraryFilter(paidSave, "purchased"), false);
   assert.equal(matchesUnifiedLibraryFilter(purchased, "purchased"), true);
   assert.equal(matchesUnifiedLibraryFilter(purchased, "uploads"), false);
+}
+
+function testSearchMatch() {
+  const playlist = playlistEntry();
+  const privateAudio = privateEntry();
+  const personal = personalEntry();
+  const paidSave = mapCatalogLibraryEntry(paidWishListItem());
+
+  assert.equal(matchesUnifiedLibrarySearch(playlist, ""), true);
+  assert.equal(matchesUnifiedLibrarySearch(playlist, "  "), true);
+  assert.equal(matchesUnifiedLibrarySearch(playlist, "вечер"), true);
+  assert.equal(matchesUnifiedLibrarySearch(playlist, "АУДИОЛАД"), true);
+  assert.equal(matchesUnifiedLibrarySearch(playlist, "утро"), false);
+  assert.equal(matchesUnifiedLibrarySearch(privateAudio, "мой файл"), true);
+  assert.equal(matchesUnifiedLibrarySearch(personal, "автор"), true);
+  assert.equal(matchesUnifiedLibrarySearch(paidSave, "Practice"), true);
+  assert.equal(matchesUnifiedLibrarySearch(paidSave, "990"), false);
+  assert.equal(matchesUnifiedLibrarySearch(playlist, playlist.slug), false);
+}
+
+function testSortOrder() {
+  assert.equal(parseLibrarySort(null), "new");
+  assert.equal(parseLibrarySort("old"), "old");
+  assert.equal(parseLibrarySort("alpha"), "alpha");
+  assert.equal(parseLibrarySort("price"), "new");
+
+  const newer = {
+    id: "b",
+    title: "Яблоко",
+    sortAt: 200,
+  };
+  const older = {
+    id: "a",
+    title: "Абрикос",
+    sortAt: 100,
+  };
+  const sameTitleNewer = {
+    id: "c",
+    title: "Абрикос",
+    sortAt: 150,
+  };
+
+  assert.ok(compareUnifiedLibrarySort(newer, older, "new") < 0);
+  assert.ok(compareUnifiedLibrarySort(newer, older, "old") > 0);
+  assert.ok(compareUnifiedLibrarySort(older, newer, "alpha") < 0);
+  assert.ok(compareUnifiedLibrarySort(sameTitleNewer, older, "alpha") < 0);
+
+  const playlist = playlistEntry();
+  const privateAudio = privateEntry();
+  const personal = personalEntry();
+  const paidSave = mapCatalogLibraryEntry(paidWishListItem());
+  const visible = applyUnifiedLibraryView(
+    [personal, privateAudio, paidSave, playlist],
+    { filter: "all", query: "", sort: "new" },
+  );
+
+  assert.deepEqual(
+    visible.map((entry) => entry.id),
+    [...visible].sort((left, right) =>
+      compareUnifiedLibrarySort(left, right, "new"),
+    ).map((entry) => entry.id),
+  );
+
+  const alpha = applyUnifiedLibraryView(
+    [personal, privateAudio, paidSave, playlist],
+    { filter: "all", query: "", sort: "alpha" },
+  );
+  const titles = alpha.map((entry) => entry.title);
+  assert.deepEqual(
+    titles,
+    [...titles].sort((left, right) => left.localeCompare(right, "ru")),
+  );
+
+  const found = applyUnifiedLibraryView(
+    [personal, privateAudio, paidSave, playlist],
+    { filter: "all", query: "вечер", sort: "new" },
+  );
+  assert.equal(found.length, 1);
+  assert.equal(found[0]?.kind, "playlist");
+
+  assert.equal(formatLibraryMaterialsCount(1), "1 материал");
+  assert.equal(formatLibraryMaterialsCount(2), "2 материала");
+  assert.equal(formatLibraryMaterialsCount(5), "5 материалов");
+  assert.equal(
+    buildMyPracticesHref({ q: "сон", filter: "saved", sort: "old" }),
+    "/my-practices?q=%D1%81%D0%BE%D0%BD&filter=saved&sort=old",
+  );
+  assert.equal(buildMyPracticesHref({ q: "  ", filter: "all", sort: "new" }), "/my-practices");
 }
 
 function testFallbackCover() {
@@ -398,6 +564,18 @@ function testEmptySaved() {
     getLibraryFilterEmptyMessage("all"),
     /В Аудиотеке пока пусто/,
   );
+  assert.equal(
+    getLibraryFilterEmptyMessage("playlists"),
+    "Здесь появятся плейлисты, которые вы сохраните.",
+  );
+  assert.deepEqual(getLibraryFilterEmptyCta("playlists"), {
+    href: "/playlists/catalog",
+    label: "Перейти к плейлистам",
+  });
+  assert.equal(
+    getLibraryFilterEmptyMessage("personal"),
+    "Личные материалы появятся здесь, когда автор отправит их вам.",
+  );
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
   assert.match(library, /getLibraryFilterEmptyMessage\(filter\)/);
@@ -434,11 +612,13 @@ function testSourceBoundaries() {
   assert.match(shell, /playback = "default"/);
 }
 
-testChips();
+testCollectionFilters();
 testBadges();
 testUnifiedLoaderAndGrid();
 testLockedPaidHasNoFullListen();
 testFilterRules();
+testSearchMatch();
+testSortOrder();
 testFallbackCover();
 testEmptySaved();
 testSourceBoundaries();

@@ -1,6 +1,6 @@
 /**
  * Аудиотека filter matching for the unified list.
- * Chip labels stay in MyPracticesLibrary. Catalog semantics stay in filters.ts.
+ * Collection labels stay in filters.ts. Catalog semantics stay in matchesLibraryFilter.
  */
 
 import {
@@ -22,6 +22,14 @@ export function matchesUnifiedLibraryFilter(
 
   if (filter === "uploads") {
     return entry.kind === "private_audio";
+  }
+
+  if (filter === "playlists") {
+    return entry.kind === "playlist";
+  }
+
+  if (filter === "personal") {
+    return entry.kind === "personal";
   }
 
   if (entry.kind === "private_audio" || entry.kind === "personal") {
