@@ -10,6 +10,7 @@ import {
 import {
   assertBlockBelongsToLesson,
   assertLessonBelongsToCourse,
+  buildCourseTextBlockPayload,
   defaultCourseLessonTitle,
   nextCoursePosition,
   validateCourseCompletionCtaInput,
@@ -558,13 +559,19 @@ export async function createCourseLessonBlock(
   const position = nextCoursePosition(lesson.blocks);
 
   if (input.type === "text") {
-    const payload =
+    const built = buildCourseTextBlockPayload(
       input.payload &&
-      typeof input.payload === "object" &&
-      !Array.isArray(input.payload) &&
-      typeof (input.payload as { text?: unknown }).text === "string"
-        ? { text: (input.payload as { text: string }).text }
-        : { text: "" };
+        typeof input.payload === "object" &&
+        !Array.isArray(input.payload)
+        ? (input.payload as { text?: unknown }).text
+        : undefined,
+    );
+
+    if (!built.ok) {
+      throw new CourseBuilderError("empty_text", 400);
+    }
+
+    const payload = built.payload;
     const validation = validateCourseLessonBlock({
       type: "text",
       assetId: null,
@@ -739,20 +746,26 @@ export async function updateCourseLessonBlock(
   }
 
   if (block.type === "text" && input.payload !== undefined) {
-    const payload =
+    const built = buildCourseTextBlockPayload(
       input.payload &&
-      typeof input.payload === "object" &&
-      !Array.isArray(input.payload) &&
-      typeof (input.payload as { text?: unknown }).text === "string"
-        ? { text: (input.payload as { text: string }).text }
-        : null;
+        typeof input.payload === "object" &&
+        !Array.isArray(input.payload)
+        ? (input.payload as { text?: unknown }).text
+        : undefined,
+    );
+
+    if (!built.ok) {
+      throw new CourseBuilderError("empty_text", 400);
+    }
+
+    const payload = built.payload;
     const validation = validateCourseLessonBlock({
       type: "text",
       assetId: null,
       payload,
     });
 
-    if (!validation.ok || !payload) {
+    if (!validation.ok) {
       throw new CourseBuilderError("invalid_request", 400);
     }
 

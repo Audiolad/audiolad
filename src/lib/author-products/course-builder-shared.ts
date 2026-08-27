@@ -8,6 +8,11 @@ import type { CourseLessonBlockType } from "@/lib/course-content/types";
 export const COURSE_BUILDER_SECTION_TITLE = "Содержание курса";
 export const COURSE_BUILDER_EMPTY_TITLE = "Добавьте первый урок курса";
 export const COURSE_BUILDER_ADD_LESSON_LABEL = "Добавить урок";
+export const COURSE_BUILDER_ADD_TEXT_LABEL = "Добавить текст";
+export const COURSE_BUILDER_SAVE_TEXT_LABEL = "Сохранить текст";
+export const COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL = "Сохранить изменения";
+export const COURSE_BUILDER_EDIT_TEXT_LABEL = "Редактировать";
+export const COURSE_BUILDER_EMPTY_TEXT_MESSAGE = "Введите текст блока.";
 export const COURSE_BUILDER_COMPLETION_CTA_TITLE = "Что дальше";
 export const COURSE_BUILDER_LEGACY_AUDIO_NOTICE =
   "У этого курса остались аудиозаписи в старом списке треков. Они не переносятся в уроки автоматически.";
@@ -213,6 +218,31 @@ export function countCoursePublishContentFromLessons(
   };
 }
 
+export function readCourseLessonBlockText(payload: unknown): string {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    typeof (payload as { text?: unknown }).text === "string"
+  ) {
+    return (payload as { text: string }).text;
+  }
+
+  return "";
+}
+
+export function buildCourseTextBlockPayload(
+  text: unknown,
+):
+  | { ok: true; payload: { text: string } }
+  | { ok: false; reason: "empty_text" } {
+  if (typeof text !== "string" || text.trim() === "") {
+    return { ok: false, reason: "empty_text" };
+  }
+
+  return { ok: true, payload: { text } };
+}
+
 function readOptionalCtaText(
   record: Record<string, unknown>,
   key: string,
@@ -289,6 +319,8 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
       return "Не удалось сохранить порядок. Обновите страницу и попробуйте снова.";
     case "missing_title":
       return "Укажите название урока.";
+    case "empty_text":
+      return COURSE_BUILDER_EMPTY_TEXT_MESSAGE;
     case COURSE_PUBLISH_MISSING_CONTENT_CODE:
       return COURSE_PUBLISH_MISSING_CONTENT_MESSAGE;
     case "invalid_file_type":
