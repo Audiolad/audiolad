@@ -209,6 +209,30 @@ export function buildPracticeHeroLightMeta(input: {
   return author ?? lightMeta;
 }
 
+/** Rest of the hero light meta after a leading `${authorName} · ` prefix. */
+export function resolvePracticeHeroLightMetaRest(
+  meta: string | null | undefined,
+  authorName: string | null | undefined,
+): string | null {
+  const trimmedMeta = meta?.trim() || null;
+  const author = authorName?.trim() || null;
+
+  if (!author || !trimmedMeta) {
+    return trimmedMeta;
+  }
+
+  if (trimmedMeta === author) {
+    return null;
+  }
+
+  const prefix = `${author} · `;
+  if (trimmedMeta.startsWith(prefix)) {
+    return trimmedMeta.slice(prefix.length).trim() || null;
+  }
+
+  return trimmedMeta;
+}
+
 /** Single-paragraph description may stand in when subtitle is empty. */
 export function resolvePracticeHeroSubtitle(
   subtitle: string | null | undefined,
