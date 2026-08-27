@@ -330,6 +330,8 @@ function testPageWiring() {
   assert(homePage.includes("buildHomeJsonLd"), "home page emits JSON-LD");
   assert(catalogPage.includes("buildCatalogMetadata"), "catalog metadata helper wired");
   assert(authorPage.includes("buildAuthorJsonLd"), "author page emits JSON-LD");
+  assert(authorPage.includes("collectAuthorContactSameAs"), "author sameAs from contacts");
+  assert(authorPage.includes("AuthorContactsSection"), "author contacts do not replace JSON-LD");
   assert(practicePage.includes("buildPracticeJsonLd"), "practice page emits JSON-LD");
   assert(promoPage.includes("buildPromoPageJsonLd"), "promo page emits JSON-LD");
   assert(playlistPage.includes("buildPublicPlaylistJsonLd"), "playlist page emits JSON-LD");

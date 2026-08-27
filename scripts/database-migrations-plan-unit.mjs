@@ -289,6 +289,11 @@ function testRepoOneFileOneVersion() {
         "20260829120000_seed_25_meditation_solutions_gallery.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260829130000_author_contacts.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -336,8 +341,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260827120000",
     "20260828120000",
     "20260829120000",
+    "20260829130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 15);
+  assert.equal(plan.database_migrations_pending, 16);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -364,8 +370,43 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260827120000",
     "20260828120000",
     "20260829120000",
+    "20260829130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 9);
+  assert.equal(plan.database_migrations_pending, 10);
+}
+
+function testOrdinaryDeployAfterLatestMainHasNoHole() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const latestMain = "20260829120000";
+  assert.ok(
+    listed.versions.includes(latestMain),
+    "latest origin/main migration stamp must still exist locally",
+  );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260829130000_author_contacts.sql",
+    ),
+    "author_contacts must be the ordinary next migration after latest main",
+  );
+  assert.equal(
+    listed.versions.includes("20260827180000"),
+    false,
+    "old author_contacts stamp must not remain as a history hole",
+  );
+  const remoteVersions = listed.versions.filter((version) => version <= latestMain);
+  assert.equal(remoteVersions.includes("20260829130000"), false);
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions,
+  });
+  const hasHole = plan.pending.some((version) => version < latestMain);
+  assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.deepEqual(plan.pending, ["20260829130000"]);
+  assert.equal(plan.database_migrations_pending, 1);
 }
 
 function main() {
@@ -383,6 +424,7 @@ function main() {
   testUnappliedOlderStampStillHoles();
   testProductionLikePendingAfterQuickOffersRestamp();
   testProductionLikePendingAfterPlaylistRestamp();
+  testOrdinaryDeployAfterLatestMainHasNoHole();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 

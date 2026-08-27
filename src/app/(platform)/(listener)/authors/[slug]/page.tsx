@@ -4,11 +4,13 @@ import type { Metadata } from "next";
 
 import AuthorPageViewTracker from "@/components/analytics/AuthorPageViewTracker";
 import AuthorAboutSection from "@/components/authors/AuthorAboutSection";
+import AuthorContactsSection from "@/components/authors/AuthorContactsSection";
 import AuthorFeaturedSection, {
   AuthorProductsSection,
 } from "@/components/authors/AuthorPublicSections";
 import AuthorPublicHeader from "@/components/authors/AuthorPublicHeader";
 import SimilarAuthorsSection from "@/components/authors/SimilarAuthorsSection";
+import { collectAuthorContactSameAs } from "@/lib/authors/contacts";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
 import {
@@ -85,6 +87,7 @@ export default async function AuthorPublicPage({ params }: PageProps) {
         description: authorDescription,
         imageUrl: data.bannerUrl || data.avatarUrl,
         topics: data.topics,
+        sameAs: collectAuthorContactSameAs(data.contacts),
       })
     : null;
 
@@ -137,6 +140,8 @@ export default async function AuthorPublicPage({ params }: PageProps) {
           fullBio={data.fullBio}
           topics={data.topics}
         />
+
+        <AuthorContactsSection contacts={data.contacts} />
 
         <SimilarAuthorsSection authors={data.similarAuthors} />
       </div>

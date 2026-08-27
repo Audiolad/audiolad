@@ -33,6 +33,7 @@ export type UploadImageSetContext = {
   audioItemId?: string;
   authorId?: string;
   authorKind?: "avatar" | "banner";
+  contactId?: string;
   userId?: string;
   playlistId?: string;
   offerId?: string;

@@ -60,9 +60,15 @@ export function hasAuthorPublicIndexNowChanges(input: {
   scalarUpdates?: Readonly<Record<string, unknown>>;
   topicKeysProvided?: boolean;
   featuredProductIdsProvided?: boolean;
+  contactsProvided?: boolean;
   assetChanged?: boolean;
 }): boolean {
-  if (input.topicKeysProvided || input.featuredProductIdsProvided || input.assetChanged) {
+  if (
+    input.topicKeysProvided ||
+    input.featuredProductIdsProvided ||
+    input.contactsProvided ||
+    input.assetChanged
+  ) {
     return true;
   }
 

@@ -159,6 +159,29 @@ JWT-сессии не могут сами менять `author_project_limit_ove
 
 Проект в продуктовой модели = строка `authors` + membership; отдельной таблицы projects нет.
 
+#### author_contacts (2026-08-27)
+
+Миграция: `20260829130000_author_contacts.sql`.
+
+Внешние контакты/ссылки автора. Не колонки `telegram_url` / `max_url` на `authors`: у автора может быть несколько контактов, список платформ будет расти.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `author_id` | uuid | FK → `authors.id` ON DELETE CASCADE |
+| `platform` | text | `telegram` \| `max` \| `custom`; CHECK расширяется при новых платформах |
+| `title` | text | авторский заголовок, 1–120 символов |
+| `description` | text NULL | короткий текст, max 120; пустое значение = NULL |
+| `url` | text | `https://…` или `mailto:email@domain` |
+| `icon_url` / `icon_path` / `icon_image` | text / text / jsonb | загруженная иконка в `author-assets`; NULL = стандартная иконка платформы |
+| `sort_order` | integer | 0–5, unique `(author_id, sort_order)` |
+| `is_visible` | boolean | `false` скрывает контакт с публичной страницы |
+| `created_at` / `updated_at` | timestamptz | |
+
+Max 6 контактов на автора (`sort_order < 6`).
+
+RLS: публичный SELECT только `is_visible = true`. Members (`owner`/`editor`) — полный CRUD своих контактов. `anon`/`authenticated` SELECT; `authenticated`/`service_role` ALL.
+
 #### RLS
 
 RLS **включён**.

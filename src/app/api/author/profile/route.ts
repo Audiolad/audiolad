@@ -8,9 +8,11 @@ import {
 import {
   getAuthorProfileDetail,
   listAuthorPublishedProductsForPicker,
+  replaceAuthorContacts,
   replaceAuthorFeaturedProducts,
   replaceAuthorTopics,
 } from "@/lib/authors/profile";
+import { normalizeAuthorContacts } from "@/lib/authors/contacts-validation";
 import {
   normalizeAuthorType,
   normalizeFeaturedProductIds,
@@ -20,7 +22,12 @@ import {
   normalizeShortPositioning,
   normalizeTopicKeys,
 } from "@/lib/authors/validation";
-import { MAX_AUTHOR_PROFILE_TOPICS } from "@/lib/authors/constants";
+import {
+  AUTHOR_ASSETS_BUCKET,
+  MAX_AUTHOR_PROFILE_TOPICS,
+} from "@/lib/authors/constants";
+import { cleanupImageManifest } from "@/lib/images/image-upload-service";
+import { parseImageManifest } from "@/lib/images/image-manifest";
 import {
   buildAuthorCanonicalUrl,
   countAuthorPublishedPractices,
@@ -187,6 +194,35 @@ export async function PATCH(request: Request) {
       }
     }
 
+    if ("contacts" in body) {
+      const contacts = normalizeAuthorContacts(body.contacts);
+
+      if (contacts === null) {
+        return NextResponse.json({ error: "invalid_contacts" }, { status: 400 });
+      }
+
+      const contactsResult = await replaceAuthorContacts(
+        supabase,
+        authorId,
+        contacts,
+      );
+
+      if (!contactsResult.ok) {
+        return NextResponse.json({ error: contactsResult.code }, { status: 400 });
+      }
+
+      for (const iconImage of contactsResult.removedIconImages) {
+        const manifest = parseImageManifest(iconImage);
+        if (manifest) {
+          await cleanupImageManifest(
+            supabase.storage,
+            AUTHOR_ASSETS_BUCKET,
+            manifest,
+          );
+        }
+      }
+    }
+
     const profile = await getAuthorProfileDetail(supabase, authorId);
     const publishedProducts = await listAuthorPublishedProductsForPicker(
       supabase,
@@ -197,6 +233,7 @@ export async function PATCH(request: Request) {
       scalarUpdates: updates,
       topicKeysProvided: "topic_keys" in body,
       featuredProductIdsProvided: "featured_product_ids" in body,
+      contactsProvided: "contacts" in body,
     });
 
     if (
