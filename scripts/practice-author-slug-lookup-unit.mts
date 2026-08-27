@@ -66,7 +66,8 @@ function createLookupClient() {
     const filters: Filter[] = [];
 
     const query = {
-      select() {
+      select(..._args: unknown[]) {
+        void _args;
         return query;
       },
       eq(column: string, value: unknown) {
