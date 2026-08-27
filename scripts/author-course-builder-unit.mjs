@@ -799,6 +799,15 @@ assert.match(
   coursePdfNginx,
   /course\/lessons\/\[\^\/\]\+\/blocks/,
 );
+assert.match(
+  coursePdfNginx,
+  /server_name audiolad\.ru` HTTPS server block/,
+);
+assert.match(
+  coursePdfNginx,
+  /8–9 MB PDFs/,
+  "snippet warns 8–9 MB still 413 until Timeweb apply",
+);
 assert.doesNotMatch(coursePdfNginx, /client_max_body_size 55m/);
 assert.doesNotMatch(coursePdfNginx, /personal-materials/);
 assert.doesNotMatch(
