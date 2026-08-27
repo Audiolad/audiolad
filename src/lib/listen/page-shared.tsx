@@ -31,9 +31,9 @@ import {
   canAccessCourseContent,
   resolveProductAccess,
 } from "@/lib/products/access";
-import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import {
   getPracticeAuthorSlug,
+  getPracticeByAuthorAndSlug,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
@@ -320,41 +320,11 @@ export async function renderListenPage(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: practice, error: practiceError } = await supabase
-    .from("practices")
-    .select(
-      `
-      id,
-      author_id,
-      title,
-      slug,
-      description,
-      format,
-      duration_minutes,
-      audio_url,
-      cover_url,
-      cover_image,
-      use_shared_cover,
-      updated_at,
-      status,
-      is_free,
-      is_catalog_listed,
-      guest_access_enabled,
-      product_kind,
-      publication_class,
-      listening_notice_enabled,
-      listening_notice_title,
-      listening_notice_text,
-      authors!practices_author_id_fkey (
-        id,
-        name,
-        slug
-      )
-    `,
-    )
-    .eq("slug", productSlug)
-    .eq("authors.slug", authorSlug)
-    .maybeSingle();
+  const { practice, error: practiceError } = await getPracticeByAuthorAndSlug(
+    supabase,
+    authorSlug,
+    productSlug,
+  );
 
   if (practiceError) {
     return (
@@ -368,10 +338,6 @@ export async function renderListenPage(
   }
 
   if (!practice) {
-    notFound();
-  }
-
-  if (shouldBlockPublicPracticeAccess(practice)) {
     notFound();
   }
 
