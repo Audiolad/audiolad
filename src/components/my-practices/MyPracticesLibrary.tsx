@@ -5,18 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import PrivateAudioCard from "@/components/private-audio/PrivateAudioCard";
+import LibraryCatalogTile from "@/components/my-practices/LibraryCatalogTile";
+import LibraryOwnedCard from "@/components/my-practices/LibraryOwnedCard";
+import PlaylistCard from "@/components/playlists/catalog/PlaylistCard";
 import {
   getLibraryFilterEmptyCta,
   getLibraryFilterEmptyMessage,
   isLibraryFilterId,
-  matchesLibraryFilter,
   type LibraryFilterId,
 } from "@/lib/library/filters";
+import { matchesUnifiedLibraryFilter } from "@/lib/library/unified-filter";
+import { unifiedPlaylistEntryToListingItem } from "@/lib/library/unified-playlist-item";
+import type { UnifiedLibraryEntry } from "@/lib/library/unified-entry";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
-import type { PrivateAudioListItemDto } from "@/lib/private-audio/types";
-
-import LibraryCard, { type LibraryCardItem } from "./LibraryCard";
 
 type LibraryFilter = {
   id: LibraryFilterId;
@@ -36,11 +37,9 @@ let pendingLibraryRemoveToast: string | null = null;
 let pendingLibraryRemoveToastUntil = 0;
 
 type MyPracticesLibraryProps = {
-  items: LibraryCardItem[];
+  entries: UnifiedLibraryEntry[];
   error: boolean;
   purchasedSlug?: string | null;
-  initialPrivateItems?: PrivateAudioListItemDto[];
-  privateError?: boolean;
 };
 
 function formatPracticesCount(count: number): string {
@@ -123,12 +122,69 @@ function LibraryFilterEmpty({
   );
 }
 
+function LibraryFeedTile({
+  entry,
+  leaving,
+  highlighted,
+  onRemovedFromLibrary,
+}: {
+  entry: UnifiedLibraryEntry;
+  leaving: boolean;
+  highlighted: boolean;
+  onRemovedFromLibrary: (entryId: string, options?: { keepIfEntitled?: boolean }) => void;
+}) {
+  const tileClassName = `h-full min-w-0 transition-opacity duration-200 ${
+    leaving ? "pointer-events-none opacity-0" : "opacity-100"
+  }`;
+
+  if (entry.kind === "catalog") {
+    return (
+      <li className={tileClassName}>
+        <LibraryCatalogTile
+          entry={entry}
+          highlighted={highlighted}
+          onHeartSavedChange={(saved) => {
+            if (!saved) {
+              onRemovedFromLibrary(entry.id, { keepIfEntitled: true });
+            }
+          }}
+        />
+      </li>
+    );
+  }
+
+  if (entry.kind === "playlist") {
+    return (
+      <li className={tileClassName}>
+        <PlaylistCard
+          item={unifiedPlaylistEntryToListingItem(entry)}
+          isAuthenticated
+          signInReturnPath="/my-practices"
+          onViewerSavedChange={(saved) => {
+            if (!saved) {
+              onRemovedFromLibrary(entry.id);
+            }
+          }}
+        />
+      </li>
+    );
+  }
+
+  if (entry.kind === "private_audio" || entry.kind === "personal") {
+    return (
+      <li className={tileClassName}>
+        <LibraryOwnedCard entry={entry} />
+      </li>
+    );
+  }
+
+  return null;
+}
+
 export default function MyPracticesLibrary({
-  items,
+  entries,
   error,
   purchasedSlug = null,
-  initialPrivateItems = [],
-  privateError = false,
 }: MyPracticesLibraryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -137,9 +193,9 @@ export default function MyPracticesLibrary({
     ? filterFromQuery
     : "all";
 
-  const [catalogItems, setCatalogItems] = useState(items);
-  const [itemsSource, setItemsSource] = useState(items);
-  const [leavingPracticeIds, setLeavingPracticeIds] = useState<Set<string>>(
+  const [visibleEntries, setVisibleEntries] = useState(entries);
+  const [entriesSource, setEntriesSource] = useState(entries);
+  const [leavingEntryIds, setLeavingEntryIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [toast, setToast] = useState<string | null>(() => {
@@ -152,12 +208,11 @@ export default function MyPracticesLibrary({
 
     return null;
   });
-  const privateItems = initialPrivateItems;
 
-  if (items !== itemsSource) {
-    setItemsSource(items);
-    setCatalogItems(items);
-    setLeavingPracticeIds(new Set());
+  if (entries !== entriesSource) {
+    setEntriesSource(entries);
+    setVisibleEntries(entries);
+    setLeavingEntryIds(new Set());
   }
 
   useEffect(() => {
@@ -174,10 +229,30 @@ export default function MyPracticesLibrary({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  function handleRemovedFromLibrary(practiceId: string) {
-    setLeavingPracticeIds((prev) => {
+  function handleRemovedFromLibrary(
+    entryId: string,
+    options?: { keepIfEntitled?: boolean },
+  ) {
+    const current = visibleEntries.find((entry) => entry.id === entryId);
+    const keepEntitled =
+      options?.keepIfEntitled === true &&
+      current?.kind === "catalog" &&
+      current.canListen;
+
+    if (keepEntitled) {
+      setVisibleEntries((prev) =>
+        prev.map((entry) =>
+          entry.id === entryId && entry.kind === "catalog"
+            ? { ...entry, isSaved: false }
+            : entry,
+        ),
+      );
+      return;
+    }
+
+    setLeavingEntryIds((prev) => {
       const next = new Set(prev);
-      next.add(practiceId);
+      next.add(entryId);
       return next;
     });
     pendingLibraryRemoveToast = "Удалено из Аудиотеки";
@@ -185,12 +260,12 @@ export default function MyPracticesLibrary({
     setToast(pendingLibraryRemoveToast);
 
     window.setTimeout(() => {
-      setCatalogItems((prev) =>
-        prev.filter((item) => item.practice?.id !== practiceId),
+      setVisibleEntries((prev) =>
+        prev.filter((entry) => entry.id !== entryId),
       );
-      setLeavingPracticeIds((prev) => {
+      setLeavingEntryIds((prev) => {
         const next = new Set(prev);
-        next.delete(practiceId);
+        next.delete(entryId);
         return next;
       });
     }, 200);
@@ -198,55 +273,25 @@ export default function MyPracticesLibrary({
 
   const normalizedPurchasedSlug = purchasedSlug?.trim().toLowerCase() ?? null;
   const purchasedItem = normalizedPurchasedSlug
-    ? catalogItems.find(
-        (item) => item.practice?.slug === normalizedPurchasedSlug,
+    ? visibleEntries.find(
+        (entry) =>
+          entry.kind === "catalog" &&
+          entry.practice?.slug === normalizedPurchasedSlug,
       )
     : null;
 
-  const filteredItems = useMemo(
+  const filteredEntries = useMemo(
     () =>
-      catalogItems.filter((item) => matchesLibraryFilter(item, activeFilter)),
-    [activeFilter, catalogItems],
+      visibleEntries.filter((entry) =>
+        matchesUnifiedLibraryFilter(entry, activeFilter),
+      ),
+    [activeFilter, visibleEntries],
   );
 
-  type AllLibraryEntry =
-    | { kind: "catalog"; sortAt: number; item: LibraryCardItem }
-    | { kind: "private_audio"; sortAt: number; item: PrivateAudioListItemDto };
-
-  const allEntries = useMemo(() => {
-    if (activeFilter !== "all") {
-      return [] as AllLibraryEntry[];
-    }
-
-    const catalogEntries: AllLibraryEntry[] = filteredItems.map((item) => {
-      const sortSource = item.grantedAt ?? item.practice?.updatedAt ?? null;
-      const sortAt = sortSource ? Date.parse(sortSource) : 0;
-
-      return {
-        kind: "catalog" as const,
-        sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-        item,
-      };
-    });
-
-    const privateEntries: AllLibraryEntry[] = privateItems.map((item) => {
-      const sortAt = Date.parse(item.createdAt);
-
-      return {
-        kind: "private_audio" as const,
-        sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-        item,
-      };
-    });
-
-    return [...catalogEntries, ...privateEntries].sort(
-      (left, right) => right.sortAt - left.sortAt,
-    );
-  }, [activeFilter, filteredItems, privateItems]);
-
-  const allCount = filteredItems.length + privateItems.length;
-  const libraryIsEmpty =
-    catalogItems.length === 0 && privateItems.length === 0 && !privateError;
+  const privateCount = visibleEntries.filter(
+    (entry) => entry.kind === "private_audio",
+  ).length;
+  const libraryIsEmpty = visibleEntries.length === 0;
 
   function selectFilter(filter: LibraryFilterId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -264,6 +309,8 @@ export default function MyPracticesLibrary({
   }
 
   const showingUploads = activeFilter === "uploads";
+  const showLibraryError = libraryIsEmpty && error;
+  const showUploadsError = showingUploads && privateCount === 0 && error;
 
   return (
     <div className={platformBottomContentPaddingClass}>
@@ -311,10 +358,8 @@ export default function MyPracticesLibrary({
         <div className="flex items-center justify-between">
           <p className="text-sm text-[#7d70a2]">
             {showingUploads
-              ? `В загрузках: ${formatUploadsCount(privateItems.length)}`
-              : activeFilter === "all"
-                ? `В библиотеке: ${formatPracticesCount(allCount)}`
-                : `В библиотеке: ${formatPracticesCount(filteredItems.length)}`}
+              ? `В загрузках: ${formatUploadsCount(privateCount)}`
+              : `В библиотеке: ${formatPracticesCount(filteredEntries.length)}`}
           </p>
 
           <button
@@ -327,37 +372,29 @@ export default function MyPracticesLibrary({
           </button>
         </div>
 
-        {showingUploads ? (
-          privateError ? (
-            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-              <p className="text-[17px] font-semibold">
-                Не удалось загрузить материалы
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                Попробуйте обновить страницу.
-              </p>
-            </div>
-          ) : privateItems.length === 0 ? (
-            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-              <p className="text-[17px] font-semibold">Пока нет загрузок</p>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                {getLibraryFilterEmptyMessage("uploads")}
-              </p>
-              <Link
-                href="/my-library/private-audio/new"
-                className="mt-4 inline-block rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
-              >
-                Добавить своё аудио
-              </Link>
-            </div>
-          ) : (
-            <div className="mt-5 space-y-4">
-              {privateItems.map((item) => (
-                <PrivateAudioCard key={item.id} item={item} />
-              ))}
-            </div>
-          )
-        ) : error && activeFilter !== "all" ? (
+        {showUploadsError ? (
+          <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+            <p className="text-[17px] font-semibold">
+              Не удалось загрузить материалы
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+              Попробуйте обновить страницу.
+            </p>
+          </div>
+        ) : showingUploads && privateCount === 0 ? (
+          <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+            <p className="text-[17px] font-semibold">Пока нет загрузок</p>
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+              {getLibraryFilterEmptyMessage("uploads")}
+            </p>
+            <Link
+              href="/my-library/private-audio/new"
+              className="mt-4 inline-block rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
+            >
+              Добавить своё аудио
+            </Link>
+          </div>
+        ) : showLibraryError ? (
           <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
             <p className="text-[17px] font-semibold">
               Не удалось загрузить библиотеку
@@ -372,77 +409,33 @@ export default function MyPracticesLibrary({
               Обновить
             </Link>
           </div>
-        ) : activeFilter !== "all" &&
-          (libraryIsEmpty || filteredItems.length === 0) ? (
+        ) : filteredEntries.length === 0 ? (
           <LibraryFilterEmpty
             filter={activeFilter}
-            onShowAll={() => selectFilter("all")}
+            onShowAll={
+              activeFilter === "all" ? undefined : () => selectFilter("all")
+            }
           />
-        ) : libraryIsEmpty ? (
-          <LibraryFilterEmpty filter="all" />
-        ) : activeFilter === "all" ? (
-          error && privateItems.length === 0 ? (
-            <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
-              <p className="text-[17px] font-semibold">
-                Не удалось загрузить библиотеку
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                Попробуйте обновить страницу.
-              </p>
-            </div>
-          ) : allEntries.length === 0 ? (
-            <LibraryFilterEmpty filter="all" />
-          ) : (
-            <div className="mt-5 space-y-4">
-              {allEntries.map((entry, index) =>
-                entry.kind === "private_audio" ? (
-                  <PrivateAudioCard
-                    key={`private-${entry.item.id}`}
-                    item={entry.item}
-                  />
-                ) : (
-                  <LibraryCard
-                    key={`catalog-${entry.item.id}`}
-                    item={entry.item}
-                    index={index}
-                    isAuthenticated
-                    signInReturnPath="/my-practices"
-                    leaving={
-                      entry.item.practice?.id
-                        ? leavingPracticeIds.has(entry.item.practice.id)
-                        : false
-                    }
-                    onRemovedFromLibrary={handleRemovedFromLibrary}
-                    highlighted={
-                      normalizedPurchasedSlug !== null &&
-                      entry.item.practice?.slug === normalizedPurchasedSlug
-                    }
-                  />
-                ),
-              )}
-            </div>
-          )
         ) : (
-          <div className="mt-5 space-y-4">
-            {filteredItems.map((item, index) => (
-              <LibraryCard
-                key={item.id}
-                item={item}
-                index={index}
-                isAuthenticated
-                signInReturnPath="/my-practices"
-                leaving={
-                  item.practice?.id
-                    ? leavingPracticeIds.has(item.practice.id)
-                    : false
-                }
-                onRemovedFromLibrary={handleRemovedFromLibrary}
-                highlighted={
-                  normalizedPurchasedSlug !== null &&
-                  item.practice?.slug === normalizedPurchasedSlug
-                }
-              />
-            ))}
+          <div className="listener-library-grid mt-5">
+            <ul
+              data-library-product-grid
+              className="catalog-product-grid"
+            >
+              {filteredEntries.map((entry) => (
+                <LibraryFeedTile
+                  key={entry.id}
+                  entry={entry}
+                  leaving={leavingEntryIds.has(entry.id)}
+                  highlighted={
+                    entry.kind === "catalog" &&
+                    normalizedPurchasedSlug !== null &&
+                    entry.practice?.slug === normalizedPurchasedSlug
+                  }
+                  onRemovedFromLibrary={handleRemovedFromLibrary}
+                />
+              ))}
+            </ul>
           </div>
         )}
       </section>

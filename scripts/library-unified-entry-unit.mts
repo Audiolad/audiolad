@@ -406,9 +406,10 @@ function testSourceBoundaries() {
   assert.match(collection, /canListen: Boolean\(active\)/);
   assert.doesNotMatch(collection, /unified-entry|loadUnifiedLibrary/);
 
-  assert.match(page, /loadLibraryCollection\(supabase, user.id\)/);
-  assert.doesNotMatch(page, /loadUnifiedLibrary/);
-  assert.doesNotMatch(library, /loadUnifiedLibrary|unified-entry/);
+  assert.match(page, /loadUnifiedLibrary\(supabase, user.id\)/);
+  assert.doesNotMatch(page, /loadLibraryCollection\(/);
+  assert.doesNotMatch(page, /listPrivateAudioItems/);
+  assert.match(library, /UnifiedLibraryEntry/);
   assert.doesNotMatch(card, /loadUnifiedLibrary|unified-entry/);
   assert.doesNotMatch(privateCard, /loadUnifiedLibrary|unified-entry/);
   assert.doesNotMatch(filters, /loadUnifiedLibrary|unified-entry/);

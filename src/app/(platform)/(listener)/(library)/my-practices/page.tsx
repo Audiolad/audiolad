@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 
 import MyPracticesLibrary from "@/components/my-practices/MyPracticesLibrary";
-import { loadLibraryCollection } from "@/lib/library/collection";
-import { listPrivateAudioItems } from "@/lib/private-audio/server/repository";
-import type { PrivateAudioListItemDto } from "@/lib/private-audio/types";
+import { loadUnifiedLibrary } from "@/lib/library/unified";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -27,15 +25,7 @@ export default async function MyPracticesPage({
     redirect("/auth/sign-in");
   }
 
-  const [{ items: libraryItems, error }, privateAudio] = await Promise.all([
-    loadLibraryCollection(supabase, user.id),
-    listPrivateAudioItems(supabase, user.id)
-      .then((items) => ({ items, error: false }))
-      .catch(() => ({
-        items: [] as PrivateAudioListItemDto[],
-        error: true,
-      })),
-  ]);
+  const { entries, error } = await loadUnifiedLibrary(supabase, user.id);
 
   return (
     <>
@@ -52,11 +42,9 @@ export default async function MyPracticesPage({
         }
       >
         <MyPracticesLibrary
-          items={libraryItems}
+          entries={entries}
           error={error}
           purchasedSlug={purchasedSlug}
-          initialPrivateItems={privateAudio.items}
-          privateError={privateAudio.error}
         />
       </Suspense>
     </>

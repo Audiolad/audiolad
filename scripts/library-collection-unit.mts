@@ -366,10 +366,11 @@ function testSourceBoundaries() {
   assert.doesNotMatch(collection, /claim_free_practice/);
   assert.doesNotMatch(collection, /createCheckout|fulfillTochka|from\("orders"\)/);
 
-  assert.match(page, /loadLibraryCollection\(supabase, user.id\)/);
+  assert.match(page, /loadUnifiedLibrary\(supabase, user.id\)/);
+  assert.doesNotMatch(page, /loadLibraryCollection\(/);
   assert.doesNotMatch(page, /function mapLibraryItems/);
   assert.match(page, /purchasedSlug/);
-  assert.match(page, /listPrivateAudioItems/);
+  assert.doesNotMatch(page, /listPrivateAudioItems/);
 
   assert.match(card, /practiceId: string/);
   assert.match(card, /isSaved: boolean/);
@@ -383,7 +384,7 @@ function testSourceBoundaries() {
   assert.doesNotMatch(card, /Избранн/);
 
   assert.match(library, /isLibraryFilterId/);
-  assert.match(library, /matchesLibraryFilter\(item, activeFilter\)/);
+  assert.match(library, /matchesUnifiedLibraryFilter\(entry, activeFilter\)/);
 
   assert.doesNotMatch(play, /library\/collection|loadLibraryCollection/);
   assert.doesNotMatch(player, /library\/collection|loadLibraryCollection/);
