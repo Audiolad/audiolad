@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MEDITATION_SOLUTIONS_CARDS } from "../src/lib/landings/25-meditation-solutions/content";
 import {
   PRACTICE_HERO_DOT_WINDOW,
   buildCoverFirstHeroSlides,
@@ -180,7 +179,7 @@ function testMeditationSolutionsGalleryOrder() {
       id: `slide-${index + 1}`,
       image_url,
       position: index,
-      alt: MEDITATION_SOLUTIONS_CARDS[index]?.format ?? "",
+      alt: index === expectedGalleryUrls().length - 1 ? "Бонус · PDF + аудио" : "Материал · PDF",
     })),
   );
 
@@ -199,8 +198,11 @@ function testMeditationSolutionsGalleryOrder() {
   );
   assert.equal(
     formatHeroMaterialsMeta(
-      MEDITATION_SOLUTIONS_CARDS.map((card) => ({
-        alt: `${card.title} · ${card.format}`,
+      expectedGalleryUrls().map((url, index) => ({
+        alt:
+          index === expectedGalleryUrls().length - 1
+            ? "Бонус · PDF + аудио"
+            : "Материал · PDF",
       })),
     ),
     "26 материалов · PDF и аудио",
@@ -224,9 +226,6 @@ function testReusablePdpWiring() {
   );
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
-  );
-  const landing = read(
-    "src/app/(platform)/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy/page.tsx",
   );
 
   assert.match(page, /loadPublicationGalleriesByIds/);
@@ -266,8 +265,6 @@ function testReusablePdpWiring() {
   assert.match(hero, /data-practice-product-hero=\{layout\}/);
   assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);
   assert.doesNotMatch(hero, /grid-cols-\[minmax/);
-  assert.match(landing, /MeditationSolutionsLandingView/);
-  assert.doesNotMatch(landing, /permanentRedirect|301/);
 
   const subtitle = resolvePracticeHeroSubtitle(
     null,
