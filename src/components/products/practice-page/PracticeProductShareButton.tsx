@@ -35,11 +35,13 @@ export default function PracticeProductShareButton({
     return null;
   }
 
+  const sharePayload = payload;
+
   async function onClick(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
 
-    const result = await shareProductPage(payload, {
+    const result = await shareProductPage(sharePayload, {
       share: navigator.share?.bind(navigator),
       canShare: navigator.canShare?.bind(navigator),
       writeText: navigator.clipboard?.writeText?.bind(navigator.clipboard),
