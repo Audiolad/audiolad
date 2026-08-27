@@ -68,9 +68,10 @@ export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
  * Аудиотека. `showMyMaterialsNav` is kept for callers; it no longer reveals
  * the item. `/my-materials` routes and profile quick links stay as-is.
  */
-export function getListenerSidebarNavItems(_options: {
+export function getListenerSidebarNavItems(options: {
   showMyMaterialsNav: boolean;
 }): readonly ListenerSidebarNavItem[] {
+  void options.showMyMaterialsNav;
   return LISTENER_SIDEBAR_NAV_ITEMS.filter((item) => item.key !== "my-materials");
 }
 
