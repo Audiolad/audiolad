@@ -6,23 +6,25 @@ import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import { usePointerReorder } from "@/components/author-dashboard/usePointerReorder";
 import {
   COURSE_BUILDER_ADD_LESSON_LABEL,
+  COURSE_BUILDER_AUDIO_HINT,
   COURSE_BUILDER_COMPLETION_CTA_TITLE,
   COURSE_BUILDER_EMPTY_TITLE,
   COURSE_BUILDER_LEGACY_AUDIO_NOTICE,
+  COURSE_BUILDER_PDF_HINT,
   COURSE_BUILDER_SECTION_TITLE,
   countCoursePublishContentFromLessons,
+  getCourseBuilderAudioUploadError,
   getCourseBuilderErrorMessage,
+  getCourseBuilderPdfErrorMessage,
   resolveCourseBuilderPanes,
+  validateCourseBuilderAudioFile,
+  validateCourseBuilderPdfFile,
   type CourseBuilderBlockDto,
   type CourseBuilderLessonDto,
   type CourseBuilderSnapshot,
   type CourseCompletionCtaDto,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
-import {
-  getAudioUploadErrorMessage,
-  validateMp3FileClient,
-} from "@/lib/author-products/limits";
 
 type AuthorCourseBuilderProps = {
   practiceId: string | null;
@@ -552,6 +554,14 @@ function AuthorCourseLessonEditor({
 
     onError(null);
 
+    if (file) {
+      const pdfCheck = validateCourseBuilderPdfFile(file);
+      if (!pdfCheck.ok) {
+        onError(getCourseBuilderPdfErrorMessage(pdfCheck.code));
+        return;
+      }
+    }
+
     const url = `/api/author/products/${practiceId}/course/lessons/${lesson.id}/blocks`;
     const response = file
       ? await fetch(url, (() => {
@@ -591,6 +601,17 @@ function AuthorCourseLessonEditor({
   ) {
     if (!practiceId) {
       return null;
+    }
+
+    if (body instanceof FormData) {
+      const file = body.get("file");
+      if (file instanceof File) {
+        const pdfCheck = validateCourseBuilderPdfFile(file);
+        if (!pdfCheck.ok) {
+          onError(getCourseBuilderPdfErrorMessage(pdfCheck.code));
+          return null;
+        }
+      }
     }
 
     const response = await fetch(
@@ -660,7 +681,7 @@ function AuthorCourseLessonEditor({
       return;
     }
 
-    const clientError = validateMp3FileClient(file);
+    const clientError = validateCourseBuilderAudioFile(file);
 
     if (clientError) {
       onError(clientError);
@@ -681,7 +702,11 @@ function AuthorCourseLessonEditor({
 
     if (!response.ok) {
       onError(
-        getAudioUploadErrorMessage(payload.error, response.status, payload.message),
+        getCourseBuilderAudioUploadError(
+          payload.error,
+          response.status,
+          payload.message,
+        ),
       );
       return;
     }
@@ -890,15 +915,18 @@ function AuthorCourseLessonEditor({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => void addBlock("audio")}
-          className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
-        >
-          Добавить аудио
-        </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => void addBlock("audio")}
+            className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+          >
+            Добавить аудио
+          </button>
+          <span className="text-xs text-[#8c79b6]">{COURSE_BUILDER_AUDIO_HINT}</span>
+        </div>
         <button
           type="button"
           disabled={disabled}
@@ -907,22 +935,25 @@ function AuthorCourseLessonEditor({
         >
           Добавить текст
         </button>
-        <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
-          Добавить PDF
-          <input
-            type="file"
-            accept="application/pdf,.pdf"
-            className="hidden"
-            disabled={disabled}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) {
-                void addBlock("file", file);
-              }
-            }}
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
+            Добавить PDF
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              disabled={disabled}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) {
+                  void addBlock("file", file);
+                }
+              }}
+            />
+          </label>
+          <span className="text-xs text-[#8c79b6]">{COURSE_BUILDER_PDF_HINT}</span>
+        </div>
       </div>
     </div>
   );

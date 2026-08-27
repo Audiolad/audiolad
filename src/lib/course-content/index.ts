@@ -7,6 +7,7 @@ export {
 
 export {
   COURSE_LESSON_BLOCK_TYPES,
+  PUBLICATION_FILE_MAX_PDF_BYTES,
   PUBLICATION_FILE_PDF_MIME,
   type CourseAudioBlockPayload,
   type CourseCompletionCta,

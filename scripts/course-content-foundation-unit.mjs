@@ -15,6 +15,7 @@ import {
 } from "../src/lib/products/access.ts";
 import {
   PUBLICATION_FILE_LIMITS,
+  PUBLICATION_FILE_MAX_PDF_BYTES,
   PUBLICATION_FILE_PDF_MIME,
   PUBLICATION_FILES_BUCKET,
   buildPublicationFileStoragePath,
@@ -24,6 +25,7 @@ import {
   signPublicationFileIfAllowed,
   validateCourseLessonBlock,
   validateCourseParentClass,
+  validatePublicationPdfUpload,
 } from "../src/lib/course-content/index.ts";
 import { PERSONAL_MATERIAL_LIMITS } from "../src/lib/personal-materials/types.ts";
 
@@ -417,9 +419,76 @@ assert.equal(
 assert.equal(isPublicationFilePdfMime("application/pdf"), true);
 assert.equal(isPublicationFilePdfMime("application/zip"), false);
 assert.equal(PUBLICATION_FILE_PDF_MIME, "application/pdf");
+assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 5 * 1024 * 1024);
+assert.equal(PUBLICATION_FILE_LIMITS.maxPdfBytes, PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(PERSONAL_MATERIAL_LIMITS.maxPdfBytes, 20 * 1024 * 1024);
+
+function pdfBufferWithSize(size) {
+  const buffer = Buffer.alloc(size, 0x20);
+  Buffer.from("%PDF-").copy(buffer, 0);
+  return buffer;
+}
+
+function pdfFileFromBuffer(buffer, name = "notes.pdf", type = "application/pdf") {
+  return new File([buffer], name, { type });
+}
+
+const smallPdf = pdfBufferWithSize(128);
 assert.equal(
-  PUBLICATION_FILE_LIMITS.maxPdfBytes,
-  PERSONAL_MATERIAL_LIMITS.maxPdfBytes,
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(smallPdf),
+    buffer: smallPdf,
+  }).ok,
+  true,
+  "small PDF accepted",
+);
+
+const almostFiveMb = pdfBufferWithSize(Math.floor(4.8 * 1024 * 1024));
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(almostFiveMb),
+    buffer: almostFiveMb,
+  }).ok,
+  true,
+  "~4.8 MB PDF accepted",
+);
+
+const exactlyFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(exactlyFiveMb),
+    buffer: exactlyFiveMb,
+  }).ok,
+  true,
+  "exactly 5 MB PDF accepted",
+);
+
+const overFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
+assert.deepEqual(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(overFiveMb),
+    buffer: overFiveMb,
+  }),
+  { ok: false, code: "invalid_file_size" },
+  ">5 MB PDF rejected",
+);
+
+const zipAsPdf = Buffer.from("PK\u0003\u0004not-a-pdf");
+assert.deepEqual(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(zipAsPdf, "notes.zip", "application/zip"),
+    buffer: zipAsPdf,
+  }),
+  { ok: false, code: "invalid_file_type" },
+  "non-PDF MIME rejected",
+);
+
+const validatorsSrc = read("src/lib/course-content/validators.ts");
+assert.match(validatorsSrc, /PUBLICATION_FILE_MAX_PDF_BYTES/);
+assert.match(validatorsSrc, /validatePublicationPdfUpload/);
+assert.doesNotMatch(
+  validatorsSrc,
+  /maxPdfBytes:\s*PERSONAL_MATERIAL_LIMITS\.maxPdfBytes/,
 );
 assert.equal(PUBLICATION_FILES_BUCKET, "publication-files");
 assert.notEqual(PUBLICATION_FILES_BUCKET, "personal-materials");

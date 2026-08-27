@@ -12,24 +12,42 @@ import {
   assertLessonBelongsToCourse,
   countCoursePublishContentFromLessons,
   COURSE_BUILDER_ADD_LESSON_LABEL,
+  COURSE_BUILDER_AUDIO_HINT,
+  COURSE_BUILDER_AUDIO_TOO_LARGE,
+  COURSE_BUILDER_AUDIO_WRONG_TYPE,
   COURSE_BUILDER_COMPLETION_CTA_TITLE,
   COURSE_BUILDER_EMPTY_TITLE,
+  COURSE_BUILDER_PDF_HINT,
+  COURSE_BUILDER_PDF_TOO_LARGE,
+  COURSE_BUILDER_PDF_WRONG_TYPE,
   COURSE_BUILDER_SECTION_TITLE,
   COURSE_PUBLISH_MISSING_CONTENT_CODE,
   defaultCourseLessonTitle,
   evaluateCoursePublishContentGate,
+  getCourseBuilderAudioUploadError,
+  getCourseBuilderErrorMessage,
+  getCourseBuilderPdfErrorMessage,
+  MAX_AUDIO_BYTES,
   nextCoursePosition,
+  PUBLICATION_FILE_MAX_PDF_BYTES,
   resolveCourseBuilderPanes,
   shouldCreateDefaultAudioItem,
   shouldShowPracticeListeningNotice,
   shouldShowSharedTrackCoverToggle,
   shouldSkipFlatAudioPublishRequirement,
+  validateCourseBuilderAudioFile,
+  validateCourseBuilderPdfFile,
   validateCourseCompletionCtaInput,
 } from "../src/lib/author-products/course-builder-shared.ts";
+import { MAX_AUDIO_BYTES as SHARED_AUTHOR_AUDIO_MAX_BYTES } from "../src/lib/author-products/limits.ts";
+import {
+  PUBLICATION_FILE_LIMITS,
+  validateCourseLessonBlock,
+  validatePublicationPdfUpload,
+} from "../src/lib/course-content/validators.ts";
 import { isCoursePublication } from "../src/lib/author-products/publication-class.ts";
 import { evaluatePublishReadiness } from "../src/lib/author-products/publish.ts";
 import { validatePositionReorderBatch } from "../src/lib/author-products/reorder-batch.ts";
-import { validateCourseLessonBlock } from "../src/lib/course-content/validators.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -96,8 +114,15 @@ assert.match(builder, /К списку уроков/);
 assert.match(builder, /usePointerReorder/);
 assert.match(builder, /AudioDragHandle/);
 assert.match(builder, /Добавить аудио/);
+assert.match(builder, /COURSE_BUILDER_AUDIO_HINT/);
 assert.match(builder, /Добавить текст/);
 assert.match(builder, /Добавить PDF/);
+assert.match(builder, /COURSE_BUILDER_PDF_HINT/);
+assert.match(builder, /validateCourseBuilderPdfFile/);
+assert.match(builder, /validateCourseBuilderAudioFile/);
+assert.match(builder, /getCourseBuilderAudioUploadError/);
+assert.doesNotMatch(builder, /Не удалось загрузить PDF/);
+assert.doesNotMatch(builder, /Не удалось загрузить аудио\./);
 assert.match(builder, /course_completion_ctas|completion-cta/);
 assert.match(builder, /\/api\/author\/products\/\$\{.*\}\/audio\/\$\{.*\}\/upload/);
 assert.match(builder, /\/api\/author\/products\/\$\{practiceId\}\/course\/files\//);
@@ -565,5 +590,168 @@ assert.doesNotMatch(builder, /course_sections|course_modules/);
 const catalogCard = read("src/components/catalog/cards/CatalogCardView.tsx");
 assert.doesNotMatch(catalogCard, /AuthorCourseBuilder/);
 assert.doesNotMatch(catalogCard, /course_lessons/);
+
+assert.equal(COURSE_BUILDER_PDF_HINT, "PDF — до 5 МБ");
+assert.equal(COURSE_BUILDER_AUDIO_HINT, "Аудио — до 50 МБ");
+assert.equal(COURSE_BUILDER_PDF_TOO_LARGE, "PDF-файл должен быть не больше 5 МБ.");
+assert.equal(COURSE_BUILDER_PDF_WRONG_TYPE, "Можно загрузить только PDF-файл.");
+assert.equal(
+  COURSE_BUILDER_AUDIO_TOO_LARGE,
+  "Аудиофайл должен быть не больше 50 МБ.",
+);
+assert.equal(COURSE_BUILDER_AUDIO_WRONG_TYPE, "Загрузите аудиофайл в формате MP3.");
+assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 5 * 1024 * 1024);
+assert.equal(PUBLICATION_FILE_LIMITS.maxPdfBytes, PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(MAX_AUDIO_BYTES, 50 * 1024 * 1024);
+assert.equal(MAX_AUDIO_BYTES, SHARED_AUTHOR_AUDIO_MAX_BYTES);
+assert.equal(
+  getCourseBuilderErrorMessage("invalid_file_size"),
+  COURSE_BUILDER_PDF_TOO_LARGE,
+);
+assert.equal(
+  getCourseBuilderErrorMessage("invalid_file_type"),
+  COURSE_BUILDER_PDF_WRONG_TYPE,
+);
+assert.equal(
+  getCourseBuilderPdfErrorMessage("invalid_file_size"),
+  COURSE_BUILDER_PDF_TOO_LARGE,
+);
+assert.equal(
+  getCourseBuilderPdfErrorMessage("invalid_file_type"),
+  COURSE_BUILDER_PDF_WRONG_TYPE,
+);
+
+function pdfBufferWithSize(size) {
+  const buffer = Buffer.alloc(size, 0x20);
+  Buffer.from("%PDF-").copy(buffer, 0);
+  return buffer;
+}
+
+function pdfFileFromBuffer(buffer, name = "notes.pdf", type = "application/pdf") {
+  return new File([buffer], name, { type });
+}
+
+const smallPdf = pdfBufferWithSize(64);
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(smallPdf),
+    buffer: smallPdf,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(smallPdf)).ok,
+  true,
+);
+
+const almostFiveMb = pdfBufferWithSize(Math.floor(4.8 * 1024 * 1024));
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(almostFiveMb),
+    buffer: almostFiveMb,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(almostFiveMb)).ok,
+  true,
+);
+
+const exactlyFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(exactlyFiveMb),
+    buffer: exactlyFiveMb,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(exactlyFiveMb)).ok,
+  true,
+);
+
+const overFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
+assert.deepEqual(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(overFiveMb),
+    buffer: overFiveMb,
+  }),
+  { ok: false, code: "invalid_file_size" },
+);
+assert.deepEqual(
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(overFiveMb)),
+  { ok: false, code: "invalid_file_size" },
+);
+assert.equal(
+  getCourseBuilderPdfErrorMessage("invalid_file_size"),
+  "PDF-файл должен быть не больше 5 МБ.",
+);
+
+const notPdf = new File([smallPdf], "notes.docx", {
+  type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+});
+assert.deepEqual(validateCourseBuilderPdfFile(notPdf), {
+  ok: false,
+  code: "invalid_file_type",
+});
+assert.equal(
+  getCourseBuilderPdfErrorMessage("invalid_file_type"),
+  "Можно загрузить только PDF-файл.",
+);
+
+function fakeAudioFile({ name = "lesson.mp3", type = "audio/mpeg", size }) {
+  const file = new File(["id3"], name, { type });
+  Object.defineProperty(file, "size", { value: size });
+  return file;
+}
+
+assert.equal(
+  validateCourseBuilderAudioFile(
+    fakeAudioFile({ size: PUBLICATION_FILE_MAX_PDF_BYTES }),
+  ),
+  null,
+  "audio under 50 MB accepted",
+);
+assert.equal(
+  validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_AUDIO_BYTES })),
+  null,
+  "audio at 50 MB accepted",
+);
+assert.equal(
+  validateCourseBuilderAudioFile(fakeAudioFile({ size: MAX_AUDIO_BYTES + 1 })),
+  COURSE_BUILDER_AUDIO_TOO_LARGE,
+);
+assert.equal(
+  validateCourseBuilderAudioFile(
+    fakeAudioFile({ name: "lesson.wav", type: "audio/wav", size: 1024 }),
+  ),
+  COURSE_BUILDER_AUDIO_WRONG_TYPE,
+);
+assert.equal(
+  getCourseBuilderAudioUploadError("invalid_file_size", 400),
+  COURSE_BUILDER_AUDIO_TOO_LARGE,
+);
+assert.equal(
+  getCourseBuilderAudioUploadError("invalid_file_type", 400),
+  COURSE_BUILDER_AUDIO_WRONG_TYPE,
+);
+assert.notEqual(
+  getCourseBuilderAudioUploadError("upload_failed", 500),
+  COURSE_BUILDER_AUDIO_TOO_LARGE,
+);
+
+const studioEditor = read("src/components/studio/StudioEditorShell.tsx");
+const studioProvider = read("src/components/studio/StudioAudioProvider.tsx");
+const authorForm = read("src/components/author-dashboard/AuthorProductForm.tsx");
+const authorAudioLimits = read("src/lib/author-products/limits.ts");
+const personalLimits = read("src/lib/personal-materials/types.ts");
+assert.match(studioProvider, /750 \* 1024 \* 1024/);
+assert.doesNotMatch(studioEditor, /COURSE_BUILDER_AUDIO_TOO_LARGE/);
+assert.match(authorForm, /validateMp3FileClient/);
+assert.match(authorForm, /getAudioUploadErrorMessage/);
+assert.doesNotMatch(authorForm, /validateCourseBuilderAudioFile/);
+assert.doesNotMatch(authorForm, /Аудиофайл должен быть не больше 50 МБ/);
+assert.match(authorAudioLimits, /Размер аудиофайла не должен превышать 50 МБ/);
+assert.match(personalLimits, /maxPdfBytes: 20 \* 1024 \* 1024/);
 
 console.log("author-course-builder-unit: ok");

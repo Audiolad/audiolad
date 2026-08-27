@@ -1,9 +1,85 @@
 import {
+  MAX_AUDIO_BYTES,
+  getAudioUploadErrorMessage,
+  validateMp3FileClient,
+} from "@/lib/author-products/limits";
+import {
   PRODUCT_KIND,
   normalizeProductKind,
 } from "@/lib/author-products/product-kind";
 import { isCoursePublication } from "@/lib/author-products/publication-class";
-import type { CourseLessonBlockType } from "@/lib/course-content/types";
+import {
+  PUBLICATION_FILE_MAX_PDF_BYTES,
+  PUBLICATION_FILE_PDF_MIME,
+  type CourseLessonBlockType,
+} from "@/lib/course-content/types";
+
+export { MAX_AUDIO_BYTES, PUBLICATION_FILE_MAX_PDF_BYTES };
+
+const COURSE_BUILDER_PDF_MAX_MB = PUBLICATION_FILE_MAX_PDF_BYTES / (1024 * 1024);
+const COURSE_BUILDER_AUDIO_MAX_MB = MAX_AUDIO_BYTES / (1024 * 1024);
+
+export const COURSE_BUILDER_PDF_HINT = `PDF — до ${COURSE_BUILDER_PDF_MAX_MB} МБ`;
+export const COURSE_BUILDER_AUDIO_HINT = `Аудио — до ${COURSE_BUILDER_AUDIO_MAX_MB} МБ`;
+export const COURSE_BUILDER_PDF_TOO_LARGE =
+  `PDF-файл должен быть не больше ${COURSE_BUILDER_PDF_MAX_MB} МБ.`;
+export const COURSE_BUILDER_PDF_WRONG_TYPE = "Можно загрузить только PDF-файл.";
+export const COURSE_BUILDER_AUDIO_TOO_LARGE =
+  `Аудиофайл должен быть не больше ${COURSE_BUILDER_AUDIO_MAX_MB} МБ.`;
+export const COURSE_BUILDER_AUDIO_WRONG_TYPE = "Загрузите аудиофайл в формате MP3.";
+
+export function validateCourseBuilderPdfFile(file: {
+  type: string;
+  size: number;
+}): { ok: true } | { ok: false; code: "invalid_file_type" | "invalid_file_size" } {
+  if (file.type.trim().toLowerCase() !== PUBLICATION_FILE_PDF_MIME) {
+    return { ok: false, code: "invalid_file_type" };
+  }
+
+  if (file.size <= 0 || file.size > PUBLICATION_FILE_MAX_PDF_BYTES) {
+    return { ok: false, code: "invalid_file_size" };
+  }
+
+  return { ok: true };
+}
+
+export function getCourseBuilderPdfErrorMessage(
+  code: "invalid_file_type" | "invalid_file_size",
+): string {
+  return code === "invalid_file_size"
+    ? COURSE_BUILDER_PDF_TOO_LARGE
+    : COURSE_BUILDER_PDF_WRONG_TYPE;
+}
+
+export function validateCourseBuilderAudioFile(file: File): string | null {
+  const sharedError = validateMp3FileClient(file);
+
+  if (!sharedError) {
+    return null;
+  }
+
+  if (file.size > MAX_AUDIO_BYTES) {
+    return COURSE_BUILDER_AUDIO_TOO_LARGE;
+  }
+
+  return COURSE_BUILDER_AUDIO_WRONG_TYPE;
+}
+
+export function getCourseBuilderAudioUploadError(
+  code: string | undefined,
+  status: number,
+  message?: string,
+): string {
+  if (code === "invalid_file_size" || status === 413) {
+    return COURSE_BUILDER_AUDIO_TOO_LARGE;
+  }
+
+  if (code === "invalid_file_type") {
+    return COURSE_BUILDER_AUDIO_WRONG_TYPE;
+  }
+
+  return getAudioUploadErrorMessage(code, status, message);
+}
 
 export const COURSE_BUILDER_SECTION_TITLE = "Содержание курса";
 export const COURSE_BUILDER_EMPTY_TITLE = "Добавьте первый урок курса";
@@ -292,9 +368,9 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
     case COURSE_PUBLISH_MISSING_CONTENT_CODE:
       return COURSE_PUBLISH_MISSING_CONTENT_MESSAGE;
     case "invalid_file_type":
-      return "Загрузите файл в формате PDF.";
+      return COURSE_BUILDER_PDF_WRONG_TYPE;
     case "invalid_file_size":
-      return "Размер PDF не должен превышать 20 МБ.";
+      return COURSE_BUILDER_PDF_TOO_LARGE;
     default:
       return "Не удалось сохранить содержимое курса.";
   }

@@ -15,6 +15,9 @@ export type CourseLessonBlockType = (typeof COURSE_LESSON_BLOCK_TYPES)[number];
 
 export const PUBLICATION_FILE_PDF_MIME = "application/pdf" as const;
 
+/** Course lesson PDF blocks (`publication_files`). Not personal-materials (20 MB). */
+export const PUBLICATION_FILE_MAX_PDF_BYTES = 5 * 1024 * 1024;
+
 export type CourseTextBlockPayload = {
   text: string;
 };
