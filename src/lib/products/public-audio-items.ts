@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isCoursePublication } from "@/lib/author-products/publication-class";
+
 export type PublicAudioItem = {
   id: string;
   title: string;
@@ -28,12 +30,34 @@ type LoadPublicAudioItemsInput = {
   practiceStatus: string | null;
   authorPreview: boolean;
   entitledAccess?: boolean;
+  publicationClass?: string | null;
+  productKind?: string | null;
 };
+
+/**
+ * Public PDP lists flat practice/music/audiobook tracks only.
+ * Course lessons live behind canAccessCourseContent and must not appear here.
+ */
+export function shouldLoadPublicAudioItemsOnProductPage(
+  publicationClass?: string | null,
+  productKind?: string | null,
+): boolean {
+  return !isCoursePublication(publicationClass, productKind);
+}
 
 export async function loadPublicAudioItems(
   supabase: SupabaseClient,
   input: LoadPublicAudioItemsInput,
 ): Promise<PublicAudioItem[]> {
+  if (
+    !shouldLoadPublicAudioItemsOnProductPage(
+      input.publicationClass,
+      input.productKind,
+    )
+  ) {
+    return [];
+  }
+
   let query = supabase
     .from("audio_items")
     .select(

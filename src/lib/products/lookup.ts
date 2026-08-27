@@ -104,7 +104,7 @@ export async function getPracticeByAuthorAndSlug(
       promo_button_text,
       promo_url,
       promo_open_in_new_tab,
-      authors!practices_author_id_fkey (
+      authors!practices_author_id_fkey!inner (
         id,
         name,
         slug,

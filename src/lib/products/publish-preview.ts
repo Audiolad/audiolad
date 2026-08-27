@@ -35,6 +35,26 @@ export function canActivatePublishPreviewMode(input: {
 }
 
 /**
+ * Public PDP visibility for every publication class, including course.
+ * Published rows are public. Unpublished drafts stay hidden from strangers
+ * even with ?preview=publish. Author members (and entitled buyers of
+ * unpublished/archived products) can still open the existing PDP.
+ */
+export function canRevealPublicProductPage(input: {
+  practiceStatus: string | null | undefined;
+  access: Pick<
+    ProductAccessResult,
+    "isAuthorMember" | "hasEntitlement"
+  >;
+}): boolean {
+  if (isPracticePublished(input.practiceStatus)) {
+    return true;
+  }
+
+  return input.access.isAuthorMember || input.access.hasEntitlement;
+}
+
+/**
  * Clean listener-view of an unpublished product. Reuses publish-preview access
  * (owner/editor membership only) and never changes product status.
  * Guests / other workspaces cannot activate this via URL params alone.
