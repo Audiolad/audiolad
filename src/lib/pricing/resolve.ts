@@ -84,6 +84,8 @@ function personalStartSalePrice(
   start: PersonalPromotionStart,
   basePrice: number,
 ): number | null {
+  // Apply the frozen snapshot only while it is still below the current base.
+  // Do not mutate the start row when the snapshot is no longer valid.
   if (!isValidSaleAgainstBase(start.salePriceSnapshot, basePrice)) {
     return null;
   }
@@ -112,7 +114,9 @@ function toResolvedPromotion(
  * Picks at most one applicable promotion.
  * Calendar promotions apply on every surface using live sale_price.
  * Personal countdown applies on product/checkout only, and only after a start.
- * An active personal start uses start.salePriceSnapshot, not live sale_price.
+ * An active personal start uses start.salePriceSnapshot, not live sale_price,
+ * and only when snapshot > 0 AND snapshot < the current practice base price.
+ * Otherwise the effective price is the current base. The start row is not rewritten.
  * Name / above_timer_text / below_button_text stay on the live promotion row.
  * Disable (is_active=false) still stops the offer.
  * If several apply, the lowest valid effective sale price wins (no stacking).

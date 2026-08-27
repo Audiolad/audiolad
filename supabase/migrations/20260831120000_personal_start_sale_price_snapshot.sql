@@ -384,6 +384,6 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.resolve_practice_effective_price(uuid, text, text, uuid, timestamptz) IS
-  'Resolves base vs sale. Personal countdown uses start.sale_price_snapshot, not live promotion.sale_price. Name/copy stay on the live promotion row. Catalog ignores personal. Disable (is_active=false) still stops the offer. create_practice_order snapshots this resolved amount.';
+  'Resolves base vs sale. Personal countdown uses start.sale_price_snapshot only when snapshot > 0 AND snapshot < current practice.price; otherwise current base. Never rewrites the start row. Name/copy stay on the live promotion row. Catalog ignores personal. Disable (is_active=false) still stops the offer. create_practice_order snapshots this resolved amount.';
 
 COMMIT;

@@ -1434,6 +1434,109 @@ INSERT INTO public.practice_price_promotions (
   );
 }
 
+function assertStartRowUntouched(database, visitor, expectedSnapshot, label) {
+  assertEqual(
+    scalar(
+      database,
+      `SELECT format(
+         '%s|%s|%s',
+         sale_price_snapshot::text,
+         to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+         to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+       )
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${visitor}'`,
+    ),
+    `${expectedSnapshot}|2026-08-23T10:00:00Z|2026-08-23T10:20:00Z`,
+    `${label}: start row snapshot/window not rewritten`,
+  );
+}
+
+function pinVisitorWindow(database, visitor) {
+  psql(
+    database,
+    `UPDATE public.practice_price_promotion_starts AS starts
+     SET
+       started_at = timestamptz '2026-08-23T10:00:00Z',
+       expires_at = timestamptz '2026-08-23T10:20:00Z'
+     WHERE starts.visitor_id = '${visitor}'`,
+  );
+}
+
+function testSnapshotOnlyAppliesBelowCurrentBase() {
+  prepareStartDb(CLEAN_DB);
+  const first = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(first.salePrice, "499", "2: start snapshots 499 against base 4999");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  psql(CLEAN_DB, `UPDATE public.practices SET price = 5999 WHERE id = '${PRACTICE_ID}'`);
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "2: PDP stays 499 after base rises to 5999",
+  );
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "checkout", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "2: checkout stays 499 after base rises to 5999",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "2");
+
+  prepareStartDb(CLEAN_DB);
+  const lowered = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(lowered.salePrice, "499", "1: start snapshots 499 against base 4999");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  psql(CLEAN_DB, `UPDATE public.practices SET price = 399 WHERE id = '${PRACTICE_ID}'`);
+  const loweredProduct = resolvePrice(
+    CLEAN_DB,
+    VISITOR,
+    null,
+    "product",
+    "2026-08-23T10:10:00Z",
+  ).split("|");
+  assertEqual(loweredProduct[0], "399", "1: PDP uses current base 399 when snapshot 499 is above it");
+  assertEqual(loweredProduct[1], "", "1: no sale_price when snapshot is not below base");
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "checkout", "2026-08-23T10:10:00Z").split("|")[0],
+    "399",
+    "1: checkout uses current base 399",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "1");
+
+  const checkout399 = lastTuple(
+    CLEAN_DB,
+    `
+SELECT set_config('request.jwt.claim.sub', '${USER_ID}', false);
+UPDATE public.practice_price_promotion_starts
+SET
+  started_at = now() - interval '2 minutes',
+  expires_at = now() + interval '10 minutes'
+WHERE visitor_id = '${VISITOR}';
+SELECT public.bind_practice_price_promotion_starts('${VISITOR}', '${USER_ID}');
+SELECT amount_minor::text
+FROM public.create_practice_order(
+  'paid-practice',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  NULL, NULL, NULL, NULL,
+  39900,
+  '${VISITOR}'
+);
+`,
+  );
+  assertEqual(checkout399, "39900", "1: checkout charges current base 39900");
+  assertEqual(
+    scalar(
+      CLEAN_DB,
+      `SELECT sale_price_snapshot::text
+       FROM public.practice_price_promotion_starts
+       WHERE visitor_id = '${VISITOR}'`,
+    ),
+    "499",
+    "1: checkout does not rewrite sale_price_snapshot",
+  );
+}
+
 function testMigrationContract() {
   const oneshot = readFileSync(M183, "utf8");
   assert(oneshot.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "conflict");
@@ -1468,6 +1571,11 @@ function testMigrationContract() {
   assert(snapshot.includes("ALTER COLUMN sale_price_snapshot SET NOT NULL"), "NOT NULL after backfill");
   assert(snapshot.includes("sale_price := v_existing.sale_price_snapshot"), "reuse returns snapshot");
   assert(snapshot.includes("canonical.sale_price_snapshot"), "resolve uses start snapshot");
+  assert(
+    snapshot.includes("canonical.sale_price_snapshot > 0") &&
+      snapshot.includes("canonical.sale_price_snapshot < v_practice.price"),
+    "snapshot applies only below current base",
+  );
   assert(snapshot.includes("CREATE OR REPLACE FUNCTION public.create_practice_order") === false, "order fn still uses resolver");
 }
 
@@ -1487,6 +1595,7 @@ function main() {
   testOneshotAmbiguousThenQualifyHotfix();
   testStartRpcSemantics();
   testSalePriceSnapshotSemantics();
+  testSnapshotOnlyAppliesBelowCurrentBase();
   console.log(`price-promotions-sql-unit: ok (${backend})`);
 }
 

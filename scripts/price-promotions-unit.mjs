@@ -814,6 +814,60 @@ function testPersonalStartKeepsSalePriceSnapshot() {
   assertEqual(merged[0].salePriceSnapshot, 499, "canonical start keeps earliest snapshot");
 }
 
+function testSnapshotOnlyAppliesBelowCurrentBase() {
+  const visitorStart = start({ salePriceSnapshot: 499 });
+  const during = new Date("2026-08-23T10:10:00.000Z");
+  const promo = promotion();
+
+  const afterLoweredBase = (surface) =>
+    resolvePracticePrice({
+      isFree: false,
+      basePrice: 399,
+      promotions: [promo],
+      starts: [visitorStart],
+      surface,
+      now: during,
+    });
+
+  const product = afterLoweredBase(PRICE_SURFACES.PRODUCT);
+  assertEqual(product.finalPrice, 399, "1: PDP uses current base when snapshot >= base");
+  assertEqual(product.salePrice, null, "1: snapshot 499 is not applied against base 399");
+  assertEqual(product.promotion, null, "1: no promo when snapshot is not below base");
+
+  const checkout = afterLoweredBase(PRICE_SURFACES.CHECKOUT);
+  assertEqual(checkout.finalPrice, 399, "1: checkout uses current base 399");
+  assertEqual(checkout.finalPriceMinor, 39900, "1: checkout minor is 39900");
+  assertEqual(visitorStart.salePriceSnapshot, 499, "1: start snapshot is not rewritten");
+  assertEqual(
+    visitorStart.expiresAt,
+    "2026-08-23T10:20:00.000Z",
+    "1: start expires_at is not rewritten",
+  );
+
+  const afterRaisedBase = (surface) =>
+    resolvePracticePrice({
+      isFree: false,
+      basePrice: 5999,
+      promotions: [promo],
+      starts: [visitorStart],
+      surface,
+      now: during,
+    });
+
+  const raisedProduct = afterRaisedBase(PRICE_SURFACES.PRODUCT);
+  assertEqual(raisedProduct.finalPrice, 499, "2: raised base keeps snapshot 499 on PDP");
+  assertEqual(raisedProduct.salePrice, 499, "2: snapshot still applies below 5999");
+
+  const raisedCheckout = afterRaisedBase(PRICE_SURFACES.CHECKOUT);
+  assertEqual(raisedCheckout.finalPrice, 499, "2: raised base keeps snapshot 499 at checkout");
+  assertEqual(visitorStart.salePriceSnapshot, 499, "2: start snapshot still untouched");
+  assertEqual(
+    visitorStart.expiresAt,
+    "2026-08-23T10:20:00.000Z",
+    "2: start expires_at still untouched",
+  );
+}
+
 function testMigrationContract() {
   const schema = readFileSync(
     join(ROOT, "supabase/migrations/20260823180000_practice_price_promotions.sql"),
@@ -881,6 +935,11 @@ function testMigrationContract() {
   assert(snapshotMigration.includes("sale_price_snapshot"), "snapshot column");
   assert(snapshotMigration.includes("sale_price := v_existing.sale_price_snapshot"), "reuse returns snapshot");
   assert(snapshotMigration.includes("canonical.sale_price_snapshot"), "resolve uses snapshot");
+  assert(
+    snapshotMigration.includes("canonical.sale_price_snapshot > 0") &&
+      snapshotMigration.includes("canonical.sale_price_snapshot < v_practice.price"),
+    "snapshot applies only below current base",
+  );
   assert(!snapshotMigration.includes("sale_price := v_promo.sale_price"), "start no longer returns live sale on reuse");
 }
 
@@ -968,6 +1027,7 @@ function main() {
   testFrontendTamperRejected();
   testOrderSnapshotShape();
   testPersonalStartKeepsSalePriceSnapshot();
+  testSnapshotOnlyAppliesBelowCurrentBase();
   testAuthorPromotionValidation();
   testPurchaseRegressionStillUsesIntegerRubles();
   testMigrationContract();
