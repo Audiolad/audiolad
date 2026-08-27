@@ -31,6 +31,10 @@ import {
 import { normalizeStoredBannerPosition } from "@/lib/authors/banner-position";
 
 import {
+  selectVisibleAuthorContacts,
+  type AuthorPublicContact,
+} from "./contacts";
+import {
   getAuthorProfileDetail,
   type AuthorProfileTopic,
 } from "./profile";
@@ -63,6 +67,7 @@ export type AuthorPublicPageData = {
   topics: AuthorProfileTopic[];
   featuredProducts: AuthorPublicProduct[];
   allProducts: AuthorPublicProduct[];
+  contacts: AuthorPublicContact[];
   similarAuthors: Awaited<ReturnType<typeof findSimilarAuthors>>;
 };
 
@@ -273,6 +278,7 @@ export async function loadAuthorPublicPageData(
       topics: profile?.topics ?? [],
       featuredProducts,
       allProducts: sortedProducts,
+      contacts: selectVisibleAuthorContacts(profile?.contacts ?? []),
       similarAuthors,
     },
     error: false,

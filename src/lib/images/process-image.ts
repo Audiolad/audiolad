@@ -201,7 +201,11 @@ export function imageProcessErrorMessage(
       if (profile === "author-banner") {
         return "Минимальный размер баннера — 1200 × 400 пикселей.";
       }
-      if (profile === "author-avatar" || profile === "user-avatar") {
+      if (
+        profile === "author-avatar" ||
+        profile === "author-contact-icon" ||
+        profile === "user-avatar"
+      ) {
         return "Не удалось сохранить фотографию. Попробуйте ещё раз.";
       }
       if (profile === "product-gallery") {

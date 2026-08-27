@@ -134,6 +134,15 @@ export const IMAGE_PROFILES: Record<ImageProfile, ImageProfileConfig> = {
     allowUpscale: false,
     storesOriginal: false,
   },
+  "author-contact-icon": {
+    profile: "author-contact-icon",
+    maxUploadBytes: 3 * 1024 * 1024,
+    requireSquare: true,
+    variants: AVATAR_VARIANTS,
+    includePlaceholder: false,
+    allowUpscale: false,
+    storesOriginal: false,
+  },
   "user-avatar": {
     profile: "user-avatar",
     maxUploadBytes: 3 * 1024 * 1024,

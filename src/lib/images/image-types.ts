@@ -3,6 +3,7 @@ export type ImageProfile =
   | "product-gallery"
   | "track-cover"
   | "author-avatar"
+  | "author-contact-icon"
   | "user-avatar"
   | "author-banner"
   | "playlist-cover"

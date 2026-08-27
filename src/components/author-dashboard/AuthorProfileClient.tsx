@@ -26,6 +26,11 @@ import {
   type BannerPosition,
 } from "@/lib/authors/banner-position";
 import {
+  getAuthorContactDescriptionError,
+  getAuthorContactTitleError,
+  getAuthorContactUrlError,
+} from "@/lib/authors/contacts-validation";
+import {
   getFullBioLengthError,
   getShortPositioningLengthError,
 } from "@/lib/authors/validation";
@@ -34,6 +39,10 @@ import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 import AuthorBannerUploadBlock, {
   readBannerPositionFromProfileRow,
 } from "./AuthorBannerUploadBlock";
+import AuthorContactsEditor, {
+  contactsFromProfile,
+  type AuthorContactDraft,
+} from "./AuthorContactsEditor";
 
 type PublishedProductOption = {
   id: string;
@@ -77,6 +86,7 @@ export default function AuthorProfileClient({
   );
   const [topicKeys, setTopicKeys] = useState<string[]>([]);
   const [featuredProductIds, setFeaturedProductIds] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<AuthorContactDraft[]>([]);
   const [publishedProducts, setPublishedProducts] = useState<
     PublishedProductOption[]
   >([]);
@@ -122,6 +132,7 @@ export default function AuthorProfileClient({
         setBannerPosition(readBannerPositionFromProfileRow(profile));
         setTopicKeys(profile.topicKeys);
         setFeaturedProductIds(profile.featuredProducts.map((product) => product.id));
+        setContacts(contactsFromProfile(profile.contacts ?? []));
         setPublishedProducts(payload.publishedProducts ?? []);
         setProfileSlug(profile.slug);
       } catch {
@@ -197,6 +208,19 @@ export default function AuthorProfileClient({
       return;
     }
 
+    for (const contact of contacts) {
+      const titleError = getAuthorContactTitleError(contact.title);
+      const urlError = getAuthorContactUrlError(contact.url);
+      const descriptionError = getAuthorContactDescriptionError(
+        contact.description,
+      );
+
+      if (titleError || urlError || descriptionError) {
+        setError(titleError ?? urlError ?? descriptionError);
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -213,6 +237,17 @@ export default function AuthorProfileClient({
           full_bio: fullBio.trim() || null,
           topic_keys: topicKeys,
           featured_product_ids: featuredProductIds,
+          contacts: contacts.map((contact) => ({
+            id: contact.id,
+            platform: contact.platform,
+            title: contact.title,
+            description: contact.description,
+            url: contact.url,
+            iconUrl: contact.iconUrl,
+            iconPath: contact.iconPath,
+            iconImage: contact.iconImage,
+            isVisible: contact.isVisible,
+          })),
         }),
       });
 
@@ -231,6 +266,7 @@ export default function AuthorProfileClient({
       setFeaturedProductIds(
         payload.profile.featuredProducts.map((product) => product.id),
       );
+      setContacts(contactsFromProfile(payload.profile.contacts ?? []));
       setPublishedProducts(payload.publishedProducts ?? []);
       setProfileSlug(payload.profile.slug);
       setSuccess("Изменения сохранены.");
@@ -238,6 +274,8 @@ export default function AuthorProfileClient({
       setError(
         saveError instanceof Error && saveError.message === "featured_product_forbidden"
           ? "Можно добавлять только собственные опубликованные продукты."
+          : saveError instanceof Error && saveError.message === "invalid_contacts"
+            ? "Проверьте контакты: нужна ссылка https или email, название и не больше 120 символов в коротком тексте."
           : "Не удалось сохранить профиль. Проверьте данные и попробуйте снова.",
       );
     } finally {
@@ -369,6 +407,13 @@ export default function AuthorProfileClient({
               />
             </div>
           </section>
+
+          <AuthorContactsEditor
+            authorId={selectedAuthor.id}
+            contacts={contacts}
+            disabled={saving}
+            onChange={setContacts}
+          />
 
           <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
             <h2 className="text-lg font-semibold">Рекомендуем начать</h2>

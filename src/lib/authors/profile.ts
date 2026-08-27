@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AuthorType } from "./constants";
+import {
+  isAuthorContactPlatform,
+  mapAuthorContactRow,
+  type AuthorContactRow,
+  type AuthorProfileContact,
+} from "./contacts";
+import type { NormalizedAuthorContact } from "./contacts-validation";
 
 export type AuthorProfileRow = {
   id: string;
@@ -47,6 +54,7 @@ export type AuthorProfileDetail = AuthorProfileRow & {
   topicKeys: string[];
   topics: AuthorProfileTopic[];
   featuredProducts: AuthorFeaturedProductSummary[];
+  contacts: AuthorProfileContact[];
 };
 
 export async function getAuthorProfileDetail(
@@ -151,11 +159,35 @@ export async function getAuthorProfileDetail(
     });
   }
 
+  const { data: contactRows } = await supabase
+    .from("author_contacts")
+    .select(
+      "id, author_id, platform, title, description, url, icon_url, icon_path, icon_image, sort_order, is_visible",
+    )
+    .eq("author_id", authorId)
+    .order("sort_order", { ascending: true });
+
+  const contacts: AuthorProfileContact[] = [];
+
+  for (const row of contactRows ?? []) {
+    if (!isAuthorContactPlatform(row.platform) || !row.id || !row.title || !row.url) {
+      continue;
+    }
+
+    contacts.push(
+      mapAuthorContactRow({
+        ...(row as AuthorContactRow),
+        platform: row.platform,
+      }),
+    );
+  }
+
   return {
     ...(author as AuthorProfileRow),
     topicKeys: topics.map((topic) => topic.key),
     topics,
     featuredProducts,
+    contacts,
   };
 }
 
@@ -290,6 +322,67 @@ export async function replaceAuthorFeaturedProducts(
   }
 
   return { ok: true };
+}
+
+export async function replaceAuthorContacts(
+  supabase: SupabaseClient,
+  authorId: string,
+  contacts: NormalizedAuthorContact[],
+): Promise<
+  | { ok: true; removedIconImages: unknown[] }
+  | { ok: false; code: string }
+> {
+  const { data: existingRows, error: existingError } = await supabase
+    .from("author_contacts")
+    .select("id, icon_image")
+    .eq("author_id", authorId);
+
+  if (existingError) {
+    return { ok: false, code: "contacts_replace_failed" };
+  }
+
+  const nextIds = new Set(contacts.map((contact) => contact.id));
+  const removedIconImages = (existingRows ?? [])
+    .filter((row) => typeof row.id === "string" && !nextIds.has(row.id))
+    .map((row) => row.icon_image);
+
+  const { error: deleteError } = await supabase
+    .from("author_contacts")
+    .delete()
+    .eq("author_id", authorId);
+
+  if (deleteError) {
+    return { ok: false, code: "contacts_replace_failed" };
+  }
+
+  if (contacts.length === 0) {
+    return { ok: true, removedIconImages };
+  }
+
+  const inserts = contacts.map((contact, index) => ({
+    id: contact.id,
+    author_id: authorId,
+    platform: contact.platform,
+    title: contact.title,
+    description: contact.description,
+    url: contact.url,
+    icon_url: contact.iconUrl,
+    icon_path: contact.iconPath,
+    icon_image: contact.iconImage ?? null,
+    sort_order: index,
+    is_visible: contact.isVisible,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error: insertError } = await supabase
+    .from("author_contacts")
+    .insert(inserts);
+
+  if (insertError) {
+    return { ok: false, code: "contacts_replace_failed" };
+  }
+
+  return { ok: true, removedIconImages };
 }
 
 export async function listAuthorPublishedProductsForPicker(

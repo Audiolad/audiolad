@@ -1,0 +1,403 @@
+#!/usr/bin/env node
+/**
+ * Author contacts — validation, public mapping, cabinet/public wiring.
+ * Safe without database access.
+ */
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  MAX_AUTHOR_CONTACTS,
+  MAX_AUTHOR_CONTACT_DESCRIPTION_LENGTH,
+  AUTHOR_CONTACT_PLATFORMS,
+  AUTHOR_CONTACT_STANDARD_ICON_SRC,
+  AUTHOR_CONTACT_CUSTOM_ICON_SRC,
+} from "../src/lib/authors/constants.ts";
+import {
+  collectAuthorContactSameAs,
+  resolveAuthorContactIconUrl,
+  selectVisibleAuthorContacts,
+} from "../src/lib/authors/contacts.ts";
+import {
+  getAuthorContactDescriptionError,
+  normalizeAuthorContactUrl,
+  normalizeAuthorContacts,
+} from "../src/lib/authors/contacts-validation.ts";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function read(relativePath) {
+  return readFileSync(path.join(root, relativePath), "utf8");
+}
+
+const TELEGRAM_ID = "11111111-1111-4111-8111-111111111111";
+const MAX_ID = "22222222-2222-4222-8222-222222222222";
+const CUSTOM_ID = "33333333-3333-4333-8333-333333333333";
+const HIDDEN_ID = "44444444-4444-4444-8444-444444444444";
+
+function contactInput(overrides = {}) {
+  return {
+    id: TELEGRAM_ID,
+    platform: "telegram",
+    title: "Telegram-канал",
+    description: "",
+    url: "https://t.me/sergey",
+    isVisible: true,
+    ...overrides,
+  };
+}
+
+function testPlatformCatalogIsExtensible() {
+  assert(AUTHOR_CONTACT_PLATFORMS.includes("telegram"), "telegram platform");
+  assert(AUTHOR_CONTACT_PLATFORMS.includes("max"), "max platform");
+  assert(AUTHOR_CONTACT_PLATFORMS.includes("custom"), "custom platform");
+  assert(MAX_AUTHOR_CONTACTS === 6, "max 6 contacts");
+}
+
+function testUrlValidation() {
+  assert(
+    normalizeAuthorContactUrl("https://t.me/sergey") === "https://t.me/sergey",
+    "https telegram accepted",
+  );
+  assert(
+    normalizeAuthorContactUrl("https://max.ru/sergey")?.startsWith("https://"),
+    "https max accepted",
+  );
+  assert(
+    normalizeAuthorContactUrl("mailto:sergey@example.com") ===
+      "mailto:sergey@example.com",
+    "mailto accepted",
+  );
+  assert(normalizeAuthorContactUrl("not-a-url") === null, "plain text rejected");
+  assert(normalizeAuthorContactUrl("javascript:alert(1)") === null, "javascript rejected");
+  assert(normalizeAuthorContactUrl("http://t.me/sergey") === null, "http rejected");
+  assert(normalizeAuthorContactUrl("data:text/html,hi") === null, "data rejected");
+  assert(normalizeAuthorContactUrl("") === null, "empty rejected");
+}
+
+function testDescriptionLimit() {
+  const exact = "а".repeat(MAX_AUTHOR_CONTACT_DESCRIPTION_LENGTH);
+  const tooLong = "а".repeat(MAX_AUTHOR_CONTACT_DESCRIPTION_LENGTH + 1);
+
+  const accepted = normalizeAuthorContacts([
+    contactInput({ description: exact }),
+  ]);
+  assert(accepted?.[0]?.description === exact, "120-char description accepted");
+  assert(getAuthorContactDescriptionError(exact) === null, "120 no client error");
+
+  assert(
+    normalizeAuthorContacts([contactInput({ description: tooLong })]) === null,
+    "121-char description rejected",
+  );
+  assert(
+    getAuthorContactDescriptionError(tooLong)?.includes("120"),
+    "121 client error mentions 120",
+  );
+}
+
+function testNormalizeContactsScenarios() {
+  assert(normalizeAuthorContacts([])?.length === 0, "empty list allowed");
+
+  const telegramNoDescription = normalizeAuthorContacts([
+    contactInput({ description: "   " }),
+  ]);
+  assert(telegramNoDescription?.[0]?.description === null, "blank description stored as null");
+  assert(telegramNoDescription?.[0]?.platform === "telegram", "telegram kept");
+
+  const telegramWithDescription = normalizeAuthorContacts([
+    contactInput({ description: "Новые практики и эфиры" }),
+  ]);
+  assert(
+    telegramWithDescription?.[0]?.description === "Новые практики и эфиры",
+    "telegram description kept",
+  );
+
+  const maxContact = normalizeAuthorContacts([
+    contactInput({
+      id: MAX_ID,
+      platform: "max",
+      title: "MAX-канал",
+      url: "https://max.ru/sergey",
+    }),
+  ]);
+  assert(maxContact?.[0]?.platform === "max", "max contact accepted");
+
+  const customContact = normalizeAuthorContacts([
+    contactInput({
+      id: CUSTOM_ID,
+      platform: "custom",
+      title: "Мой RuTube",
+      url: "https://rutube.ru/channel/1",
+      iconUrl: "https://cdn.example/icon.webp",
+    }),
+  ]);
+  assert(customContact?.[0]?.platform === "custom", "custom contact accepted");
+  assert(customContact?.[0]?.iconUrl?.includes("icon.webp"), "custom icon url kept");
+
+  const ordered = normalizeAuthorContacts([
+    contactInput({ title: "First" }),
+    contactInput({
+      id: MAX_ID,
+      platform: "max",
+      title: "Second",
+      url: "https://max.ru/a",
+    }),
+  ]);
+  assert(ordered?.[0]?.title === "First", "order preserved 1");
+  assert(ordered?.[1]?.title === "Second", "order preserved 2");
+
+  const hidden = normalizeAuthorContacts([
+    contactInput({ id: HIDDEN_ID, isVisible: false, title: "Hidden" }),
+  ]);
+  assert(hidden?.[0]?.isVisible === false, "hidden flag persisted");
+
+  const tooMany = Array.from({ length: 7 }, (_, index) =>
+    contactInput({
+      id: `55555555-5555-4555-8555-55555555555${index}`,
+      title: `Contact ${index}`,
+    }),
+  );
+  assert(normalizeAuthorContacts(tooMany) === null, "7 contacts rejected");
+}
+
+function testPublicVisibilityAndEmptyState() {
+  const none = selectVisibleAuthorContacts([]);
+  assert(none.length === 0, "no contacts → empty public list");
+
+  const mixed = selectVisibleAuthorContacts([
+    {
+      id: TELEGRAM_ID,
+      platform: "telegram",
+      title: "Telegram-канал",
+      description: "Новые практики",
+      url: "https://t.me/sergey",
+      iconUrl: null,
+      iconPath: null,
+      sortOrder: 0,
+      isVisible: true,
+    },
+    {
+      id: HIDDEN_ID,
+      platform: "max",
+      title: "Скрытый MAX",
+      description: null,
+      url: "https://max.ru/hidden",
+      iconUrl: null,
+      iconPath: null,
+      sortOrder: 1,
+      isVisible: false,
+    },
+  ]);
+
+  assert(mixed.length === 1, "hidden contact omitted from public list");
+  assert(mixed[0].title === "Telegram-канал", "visible telegram kept");
+  assert(mixed[0].description === "Новые практики", "description kept when present");
+  assert(!mixed[0].url.includes("hidden"), "hidden url not leaked");
+
+  const withoutDescription = selectVisibleAuthorContacts([
+    {
+      id: TELEGRAM_ID,
+      platform: "telegram",
+      title: "Написать мне в Telegram",
+      description: null,
+      url: "https://t.me/sergey",
+      iconUrl: null,
+      iconPath: null,
+      sortOrder: 0,
+      isVisible: true,
+    },
+  ]);
+  assert(withoutDescription[0].description === null, "empty description stays null");
+}
+
+function testIconsAndSameAs() {
+  assert(
+    resolveAuthorContactIconUrl("telegram", null) ===
+      AUTHOR_CONTACT_STANDARD_ICON_SRC.telegram,
+    "telegram standard icon",
+  );
+  assert(
+    resolveAuthorContactIconUrl("max", null) === AUTHOR_CONTACT_STANDARD_ICON_SRC.max,
+    "max standard icon",
+  );
+  assert(
+    resolveAuthorContactIconUrl("custom", null) === AUTHOR_CONTACT_CUSTOM_ICON_SRC,
+    "custom fallback icon",
+  );
+  assert(
+    resolveAuthorContactIconUrl("telegram", "https://cdn.example/own.webp") ===
+      "https://cdn.example/own.webp",
+    "uploaded icon overrides standard",
+  );
+
+  const sameAs = collectAuthorContactSameAs([
+    {
+      platform: "telegram",
+      platformLabel: "Telegram",
+      title: "TG",
+      description: null,
+      url: "https://t.me/sergey",
+      iconUrl: AUTHOR_CONTACT_STANDARD_ICON_SRC.telegram,
+      openInNewTab: true,
+    },
+    {
+      platform: "custom",
+      platformLabel: "Ссылка",
+      title: "Почта",
+      description: null,
+      url: "mailto:sergey@example.com",
+      iconUrl: AUTHOR_CONTACT_CUSTOM_ICON_SRC,
+      openInNewTab: false,
+    },
+  ]);
+  assert(sameAs.length === 1, "mailto excluded from sameAs");
+  assert(sameAs[0] === "https://t.me/sergey", "https included in sameAs");
+}
+
+function testLocalStandardIconsExist() {
+  for (const relative of [
+    "public/authors/contacts/telegram.svg",
+    "public/authors/contacts/max.svg",
+    "public/authors/contacts/custom.svg",
+  ]) {
+    assert(existsSync(path.join(root, relative)), `${relative} exists`);
+    const svg = read(relative);
+    assert(svg.includes("<svg"), `${relative} is svg`);
+    assert(!/https?:\/\/(?!www\.w3\.org)/.test(svg), `${relative} has no remote icons`);
+    assert(!svg.includes("cdn."), `${relative} is local`);
+  }
+}
+
+function testMigrationAndRls() {
+  const migration = read("supabase/migrations/20260830120000_author_contacts.sql");
+
+  assert(migration.includes("CREATE TABLE IF NOT EXISTS public.author_contacts"), "table");
+  assert(migration.includes("platform"), "platform column");
+  assert(migration.includes("'telegram', 'max', 'custom'"), "extensible platform check");
+  assert(migration.includes("sort_order"), "sort_order column");
+  assert(migration.includes("is_visible"), "is_visible column");
+  assert(migration.includes("icon_url"), "icon_url column");
+  assert(migration.includes("sort_order < 6"), "max 6 via sort_order");
+  assert(
+    migration.includes("Public can read visible author contacts"),
+    "public reads only visible",
+  );
+  assert(migration.includes("is_visible = true"), "public policy filters hidden");
+  assert(
+    migration.includes("Author members can manage author contacts"),
+    "members manage own contacts",
+  );
+  assert(migration.includes("author_members"), "membership guard");
+  assert(migration.includes("am.user_id = auth.uid()"), "uid membership check");
+}
+
+function testServerOwnershipAndPersistence() {
+  const profile = read("src/lib/authors/profile.ts");
+  const route = read("src/app/api/author/profile/route.ts");
+  const iconRoute = read("src/app/api/author/profile/contact-icon/route.ts");
+  const client = read("src/components/author-dashboard/AuthorProfileClient.tsx");
+
+  assert(profile.includes("replaceAuthorContacts"), "replace helper");
+  assert(profile.includes(".eq(\"author_id\", authorId)"), "scoped to author workspace");
+  assert(route.includes("requireAuthorMutationMembership"), "writes require membership");
+  assert(route.includes("normalizeAuthorContacts"), "server validates contacts");
+  assert(route.includes('error: "invalid_contacts"'), "invalid contacts rejected");
+  assert(iconRoute.includes("requireAuthorMutationMembership"), "icon writes require membership");
+  assert(iconRoute.includes("uploadOptimizedImageSet"), "uses existing image pipeline");
+  assert(iconRoute.includes("author-contact-icon"), "contact icon profile");
+  assert(iconRoute.includes("AUTHOR_ASSETS_BUCKET"), "reuses author-assets bucket");
+  assert(client.includes("contactsFromProfile(profile.contacts"), "load hydrates contacts");
+  assert(client.includes("setContacts(contactsFromProfile(payload.profile.contacts"), "save rehydrates");
+}
+
+function testCabinetUi() {
+  const client = read("src/components/author-dashboard/AuthorProfileClient.tsx");
+  const editor = read("src/components/author-dashboard/AuthorContactsEditor.tsx");
+
+  assert(client.includes("AuthorContactsEditor"), "contacts section on existing profile page");
+  assert(editor.includes("Контакты"), "contacts heading");
+  assert(editor.includes("+ Добавить контакт"), "add button");
+  assert(editor.includes("AUTHOR_CONTACT_PLATFORM_LABELS"), "type labels from catalog");
+  const constants = read("src/lib/authors/constants.ts");
+  assert(constants.includes('telegram: "Telegram"'), "telegram type");
+  assert(constants.includes('max: "MAX"'), "max type");
+  assert(constants.includes('custom: "Другое"'), "custom type");
+  assert(editor.includes("Название"), "title label");
+  assert(editor.includes("Ссылка"), "url label");
+  assert(editor.includes("Короткий текст"), "description label");
+  assert(editor.includes("Показывать на странице автора"), "visibility without tech name");
+  assert(editor.includes(">Тип<") || editor.includes("Тип"), "type label instead of platform");
+  assert(!editor.includes("sort_order"), "no sort_order in UI");
+  assert(!editor.includes("is_visible"), "no is_visible field name in UI");
+  assert(!editor.includes("sort order"), "no sort order label");
+  assert(editor.includes("aria-label=\"Поднять выше\""), "up control");
+  assert(editor.includes("aria-label=\"Опустить ниже\""), "down control");
+  assert(editor.includes("Загрузить иконку"), "custom icon upload");
+}
+
+function testPublicPageUi() {
+  const page = read("src/app/(platform)/(listener)/authors/[slug]/page.tsx");
+  const section = read("src/components/authors/AuthorContactsSection.tsx");
+  const loader = read("src/lib/authors/public-page.ts");
+
+  assert(page.includes("AuthorContactsSection"), "contacts section wired");
+  assert(page.includes("collectAuthorContactSameAs"), "sameAs from contacts");
+  assert(page.includes("AuthorAboutSection"), "about section still wired");
+  assert(page.includes("generateMetadata"), "seo metadata kept");
+  assert(loader.includes("selectVisibleAuthorContacts"), "public loader filters visible");
+  assert(section.includes("Контакты автора"), "public heading");
+  assert(section.includes("contacts.length === 0"), "empty state returns null");
+  assert(section.includes("target: \"_blank\""), "https opens new tab");
+  assert(section.includes("noopener noreferrer"), "safe rel");
+  assert(section.includes("contact.description ?"), "empty description adds no block");
+  assert(section.includes("href={contact.url}"), "url is the card href");
+  assert(
+    !/\{contact\.url\}<\/|\n\s*\{contact\.url\}/.test(section),
+    "raw url is not printed as text",
+  );
+  assert(section.includes("min-w-0"), "mobile overflow guard");
+  assert(section.includes("max-w-full"), "card cannot overflow horizontally");
+  assert(section.includes("break-words"), "long title wraps");
+  assert(section.includes("flex-1"), "text sits to the right of icon");
+  assert(!section.includes("max-w-["), "no fixed max width that clips");
+  assert(!section.includes("w-[320px]"), "no fixed card width");
+}
+
+function testImagePipelineExtension() {
+  const types = read("src/lib/images/image-types.ts");
+  const profiles = read("src/lib/images/image-profiles.ts");
+  const paths = read("src/lib/images/image-paths.ts");
+
+  assert(types.includes("author-contact-icon"), "image profile added");
+  assert(profiles.includes("author-contact-icon"), "profile config added");
+  assert(paths.includes("authors/${authorId}/contacts/${contactId}"), "storage path under author-assets");
+}
+
+const tests = [
+  ["platform catalog", testPlatformCatalogIsExtensible],
+  ["url validation", testUrlValidation],
+  ["description 120 limit", testDescriptionLimit],
+  ["normalize scenarios", testNormalizeContactsScenarios],
+  ["public visibility", testPublicVisibilityAndEmptyState],
+  ["icons and sameAs", testIconsAndSameAs],
+  ["local standard icons", testLocalStandardIconsExist],
+  ["migration and RLS", testMigrationAndRls],
+  ["ownership and persistence", testServerOwnershipAndPersistence],
+  ["cabinet UI", testCabinetUi],
+  ["public page UI", testPublicPageUi],
+  ["image pipeline", testImagePipelineExtension],
+];
+
+for (const [name, fn] of tests) {
+  fn();
+  console.log(`ok - ${name}`);
+}
+
+console.log(`\n${tests.length} author contacts checks passed.`);
