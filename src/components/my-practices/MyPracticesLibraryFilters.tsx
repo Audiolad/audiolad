@@ -71,13 +71,8 @@ export default function MyPracticesLibraryFilters({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [draftFilter, setDraftFilter] = useState<LibraryFilterId>(filter);
-  const [mounted, setMounted] = useState(false);
   const holdsSheetLockRef = useRef(false);
   const activeFilterCount = filter === "all" ? 0 : 1;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -176,8 +171,7 @@ export default function MyPracticesLibraryFilters({
     onReset();
   }
 
-  const sheet =
-    open && mounted ? (
+  const sheet = open ? (
       <div
         className="fixed inset-0 z-40 flex items-end justify-center bg-[#25135c]/35 px-0"
         role="presentation"
@@ -271,9 +265,7 @@ export default function MyPracticesLibraryFilters({
           </span>
         ) : null}
       </button>
-      {sheet && typeof document !== "undefined"
-        ? createPortal(sheet, document.body)
-        : null}
+      {sheet ? createPortal(sheet, document.body) : null}
     </>
   );
 }
