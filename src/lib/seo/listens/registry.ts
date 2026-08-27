@@ -57,6 +57,7 @@ import { KARTA_TARO_NA_DENGI_PAGE } from "./content/karta-taro-na-dengi";
 import { TARO_PRIVLECHENIE_DENEG_PAGE } from "./content/taro-privlechenie-deneg";
 import { KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE } from "./content/karta-taro-dlya-privlecheniya-deneg";
 import { TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE } from "./content/taro-na-dengi-na-zastavku-telefona";
+import { RASKLAD_TARO_NA_DENGI_PAGE } from "./content/rasklad-taro-na-dengi";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -123,6 +124,7 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   TARO_PRIVLECHENIE_DENEG_PAGE,
   KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE,
   TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE,
+  RASKLAD_TARO_NA_DENGI_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(
