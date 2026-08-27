@@ -91,6 +91,16 @@ assert.match(
   /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
   "1280 grid stays 4 columns",
 );
+assert.match(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);\s*\}\s*\.listener-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.5rem;/,
+  "desktop /catalog grid gap is 0.5rem at 1280+",
+);
+assert.doesNotMatch(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{[^}]*gap:/,
+  "unscoped 1280 catalog-product-grid does not set gap (playlists stay 1rem)",
+);
 assert.match(grid, /catalog-product-grid/, "grid uses the 2-column class");
 assert.match(grid, /IntersectionObserver/, "infinite scroll is wired");
 assert.match(grid, /Загрузить ещё/, "load more fallback exists");
