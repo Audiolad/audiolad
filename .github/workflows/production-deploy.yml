@@ -1,0 +1,169 @@
+# Manual one-click production deploy. Does not run on push/PR/schedule.
+# Remote command is only: sudo -n /usr/local/sbin/audiolad-deploy <40-char-sha>
+# That wrapper launches the existing run-from-target-sha.sh -> deploy.sh path.
+# Smoke failure still blocks cutover. This workflow does not set
+# AUDIOLAD_DEPLOY_OVERRIDE and does not deploy by being merged.
+name: Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Optional 40-char lowercase hex SHA. Empty = origin/main tip of this checkout."
+        required: false
+        type: string
+        default: ""
+      confirm:
+        description: "Must be DEPLOY to start a production deploy."
+        required: true
+        type: choice
+        options:
+          - DO_NOT_DEPLOY
+          - DEPLOY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout origin/main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve target SHA
+        id: target
+        env:
+          INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "${INPUT_CONFIRM}" != "DEPLOY" ]]; then
+            echo "confirm must be DEPLOY" >&2
+            exit 1
+          fi
+
+          REQUESTED="$(printf '%s' "${INPUT_COMMIT_SHA}" | tr -d '[:space:]')"
+          if [[ -z "${REQUESTED}" ]]; then
+            TARGET_SHA="$(git rev-parse HEAD)"
+          else
+            TARGET_SHA="${REQUESTED}"
+          fi
+
+          if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "commit_sha must be a 40-character lowercase hex SHA" >&2
+            exit 1
+          fi
+
+          git cat-file -e "${TARGET_SHA}^{commit}"
+          ORIGIN_MAIN_SHA="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}"; then
+            echo "ERROR: ${TARGET_SHA} is not an ancestor of origin/main (${ORIGIN_MAIN_SHA})" >&2
+            exit 1
+          fi
+
+          echo "requested SHA: ${TARGET_SHA}"
+          echo "origin/main SHA: ${ORIGIN_MAIN_SHA}"
+          echo "target_sha=${TARGET_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "origin_main_sha=${ORIGIN_MAIN_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare SSH identity
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          echo "SSH_DIR=${SSH_DIR}" >> "${GITHUB_ENV}"
+          echo "SSH_KEY_FILE=${KEY_FILE}" >> "${GITHUB_ENV}"
+          echo "SSH_KNOWN_HOSTS_FILE=${HOSTS_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Deploy via SSH wrapper
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
+          : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
+          : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
+          if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "internal error: TARGET_SHA is not a 40-character lowercase hex SHA" >&2
+            exit 1
+          fi
+          ssh \
+            -i "${SSH_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            sudo -n /usr/local/sbin/audiolad-deploy \
+            "${TARGET_SHA}"
+
+      - name: Post-check current release
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "internal error: TARGET_SHA is not a 40-character lowercase hex SHA" >&2
+            exit 1
+          fi
+          REMOTE_COMMIT="$(
+            ssh \
+              -i "${SSH_KEY_FILE}" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}" \
+              -o StrictHostKeyChecking=yes \
+              -p "${PRODUCTION_SSH_PORT}" \
+              -- \
+              "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+              cat /var/www/audiolad-deploy/current/.deploy-commit \
+            | tr -d '[:space:]'
+          )"
+          if [[ "${REMOTE_COMMIT}" != "${TARGET_SHA}" ]]; then
+            echo "post-check failed: current/.deploy-commit=${REMOTE_COMMIT} expected=${TARGET_SHA}" >&2
+            exit 1
+          fi
+          echo "post-check: /var/www/audiolad-deploy/current/.deploy-commit equals ${TARGET_SHA}"
+          echo "deploy.sh already ran local readiness, candidate smoke, public smoke, and health-watch."
+          echo "This job does not add a second smoke suite."
+          HEALTH_JSON="$(curl -fsS https://audiolad.ru/api/health/build)"
+          printf '%s\n' "${HEALTH_JSON}"
+          python3 -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("status")=="ok" else 1)' <<< "${HEALTH_JSON}"
+
+      - name: Remove SSH identity
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${SSH_DIR:-}" ]]; then
+            rm -rf "${SSH_DIR}"
+          fi
