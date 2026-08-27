@@ -85,6 +85,7 @@ import { TARO_BOGATSTVA_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro
 import { KARTA_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/karta-taro-na-dengi.ts";
 import { TARO_PRIVLECHENIE_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-privlechenie-deneg.ts";
 import { KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE } from "../src/lib/seo/listens/content/karta-taro-dlya-privlecheniya-deneg.ts";
+import { TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-na-zastavku-telefona.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1883,6 +1884,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftyEighthListenHref}`,
     ),
     "directory JSON-LD includes fifty-eighth listen href",
+  );
+
+  const fiftyNinthListenHref = "/listens/taro-na-dengi-na-zastavku-telefona";
+  const fiftyNinthListenCard = data.articles.find((card) => card.href === fiftyNinthListenHref);
+  assert(fiftyNinthListenCard, "fifty-ninth indexable listen page is listed");
+  assert(
+    fiftyNinthListenCard.title === "Таро на деньги на заставку телефона – какую карту выбрать | АудиоЛад",
+    "fifty-ninth listen directory title",
+  );
+  assert(
+    fiftyNinthListenCard.description === TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE.description,
+    "fifty-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-na-dengi-na-zastavku-telefona",
+    ),
+    "no /articles duplicate for fifty-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-ninth listen href",
   );
 
 
