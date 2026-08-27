@@ -60,6 +60,8 @@ export type PracticePageViewModel = {
     endsAt: string | null;
     expiresAt: string | null;
     promotionType: "calendar" | "personal_countdown" | null;
+    aboveTimerText: string | null;
+    belowButtonText: string | null;
   } | null;
   promoStartToken: string | null;
   publishPreview: PracticePagePublishPreview | null;

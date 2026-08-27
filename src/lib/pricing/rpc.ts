@@ -2,11 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRICE_CHANGED_MESSAGE } from "@/lib/pricing/resolve";
 import { isPricePromotionType } from "@/lib/pricing/resolve";
-import type {
-  PricePromotionType,
-  PriceSurface,
-  ResolvedPracticePrice,
-  ResolvedPromotion,
+import {
+  PRICE_PROMOTION_TYPES,
+  type PricePromotionType,
+  type PriceSurface,
+  type ResolvedPracticePrice,
+  type ResolvedPromotion,
 } from "@/lib/pricing/types";
 import { formatRubles } from "@/lib/products/price-format";
 
@@ -42,6 +43,8 @@ export function mapResolvedPriceRpcRow(row: RpcRow): ResolvedPracticePrice {
           salePrice: asInteger(row.sale_price),
           endsAt: row.ends_at,
           expiresAt: row.expires_at,
+          aboveTimerText: null,
+          belowButtonText: null,
         }
       : null;
 
@@ -116,7 +119,43 @@ export async function resolvePracticePriceRpc(input: {
     return null;
   }
 
-  return mapResolvedPriceRpcRow(row);
+  return attachPersonalTimerCopy(input.supabase, mapResolvedPriceRpcRow(row));
+}
+
+async function attachPersonalTimerCopy(
+  supabase: SupabaseClient,
+  resolved: ResolvedPracticePrice,
+): Promise<ResolvedPracticePrice> {
+  if (
+    !resolved.promotion ||
+    resolved.promotion.promotionType !== PRICE_PROMOTION_TYPES.PERSONAL_COUNTDOWN
+  ) {
+    return resolved;
+  }
+
+  const { data, error } = await supabase
+    .from("practice_price_promotions")
+    .select("above_timer_text, below_button_text")
+    .eq("id", resolved.promotion.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("personal_timer_copy_load_error", error.message);
+    return resolved;
+  }
+
+  return {
+    ...resolved,
+    promotion: {
+      ...resolved.promotion,
+      aboveTimerText:
+        typeof data?.above_timer_text === "string" ? data.above_timer_text : null,
+      belowButtonText:
+        typeof data?.below_button_text === "string"
+          ? data.below_button_text
+          : null,
+    },
+  };
 }
 
 export function buildPriceChangedPayload(resolved: ResolvedPracticePrice): {

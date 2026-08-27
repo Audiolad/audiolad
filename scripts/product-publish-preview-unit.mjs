@@ -493,6 +493,17 @@ function testSourceContracts() {
   assert.match(page, /canActivatePublishListenerViewMode/);
   assert.match(page, /publishListenerViewMode/);
   assert.match(page, /buildPracticePublishListenerPreviewPath/);
+  assert.match(
+    page,
+    /aboveTimerText: resolvedPrice\?\.promotion\?\.aboveTimerText/,
+    "listener preview and public PDP share the same promo copy fields",
+  );
+  assert.match(
+    page,
+    /belowButtonText: resolvedPrice\?\.promotion\?\.belowButtonText/,
+  );
+  const offer = read("src/components/pricing/ProductPriceOffer.tsx");
+  assert.match(offer, /buildPersonalTimerOfferCopy/);
   assert.match(page, /Вернуться в предпросмотр автора/);
   assert.match(
     paths,

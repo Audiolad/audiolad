@@ -84,6 +84,8 @@ export async function POST(request: Request, context: RouteContext) {
         starts_at: parsed.startsAt,
         ends_at: parsed.endsAt,
         duration_seconds: parsed.durationSeconds,
+        above_timer_text: parsed.aboveTimerText,
+        below_button_text: parsed.belowButtonText,
         is_active: parsed.isActive,
       })
       .select(PRICE_PROMOTION_SELECT)

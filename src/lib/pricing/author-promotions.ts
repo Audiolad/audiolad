@@ -4,6 +4,7 @@ import {
   parseIntegerRubles,
   validateSalePriceRubles,
 } from "@/lib/pricing/money";
+import { PERSONAL_TIMER_COPY_MAX_LENGTH } from "@/lib/pricing/personal-timer-copy";
 import { isPricePromotionType } from "@/lib/pricing/resolve";
 import { PRICE_PROMOTION_TYPES } from "@/lib/pricing/types";
 
@@ -56,6 +57,8 @@ export function parsePromotionWriteBody(
       startsAt: string | null;
       endsAt: string | null;
       durationSeconds: number | null;
+      aboveTimerText: string | null;
+      belowButtonText: string | null;
       isActive: boolean;
     }
   | { ok: false; error: string } {
@@ -106,6 +109,8 @@ export function parsePromotionWriteBody(
       startsAt: new Date(startMs).toISOString(),
       endsAt: new Date(endMs).toISOString(),
       durationSeconds: null,
+      aboveTimerText: null,
+      belowButtonText: null,
       isActive,
     };
   }
@@ -127,6 +132,16 @@ export function parsePromotionWriteBody(
     return { ok: false, error: "invalid_duration" };
   }
 
+  const aboveTimerText = parseOptionalCopyField(body.above_timer_text);
+  if (!aboveTimerText.ok) {
+    return aboveTimerText;
+  }
+
+  const belowButtonText = parseOptionalCopyField(body.below_button_text);
+  if (!belowButtonText.ok) {
+    return belowButtonText;
+  }
+
   return {
     ok: true,
     name,
@@ -135,8 +150,36 @@ export function parsePromotionWriteBody(
     startsAt: null,
     endsAt: null,
     durationSeconds,
+    aboveTimerText: aboveTimerText.value,
+    belowButtonText: belowButtonText.value,
     isActive,
   };
+}
+
+function parseOptionalCopyField(
+  value: unknown,
+):
+  | { ok: true; value: string | null }
+  | { ok: false; error: string } {
+  if (value === undefined || value === null) {
+    return { ok: true, value: null };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false, error: "invalid_promotion_copy" };
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return { ok: true, value: null };
+  }
+
+  if (trimmed.length > PERSONAL_TIMER_COPY_MAX_LENGTH) {
+    return { ok: false, error: "invalid_promotion_copy" };
+  }
+
+  return { ok: true, value: trimmed };
 }
 
 export function paidPriceRangeHint(): string {

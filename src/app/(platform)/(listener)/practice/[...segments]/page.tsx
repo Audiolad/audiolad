@@ -572,6 +572,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
             endsAt: resolvedPrice?.promotion?.endsAt ?? null,
             expiresAt: resolvedPrice?.promotion?.expiresAt ?? null,
             promotionType: resolvedPrice?.promotion?.promotionType ?? null,
+            aboveTimerText: resolvedPrice?.promotion?.aboveTimerText ?? null,
+            belowButtonText: resolvedPrice?.promotion?.belowButtonText ?? null,
           }
         : null,
     promoStartToken,
