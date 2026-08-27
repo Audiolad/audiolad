@@ -21,7 +21,12 @@ type AuthorContactsEditorProps = {
   authorId: string;
   contacts: AuthorContactDraft[];
   disabled?: boolean;
+  dirty?: boolean;
+  saving?: boolean;
+  saved?: boolean;
+  saveError?: string | null;
   onChange: (contacts: AuthorContactDraft[]) => void;
+  onSave?: () => void;
 };
 
 const TITLE_EXAMPLES: Record<AuthorContactPlatform, string> = {
@@ -48,7 +53,12 @@ export default function AuthorContactsEditor({
   authorId,
   contacts,
   disabled = false,
+  dirty = false,
+  saving = false,
+  saved = false,
+  saveError = null,
   onChange,
+  onSave,
 }: AuthorContactsEditorProps) {
   const [adding, setAdding] = useState(false);
 
@@ -157,6 +167,22 @@ export default function AuthorContactsEditor({
           Можно добавить не больше {MAX_AUTHOR_CONTACTS} контактов.
         </p>
       )}
+
+      <div className="mt-5 min-w-0 max-w-full">
+        <button
+          type="button"
+          disabled={disabled || saving || !dirty}
+          onClick={() => onSave?.()}
+          className="inline-flex min-h-11 w-full max-w-full items-center justify-center rounded-full bg-[#7042c5] px-6 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+        >
+          {saving ? "Сохраняем…" : "Сохранить изменения"}
+        </button>
+        {saveError ? (
+          <p className="mt-3 break-words text-sm text-[#9b3d3d]">{saveError}</p>
+        ) : saved ? (
+          <p className="mt-3 text-sm text-[#2f7a55]">Сохранено</p>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -40,6 +40,7 @@ import AuthorBannerUploadBlock, {
   readBannerPositionFromProfileRow,
 } from "./AuthorBannerUploadBlock";
 import {
+  areAuthorContactDraftsEqual,
   contactsFromProfile,
   draftsToContactPayload,
   type AuthorContactDraft,
@@ -89,6 +90,7 @@ export default function AuthorProfileClient({
   const [topicKeys, setTopicKeys] = useState<string[]>([]);
   const [featuredProductIds, setFeaturedProductIds] = useState<string[]>([]);
   const [contacts, setContacts] = useState<AuthorContactDraft[]>([]);
+  const [savedContacts, setSavedContacts] = useState<AuthorContactDraft[]>([]);
   const [publishedProducts, setPublishedProducts] = useState<
     PublishedProductOption[]
   >([]);
@@ -134,7 +136,9 @@ export default function AuthorProfileClient({
         setBannerPosition(readBannerPositionFromProfileRow(profile));
         setTopicKeys(profile.topicKeys);
         setFeaturedProductIds(profile.featuredProducts.map((product) => product.id));
-        setContacts(contactsFromProfile(profile.contacts ?? []));
+        const loadedContacts = contactsFromProfile(profile.contacts ?? []);
+        setContacts(loadedContacts);
+        setSavedContacts(loadedContacts);
         setPublishedProducts(payload.publishedProducts ?? []);
         setProfileSlug(profile.slug);
       } catch {
@@ -187,9 +191,7 @@ export default function AuthorProfileClient({
     setFeaturedProductIds((current) => [...current, productId]);
   }
 
-  async function handleSave(event: React.FormEvent) {
-    event.preventDefault();
-
+  async function persistProfile() {
     if (!selectedAuthor || saving) {
       return;
     }
@@ -198,6 +200,7 @@ export default function AuthorProfileClient({
 
     if (fullBioError) {
       setError(fullBioError);
+      setSuccess(null);
       return;
     }
 
@@ -207,6 +210,7 @@ export default function AuthorProfileClient({
 
     if (shortPositioningError) {
       setError(shortPositioningError);
+      setSuccess(null);
       return;
     }
 
@@ -219,6 +223,7 @@ export default function AuthorProfileClient({
 
       if (titleError || urlError || descriptionError) {
         setError(titleError ?? urlError ?? descriptionError);
+        setSuccess(null);
         return;
       }
     }
@@ -258,7 +263,9 @@ export default function AuthorProfileClient({
       setFeaturedProductIds(
         payload.profile.featuredProducts.map((product) => product.id),
       );
-      setContacts(contactsFromProfile(payload.profile.contacts ?? []));
+      const nextContacts = contactsFromProfile(payload.profile.contacts ?? []);
+      setContacts(nextContacts);
+      setSavedContacts(nextContacts);
       setPublishedProducts(payload.publishedProducts ?? []);
       setProfileSlug(payload.profile.slug);
       setSuccess("Изменения сохранены.");
@@ -274,6 +281,18 @@ export default function AuthorProfileClient({
       setSaving(false);
     }
   }
+
+  async function handleSave(event: React.FormEvent) {
+    event.preventDefault();
+    await persistProfile();
+  }
+
+  function handleContactsChange(nextContacts: AuthorContactDraft[]) {
+    setContacts(nextContacts);
+    setSuccess(null);
+  }
+
+  const contactsDirty = !areAuthorContactDraftsEqual(contacts, savedContacts);
 
   const availableProducts = publishedProducts.filter(
     (product) => !featuredProductIds.includes(product.id),
@@ -404,7 +423,14 @@ export default function AuthorProfileClient({
             authorId={selectedAuthor.id}
             contacts={contacts}
             disabled={saving}
-            onChange={setContacts}
+            dirty={contactsDirty}
+            saving={saving}
+            saved={Boolean(success) && !contactsDirty}
+            saveError={error}
+            onChange={handleContactsChange}
+            onSave={() => {
+              void persistProfile();
+            }}
           />
 
           <section className="rounded-[24px] border border-[#eadff8] bg-white p-5">
