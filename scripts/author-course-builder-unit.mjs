@@ -591,16 +591,16 @@ const catalogCard = read("src/components/catalog/cards/CatalogCardView.tsx");
 assert.doesNotMatch(catalogCard, /AuthorCourseBuilder/);
 assert.doesNotMatch(catalogCard, /course_lessons/);
 
-assert.equal(COURSE_BUILDER_PDF_HINT, "PDF — до 5 МБ");
+assert.equal(COURSE_BUILDER_PDF_HINT, "PDF — до 10 МБ");
 assert.equal(COURSE_BUILDER_AUDIO_HINT, "Аудио — до 50 МБ");
-assert.equal(COURSE_BUILDER_PDF_TOO_LARGE, "PDF-файл должен быть не больше 5 МБ.");
+assert.equal(COURSE_BUILDER_PDF_TOO_LARGE, "PDF-файл должен быть не больше 10 МБ.");
 assert.equal(COURSE_BUILDER_PDF_WRONG_TYPE, "Можно загрузить только PDF-файл.");
 assert.equal(
   COURSE_BUILDER_AUDIO_TOO_LARGE,
   "Аудиофайл должен быть не больше 50 МБ.",
 );
 assert.equal(COURSE_BUILDER_AUDIO_WRONG_TYPE, "Загрузите аудиофайл в формате MP3.");
-assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 5 * 1024 * 1024);
+assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 10 * 1024 * 1024);
 assert.equal(PUBLICATION_FILE_LIMITS.maxPdfBytes, PUBLICATION_FILE_MAX_PDF_BYTES);
 assert.equal(MAX_AUDIO_BYTES, 50 * 1024 * 1024);
 assert.equal(MAX_AUDIO_BYTES, SHARED_AUTHOR_AUDIO_MAX_BYTES);
@@ -657,34 +657,47 @@ assert.equal(
   true,
 );
 
-const exactlyFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+const eightToNineMb = pdfBufferWithSize(Math.floor(8.5 * 1024 * 1024));
 assert.equal(
   validatePublicationPdfUpload({
-    file: pdfFileFromBuffer(exactlyFiveMb),
-    buffer: exactlyFiveMb,
+    file: pdfFileFromBuffer(eightToNineMb),
+    buffer: eightToNineMb,
   }).ok,
   true,
 );
 assert.equal(
-  validateCourseBuilderPdfFile(pdfFileFromBuffer(exactlyFiveMb)).ok,
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(eightToNineMb)).ok,
   true,
 );
 
-const overFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
+const exactlyTenMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(exactlyTenMb),
+    buffer: exactlyTenMb,
+  }).ok,
+  true,
+);
+assert.equal(
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(exactlyTenMb)).ok,
+  true,
+);
+
+const overTenMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
 assert.deepEqual(
   validatePublicationPdfUpload({
-    file: pdfFileFromBuffer(overFiveMb),
-    buffer: overFiveMb,
+    file: pdfFileFromBuffer(overTenMb),
+    buffer: overTenMb,
   }),
   { ok: false, code: "invalid_file_size" },
 );
 assert.deepEqual(
-  validateCourseBuilderPdfFile(pdfFileFromBuffer(overFiveMb)),
+  validateCourseBuilderPdfFile(pdfFileFromBuffer(overTenMb)),
   { ok: false, code: "invalid_file_size" },
 );
 assert.equal(
   getCourseBuilderPdfErrorMessage("invalid_file_size"),
-  "PDF-файл должен быть не больше 5 МБ.",
+  "PDF-файл должен быть не больше 10 МБ.",
 );
 
 const notPdf = new File([smallPdf], "notes.docx", {
@@ -753,5 +766,53 @@ assert.doesNotMatch(authorForm, /validateCourseBuilderAudioFile/);
 assert.doesNotMatch(authorForm, /Аудиофайл должен быть не больше 50 МБ/);
 assert.match(authorAudioLimits, /Размер аудиофайла не должен превышать 50 МБ/);
 assert.match(personalLimits, /maxPdfBytes: 20 \* 1024 \* 1024/);
+
+const blocksCreateRoute = read(
+  "src/app/api/author/products/[id]/course/lessons/[lessonId]/blocks/route.ts",
+);
+const blocksUpdateRoute = read(
+  "src/app/api/author/products/[id]/course/lessons/[lessonId]/blocks/[blockId]/route.ts",
+);
+assert.match(blocksCreateRoute, /multipart\/form-data/);
+assert.match(blocksCreateRoute, /request\.formData\(\)/);
+assert.match(blocksUpdateRoute, /multipart\/form-data/);
+assert.match(blocksUpdateRoute, /request\.formData\(\)/);
+assert.doesNotMatch(blocksCreateRoute, /bodySizeLimit/);
+assert.doesNotMatch(blocksUpdateRoute, /bodySizeLimit/);
+assert.match(
+  builder,
+  /\/api\/author\/products\/\$\{practiceId\}\/course\/lessons\/\$\{lesson\.id\}\/blocks/,
+);
+
+const nextConfig = read("next.config.ts");
+assert.match(nextConfig, /proxyClientMaxBodySize:\s*"55mb"/);
+
+const coursePdfNginx = read(
+  "deploy/nginx/course-builder-pdf-upload.location.conf",
+);
+assert.match(
+  coursePdfNginx,
+  /client_max_body_size 12m/,
+  "nginx allows 12m for Course Builder PDF blocks",
+);
+assert.match(
+  coursePdfNginx,
+  /course\/lessons\/\[\^\/\]\+\/blocks/,
+);
+assert.match(
+  coursePdfNginx,
+  /server_name audiolad\.ru` HTTPS server block/,
+);
+assert.match(
+  coursePdfNginx,
+  /8–9 MB PDFs/,
+  "snippet warns 8–9 MB still 413 until Timeweb apply",
+);
+assert.doesNotMatch(coursePdfNginx, /client_max_body_size 55m/);
+assert.doesNotMatch(coursePdfNginx, /personal-materials/);
+assert.doesNotMatch(
+  coursePdfNginx,
+  /\/api\/author\/products\/\[?\^\/\]\+\/audio/,
+);
 
 console.log("author-course-builder-unit: ok");

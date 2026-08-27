@@ -24,7 +24,7 @@ State file: `/var/www/audiolad-deploy/shared/active-upstream.env`
 Nginx:
 
 - `/etc/nginx/conf.d/audiolad-next-upstream.conf` — `upstream audiolad_next { server 127.0.0.1:PORT; }`
-- Large multipart uploads need dedicated `client_max_body_size` locations in `/etc/nginx/sites-available/audiolad.ru` (server default is `4m`). Listener private audio: see `deploy/nginx/private-audio-upload.location.conf` (`55m` create, `6m` cover).
+- Large multipart uploads need dedicated `client_max_body_size` locations in `/etc/nginx/sites-available/audiolad.ru` (server default is `4m`). Listener private audio: see `deploy/nginx/private-audio-upload.location.conf` (`55m` create, `6m` cover). Course Builder PDF blocks: see `deploy/nginx/course-builder-pdf-upload.location.conf` (`12m` for the 10 MiB app limit + multipart overhead). That snippet must be applied inside the audiolad.ru HTTPS server block; without it, 8–9 MB PDFs still 413 on the 4m default. Do not raise the global 4m default.
 - site `proxy_pass http://audiolad_next;` for Next.js locations
 - HTTPS listeners use HTTP/2 (`listen 443 ssl http2`)
 - `/_next/static/` is served from `/var/www/audiolad-deploy/shared/next-static/` (accumulated hashed assets) with fallback to the active Next process. See `deploy/nginx/next-static-overlay.location.conf`.

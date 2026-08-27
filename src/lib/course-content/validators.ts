@@ -13,7 +13,7 @@ import {
 } from "./types";
 
 /**
- * Course lesson PDF cap (5 MB). Personal-materials keeps its own 20 MB
+ * Course lesson PDF cap (10 MB). Personal-materials keeps its own 20 MB
  * limit; only magic-byte / MIME helpers are shared.
  */
 export const PUBLICATION_FILE_LIMITS = {
