@@ -10,7 +10,7 @@
 #   git fetch origin main
 #   git show <sha>:deploy/scripts/run-from-target-sha.sh | bash -s -- <sha>
 #
-# Never via /current. Never git reset --hard. Never AUDIOLAD_DEPLOY_OVERRIDE.
+# Never via /current. Do not reset the controlling checkout. No override flag.
 set -Eeuo pipefail
 
 usage() {
@@ -58,7 +58,7 @@ else
   printf 'current production .deploy-commit: (not readable)\n'
 fi
 
-# Existing canonical launch. Preserve the real exit code. No || true.
+# Existing canonical launch. Preserve the real exit code.
 git -C "$GIT_WORKDIR" fetch origin main
 git -C "$GIT_WORKDIR" show "${SHA}:deploy/scripts/run-from-target-sha.sh" \
   | GIT_WORKDIR="$GIT_WORKDIR" DEPLOY_ROOT="$DEPLOY_ROOT" bash -s -- "$SHA"

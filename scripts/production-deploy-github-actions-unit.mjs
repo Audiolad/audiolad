@@ -10,7 +10,6 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github/workflows/production-deploy.yml");
 const wrapperPath = join(repoRoot, "deploy/scripts/github-actions-deploy-wrapper.sh");
 const SHA40 = "a".repeat(40);
-const SHA_RE = "[0-9a-f]{40}";
 
 function parseYaml(text) {
   const result = spawnSync(
@@ -59,6 +58,10 @@ function main() {
   const wrapperText = readFileSync(wrapperPath, "utf8");
   const workflow = parseYaml(workflowText);
   const combined = `${workflowText}\n${wrapperText}`;
+  const combinedCode = combined
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
 
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"], "on must be workflow_dispatch only");
   assert.equal(Object.hasOwn(workflow.on, "push"), false, "no on.push");
@@ -79,10 +82,10 @@ function main() {
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
 
-  assert.doesNotMatch(combined, /StrictHostKeyChecking=no/);
+  assert.doesNotMatch(combinedCode, /StrictHostKeyChecking=no/);
   assert.match(workflowText, /StrictHostKeyChecking=yes/);
-  assert.doesNotMatch(combined, /git reset --hard/);
-  assert.doesNotMatch(combined, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
+  assert.doesNotMatch(combinedCode, /git reset --hard/);
+  assert.doesNotMatch(combinedCode, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
   assert.match(wrapperText, /unset AUDIOLAD_DEPLOY_OVERRIDE/);
   assert.doesNotMatch(
     wrapperText,
@@ -90,7 +93,7 @@ function main() {
     "wrapper must not launch via /current",
   );
   assert.doesNotMatch(workflowText, /\/current\/deploy\/scripts/);
-  assert.match(combined, new RegExp(SHA_RE.replace("{40}", "\\{40\\}")));
+  assert.match(combined, new RegExp(String.raw`\[0-9a-f\]\{40\}`));
   assert.match(wrapperText, /\^\[0-9a-f\]\{40\}\$/);
   assert.match(workflowText, /\^\[0-9a-f\]\{40\}\$/);
   assert.match(workflowText, /\/usr\/local\/sbin\/audiolad-deploy/);
@@ -98,9 +101,9 @@ function main() {
   assert.match(wrapperText, /GIT_WORKDIR=\/var\/www\/audiolad-clean/);
   assert.match(wrapperText, /DEPLOY_ROOT=\/var\/www\/audiolad-deploy/);
   assert.match(wrapperText, /run-from-target-sha\.sh/);
-  assert.doesNotMatch(wrapperText, /\brsync\b/);
+  assert.doesNotMatch(combinedCode, /\brsync\b/);
   assert.doesNotMatch(wrapperText, /\bnpm\b/);
-  assert.doesNotMatch(wrapperText, /\|\| true/);
+  assert.doesNotMatch(combinedCode, /\|\| true/);
 
   const confirm = workflow.on.workflow_dispatch.inputs.confirm;
   assert.equal(confirm.required, true);
