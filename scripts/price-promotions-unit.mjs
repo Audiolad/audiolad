@@ -12,6 +12,7 @@ import {
   validatePaidPriceRubles,
   validateSalePriceRubles,
 } from "../src/lib/pricing/money.ts";
+import { buildCatalogListingPriceView } from "../src/lib/pricing/catalog-listing.ts";
 import {
   PRICE_CHANGED_MESSAGE,
   resolvePracticePrice,
@@ -171,7 +172,7 @@ function testPersonalCountdownAndCatalogIsolation() {
     now,
   });
   assertEqual(catalog.finalPrice, 4999, "catalog stays at base");
-  assertEqual(catalog.promotion, null, "catalog ignores personal");
+  assertEqual(catalog.promotion, null, "catalog ignores personal without teaser");
 
   const otherVisitor = resolvePracticePrice({
     isFree: false,
@@ -182,6 +183,105 @@ function testPersonalCountdownAndCatalogIsolation() {
     now,
   });
   assertEqual(otherVisitor.finalPrice, 4999, "other visitor sees base");
+}
+
+function testCatalogPersonalTeaserStates() {
+  const promo = promotion();
+  const now = new Date("2026-08-23T10:10:00.000Z");
+  const neverStarted = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promo],
+    starts: [],
+    surface: PRICE_SURFACES.CATALOG,
+    catalogPersonalTeaser: true,
+    now,
+  });
+  assertEqual(neverStarted.finalPrice, 499, "never-started catalog teases sale");
+  assertEqual(neverStarted.basePrice, 4999, "never-started keeps base");
+  assertEqual(neverStarted.promotion?.expiresAt ?? null, null, "never-started has no timer");
+
+  const active = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promo],
+    starts: [start()],
+    surface: PRICE_SURFACES.CATALOG,
+    catalogPersonalTeaser: true,
+    now,
+  });
+  assertEqual(active.finalPrice, 499, "active catalog teases sale");
+  assertEqual(active.promotion?.expiresAt, start().expiresAt, "active keeps expires_at");
+
+  const expired = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promo],
+    starts: [start({ expiresAt: "2026-08-23T10:05:00.000Z" })],
+    surface: PRICE_SURFACES.CATALOG,
+    catalogPersonalTeaser: true,
+    now,
+  });
+  assertEqual(expired.finalPrice, 4999, "expired catalog is base");
+  assertEqual(expired.promotion, null, "expired catalog has no teaser");
+}
+
+function testCatalogPersonalTeaserVersusCalendar() {
+  const personal = promotion({ salePrice: 499 });
+  const calendar = promotion({
+    id: "promo-cal",
+    promotionType: PRICE_PROMOTION_TYPES.CALENDAR,
+    salePrice: 399,
+    startsAt: "2026-08-23T09:00:00.000Z",
+    endsAt: "2026-08-23T18:00:00.000Z",
+    durationSeconds: null,
+    startToken: "token-cal",
+  });
+  const now = new Date("2026-08-23T10:10:00.000Z");
+
+  const calendarWins = buildCatalogListingPriceView({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [personal, calendar],
+    starts: [],
+    authorSlug: "anna",
+    productSlug: "morning",
+    now,
+    personalTeaser: true,
+  });
+  assertEqual(calendarWins.resolved.finalPrice, 399, "lowest applicable calendar wins");
+  assertEqual(calendarWins.resolved.promotion?.promotionType, "calendar", "calendar type");
+  assertEqual(calendarWins.href, "/practice/anna/morning", "calendar winner has no promo query");
+
+  const personalWins = buildCatalogListingPriceView({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [personal, { ...calendar, salePrice: 888 }],
+    starts: [],
+    authorSlug: "anna",
+    productSlug: "morning",
+    now,
+    personalTeaser: true,
+  });
+  assertEqual(personalWins.resolved.finalPrice, 499, "cheaper never-started personal wins");
+  assertEqual(
+    personalWins.href,
+    "/practice/anna/morning?promo=token-1",
+    "never-started personal winner starts via existing query",
+  );
+
+  const expiredPersonal = buildCatalogListingPriceView({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [personal, calendar],
+    starts: [start({ expiresAt: "2026-08-23T10:05:00.000Z" })],
+    authorSlug: "anna",
+    productSlug: "morning",
+    now,
+    personalTeaser: true,
+  });
+  assertEqual(expiredPersonal.resolved.finalPrice, 399, "expired personal leaves calendar");
+  assertEqual(expiredPersonal.href, "/practice/anna/morning", "expired href is canonical");
 }
 
 function testOneShotPersonalCountdown() {
@@ -682,6 +782,32 @@ function testSourceContracts() {
   assert(offer.includes("buildPersonalTimerOfferCopy"), "PDP substitutes copy");
   assert(!offer.includes("4 999"), "no hardcoded ruble amount");
 
+  const catalogListing = readFileSync(
+    join(ROOT, "src/lib/pricing/catalog-listing.ts"),
+    "utf8",
+  );
+  assert(catalogListing.includes("buildPracticePromoStartPath"), "catalog href uses path helper");
+  assert(catalogListing.includes("NEVER_STARTED"), "catalog distinguishes never started");
+  assert(
+    !catalogListing.includes("ensurePriceVisitorId"),
+    "catalog listing price view does not mint a visitor",
+  );
+  assert(
+    !catalogListing.includes("start_practice_price_promotion"),
+    "catalog listing does not start a promotion",
+  );
+
+  const catalogFetch = readFileSync(join(ROOT, "src/lib/products/catalog.ts"), "utf8");
+  assert(catalogFetch.includes("buildCatalogListingPriceView"), "catalog products use listing view");
+  assert(
+    !catalogFetch.includes("start_practice_price_promotion"),
+    "catalog GET does not start a promotion",
+  );
+  assert(
+    !catalogFetch.includes("ensurePriceVisitorId"),
+    "catalog product fetch does not mint a visitor cookie",
+  );
+
   const startRoute = readFileSync(
     join(ROOT, "src/app/api/price-promotions/start/route.ts"),
     "utf8",
@@ -705,6 +831,8 @@ function main() {
   testBasePriceOnly();
   testCalendarPromo();
   testPersonalCountdownAndCatalogIsolation();
+  testCatalogPersonalTeaserStates();
+  testCatalogPersonalTeaserVersusCalendar();
   testOneShotPersonalCountdown();
   testBindVisitorAndUserRowsKeepsEarliestWindow();
   testGuestLoginKeepsOriginalWindow();

@@ -9,6 +9,24 @@ export function buildPracticePublicPath(
   return `/practice/${authorSlug}/${productSlug}`;
 }
 
+/** Public one-shot personal-timer trigger. Same query the PDP start handler already consumes. */
+export const PRACTICE_PROMO_START_QUERY_PARAM = "promo";
+
+export function buildPracticePromoStartPath(
+  authorSlug: string,
+  productSlug: string,
+  startToken: string,
+): string {
+  const token = startToken.trim();
+  const base = buildPracticePublicPath(authorSlug, productSlug);
+
+  if (!token) {
+    return base;
+  }
+
+  return `${base}?${PRACTICE_PROMO_START_QUERY_PARAM}=${encodeURIComponent(token)}`;
+}
+
 export function parsePracticePublicPath(
   href: string | null | undefined,
 ): { authorSlug: string; productSlug: string } | null {

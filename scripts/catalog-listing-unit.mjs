@@ -499,4 +499,22 @@ assert(
   "legacy kind href maps to class=release",
 );
 
+const teaserCard = candidate({
+  price: 499,
+  compareAtPrice: 4999,
+  priceLabel: "499 ₽",
+  compareAtPriceLabel: "4 999 ₽",
+  href: "/practice/anna/practice?promo=token-1",
+});
+assert(teaserCard.default_offer?.access === "paid", "teaser stays paid");
+assert(teaserCard.default_offer?.price?.amount_minor === 49900, "teaser sale minor");
+assert(
+  teaserCard.default_offer?.compare_at_price?.amount_minor === 499900,
+  "teaser compare-at minor",
+);
+assert(
+  teaserCard.paths.pdp === "/practice/anna/practice?promo=token-1",
+  "never-started listing keeps promo start href on paths.pdp",
+);
+
 console.log("catalog-listing-unit: ok");

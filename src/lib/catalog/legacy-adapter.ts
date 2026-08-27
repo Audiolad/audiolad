@@ -33,6 +33,7 @@ export type LegacyCatalogSource = {
   productKind?: string | null;
   publicationClass?: PublicationClass | string | null;
   price?: number | null;
+  compareAtPrice?: number | null;
   isFree?: boolean;
   coverUrl?: string | null;
   coverImage?: unknown;
@@ -108,9 +109,16 @@ function resolveDefaultOffer(
     return null;
   }
 
+  const compareAtPrice = catalogMoneyFromRubles(source.compareAtPrice);
+  const compareAt =
+    compareAtPrice && compareAtPrice.amount_minor > price.amount_minor
+      ? compareAtPrice
+      : null;
+
   return {
     access: "paid",
     price,
+    compare_at_price: compareAt,
   };
 }
 

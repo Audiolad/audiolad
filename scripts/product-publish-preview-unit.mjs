@@ -11,6 +11,7 @@ import {
 } from "../src/lib/products/practice-access-ui.ts";
 import {
   buildPracticePromoPreviewPath,
+  buildPracticePromoStartPath,
   buildPracticePublishListenerPreviewPath,
   buildPracticePublishPreviewPath,
 } from "../src/lib/products/paths.ts";
@@ -98,6 +99,10 @@ function testPathsHelper() {
   assert.equal(
     buildPracticePromoPreviewPath("anna", "praktika", "promo-1"),
     "/practice/anna/praktika?preview=publish&view=listener&promo_preview=promo-1",
+  );
+  assert.equal(
+    buildPracticePromoStartPath("anna", "praktika", "token-1"),
+    "/practice/anna/praktika?promo=token-1",
   );
   assert.equal(isPublishPreviewQuery("publish"), true);
   assert.equal(isPublishPreviewQuery("buyer"), false);

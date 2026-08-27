@@ -1,7 +1,10 @@
 import { rublesToMinor } from "@/lib/pricing/money";
 import {
   chooseCanonicalPersonalStart,
+  classifyPersonalCountdownViewerState,
+  isPersonalCountdownDefinitionActive,
   isPersonalStartActive,
+  PERSONAL_COUNTDOWN_VIEWER_STATES,
 } from "@/lib/pricing/personal-start";
 import {
   PRICE_PROMOTION_TYPES,
@@ -21,6 +24,11 @@ export type ResolvePracticePriceInput = {
   starts: PersonalPromotionStart[];
   now?: Date;
   surface: PriceSurface;
+  /**
+   * Catalog listing only. Teases never-started / in-window personal
+   * countdown without starting a row. Product/checkout ignore this flag.
+   */
+  catalogPersonalTeaser?: boolean;
 };
 
 function toTime(value: string | null | undefined): number | null {
@@ -51,13 +59,7 @@ function isCalendarActive(promotion: PricePromotionRecord, nowMs: number): boole
 }
 
 function isPersonalDefinitionActive(promotion: PricePromotionRecord): boolean {
-  return (
-    promotion.promotionType === PRICE_PROMOTION_TYPES.PERSONAL_COUNTDOWN &&
-    promotion.isActive &&
-    typeof promotion.durationSeconds === "number" &&
-    Number.isInteger(promotion.durationSeconds) &&
-    promotion.durationSeconds > 0
-  );
+  return isPersonalCountdownDefinitionActive(promotion);
 }
 
 function findActivePersonalStart(
@@ -93,8 +95,10 @@ function toResolvedPromotion(
 /**
  * Picks at most one applicable promotion.
  * Calendar promotions apply on every surface.
- * Personal countdown applies on product/checkout only, and only after a start.
- * If several apply, the lowest valid sale price wins (no stacking).
+ * Personal countdown applies on product/checkout only after a start, unless
+ * `catalogPersonalTeaser` is set: then catalog may tease NEVER_STARTED or
+ * ACTIVE personal (not EXPIRED). If several apply, the lowest valid sale
+ * price wins (no stacking).
  */
 export function resolvePracticePrice(
   input: ResolvePracticePriceInput,
@@ -106,6 +110,9 @@ export function resolvePracticePrice(
       : 0;
   const nowMs = (input.now ?? new Date()).getTime();
   const allowPersonal = input.surface !== PRICE_SURFACES.CATALOG;
+  const allowPersonalCatalogTeaser =
+    input.surface === PRICE_SURFACES.CATALOG &&
+    input.catalogPersonalTeaser === true;
 
   if (isFree || basePrice <= 0) {
     return {
@@ -138,6 +145,30 @@ export function resolvePracticePrice(
       if (!winner || promotion.salePrice < winner.promotion.salePrice) {
         winner = { promotion, expiresAt: promotion.endsAt };
       }
+      continue;
+    }
+
+    if (allowPersonalCatalogTeaser && isPersonalDefinitionActive(promotion)) {
+      const viewerState = classifyPersonalCountdownViewerState(
+        promotion,
+        input.starts,
+        nowMs,
+      );
+
+      if (
+        viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.NEVER_STARTED ||
+        viewerState === PERSONAL_COUNTDOWN_VIEWER_STATES.ACTIVE
+      ) {
+        const start = findActivePersonalStart(promotion, input.starts, nowMs);
+
+        if (!winner || promotion.salePrice < winner.promotion.salePrice) {
+          winner = {
+            promotion,
+            expiresAt: start?.expiresAt ?? null,
+          };
+        }
+      }
+
       continue;
     }
 

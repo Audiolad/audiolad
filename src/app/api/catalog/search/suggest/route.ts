@@ -12,6 +12,7 @@ import {
   mapCatalogProductsToSuggestions,
 } from "@/lib/catalog/search-suggestions";
 import { normalizeCatalogTopicParam } from "@/lib/catalog/topic-filter";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
+    const visitorId = await readPriceVisitorId();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const [authorResults, productResults] = await Promise.all([
       searchPublishedCatalogAuthors(supabase, {
@@ -48,6 +53,10 @@ export async function GET(request: Request) {
         query: normalizedQuery,
         topicKey,
         limit: CATALOG_PRODUCT_SUGGEST_LIMIT,
+        viewer: {
+          visitorId,
+          userId: user?.id ?? null,
+        },
       }),
     ]);
 

@@ -4,6 +4,7 @@ import {
   listPublishedCatalog,
   parseCatalogListingQuery,
 } from "@/lib/catalog/listing";
+import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,8 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
-    const result = await listPublishedCatalog(supabase, query);
+    const visitorId = await readPriceVisitorId();
+    const result = await listPublishedCatalog(supabase, query, { visitorId });
 
     return NextResponse.json(result, { headers: NO_STORE_HEADERS });
   } catch (error) {

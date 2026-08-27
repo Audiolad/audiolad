@@ -15,6 +15,7 @@ import {
 } from "@/lib/library/saves";
 import {
   getPublishedCatalogProducts,
+  type CatalogPriceViewer,
   type CatalogProduct,
 } from "@/lib/products/catalog";
 
@@ -73,6 +74,7 @@ export function mapLegacyCatalogProductToSource(
     productKind: product.productKind,
     publicationClass: product.publicationClass,
     price: product.price,
+    compareAtPrice: product.compareAtPrice,
     isFree: product.isFree,
     coverUrl: product.coverUrl,
     coverImage: product.coverImage,
@@ -320,20 +322,28 @@ export async function listPublishedCatalog(
   query: CatalogListingQuery,
   options: {
     userId?: string | null;
+    visitorId?: string | null;
     savesStore?: LibrarySavesAsyncStore;
   } = {},
 ): Promise<CatalogListingResult> {
   const productKindHint = listingProductKindHint(query.class);
+  const userId = await resolveCatalogListingUserId(supabase, options.userId);
+  const viewer: CatalogPriceViewer = {
+    visitorId: options.visitorId ?? null,
+    userId,
+  };
 
   const products = query.q
     ? await searchPublishedCatalogProducts(supabase, {
         query: query.q,
         topicKey: query.topic,
         limit: CATALOG_LISTING_SEARCH_LIMIT,
+        viewer,
       })
     : await getPublishedCatalogProducts(supabase, {
         topicKey: query.topic,
         productKind: productKindHint,
+        viewer,
       });
 
   const candidates = filterCatalogListingItems(
@@ -348,7 +358,6 @@ export async function listPublishedCatalog(
   );
   const sorted = sortCatalogListingItems(candidates, query.sort);
   const page = paginateCatalogListingItems(sorted, query);
-  const userId = await resolveCatalogListingUserId(supabase, options.userId);
 
   if (!userId) {
     return {

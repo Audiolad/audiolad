@@ -140,6 +140,10 @@ assert.doesNotMatch(card, /hidden xl:block/, "format label stays visible on mobi
 assert.doesNotMatch(card, /durationLabel/, "card no longer shows duration or audio count");
 assert.match(card, /data-catalog-card-meta/, "paid price keeps a meta row");
 assert.match(card, /readPaidCatalogOfferPriceLabel/, "paid price comes from default_offer");
+assert.match(card, /readPaidCatalogOfferCompareAtLabel/, "compare-at comes from default_offer");
+assert.match(card, /data-catalog-card-compare-at/, "struck full price is marked");
+assert.match(card, /line-through/, "compare-at is struck");
+assert.doesNotMatch(card, /Предложение действует|20 минут|setInterval/, "catalog card has no timer copy");
 assert.match(card, /class === "post"/, "posts never render an offer price");
 assert.match(card, /data-catalog-card-price/, "paid price is a visual marker");
 assert.match(
