@@ -12,13 +12,21 @@ import {
   assertLessonBelongsToCourse,
   countCoursePublishContentFromLessons,
   COURSE_BUILDER_ADD_LESSON_LABEL,
+  COURSE_BUILDER_ADD_TEXT_LABEL,
   COURSE_BUILDER_COMPLETION_CTA_TITLE,
+  COURSE_BUILDER_EDIT_TEXT_LABEL,
+  COURSE_BUILDER_EMPTY_TEXT_MESSAGE,
   COURSE_BUILDER_EMPTY_TITLE,
+  COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL,
+  COURSE_BUILDER_SAVE_TEXT_LABEL,
   COURSE_BUILDER_SECTION_TITLE,
   COURSE_PUBLISH_MISSING_CONTENT_CODE,
+  buildCourseTextBlockPayload,
   defaultCourseLessonTitle,
   evaluateCoursePublishContentGate,
+  getCourseBuilderErrorMessage,
   nextCoursePosition,
+  readCourseLessonBlockText,
   resolveCourseBuilderPanes,
   shouldCreateDefaultAudioItem,
   shouldShowPracticeListeningNotice,
@@ -96,8 +104,64 @@ assert.match(builder, /К списку уроков/);
 assert.match(builder, /usePointerReorder/);
 assert.match(builder, /AudioDragHandle/);
 assert.match(builder, /Добавить аудио/);
-assert.match(builder, /Добавить текст/);
+assert.match(builder, /COURSE_BUILDER_ADD_TEXT_LABEL|Добавить текст/);
 assert.match(builder, /Добавить PDF/);
+assert.equal(COURSE_BUILDER_ADD_TEXT_LABEL, "Добавить текст");
+assert.equal(COURSE_BUILDER_SAVE_TEXT_LABEL, "Сохранить текст");
+assert.equal(COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL, "Сохранить изменения");
+assert.equal(COURSE_BUILDER_EDIT_TEXT_LABEL, "Редактировать");
+assert.equal(COURSE_BUILDER_EMPTY_TEXT_MESSAGE, "Введите текст блока.");
+assert.match(builder, /COURSE_BUILDER_SAVE_TEXT_LABEL/);
+assert.match(builder, /COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL/);
+assert.match(builder, /COURSE_BUILDER_EDIT_TEXT_LABEL/);
+assert.match(builder, /AuthorCourseTextBlockEditor/);
+assert.match(builder, /data-course-text-block="saved"/);
+assert.match(builder, /data-course-text-draft/);
+assert.match(builder, /addTextDraft/);
+assert.match(builder, /createTextBlock/);
+assert.match(builder, /saveTextBlock/);
+assert.match(
+  builder,
+  /JSON\.stringify\(\{ type: "text", payload: built\.payload \}\)/,
+  "explicit first save POSTs { type: text, payload: { text } }",
+);
+assert.match(
+  builder,
+  /patchBlock\(blockId, \{ payload: built\.payload \}\)/,
+  "re-edit save PATCHes { payload: { text } }",
+);
+assert.doesNotMatch(
+  builder,
+  /payload: \{ text: "" \}/,
+  "Добавить текст must not POST an empty text block",
+);
+assert.doesNotMatch(
+  builder,
+  /type === "text"[\s\S]{0,400}onBlur/,
+  "text blocks must not save on blur",
+);
+assert.doesNotMatch(
+  builder,
+  /onBlur=\{[\s\S]{0,180}payload: \{ text:/,
+  "text payload must not be saved from textarea blur",
+);
+assert.doesNotMatch(
+  builder,
+  /onChange=\{[\s\S]{0,200}(createTextBlock|saveTextBlock|patchBlock)/,
+  "no per-keystroke text save",
+);
+assert.match(
+  builder,
+  /readCourseLessonBlockText\(block\.payload\)/,
+  "saved view reads text from the server row payload",
+);
+assert.match(
+  builder,
+  /\/api\/author\/products\/\$\{id\}\/course\/lessons/,
+  "close/reopen/reload hydrates lessons+blocks from GET snapshot",
+);
+assert.match(builder, /loadSnapshot/);
+assert.match(builder, /applySnapshot/);
 assert.match(builder, /course_completion_ctas|completion-cta/);
 assert.match(builder, /\/api\/author\/products\/\$\{.*\}\/audio\/\$\{.*\}\/upload/);
 assert.match(builder, /\/api\/author\/products\/\$\{practiceId\}\/course\/files\//);
@@ -182,6 +246,23 @@ assert.equal(
   }).ok,
   true,
 );
+
+const savedTextPayload = buildCourseTextBlockPayload("абзац\nвторая строка");
+assert.equal(savedTextPayload.ok, true);
+if (savedTextPayload.ok) {
+  assert.deepEqual(savedTextPayload.payload, { text: "абзац\nвторая строка" });
+  assert.match(
+    savedTextPayload.payload.text,
+    /\n/,
+    "newlines are kept in the { text } payload",
+  );
+}
+assert.equal(buildCourseTextBlockPayload("").ok, false);
+assert.equal(buildCourseTextBlockPayload("   \n\t").ok, false);
+assert.equal(buildCourseTextBlockPayload(null).ok, false);
+assert.equal(readCourseLessonBlockText({ text: "абзац\nвторая строка" }), "абзац\nвторая строка");
+assert.equal(readCourseLessonBlockText({}), "");
+assert.equal(getCourseBuilderErrorMessage("empty_text"), COURSE_BUILDER_EMPTY_TEXT_MESSAGE);
 assert.equal(
   validateCourseLessonBlock({
     type: "audio",
@@ -226,6 +307,33 @@ assert.deepEqual(
     { blocks: [{}] },
   ]),
   { lessonCount: 2, blockCount: 3 },
+);
+
+const textOnlyLesson = countCoursePublishContentFromLessons([
+  {
+    blocks: [
+      {
+        type: "text",
+        payload: { text: "Только текст урока" },
+      },
+    ],
+  },
+]);
+assert.deepEqual(
+  textOnlyLesson,
+  { lessonCount: 1, blockCount: 1 },
+  "a persisted text-only lesson counts as publish content",
+);
+assert.equal(
+  evaluateCoursePublishContentGate({
+    publicationClass: "course",
+    productKind: "practice",
+    publishedAt: null,
+    lessonCount: textOnlyLesson.lessonCount,
+    blockCount: textOnlyLesson.blockCount,
+  }).ok,
+  true,
+  "text-only lesson satisfies lessonCount>=1 && blockCount>=1",
 );
 
 assert.equal(
@@ -502,6 +610,18 @@ assert.match(server, /PUBLICATION_FILES_BUCKET/);
 assert.match(server, /validatePublicationPdfUpload/);
 assert.match(server, /cleanupUnusedCourseAssets/);
 assert.match(server, /createServiceRoleClient/);
+assert.match(server, /buildCourseTextBlockPayload/);
+assert.match(server, /CourseBuilderError\("empty_text"/);
+assert.doesNotMatch(
+  server,
+  /: \{ text: "" \}/,
+  "server must not persist an empty text block",
+);
+assert.match(
+  server,
+  /export async function countCoursePublishContent[\s\S]+select\("id", \{ count: "exact", head: true \}\)/,
+  "publish blockCount counts every persisted row including text",
+);
 assert.doesNotMatch(server, /promo_/);
 assert.doesNotMatch(server, /app\/learn/);
 

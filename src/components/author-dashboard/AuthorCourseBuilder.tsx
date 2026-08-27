@@ -6,12 +6,19 @@ import { AudioDragHandle } from "@/components/author-dashboard/AudioDragHandle";
 import { usePointerReorder } from "@/components/author-dashboard/usePointerReorder";
 import {
   COURSE_BUILDER_ADD_LESSON_LABEL,
+  COURSE_BUILDER_ADD_TEXT_LABEL,
   COURSE_BUILDER_COMPLETION_CTA_TITLE,
+  COURSE_BUILDER_EDIT_TEXT_LABEL,
+  COURSE_BUILDER_EMPTY_TEXT_MESSAGE,
   COURSE_BUILDER_EMPTY_TITLE,
   COURSE_BUILDER_LEGACY_AUDIO_NOTICE,
+  COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL,
+  COURSE_BUILDER_SAVE_TEXT_LABEL,
   COURSE_BUILDER_SECTION_TITLE,
+  buildCourseTextBlockPayload,
   countCoursePublishContentFromLessons,
   getCourseBuilderErrorMessage,
+  readCourseLessonBlockText,
   resolveCourseBuilderPanes,
   type CourseBuilderBlockDto,
   type CourseBuilderLessonDto,
@@ -474,6 +481,85 @@ export default function AuthorCourseBuilder({
   );
 }
 
+function AuthorCourseTextBlockEditor({
+  savedText,
+  mode,
+  disabled,
+  onSave,
+}: {
+  savedText: string;
+  mode: "create" | "update";
+  disabled: boolean;
+  onSave: (text: string) => Promise<boolean>;
+}) {
+  const isPersisted = mode === "update";
+  const [editing, setEditing] = useState(!isPersisted);
+  const [text, setText] = useState(savedText);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const built = buildCourseTextBlockPayload(text);
+
+    if (!built.ok) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const ok = await onSave(built.payload.text);
+
+      if (ok && isPersisted) {
+        setText(built.payload.text);
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div data-course-text-block="saved" className="space-y-3">
+        <p className="whitespace-pre-wrap text-sm text-[#3f3560]">{savedText}</p>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            setText(savedText);
+            setEditing(true);
+          }}
+          className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+        >
+          {COURSE_BUILDER_EDIT_TEXT_LABEL}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-course-text-block={isPersisted ? "editing" : "draft"} className="space-y-3">
+      <textarea
+        value={text}
+        disabled={disabled || saving}
+        rows={6}
+        onChange={(event) => setText(event.target.value)}
+        className="w-full rounded-[16px] border border-[#e4d7f4] px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
+      />
+      <button
+        type="button"
+        disabled={disabled || saving || text.trim() === ""}
+        onClick={() => void save()}
+        className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {isPersisted
+          ? COURSE_BUILDER_SAVE_TEXT_CHANGES_LABEL
+          : COURSE_BUILDER_SAVE_TEXT_LABEL}
+      </button>
+    </div>
+  );
+}
+
 function AuthorCourseLessonEditor({
   practiceId,
   lesson,
@@ -494,6 +580,9 @@ function AuthorCourseLessonEditor({
   onError: (message: string | null) => void;
 }) {
   const [title, setTitle] = useState(lesson.title);
+  const [textDrafts, setTextDrafts] = useState<Array<{ key: string }>>([]);
+  const lessonRef = useRef(lesson);
+  lessonRef.current = lesson;
 
   const persistBlockOrder = useCallback(
     async (nextBlocks: CourseBuilderBlockDto[]) => {
@@ -545,7 +634,18 @@ function AuthorCourseLessonEditor({
     onReorder: persistBlockOrder,
   });
 
-  async function addBlock(type: "text" | "audio" | "file", file?: File) {
+  function addTextDraft() {
+    if (disabled) {
+      return;
+    }
+
+    setTextDrafts((current) => [
+      ...current,
+      { key: `draft-${crypto.randomUUID()}` },
+    ]);
+  }
+
+  async function addBlock(type: "audio" | "file", file?: File) {
     if (!practiceId || disabled) {
       return;
     }
@@ -563,9 +663,7 @@ function AuthorCourseLessonEditor({
       : await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            type === "text" ? { type, payload: { text: "" } } : { type },
-          ),
+          body: JSON.stringify({ type }),
         });
 
     const payload = (await response.json()) as {
@@ -580,9 +678,62 @@ function AuthorCourseLessonEditor({
     }
 
     onLessonChange({
-      ...lesson,
-      blocks: [...lesson.blocks, payload.block],
+      ...lessonRef.current,
+      blocks: [...lessonRef.current.blocks, payload.block],
     });
+  }
+
+  async function createTextBlock(text: string) {
+    if (!practiceId || disabled) {
+      return null;
+    }
+
+    const built = buildCourseTextBlockPayload(text);
+
+    if (!built.ok) {
+      onError(COURSE_BUILDER_EMPTY_TEXT_MESSAGE);
+      return null;
+    }
+
+    onError(null);
+
+    const response = await fetch(
+      `/api/author/products/${practiceId}/course/lessons/${lesson.id}/blocks`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "text", payload: built.payload }),
+      },
+    );
+    const payload = (await response.json()) as {
+      block?: CourseBuilderBlockDto;
+      error?: string;
+      message?: string;
+    };
+
+    if (!response.ok || !payload.block) {
+      onError(payload.message ?? getCourseBuilderErrorMessage(payload.error));
+      return null;
+    }
+
+    onLessonChange({
+      ...lessonRef.current,
+      blocks: [...lessonRef.current.blocks, payload.block],
+    });
+
+    return payload.block;
+  }
+
+  async function saveTextBlock(blockId: string, text: string) {
+    const built = buildCourseTextBlockPayload(text);
+
+    if (!built.ok) {
+      onError(COURSE_BUILDER_EMPTY_TEXT_MESSAGE);
+      return null;
+    }
+
+    onError(null);
+    return patchBlock(blockId, { payload: built.payload });
   }
 
   async function patchBlock(
@@ -615,10 +766,11 @@ function AuthorCourseLessonEditor({
     }
 
     const nextBlock = payload.block;
+    const currentLesson = lessonRef.current;
 
     onLessonChange({
-      ...lesson,
-      blocks: lesson.blocks.map((block) =>
+      ...currentLesson,
+      blocks: currentLesson.blocks.map((block) =>
         block.id === blockId
           ? {
               ...nextBlock,
@@ -794,23 +946,14 @@ function AuthorCourseLessonEditor({
             </div>
 
             {block.type === "text" ? (
-              <textarea
-                defaultValue={
-                  block.payload &&
-                  typeof block.payload === "object" &&
-                  "text" in block.payload &&
-                  typeof block.payload.text === "string"
-                    ? block.payload.text
-                    : ""
-                }
+              <AuthorCourseTextBlockEditor
+                savedText={readCourseLessonBlockText(block.payload)}
+                mode="update"
                 disabled={disabled}
-                rows={6}
-                onBlur={(event) =>
-                  void patchBlock(block.id, {
-                    payload: { text: event.target.value },
-                  })
-                }
-                className="w-full rounded-[16px] border border-[#e4d7f4] px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
+                onSave={async (text) => {
+                  const next = await saveTextBlock(block.id, text);
+                  return next != null;
+                }}
               />
             ) : null}
 
@@ -888,6 +1031,49 @@ function AuthorCourseLessonEditor({
             ) : null}
           </article>
         ))}
+
+        {textDrafts.map((draft) => (
+          <article
+            key={draft.key}
+            data-course-text-draft
+            className="rounded-[18px] border border-[#eee6f7] bg-white p-4"
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#8c79b6]">
+                Текст
+              </span>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  setTextDrafts((current) =>
+                    current.filter((item) => item.key !== draft.key),
+                  )
+                }
+                className="text-xs font-semibold text-[#9b3d3d] disabled:opacity-50"
+              >
+                Удалить
+              </button>
+            </div>
+            <AuthorCourseTextBlockEditor
+              savedText=""
+              mode="create"
+              disabled={disabled}
+              onSave={async (text) => {
+                const next = await createTextBlock(text);
+
+                if (!next) {
+                  return false;
+                }
+
+                setTextDrafts((current) =>
+                  current.filter((item) => item.key !== draft.key),
+                );
+                return true;
+              }}
+            />
+          </article>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -902,10 +1088,10 @@ function AuthorCourseLessonEditor({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => void addBlock("text")}
+          onClick={addTextDraft}
           className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
         >
-          Добавить текст
+          {COURSE_BUILDER_ADD_TEXT_LABEL}
         </button>
         <label className="inline-flex cursor-pointer rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]">
           Добавить PDF
