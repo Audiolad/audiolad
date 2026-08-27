@@ -549,6 +549,9 @@ html.catalog-sheet-lock body {
   .catalog-product-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  .listener-catalog-content .catalog-product-grid {
+    gap: 0.5rem; /* 8px, half of 1rem */
+  }
 }
 
 .catalog-product-grid--fixed-2 {
