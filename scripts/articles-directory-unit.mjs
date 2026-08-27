@@ -88,6 +88,7 @@ import { KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE } from "../src/lib/seo/listens
 import { TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-na-zastavku-telefona.ts";
 import { RASKLAD_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-dengi.ts";
 import { TARO_NA_DENGI_I_UDACHU_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-i-udachu.ts";
+import { BUDUT_LI_DENGI_TARO_PAGE } from "../src/lib/seo/listens/content/budut-li-dengi-taro.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1960,6 +1961,31 @@ function testListenPagesAppearInDirectory() {
     "directory JSON-LD includes sixty-first listen href",
   );
 
+
+
+  const sixtySecondListenHref = "/listens/budut-li-dengi-taro";
+  const sixtySecondListenCard = data.articles.find((card) => card.href === sixtySecondListenHref);
+  assert(sixtySecondListenCard, "sixty-second indexable listen page is listed");
+  assert(
+    sixtySecondListenCard.title === "Будут ли деньги – Таро и финансовая ситуация | АудиоЛад",
+    "sixty-second listen directory title",
+  );
+  assert(
+    sixtySecondListenCard.description === BUDUT_LI_DENGI_TARO_PAGE.description,
+    "sixty-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/budut-li-dengi-taro",
+    ),
+    "no /articles duplicate for sixty-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtySecondListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-second listen href",
+  );
 
 const articleCards = listArticleDirectoryCards();
   const articleHrefs = new Set(articleCards.map((card) => card.href));
