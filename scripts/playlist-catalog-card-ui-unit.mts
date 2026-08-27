@@ -125,15 +125,88 @@ assert.doesNotMatch(grid, /\/api\/catalog/);
 assert.doesNotMatch(grid, /материалов/);
 assert.doesNotMatch(grid, /трек/);
 assert.doesNotMatch(grid, /PlaylistCatalogFilters/);
+assert.doesNotMatch(
+  grid,
+  /listener-playlists-catalog-content/,
+  "PlaylistGrid itself does not own catalog density",
+);
 
 assert.match(
   css,
-  /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
-  "catalog grid CSS stays 2 columns on mobile",
+  /\.catalog-product-grid \{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*0\.75rem;/,
+  "default catalog-product-grid stays 2 columns with 0.75rem gap",
+);
+assert.match(
+  css,
+  /@media \(max-width:\s*767px\) \{\s*\.listener-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.375rem;/,
+  "mobile /catalog grid gap stays 0.375rem below 768",
+);
+assert.match(
+  css,
+  /@media \(max-width:\s*767px\) \{\s*\.listener-playlists-catalog-content \{\s*margin-left:\s*-0\.625rem;[\s\S]*?margin-right:\s*-0\.625rem;/,
+  "mobile /playlists/catalog pulls 10px out of parent px-5",
+);
+assert.match(
+  css,
+  /\.listener-playlists-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.375rem;/,
+  "mobile /playlists/catalog grid gap is 0.375rem below 768",
+);
+assert.match(
+  css,
+  /@media \(min-width:\s*768px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*1rem;/,
+  "768 grid stays 3 columns with 1rem gap",
 );
 
 assert.match(page, /PlaylistGrid/);
 assert.match(page, /PlaylistCatalogSearch/);
+assert.match(
+  page,
+  /className="listener-playlists-catalog-content"/,
+  "catalog page wraps the grid in listener-playlists-catalog-content",
+);
+const searchIndex = page.indexOf("<PlaylistCatalogSearch");
+const wrapperIndex = page.indexOf(
+  'className="listener-playlists-catalog-content"',
+);
+assert.ok(searchIndex !== -1, "catalog page still mounts PlaylistCatalogSearch");
+assert.ok(wrapperIndex !== -1, "catalog page mounts the density wrapper");
+assert.ok(
+  searchIndex < wrapperIndex,
+  "PlaylistCatalogSearch stays a sibling before the density wrapper",
+);
+assert.doesNotMatch(
+  page.slice(wrapperIndex),
+  /PlaylistCatalogSearch/,
+  "PlaylistCatalogSearch is not inside listener-playlists-catalog-content",
+);
+assert.match(
+  page.slice(wrapperIndex),
+  /PlaylistGrid/,
+  "PlaylistGrid stays inside listener-playlists-catalog-content",
+);
+
+const playlistsLayout = read(
+  "src/app/(platform)/(listener)/(playlists)/playlists/layout.tsx",
+);
+assert.match(
+  playlistsLayout,
+  /listener-playlists-content px-5 pt-6 pb-4 lg:px-10/,
+  "shared playlists layout keeps px-5 until lg",
+);
+assert.doesNotMatch(
+  playlistsLayout,
+  /listener-playlists-catalog-content|px-2\.5/,
+  "shared playlists layout is not the density hook",
+);
+
+const savedPage = read(
+  "src/app/(platform)/(listener)/(playlists)/playlists/saved/page.tsx",
+);
+assert.doesNotMatch(
+  savedPage,
+  /listener-playlists-catalog-content/,
+  "/playlists/saved keeps the shared 20px / 12px density",
+);
 assert.doesNotMatch(page, /PlaylistCatalogSort/);
 assert.doesNotMatch(page, /PlaylistCatalogTopicFilter/);
 assert.match(page, /Ничего не нашлось/);
