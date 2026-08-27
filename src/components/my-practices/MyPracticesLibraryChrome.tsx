@@ -51,11 +51,17 @@ function SearchFiltersRow({
   );
 }
 
-export default function MyPracticesLibraryChrome() {
+type MyPracticesLibraryChromeProps = {
+  /** `mobile` stays in the route layout. `desktop` mounts in DesktopShellSearch. */
+  surface?: "mobile" | "desktop";
+};
+
+export default function MyPracticesLibraryChrome({
+  surface = "mobile",
+}: MyPracticesLibraryChromeProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const mobileSearchId = useId();
-  const desktopSearchId = useId();
+  const searchId = useId();
   const activeFilter = parseLibraryFilter(searchParams.get("filter"));
   const activeSort = parseLibrarySort(searchParams.get("sort"));
   const queryFromUrl = parseLibrarySearchQuery(searchParams.get("q"));
@@ -144,12 +150,26 @@ export default function MyPracticesLibraryChrome() {
     onResetFilter: () => selectFilter("all"),
   };
 
+  if (surface === "desktop") {
+    return (
+      <div className="pt-3">
+        <h1 className="text-[28px] font-semibold">Аудиотека</h1>
+        <p className="mt-1 text-sm text-[#7d70a2]">
+          Всё, что вы сохранили, купили, добавили.
+        </p>
+        <div className="mt-3">
+          <SearchFiltersRow searchId={searchId} {...rowProps} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
         <LibraryMobileHeader />
         <div className="mt-3 px-5">
-          <SearchFiltersRow searchId={mobileSearchId} {...rowProps} />
+          <SearchFiltersRow searchId={searchId} {...rowProps} />
         </div>
       </div>
       <div
@@ -159,15 +179,6 @@ export default function MyPracticesLibraryChrome() {
         <LibraryMobileHeader />
         <div className="mt-3 px-5">
           <div className="h-[52px]" />
-        </div>
-      </div>
-      <div className="hidden px-5 lg:px-10 xl:block xl:px-6 xl:pt-3">
-        <h1 className="text-[28px] font-semibold">Аудиотека</h1>
-        <p className="mt-1 text-sm text-[#7d70a2]">
-          Всё, что вы сохранили, купили, добавили.
-        </p>
-        <div className="mt-3">
-          <SearchFiltersRow searchId={desktopSearchId} {...rowProps} />
         </div>
       </div>
     </>

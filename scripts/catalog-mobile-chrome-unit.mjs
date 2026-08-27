@@ -256,6 +256,16 @@ assert.match(
   /PlatformSearchCombobox/,
   "non-catalog routes keep the shell combobox",
 );
+assert.match(
+  shellSearch,
+  /<MyPracticesLibraryChrome surface=["']desktop["']/,
+  "desktop Audioteka chrome uses the same shell slot as catalog",
+);
+assert.doesNotMatch(
+  shellSearch,
+  /if \(isMyPracticesRoute\) \{\s*return null;/,
+  "shell search does not return null on /my-practices",
+);
 const catalogSearch = read("src/components/listener/MobileCatalogSearch.tsx");
 assert.match(
   catalogSearch,

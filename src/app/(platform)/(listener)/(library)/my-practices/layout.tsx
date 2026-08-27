@@ -11,17 +11,9 @@ export const metadata: Metadata = {
 
 function LibraryChromeFallback() {
   return (
-    <>
-      <div className="xl:hidden">
-        <LibraryMobileHeader />
-      </div>
-      <div className="hidden px-5 lg:px-10 xl:block xl:px-6 xl:pt-3">
-        <h1 className="text-[28px] font-semibold">Аудиотека</h1>
-        <p className="mt-1 text-sm text-[#7d70a2]">
-          Всё, что вы сохранили, купили, добавили.
-        </p>
-      </div>
-    </>
+    <div className="xl:hidden">
+      <LibraryMobileHeader />
+    </div>
   );
 }
 

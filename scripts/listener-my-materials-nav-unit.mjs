@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Listener nav: «Личные материалы» only when shell confirms claimed materials.
+ * Listener nav: «Личные материалы» never appear in the desktop sidebar.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -122,18 +122,18 @@ assert.equal(
 const visible = getListenerSidebarNavItems({ showMyMaterialsNav: true });
 assert.equal(
   visible.some((item) => item.key === "my-materials"),
-  true,
-  "sidebar shows my-materials when flag is true",
+  false,
+  "sidebar never shows my-materials after Stage 2, even when flag is true",
 );
 assert.equal(
-  visible.find((item) => item.key === "my-materials")?.title,
+  LISTENER_SIDEBAR_NAV_ITEMS.find((item) => item.key === "my-materials")?.title,
   "Личные материалы",
-  "my-materials title preserved",
+  "my-materials title stays in the source list for routes and profile links",
 );
 assert.equal(
   visible.filter((item) => item.key === "help").length,
   1,
-  "sidebar keeps a single help item when my-materials is visible",
+  "sidebar keeps a single help item when my-materials flag is true",
 );
 assert.equal(
   hidden.filter((item) => item.key === "help").length,
