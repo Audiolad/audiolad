@@ -9,6 +9,7 @@ export type StartPersonalCountdownInput = {
   userId: string | null;
   now: Date;
   durationSeconds: number;
+  salePriceSnapshot: number;
   id?: string;
 };
 
@@ -99,7 +100,8 @@ export function isPersonalStartActive(
 
 /**
  * One-shot bind: attach user_id to the earliest matching start.
- * Never creates a row and never changes started_at / expires_at.
+ * Never creates a row and never changes started_at / expires_at /
+ * sale_price_snapshot.
  */
 export function bindPersonalStarts(
   store: PersonalStartRow[],
@@ -177,7 +179,9 @@ function findUniqueConflict(
 
 /**
  * One-shot personal start. If any start already exists for this
- * (promotion, visitor) or (promotion, user), return that original window.
+ * (promotion, visitor) or (promotion, user), return that original window
+ * including its sale_price_snapshot. First INSERT freezes the current
+ * promotion sale price.
  */
 export function startPersonalCountdown(
   input: StartPersonalCountdownInput,
@@ -220,6 +224,7 @@ export function startPersonalCountdown(
     userId: input.userId,
     startedAt,
     expiresAt,
+    salePriceSnapshot: input.salePriceSnapshot,
   };
 
   store = [...store, created];
