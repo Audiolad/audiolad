@@ -1,10 +1,16 @@
+import Link from "next/link";
+
 import FeaturedProductCard, {
   FEATURED_CARD_CHIP_CLASS,
   FEATURED_CARD_META_CLASS,
   FEATURED_CARD_SUBTITLE_CLASS,
   FEATURED_CARD_TITLE_CLASS,
 } from "@/components/home/FeaturedProductCard";
-import { isHeroPromoOfferActive } from "@/lib/catalog/product-hero-gallery";
+import {
+  isHeroPromoOfferActive,
+  resolvePracticeHeroLightMetaRest,
+} from "@/lib/catalog/product-hero-gallery";
+import { buildAuthorPublicPath } from "@/lib/products/paths";
 
 import PracticeHeroGallery from "./PracticeHeroGallery";
 import {
@@ -12,6 +18,36 @@ import {
   toPracticeHeartProduct,
 } from "./PracticePageParts";
 import type { PracticePageViewModel } from "./types";
+
+const HERO_AUTHOR_LINK_CLASS =
+  "text-inherit no-underline xl:hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+
+function PracticeHeroMetaLine({
+  viewModel,
+}: {
+  viewModel: PracticePageViewModel;
+}) {
+  const authorName = viewModel.authorName?.trim() || null;
+  const rest = resolvePracticeHeroLightMetaRest(viewModel.meta, authorName);
+
+  if (!authorName || !viewModel.resolvedAuthorSlug.trim()) {
+    return viewModel.meta ? (
+      <p className={FEATURED_CARD_META_CLASS}>{viewModel.meta}</p>
+    ) : null;
+  }
+
+  return (
+    <p className={FEATURED_CARD_META_CLASS}>
+      <Link
+        href={buildAuthorPublicPath(viewModel.resolvedAuthorSlug)}
+        className={HERO_AUTHOR_LINK_CLASS}
+      >
+        {authorName}
+      </Link>
+      {rest ? ` · ${rest}` : null}
+    </p>
+  );
+}
 
 type PracticeProductHeroProps = {
   viewModel: PracticePageViewModel;
@@ -61,9 +97,7 @@ export default function PracticeProductHero({
         <p className={FEATURED_CARD_SUBTITLE_CLASS}>{viewModel.subtitle}</p>
       ) : null}
 
-      {viewModel.meta ? (
-        <p className={FEATURED_CARD_META_CLASS}>{viewModel.meta}</p>
-      ) : null}
+      <PracticeHeroMetaLine viewModel={viewModel} />
 
       <PracticePrimaryActionSection
         viewModel={viewModel}
