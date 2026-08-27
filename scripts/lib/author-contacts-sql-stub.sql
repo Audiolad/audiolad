@@ -46,3 +46,85 @@ CREATE TABLE IF NOT EXISTS public.author_members (
 );
 
 GRANT SELECT ON TABLE public.author_members TO anon, authenticated, service_role;
+
+-- Existing author-assets storage RLS (from 20260717160000), isolated here so
+-- contact icon paths authors/{author_id}/contacts/... can be proven against
+-- the same split_part(name, '/', 2) membership rule. Never applied to production.
+CREATE SCHEMA IF NOT EXISTS storage;
+
+CREATE TABLE IF NOT EXISTS storage.objects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text NOT NULL,
+  name text NOT NULL
+);
+
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can read author assets" ON storage.objects;
+CREATE POLICY "Public can read author assets"
+  ON storage.objects
+  FOR SELECT
+  TO anon, authenticated
+  USING (bucket_id = 'author-assets');
+
+DROP POLICY IF EXISTS "Author members can upload author assets" ON storage.objects;
+CREATE POLICY "Author members can upload author assets"
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'author-assets'
+    AND EXISTS (
+      SELECT 1
+      FROM public.author_members AS am
+      WHERE am.author_id = split_part(name, '/', 2)::uuid
+        AND am.user_id = auth.uid()
+        AND am.role IN ('owner', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Author members can update author assets" ON storage.objects;
+CREATE POLICY "Author members can update author assets"
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'author-assets'
+    AND EXISTS (
+      SELECT 1
+      FROM public.author_members AS am
+      WHERE am.author_id = split_part(name, '/', 2)::uuid
+        AND am.user_id = auth.uid()
+        AND am.role IN ('owner', 'editor')
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'author-assets'
+    AND EXISTS (
+      SELECT 1
+      FROM public.author_members AS am
+      WHERE am.author_id = split_part(name, '/', 2)::uuid
+        AND am.user_id = auth.uid()
+        AND am.role IN ('owner', 'editor')
+    )
+  );
+
+DROP POLICY IF EXISTS "Author members can delete author assets" ON storage.objects;
+CREATE POLICY "Author members can delete author assets"
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'author-assets'
+    AND EXISTS (
+      SELECT 1
+      FROM public.author_members AS am
+      WHERE am.author_id = split_part(name, '/', 2)::uuid
+        AND am.user_id = auth.uid()
+        AND am.role IN ('owner', 'editor')
+    )
+  );
+
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT SELECT ON TABLE storage.objects TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON TABLE storage.objects TO authenticated, service_role;

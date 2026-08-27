@@ -118,6 +118,93 @@ BEGIN
   END IF;
 
   -- -------------------------------------------------------------------------
+  -- E. Storage RLS for contact icons (existing author-assets policies)
+  -- Path shape matches server builder: authors/{authorId}/contacts/{contactId}/...
+  -- Client cannot choose this path; API only accepts author_id + contact_id + file.
+  -- -------------------------------------------------------------------------
+  DECLARE
+    icon_a text :=
+      'authors/' || author_a::text || '/contacts/' || contact_a::text
+      || '/variants/v1/card.webp';
+    icon_a_replace text :=
+      'authors/' || author_a::text || '/contacts/' || contact_a::text
+      || '/variants/v2/card.webp';
+    foreign_path text :=
+      'authors/' || author_a::text || '/contacts/' || contact_a::text
+      || '/variants/stolen/card.webp';
+  BEGIN
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claim.sub', user_a::text, false);
+    EXECUTE 'SET ROLE authenticated';
+
+    INSERT INTO storage.objects (bucket_id, name)
+    VALUES ('author-assets', icon_a);
+    SELECT count(*) INTO cnt FROM storage.objects WHERE name = icon_a;
+    IF cnt <> 1 THEN
+      RAISE EXCEPTION 'E: author A could not upload own contact icon';
+    END IF;
+
+    INSERT INTO storage.objects (bucket_id, name)
+    VALUES ('author-assets', icon_a_replace);
+    DELETE FROM storage.objects WHERE name = icon_a;
+    SELECT count(*) INTO cnt FROM storage.objects WHERE name = icon_a;
+    IF cnt <> 0 THEN
+      RAISE EXCEPTION 'E: author A could not delete replaced own contact icon';
+    END IF;
+    SELECT count(*) INTO cnt FROM storage.objects WHERE name = icon_a_replace;
+    IF cnt <> 1 THEN
+      RAISE EXCEPTION 'E: author A replace upload missing';
+    END IF;
+
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claim.sub', user_b::text, false);
+    EXECUTE 'SET ROLE authenticated';
+
+    raised := false;
+    BEGIN
+      INSERT INTO storage.objects (bucket_id, name)
+      VALUES ('author-assets', foreign_path);
+    EXCEPTION WHEN others THEN
+      raised := true;
+    END;
+    IF NOT raised THEN
+      RAISE EXCEPTION 'E: author B inserted into author A contact icon path';
+    END IF;
+
+    raised := false;
+    BEGIN
+      UPDATE storage.objects
+      SET name = name || '.hijack'
+      WHERE name = icon_a_replace;
+    EXCEPTION WHEN others THEN
+      raised := true;
+    END;
+    IF NOT raised THEN
+      SELECT count(*) INTO cnt
+      FROM storage.objects
+      WHERE name = icon_a_replace || '.hijack';
+      IF cnt <> 0 THEN
+        RAISE EXCEPTION 'E: author B overwrote author A contact icon';
+      END IF;
+    END IF;
+
+    DELETE FROM storage.objects WHERE name = icon_a_replace;
+    SELECT count(*) INTO cnt FROM storage.objects WHERE name = icon_a_replace;
+    IF cnt <> 1 THEN
+      RAISE EXCEPTION 'E: author B deleted author A contact icon';
+    END IF;
+
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claim.sub', user_a::text, false);
+    EXECUTE 'SET ROLE authenticated';
+    DELETE FROM storage.objects WHERE name = icon_a_replace;
+    SELECT count(*) INTO cnt FROM storage.objects WHERE name = icon_a_replace;
+    IF cnt <> 0 THEN
+      RAISE EXCEPTION 'E: author A cleanup delete failed';
+    END IF;
+  END;
+
+  -- -------------------------------------------------------------------------
   -- C. Ordinary user / guest: no mutations; public SELECT only visible
   -- -------------------------------------------------------------------------
   RESET ROLE;

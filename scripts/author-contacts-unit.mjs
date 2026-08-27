@@ -360,7 +360,7 @@ function testLocalStandardIconsExist() {
 }
 
 function testMigrationAndRls() {
-  const migration = read("supabase/migrations/20260827180000_author_contacts.sql");
+  const migration = read("supabase/migrations/20260829130000_author_contacts.sql");
 
   assert(migration.includes("CREATE TABLE IF NOT EXISTS public.author_contacts"), "table");
   assert(migration.includes("platform"), "platform column");
@@ -471,6 +471,44 @@ function testImagePipelineExtension() {
   assert(iconRoute.includes("authorId, contactId"), "icon path scoped to author + contact");
 }
 
+function testContactIconPathIsServerGenerated() {
+  const iconRoute = read("src/app/api/author/profile/contact-icon/route.ts");
+  const editor = read("src/components/author-dashboard/AuthorContactsEditor.tsx");
+  const paths = read("src/lib/images/image-paths.ts");
+  const assetsPolicy = read(
+    "supabase/migrations/20260717160000_author_public_profile.sql",
+  );
+
+  assert(iconRoute.includes('formData.get("author_id")'), "POST reads author_id");
+  assert(iconRoute.includes('formData.get("contact_id")'), "POST reads contact_id");
+  assert(iconRoute.includes('formData.get("file")'), "POST reads file");
+  assert(!iconRoute.includes('formData.get("path")'), "POST does not read path");
+  assert(!iconRoute.includes('formData.get("icon_path")'), "POST does not read icon_path");
+  assert(
+    !iconRoute.includes('formData.get("storage_path")'),
+    "POST does not read storage_path",
+  );
+  assert(
+    iconRoute.includes("context: { authorId, contactId }"),
+    "upload context is server-built",
+  );
+  assert(
+    paths.includes(
+      "return `authors/${authorId}/contacts/${contactId}/variants/${versionId}`",
+    ),
+    "path builder is authors/{authorId}/contacts/{contactId}/variants/{versionId}",
+  );
+  assert(editor.includes('formData.set("author_id", authorId)'), "client sends author_id");
+  assert(editor.includes('formData.set("contact_id", contact.id)'), "client sends contact_id");
+  assert(editor.includes('formData.set("file", file)'), "client sends file");
+  assert(!editor.includes('formData.set("path"'), "client does not send path");
+  assert(!editor.includes('formData.set("icon_path"'), "client does not send icon_path");
+  assert(
+    assetsPolicy.includes("split_part(name, '/', 2)::uuid"),
+    "existing author-assets RLS keys off authors/{authorId}/...",
+  );
+}
+
 const tests = [
   ["platform catalog", testPlatformCatalogIsExtensible],
   ["url validation", testUrlValidation],
@@ -485,6 +523,7 @@ const tests = [
   ["cabinet UI", testCabinetUi],
   ["public page UI", testPublicPageUi],
   ["image pipeline", testImagePipelineExtension],
+  ["server-generated icon path", testContactIconPathIsServerGenerated],
 ];
 
 for (const [name, fn] of tests) {

@@ -84,7 +84,7 @@ function testMigrationExists() {
   assert(positioningMigration.includes("short_positioning"), "short positioning column");
 
   const contactsMigration = read(
-    "supabase/migrations/20260827180000_author_contacts.sql",
+    "supabase/migrations/20260829130000_author_contacts.sql",
   );
 
   assert(contactsMigration.includes("author_contacts"), "author contacts table");

@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20260827180000_author_contacts.sql";
+const migrationName = "20260829130000_author_contacts.sql";
 const migrationPath = join(repoRoot, "supabase/migrations", migrationName);
 const stubPath = join(repoRoot, "scripts/lib/author-contacts-sql-stub.sql");
 const smokePath = join(repoRoot, "supabase/tests/author_contacts_rls_smoke.sql");
@@ -55,6 +55,14 @@ assert(migration.includes("author_contacts_author_id_sort_idx"), "sort index");
 assert(migration.includes("author_contacts_author_visible_sort_idx"), "visible index");
 assert(migration.includes("is_visible = true"), "public reads visible only");
 assert(migration.includes("author_members"), "membership RLS");
+
+const storageStub = readFileSync(stubPath, "utf8");
+assert(storageStub.includes("CREATE TABLE IF NOT EXISTS storage.objects"), "storage stub");
+assert(storageStub.includes("split_part(name, '/', 2)::uuid"), "storage RLS uses author id segment");
+assert(
+  storageStub.includes("Author members can upload author assets"),
+  "existing author-assets insert policy",
+);
 
 function runIsolatedSql() {
   if (!existsSync(stubPath) || !existsSync(smokePath)) {
