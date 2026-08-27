@@ -1,9 +1,20 @@
 import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
+import {
+  ANALYTICS_SESSION_LINK_DONE_KEY,
+  ANALYTICS_SIGNUP_DONE_KEY,
+  buildAnalyticsLinkDedupeKey,
+  readAnalyticsLocalFlag,
+  shouldSkipAnalyticsCallForCooldown,
+  shouldSkipCompletedAnalyticsCall,
+  writeAnalyticsLocalFlag,
+} from "@/lib/analytics/auth-link";
 import { createClientEventId } from "@/lib/analytics/event-id";
 import { getOrCreateAnonymousId } from "@/lib/analytics/identity-storage";
+import { isAnalyticsPoolExhaustionStatus } from "@/lib/analytics/rpc-errors";
 import {
   enqueueAnalyticsRetry,
   flushAnalyticsRetryQueue,
+  tripAnalyticsRetryPoolCircuit,
   type AnalyticsRetryItem,
   type AnalyticsRetrySendResult,
 } from "@/lib/analytics/retry-queue";
@@ -50,6 +61,12 @@ export type TrackPlatformEventResult = {
 
 let cachedSessionId: string | null = null;
 let sessionInitPromise: Promise<string | null> | null = null;
+let sessionLinkInflight: Promise<void> | null = null;
+let sessionLinkInflightKey: string | null = null;
+let sessionLinkFailureAt = 0;
+let signupInflight: Promise<boolean> | null = null;
+let signupInflightKey: string | null = null;
+let signupFailureAt = 0;
 
 type PostJsonResult<T> = {
   ok: boolean;
@@ -102,10 +119,10 @@ async function sendRetryItem(item: AnalyticsRetryItem): Promise<AnalyticsRetrySe
   }
 
   if (result.status === 0 || result.status === 429 || result.status >= 500) {
-    return { ok: false, retry: true };
+    return { ok: false, retry: true, status: result.status };
   }
 
-  return { ok: false, retry: false };
+  return { ok: false, retry: false, status: result.status };
 }
 
 export async function ensureAnalyticsSession(
@@ -164,10 +181,59 @@ export async function linkAnalyticsSessionUser(): Promise<void> {
     return;
   }
 
-  await postJson("/api/analytics/session/link", {
-    session_id: sessionId,
-    anonymous_id: getOrCreateAnonymousId(),
+  const anonymousId = getOrCreateAnonymousId();
+  const dedupeKey = buildAnalyticsLinkDedupeKey(sessionId, anonymousId);
+
+  if (
+    shouldSkipCompletedAnalyticsCall(
+      readAnalyticsLocalFlag(ANALYTICS_SESSION_LINK_DONE_KEY),
+      dedupeKey,
+    )
+  ) {
+    return;
+  }
+
+  if (shouldSkipAnalyticsCallForCooldown(sessionLinkFailureAt, Date.now())) {
+    return;
+  }
+
+  if (sessionLinkInflight && sessionLinkInflightKey === dedupeKey) {
+    return sessionLinkInflight;
+  }
+
+  sessionLinkInflightKey = dedupeKey;
+  sessionLinkInflight = (async () => {
+    const result = await postJson<{ linked?: boolean; deferred?: boolean }>(
+      "/api/analytics/session/link",
+      {
+        session_id: sessionId,
+        anonymous_id: anonymousId,
+      },
+    );
+
+    if (result.ok && result.data?.deferred !== true) {
+      writeAnalyticsLocalFlag(ANALYTICS_SESSION_LINK_DONE_KEY, dedupeKey);
+      sessionLinkFailureAt = 0;
+      return;
+    }
+
+    if (
+      !result.ok &&
+      (result.status === 0 || result.status === 429 || result.status >= 500)
+    ) {
+      sessionLinkFailureAt = Date.now();
+      return;
+    }
+
+    if (result.data?.deferred === true) {
+      sessionLinkFailureAt = Date.now();
+    }
+  })().finally(() => {
+    sessionLinkInflight = null;
+    sessionLinkInflightKey = null;
   });
+
+  return sessionLinkInflight;
 }
 
 /** Close active identity links for the current authenticated user (call before sign-out). */
@@ -182,21 +248,69 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
     return false;
   }
 
-  const result = await postJson<{ recorded?: boolean }>(
-    "/api/analytics/signup/complete",
-    {
-      session_id: sessionId,
-      anonymous_id: getOrCreateAnonymousId(),
-    },
-  );
+  const anonymousId = getOrCreateAnonymousId();
+  const dedupeKey = buildAnalyticsLinkDedupeKey(sessionId, anonymousId);
 
-  const recorded = Boolean(result.data?.recorded);
-
-  if (recorded) {
-    sendYandexGoal("signup_completed");
+  if (
+    shouldSkipCompletedAnalyticsCall(
+      readAnalyticsLocalFlag(ANALYTICS_SIGNUP_DONE_KEY),
+      dedupeKey,
+    )
+  ) {
+    return false;
   }
 
-  return recorded;
+  if (shouldSkipAnalyticsCallForCooldown(signupFailureAt, Date.now())) {
+    return false;
+  }
+
+  if (signupInflight && signupInflightKey === dedupeKey) {
+    return signupInflight;
+  }
+
+  signupInflightKey = dedupeKey;
+  signupInflight = (async () => {
+    const result = await postJson<{
+      recorded?: boolean;
+      deferred?: boolean;
+      reason?: string | null;
+    }>("/api/analytics/signup/complete", {
+      session_id: sessionId,
+      anonymous_id: anonymousId,
+    });
+
+    if (result.ok && result.data?.deferred !== true) {
+      writeAnalyticsLocalFlag(ANALYTICS_SIGNUP_DONE_KEY, dedupeKey);
+      signupFailureAt = 0;
+
+      const recorded = Boolean(result.data?.recorded);
+
+      if (recorded) {
+        sendYandexGoal("signup_completed");
+      }
+
+      return recorded;
+    }
+
+    if (
+      !result.ok &&
+      (result.status === 0 || result.status === 429 || result.status >= 500)
+    ) {
+      signupFailureAt = Date.now();
+      return false;
+    }
+
+    if (result.data?.deferred === true) {
+      signupFailureAt = Date.now();
+    }
+
+    return false;
+  })().finally(() => {
+    signupInflight = null;
+    signupInflightKey = null;
+  });
+
+  return signupInflight;
 }
 
 export async function trackPlatformEvent(
@@ -227,11 +341,21 @@ export async function trackPlatformEvent(
     !result.ok &&
     (result.status === 0 || result.status === 429 || result.status >= 500)
   ) {
-    enqueueAnalyticsRetry({
-      id: clientEventId,
-      url: "/api/analytics/track",
-      body,
-    });
+    if (isAnalyticsPoolExhaustionStatus(result.status)) {
+      tripAnalyticsRetryPoolCircuit();
+      enqueueAnalyticsRetry({
+        id: clientEventId,
+        url: "/api/analytics/track",
+        body,
+        lastAttemptAt: Date.now(),
+      });
+    } else {
+      enqueueAnalyticsRetry({
+        id: clientEventId,
+        url: "/api/analytics/track",
+        body,
+      });
+    }
   }
 
   touchSessionState();

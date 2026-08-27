@@ -7,9 +7,16 @@ export type ListenerAuthorCta = {
   href: string;
 };
 
+/** Confirmed lookup vs failed author/admin role read. Security stays fail-closed. */
+export type AuthorRoleLookupStatus = "confirmed" | "unknown";
+
+const BECOME_AUTHOR_LABEL = "Стать автором";
+const AUTHOR_CABINET_LABEL = "Кабинет автора";
+
 export function resolveListenerAuthorCta(input: {
   workspaces: AuthorWorkspace[];
   applicationVariant: ProfileApplicationVariant | null;
+  roleLookupStatus?: AuthorRoleLookupStatus;
 }): ListenerAuthorCta {
   if (input.workspaces.length > 0) {
     const href =
@@ -18,9 +25,13 @@ export function resolveListenerAuthorCta(input: {
         : "/author-dashboard";
 
     return {
-      label: "Кабинет автора",
+      label: AUTHOR_CABINET_LABEL,
       href,
     };
+  }
+
+  if (input.roleLookupStatus === "unknown") {
+    return { label: "Профиль", href: "/profile" };
   }
 
   const variant = input.applicationVariant ?? "none";
@@ -39,41 +50,56 @@ export function resolveListenerAuthorCta(input: {
     case "rejected":
       return { label: "Посмотреть решение", href: BECOME_AUTHOR_HREF };
     default:
-      return { label: "Стать автором", href: BECOME_AUTHOR_HREF };
+      return { label: BECOME_AUTHOR_LABEL, href: BECOME_AUTHOR_HREF };
   }
 }
 
 export function resolveShowBecomeAuthorPromo(input: {
   workspaces: AuthorWorkspace[];
   applicationVariant: ProfileApplicationVariant | null;
+  roleLookupStatus?: AuthorRoleLookupStatus;
 }): boolean {
+  if (input.roleLookupStatus === "unknown") {
+    return false;
+  }
+
   if (input.workspaces.length > 0) {
     return false;
   }
 
   const cta = resolveListenerAuthorCta(input);
 
-  return cta.label === "Стать автором" || cta.label === "Посмотреть решение";
+  return cta.label === BECOME_AUTHOR_LABEL || cta.label === "Посмотреть решение";
 }
 
 /** Desktop sidebar bottom promo — hidden for active authors (cabinet CTA lives in the right column). */
 export function resolveShowSidebarAuthorPromo(input: {
   workspaces: AuthorWorkspace[];
   applicationVariant: ProfileApplicationVariant | null;
+  roleLookupStatus?: AuthorRoleLookupStatus;
 }): boolean {
-  return resolveListenerAuthorCta(input).label !== "Кабинет автора";
+  if (input.roleLookupStatus === "unknown") {
+    return false;
+  }
+
+  return resolveListenerAuthorCta(input).label !== AUTHOR_CABINET_LABEL;
 }
 
 /**
  * Right-column author entry vs control panel are independent.
  * Staff without an author cabinet should not see become-author CTAs here.
+ * Unknown role lookup must not fall back to «Стать автором».
  */
 export function resolveShowAuthorEntry(input: {
   authorCtaLabel: string;
   showAdminPanel: boolean;
+  roleLookupStatus?: AuthorRoleLookupStatus;
 }): boolean {
-  if (input.authorCtaLabel === "Кабинет автора") {
+  if (input.authorCtaLabel === AUTHOR_CABINET_LABEL) {
     return true;
+  }
+  if (input.roleLookupStatus === "unknown") {
+    return false;
   }
   if (input.showAdminPanel) {
     return false;

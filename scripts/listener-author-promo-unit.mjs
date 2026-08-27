@@ -82,6 +82,34 @@ assertSidebarPromo(
 );
 assertSidebarPromo(null, workspace, false, "sidebar promo: active author");
 
+assert.equal(
+  resolveShowBecomeAuthorPromo({
+    workspaces: [],
+    applicationVariant: "none",
+    roleLookupStatus: "unknown",
+  }),
+  false,
+  "home promo: unknown role lookup hides become-author",
+);
+assert.equal(
+  resolveShowSidebarAuthorPromo({
+    workspaces: [],
+    applicationVariant: "none",
+    roleLookupStatus: "unknown",
+  }),
+  false,
+  "sidebar promo: unknown role lookup hides become-author",
+);
+assert.notEqual(
+  resolveListenerAuthorCta({
+    workspaces: [],
+    applicationVariant: "none",
+    roleLookupStatus: "unknown",
+  }).label,
+  "Стать автором",
+  "listener CTA: unknown role lookup is not become-author",
+);
+
 assert(
   sidebar.includes("showSidebarAuthorPromo"),
   "DesktopSidebar gates banner via showSidebarAuthorPromo",

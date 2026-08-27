@@ -12,6 +12,7 @@ import {
   resolveListenerAuthorCta,
   resolveShowAuthorEntry,
   resolveShowSidebarAuthorPromo,
+  type AuthorRoleLookupStatus,
   type ListenerAuthorCta,
 } from "@/lib/listener/author-cta";
 import { hasClaimedPersonalMaterials } from "@/lib/personal-materials/client-library/repository";
@@ -19,13 +20,28 @@ import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import { getDisplayName, getInitial } from "@/lib/profile/display-name";
 import { createClient } from "@/lib/supabase/server";
 
-export type { ListenerAuthorCta };
+export type { AuthorRoleLookupStatus, ListenerAuthorCta };
 export {
   resolveListenerAuthorCta,
   resolveShowAuthorEntry,
   resolveShowBecomeAuthorPromo,
   resolveShowSidebarAuthorPromo,
 } from "@/lib/listener/author-cta";
+
+type LookupResult<T> = { ok: true; value: T } | { ok: false; value: T };
+
+async function settleLookup<T>(
+  loader: () => Promise<T>,
+  fallback: T,
+  logLabel: string,
+): Promise<LookupResult<T>> {
+  try {
+    return { ok: true, value: await loader() };
+  } catch (error) {
+    console.error(logLabel, error);
+    return { ok: false, value: fallback };
+  }
+}
 
 export type ListenerShellData = {
   isAuthenticated: boolean;
@@ -85,25 +101,27 @@ async function loadListenerShellData(
     };
   }
 
-  const [profileResult, workspaces, application, showAdminPanel, showMyMaterialsNav, editorialAccess] =
+  const [profileResult, workspacesLookup, application, adminLookup, showMyMaterialsNav, editorialAccess] =
     await Promise.all([
       client
         .from("profiles")
         .select("full_name, avatar_path, avatar_url")
         .eq("id", user.id)
         .maybeSingle(),
-      listAuthorWorkspacesForUser(user.id).catch((error) => {
-        console.error("listener_shell_author_workspaces_error", error);
-        return [] as AuthorWorkspace[];
-      }),
+      settleLookup(
+        () => listAuthorWorkspacesForUser(user.id),
+        [] as AuthorWorkspace[],
+        "listener_shell_author_workspaces_error",
+      ),
       getCurrentAuthorApplication(client, user.id).catch((error) => {
         console.error("listener_shell_author_application_error", error);
         return null;
       }),
-      hasAdminPanelAccess(client, user.id).catch((error) => {
-        console.error("listener_shell_admin_panel_access_error", error);
-        return false;
-      }),
+      settleLookup(
+        () => hasAdminPanelAccess(client, user.id),
+        false,
+        "listener_shell_admin_panel_access_error",
+      ),
       hasClaimedPersonalMaterials(client).catch((error) => {
         console.error("listener_shell_my_materials_nav_error", error);
         return false;
@@ -123,6 +141,11 @@ async function loadListenerShellData(
       }),
     ]);
 
+  const workspaces = workspacesLookup.value;
+  const showAdminPanel = adminLookup.value;
+  const roleLookupStatus: AuthorRoleLookupStatus =
+    workspacesLookup.ok && adminLookup.ok ? "confirmed" : "unknown";
+
   if (profileResult.error) {
     console.error(
       "listener_shell_profile_load_error",
@@ -140,6 +163,7 @@ async function loadListenerShellData(
       workspaceCount: workspaces.length,
       applicationStatus: application?.status ?? null,
     }),
+    roleLookupStatus,
   };
   const authorCta = resolveListenerAuthorCta(authorInput);
 
@@ -153,6 +177,7 @@ async function loadListenerShellData(
     showAuthorEntry: resolveShowAuthorEntry({
       authorCtaLabel: authorCta.label,
       showAdminPanel,
+      roleLookupStatus,
     }),
     showAdminPanel,
     adminPanelHref: "/admin",
