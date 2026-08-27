@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MEDITATION_SOLUTIONS_CARDS } from "../src/lib/landings/25-meditation-solutions/content.ts";
+import { MEDITATION_SOLUTIONS_CARDS } from "../src/lib/landings/25-meditation-solutions/content";
 import {
   buildCoverFirstHeroSlides,
   buildPracticeHeroLightMeta,
@@ -11,7 +11,7 @@ import {
   isHeroPromoOfferActive,
   resolvePracticeHeroSubtitle,
   shouldRenderProductHeroSlider,
-} from "../src/lib/catalog/product-hero-gallery.ts";
+} from "../src/lib/catalog/product-hero-gallery";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
