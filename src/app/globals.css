@@ -581,6 +581,9 @@ html.catalog-sheet-lock body {
   .listener-catalog-content .catalog-product-grid {
     gap: 0.5rem; /* 8px, half of 1rem */
   }
+  .listener-playlists-catalog-content .catalog-product-grid {
+    gap: 0.5rem; /* 8px, half of 1rem */
+  }
 }
 
 .catalog-product-grid--fixed-2 {

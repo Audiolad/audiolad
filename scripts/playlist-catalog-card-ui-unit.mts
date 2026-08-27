@@ -156,6 +156,21 @@ assert.match(
   /@media \(min-width:\s*768px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*1rem;/,
   "768 grid stays 3 columns with 1rem gap",
 );
+assert.match(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);\s*\}\s*\.listener-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.5rem;/,
+  "desktop /catalog grid gap stays 0.5rem at 1280+",
+);
+assert.match(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);\s*\}\s*\.listener-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.5rem;[\s\S]*?\.listener-playlists-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.5rem;/,
+  "desktop /playlists/catalog grid gap is 0.5rem at 1280+",
+);
+assert.doesNotMatch(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{[^}]*gap:/,
+  "unscoped 1280 catalog-product-grid does not set gap",
+);
 
 assert.match(page, /PlaylistGrid/);
 assert.match(page, /PlaylistCatalogSearch/);
