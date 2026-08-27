@@ -10,6 +10,7 @@ type CatalogProductHeartButtonProps = {
   isAuthenticated: boolean;
   signInReturnPath: string;
   onSavedChange?: (saved: boolean) => void;
+  className?: string;
 };
 
 export default function CatalogProductHeartButton({
@@ -17,6 +18,7 @@ export default function CatalogProductHeartButton({
   isAuthenticated,
   signInReturnPath,
   onSavedChange,
+  className = "absolute top-2 right-2 z-10",
 }: CatalogProductHeartButtonProps) {
   const { isSaved, isPending, errorMessage, handleClick } = useCatalogLibrarySave({
     practiceId: product.id,
@@ -42,7 +44,7 @@ export default function CatalogProductHeartButton({
         aria-pressed={isSaved}
         aria-busy={isPending}
         onClick={onClick}
-        className={`absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-[18px] leading-none shadow-[0_4px_12px_rgba(36,19,63,0.28)] before:absolute before:-inset-1 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+        className={`${className} flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-[18px] leading-none shadow-[0_4px_12px_rgba(36,19,63,0.28)] before:absolute before:-inset-1 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
           isSaved ? "text-[#7042c5]" : "text-[#4b2f86]"
         }`}
       >

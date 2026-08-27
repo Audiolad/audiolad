@@ -43,6 +43,9 @@ export default function PracticeProductHero({
           heartProduct={toPracticeHeartProduct(viewModel)}
           isAuthenticated={viewModel.isAuthenticated}
           signInReturnPath={viewModel.practicePagePath}
+          shareTitle={viewModel.practice.title}
+          sharePath={viewModel.practicePagePath}
+          shareSubtitle={viewModel.subtitle}
         />
       }
     >
