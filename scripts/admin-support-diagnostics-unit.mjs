@@ -14,7 +14,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateAuthorSubmitEligibility } from "../src/lib/admin/author-submit-eligibility.ts";
-import { collectLayeredDiagnosticIssues } from "../src/lib/admin/product-diagnostics-shared.ts";
+import {
+  collectLayeredDiagnosticIssues,
+  evaluateModerationSubmitHeadline,
+} from "../src/lib/admin/product-diagnostics-shared.ts";
 import {
   buildAdminUsersProfileSearchOr,
   isAdminExactUuid,
@@ -99,11 +102,36 @@ function readinessPair(practice, audioItems, options) {
   return {
     tsReadiness,
     dbReadiness,
-    canSubmit: isReadyForModerationSubmit({
+    fieldsReady: isReadyForModerationSubmit({
       tsReady: tsReadiness.ok,
       dbReady: dbReadiness.ok,
     }),
   };
+}
+
+function headlineFor(
+  practice,
+  audioItems,
+  options,
+  eligibilityOverrides = {},
+) {
+  const pair = readinessPair(practice, audioItems, options);
+  const eligibility = evaluateAuthorSubmitEligibility({
+    status: practice.status,
+    moderationStatus: practice.moderation_status,
+    deletedAt: practice.deleted_at,
+    canBypassProductModeration: false,
+    accessStatus: options.accessStatus,
+    isFree: practice.is_free,
+    price: practice.price,
+    ...eligibilityOverrides,
+  });
+
+  return evaluateModerationSubmitHeadline({
+    tsReady: pair.tsReadiness.ok,
+    dbReady: pair.dbReadiness.ok,
+    eligibility,
+  });
 }
 
 // Search helpers
@@ -144,7 +172,7 @@ const ready = readinessPair(basePractice(), [baseAudio()], {
 });
 assert.equal(ready.tsReadiness.ok, true, "ready product passes TS readiness");
 assert.equal(ready.dbReadiness.ok, true, "ready product passes DB readiness");
-assert.equal(ready.canSubmit, true, "ready product can submit");
+assert.equal(ready.fieldsReady, true, "ready product passes field readiness");
 
 // Failed readiness: missing cover / audio / topics
 const missingCover = readinessPair(
@@ -157,7 +185,7 @@ assert.equal(
   missingCover.tsReadiness.requirements.find((item) => item.key === "cover")?.code,
   "missing_cover",
 );
-assert.equal(missingCover.canSubmit, false);
+assert.equal(missingCover.fieldsReady, false);
 
 const missingAudio = readinessPair(basePractice(), [], {
   accessStatus: "free",
@@ -170,7 +198,7 @@ assert.ok(
     (check) => check.code === "missing_audio" && !check.ok,
   ),
 );
-assert.equal(missingAudio.canSubmit, false);
+assert.equal(missingAudio.fieldsReady, false);
 
 const missingTopics = readinessPair(basePractice(), [baseAudio()], {
   accessStatus: "free",
@@ -178,7 +206,7 @@ const missingTopics = readinessPair(basePractice(), [baseAudio()], {
 });
 assert.equal(missingTopics.tsReadiness.ok, false);
 assert.equal(missingTopics.tsReadiness.firstFailure?.code, "topic_min_required");
-assert.equal(missingTopics.canSubmit, false);
+assert.equal(missingTopics.fieldsReady, false);
 
 // Paid product without commercial eligibility
 const paidFreeAuthor = readinessPair(
@@ -197,7 +225,7 @@ assert.ok(
     (check) => check.code === "commercial_eligibility_required" && !check.ok,
   ),
 );
-assert.equal(paidFreeAuthor.canSubmit, false);
+assert.equal(paidFreeAuthor.fieldsReady, false);
 
 const paidEligibility = evaluateAuthorSubmitEligibility({
   status: "draft",
@@ -225,7 +253,7 @@ assert.ok(
     (check) => check.code === "invalid_slug" && !check.ok,
   ),
 );
-assert.equal(invalidSlug.canSubmit, false, "combined ready must stay false");
+assert.equal(invalidSlug.fieldsReady, false, "combined field ready must stay false");
 
 // SQL-only: currency
 const usd = readinessPair(basePractice({ currency: "USD" }), [baseAudio()], {
@@ -234,7 +262,7 @@ const usd = readinessPair(basePractice({ currency: "USD" }), [baseAudio()], {
 });
 assert.equal(usd.tsReadiness.ok, true);
 assert.equal(usd.dbReadiness.ok, false);
-assert.equal(usd.canSubmit, false);
+assert.equal(usd.fieldsReady, false);
 
 // SQL-only: course with lessons/blocks and no flat audio
 const courseNoAudio = readinessPair(
@@ -260,7 +288,7 @@ assert.ok(
     (check) => check.code === "missing_audio" && !check.ok,
   ),
 );
-assert.equal(courseNoAudio.canSubmit, false);
+assert.equal(courseNoAudio.fieldsReady, false);
 
 // Submit UI eligibility
 const submitted = evaluateAuthorSubmitEligibility({
@@ -294,6 +322,126 @@ const suspended = evaluateAuthorSubmitEligibility({
 });
 assert.equal(suspended.action, "disabled");
 assert.equal(suspended.canEditPublicFields, false);
+
+const readyOptions = { accessStatus: "free", activeTopicCount: 1 };
+
+const draftHeadline = headlineFor(basePractice(), [baseAudio()], readyOptions);
+assert.equal(draftHeadline.answer, "ДА", "draft/not_submitted + ready -> DA");
+assert.equal(draftHeadline.canSubmitNow, true);
+assert.equal(draftHeadline.question, "Можно отправлять на модерацию");
+
+const changesHeadline = headlineFor(
+  basePractice({ moderation_status: "changes_requested" }),
+  [baseAudio()],
+  readyOptions,
+);
+assert.equal(changesHeadline.answer, "ДА", "changes_requested + ready -> DA");
+assert.equal(changesHeadline.question, "Можно повторно отправить на модерацию");
+
+const submittedHeadline = headlineFor(
+  basePractice({ moderation_status: "submitted" }),
+  [baseAudio()],
+  readyOptions,
+);
+assert.equal(submittedHeadline.answer, "НЕТ", "submitted + ready fields -> NET");
+assert.match(submittedHeadline.reason, /уже отправлен на модерацию/);
+
+const publishedHeadline = headlineFor(
+  basePractice({ status: "published", moderation_status: "approved" }),
+  [baseAudio()],
+  readyOptions,
+);
+assert.equal(publishedHeadline.answer, "НЕТ", "published + ready fields -> NET");
+assert.match(publishedHeadline.reason, /уже опубликован/);
+
+const unpublishedApprovedHeadline = headlineFor(
+  basePractice({ status: "unpublished", moderation_status: "approved" }),
+  [baseAudio()],
+  readyOptions,
+);
+assert.equal(
+  unpublishedApprovedHeadline.answer,
+  "НЕТ",
+  "unpublished+approved -> NET, RPC rejects that state",
+);
+assert.match(unpublishedApprovedHeadline.reason, /одобрен/);
+
+const deletedHeadline = headlineFor(
+  basePractice({ deleted_at: "2026-08-01T10:00:00.000Z" }),
+  [baseAudio()],
+  readyOptions,
+);
+assert.equal(deletedHeadline.answer, "НЕТ", "deleted -> NET");
+assert.match(deletedHeadline.reason, /удалён/);
+
+const suspendedHeadline = headlineFor(basePractice(), [baseAudio()], {
+  ...readyOptions,
+  accessStatus: "suspended",
+});
+assert.equal(suspendedHeadline.answer, "НЕТ", "suspended -> NET");
+assert.match(suspendedHeadline.reason, /приостановлен или завершён/);
+
+const terminatedHeadline = headlineFor(basePractice(), [baseAudio()], {
+  ...readyOptions,
+  accessStatus: "terminated",
+});
+assert.equal(terminatedHeadline.answer, "НЕТ", "terminated -> NET");
+assert.match(terminatedHeadline.reason, /приостановлен или завершён/);
+
+const bypassHeadline = headlineFor(
+  basePractice(),
+  [baseAudio()],
+  readyOptions,
+  { canBypassProductModeration: true },
+);
+assert.equal(
+  bypassHeadline.answer,
+  "НЕТ",
+  "bypass author must not show moderation submit as DA",
+);
+assert.match(bypassHeadline.reason, /Опубликовать/);
+assert.doesNotMatch(bypassHeadline.question + bypassHeadline.answer, /модерацию: ДА/);
+
+assert.equal(
+  headlineFor(
+    basePractice({ cover_url: null }),
+    [baseAudio()],
+    readyOptions,
+  ).answer,
+  "НЕТ",
+  "missing cover stays NET",
+);
+assert.equal(
+  headlineFor(basePractice(), [], readyOptions).answer,
+  "НЕТ",
+  "missing audio stays NET",
+);
+assert.equal(
+  headlineFor(basePractice(), [baseAudio()], {
+    accessStatus: "free",
+    activeTopicCount: 0,
+  }).answer,
+  "НЕТ",
+  "missing topics stays NET",
+);
+assert.equal(
+  headlineFor(
+    basePractice({ is_free: false, price: 990 }),
+    [baseAudio()],
+    readyOptions,
+  ).answer,
+  "НЕТ",
+  "paid without commercial eligibility stays NET",
+);
+assert.equal(
+  headlineFor(
+    basePractice({ slug: "Invalid Slug" }),
+    [baseAudio()],
+    readyOptions,
+  ).answer,
+  "НЕТ",
+  "SQL-only invalid slug stays NET",
+);
 
 const layered = collectLayeredDiagnosticIssues({
   submitEligibility: paidEligibility,
@@ -347,8 +495,11 @@ const diagnosticsPage = read(
 );
 assert.match(diagnosticsPage, /requireAdminPermission\("users\.view"\)/);
 assert.match(diagnosticsPage, /getAdminProductDiagnostics/);
+assert.match(diagnosticsPage, /submitHeadline/);
+assert.match(diagnosticsPage, /submitHeadline\.question/);
 assert.match(diagnosticsPage, /evaluatePublishReadiness/);
-assert.match(diagnosticsPage, /Можно отправлять на модерацию/);
+assert.match(diagnosticsPage, /submit_practice_for_moderation/);
+assert.match(diagnosticsPage, /Обход модерации/);
 assert.match(diagnosticsPage, /Database submission checks/);
 assert.match(diagnosticsPage, /Только чтение/);
 assert.doesNotMatch(diagnosticsPage, /approveAndPublishPractice/);
@@ -358,12 +509,24 @@ assert.doesNotMatch(diagnosticsPage, /createBrowserClient/);
 
 const diagnosticsShared = read("src/lib/admin/product-diagnostics-shared.ts");
 assert.match(diagnosticsShared, /collectLayeredDiagnosticIssues/);
+assert.match(diagnosticsShared, /evaluateModerationSubmitHeadline/);
+assert.match(diagnosticsShared, /Можно отправлять на модерацию/);
+assert.match(diagnosticsShared, /Можно повторно отправить на модерацию/);
+assert.match(diagnosticsShared, /canSubmitByLifecycle/);
+assert.match(diagnosticsShared, /canMutateContent/);
+assert.doesNotMatch(
+  diagnosticsShared,
+  /action === "publish"[\s\S]*canSubmitNow: true/,
+);
 
 const diagnosticsQuery = read("src/lib/admin/product-diagnostics.ts");
 assert.match(diagnosticsQuery, /createServiceRoleClient/);
 assert.match(diagnosticsQuery, /evaluatePublishReadiness/);
 assert.match(diagnosticsQuery, /evaluateDatabaseModerationReady/);
 assert.match(diagnosticsQuery, /evaluateAuthorSubmitEligibility/);
+assert.match(diagnosticsQuery, /evaluateModerationSubmitHeadline/);
+assert.match(diagnosticsQuery, /submitHeadline\.canSubmitNow/);
+assert.doesNotMatch(diagnosticsQuery, /isReadyForModerationSubmit/);
 assert.doesNotMatch(diagnosticsQuery, /submit_practice_for_moderation/);
 assert.doesNotMatch(diagnosticsQuery, /approve_and_publish_practice/);
 assert.doesNotMatch(diagnosticsQuery, /from\("user_practices"\)/);

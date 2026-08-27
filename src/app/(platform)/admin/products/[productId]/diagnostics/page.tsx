@@ -104,18 +104,23 @@ export default async function AdminProductDiagnosticsPage({
 
       <div
         className={`rounded-[22px] border p-5 ${
-          diagnostics.canSubmitToModeration
+          diagnostics.submitHeadline.canSubmitNow
             ? "border-[#cfe8d6] bg-[#f4fbf6]"
             : "border-[#efc7cf] bg-[#fff8f9]"
         }`}
       >
         <p className="text-sm font-semibold text-[#25135c]">
-          Можно отправлять на модерацию:{" "}
-          {diagnostics.canSubmitToModeration ? "ДА" : "НЕТ"}
+          {diagnostics.submitHeadline.question}:{" "}
+          {diagnostics.submitHeadline.answer}
         </p>
-        <p className="mt-1 text-sm text-[#796ba0]">
-          Итог = evaluatePublishReadiness и проверки
-          assert_practice_moderation_ready. Ложное READY запрещено.
+        <p className="mt-1 text-sm text-[#25135c]">
+          {diagnostics.submitHeadline.reason}
+        </p>
+        <p className="mt-2 text-sm text-[#796ba0]">
+          Итог = evaluatePublishReadiness, проверки
+          assert_practice_moderation_ready, жизненный цикл
+          submit_practice_for_moderation и доступность кнопки в форме автора.
+          Обход модерации («Опубликовать») не считается отправкой на модерацию.
         </p>
       </div>
 

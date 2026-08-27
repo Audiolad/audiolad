@@ -1,12 +1,13 @@
 import { evaluateAuthorSubmitEligibility } from "@/lib/admin/author-submit-eligibility";
 import {
   collectLayeredDiagnosticIssues,
+  evaluateModerationSubmitHeadline,
   type AdminProductLayeredIssue,
+  type ModerationSubmitHeadline,
 } from "@/lib/admin/product-diagnostics-shared";
 import { isAdminExactUuid } from "@/lib/admin/users-search";
 import {
   evaluateDatabaseModerationReady,
-  isReadyForModerationSubmit,
   type DatabaseModerationReadyResult,
 } from "@/lib/author-products/database-moderation-ready";
 import {
@@ -90,6 +91,7 @@ export type AdminProductDiagnostics = {
   tsReadiness: PublishReadinessResult;
   dbReadiness: DatabaseModerationReadyResult;
   canSubmitToModeration: boolean;
+  submitHeadline: ModerationSubmitHeadline;
   submitEligibility: ReturnType<typeof evaluateAuthorSubmitEligibility>;
   layeredIssues: AdminProductLayeredIssue[];
 };
@@ -276,6 +278,11 @@ export async function getAdminProductDiagnostics(
   });
 
   const publicationClass = parsePublicationClass(practice.publication_class);
+  const submitHeadline = evaluateModerationSubmitHeadline({
+    tsReady: tsReadiness.ok,
+    dbReady: dbReadiness.ok,
+    eligibility: submitEligibility,
+  });
 
   return {
     practice,
@@ -311,10 +318,8 @@ export async function getAdminProductDiagnostics(
       : null,
     tsReadiness,
     dbReadiness,
-    canSubmitToModeration: isReadyForModerationSubmit({
-      tsReady: tsReadiness.ok,
-      dbReady: dbReadiness.ok,
-    }),
+    canSubmitToModeration: submitHeadline.canSubmitNow,
+    submitHeadline,
     submitEligibility,
     layeredIssues: collectLayeredDiagnosticIssues({
       submitEligibility,
