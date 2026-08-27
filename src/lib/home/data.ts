@@ -28,7 +28,7 @@ import {
   loadAudioSummaryMap,
   takeUniqueProducts,
 } from "./listening-progress";
-import { safeHomeSection } from "./safe";
+import { safeHomeSection, safeHomeSectionResult } from "./safe";
 import type {
   GuestHomeData,
   HomeAuthor,
@@ -252,7 +252,7 @@ export async function getPersonalHomeData(
     activePrograms,
     forYouProducts,
     authors,
-    authorWorkspaces,
+    authorWorkspacesResult,
     authorApplication,
   ] = await Promise.all([
     safeHomeSection(
@@ -303,7 +303,7 @@ export async function getPersonalHomeData(
       [],
       { userId },
     ),
-    safeHomeSection(
+    safeHomeSectionResult(
       "personal_author_workspaces",
       () => listAuthorWorkspacesForUser(userId),
       [],
@@ -317,6 +317,8 @@ export async function getPersonalHomeData(
     ),
   ]);
 
+  const authorWorkspaces = authorWorkspacesResult.value;
+
   const applicationVariant = resolveProfileApplicationVariant({
     workspaceCount: authorWorkspaces.length,
     applicationStatus: authorApplication?.status ?? null,
@@ -325,6 +327,7 @@ export async function getPersonalHomeData(
   const showBecomeAuthorPromo = resolveShowBecomeAuthorPromo({
     workspaces: authorWorkspaces,
     applicationVariant,
+    roleLookupStatus: authorWorkspacesResult.ok ? "confirmed" : "unknown",
   });
 
   const shownIds = new Set<string>();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isAnalyticsBestEffortRpcError } from "@/lib/analytics/rpc-errors";
 import { sanitizeAnalyticsString, sanitizeAnalyticsTrackId } from "@/lib/promo/analytics-events";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
@@ -38,6 +39,12 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("analytics_session_link_error", error.message);
+    if (isAnalyticsBestEffortRpcError(error)) {
+      return NextResponse.json(
+        { linked: false, deferred: true },
+        { status: 200 },
+      );
+    }
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 

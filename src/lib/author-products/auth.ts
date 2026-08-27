@@ -115,11 +115,16 @@ export async function listAuthorWorkspacesForUser(
     throw new AuthorAccessError("internal_error", 500);
   }
 
-  const actorCanBypass = await hasPermission(
-    supabase,
-    userId,
-    "author_products.moderate",
-  );
+  let actorCanBypass = false;
+  try {
+    actorCanBypass = await hasPermission(
+      supabase,
+      userId,
+      "author_products.moderate",
+    );
+  } catch (permissionError) {
+    console.error("author_workspaces_permission_error", permissionError);
+  }
 
   const workspaces: AuthorWorkspace[] = [];
 

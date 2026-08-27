@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isAnalyticsBestEffortRpcError } from "@/lib/analytics/rpc-errors";
 import { sanitizeAnalyticsString, sanitizeAnalyticsTrackId } from "@/lib/promo/analytics-events";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
@@ -46,10 +47,27 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("analytics_signup_complete_error", error.message);
+    if (isAnalyticsBestEffortRpcError(error)) {
+      return NextResponse.json(
+        { recorded: false, reason: "lock_timeout", deferred: true },
+        { status: 200 },
+      );
+    }
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   const result = (data ?? {}) as { recorded?: boolean; reason?: string };
+
+  if (result.reason === "lock_timeout") {
+    return NextResponse.json(
+      {
+        recorded: false,
+        reason: "lock_timeout",
+        deferred: true,
+      },
+      { status: 200 },
+    );
+  }
 
   return NextResponse.json(
     {

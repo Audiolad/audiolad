@@ -73,17 +73,31 @@ export function logHomeSectionError(
   });
 }
 
+export type SafeHomeSectionResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; value: T };
+
 export async function safeHomeSection<T>(
   section: string,
   loader: () => Promise<T>,
   fallback: T,
   context?: Record<string, unknown>,
 ): Promise<T> {
+  const result = await safeHomeSectionResult(section, loader, fallback, context);
+  return result.value;
+}
+
+export async function safeHomeSectionResult<T>(
+  section: string,
+  loader: () => Promise<T>,
+  fallback: T,
+  context?: Record<string, unknown>,
+): Promise<SafeHomeSectionResult<T>> {
   try {
-    return await loader();
+    return { ok: true, value: await loader() };
   } catch (error) {
     logHomeSectionError(section, error, context);
-    return fallback;
+    return { ok: false, value: fallback };
   }
 }
 

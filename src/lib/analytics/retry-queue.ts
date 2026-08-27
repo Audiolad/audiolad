@@ -1,3 +1,5 @@
+import { isAnalyticsPoolExhaustionStatus } from "@/lib/analytics/rpc-errors";
+
 export const RETRY_QUEUE_KEY = "audiolad_analytics_retry_queue";
 const RETRY_TTL_MS = 48 * 60 * 60 * 1000;
 const MAX_QUEUE_ITEMS = 100;
@@ -5,6 +7,15 @@ const MAX_ATTEMPTS = 8;
 const LOCK_NAME = "audiolad-analytics-retry-queue";
 const LOCK_FALLBACK_KEY = "audiolad_analytics_retry_queue_lock";
 const LOCK_FALLBACK_TTL_MS = 15_000;
+
+/** Exponential backoff so a 5xx/504 storm cannot replay the whole queue on every render. */
+export const ANALYTICS_RETRY_BACKOFF_MS = [
+  15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000,
+] as const;
+
+export const ANALYTICS_POOL_CIRCUIT_BREAK_MS = 30_000;
+
+let poolCircuitUntil = 0;
 
 export type AnalyticsRetryItem = {
   id: string;
@@ -21,12 +32,58 @@ export type AnalyticsRetryEnqueueInput = {
   url: string;
   body: unknown;
   createdAt?: number;
+  lastAttemptAt?: number | null;
 };
 
 export type AnalyticsRetrySendResult = {
   ok: boolean;
   retry?: boolean;
+  status?: number;
 };
+
+export function analyticsRetryBackoffMs(
+  attempts: number,
+  poolExhausted = false,
+): number {
+  const index = Math.min(
+    Math.max(attempts, 0),
+    ANALYTICS_RETRY_BACKOFF_MS.length - 1,
+  );
+  const base = ANALYTICS_RETRY_BACKOFF_MS[index]!;
+  return poolExhausted ? Math.max(base, ANALYTICS_POOL_CIRCUIT_BREAK_MS) : base;
+}
+
+export function shouldDeferAnalyticsRetry(
+  item: Pick<AnalyticsRetryItem, "attempts" | "lastAttemptAt">,
+  now: number,
+  circuitUntil: number = poolCircuitUntil,
+): boolean {
+  if (now < circuitUntil) {
+    return true;
+  }
+
+  if (item.lastAttemptAt == null) {
+    return false;
+  }
+
+  return now - item.lastAttemptAt < analyticsRetryBackoffMs(item.attempts);
+}
+
+export function getAnalyticsRetryPoolCircuitUntil(): number {
+  return poolCircuitUntil;
+}
+
+export function tripAnalyticsRetryPoolCircuit(
+  now: number = Date.now(),
+  holdMs: number = ANALYTICS_POOL_CIRCUIT_BREAK_MS,
+): number {
+  poolCircuitUntil = Math.max(poolCircuitUntil, now + holdMs);
+  return poolCircuitUntil;
+}
+
+export function resetAnalyticsRetryPoolCircuit(): void {
+  poolCircuitUntil = 0;
+}
 
 export type AnalyticsRetrySendFn = (
   item: AnalyticsRetryItem,
@@ -128,8 +185,8 @@ export function enqueueAnalyticsRetry(item: AnalyticsRetryEnqueueInput): void {
     url: item.url,
     body: item.body,
     createdAt: item.createdAt ?? Date.now(),
-    attempts: 0,
-    lastAttemptAt: null,
+    attempts: item.lastAttemptAt == null ? 0 : 1,
+    lastAttemptAt: item.lastAttemptAt ?? null,
   };
 
   items.push(next);
@@ -204,7 +261,14 @@ export async function flushAnalyticsRetryQueue(
 
     const remaining: AnalyticsRetryItem[] = [];
 
+    const now = Date.now();
+
     for (const item of items) {
+      if (shouldDeferAnalyticsRetry(item, now)) {
+        remaining.push(item);
+        continue;
+      }
+
       try {
         const result = await sendFn(item);
 
@@ -214,6 +278,11 @@ export async function flushAnalyticsRetryQueue(
 
         const attempts = item.attempts + 1;
         const permanentFailure = result.retry === false || attempts >= MAX_ATTEMPTS;
+        const status = typeof result.status === "number" ? result.status : 0;
+
+        if (isAnalyticsPoolExhaustionStatus(status)) {
+          tripAnalyticsRetryPoolCircuit(Date.now());
+        }
 
         remaining.push({
           ...item,

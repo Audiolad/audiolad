@@ -3,6 +3,10 @@
 import { useEffect } from "react";
 
 import {
+  shouldLinkAnalyticsSessionOnAuthEvent,
+  shouldRecordSignupCompletedOnAuthEvent,
+} from "@/lib/analytics/auth-link";
+import {
   linkAnalyticsSessionUser,
   recordPlatformSignupCompleted,
 } from "@/lib/analytics/client";
@@ -12,12 +16,6 @@ export default function AnalyticsAuthLinker() {
   useEffect(() => {
     const supabase = createClient();
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        void linkAnalyticsSessionUser();
-      }
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -25,9 +23,13 @@ export default function AnalyticsAuthLinker() {
         return;
       }
 
-      void linkAnalyticsSessionUser();
+      // TOKEN_REFRESHED / USER_UPDATED must not hit analytics RPCs.
+      // A separate session read is omitted because it doubled INITIAL_SESSION.
+      if (shouldLinkAnalyticsSessionOnAuthEvent(event)) {
+        void linkAnalyticsSessionUser();
+      }
 
-      if (event === "SIGNED_IN") {
+      if (shouldRecordSignupCompletedOnAuthEvent(event)) {
         void recordPlatformSignupCompleted();
       }
     });
