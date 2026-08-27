@@ -93,7 +93,7 @@
     "test:author-status-page": "npx tsx scripts/author-status-page-unit.mjs",
     "test:free-author-first-step": "npx tsx scripts/free-author-first-step-unit.mjs",
     "test:author-opportunities-hub": "npx tsx scripts/author-opportunities-hub-unit.mjs",
-    "test:author-contacts": "npx tsx scripts/author-contacts-unit.mjs",
+    "test:author-contacts": "npx tsx scripts/author-contacts-unit.mjs && node scripts/author-contacts-sql-unit.mjs",
     "test:quick-offers": "npx tsx scripts/quick-offers-unit.mjs",
     "test:retired-meditation-solutions-landing": "npx tsx scripts/retired-meditation-solutions-landing-unit.mts",
     "test:listener-welcome": "npx tsx scripts/listener-welcome-unit.mts",

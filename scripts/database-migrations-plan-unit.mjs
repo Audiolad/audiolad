@@ -291,7 +291,7 @@ function testRepoOneFileOneVersion() {
   );
   assert.ok(
     listed.files.some(
-      (row) => row.filename === "20260830120000_author_contacts.sql",
+      (row) => row.filename === "20260827180000_author_contacts.sql",
     ),
   );
 }
@@ -339,9 +339,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260826120000",
     "20260826180000",
     "20260827120000",
+    "20260827180000",
     "20260828120000",
     "20260829120000",
-    "20260830120000",
   ]);
   assert.equal(plan.database_migrations_pending, 16);
 }
@@ -368,9 +368,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260826120000",
     "20260826180000",
     "20260827120000",
+    "20260827180000",
     "20260828120000",
     "20260829120000",
-    "20260830120000",
   ]);
   assert.equal(plan.database_migrations_pending, 10);
 }

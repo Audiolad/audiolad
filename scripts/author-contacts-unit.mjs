@@ -16,8 +16,11 @@ import {
 } from "../src/lib/authors/constants.ts";
 import {
   collectAuthorContactSameAs,
+  contactsFromProfile,
+  draftsToContactPayload,
   resolveAuthorContactIconUrl,
   selectVisibleAuthorContacts,
+  toSafeAuthorContactHref,
 } from "../src/lib/authors/contacts.ts";
 import {
   getAuthorContactDescriptionError,
@@ -79,7 +82,15 @@ function testUrlValidation() {
   assert(normalizeAuthorContactUrl("javascript:alert(1)") === null, "javascript rejected");
   assert(normalizeAuthorContactUrl("http://t.me/sergey") === null, "http rejected");
   assert(normalizeAuthorContactUrl("data:text/html,hi") === null, "data rejected");
+  assert(normalizeAuthorContactUrl("vbscript:msgbox(1)") === null, "vbscript rejected");
+  assert(normalizeAuthorContactUrl("https://user:pass@evil.test") === null, "userinfo rejected");
   assert(normalizeAuthorContactUrl("") === null, "empty rejected");
+  assert(toSafeAuthorContactHref("javascript:alert(1)") === null, "public href rejects javascript");
+  assert(toSafeAuthorContactHref("data:text/html,hi") === null, "public href rejects data");
+  assert(
+    toSafeAuthorContactHref("https://t.me/sergey") === "https://t.me/sergey",
+    "public href keeps https",
+  );
 }
 
 function testDescriptionLimit() {
@@ -215,6 +226,79 @@ function testPublicVisibilityAndEmptyState() {
     },
   ]);
   assert(withoutDescription[0].description === null, "empty description stays null");
+
+  const dangerousDropped = selectVisibleAuthorContacts([
+    {
+      id: CUSTOM_ID,
+      platform: "custom",
+      title: "Evil",
+      description: null,
+      url: "javascript:alert(1)",
+      iconUrl: null,
+      iconPath: null,
+      sortOrder: 0,
+      isVisible: true,
+    },
+  ]);
+  assert(dangerousDropped.length === 0, "unsafe href never reaches public cards");
+
+  const longTitle = selectVisibleAuthorContacts([
+    {
+      id: TELEGRAM_ID,
+      platform: "telegram",
+      title: "Очень длинное название контакта которое должно переноситься на узком экране",
+      description: "а".repeat(120),
+      url: "https://t.me/sergey",
+      iconUrl: null,
+      iconPath: null,
+      sortOrder: 0,
+      isVisible: true,
+    },
+  ]);
+  assert(longTitle[0].description?.length === 120, "exact 120 description kept");
+}
+
+function testCabinetPersistRoundtrip() {
+  const firstSave = normalizeAuthorContacts([
+    contactInput({
+      title: "Telegram-канал",
+      description: "Новые практики",
+      url: "https://t.me/sergey",
+      isVisible: true,
+    }),
+    contactInput({
+      id: MAX_ID,
+      platform: "max",
+      title: "MAX",
+      url: "https://max.ru/sergey",
+      isVisible: false,
+    }),
+    contactInput({
+      id: CUSTOM_ID,
+      platform: "custom",
+      title: "RuTube",
+      url: "https://rutube.ru/channel/1",
+      iconUrl: "https://cdn.example/icon.webp",
+      iconPath: "authors/a/contacts/c/lg.webp",
+      isVisible: true,
+    }),
+  ]);
+
+  const drafts = contactsFromProfile(
+    firstSave.map((contact, index) => ({
+      ...contact,
+      sortOrder: index,
+    })),
+  );
+  const reloaded = normalizeAuthorContacts(draftsToContactPayload(drafts));
+
+  assert(reloaded?.length === 3, "reload keeps all contacts");
+  assert(reloaded[0].title === "Telegram-канал", "title persists");
+  assert(reloaded[0].description === "Новые практики", "description persists");
+  assert(reloaded[1].isVisible === false, "hidden flag persists");
+  assert(reloaded[2].iconUrl?.includes("icon.webp"), "custom icon persists");
+  assert(reloaded[0].url === "https://t.me/sergey", "url persists");
+  assert(reloaded.map((item) => item.id).join(",") === firstSave.map((item) => item.id).join(","), "order persists");
 }
 
 function testIconsAndSameAs() {
@@ -276,7 +360,7 @@ function testLocalStandardIconsExist() {
 }
 
 function testMigrationAndRls() {
-  const migration = read("supabase/migrations/20260830120000_author_contacts.sql");
+  const migration = read("supabase/migrations/20260827180000_author_contacts.sql");
 
   assert(migration.includes("CREATE TABLE IF NOT EXISTS public.author_contacts"), "table");
   assert(migration.includes("platform"), "platform column");
@@ -368,6 +452,9 @@ function testPublicPageUi() {
   assert(section.includes("flex-1"), "text sits to the right of icon");
   assert(!section.includes("max-w-["), "no fixed max width that clips");
   assert(!section.includes("w-[320px]"), "no fixed card width");
+  assert(section.includes("focus-visible:outline"), "keyboard focus ring");
+  assert(section.includes("<a"), "whole card is the link");
+  assert(!section.includes("overflow-x-scroll"), "no horizontal scroll container");
 }
 
 function testImagePipelineExtension() {
@@ -378,6 +465,10 @@ function testImagePipelineExtension() {
   assert(types.includes("author-contact-icon"), "image profile added");
   assert(profiles.includes("author-contact-icon"), "profile config added");
   assert(paths.includes("authors/${authorId}/contacts/${contactId}"), "storage path under author-assets");
+  const iconRoute = read("src/app/api/author/profile/contact-icon/route.ts");
+  assert(iconRoute.includes("requireAuthorMutationMembership"), "icon upload membership-gated");
+  assert(iconRoute.includes("cleanupImageManifest"), "replacing icon cleans previous variants");
+  assert(iconRoute.includes("authorId, contactId"), "icon path scoped to author + contact");
 }
 
 const tests = [
@@ -386,6 +477,7 @@ const tests = [
   ["description 120 limit", testDescriptionLimit],
   ["normalize scenarios", testNormalizeContactsScenarios],
   ["public visibility", testPublicVisibilityAndEmptyState],
+  ["cabinet persist roundtrip", testCabinetPersistRoundtrip],
   ["icons and sameAs", testIconsAndSameAs],
   ["local standard icons", testLocalStandardIconsExist],
   ["migration and RLS", testMigrationAndRls],

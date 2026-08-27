@@ -45,6 +45,18 @@ export type AuthorPublicContact = {
   openInNewTab: boolean;
 };
 
+export type AuthorContactDraft = {
+  id: string;
+  platform: AuthorContactPlatform;
+  title: string;
+  description: string;
+  url: string;
+  iconUrl: string | null;
+  iconPath: string | null;
+  iconImage: unknown;
+  isVisible: boolean;
+};
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -63,6 +75,77 @@ export function isAuthorContactId(value: unknown): value is string {
 
 export function isMailtoContactUrl(url: string): boolean {
   return url.trim().toLowerCase().startsWith("mailto:");
+}
+
+export function toSafeAuthorContactHref(url: unknown): string | null {
+  if (typeof url !== "string") {
+    return null;
+  }
+
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (
+    !trimmed ||
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("vbscript:") ||
+    lower.startsWith("file:") ||
+    lower.startsWith("http:")
+  ) {
+    return null;
+  }
+
+  if (lower.startsWith("mailto:")) {
+    return /^mailto:[^\s@/?#]+@[^\s@/?#]+\.[^\s@/?#]+$/i.test(trimmed)
+      ? trimmed
+      : null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (
+      parsed.protocol !== "https:" ||
+      !parsed.hostname.trim() ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function contactsFromProfile(
+  contacts: AuthorProfileContact[],
+): AuthorContactDraft[] {
+  return contacts.map((contact) => ({
+    id: contact.id,
+    platform: contact.platform,
+    title: contact.title,
+    description: contact.description ?? "",
+    url: contact.url,
+    iconUrl: contact.iconUrl,
+    iconPath: contact.iconPath,
+    iconImage: contact.iconImage ?? null,
+    isVisible: contact.isVisible,
+  }));
+}
+
+export function draftsToContactPayload(contacts: AuthorContactDraft[]) {
+  return contacts.map((contact) => ({
+    id: contact.id,
+    platform: contact.platform,
+    title: contact.title,
+    description: contact.description,
+    url: contact.url,
+    iconUrl: contact.iconUrl,
+    iconPath: contact.iconPath,
+    iconImage: contact.iconImage,
+    isVisible: contact.isVisible,
+  }));
 }
 
 export function resolveAuthorContactIconUrl(
@@ -101,15 +184,21 @@ export function mapAuthorContactRow(
 
 export function toAuthorPublicContact(
   contact: AuthorProfileContact,
-): AuthorPublicContact {
+): AuthorPublicContact | null {
+  const href = toSafeAuthorContactHref(contact.url);
+
+  if (!href) {
+    return null;
+  }
+
   return {
     platform: contact.platform,
     platformLabel: AUTHOR_CONTACT_PLATFORM_PUBLIC_LABELS[contact.platform],
     title: contact.title,
     description: contact.description,
-    url: contact.url,
+    url: href,
     iconUrl: resolveAuthorContactIconUrl(contact.platform, contact.iconUrl),
-    openInNewTab: !isMailtoContactUrl(contact.url),
+    openInNewTab: !isMailtoContactUrl(href),
   };
 }
 
@@ -118,7 +207,8 @@ export function selectVisibleAuthorContacts(
 ): AuthorPublicContact[] {
   return contacts
     .filter((contact) => contact.isVisible)
-    .map(toAuthorPublicContact);
+    .map(toAuthorPublicContact)
+    .filter((contact): contact is AuthorPublicContact => contact !== null);
 }
 
 export function collectAuthorContactSameAs(

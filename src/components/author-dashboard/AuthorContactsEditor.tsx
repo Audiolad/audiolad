@@ -11,21 +11,11 @@ import {
 } from "@/lib/authors/constants";
 import {
   resolveAuthorContactIconUrl,
-  type AuthorProfileContact,
+  type AuthorContactDraft,
 } from "@/lib/authors/contacts";
 import { listAuthorContactPlatforms } from "@/lib/authors/contacts-validation";
 
-export type AuthorContactDraft = {
-  id: string;
-  platform: AuthorContactPlatform;
-  title: string;
-  description: string;
-  url: string;
-  iconUrl: string | null;
-  iconPath: string | null;
-  iconImage: unknown;
-  isVisible: boolean;
-};
+export type { AuthorContactDraft };
 
 type AuthorContactsEditorProps = {
   authorId: string;
@@ -52,22 +42,6 @@ function createContactDraft(platform: AuthorContactPlatform): AuthorContactDraft
     iconImage: null,
     isVisible: true,
   };
-}
-
-export function contactsFromProfile(
-  contacts: AuthorProfileContact[],
-): AuthorContactDraft[] {
-  return contacts.map((contact) => ({
-    id: contact.id,
-    platform: contact.platform,
-    title: contact.title,
-    description: contact.description ?? "",
-    url: contact.url,
-    iconUrl: contact.iconUrl,
-    iconPath: contact.iconPath,
-    iconImage: contact.iconImage ?? null,
-    isVisible: contact.isVisible,
-  }));
 }
 
 export default function AuthorContactsEditor({

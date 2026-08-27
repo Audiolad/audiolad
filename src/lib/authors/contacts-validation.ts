@@ -6,7 +6,11 @@ import {
   MAX_AUTHOR_CONTACT_URL_LENGTH,
   type AuthorContactPlatform,
 } from "./constants";
-import { isAuthorContactId, isAuthorContactPlatform } from "./contacts";
+import {
+  isAuthorContactId,
+  isAuthorContactPlatform,
+  toSafeAuthorContactHref,
+} from "./contacts";
 
 export type NormalizedAuthorContact = {
   id: string;
@@ -103,33 +107,7 @@ export function normalizeAuthorContactUrl(value: unknown): string | null {
     return null;
   }
 
-  if (lower.startsWith("mailto:")) {
-    const email = trimmed.slice("mailto:".length).trim();
-
-    if (!/^[^\s@/?#]+@[^\s@/?#]+\.[^\s@/?#]+$/.test(email)) {
-      return null;
-    }
-
-    return `mailto:${email}`;
-  }
-
-  let parsed: URL;
-
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    return null;
-  }
-
-  if (parsed.protocol !== "https:") {
-    return null;
-  }
-
-  if (!parsed.hostname.trim() || parsed.username || parsed.password) {
-    return null;
-  }
-
-  return parsed.toString();
+  return toSafeAuthorContactHref(trimmed);
 }
 
 export function getAuthorContactTitleError(value: string): string | null {

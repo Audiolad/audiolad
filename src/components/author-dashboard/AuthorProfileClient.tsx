@@ -39,10 +39,12 @@ import AuthorAvatarUploadBlock from "./AuthorAvatarUploadBlock";
 import AuthorBannerUploadBlock, {
   readBannerPositionFromProfileRow,
 } from "./AuthorBannerUploadBlock";
-import AuthorContactsEditor, {
+import {
   contactsFromProfile,
+  draftsToContactPayload,
   type AuthorContactDraft,
-} from "./AuthorContactsEditor";
+} from "@/lib/authors/contacts";
+import AuthorContactsEditor from "./AuthorContactsEditor";
 
 type PublishedProductOption = {
   id: string;
@@ -237,17 +239,7 @@ export default function AuthorProfileClient({
           full_bio: fullBio.trim() || null,
           topic_keys: topicKeys,
           featured_product_ids: featuredProductIds,
-          contacts: contacts.map((contact) => ({
-            id: contact.id,
-            platform: contact.platform,
-            title: contact.title,
-            description: contact.description,
-            url: contact.url,
-            iconUrl: contact.iconUrl,
-            iconPath: contact.iconPath,
-            iconImage: contact.iconImage,
-            isVisible: contact.isVisible,
-          })),
+          contacts: draftsToContactPayload(contacts),
         }),
       });
 
