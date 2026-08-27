@@ -763,7 +763,9 @@ html.catalog-sheet-lock body {
 
   .featured-card--guest .featured-card__cover {
     width: min(56%, 360px);
+    flex: 0 0 min(56%, 360px);
     aspect-ratio: 1 / 1;
+    align-self: flex-start;
     border-radius: 28px 0 0 28px;
     background-color: #ffffff;
   }
