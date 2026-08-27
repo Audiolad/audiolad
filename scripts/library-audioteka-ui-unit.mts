@@ -193,19 +193,25 @@ function testCollectionFilters() {
   assert.equal(isLibraryFilterId("downloaded"), true);
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const chrome = read("src/components/my-practices/MyPracticesLibraryChrome.tsx");
   const filters = read("src/components/my-practices/MyPracticesLibraryFilters.tsx");
   const search = read("src/components/my-practices/MyPracticesLibrarySearch.tsx");
   const page = read(
     "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
   );
+  const layout = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/layout.tsx",
+  );
   const mobileHeader = read("src/components/listener/LibraryMobileHeader.tsx");
   const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
 
-  assert.match(library, /MyPracticesLibrarySearch/);
-  assert.match(library, /MyPracticesLibraryFilters/);
+  assert.match(chrome, /MyPracticesLibrarySearch/);
+  assert.match(chrome, /MyPracticesLibraryFilters/);
   assert.match(library, /MyPracticesLibrarySort/);
   assert.match(library, /buildMyPracticesHref/);
+  assert.match(chrome, /buildMyPracticesHref/);
   assert.match(library, /scroll:\s*false/);
+  assert.match(chrome, /scroll:\s*false/);
   assert.doesNotMatch(library, /Мои записи/);
   assert.doesNotMatch(library, /В библиотеке/);
   assert.doesNotMatch(library, /overflow-x-auto px-5 pb-2/);
@@ -224,14 +230,40 @@ function testCollectionFilters() {
   assert.doesNotMatch(filters, /topic=|access=/);
   assert.doesNotMatch(filters, /CatalogMobileFilters|buildCatalogHref/);
 
+  assert.match(layout, /MyPracticesLibraryChrome/);
   assert.match(
-    page,
-    /Всё, что вы сохранили, купили, получили или добавили/,
+    chrome,
+    /Всё, что вы сохранили, купили, добавили\./,
   );
-  assert.match(page, /Аудиотека/);
+  assert.match(chrome, /Аудиотека/);
   assert.match(
     mobileHeader,
-    /Всё, что вы сохранили, купили, получили или добавили/,
+    /Всё, что вы сохранили, купили, добавили\./,
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[\s\S]*className="mt-3 px-5"/,
+    "mobile search row gap under subtitle is mt-3 (12px)",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search-spacer[\s\S]*className="mt-3 px-5"/,
+    "invisible spacer clones the same mt-3 search-row gap",
+  );
+  assert.match(
+    chrome,
+    /<p className="mt-1 text-sm text-\[#7d70a2\]">[\s\S]*?<div className="mt-3">/,
+    "desktop search row gap under subtitle is mt-3 (12px)",
+  );
+  assert.doesNotMatch(chrome, /className="mt-6(?: px-5)?"/);
+  assert.doesNotMatch(
+    mobileHeader,
+    /получили или добавили/,
+  );
+  assert.doesNotMatch(
+    layout,
+    /Всё, что вы сохранили, купили, добавили\./,
+    "layout no longer paints desktop subtitle inside the page slot",
   );
   assert.doesNotMatch(page, /Ваши подарки, купленные и личные материалы/);
   assert.doesNotMatch(mobileHeader, /Ваши подарки и купленные материалы/);
@@ -240,6 +272,8 @@ function testCollectionFilters() {
     shellSearch,
     /pathname === ["']\/my-practices["'] \|\| pathname\.startsWith\(["']\/my-practices\//,
   );
+  assert.match(shellSearch, /MyPracticesLibraryChrome/);
+  assert.match(shellSearch, /surface=["']desktop["']/);
   assert.match(shellSearch, /PlatformSearchCombobox/);
   assert.match(shellSearch, /isPublicPlaylistCatalogPath/);
 }
@@ -582,6 +616,205 @@ function testEmptySaved() {
   assert.match(library, /getLibraryFilterEmptyCta\(filter\)/);
 }
 
+function testLibrarySearchScrollRoot() {
+  const chrome = read("src/components/my-practices/MyPracticesLibraryChrome.tsx");
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const filters = read("src/components/my-practices/MyPracticesLibraryFilters.tsx");
+  const search = read("src/components/my-practices/MyPracticesLibrarySearch.tsx");
+  const layout = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/layout.tsx",
+  );
+  const page = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
+  );
+  const bottomNav = read("src/components/BottomNav.tsx");
+  const css = read("src/app/globals.css");
+
+  const replaceCalls = [
+    ...chrome.matchAll(/router\.replace\(([\s\S]*?)\);/g),
+    ...library.matchAll(/router\.replace\(([\s\S]*?)\);/g),
+  ];
+  assert.ok(replaceCalls.length >= 2, "library chrome and grid both replace query");
+  for (const match of replaceCalls) {
+    assert.match(
+      match[1] ?? "",
+      /scroll:\s*false/,
+      "every library router.replace for q/filter/sort keeps scroll: false",
+    );
+  }
+  assert.doesNotMatch(chrome, /router\.push/);
+  assert.doesNotMatch(library, /router\.push/);
+
+  assert.doesNotMatch(chrome, /body\.style\.overflow/);
+  assert.doesNotMatch(library, /body\.style\.overflow/);
+  assert.doesNotMatch(filters, /body\.style\.overflow/);
+  assert.doesNotMatch(search, /body\.style\.overflow/);
+  assert.doesNotMatch(layout, /body\.style\.overflow/);
+  assert.match(filters, /catalog-sheet-lock/);
+  assert.doesNotMatch(filters, /document\.body\.style\.overflow/);
+
+  assert.match(
+    layout,
+    /MyPracticesLibraryChrome/,
+    "search+filters chrome is layout-owned so the input survives q= refresh",
+  );
+  assert.doesNotMatch(
+    page,
+    /MyPracticesLibrarySearch|MyPracticesLibraryFilters|MyPracticesLibraryChrome/,
+    "navigating page slot does not own the search+filters row",
+  );
+  assert.doesNotMatch(
+    library,
+    /MyPracticesLibrarySearch|MyPracticesLibraryFilters/,
+    "page grid tree does not mount the in-flow search input",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*fixed top-0 inset-x-0 z-30/,
+    "mobile search+filters reuse catalog fixed top-0 chrome",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*xl:hidden/,
+    "fixed library search chrome stays mobile-only",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
+    "fixed library search has the catalog spacer",
+  );
+  assert.match(chrome, /LibraryMobileHeader/, "fixed stack keeps the Аудиотека title");
+  assert.match(
+    chrome,
+    /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
+    "fixed library chrome reuses catalog safe-area padding",
+  );
+  assert.doesNotMatch(
+    chrome,
+    /listener-catalog-mobile-search[^"]*sticky/,
+    "mobile library search stays fixed, not sticky",
+  );
+  assert.doesNotMatch(
+    chrome,
+    /sticky/,
+    "Audioteka chrome does not use sticky inside center-scroll",
+  );
+  assert.doesNotMatch(layout, /sticky/, "library layout does not pin chrome with sticky");
+  assert.doesNotMatch(chrome, /body\.style\.overflow|:has\(/);
+  assert.doesNotMatch(layout, /overflow:\s*hidden|body\.style/);
+
+  assert.match(
+    bottomNav,
+    /createPortal\(nav, document\.body\)/,
+    "BottomNav still portals to document.body",
+  );
+  assert.match(
+    css,
+    /\.bottom-nav \{\s*position:\s*fixed;/,
+    "BottomNav stays position:fixed",
+  );
+}
+
+function testLibraryDesktopChromePinnedInShell() {
+  const chrome = read("src/components/my-practices/MyPracticesLibraryChrome.tsx");
+  const layout = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/layout.tsx",
+  );
+  const page = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
+  );
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
+  const shell = read("src/components/listener/ListenerAppShell.tsx");
+  const bottomNav = read("src/components/BottomNav.tsx");
+
+  assert.match(
+    chrome,
+    /surface\?:\s*"mobile"\s*\|\s*"desktop"/,
+    "chrome exposes mobile vs desktop surfaces",
+  );
+  assert.match(
+    chrome,
+    /surface === ["']desktop["']/,
+    "desktop surface is an explicit branch",
+  );
+  assert.match(
+    shellSearch,
+    /<MyPracticesLibraryChrome surface=["']desktop["']/,
+    "DesktopShellSearch renders Audioteka desktop chrome in the shell slot",
+  );
+  assert.doesNotMatch(
+    shellSearch,
+    /if \(isMyPracticesRoute\) \{\s*return null;/,
+    "DesktopShellSearch does not return null on /my-practices",
+  );
+  assert.doesNotMatch(
+    shellSearch,
+    /if \(pathname === ["']\/my-practices["'] \|\| pathname\.startsWith\(["']\/my-practices\/["']\)\) \{\s*return null;/,
+    "DesktopShellSearch no longer early-returns null for Audioteka",
+  );
+
+  assert.match(
+    shell,
+    /<DesktopShellSearch[\s\S]*listener-app-shell__center-scroll/,
+    "DesktopShellSearch wrapper is a sibling before center-scroll",
+  );
+  assert.doesNotMatch(
+    shell,
+    /listener-app-shell__center-scroll[\s\S]*<DesktopShellSearch/,
+    "DesktopShellSearch is not inside center-scroll",
+  );
+  assert.match(
+    shell,
+    /hidden shrink-0 xl:block xl:px-6/,
+    "desktop Audioteka chrome is shrink-0 above the scroller",
+  );
+  assert.doesNotMatch(
+    shell,
+    /xl:sticky|sticky top-0/,
+    "shell does not pin chrome with sticky",
+  );
+
+  assert.match(
+    layout,
+    /MyPracticesLibraryChrome/,
+    "route layout still mounts mobile chrome",
+  );
+  assert.doesNotMatch(
+    layout,
+    /surface=["']desktop["']/,
+    "route layout does not mount the desktop surface",
+  );
+  assert.doesNotMatch(
+    layout,
+    /hidden px-5 lg:px-10 xl:block xl:px-6/,
+    "layout no longer paints desktop title+search inside the page slot",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*fixed top-0 inset-x-0 z-30/,
+    "mobile search+filters stay in the route-layout chrome",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*xl:hidden/,
+    "fixed library search chrome stays mobile-only",
+  );
+
+  assert.match(library, /В аудиотеке:/);
+  assert.match(library, /MyPracticesLibrarySort/);
+  assert.doesNotMatch(
+    page,
+    /MyPracticesLibrarySearch|MyPracticesLibraryFilters|MyPracticesLibraryChrome/,
+    "scrolling page slot does not own title+search chrome",
+  );
+  assert.match(
+    bottomNav,
+    /createPortal\(nav, document\.body\)/,
+    "BottomNav still portals to document.body",
+  );
+}
+
 function testSourceBoundaries() {
   const card = read("src/components/my-practices/LibraryCard.tsx");
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
@@ -621,6 +854,8 @@ testSearchMatch();
 testSortOrder();
 testFallbackCover();
 testEmptySaved();
+testLibrarySearchScrollRoot();
+testLibraryDesktopChromePinnedInShell();
 testSourceBoundaries();
 
 console.log("library-audioteka-ui-unit: ok");

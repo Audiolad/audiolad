@@ -4,7 +4,7 @@ export const FEATURED_CARD_SHELL_CLASS =
   "featured-card featured-card--guest overflow-hidden rounded-[28px]";
 
 export const FEATURED_CARD_CHIP_CLASS =
-  "inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]";
+  "featured-card__chip inline-flex w-fit self-start rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]";
 
 export const FEATURED_CARD_TITLE_CLASS =
   "mt-3 text-[22px] font-semibold leading-tight text-[#25135c]";

@@ -4,7 +4,7 @@ export default function LibraryMobileHeader() {
       <header>
         <h1 className="text-[28px] font-semibold">Аудиотека</h1>
         <p className="mt-1 text-sm text-[#7d70a2]">
-          Всё, что вы сохранили, купили, получили или добавили
+          Всё, что вы сохранили, купили, добавили.
         </p>
       </header>
     </div>

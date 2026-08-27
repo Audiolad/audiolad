@@ -41,6 +41,7 @@ function testPublicPageSections() {
   assert(page.includes("AuthorFeaturedSection"), "featured section wired");
   assert(page.includes("AuthorProductsSection"), "products section wired");
   assert(page.includes("AuthorAboutSection"), "about section wired");
+  assert(page.includes("AuthorContactsSection"), "contacts section wired");
   assert(page.includes("SimilarAuthorsSection"), "similar authors wired");
   assert(page.includes("openGraph"), "SEO open graph metadata");
   assert(page.includes("canonical"), "canonical metadata");
@@ -52,6 +53,8 @@ function testProfileApi() {
   assert(route.includes("requireAuthorMembership"), "profile API checks membership");
   assert(route.includes("replaceAuthorFeaturedProducts"), "featured products validated server-side");
   assert(route.includes("featured_product_forbidden"), "foreign featured products rejected");
+  assert(route.includes("replaceAuthorContacts"), "contacts replaced server-side");
+  assert(route.includes("requireAuthorMutationMembership"), "contact writes require membership");
 }
 
 function testFeaturedProductsValidation() {
@@ -79,6 +82,13 @@ function testMigrationExists() {
   );
 
   assert(positioningMigration.includes("short_positioning"), "short positioning column");
+
+  const contactsMigration = read(
+    "supabase/migrations/20260829130000_author_contacts.sql",
+  );
+
+  assert(contactsMigration.includes("author_contacts"), "author contacts table");
+  assert(contactsMigration.includes("is_visible"), "contact visibility column");
 }
 
 function testAuthorDashboardNav() {

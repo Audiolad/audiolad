@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MEDITATION_SOLUTIONS_CARDS } from "../src/lib/landings/25-meditation-solutions/content";
 import {
   PRACTICE_HERO_DOT_WINDOW,
   buildCoverFirstHeroSlides,
@@ -195,7 +194,7 @@ function testMeditationSolutionsGalleryOrder() {
       id: `slide-${index + 1}`,
       image_url,
       position: index,
-      alt: MEDITATION_SOLUTIONS_CARDS[index]?.format ?? "",
+      alt: index === expectedGalleryUrls().length - 1 ? "Бонус · PDF + аудио" : "Материал · PDF",
     })),
   );
 
@@ -214,8 +213,11 @@ function testMeditationSolutionsGalleryOrder() {
   );
   assert.equal(
     formatHeroMaterialsMeta(
-      MEDITATION_SOLUTIONS_CARDS.map((card) => ({
-        alt: `${card.title} · ${card.format}`,
+      expectedGalleryUrls().map((url, index) => ({
+        alt:
+          index === expectedGalleryUrls().length - 1
+            ? "Бонус · PDF + аудио"
+            : "Материал · PDF",
       })),
     ),
     "26 материалов · PDF и аудио",
@@ -240,9 +242,6 @@ function testReusablePdpWiring() {
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
-  const landing = read(
-    "src/app/(platform)/p/25-gotovyh-resheniy-dlya-sozdaniya-svoih-meditaciy/page.tsx",
-  );
 
   assert.match(page, /loadPublicationGalleriesByIds/);
   assert.match(page, /catalogGalleryForPublication/);
@@ -256,13 +255,31 @@ function testReusablePdpWiring() {
   assert.match(mobile, /ListenerAppShell|PracticeProductHero/);
   assert.match(desktop, /PracticeProductHero/);
   assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
+  assert.match(hero, /data-practice-hero-type-chip/);
+  assert.doesNotMatch(hero, /w-full|flex-grow/);
   assert.match(hero, /FeaturedProductCard/);
+
+  const chipClass = read("src/components/home/FeaturedProductCard.tsx");
+  const chipClassValue =
+    /export const FEATURED_CARD_CHIP_CLASS =\s*"([^"]+)"/.exec(chipClass)?.[1] ??
+    "";
+  assert.match(chipClassValue, /inline-flex/);
+  assert.match(chipClassValue, /w-fit|featured-card__chip/);
+  assert.doesNotMatch(chipClassValue, /w-full/);
+
+  const css = read("src/app/globals.css");
+  assert.match(
+    css,
+    /\[data-practice-product-hero\][\s\S]*\[data-practice-hero-type-chip\][\s\S]*width:\s*fit-content/,
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero\][\s\S]*\.featured-card__chip[\s\S]*width:\s*fit-content/,
+  );
   assert.match(hero, /practice-product-hero/);
   assert.match(hero, /data-practice-product-hero=\{layout\}/);
   assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);
   assert.doesNotMatch(hero, /grid-cols-\[minmax/);
-  assert.match(landing, /MeditationSolutionsLandingView/);
-  assert.doesNotMatch(landing, /permanentRedirect|301/);
 
   const subtitle = resolvePracticeHeroSubtitle(
     null,
@@ -350,8 +367,28 @@ function testDesktopHeroHeightFollowsSquareCover() {
   );
   assert.match(
     css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*nowrap/,
+    "mobile Buy + Listen stay on one row",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*align-items:\s*stretch/,
+    "mobile CTA row stretches both buttons to one height",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions > :first-child\s*\{[^}]*flex:\s*0 0 auto/,
+    "mobile Buy stays compact",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\][\s\S]*\[data-practice-primary-play\]:not\(:only-child\)\s*\{[^}]*flex:\s*1 1 0/,
+    "mobile Listen takes leftover width",
+  );
+  assert.doesNotMatch(
+    css,
     /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*wrap/,
-    "mobile buttons may wrap when the row is tight",
+    "mobile CTA row must not wrap",
   );
   assert.match(
     desktopBlock,

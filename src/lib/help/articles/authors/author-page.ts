@@ -18,8 +18,8 @@ export const authorPageArticle: HelpArticle = {
     "аватар",
     "баннер",
   ],
-  updatedAt: "2026-07-29",
-  version: 2,
+  updatedAt: "2026-08-27",
+  version: 3,
   relatedRoutes: ["/author-dashboard/profile"],
   relatedArticleIds: [
     "help.authors.create-first-product",
@@ -45,6 +45,7 @@ export const authorPageArticle: HelpArticle = {
         "Загрузите аватар и при необходимости баннер.",
         "Заполните поле «Короткое позиционирование» — краткую фразу о вашей специализации.",
         "Заполните раздел «Об авторе» — более подробное описание.",
+        "При желании добавьте контакты: Telegram, MAX или другую ссылку.",
         "Сохраните изменения.",
       ],
       notes: [

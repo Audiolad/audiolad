@@ -168,6 +168,10 @@ function testAuthorPublicFields() {
     "topics public",
   );
   assert(
+    hasAuthorPublicIndexNowChanges({ contactsProvided: true }),
+    "contacts public",
+  );
+  assert(
     !hasAuthorPublicIndexNowChanges({
       scalarUpdates: { updated_at: "t" },
     }),

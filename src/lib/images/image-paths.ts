@@ -105,6 +105,32 @@ export function buildAuthorAssetOriginalPath(
   return `${buildAuthorAssetVariantBasePath(authorId, kind, versionId)}/original.${extension}`;
 }
 
+export function buildAuthorContactIconVariantBasePath(
+  authorId: string,
+  contactId: string,
+  versionId: string,
+): string {
+  return `authors/${authorId}/contacts/${contactId}/variants/${versionId}`;
+}
+
+export function buildAuthorContactIconVariantPath(
+  authorId: string,
+  contactId: string,
+  versionId: string,
+  key: ImageVariantKey,
+): string {
+  return `${buildAuthorContactIconVariantBasePath(authorId, contactId, versionId)}/${buildVariantFileName(key)}`;
+}
+
+export function buildAuthorContactIconOriginalPath(
+  authorId: string,
+  contactId: string,
+  versionId: string,
+  extension: "jpg" | "png" | "webp",
+): string {
+  return `${buildAuthorContactIconVariantBasePath(authorId, contactId, versionId)}/original.${extension}`;
+}
+
 export function buildQuickOfferAssetVariantBasePath(
   authorId: string,
   offerId: string,
@@ -203,6 +229,7 @@ export function buildVariantPathsForProfile(
     audioItemId?: string;
     authorId?: string;
     authorKind?: "avatar" | "banner";
+    contactId?: string;
     userId?: string;
     playlistId?: string;
     offerId?: string;
@@ -301,6 +328,29 @@ export function buildVariantPathsForProfile(
         assign(
           variant.key,
           buildAuthorAssetVariantPath(authorId, kind, versionId, variant.key),
+        );
+      }
+      break;
+    }
+    case "author-contact-icon": {
+      const authorId = context.authorId!;
+      const contactId = context.contactId!;
+      const { versionId, originalExtension } = processed;
+      originalPath = buildAuthorContactIconOriginalPath(
+        authorId,
+        contactId,
+        versionId,
+        originalExtension,
+      );
+      for (const variant of processed.variants) {
+        assign(
+          variant.key,
+          buildAuthorContactIconVariantPath(
+            authorId,
+            contactId,
+            versionId,
+            variant.key,
+          ),
         );
       }
       break;

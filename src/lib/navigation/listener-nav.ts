@@ -63,16 +63,15 @@ export const LISTENER_SIDEBAR_NAV_ITEMS: readonly ListenerSidebarNavItem[] = [
 ] as const;
 
 /**
- * Sidebar items for the current listener. Hides «Личные материалы» until the
- * shell confirms at least one claimed, non-deleted personal material.
+ * Sidebar items for the current listener.
+ * «Личные материалы» stay out of the sidebar after Stage 2 — they live in
+ * Аудиотека. `showMyMaterialsNav` is kept for callers; it no longer reveals
+ * the item. `/my-materials` routes and profile quick links stay as-is.
  */
 export function getListenerSidebarNavItems(options: {
   showMyMaterialsNav: boolean;
 }): readonly ListenerSidebarNavItem[] {
-  if (options.showMyMaterialsNav) {
-    return LISTENER_SIDEBAR_NAV_ITEMS;
-  }
-
+  void options.showMyMaterialsNav;
   return LISTENER_SIDEBAR_NAV_ITEMS.filter((item) => item.key !== "my-materials");
 }
 

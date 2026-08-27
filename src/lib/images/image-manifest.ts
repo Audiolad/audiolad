@@ -94,6 +94,7 @@ export function getManifestVariantPath(
 export function getPrimaryVariantKey(profile: ImageProfile): ImageVariantKey {
   switch (profile) {
     case "author-avatar":
+    case "author-contact-icon":
     case "user-avatar":
       return "lg";
     case "author-banner":
