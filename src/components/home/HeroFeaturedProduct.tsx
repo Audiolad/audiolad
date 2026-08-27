@@ -5,6 +5,14 @@ import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import type { HomeProduct } from "@/lib/home/types";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
+import FeaturedProductCard, {
+  FEATURED_CARD_ACTIONS_CLASS,
+  FEATURED_CARD_CHIP_CLASS,
+  FEATURED_CARD_META_CLASS,
+  FEATURED_CARD_PRIMARY_CTA_CLASS,
+  FEATURED_CARD_SECONDARY_CTA_CLASS,
+  FEATURED_CARD_TITLE_CLASS,
+} from "./FeaturedProductCard";
 import HomeProductPlayButton from "./HomeProductPlayButton";
 import { PlayIcon } from "./HomeIcons";
 
@@ -16,73 +24,69 @@ export default function HeroFeaturedProduct({ product }: HeroFeaturedProductProp
   const canPlay = Boolean(product.authorSlug && product.slug);
 
   return (
-    <article className="featured-card featured-card--guest mt-8 overflow-hidden rounded-[28px]">
-      <Link
-        href={product.href}
-        className="featured-card__cover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-      >
-        <ProductCoverThumbnail
-          slug={product.slug}
-          title={product.title}
-          coverUrl={product.coverUrl}
-          coverImage={product.coverImage}
-          updatedAt={product.updatedAt}
-          authorName={product.authorName}
-          format={product.format}
-          displayWidth={640}
-          priority
-          className="h-full w-full rounded-none"
-        />
-      </Link>
-
-      <div className="featured-card__content">
-        <span className="inline-flex rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
-          {product.productTypeLabel}
-        </span>
-
-        <h2 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">
-          <Link
-            href={product.href}
-            className="hover:text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            {product.title}
-          </Link>
-        </h2>
-
-        {product.authorName ? (
-          <AuthorLink
-            authorSlug={product.authorSlug}
+    <FeaturedProductCard
+      className="mt-8"
+      cover={
+        <Link
+          href={product.href}
+          className="featured-card__cover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          <ProductCoverThumbnail
+            slug={product.slug}
+            title={product.title}
+            coverUrl={product.coverUrl}
+            coverImage={product.coverImage}
+            updatedAt={product.updatedAt}
             authorName={product.authorName}
-            className="mt-2 text-sm font-medium text-[#7042c5]"
+            format={product.format}
+            displayWidth={640}
+            priority
+            className="h-full w-full rounded-none"
           />
-        ) : null}
+        </Link>
+      }
+    >
+      <span className={FEATURED_CARD_CHIP_CLASS}>{product.productTypeLabel}</span>
 
-        {product.statsLabel ? (
-          <p className="mt-2 text-sm text-[#7d70a2]">{product.statsLabel}</p>
-        ) : null}
+      <h2 className={FEATURED_CARD_TITLE_CLASS}>
+        <Link
+          href={product.href}
+          className="hover:text-[#7042c5] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          {product.title}
+        </Link>
+      </h2>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          {canPlay && product.authorSlug ? (
-            <HomeProductPlayButton
-              practiceId={product.id}
-              authorSlug={product.authorSlug}
-              productSlug={product.slug}
-              ariaLabel={`${PLAY_ACTION_LABEL} ${product.title}`}
-              className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              <PlayIcon />
-              {PLAY_ACTION_LABEL}
-            </HomeProductPlayButton>
-          ) : null}
+      {product.authorName ? (
+        <AuthorLink
+          authorSlug={product.authorSlug}
+          authorName={product.authorName}
+          className="mt-2 text-sm font-medium text-[#7042c5]"
+        />
+      ) : null}
 
-          <Link
-            href={product.href}
-            className="inline-flex min-h-11 items-center rounded-2xl border border-[#7042c5] bg-white px-5 py-3 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      {product.statsLabel ? (
+        <p className={FEATURED_CARD_META_CLASS}>{product.statsLabel}</p>
+      ) : null}
+
+      <div className={FEATURED_CARD_ACTIONS_CLASS}>
+        {canPlay && product.authorSlug ? (
+          <HomeProductPlayButton
+            practiceId={product.id}
+            authorSlug={product.authorSlug}
+            productSlug={product.slug}
+            ariaLabel={`${PLAY_ACTION_LABEL} ${product.title}`}
+            className={FEATURED_CARD_PRIMARY_CTA_CLASS}
           >
-            Подробнее
-          </Link>
-        </div>
+            <PlayIcon />
+            {PLAY_ACTION_LABEL}
+          </HomeProductPlayButton>
+        ) : null}
+
+        <Link href={product.href} className={FEATURED_CARD_SECONDARY_CTA_CLASS}>
+          Подробнее
+        </Link>
       </div>
-    </article>
+    </FeaturedProductCard>
   );
 }

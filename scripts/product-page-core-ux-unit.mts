@@ -64,10 +64,10 @@ function testHeartOnCover() {
   assert.match(page, /isSaved/);
 }
 
-function heroBuyClassSource(parts: string) {
-  const start = parts.indexOf("const heroBuyClassName");
-  const end = parts.indexOf(";", start);
-  return parts.slice(start, end);
+function featuredBuyClassSource(card: string) {
+  const start = card.indexOf("export const FEATURED_CARD_PRIMARY_CTA_CLASS");
+  const end = card.indexOf(";", start);
+  return card.slice(start, end);
 }
 
 function testBeforePurchaseRowKeepsBuy() {
@@ -77,6 +77,7 @@ function testBeforePurchaseRowKeepsBuy() {
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
+  const featuredCard = read("src/components/home/FeaturedProductCard.tsx");
   const mobile = read(
     "src/components/products/practice-page/PracticePageMobile.tsx",
   );
@@ -98,7 +99,7 @@ function testBeforePurchaseRowKeepsBuy() {
   );
   const legalFn = parts.slice(
     parts.indexOf("function PaymentLegalNote"),
-    parts.indexOf("const heroBuyClassName"),
+    parts.indexOf("export function toPracticeHeartProduct"),
   );
 
   assert.match(
@@ -125,21 +126,30 @@ function testBeforePurchaseRowKeepsBuy() {
     "preview play is before PaymentLegalNote",
   );
 
-  assert.match(action, /heroBuyClassName/, "paid buy uses the hero class");
   assert.match(
-    heroBuyClassSource(parts),
-    /min-h-12/,
-    "hero buy keeps a 44px+ touch target",
+    action,
+    /FEATURED_CARD_PRIMARY_CTA_CLASS/,
+    "paid buy uses the homepage featured CTA class",
   );
   assert.match(
-    heroBuyClassSource(parts),
+    featuredBuyClassSource(featuredCard),
+    /min-h-11/,
+    "featured buy keeps a 44px touch target",
+  );
+  assert.doesNotMatch(
+    featuredBuyClassSource(featuredCard),
     /\bw-full\b/,
-    "hero buy is full width in the sell zone",
+    "featured buy is not a full-width invented plate",
   );
   assert.match(
     action,
-    /className=\{heroBuyClassName\}/,
-    "BuyPracticeButton uses the hero class only",
+    /className=\{FEATURED_CARD_PRIMARY_CTA_CLASS\}/,
+    "BuyPracticeButton uses the featured card CTA class",
+  );
+  assert.doesNotMatch(
+    action,
+    /bg-\[#f4ecfb\]/,
+    "sell zone does not invent a purple price plate",
   );
 
   assert.match(legalFn, /text-xs/, "PaymentLegalNote is smaller");

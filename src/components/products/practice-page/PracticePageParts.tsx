@@ -2,6 +2,13 @@ import Link from "next/link";
 
 import AuthorLink from "@/components/authors/AuthorLink";
 import BuyPracticeButton from "@/components/BuyPracticeButton";
+import { PlayIcon } from "@/components/home/HomeIcons";
+import {
+  FEATURED_CARD_ACTIONS_CLASS,
+  FEATURED_CARD_PRIMARY_CTA_CLASS,
+  FEATURED_CARD_SECONDARY_CTA_CLASS,
+  FEATURED_CARD_TITLE_CLASS,
+} from "@/components/home/FeaturedProductCard";
 import ProductPriceOffer from "@/components/pricing/ProductPriceOffer";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
@@ -168,14 +175,6 @@ export function PracticeAccessBanners({
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-      <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
-    </svg>
-  );
-}
-
 function PaymentLegalNote() {
   const linkClassName =
     "text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
@@ -194,9 +193,6 @@ function PaymentLegalNote() {
     </p>
   );
 }
-
-const heroBuyClassName =
-  "inline-flex min-h-12 w-full items-center justify-center whitespace-nowrap rounded-[18px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-3 text-[16px] font-semibold text-white";
 
 export function toPracticeHeartProduct(
   viewModel: PracticePageViewModel,
@@ -367,8 +363,6 @@ export function PracticePrimaryActionSection({
 }) {
   const { presentation, practicePagePath, practice, resolvedAuthorSlug } =
     viewModel;
-  const playClassName =
-    "flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5]";
   const showPrimaryPlay =
     presentation.primaryAction.kind === "listen" ||
     presentation.primaryAction.kind === "buy";
@@ -380,14 +374,14 @@ export function PracticePrimaryActionSection({
     presentation.primaryAction.kind === "listen"
       ? presentation.primaryAction.label
       : PREVIEW_ACTION_LABEL;
+  const listenClassName = buyAction
+    ? FEATURED_CARD_SECONDARY_CTA_CLASS
+    : FEATURED_CARD_PRIMARY_CTA_CLASS;
 
   return (
     <section className={className}>
       {buyAction ? (
-        <div
-          data-practice-hero-sell
-          className="flex flex-col gap-3 rounded-[20px] bg-[#f4ecfb] px-4 py-4"
-        >
+        <div data-practice-hero-sell>
           <div className="min-w-0">
             {viewModel.priceOffer ? (
               <ProductPriceOffer
@@ -398,67 +392,75 @@ export function PracticePrimaryActionSection({
                 promotionType={viewModel.priceOffer.promotionType}
               />
             ) : (
-              <p className="text-[28px] font-semibold leading-8 text-[#25135c]">
+              <p className={`${FEATURED_CARD_TITLE_CLASS} mt-0`}>
                 {presentation.statusBadge}
               </p>
             )}
           </div>
-          {buyAction.disabled ? (
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              className={`${heroBuyClassName} opacity-80 ${disabledButtonClasses()}`}
-            >
-              {buyAction.label}
-            </button>
-          ) : (
-            <BuyPracticeButton
-              practiceSlug={buyAction.practiceSlug}
-              practiceId={buyAction.practiceId}
-              authorId={buyAction.authorId}
-              productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
-              currency={buyAction.currency}
-              purchaseSurface={buyAction.purchaseSurface}
-              label={buyAction.label}
-              className={heroBuyClassName}
-              signInReturnPath={practicePagePath}
-            />
-          )}
+          <div className={FEATURED_CARD_ACTIONS_CLASS}>
+            {buyAction.disabled ? (
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} opacity-80 ${disabledButtonClasses()}`}
+              >
+                {buyAction.label}
+              </button>
+            ) : (
+              <BuyPracticeButton
+                practiceSlug={buyAction.practiceSlug}
+                practiceId={buyAction.practiceId}
+                authorId={buyAction.authorId}
+                productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
+                currency={buyAction.currency}
+                purchaseSurface={buyAction.purchaseSurface}
+                label={buyAction.label}
+                className={FEATURED_CARD_PRIMARY_CTA_CLASS}
+                signInReturnPath={practicePagePath}
+              />
+            )}
+            {showPrimaryPlay ? (
+              <PracticeListenCtaLink
+                authorSlug={resolvedAuthorSlug}
+                productSlug={practice.slug}
+                practiceId={practice.id}
+                playAriaLabel={playLabel}
+                className={listenClassName}
+              >
+                <PlayIcon />
+                {playLabel}
+              </PracticeListenCtaLink>
+            ) : null}
+          </div>
         </div>
-      ) : null}
-
-      {showPrimaryPlay ? (
-        <PracticeListenCtaLink
-          authorSlug={resolvedAuthorSlug}
-          productSlug={practice.slug}
-          practiceId={practice.id}
-          playAriaLabel={playLabel}
-          className={`${buyAction ? "mt-3" : ""} ${playClassName}`.trim()}
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white">
+      ) : showPrimaryPlay ? (
+        <div className={FEATURED_CARD_ACTIONS_CLASS}>
+          <PracticeListenCtaLink
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+            practiceId={practice.id}
+            playAriaLabel={playLabel}
+            className={listenClassName}
+          >
             <PlayIcon />
-          </span>
-          {playLabel}
-        </PracticeListenCtaLink>
-      ) : null}
-
-      {buyAction && presentation.showPaymentLegalNote ? (
-        <PaymentLegalNote />
-      ) : null}
-
-      {!buyAction && !showPrimaryPlay ? (
+            {playLabel}
+          </PracticeListenCtaLink>
+        </div>
+      ) : (
         <button
           type="button"
           disabled
           aria-disabled="true"
-          className={`flex w-full items-center justify-center gap-3 rounded-[22px] border border-[#bca6df] bg-white px-5 py-4 font-semibold text-[#7042c5] ${disabledButtonClasses()}`}
+          className={`${FEATURED_CARD_SECONDARY_CTA_CLASS} ${disabledButtonClasses()}`}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7042c5] text-white opacity-70">
-            <PlayIcon />
-          </span>
+          <PlayIcon />
           {presentation.primaryAction.label}
         </button>
+      )}
+
+      {buyAction && presentation.showPaymentLegalNote ? (
+        <PaymentLegalNote />
       ) : null}
     </section>
   );

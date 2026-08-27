@@ -101,12 +101,8 @@ assert(
   "desktop page renders ProductTopicLinks below hero",
 );
 assert(
-  practiceHero.includes("showTopics={false}"),
-  "hero meta hides topics to avoid duplicate",
-);
-assert(
-  practiceHero.includes('authorMetaLayout="inline"'),
-  "hero uses inline author/meta row",
+  !practiceHero.includes("ProductTopicLinks"),
+  "hero does not render topic chips",
 );
 assert(
   practiceParts.includes("showTopics = true"),

@@ -59,9 +59,11 @@ function testSliderOnlyWhenGalleryExists() {
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
   assert.match(hero, /shouldRenderProductHeroSlider/);
-  assert.match(hero, /<PracticeProductCover/);
+  assert.match(hero, /featured-card__cover/);
+  assert.doesNotMatch(hero, /rounded-\[28px\]|shadow-\[0_22px_48px/);
   assert.match(productHero, /data-practice-hero-has-gallery/);
   assert.match(productHero, /PracticeHeroGallery/);
+  assert.match(productHero, /FeaturedProductCard/);
 }
 
 function testPromoBlockOnlyWhenOfferActive() {
@@ -228,7 +230,10 @@ function testReusablePdpWiring() {
   assert.doesNotMatch(hero, /25-meditation-solutions/);
   assert.match(mobile, /ListenerAppShell|PracticeProductHero/);
   assert.match(desktop, /PracticeProductHero/);
-  assert.match(hero, /PRODUCT_FORMAT_LINE_CLASS/);
+  assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
+  assert.match(hero, /FeaturedProductCard/);
+  assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);
+  assert.doesNotMatch(hero, /grid-cols-\[minmax/);
   assert.match(landing, /MeditationSolutionsLandingView/);
   assert.doesNotMatch(landing, /permanentRedirect|301/);
 

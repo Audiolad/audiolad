@@ -123,7 +123,7 @@
     "test:library-collection": "npx tsx scripts/library-collection-unit.mts",
     "test:library-audioteka-ui": "npx tsx scripts/library-audioteka-ui-unit.mts",
     "test:library-entitled-play": "npx tsx scripts/library-entitled-play-unit.mts",
-    "test:product-page": "npx tsx scripts/product-page-hero-unit.mts && npx tsx scripts/product-page-core-ux-unit.mts && npx tsx scripts/pdp-single-save-unit.mts",
+    "test:product-page": "npx tsx scripts/homepage-featured-card-unit.mts && npx tsx scripts/product-page-hero-unit.mts && npx tsx scripts/product-page-core-ux-unit.mts && npx tsx scripts/pdp-single-save-unit.mts",
     "test:product-page-core-ux": "npx tsx scripts/product-page-core-ux-unit.mts",
     "test:home-play-global-player": "npx tsx scripts/home-play-global-player-unit.mts",
     "test:home-legacy-play-cleanup": "npx tsx scripts/home-legacy-play-cleanup-unit.mts",

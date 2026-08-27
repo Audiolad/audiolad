@@ -757,25 +757,31 @@ html.catalog-sheet-lock body {
 }
 
 @media (min-width: 1024px) {
-  .listener-home-content .featured-card--guest {
+  .featured-card--guest {
     border-radius: 28px;
   }
 
-  .listener-home-content .featured-card--guest .featured-card__cover {
+  .featured-card--guest .featured-card__cover {
     width: min(56%, 360px);
     aspect-ratio: 1 / 1;
     border-radius: 28px 0 0 28px;
     background-color: #ffffff;
   }
 
-  .listener-home-content .featured-card--guest .featured-card__cover img {
+  .featured-card--guest .featured-card__cover img {
     object-fit: contain;
   }
 
-  .listener-home-content .featured-card--guest .featured-card__content {
+  .featured-card--guest .featured-card__content {
     width: 44%;
     max-width: 44%;
     flex: 0 1 44%;
+  }
+}
+
+@media (min-width: 1280px) {
+  .featured-card--guest .featured-card__content {
+    padding: 1rem 1.125rem;
   }
 }
 

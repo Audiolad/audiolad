@@ -16,7 +16,6 @@ import {
 } from "@/lib/catalog/product-hero-gallery";
 import type { CatalogSlide } from "@/lib/catalog/dto";
 
-import { PracticeProductCover } from "./PracticePageParts";
 import type { PracticePageCoverData } from "./types";
 
 type PracticeHeroGalleryProps = {
@@ -131,13 +130,27 @@ export default function PracticeHeroGallery({
 
   if (!showSlider) {
     return (
-      <PracticeProductCover
-        cover={cover}
-        priority={priority}
-        heartProduct={heartProduct}
-        isAuthenticated={isAuthenticated}
-        signInReturnPath={signInReturnPath}
-      />
+      <div className="featured-card__cover relative">
+        {cover.displayUrl ? (
+          <ResponsiveCoverImage
+            src={cover.responsive.src ?? cover.displayUrl}
+            alt={cover.alt}
+            manifest={cover.responsive.manifest}
+            srcSet={cover.responsive.srcSet}
+            sizes={cover.responsive.srcSet ? cover.responsive.sizes : undefined}
+            displayWidth={cover.displayWidth}
+            priority={priority}
+            className="h-full w-full rounded-none"
+          />
+        ) : (
+          <div
+            className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${cover.gradient}`}
+          >
+            <span className="text-[90px] text-white">{cover.symbol}</span>
+          </div>
+        )}
+        {heart}
+      </div>
     );
   }
 
@@ -145,9 +158,7 @@ export default function PracticeHeroGallery({
     <div
       data-practice-hero-gallery
       data-practice-hero-gallery-count={slides.length}
-      className={`relative aspect-square overflow-hidden rounded-[28px] shadow-[0_22px_48px_rgba(99,61,163,0.22)] ${
-        cover.displayUrl ? "bg-[#f4ecfb]" : `bg-gradient-to-br ${cover.gradient}`
-      }`}
+      className="featured-card__cover relative"
     >
       <div
         ref={scrollerRef}
@@ -175,7 +186,7 @@ export default function PracticeHeroGallery({
                 displayWidth={cover.displayWidth}
                 priority={priority && index === 0}
                 draggable={false}
-                className="h-full w-full object-cover"
+                className="h-full w-full rounded-none"
               />
             ) : page.type === "cover" ? (
               <div className="flex h-full w-full items-center justify-center">
@@ -186,7 +197,7 @@ export default function PracticeHeroGallery({
               <img
                 src={page.src}
                 alt={page.alt}
-                className="h-full w-full object-cover"
+                className="h-full w-full rounded-none"
                 draggable={false}
               />
             )}
@@ -198,7 +209,7 @@ export default function PracticeHeroGallery({
         type="button"
         aria-label="Предыдущий слайд"
         data-practice-hero-gallery-prev
-        className="absolute top-1/2 left-2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#7042c5] shadow-[0_8px_18px_rgba(91,62,145,0.18)] xl:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="absolute top-1/2 left-1.5 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-lg leading-none text-[#7042c5] shadow-[0_4px_10px_rgba(91,62,145,0.12)] sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-40"
         onClick={() => scrollToIndex(activeIndex - 1)}
         disabled={activeIndex === 0}
       >
@@ -208,7 +219,7 @@ export default function PracticeHeroGallery({
         type="button"
         aria-label="Следующий слайд"
         data-practice-hero-gallery-next
-        className="absolute top-1/2 right-2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#7042c5] shadow-[0_8px_18px_rgba(91,62,145,0.18)] xl:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="absolute top-1/2 right-1.5 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-lg leading-none text-[#7042c5] shadow-[0_4px_10px_rgba(91,62,145,0.12)] sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-40"
         onClick={() => scrollToIndex(activeIndex + 1)}
         disabled={activeIndex >= pages.length - 1}
       >
@@ -217,9 +228,9 @@ export default function PracticeHeroGallery({
 
       <p
         data-practice-hero-gallery-counter
-        className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#25135c]/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white"
+        className="pointer-events-none absolute right-2 bottom-2 z-10 text-[11px] tabular-nums text-[#25135c]/70"
       >
-        {activeIndex + 1}/{pages.length}
+        {activeIndex + 1} / {pages.length}
       </p>
 
       {heart}
