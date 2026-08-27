@@ -20,8 +20,13 @@ import {
 import { startPersonalCountdown } from "../src/lib/pricing/personal-start";
 import { resolvePracticePrice } from "../src/lib/pricing/resolve";
 import { PRICE_PROMOTION_TYPES, PRICE_SURFACES } from "../src/lib/pricing/types";
+import {
+  applyAuthorPromoPreviewBuyCta,
+  buildPracticeAccessPresentation,
+} from "../src/lib/products/practice-access-ui";
 import { buildPracticePromoPreviewPath } from "../src/lib/products/paths";
 import { formatRubles } from "../src/lib/products/price-format";
+import { BUY_ACTION_LABEL } from "../src/lib/ui/action-labels";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -462,6 +467,187 @@ function testStartHandlerMountGate() {
   );
 }
 
+function paidDraftPractice() {
+  return {
+    id: "practice-1",
+    slug: "draft-product",
+    price: 4999,
+    is_free: false,
+    format: "Медитация",
+    status: "draft",
+    is_catalog_listed: false,
+    guest_access_enabled: false,
+    audio_url: "https://cdn.example/audio.mp3",
+    author_id: "author-1",
+  };
+}
+
+function publishedPractice() {
+  return {
+    ...paidDraftPractice(),
+    slug: "published-product",
+    status: "published",
+    is_catalog_listed: true,
+  };
+}
+
+function ownerAccess() {
+  return {
+    canListen: true,
+    canAcquire: false,
+    isPubliclyListed: false,
+    reason: "author_owner" as const,
+    isAuthorMember: true,
+    accessSource: null,
+    hasEntitlement: false,
+  };
+}
+
+function guestBuyerAccess() {
+  return {
+    canListen: false,
+    canAcquire: true,
+    isPubliclyListed: true,
+    reason: "not_authenticated" as const,
+    isAuthorMember: false,
+    accessSource: null,
+    hasEntitlement: false,
+  };
+}
+
+function testPromoPreviewBuyCtaLooksLiveButIsPreviewOnly() {
+  const draft = buildPracticeAccessPresentation({
+    access: ownerAccess(),
+    practice: paidDraftPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: true,
+    promoPreviewMode: true,
+  });
+
+  assert.equal(draft.primaryAction.kind, "buy");
+  if (draft.primaryAction.kind === "buy") {
+    assert.equal(draft.primaryAction.label, BUY_ACTION_LABEL);
+    assert.equal(draft.primaryAction.label, "Купить");
+    assert.equal(draft.primaryAction.disabled, false);
+    assert.equal(draft.primaryAction.previewOnly, true);
+  }
+
+  const published = buildPracticeAccessPresentation({
+    access: ownerAccess(),
+    practice: publishedPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    buyerPreviewMode: true,
+    promoPreviewMode: true,
+  });
+
+  assert.equal(published.primaryAction.kind, "buy");
+  if (published.primaryAction.kind === "buy") {
+    assert.equal(published.primaryAction.label, "Купить");
+    assert.equal(published.primaryAction.disabled, false);
+    assert.equal(published.primaryAction.previewOnly, true);
+  }
+
+  const paymentsOff = buildPracticeAccessPresentation({
+    access: ownerAccess(),
+    practice: paidDraftPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: false,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: true,
+    promoPreviewMode: true,
+  });
+  assert.equal(paymentsOff.primaryAction.kind, "buy");
+  if (paymentsOff.primaryAction.kind === "buy") {
+    assert.equal(paymentsOff.primaryAction.label, "Купить");
+    assert.equal(paymentsOff.primaryAction.disabled, false);
+    assert.equal(paymentsOff.primaryAction.previewOnly, true);
+  }
+}
+
+function testOrdinaryBuyerPdpKeepsLiveBuy() {
+  const publishedGuest = buildPracticeAccessPresentation({
+    access: guestBuyerAccess(),
+    practice: publishedPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: true,
+    isAuthenticated: false,
+  });
+
+  assert.equal(publishedGuest.primaryAction.kind, "buy");
+  if (publishedGuest.primaryAction.kind === "buy") {
+    assert.equal(publishedGuest.primaryAction.label, "Купить");
+    assert.equal(publishedGuest.primaryAction.disabled, false);
+    assert.equal(publishedGuest.primaryAction.previewOnly, undefined);
+  }
+
+  const ownerBuyerPreview = buildPracticeAccessPresentation({
+    access: ownerAccess(),
+    practice: publishedPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    buyerPreviewMode: true,
+    promoPreviewMode: false,
+  });
+  assert.equal(ownerBuyerPreview.primaryAction.kind, "buy");
+  if (ownerBuyerPreview.primaryAction.kind === "buy") {
+    assert.equal(ownerBuyerPreview.primaryAction.previewOnly, undefined);
+    assert.equal(ownerBuyerPreview.primaryAction.purchaseSurface, "preview");
+  }
+
+  const listenerWithoutPromo = buildPracticeAccessPresentation({
+    access: ownerAccess(),
+    practice: paidDraftPractice(),
+    authorSlug: "sergey",
+    paymentsConfigured: true,
+    isAuthenticated: true,
+    publishPreviewMode: true,
+    publishListenerViewMode: true,
+    promoPreviewMode: false,
+  });
+  assert.equal(listenerWithoutPromo.primaryAction.kind, "buy");
+  if (listenerWithoutPromo.primaryAction.kind === "buy") {
+    assert.equal(listenerWithoutPromo.primaryAction.previewOnly, undefined);
+  }
+
+  const liveBuy = {
+    kind: "buy" as const,
+    label: "Купить",
+    disabled: false,
+    practiceSlug: "published-product",
+    practiceId: "practice-1",
+    authorId: "author-1",
+    productPriceMinorSnapshot: 499900,
+    currency: "RUB",
+    purchaseSurface: "practice_page" as const,
+  };
+  const untouched = applyAuthorPromoPreviewBuyCta(
+    {
+      statusBadge: "4 999 ₽",
+      statusDetail: null,
+      showAuthorToolbar: false,
+      showBuyerPreviewBanner: false,
+      showBuyerPreviewExit: false,
+      showPublishPreviewBanner: false,
+      canPublishFromPreview: false,
+      authorToolbarMessage: null,
+      authorToolbarActions: [],
+      showAdminPreview: false,
+      primaryAction: liveBuy,
+      libraryAction: "sign_in",
+      showPaymentLegalNote: true,
+    },
+    false,
+  );
+  assert.equal(untouched.primaryAction, liveBuy);
+}
+
 function testPathUsesPromotionIdNotStartToken() {
   assert.equal(
     PRACTICE_PROMO_PREVIEW_QUERY_PARAM,
@@ -512,6 +698,28 @@ function testSourceContracts() {
   assert.match(page, /shouldMountPricePromotionStartHandler/);
   assert.match(page, /PricePromotionStartHandler/);
   assert.match(page, /resolvePracticePriceRpc/);
+  assert.match(page, /promoPreviewMode,/);
+
+  const buyButton = read("src/components/BuyPracticeButton.tsx");
+  const parts = read(
+    "src/components/products/practice-page/PracticePageParts.tsx",
+  );
+  const accessUi = read("src/lib/products/practice-access-ui.ts");
+
+  assert.match(buyButton, /previewOnly = false/);
+  assert.match(buyButton, /if \(previewOnly\) \{\s*return;/);
+  assert.match(buyButton, /if \(previewOnly\) \{\s*setIsCheckingPending\(false\);/);
+  assert.match(buyButton, /\/api\/orders/);
+  assert.match(buyButton, /\/api\/payments/);
+  assert.match(parts, /previewOnly=\{buyAction\.previewOnly === true\}/);
+  assert.match(parts, /FEATURED_CARD_PRIMARY_CTA_CLASS/);
+  assert.match(accessUi, /previewOnly: true/);
+  assert.match(accessUi, /applyAuthorPromoPreviewBuyCta/);
+  assert.doesNotMatch(
+    parts,
+    /previewOnly=\{true\}/,
+    "ordinary BuyPracticeButton is not hard-coded preview-only",
+  );
 
   assert.match(form, /Предпросмотр акции/);
   assert.match(form, /data-author-promo-preview/);
@@ -542,6 +750,8 @@ async function main() {
   testCalendarAndMissingPromotionDoNotSimulate();
   testStartHandlerMountGate();
   testPathUsesPromotionIdNotStartToken();
+  testPromoPreviewBuyCtaLooksLiveButIsPreviewOnly();
+  testOrdinaryBuyerPdpKeepsLiveBuy();
   testSourceContracts();
   console.log("author-promo-preview-unit: ok");
 }

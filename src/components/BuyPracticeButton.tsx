@@ -31,6 +31,8 @@ type BuyPracticeButtonProps = {
   signInReturnPath?: string;
   pendingLabel?: string;
   hidePendingNotice?: boolean;
+  /** Author promo-preview: keep the live look, never fetch orders/payments. */
+  previewOnly?: boolean;
 };
 
 type ApiErrorBody = {
@@ -99,15 +101,21 @@ export default function BuyPracticeButton({
   signInReturnPath,
   pendingLabel = "Продолжить оплату",
   hidePendingNotice = false,
+  previewOnly = false,
 }: BuyPracticeButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingPending, setIsCheckingPending] = useState(true);
+  const [isCheckingPending, setIsCheckingPending] = useState(() => !previewOnly);
   const [hasPendingOrder, setHasPendingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const surface = normalizePurchaseSurface(purchaseSurface);
 
   useEffect(() => {
+    if (previewOnly) {
+      setIsCheckingPending(false);
+      return;
+    }
+
     let isMounted = true;
 
     async function checkPendingOrder() {
@@ -146,9 +154,13 @@ export default function BuyPracticeButton({
     return () => {
       isMounted = false;
     };
-  }, [practiceSlug]);
+  }, [practiceSlug, previewOnly]);
 
   async function handleBuy() {
+    if (previewOnly) {
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -296,6 +308,7 @@ export default function BuyPracticeButton({
         onClick={handleBuy}
         disabled={isLoading || isCheckingPending}
         aria-busy={isLoading}
+        data-buy-preview-only={previewOnly ? "1" : undefined}
         className={className}
       >
         {isLoading

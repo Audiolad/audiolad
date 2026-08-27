@@ -440,6 +440,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     buyerPreviewMode,
     publishPreviewMode,
     publishListenerViewMode,
+    promoPreviewMode,
   });
 
   const totalDurationSeconds = sumDurationSeconds(publicAudioItems);
