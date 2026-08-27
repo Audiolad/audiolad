@@ -38,6 +38,8 @@ PM2 и lock сегодня работают от запускающего пол
 До `git show` целевого `run-from-target-sha.sh` wrapper проверяет, что
 SHA — commit и предок свежего `origin/main`. Иначе выход без чтения
 скриптов из orphan/PR commit. Override-флаг не используется.
+Workflow резолвит SHA через fetch только объектов origin/main, без
+working-tree checkout, поэтому legacy gitlink `audiolad` не может сломать launcher.
 
 Файл `deploy/scripts/github-actions-deploy-wrapper.sh` в репозитории —
 только **шаблон**. Пока bootstrap его не скопировал в
@@ -84,8 +86,8 @@ secrets.
 
 1. Actions → **Production Deploy** → **Run workflow**.
 2. Branch: `main`.
-3. `commit_sha` — пусто (тогда `origin/main` / `HEAD` checkout `main`) либо
-   полный 40-символьный lowercase hex SHA, который есть в этом checkout.
+3. `commit_sha` — пусто (тогда tip свежего `origin/main`) либо
+   полный 40-символьный lowercase hex SHA, который есть среди объектов origin/main.
 4. `confirm` = **DEPLOY**. Любое другое значение валит job до SSH.
 5. Run workflow.
 

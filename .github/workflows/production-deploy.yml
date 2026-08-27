@@ -3,13 +3,14 @@
 # That wrapper launches the existing run-from-target-sha.sh -> deploy.sh path.
 # Smoke failure still blocks cutover. This workflow does not set
 # AUDIOLAD_DEPLOY_OVERRIDE and does not deploy by being merged.
+# SHA resolution fetches origin/main objects only; no working-tree checkout.
 name: Production Deploy
 
 on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: "Optional 40-char lowercase hex SHA. Empty = origin/main tip of this checkout."
+        description: "Optional 40-char lowercase hex SHA. Empty = origin/main tip."
         required: false
         type: string
         default: ""
@@ -34,13 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout origin/main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
-
       - name: Resolve target SHA
         id: target
         env:
@@ -53,9 +47,15 @@ jobs:
             exit 1
           fi
 
+          OBJECT_STORE="$(mktemp -d)"
+          git -C "${OBJECT_STORE}" init --quiet
+          git -C "${OBJECT_STORE}" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${OBJECT_STORE}" fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          ORIGIN_MAIN_SHA="$(git -C "${OBJECT_STORE}" rev-parse refs/remotes/origin/main)"
+
           REQUESTED="$(printf '%s' "${INPUT_COMMIT_SHA}" | tr -d '[:space:]')"
           if [[ -z "${REQUESTED}" ]]; then
-            TARGET_SHA="$(git rev-parse HEAD)"
+            TARGET_SHA="${ORIGIN_MAIN_SHA}"
           else
             TARGET_SHA="${REQUESTED}"
           fi
@@ -65,9 +65,8 @@ jobs:
             exit 1
           fi
 
-          git cat-file -e "${TARGET_SHA}^{commit}"
-          ORIGIN_MAIN_SHA="$(git rev-parse HEAD)"
-          if ! git merge-base --is-ancestor "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}"; then
+          git -C "${OBJECT_STORE}" cat-file -e "${TARGET_SHA}^{commit}"
+          if ! git -C "${OBJECT_STORE}" merge-base --is-ancestor "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}"; then
             echo "ERROR: ${TARGET_SHA} is not an ancestor of origin/main (${ORIGIN_MAIN_SHA})" >&2
             exit 1
           fi
