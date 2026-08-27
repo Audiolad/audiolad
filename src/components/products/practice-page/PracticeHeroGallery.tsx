@@ -12,6 +12,7 @@ import CatalogProductHeartButton from "@/components/products/CatalogProductHeart
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
 import {
   buildCoverFirstHeroSlides,
+  buildWindowedHeroDots,
   shouldRenderProductHeroSlider,
 } from "@/lib/catalog/product-hero-gallery";
 import type { CatalogSlide } from "@/lib/catalog/dto";
@@ -22,6 +23,7 @@ type PracticeHeroGalleryProps = {
   cover: PracticePageCoverData;
   slides: readonly CatalogSlide[];
   priority?: boolean;
+  showMobileDots?: boolean;
   heartProduct?: CatalogListingItem | null;
   isAuthenticated?: boolean;
   signInReturnPath?: string;
@@ -31,6 +33,7 @@ export default function PracticeHeroGallery({
   cover,
   slides,
   priority = false,
+  showMobileDots = false,
   heartProduct = null,
   isAuthenticated = false,
   signInReturnPath = "/catalog",
@@ -154,7 +157,32 @@ export default function PracticeHeroGallery({
     );
   }
 
-  return (
+  const dots = showMobileDots ? (
+    <div
+      data-practice-hero-dots
+      data-practice-hero-dots-total={pages.length}
+      data-practice-hero-dots-active={activeIndex}
+      className="practice-hero-dots"
+      aria-hidden="true"
+    >
+      {buildWindowedHeroDots(activeIndex, pages.length).map((dot) => (
+        <span
+          key={dot.index}
+          data-practice-hero-dot={dot.index}
+          data-practice-hero-dot-active={dot.active ? "true" : "false"}
+          className={
+            dot.active
+              ? "practice-hero-dot practice-hero-dot--active"
+              : dot.edge
+                ? "practice-hero-dot practice-hero-dot--edge"
+                : "practice-hero-dot"
+          }
+        />
+      ))}
+    </div>
+  ) : null;
+
+  const gallery = (
     <div
       data-practice-hero-gallery
       data-practice-hero-gallery-count={slides.length}
@@ -236,4 +264,10 @@ export default function PracticeHeroGallery({
       {heart}
     </div>
   );
+
+  if (!showMobileDots) {
+    return gallery;
+  }
+
+  return <div className="practice-hero-media">{gallery}{dots}</div>;
 }

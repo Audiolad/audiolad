@@ -131,6 +131,8 @@ function testPdpGalleryStaysInCoverSlot() {
   assert.match(gallery, /featured-card__cover/);
   assert.doesNotMatch(gallery, /object-cover/);
   assert.match(gallery, /\{activeIndex \+ 1\} \/ \{pages\.length\}/);
+  assert.match(gallery, /showMobileDots/);
+  assert.match(gallery, /data-practice-hero-dots/);
   assert.match(parts, /FEATURED_CARD_PRIMARY_CTA_CLASS/);
   assert.doesNotMatch(parts, /heroBuyClassName/);
   assert.doesNotMatch(parts, /bg-\[#f4ecfb\] px-4 py-4/);

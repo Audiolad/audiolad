@@ -39,6 +39,7 @@ export default function PracticeProductHero({
           cover={cover}
           slides={viewModel.gallerySlides}
           priority
+          showMobileDots={layout === "mobile"}
           heartProduct={toPracticeHeartProduct(viewModel)}
           isAuthenticated={viewModel.isAuthenticated}
           signInReturnPath={viewModel.practicePagePath}

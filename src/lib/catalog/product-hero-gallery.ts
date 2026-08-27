@@ -58,6 +58,54 @@ export function shouldRenderProductHeroSlider(
   return slides.length > 1;
 }
 
+/** Compact mobile carousel window. Never render one micro-dot per slide. */
+export const PRACTICE_HERO_DOT_WINDOW = 5;
+
+export type HeroGalleryDot = {
+  index: number;
+  active: boolean;
+  edge: boolean;
+};
+
+/**
+ * Sliding window of ~5 dots that tracks the active slide.
+ * Edge dots shrink to hint that more slides exist beyond the window.
+ */
+export function buildWindowedHeroDots(
+  activeIndex: number,
+  total: number,
+  windowSize = PRACTICE_HERO_DOT_WINDOW,
+): HeroGalleryDot[] {
+  if (total <= 0) {
+    return [];
+  }
+
+  const size = Math.max(1, Math.min(windowSize, total));
+  const current = Math.min(total - 1, Math.max(0, activeIndex));
+
+  if (total <= size) {
+    return Array.from({ length: total }, (_, index) => ({
+      index,
+      active: index === current,
+      edge: false,
+    }));
+  }
+
+  const half = Math.floor(size / 2);
+  const start = Math.max(0, Math.min(current - half, total - size));
+
+  return Array.from({ length: size }, (_, offset) => {
+    const index = start + offset;
+    const atWindowStart = offset === 0 && start > 0;
+    const atWindowEnd = offset === size - 1 && start + size < total;
+    return {
+      index,
+      active: index === current,
+      edge: (atWindowStart || atWindowEnd) && index !== current,
+    };
+  });
+}
+
 export function formatMaterialsCountLabel(count: number): string {
   const abs = Math.abs(Math.trunc(count)) % 100;
   const last = abs % 10;
