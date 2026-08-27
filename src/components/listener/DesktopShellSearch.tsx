@@ -8,6 +8,7 @@ import PlatformCatalogInlineSearch from "@/components/listener/PlatformCatalogIn
 import PlatformSearchCombobox, {
   PlatformSearchSkeleton,
 } from "@/components/listener/PlatformSearchCombobox";
+import MyPracticesLibraryChrome from "@/components/my-practices/MyPracticesLibraryChrome";
 import { isPublicPlaylistCatalogPath } from "@/lib/auth/routes";
 import {
   getListenerDesktopViewportServerSnapshot,
@@ -50,6 +51,20 @@ function CatalogDesktopSearchRow({
   );
 }
 
+function MyPracticesDesktopChromeFallback() {
+  return (
+    <div className="pt-3">
+      <h1 className="text-[28px] font-semibold">Аудиотека</h1>
+      <p className="mt-1 text-sm text-[#7d70a2]">
+        Всё, что вы сохранили, купили, добавили.
+      </p>
+      <div className="mt-3">
+        <PlatformSearchSkeleton density="compact" />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Desktop-only shell search. Hidden below xl so mobile pages keep zero
  * extra search forms in the DOM.
@@ -57,9 +72,10 @@ function CatalogDesktopSearchRow({
  * On /catalog this is the compact chrome row: PlatformCatalogInlineSearch
  * plus CatalogMobileFiltersSlot (passed in from the server shell).
  * On /playlists/catalog the page owns PlaylistCatalogSearch, so this
- * shell slot stays empty. /my-practices owns its own Audioteka search,
- * so this shell slot stays empty there too. Other routes keep
- * PlatformSearchCombobox.
+ * shell slot stays empty. On /my-practices this is the pinned Audioteka
+ * chrome (title, subtitle, search + filters) — a shrink-0 sibling above
+ * center-scroll, same mechanism as catalog. Mobile Audioteka chrome
+ * stays in the route layout. Other routes keep PlatformSearchCombobox.
  */
 export default function DesktopShellSearch({
   catalogFilters,
@@ -69,12 +85,10 @@ export default function DesktopShellSearch({
   const isDesktop = useListenerDesktopViewport();
   const isCatalogRoute =
     pathname === "/catalog" || pathname.startsWith("/catalog");
+  const isMyPracticesRoute =
+    pathname === "/my-practices" || pathname.startsWith("/my-practices/");
 
   if (isPublicPlaylistCatalogPath(pathname)) {
-    return null;
-  }
-
-  if (pathname === "/my-practices" || pathname.startsWith("/my-practices/")) {
     return null;
   }
 
@@ -86,6 +100,10 @@ export default function DesktopShellSearch({
           search={<PlatformSearchSkeleton density="compact" />}
         />
       );
+    }
+
+    if (isMyPracticesRoute) {
+      return <MyPracticesDesktopChromeFallback />;
     }
 
     return <PlatformSearchSkeleton />;
@@ -105,6 +123,14 @@ export default function DesktopShellSearch({
           </Suspense>
         }
       />
+    );
+  }
+
+  if (isMyPracticesRoute) {
+    return (
+      <Suspense fallback={<MyPracticesDesktopChromeFallback />}>
+        <MyPracticesLibraryChrome surface="desktop" />
+      </Suspense>
     );
   }
 
