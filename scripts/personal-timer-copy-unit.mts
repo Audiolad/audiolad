@@ -334,6 +334,8 @@ function testSourceContracts() {
 
   assert.match(page, /aboveTimerText: resolvedPrice\?\.promotion\?\.aboveTimerText/);
   assert.match(page, /publishListenerViewMode/);
+  assert.match(page, /promo_preview/);
+  assert.match(page, /resolveAuthorPromoPreview/);
   assert.doesNotMatch(page, /25-meditation-solutions/);
 
   assert.match(migration, /ADD COLUMN IF NOT EXISTS above_timer_text/);

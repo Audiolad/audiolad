@@ -666,6 +666,14 @@ function testSourceContracts() {
   assert(promoForm.includes("DEFAULT_PERSONAL_TIMER_BELOW_TEXT"), "default below");
   assert(promoForm.includes("above_timer_text"), "saves above copy");
   assert(promoForm.includes("below_button_text"), "saves below copy");
+  assert(promoForm.includes("Предпросмотр акции"), "author promo preview button");
+  assert(promoForm.includes("buildPracticePromoPreviewPath"), "preview uses promotion id path");
+  const previewHref = promoForm.slice(promoForm.indexOf("buildPracticePromoPreviewPath"));
+  assert(previewHref.includes("row.id"), "preview href uses promotion id");
+  assert(
+    !previewHref.slice(0, 180).includes("start_token"),
+    "preview href must not use start_token",
+  );
 
   const offer = readFileSync(
     join(ROOT, "src/components/pricing/ProductPriceOffer.tsx"),

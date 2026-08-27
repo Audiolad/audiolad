@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { formatRubles } from "@/lib/products/price-format";
+import { buildPracticePromoPreviewPath } from "@/lib/products/paths";
 import {
   durationToSeconds,
   type PromotionDurationUnit,
@@ -32,6 +34,8 @@ type AuthorProductPromotionsProps = {
   practiceId: string | null;
   basePrice: number;
   disabled?: boolean;
+  authorSlug?: string | null;
+  productSlug?: string | null;
 };
 
 function statusLabel(row: PromotionRow): string {
@@ -78,6 +82,8 @@ export default function AuthorProductPromotions({
   practiceId,
   basePrice,
   disabled = false,
+  authorSlug = null,
+  productSlug = null,
 }: AuthorProductPromotionsProps) {
   const [rows, setRows] = useState<PromotionRow[]>([]);
   const [loading, setLoading] = useState(() => Boolean(practiceId));
@@ -459,7 +465,22 @@ export default function AuthorProductPromotions({
                   </p>
                 ) : null}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {authorSlug && productSlug ? (
+                  <Link
+                    href={buildPracticePromoPreviewPath(
+                      authorSlug,
+                      productSlug,
+                      row.id,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-author-promo-preview={row.id}
+                    className="rounded-full border border-[#c6afe6] px-3 py-1.5 text-xs font-semibold text-[#7042c5]"
+                  >
+                    Предпросмотр акции
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   disabled={disabled}

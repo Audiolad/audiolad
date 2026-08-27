@@ -57,6 +57,19 @@ export function buildPracticePublishListenerPreviewPath(
   return `${buildPracticePublishPreviewPath(authorSlug, productSlug)}&view=listener`;
 }
 
+/**
+ * Author-only personal-timer preview. Reuses listener preview params and
+ * adds `promo_preview={promotionId}` — never the public `?promo=` token.
+ */
+export function buildPracticePromoPreviewPath(
+  authorSlug: string,
+  productSlug: string,
+  promotionId: string,
+): string {
+  const encoded = encodeURIComponent(promotionId.trim());
+  return `${buildPracticePublishListenerPreviewPath(authorSlug, productSlug)}&promo_preview=${encoded}`;
+}
+
 export function buildListenPath(
   authorSlug: string,
   productSlug: string,
