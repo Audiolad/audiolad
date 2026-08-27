@@ -822,6 +822,114 @@ html.catalog-sheet-lock body {
   }
 }
 
+/*
+ * Standard PDP desktop hero only. Homepage guest featured-card rules above
+ * stay the visual language; these selectors must not match that card.
+ * Square cover stays in flow and sets the card height. The info column is
+ * painted into the leftover rectangle so white cannot collect under the cover.
+ */
+@media (min-width: 1280px) {
+  [data-practice-product-hero="desktop"].featured-card {
+    position: relative;
+    align-items: flex-start;
+  }
+
+  [data-practice-product-hero="desktop"] .featured-card__cover {
+    width: min(56%, 360px);
+    flex: 0 0 min(56%, 360px);
+    aspect-ratio: 1 / 1;
+    align-self: flex-start;
+  }
+
+  [data-practice-product-hero="desktop"] .featured-card__content {
+    position: absolute;
+    inset: 0 0 0 min(56%, 360px);
+    box-sizing: border-box;
+    display: flex;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
+    flex: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.375rem;
+    overflow: hidden;
+    padding: 0.75rem 1rem 0.625rem 1.125rem;
+  }
+
+  [data-practice-product-hero="desktop"] .featured-card__content > * {
+    margin-top: 0;
+  }
+
+  [data-practice-product-hero="desktop"] .practice-product-hero__cta {
+    margin-top: 0.125rem;
+  }
+
+  [data-practice-product-hero="desktop"] .practice-product-hero__actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.625rem;
+    margin-top: 0.625rem;
+  }
+
+  [data-practice-product-hero="desktop"] .practice-product-hero__actions > * {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  [data-practice-product-hero="desktop"] .practice-product-hero__actions button {
+    white-space: nowrap;
+  }
+
+  [data-practice-product-hero="desktop"] .practice-product-hero__legal {
+    margin-top: 0.25rem;
+    font-size: 10px;
+    line-height: 1.3;
+    color: #9b92b3;
+  }
+
+  [data-practice-product-hero="desktop"][data-practice-hero-has-promo="true"]
+    .featured-card__content {
+    gap: 0.25rem;
+    padding-top: 0.625rem;
+    padding-bottom: 0.5rem;
+  }
+
+  [data-practice-product-hero="desktop"][data-practice-hero-has-promo="true"]
+    .practice-product-hero__cta {
+    margin-top: 0;
+  }
+
+  [data-practice-product-hero="desktop"][data-practice-hero-has-promo="true"]
+    .practice-product-hero__actions {
+    margin-top: 0.5rem;
+  }
+
+  [data-practice-product-hero="desktop"][data-practice-hero-has-promo="true"]
+    [data-product-price-offer="promo"]
+    p {
+    margin-top: 0.25rem;
+  }
+
+  [data-practice-product-hero="desktop"][data-practice-hero-has-promo="true"]
+    [data-product-price-offer-countdown]
+    p {
+    margin-top: 0.25rem;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+}
+
+.practice-product-hero__cta {
+  margin-top: 1rem;
+}
+
+[data-practice-product-hero="mobile"] .practice-product-hero__actions {
+  flex-wrap: wrap;
+}
+
 .primary-cta,
 .home-primary-cta {
   display: inline-flex;

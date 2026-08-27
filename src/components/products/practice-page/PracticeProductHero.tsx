@@ -28,6 +28,7 @@ export default function PracticeProductHero({
 
   return (
     <FeaturedProductCard
+      className="practice-product-hero"
       data-practice-product-hero={layout}
       data-practice-hero-has-gallery={
         viewModel.gallerySlides.length > 0 ? "true" : "false"
@@ -60,7 +61,10 @@ export default function PracticeProductHero({
         <p className={FEATURED_CARD_META_CLASS}>{viewModel.meta}</p>
       ) : null}
 
-      <PracticePrimaryActionSection viewModel={viewModel} className="mt-4 shrink-0" />
+      <PracticePrimaryActionSection
+        viewModel={viewModel}
+        className="practice-product-hero__cta shrink-0"
+      />
     </FeaturedProductCard>
   );
 }

@@ -128,6 +128,11 @@ function testBeforePurchaseRowKeepsBuy() {
 
   assert.match(
     action,
+    /data-practice-hero-actions/,
+    "Buy + Listen share one actions row",
+  );
+  assert.match(
+    action,
     /FEATURED_CARD_PRIMARY_CTA_CLASS/,
     "paid buy uses the homepage featured CTA class",
   );

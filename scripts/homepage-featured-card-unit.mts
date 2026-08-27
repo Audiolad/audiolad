@@ -88,6 +88,38 @@ function testGuestGeometryIsSharedNotHomeScoped() {
   );
 }
 
+function testHomepageGuestCardRulesStayPixelEquivalent() {
+  const css = read("src/app/globals.css");
+  const homeHero = read("src/components/home/HeroFeaturedProduct.tsx");
+
+  assert.match(
+    css,
+    /@media \(min-width: 1024px\)[\s\S]*\.featured-card--guest \.featured-card__cover\s*\{[^}]*width:\s*min\(56%, 360px\)/,
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 1024px\)[\s\S]*\.featured-card--guest \.featured-card__content\s*\{[^}]*width:\s*44%/,
+  );
+  assert.match(
+    css,
+    /\.listener-home-content \.featured-card__cover\s*\{[^}]*width:\s*168px/,
+  );
+  assert.match(
+    css,
+    /\.listener-home-content \.featured-card__content\s*\{[^}]*padding:\s*1rem 1\.125rem/,
+  );
+  assert.doesNotMatch(
+    homeHero,
+    /practice-product-hero|data-practice-product-hero/,
+    "homepage hero must not pick up PDP geometry hooks",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="desktop"\][\s\S]*position:\s*absolute/,
+    "PDP desktop info column is scoped off the homepage card",
+  );
+}
+
 function testPdpGalleryStaysInCoverSlot() {
   const gallery = read(
     "src/components/products/practice-page/PracticeHeroGallery.tsx",
@@ -106,6 +138,7 @@ function testPdpGalleryStaysInCoverSlot() {
 
 testSharedShellIsTheHomepageCard();
 testGuestGeometryIsSharedNotHomeScoped();
+testHomepageGuestCardRulesStayPixelEquivalent();
 testPdpGalleryStaysInCoverSlot();
 
 console.log("homepage-featured-card-unit: ok");
