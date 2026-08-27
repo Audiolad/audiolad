@@ -112,7 +112,6 @@ export default function BuyPracticeButton({
 
   useEffect(() => {
     if (previewOnly) {
-      setIsCheckingPending(false);
       return;
     }
 

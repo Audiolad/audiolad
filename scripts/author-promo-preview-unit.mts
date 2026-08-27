@@ -707,8 +707,13 @@ function testSourceContracts() {
   const accessUi = read("src/lib/products/practice-access-ui.ts");
 
   assert.match(buyButton, /previewOnly = false/);
+  assert.match(buyButton, /useState\(\(\) => !previewOnly\)/);
   assert.match(buyButton, /if \(previewOnly\) \{\s*return;/);
-  assert.match(buyButton, /if \(previewOnly\) \{\s*setIsCheckingPending\(false\);/);
+  assert.doesNotMatch(
+    buyButton,
+    /if \(previewOnly\) \{\s*setIsCheckingPending/,
+    "previewOnly effect must not setState",
+  );
   assert.match(buyButton, /\/api\/orders/);
   assert.match(buyButton, /\/api\/payments/);
   assert.match(parts, /previewOnly=\{buyAction\.previewOnly === true\}/);
