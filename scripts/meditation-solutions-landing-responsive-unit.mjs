@@ -29,8 +29,21 @@ const html = `<!doctype html>
       }
       .shell { padding: 1.5rem 1.25rem 1rem; }
       article { margin: 0 auto; width: 100%; max-width: 720px; padding-bottom: var(--platform-bottom-content-padding); }
-      .hero { aspect-ratio: 4 / 5; width: 100%; border-radius: 28px; background: #efe6fb; }
-      h1 { margin: 1.25rem 0 0; font-size: 26px; line-height: 1.2; }
+      .hero-card {
+        border: 1px solid #e8def5;
+        border-radius: 28px;
+        background: #fff;
+        padding: 14px;
+      }
+      .hero-cover {
+        aspect-ratio: 1 / 1;
+        width: 100%;
+        border-radius: 22px;
+        background: #efe6fb;
+        object-fit: contain;
+      }
+      .hero-title { padding: 1rem 2px 4px; }
+      h1 { margin: 0; font-size: 26px; line-height: 1.2; }
       .copy { margin: 1rem 0 0; font-size: 15px; line-height: 1.5; color: #5f5484; }
       .cta { margin-top: 1.5rem; }
       .price { font-size: 36px; font-weight: 600; line-height: 1; }
@@ -63,8 +76,12 @@ const html = `<!doctype html>
   <body>
     <div class="shell">
       <article data-meditation-solutions-landing>
-        <div class="hero"></div>
-        <h1>25 готовых решений для создания своих медитаций</h1>
+        <div data-meditation-solutions-hero-card class="hero-card">
+          <div data-meditation-solutions-hero-cover class="hero-cover"></div>
+          <div data-meditation-solutions-hero-title class="hero-title">
+            <h1>25 готовых решений для создания своих медитаций</h1>
+          </div>
+        </div>
         <p class="copy">Как создать свою медитацию с нуля: выбрать тему, написать текст для медитации, записать медитацию самостоятельно, добавить музыку и получить готовый MP3.</p>
         <p class="copy">25 готовых тем, текстов, шаблонов, инструкций и практических инструментов – от первой идеи до готовой медитации с голосом и музыкой.</p>
         <div class="cta" data-meditation-solutions-cta="top">
@@ -114,15 +131,25 @@ try {
 
     const metrics = await page.evaluate(() => {
       const article = document.querySelector("[data-meditation-solutions-landing]");
+      const heroCard = document.querySelector("[data-meditation-solutions-hero-card]");
+      const heroCover = document.querySelector("[data-meditation-solutions-hero-cover]");
+      const heroTitle = document.querySelector("[data-meditation-solutions-hero-title]");
+      const heading = heroTitle.querySelector("h1");
       const grid = document.querySelector("[data-meditation-solutions-grid]");
       const cards = [...grid.querySelectorAll(":scope > li")];
       const first = cards[0].getBoundingClientRect();
       const second = cards[1].getBoundingClientRect();
       const third = cards[2].getBoundingClientRect();
+      const coverBox = heroCover.getBoundingClientRect();
       return {
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
         articleWidth: article.getBoundingClientRect().width,
+        heroCardWidth: heroCard.getBoundingClientRect().width,
+        coverWidth: coverBox.width,
+        coverHeight: coverBox.height,
+        coverSquare: Math.abs(coverBox.width - coverBox.height) <= 1,
+        headingInsideCard: heroCard.contains(heading),
         columns: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
         firstTop: Math.round(first.top),
         secondTop: Math.round(second.top),
@@ -132,6 +159,12 @@ try {
       };
     });
 
+    assert.equal(metrics.headingInsideCard, true, `${width}px: H1 in hero card`);
+    assert.equal(metrics.coverSquare, true, `${width}px: hero cover is square`);
+    assert.ok(
+      metrics.coverWidth <= metrics.heroCardWidth,
+      `${width}px: hero cover stays inside the card`,
+    );
     assert.equal(metrics.cardCount, 26, `${width}px: 26 cards`);
     assert.equal(metrics.columns, 2, `${width}px: exactly 2 columns`);
     assert.equal(

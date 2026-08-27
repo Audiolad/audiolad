@@ -31,22 +31,35 @@ export default function MeditationSolutionsLandingView({
         data-meditation-solutions-landing
         className={`mx-auto w-full max-w-[720px] ${platformBottomContentPaddingClass}`}
       >
-        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[28px] bg-[#efe6fb] shadow-[0_16px_40px_rgba(37,19,92,0.08)]">
-          <Image
-            src={MEDITATION_SOLUTIONS_HERO_IMAGE}
-            alt={MEDITATION_SOLUTIONS_H1}
-            fill
-            priority
-            sizes="(max-width: 430px) 100vw, (max-width: 720px) 90vw, 720px"
-            className="object-cover"
-          />
+        <div
+          data-meditation-solutions-hero-card
+          className="rounded-[28px] border border-[#e8def5] bg-white p-3.5 shadow-[0_12px_32px_rgba(37,19,92,0.07)] sm:p-4"
+        >
+          <div
+            data-meditation-solutions-hero-cover
+            className="relative aspect-square w-full overflow-hidden rounded-[22px] bg-[#efe6fb]"
+          >
+            <Image
+              src={MEDITATION_SOLUTIONS_HERO_IMAGE}
+              alt={MEDITATION_SOLUTIONS_H1}
+              fill
+              priority
+              sizes="(max-width: 430px) 100vw, (max-width: 720px) 90vw, 720px"
+              className="object-contain"
+            />
+          </div>
+
+          <div
+            data-meditation-solutions-hero-title
+            className="px-0.5 pb-1 pt-4"
+          >
+            <h1 className="text-[26px] font-semibold leading-[1.2] text-[#25135c] lg:text-[32px] lg:leading-[1.15]">
+              {MEDITATION_SOLUTIONS_H1}
+            </h1>
+          </div>
         </div>
 
-        <h1 className="mt-5 text-[26px] font-semibold leading-[1.2] text-[#25135c] lg:text-[32px] lg:leading-[1.15]">
-          {MEDITATION_SOLUTIONS_H1}
-        </h1>
-
-        <p className="mt-4 text-[15px] leading-6 text-[#5f5484] lg:text-[16px] lg:leading-7">
+        <p className="mt-5 text-[15px] leading-6 text-[#5f5484] lg:text-[16px] lg:leading-7">
           {MEDITATION_SOLUTIONS_SUBTITLE}
         </p>
         <p className="mt-3 text-[15px] leading-6 text-[#5f5484] lg:text-[16px] lg:leading-7">

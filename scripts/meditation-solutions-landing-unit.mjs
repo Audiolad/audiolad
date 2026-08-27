@@ -422,6 +422,50 @@ function testSeoAndShell() {
   );
 }
 
+function testHeroProductCard() {
+  const view = read(
+    "src/components/landings/25-meditation-solutions/MeditationSolutionsLandingView.tsx",
+  );
+
+  assert.match(view, /data-meditation-solutions-hero-card/);
+  assert.match(view, /data-meditation-solutions-hero-cover/);
+  assert.match(view, /data-meditation-solutions-hero-title/);
+  assert.match(view, /aspect-square/);
+  assert.match(view, /object-contain/);
+  assert.match(view, /rounded-\[22px\]/);
+  assert.match(view, /rounded-\[28px\]/);
+  assert.match(view, /border-\[#e8def5\]/);
+  assert.doesNotMatch(view, /aspect-\[4\/5\]/);
+  assert.doesNotMatch(view, /object-cover/);
+
+  const cardIndex = view.indexOf("data-meditation-solutions-hero-card");
+  const titleIndex = view.indexOf("data-meditation-solutions-hero-title");
+  const h1Index = view.indexOf("<h1");
+  const h1CloseIndex = view.indexOf("</h1>");
+  const heroCardCloseIndex = view.indexOf("</div>", view.indexOf("</div>", h1CloseIndex) + 1);
+  const subtitleJsxIndex = view.indexOf("{MEDITATION_SOLUTIONS_SUBTITLE}");
+  const offerJsxIndex = view.indexOf("{MEDITATION_SOLUTIONS_OFFER_LINE}");
+  const topCtaIndex = view.indexOf('placement="top"');
+
+  assert.ok(cardIndex >= 0, "hero card container");
+  assert.ok(titleIndex > cardIndex, "title zone inside card");
+  assert.ok(h1Index > titleIndex, "H1 lives in the title zone");
+  assert.ok(
+    subtitleJsxIndex > heroCardCloseIndex,
+    "subtitle stays below the hero card",
+  );
+  assert.ok(offerJsxIndex > subtitleJsxIndex, "offer line stays below subtitle");
+  assert.ok(topCtaIndex > offerJsxIndex, "top CTA stays below offer copy");
+  assert.match(
+    view,
+    /data-meditation-solutions-hero-title[\s\S]*<h1[\s\S]*MEDITATION_SOLUTIONS_H1[\s\S]*<\/h1>/,
+  );
+  assert.doesNotMatch(
+    view.slice(cardIndex, heroCardCloseIndex),
+    /\{MEDITATION_SOLUTIONS_SUBTITLE\}/,
+  );
+}
+
 function testNoPageBuilder() {
   const view = read(
     "src/components/landings/25-meditation-solutions/MeditationSolutionsLandingView.tsx",
@@ -440,6 +484,7 @@ testExpiryUi();
 testCheckoutWiring();
 testProductImagesOnBranch();
 testSeoAndShell();
+testHeroProductCard();
 testNoPageBuilder();
 
 console.log("meditation-solutions-landing-unit: ok");
