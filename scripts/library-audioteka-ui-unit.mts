@@ -360,9 +360,9 @@ function testFallbackCover() {
 
   assert.equal(privateAudio.cover.url, null);
   assert.equal(personal.cover.url, null);
-  assert.equal(LIBRARY_FALLBACK_COVER_SRC, "/audiolad-logo.png");
+  assert.equal(LIBRARY_FALLBACK_COVER_SRC, "/brand/audiolad-fallback-mark.png");
   assert.match(fallback, /#f4ecfb/);
-  assert.match(fallback, /audiolad-logo\.png/);
+  assert.match(fallback, /audiolad-fallback-mark\.png/);
   assert.doesNotMatch(fallback, /ProductCoverThumbnail|hashed|gradient\+symbol/);
   assert.match(owned, /LibraryFallbackCover/);
   assert.match(owned, /entry\.cover\.url/);

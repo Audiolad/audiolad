@@ -1,4 +1,4 @@
-export const LIBRARY_FALLBACK_COVER_SRC = "/audiolad-logo.png";
+export const LIBRARY_FALLBACK_COVER_SRC = "/brand/audiolad-fallback-mark.png";
 export const LIBRARY_FALLBACK_COVER_SURFACE = "#f4ecfb";
 
 type LibraryFallbackCoverProps = {
