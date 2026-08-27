@@ -18,6 +18,7 @@ import {
 } from "@/lib/products/access";
 import {
   getPracticeAuthorSlug,
+  getPracticeByAuthorAndSlug,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
 
@@ -169,38 +170,11 @@ export async function loadListenSessionPayload(
   options?: { forceStartAtBeginning?: boolean },
 ): Promise<LoadSessionPayloadResult> {
   try {
-    const { data: practice, error: practiceError } = await supabase
-      .from("practices")
-      .select(
-        `
-      id,
-      author_id,
-      title,
-      slug,
-      description,
-      format,
-      duration_minutes,
-      audio_url,
-      cover_url,
-      cover_image,
-      use_shared_cover,
-      updated_at,
-      status,
-      is_free,
-      is_catalog_listed,
-      guest_access_enabled,
-      product_kind,
-      publication_class,
-      authors!practices_author_id_fkey (
-        id,
-        name,
-        slug
-      )
-    `,
-      )
-      .eq("slug", productSlug)
-      .eq("authors.slug", authorSlug)
-      .maybeSingle();
+    const { practice, error: practiceError } = await getPracticeByAuthorAndSlug(
+      supabase,
+      authorSlug,
+      productSlug,
+    );
 
     if (practiceError) {
       return { ok: false, reason: "error" };

@@ -1,3 +1,4 @@
+import { getAuthorBySlug } from "@/lib/authors/lookup";
 import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -70,6 +71,19 @@ export async function getPracticeByAuthorAndSlug(
   authorSlug: string,
   productSlug: string,
 ): Promise<{ practice: PublicPracticeRow | null; error: boolean }> {
+  const { author, error: authorError } = await getAuthorBySlug(
+    supabase,
+    authorSlug,
+  );
+
+  if (authorError) {
+    return { practice: null, error: true };
+  }
+
+  if (!author?.id) {
+    return { practice: null, error: false };
+  }
+
   const { data, error } = await supabase
     .from("practices")
     .select(
@@ -114,8 +128,8 @@ export async function getPracticeByAuthorAndSlug(
       )
     `,
     )
+    .eq("author_id", author.id)
     .eq("slug", productSlug)
-    .eq("authors.slug", authorSlug)
     .maybeSingle();
 
   if (error) {
