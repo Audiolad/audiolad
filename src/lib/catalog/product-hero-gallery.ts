@@ -195,11 +195,42 @@ export function buildPracticeHeroLightMeta(input: {
   gallerySlides: ReadonlyArray<{ alt?: string | null } | null | undefined> | null | undefined;
   productTypeLabel: string | null | undefined;
   formatMeta: string | null | undefined;
+  authorName?: string | null;
 }): string | null {
-  return (
+  const lightMeta =
     formatHeroMaterialsMeta(input.gallerySlides) ??
-    stripRedundantFormatPrefix(input.formatMeta, input.productTypeLabel)
-  );
+    stripRedundantFormatPrefix(input.formatMeta, input.productTypeLabel);
+  const author = input.authorName?.trim() || null;
+
+  if (author && lightMeta) {
+    return `${author} · ${lightMeta}`;
+  }
+
+  return author ?? lightMeta;
+}
+
+/** Rest of the hero light meta after a leading `${authorName} · ` prefix. */
+export function resolvePracticeHeroLightMetaRest(
+  meta: string | null | undefined,
+  authorName: string | null | undefined,
+): string | null {
+  const trimmedMeta = meta?.trim() || null;
+  const author = authorName?.trim() || null;
+
+  if (!author || !trimmedMeta) {
+    return trimmedMeta;
+  }
+
+  if (trimmedMeta === author) {
+    return null;
+  }
+
+  const prefix = `${author} · `;
+  if (trimmedMeta.startsWith(prefix)) {
+    return trimmedMeta.slice(prefix.length).trim() || null;
+  }
+
+  return trimmedMeta;
 }
 
 /** Single-paragraph description may stand in when subtitle is empty. */

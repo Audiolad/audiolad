@@ -10,6 +10,7 @@ import {
   buildWindowedHeroDots,
   formatHeroMaterialsMeta,
   isHeroPromoOfferActive,
+  resolvePracticeHeroLightMetaRest,
   resolvePracticeHeroSubtitle,
   shouldRenderProductHeroSlider,
 } from "../src/lib/catalog/product-hero-gallery";
@@ -18,6 +19,8 @@ import {
   buildPersonalTimerOfferCopy,
   formatPersonalTimerRemaining,
 } from "../src/lib/pricing/personal-timer-copy";
+import { formatProductMeta } from "../src/lib/products/duration";
+import { buildAuthorPublicPath } from "../src/lib/products/paths";
 import { formatRubles } from "../src/lib/products/price-format";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -126,6 +129,74 @@ function testPromoBlockOnlyWhenOfferActive() {
   assert.doesNotMatch(offer, /4 999|4999/);
   assert.match(hero, /isHeroPromoOfferActive/);
   assert.match(hero, /data-practice-hero-has-promo/);
+}
+
+function testHeroLightMetaAuthorPrefix() {
+  const authorName = "Сергей";
+  const practiceFormatMeta = formatProductMeta({
+    format: "Аудиопрактика",
+    audioCount: 9,
+    durationMinutesFallback: 31,
+  });
+  const musicFormatMeta = formatProductMeta({
+    format: "Музыка",
+    audioCount: 9,
+    durationMinutesFallback: 31,
+  });
+
+  assert.equal(practiceFormatMeta, "Аудиопрактика · 9 аудио · 31 мин");
+  assert.equal(musicFormatMeta, "Музыка · 9 аудио · 31 мин");
+
+  const withAuthor = buildPracticeHeroLightMeta({
+    gallerySlides: [],
+    productTypeLabel: "Аудиопрактика",
+    formatMeta: practiceFormatMeta,
+    authorName,
+  });
+  assert.equal(withAuthor, "Сергей · 9 аудио · 31 мин");
+
+  const withoutAuthor = buildPracticeHeroLightMeta({
+    gallerySlides: [],
+    productTypeLabel: "Аудиопрактика",
+    formatMeta: practiceFormatMeta,
+  });
+  assert.equal(withoutAuthor, "9 аудио · 31 мин");
+
+  const blankAuthor = buildPracticeHeroLightMeta({
+    gallerySlides: [],
+    productTypeLabel: "Аудиопрактика",
+    formatMeta: practiceFormatMeta,
+    authorName: "   ",
+  });
+  assert.equal(blankAuthor, "9 аудио · 31 мин");
+
+  const authorOnly = buildPracticeHeroLightMeta({
+    gallerySlides: [],
+    productTypeLabel: "Аудиопрактика",
+    formatMeta: "Аудиопрактика",
+    authorName,
+  });
+  assert.equal(authorOnly, "Сергей");
+  assert.equal(resolvePracticeHeroLightMetaRest(withAuthor, authorName), "9 аудио · 31 мин");
+  assert.equal(resolvePracticeHeroLightMetaRest(authorOnly, authorName), null);
+  assert.equal(resolvePracticeHeroLightMetaRest(withoutAuthor, null), "9 аудио · 31 мин");
+  assert.equal(resolvePracticeHeroLightMetaRest(withoutAuthor, "   "), "9 аудио · 31 мин");
+
+  for (const [productTypeLabel, formatMeta] of [
+    ["Аудиопрактика", practiceFormatMeta],
+    ["Музыка", musicFormatMeta],
+  ] as const) {
+    assert.equal(
+      buildPracticeHeroLightMeta({
+        gallerySlides: [],
+        productTypeLabel,
+        formatMeta,
+        authorName,
+      }),
+      "Сергей · 9 аудио · 31 мин",
+      `${productTypeLabel} uses the same author prefix`,
+    );
+  }
 }
 
 function testNoGalleryNoPromoFallback() {
@@ -255,11 +326,19 @@ function testReusablePdpWiring() {
   assert.match(page, /PricePromotionStartHandler/);
   assert.match(page, /resolvePracticeHeroSubtitle/);
   assert.match(page, /buildPracticeHeroLightMeta/);
+  assert.match(
+    page,
+    /buildPracticeHeroLightMeta\(\{[\s\S]*?authorName,/,
+    "PDP page passes getAuthorName() into the light meta builder",
+  );
   assert.doesNotMatch(page, /25-meditation-solutions/);
   assert.doesNotMatch(hero, /25-meditation-solutions/);
   assert.match(mobile, /ListenerAppShell|PracticeProductHero/);
   assert.match(desktop, /PracticeProductHero/);
   assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
+  assert.match(hero, /FEATURED_CARD_META_CLASS/);
+  assert.match(hero, /\{viewModel\.meta\}/);
+  assert.match(hero, /PracticeHeroMetaLine/);
   assert.match(hero, /data-practice-hero-type-chip/);
   assert.doesNotMatch(hero, /w-full|flex-grow/);
   assert.match(hero, /FeaturedProductCard/);
@@ -483,8 +562,85 @@ function testMobileWindowedDotsKeepDesktopArrows() {
   );
 }
 
+function testHeroAuthorNameLinksToPublicAuthorPage() {
+  const hero = read(
+    "src/components/products/practice-page/PracticeProductHero.tsx",
+  );
+  const mobile = read(
+    "src/components/products/practice-page/PracticePageMobile.tsx",
+  );
+  const desktop = read(
+    "src/components/products/practice-page/PracticePageDesktop.tsx",
+  );
+  const authorName = "Сергей";
+  const authorSlug = "sergey-audiolad";
+  const lightMeta = buildPracticeHeroLightMeta({
+    gallerySlides: [],
+    productTypeLabel: "Аудиопрактика",
+    formatMeta: formatProductMeta({
+      format: "Аудиопрактика",
+      audioCount: 9,
+      durationMinutesFallback: 31,
+    }),
+    authorName,
+  });
+  const rest = resolvePracticeHeroLightMetaRest(lightMeta, authorName);
+
+  assert.equal(buildAuthorPublicPath(authorSlug), `/authors/${authorSlug}`);
+  assert.equal(lightMeta, "Сергей · 9 аудио · 31 мин");
+  assert.equal(rest, "9 аудио · 31 мин");
+  assert.match(rest ?? "", /9 аудио/);
+  assert.match(rest ?? "", /31 мин/);
+
+  assert.match(hero, /from "next\/link"/);
+  assert.match(hero, /buildAuthorPublicPath/);
+  assert.match(
+    hero,
+    /from "@\/lib\/products\/paths"/,
+    "hero uses the existing public author path helper",
+  );
+  assert.match(
+    hero,
+    /href=\{buildAuthorPublicPath\(viewModel\.resolvedAuthorSlug\)\}/,
+    "author link href is /authors/{resolvedAuthorSlug} via buildAuthorPublicPath",
+  );
+  assert.match(hero, /resolvePracticeHeroLightMetaRest\(viewModel\.meta, authorName\)/);
+  assert.match(hero, /PracticeHeroMetaLine/);
+  assert.match(mobile, /<PracticeProductHero viewModel=\{viewModel\} layout="mobile" \/>/);
+  assert.match(desktop, /<PracticeProductHero viewModel=\{viewModel\} layout="desktop" \/>/);
+  assert.doesNotMatch(
+    hero,
+    /\/authors\//,
+    "do not hardcode /authors/ outside buildAuthorPublicPath",
+  );
+
+  const linkMatch = hero.match(/<Link[\s\S]*?<\/Link>/);
+  assert.ok(linkMatch, "hero renders a Link for the author name");
+  assert.match(
+    linkMatch[0],
+    /\{authorName\}/,
+    "link text is the author name",
+  );
+  assert.doesNotMatch(
+    linkMatch[0],
+    /аудио|мин| · /,
+    "duration/count stay outside the author <a>",
+  );
+  assert.match(
+    hero,
+    /\{rest \? ` · \$\{rest\}` : null\}/,
+    "count and duration render as plain text after the author link",
+  );
+  assert.match(hero, /FEATURED_CARD_META_CLASS/);
+  assert.match(hero, /text-inherit/);
+  assert.match(hero, /xl:hover:underline/);
+  assert.match(hero, /outline-\[#7042c5\]/);
+}
+
 testSliderOnlyWhenGalleryExists();
 testPromoBlockOnlyWhenOfferActive();
+testHeroLightMetaAuthorPrefix();
+testHeroAuthorNameLinksToPublicAuthorPage();
 testNoGalleryNoPromoFallback();
 testMeditationSolutionsGalleryOrder();
 testReusablePdpWiring();

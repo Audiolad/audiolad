@@ -420,6 +420,7 @@ export function PracticePrimaryActionSection({
                       label={buyAction.label}
                       className={FEATURED_CARD_PRIMARY_CTA_CLASS}
                       signInReturnPath={practicePagePath}
+                      previewOnly={buyAction.previewOnly === true}
                     />
                   )}
                   {showPrimaryPlay ? (
@@ -465,6 +466,7 @@ export function PracticePrimaryActionSection({
                       label={buyAction.label}
                       className={FEATURED_CARD_PRIMARY_CTA_CLASS}
                       signInReturnPath={practicePagePath}
+                      previewOnly={buyAction.previewOnly === true}
                     />
                   )}
                   {showPrimaryPlay ? (

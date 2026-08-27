@@ -89,6 +89,8 @@ export type PracticePrimaryAction =
       productPriceMinorSnapshot: number | null;
       currency: string;
       purchaseSurface: "practice_page" | "preview";
+      /** Author promo-preview only: look like Купить, never checkout. */
+      previewOnly?: boolean;
     }
   | {
       kind: "audio_pending";
@@ -511,6 +513,29 @@ function buildAuthorToolbarActions(input: {
   ];
 }
 
+/**
+ * Author promo-preview keeps the live-looking «Купить» CTA but never
+ * starts checkout. Ordinary buyer / published PDP is unchanged.
+ */
+export function applyAuthorPromoPreviewBuyCta(
+  presentation: PracticeAccessPresentation,
+  promoPreviewMode: boolean,
+): PracticeAccessPresentation {
+  if (!promoPreviewMode || presentation.primaryAction.kind !== "buy") {
+    return presentation;
+  }
+
+  return {
+    ...presentation,
+    primaryAction: {
+      ...presentation.primaryAction,
+      label: BUY_ACTION_LABEL,
+      disabled: false,
+      previewOnly: true,
+    },
+  };
+}
+
 export function buildPracticeAccessPresentation(input: {
   access: ProductAccessResult;
   practice: PracticePricing & {
@@ -526,6 +551,8 @@ export function buildPracticeAccessPresentation(input: {
   publishPreviewMode?: boolean;
   /** Clean listener-view within publish-preview (draft only; no status change). */
   publishListenerViewMode?: boolean;
+  /** Author-only personal-timer preview. Buy CTA stays visual, not live. */
+  promoPreviewMode?: boolean;
 }): PracticeAccessPresentation {
   const {
     access,
@@ -536,6 +563,7 @@ export function buildPracticeAccessPresentation(input: {
     buyerPreviewMode = false,
     publishPreviewMode = false,
     publishListenerViewMode = false,
+    promoPreviewMode = false,
   } = input;
   const audioReady = hasAudioReady(practice.audio_url);
   const listenHref = buildListenPath(authorSlug, practice.slug, {
@@ -566,32 +594,38 @@ export function buildPracticeAccessPresentation(input: {
     // Listener-view reuses the same commercial simulation as author publish-preview,
     // but hides service chrome and shows the floating return control.
     if (publishListenerViewMode) {
-      return {
+      return applyAuthorPromoPreviewBuyCta(
+        {
+          ...commercial,
+          libraryAction,
+          showAuthorToolbar: false,
+          showBuyerPreviewBanner: false,
+          showBuyerPreviewExit: true,
+          showPublishPreviewBanner: false,
+          canPublishFromPreview: false,
+          authorToolbarMessage: null,
+          authorToolbarActions: [],
+          showAdminPreview: false,
+        },
+        promoPreviewMode,
+      );
+    }
+
+    return applyAuthorPromoPreviewBuyCta(
+      {
         ...commercial,
         libraryAction,
         showAuthorToolbar: false,
         showBuyerPreviewBanner: false,
-        showBuyerPreviewExit: true,
-        showPublishPreviewBanner: false,
-        canPublishFromPreview: false,
+        showBuyerPreviewExit: false,
+        showPublishPreviewBanner: true,
+        canPublishFromPreview: access.isAuthorMember,
         authorToolbarMessage: null,
         authorToolbarActions: [],
         showAdminPreview: false,
-      };
-    }
-
-    return {
-      ...commercial,
-      libraryAction,
-      showAuthorToolbar: false,
-      showBuyerPreviewBanner: false,
-      showBuyerPreviewExit: false,
-      showPublishPreviewBanner: true,
-      canPublishFromPreview: access.isAuthorMember,
-      authorToolbarMessage: null,
-      authorToolbarActions: [],
-      showAdminPreview: false,
-    };
+      },
+      promoPreviewMode,
+    );
   }
 
   const isAuthorOwner = access.reason === "author_owner";
@@ -617,18 +651,21 @@ export function buildPracticeAccessPresentation(input: {
       buyerPreviewMode: true,
     });
 
-    return {
-      ...commercial,
-      libraryAction,
-      showAuthorToolbar: false,
-      showBuyerPreviewBanner: false,
-      showBuyerPreviewExit: true,
-      showPublishPreviewBanner: false,
-      canPublishFromPreview: false,
-      authorToolbarMessage: null,
-      authorToolbarActions: [],
-      showAdminPreview: false,
-    };
+    return applyAuthorPromoPreviewBuyCta(
+      {
+        ...commercial,
+        libraryAction,
+        showAuthorToolbar: false,
+        showBuyerPreviewBanner: false,
+        showBuyerPreviewExit: true,
+        showPublishPreviewBanner: false,
+        canPublishFromPreview: false,
+        authorToolbarMessage: null,
+        authorToolbarActions: [],
+        showAdminPreview: false,
+      },
+      promoPreviewMode,
+    );
   }
 
   const libraryAction = resolveLibraryAction({
@@ -651,38 +688,44 @@ export function buildPracticeAccessPresentation(input: {
   });
 
   if (isAuthorOwner) {
-    return {
+    return applyAuthorPromoPreviewBuyCta(
+      {
+        ...commercial,
+        libraryAction,
+        showAuthorToolbar: true,
+        showBuyerPreviewBanner: false,
+        showBuyerPreviewExit: false,
+        showPublishPreviewBanner: false,
+        canPublishFromPreview: false,
+        authorToolbarMessage: "Вы вошли как владелец этого продукта",
+        authorToolbarActions: buildAuthorToolbarActions({
+          authorSlug,
+          productSlug: practice.slug,
+          practiceId: practice.id,
+          audioReady,
+          listenHref,
+        }),
+        showAdminPreview: false,
+      },
+      promoPreviewMode,
+    );
+  }
+
+  return applyAuthorPromoPreviewBuyCta(
+    {
       ...commercial,
       libraryAction,
-      showAuthorToolbar: true,
+      showAuthorToolbar: false,
       showBuyerPreviewBanner: false,
       showBuyerPreviewExit: false,
       showPublishPreviewBanner: false,
       canPublishFromPreview: false,
-      authorToolbarMessage: "Вы вошли как владелец этого продукта",
-      authorToolbarActions: buildAuthorToolbarActions({
-        authorSlug,
-        productSlug: practice.slug,
-        practiceId: practice.id,
-        audioReady,
-        listenHref,
-      }),
-      showAdminPreview: false,
-    };
-  }
-
-  return {
-    ...commercial,
-    libraryAction,
-    showAuthorToolbar: false,
-    showBuyerPreviewBanner: false,
-    showBuyerPreviewExit: false,
-    showPublishPreviewBanner: false,
-    canPublishFromPreview: false,
-    authorToolbarMessage: null,
-    authorToolbarActions: [],
-    showAdminPreview: access.reason === "admin",
-  };
+      authorToolbarMessage: null,
+      authorToolbarActions: [],
+      showAdminPreview: access.reason === "admin",
+    },
+    promoPreviewMode,
+  );
 }
 
 export function buildAuthorDashboardEditPath(practiceId: string): string {
