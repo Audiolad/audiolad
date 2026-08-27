@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parsePromotionWriteBody } from "../src/lib/pricing/author-promotions.ts";
+import { parsePromotionWriteBody } from "../src/lib/pricing/author-promotions";
 import {
   DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
   DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
@@ -14,10 +14,10 @@ import {
   formatPersonalTimerRemaining,
   resolvePersonalTimerCopy,
   substitutePersonalTimerTokens,
-} from "../src/lib/pricing/personal-timer-copy.ts";
-import { resolvePracticePrice } from "../src/lib/pricing/resolve.ts";
-import { PRICE_PROMOTION_TYPES, PRICE_SURFACES } from "../src/lib/pricing/types.ts";
-import { formatRubles } from "../src/lib/products/price-format.ts";
+} from "../src/lib/pricing/personal-timer-copy";
+import { resolvePracticePrice } from "../src/lib/pricing/resolve";
+import { PRICE_PROMOTION_TYPES, PRICE_SURFACES } from "../src/lib/pricing/types";
+import { formatRubles } from "../src/lib/products/price-format";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
