@@ -431,6 +431,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     gallerySlides,
     productTypeLabel: typeLabel,
     formatMeta,
+    authorName,
   });
   const recommendation = isAudioPost
     ? resolvePublicPromoRecommendation({
