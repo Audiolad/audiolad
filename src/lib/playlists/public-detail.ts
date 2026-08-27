@@ -46,6 +46,7 @@ type PracticeEmbed = {
   updated_at: string | null;
   status: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   authors: AuthorEmbed | AuthorEmbed[] | null;
 };
 
@@ -209,6 +210,7 @@ export const loadPublicPlaylistBySlug = cache(
         updated_at,
         status,
         is_catalog_listed,
+        catalog_visibility,
         authors!practices_author_id_fkey (
           name,
           slug
@@ -267,7 +269,7 @@ export const loadPublicPlaylistBySlug = cache(
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
 
-      if (!practice) {
+      if (!practice || practice.catalog_visibility === "selected_users") {
         hasUnavailable = true;
         items.push({
           practiceId: row.practice_id,

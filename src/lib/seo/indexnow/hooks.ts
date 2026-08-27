@@ -14,6 +14,7 @@ import {
 } from "@/lib/seo/indexnow/notify";
 import type { IndexNowReason } from "@/lib/seo/indexnow/reasons";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { shouldNotifyIndexNowByVisibility } from "@/lib/products/catalog-visibility";
 
 export type ScheduleIndexNowOptions = NotifyIndexNowOptions & {
   /**
@@ -123,7 +124,18 @@ export function planPracticePublishIndexNow(input: {
   isFirstPublishOfPractice: boolean;
   /** Count of status=published practices before this publish. */
   publishedCountBefore: number;
+  catalogVisibility?: string | null;
+  isCatalogListed?: boolean | null;
 }): Array<{ reason: IndexNowReason; urls: string[] }> {
+  if (
+    !shouldNotifyIndexNowByVisibility(
+      input.catalogVisibility,
+      input.isCatalogListed,
+    )
+  ) {
+    return [];
+  }
+
   const practiceUrl = buildPracticeCanonicalUrl(
     input.authorSlug,
     input.practiceSlug,

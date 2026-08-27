@@ -9,6 +9,11 @@ import {
   mapPracticeRowsToCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import {
+  applyOrdinaryCatalogEligibility,
+  GUEST_ORDINARY_CATALOG_VIEWER,
+  type OrdinaryCatalogViewer,
+} from "@/lib/catalog/visibility-query";
 
 export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_SEARCH_RESULT_LIMIT = 50;
@@ -34,6 +39,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   cover_image,
   status,
   is_catalog_listed,
+  catalog_visibility,
   updated_at,
   published_at,
   created_at,
@@ -46,6 +52,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
 export type PublicCatalogPracticeVisibilityInput = {
   status: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   slug: string | null;
   author_id: string | null;
   cover_image?: unknown;
@@ -126,6 +133,7 @@ type CatalogPracticeSearchRow = {
   cover_image?: unknown;
   status: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -158,12 +166,12 @@ async function loadPracticesMatchingFields(
   pattern: string,
   practiceIdsForTopic: string[] | null,
   limit: number,
+  viewer: OrdinaryCatalogViewer,
 ): Promise<CatalogPracticeSearchRow[]> {
-  let query = supabase
-    .from("practices")
-    .select(CATALOG_PRACTICE_SEARCH_SELECT)
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
+  let query = applyOrdinaryCatalogEligibility(
+    supabase.from("practices").select(CATALOG_PRACTICE_SEARCH_SELECT),
+    viewer,
+  )
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .or(buildPracticeFieldsOrIlikeFilter(pattern));
@@ -186,16 +194,16 @@ async function loadPracticesMatchingAuthors(
   authorIds: string[],
   practiceIdsForTopic: string[] | null,
   limit: number,
+  viewer: OrdinaryCatalogViewer,
 ): Promise<CatalogPracticeSearchRow[]> {
   if (authorIds.length === 0) {
     return [];
   }
 
-  let query = supabase
-    .from("practices")
-    .select(CATALOG_PRACTICE_SEARCH_SELECT)
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
+  let query = applyOrdinaryCatalogEligibility(
+    supabase.from("practices").select(CATALOG_PRACTICE_SEARCH_SELECT),
+    viewer,
+  )
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .in("author_id", authorIds);
@@ -217,6 +225,7 @@ export type CatalogProductSearchOptions = {
   query: string;
   topicKey?: string | null;
   limit?: number;
+  viewer?: OrdinaryCatalogViewer;
 };
 
 /**
@@ -238,12 +247,14 @@ export async function searchPublishedCatalogProducts(
 
   const resultLimit = options.limit ?? CATALOG_SEARCH_RESULT_LIMIT;
   const topicKey = options.topicKey?.trim().toLowerCase() || null;
+  const viewer = options.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
 
   if (topicKey) {
     practiceIdsForTopic = await getPublishedPracticeIdsForTopicKey(
       supabase,
       topicKey,
+      viewer,
     );
 
     if (practiceIdsForTopic.length === 0) {
@@ -259,6 +270,7 @@ export async function searchPublishedCatalogProducts(
       normalizedQuery,
       practiceIdsForTopic,
       resultLimit,
+      viewer,
     ),
     loadMatchingAuthorIds(supabase, ilikePattern),
   ]);
@@ -268,6 +280,7 @@ export async function searchPublishedCatalogProducts(
     matchingAuthorIds,
     practiceIdsForTopic,
     resultLimit,
+    viewer,
   );
 
   const mergedRows = dedupePracticeRowsById([

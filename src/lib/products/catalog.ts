@@ -31,6 +31,11 @@ import {
   groupAudioSummariesByPractice,
   loadPublishedAudioSummaries,
 } from "@/lib/products/public-audio-items";
+import {
+  applyOrdinaryCatalogEligibility,
+  GUEST_ORDINARY_CATALOG_VIEWER,
+  type OrdinaryCatalogViewer,
+} from "@/lib/catalog/visibility-query";
 
 type CatalogPracticeRow = {
   id: string;
@@ -49,6 +54,7 @@ type CatalogPracticeRow = {
   cover_image?: unknown;
   status: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   updated_at: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -94,11 +100,17 @@ export type CatalogQueryOptions = {
   topicKey?: string | null;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
   productKind?: ProductKind | null;
+  /**
+   * Ordinary catalog personalization. Omit (guest) for listed-only public
+   * showcases: home, sitemap, topic hubs, author page.
+   */
+  viewer?: OrdinaryCatalogViewer;
 };
 
 export async function getPublishedPracticeIdsForTopicKey(
   supabase: SupabaseClient,
   topicKey: string,
+  viewer: OrdinaryCatalogViewer = GUEST_ORDINARY_CATALOG_VIEWER,
 ): Promise<string[]> {
   const topicKeys = parseCatalogTopicKeyList(topicKey);
 
@@ -118,11 +130,11 @@ export async function getPublishedPracticeIdsForTopicKey(
 
   const topicIds = topicRows.map((row) => row.id as string);
 
-  const { data: practiceRows, error: practicesError } = await supabase
-    .from("practices")
-    .select("id")
-    .eq("status", "published")
-    .eq("is_catalog_listed", true);
+  const { data: practiceRows, error: practicesError } =
+    await applyOrdinaryCatalogEligibility(
+      supabase.from("practices").select("id"),
+      viewer,
+    );
 
   if (practicesError) {
     return [];
@@ -233,12 +245,14 @@ export async function getPublishedCatalogProducts(
   options?: CatalogQueryOptions,
 ): Promise<CatalogProduct[]> {
   const topicKey = options?.topicKey?.trim().toLowerCase() || null;
+  const viewer = options?.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
 
   if (topicKey) {
     practiceIdsForTopic = await getPublishedPracticeIdsForTopicKey(
       supabase,
       topicKey,
+      viewer,
     );
 
     if (practiceIdsForTopic.length === 0) {
@@ -246,10 +260,11 @@ export async function getPublishedCatalogProducts(
     }
   }
 
-  let query = supabase
-    .from("practices")
-    .select(
-      `
+  let query = applyOrdinaryCatalogEligibility(
+    supabase
+      .from("practices")
+      .select(
+        `
       id,
       author_id,
       title,
@@ -266,6 +281,7 @@ export async function getPublishedCatalogProducts(
       cover_image,
       status,
       is_catalog_listed,
+      catalog_visibility,
       updated_at,
       published_at,
       created_at,
@@ -274,9 +290,9 @@ export async function getPublishedCatalogProducts(
         slug
       )
     `,
-    )
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
+      ),
+    viewer,
+  )
     .not("slug", "is", null)
     .not("author_id", "is", null);
 

@@ -114,12 +114,13 @@ function testDraftAndUnpublishedStayHidden() {
     "direct practice lookup blocks hidden fixtures",
   );
   assert(
-    catalog.includes('eq("status", "published")'),
-    "catalog lists only published products",
+    catalog.includes("applyOrdinaryCatalogEligibility"),
+    "catalog applies ordinary visibility eligibility",
   );
   assert(
-    catalog.includes('eq("is_catalog_listed", true)'),
-    "catalog lists only catalog-listed products",
+    catalog.includes("GUEST_ORDINARY_CATALOG_VIEWER") ||
+      catalog.includes("options?.viewer"),
+    "catalog defaults public showcases to listed-only guest viewer",
   );
   assert(
     marker.includes("isPublicCatalogPracticeRow"),

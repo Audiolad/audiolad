@@ -31,6 +31,7 @@ export type PublicPracticeRow = {
   status: string | null;
   updated_at: string | null;
   is_catalog_listed: boolean | null;
+  catalog_visibility?: string | null;
   guest_access_enabled?: boolean | null;
   listening_notice_enabled?: boolean | null;
   listening_notice_title?: string | null;
@@ -94,6 +95,7 @@ export async function getPracticeByAuthorAndSlug(
       status,
       updated_at,
       is_catalog_listed,
+      catalog_visibility,
       guest_access_enabled,
       listening_notice_enabled,
       listening_notice_title,

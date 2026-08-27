@@ -59,6 +59,7 @@ import {
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
   canRevealPublicProductPage,
+  resolvePracticePageRobots,
   shouldIndexPracticePage,
   shouldTrackPracticeListenerAnalytics,
 } from "@/lib/products/publish-preview";
@@ -221,6 +222,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const indexable = shouldIndexPracticePage(
     practice.status,
     practice.is_catalog_listed,
+    practice.catalog_visibility,
+  );
+  const robots = resolvePracticePageRobots(
+    practice.status,
+    practice.is_catalog_listed,
+    practice.catalog_visibility,
   );
   const isMusic = isMusicProductKind(practice.product_kind);
   const isAudioPost = isAudioPostProductKind(practice.product_kind);
@@ -248,12 +255,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       url: canonical,
     },
-    robots: indexable
-      ? undefined
-      : {
-          index: false,
-          follow: false,
-        },
+    robots: indexable ? undefined : robots,
   };
 }
 
@@ -307,6 +309,8 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     !canRevealPublicProductPage({
       practiceStatus: practice.status,
       access,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
     })
   ) {
     notFound();
@@ -601,6 +605,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     status: practice.status,
     isFixtureMarked: isFixtureMarkedPractice(practice),
     isCatalogListed: practice.is_catalog_listed,
+    catalogVisibility: practice.catalog_visibility,
   })
     ? buildPracticeJsonLd({
         title: practice.title,

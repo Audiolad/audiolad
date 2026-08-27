@@ -92,6 +92,14 @@ function testPracticePublicFields() {
     !hasPracticePublicIndexNowChanges({ author_id: "uuid" }),
     "author_id alone not treated as public notify field",
   );
+  assert(
+    hasPracticePublicIndexNowChanges({ catalog_visibility: "unlisted" }),
+    "visibility change is public-significant",
+  );
+  assert(
+    hasPracticePublicIndexNowChanges({ is_catalog_listed: false }),
+    "listing flag change is public-significant",
+  );
 }
 
 function testSlugChange() {

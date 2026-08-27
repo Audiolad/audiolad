@@ -17,6 +17,7 @@ type PracticePricing = {
   format: string | null;
   status: string | null;
   is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
   guest_access_enabled?: boolean | null;
   /** Effective ruble amount for display/checkout confirmation. */
   displayPrice?: number | null;
@@ -244,7 +245,8 @@ function resolveCommercialAccess(
   if (buyerPreviewMode && canUseBuyerPreview) {
     const isPubliclyListed = isPracticeCatalogListed(practice);
     const canAcquire =
-      isPracticePublished(practice.status) && practice.is_catalog_listed !== false;
+      isPracticePublished(practice.status) &&
+      practice.catalog_visibility !== "selected_users";
 
     // Visual-only simulation of an anonymous visitor without product access.
     if (

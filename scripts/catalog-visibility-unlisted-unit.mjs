@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression: unlisted (published + is_catalog_listed=false) must stay off
+ * Regression: unlisted (published + unlisted / is_catalog_listed=false) must stay off
  * public storefronts, while publish/approve must preserve the author choice.
  */
 import assert from "node:assert/strict";
@@ -34,29 +34,40 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(migration, /is_catalog_listed\s*=\s*NOT v_starter/);
 
+const visibilityMigration = read(
+  "supabase/migrations/20260830120000_practice_catalog_visibility_modes.sql",
+);
+assert.match(visibilityMigration, /catalog_visibility IN \('listed', 'unlisted', 'selected_users'\)/);
+assert.match(visibilityMigration, /is_catalog_listed = \(catalog_visibility = 'listed'\)/);
+assert.match(visibilityMigration, /WHEN is_catalog_listed IS TRUE THEN 'listed'/);
+assert.doesNotMatch(
+  visibilityMigration,
+  /WHEN is_catalog_listed IS FALSE THEN 'selected_users'/,
+);
+
 // Form + API preserve visibility choice
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /isCatalogListed: true/);
 assert.match(form, /isCatalogListed: false/);
-assert.match(form, /is_catalog_listed: form\.isCatalogListed/);
-assert.match(form, /По ссылке/);
+assert.match(form, /catalog_visibility: form\.catalogVisibility/);
+assert.match(form, /Только по ссылке/);
+assert.match(form, /Кому показывать продукт\?/);
 
 const formMerge = read("src/lib/author-products/form-merge.ts");
 assert.match(formMerge, /isCatalogListed: practice\.is_catalog_listed !== false/);
 
 const productRoute = read("src/app/api/author/products/[id]/route.ts");
+assert.match(productRoute, /updates\.catalog_visibility = body\.catalog_visibility/);
 assert.match(productRoute, /updates\.is_catalog_listed = body\.is_catalog_listed/);
 
-// Public storefronts require catalog listing
+// Ordinary catalog is viewer-aware; public showcases stay listed-only
 const catalog = read("src/lib/products/catalog.ts");
-assert.match(catalog, /\.eq\("is_catalog_listed", true\)/);
+assert.match(catalog, /applyOrdinaryCatalogEligibility/);
+assert.match(catalog, /options\?\.viewer \?\? GUEST_ORDINARY_CATALOG_VIEWER/);
 
 const search = read("src/lib/catalog/search.ts");
-assert.equal(
-  (search.match(/\.eq\("is_catalog_listed", true\)/g) ?? []).length >= 2,
-  true,
-  "catalog search filters listed products",
-);
+assert.match(search, /applyOrdinaryCatalogEligibility/);
+assert.match(search, /viewer \?\? GUEST_ORDINARY_CATALOG_VIEWER/);
 
 const authorPage = read("src/lib/authors/public-page.ts");
 assert.match(authorPage, /\.eq\("is_catalog_listed", true\)/);
@@ -83,14 +94,17 @@ assert.doesNotMatch(lookup, /\.eq\("is_catalog_listed"/);
 
 const practicePage = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
 assert.match(practicePage, /shouldIndexPracticePage/);
+assert.match(practicePage, /resolvePracticePageRobots/);
 assert.match(practicePage, /practice\.is_catalog_listed/);
-assert.match(practicePage, /index: false/);
+assert.match(practicePage, /practice\.catalog_visibility/);
 
 const jsonLd = read("src/lib/seo/json-ld/builders.ts");
 assert.match(jsonLd, /isCatalogListed === false/);
+assert.match(jsonLd, /catalogVisibility === "unlisted"/);
 
 const indexHelper = read("src/lib/products/publish-preview.ts");
 assert.match(indexHelper, /export function shouldIndexPracticePage/);
 assert.match(indexHelper, /isCatalogListed/);
+assert.match(indexHelper, /shouldFollowPracticePage/);
 
 console.log("catalog-visibility-unlisted-unit: ok");

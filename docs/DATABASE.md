@@ -25,13 +25,30 @@
 
 Единая сущность аудиопродукта (практика, музыка или аудиопост). Используется в `/catalog` и кабинете автора.
 
-Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `is_catalog_listed`.
+Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `catalog_visibility`, `is_catalog_listed`.
 
-Фильтр публичных витрин: `status=eq.published` и `is_catalog_listed=eq.true`. Режим «По ссылке» = `published` + `is_catalog_listed=false` (прямой URL, без каталога/главной/поиска/sitemap; `noindex`). `approve_and_publish_practice` / `publish_audio_product` сохраняют выбранное `is_catalog_listed` (миграция `20260805194500_preserve_catalog_listed_on_publish.sql`); starters остаются unlisted.
+`catalog_visibility` — источник истины (`listed` | `unlisted` | `selected_users`). `is_catalog_listed` остаётся совместимым флагом и синхронизируется триггером: `listed` → true, `unlisted`/`selected_users` → false. Backfill: `is_catalog_listed=true` → `listed`, `false` → `unlisted` (никогда `selected_users`).
+
+Обычный каталог `/catalog` и `/api/catalog`: guest видит только `listed`; авторизованный — `listed` плюс свои `selected_users` по allowlist `practice_visibility_users`. `unlisted` в каталоге нет. Карточка скрывается, если у зрителя есть активный `user_practices` или `library_saves` (это не одно и то же; оба только убирают карточку из обычного каталога). Публичные витрины (главная, sitemap, editorial, страница автора) остаются listed-only.
+
+Режим «Только по ссылке» = `published` + `unlisted`. Режим «Только выбранным пользователям» = `published` + `selected_users` + строка в `practice_visibility_users`. Allowlist означает только видимость, не grant и не запись в `user_practices`. `approve_and_publish_practice` / `publish_audio_product` сохраняют выбранное `is_catalog_listed` (миграция `20260805194500_preserve_catalog_listed_on_publish.sql`); starters остаются unlisted. Unpublish ставит `is_catalog_listed=false`; триггер переводит `listed` → `unlisted` и оставляет `selected_users`.
 
 Сортировка каталога: `created_at.desc`.
 
-RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published'`.
+RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published' AND catalog_visibility IN ('listed', 'unlisted')`. `selected_users` читают allowlist / автор / admin / entitled (отдельные политики). `audio_items`, gallery и `practice_topics` публично читаются только если `can_current_viewer_read_practice` разрешает родителя. Allowlist-таблица: клиентский SELECT своих/авторских строк, записи только через SECURITY DEFINER RPC.
+
+#### practice_visibility_users (2026-08-30)
+
+Миграции: `20260830120000_practice_catalog_visibility_modes.sql`, `20260830121000_create_practice_order_visibility.sql`.
+
+| Колонка | Тип | Правила |
+|---------|-----|---------|
+| `practice_id` | uuid NOT NULL | FK `practices(id)` ON DELETE CASCADE |
+| `user_id` | uuid NOT NULL | FK `auth.users(id)` ON DELETE CASCADE |
+| `created_by` | uuid NULL | FK `auth.users(id)` ON DELETE SET NULL |
+| `created_at` | timestamptz | default now() |
+
+UNIQUE `(practice_id, user_id)`. Это только VISIBILITY: пользователь может увидеть `selected_users` продукт. Не purchase, не grant, не claim, не library save. Lookup автора — exact email или exact UUID через `lookup_practice_visibility_user` (rate limit 20 / 10 мин, generic not-found). Не использовать editorial search / service-role ilike.
 
 #### product_kind / music_usage_permission (2026-07-29, audio_post 2026-08-05)
 

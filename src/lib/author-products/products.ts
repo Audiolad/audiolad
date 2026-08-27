@@ -44,6 +44,7 @@ const PRACTICE_DETAIL_SELECT = `
   price,
   is_free,
   is_catalog_listed,
+  catalog_visibility,
   cover_url,
   cover_image,
   use_shared_cover,

@@ -10,6 +10,11 @@ import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGal
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
+import PracticeVisibilityUsersEditor from "@/components/author-dashboard/PracticeVisibilityUsersEditor";
+import {
+  CATALOG_VISIBILITY,
+  type CatalogVisibility,
+} from "@/lib/products/catalog-visibility";
 import TopicSelector from "@/components/author-products/TopicSelector";
 import {
   MAX_PAID_PRICE_RUB,
@@ -153,6 +158,7 @@ type FormState = {
   isFree: boolean;
   price: number;
   isCatalogListed: boolean;
+  catalogVisibility: CatalogVisibility;
   promoEnabled: boolean;
   promoTitle: string;
   promoText: string;
@@ -291,6 +297,7 @@ function buildInitialForm(
     isFree: true,
     price: 99,
     isCatalogListed: true,
+    catalogVisibility: CATALOG_VISIBILITY.LISTED,
     promoEnabled: false,
     promoTitle: "",
     promoText: "",
@@ -397,7 +404,8 @@ function buildProductSavePayload(
       form.productKind === PRODUCT_KIND.AUDIO_POST || form.isFree
         ? 0
         : form.price,
-    is_catalog_listed: form.isCatalogListed,
+    is_catalog_listed: form.catalogVisibility === CATALOG_VISIBILITY.LISTED,
+    catalog_visibility: form.catalogVisibility,
     promo_enabled: form.promoEnabled,
     promo_title: form.promoTitle,
     promo_text: form.promoText,
@@ -2829,49 +2837,89 @@ export default function AuthorProductForm({
         </div>
         ) : null}
 
-        {form.productKind === PRODUCT_KIND.AUDIO_POST ? (
-          <fieldset className="block">
-            <legend className="mb-2 block text-sm font-medium">Видимость</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.isCatalogListed ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
-                <input
-                  type="radio"
-                  name="is_catalog_listed"
-                  className="mt-1"
-                  checked={form.isCatalogListed}
-                  disabled={busy}
-                  onChange={() =>
-                    setForm((current) => ({ ...current, isCatalogListed: true }))
-                  }
-                />
-                <span>
-                  <span className="block text-sm font-medium text-[#3f3560]">Публичный</span>
-                  <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
-                    Будет показан в каталоге и на странице автора.
-                  </span>
+        <fieldset className="block">
+          <legend className="mb-2 block text-sm font-medium">
+            Кому показывать продукт?
+          </legend>
+          <div className="grid gap-3">
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.catalogVisibility === CATALOG_VISIBILITY.LISTED ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
+              <input
+                type="radio"
+                name="catalog_visibility"
+                className="mt-1"
+                checked={form.catalogVisibility === CATALOG_VISIBILITY.LISTED}
+                disabled={busy}
+                onChange={() =>
+                  setForm((current) => ({
+                    ...current,
+                    catalogVisibility: CATALOG_VISIBILITY.LISTED,
+                    isCatalogListed: true,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">Всем</span>
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  Обычный продукт каталога. Виден всем в каталоге и по прямой ссылке.
                 </span>
-              </label>
-              <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${!form.isCatalogListed ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
-                <input
-                  type="radio"
-                  name="is_catalog_listed"
-                  className="mt-1"
-                  checked={!form.isCatalogListed}
-                  disabled={busy}
-                  onChange={() =>
-                    setForm((current) => ({ ...current, isCatalogListed: false }))
-                  }
-                />
-                <span>
-                  <span className="block text-sm font-medium text-[#3f3560]">По ссылке</span>
-                  <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
-                    Доступен только по прямой ссылке.
-                  </span>
+              </span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.catalogVisibility === CATALOG_VISIBILITY.SELECTED_USERS ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
+              <input
+                type="radio"
+                name="catalog_visibility"
+                className="mt-1"
+                checked={form.catalogVisibility === CATALOG_VISIBILITY.SELECTED_USERS}
+                disabled={busy}
+                onChange={() =>
+                  setForm((current) => ({
+                    ...current,
+                    catalogVisibility: CATALOG_VISIBILITY.SELECTED_USERS,
+                    isCatalogListed: false,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">
+                  Только выбранным пользователям
                 </span>
-              </label>
-            </div>
-          </fieldset>
-        ) : null}
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  В каталоге видят только добавленные пользователи. Остальным продукт не существует.
+                </span>
+              </span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-[18px] border px-4 py-3 ${form.catalogVisibility === CATALOG_VISIBILITY.UNLISTED ? "border-[#9a74d8] bg-[#f8f4ff]" : "border-[#e4d7f4] bg-white"}`}>
+              <input
+                type="radio"
+                name="catalog_visibility"
+                className="mt-1"
+                checked={form.catalogVisibility === CATALOG_VISIBILITY.UNLISTED}
+                disabled={busy}
+                onChange={() =>
+                  setForm((current) => ({
+                    ...current,
+                    catalogVisibility: CATALOG_VISIBILITY.UNLISTED,
+                    isCatalogListed: false,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#3f3560]">
+                  Только по ссылке
+                </span>
+                <span className="mt-1 block text-sm leading-5 text-[#7d70a2]">
+                  Не показывается в каталоге. Любой, у кого есть ссылка, может открыть страницу.
+                </span>
+              </span>
+            </label>
+          </div>
+          {form.catalogVisibility === CATALOG_VISIBILITY.SELECTED_USERS ? (
+            <PracticeVisibilityUsersEditor
+              practiceId={practiceId || null}
+              disabled={busy}
+            />
+          ) : null}
+        </fieldset>
       </section>
 
       {isCourse ? (
