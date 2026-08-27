@@ -35,6 +35,9 @@ PM2 и lock сегодня работают от запускающего пол
 `AUDIOLAD_DEPLOY_OVERRIDE` wrapper снимает (`unset`); Actions его не
 выставляет и не делает `SendEnv`. SSH-переменные сессии (`SSH_CLIENT` и
 др.) wrapper тоже снимает — в `deploy.sh` они не пробрасываются.
+До `git show` целевого `run-from-target-sha.sh` wrapper проверяет, что
+SHA — commit и предок свежего `origin/main`. Иначе выход без чтения
+скриптов из orphan/PR commit. Override-флаг не используется.
 
 Файл `deploy/scripts/github-actions-deploy-wrapper.sh` в репозитории —
 только **шаблон**. Пока bootstrap его не скопировал в

@@ -67,6 +67,10 @@ jobs:
 
           git cat-file -e "${TARGET_SHA}^{commit}"
           ORIGIN_MAIN_SHA="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "${TARGET_SHA}" "${ORIGIN_MAIN_SHA}"; then
+            echo "ERROR: ${TARGET_SHA} is not an ancestor of origin/main (${ORIGIN_MAIN_SHA})" >&2
+            exit 1
+          fi
 
           echo "requested SHA: ${TARGET_SHA}"
           echo "origin/main SHA: ${ORIGIN_MAIN_SHA}"

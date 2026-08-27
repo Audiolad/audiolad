@@ -196,6 +196,18 @@ function main() {
   const gitOffset = wrapperText.indexOf("git -C");
   assert.ok(validationOffset >= 0 && gitOffset > validationOffset, "SHA validation must precede git");
 
+  const targetShowNeedle = 'git -C "$GIT_WORKDIR" show "${SHA}:deploy/scripts/run-from-target-sha.sh"';
+  const ancestorOffset = wrapperText.indexOf("merge-base --is-ancestor");
+  const targetShowOffset = wrapperText.indexOf(targetShowNeedle);
+  assert.ok(ancestorOffset >= 0, "wrapper must call merge-base --is-ancestor");
+  assert.ok(targetShowOffset >= 0, "wrapper must launch via target-SHA git show");
+  assert.ok(
+    ancestorOffset < targetShowOffset,
+    "wrapper must verify origin/main ancestry before the first target-controlled git show",
+  );
+  assert.match(workflowText, /merge-base --is-ancestor/);
+  assert.doesNotMatch(wrapperText, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
+
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
 

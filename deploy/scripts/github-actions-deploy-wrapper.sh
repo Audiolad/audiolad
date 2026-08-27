@@ -6,8 +6,8 @@
 # docs/production-deploy-github-actions.md.
 #
 # Accepts exactly one argument: a 40-character lowercase hex SHA.
-# Then runs the existing canonical launcher only:
-#   git fetch origin main
+# After fetch, the SHA must be a commit and an ancestor of origin/main.
+# Only then:
 #   git show <sha>:deploy/scripts/run-from-target-sha.sh | bash -s -- <sha>
 #
 # Never via /current. Do not reset the controlling checkout. No override flag.
@@ -61,7 +61,16 @@ else
   printf 'current production .deploy-commit: (not readable)\n'
 fi
 
+if ! git -C "$GIT_WORKDIR" cat-file -e "${SHA}^{commit}"; then
+  printf 'ERROR: %s is not a reachable commit object.\n' "$SHA" >&2
+  exit 1
+fi
+if ! git -C "$GIT_WORKDIR" merge-base --is-ancestor "$SHA" "$ORIGIN_MAIN_SHA"; then
+  printf 'ERROR: %s is not an ancestor of origin/main (%s). Refusing to read or execute target deploy scripts.\n' \
+    "$SHA" "$ORIGIN_MAIN_SHA" >&2
+  exit 1
+fi
+
 # Existing canonical launch. Preserve the real exit code.
-git -C "$GIT_WORKDIR" fetch origin main
 git -C "$GIT_WORKDIR" show "${SHA}:deploy/scripts/run-from-target-sha.sh" \
   | GIT_WORKDIR="$GIT_WORKDIR" DEPLOY_ROOT="$DEPLOY_ROOT" bash -s -- "$SHA"
