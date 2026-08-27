@@ -90,6 +90,7 @@ import { RASKLAD_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/raskl
 import { TARO_NA_DENGI_I_UDACHU_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-i-udachu.ts";
 import { BUDUT_LI_DENGI_TARO_PAGE } from "../src/lib/seo/listens/content/budut-li-dengi-taro.ts";
 import { TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-v-blizhayshee-vremya.ts";
+import { TARO_DOHODY_PAGE } from "../src/lib/seo/listens/content/taro-dohody.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2010,6 +2011,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${sixtyThirdListenHref}`,
     ),
     "directory JSON-LD includes sixty-third listen href",
+  );
+
+
+  const sixtyFourthListenHref = "/listens/taro-dohody";
+  const sixtyFourthListenCard = data.articles.find((card) => card.href === sixtyFourthListenHref);
+  assert(sixtyFourthListenCard, "sixty-fourth indexable listen page is listed");
+  assert(
+    sixtyFourthListenCard.title === "Таро доходы – заработок и источники денег | АудиоЛад",
+    "sixty-fourth listen directory title",
+  );
+  assert(
+    sixtyFourthListenCard.description === TARO_DOHODY_PAGE.description,
+    "sixty-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-dohody",
+    ),
+    "no /articles duplicate for sixty-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtyFourthListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-fourth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
