@@ -56,6 +56,8 @@ function testHeartOnCover() {
   assert.match(parts, /function PracticeLibraryActionSection[\s\S]*LibraryAddButton/);
   assert.match(hero, /toPracticeHeartProduct\(viewModel\)/);
   assert.match(gallery, /CatalogProductHeartButton/);
+  assert.match(gallery, /PracticeProductShareButton/);
+  assert.match(gallery, /data-practice-hero-cover-actions/);
   assert.match(mobile, /PracticeProductHero/);
   assert.match(desktop, /PracticeProductHero/);
   assert.doesNotMatch(mobile, /PracticeLibraryActionSection|LibraryAddButton/);

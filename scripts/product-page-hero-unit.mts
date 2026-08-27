@@ -65,6 +65,11 @@ function testSliderOnlyWhenGalleryExists() {
   assert.match(productHero, /data-practice-hero-has-gallery/);
   assert.match(productHero, /PracticeHeroGallery/);
   assert.match(productHero, /FeaturedProductCard/);
+  assert.match(productHero, /shareTitle=\{viewModel\.practice\.title\}/);
+  assert.match(productHero, /sharePath=\{viewModel\.practicePagePath\}/);
+  assert.match(hero, /PracticeProductShareButton/);
+  assert.match(hero, /data-practice-hero-cover-actions/);
+  assert.match(hero, /className="absolute top-2 right-2 z-10 flex items-center gap-1\.5"/);
 }
 
 function testPromoBlockOnlyWhenOfferActive() {
