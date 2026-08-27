@@ -195,11 +195,18 @@ export function buildPracticeHeroLightMeta(input: {
   gallerySlides: ReadonlyArray<{ alt?: string | null } | null | undefined> | null | undefined;
   productTypeLabel: string | null | undefined;
   formatMeta: string | null | undefined;
+  authorName?: string | null;
 }): string | null {
-  return (
+  const lightMeta =
     formatHeroMaterialsMeta(input.gallerySlides) ??
-    stripRedundantFormatPrefix(input.formatMeta, input.productTypeLabel)
-  );
+    stripRedundantFormatPrefix(input.formatMeta, input.productTypeLabel);
+  const author = input.authorName?.trim() || null;
+
+  if (author && lightMeta) {
+    return `${author} · ${lightMeta}`;
+  }
+
+  return author ?? lightMeta;
 }
 
 /** Single-paragraph description may stand in when subtitle is empty. */
