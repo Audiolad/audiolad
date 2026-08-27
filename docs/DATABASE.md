@@ -41,7 +41,7 @@ RLS включён. Политика SELECT: `Public can read published practice
 
 #### practice_visibility_users (2026-08-27)
 
-Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`, `20260830120300_public_playlist_selected_visibility.sql`.
+Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`, `20260830120300_public_playlist_selected_visibility.sql`, `20260830120400_fix_visibility_allowlist_author_policy.sql`.
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|

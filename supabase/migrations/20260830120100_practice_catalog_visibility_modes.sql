@@ -166,21 +166,6 @@ CREATE POLICY "Users can view own practice visibility rows"
 
 DROP POLICY IF EXISTS "Author members can view practice visibility rows"
   ON public.practice_visibility_users;
-CREATE POLICY "Author members can view practice visibility rows"
-  ON public.practice_visibility_users
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.practices AS p
-      JOIN public.author_members AS am
-        ON am.author_id = p.author_id
-      WHERE p.id = practice_visibility_users.practice_id
-        AND am.user_id = auth.uid()
-        AND am.role IN ('owner', 'editor')
-    )
-  );
 
 CREATE TABLE IF NOT EXISTS public.practice_visibility_lookup_attempts (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -328,6 +313,19 @@ REVOKE ALL ON FUNCTION public.can_current_viewer_read_practice(uuid) FROM PUBLIC
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO service_role;
+
+-- This policy must use the DEFINER helper: an invoker SELECT of practices here
+-- would recurse through the selected_users practices policy's allowlist check.
+CREATE POLICY "Author members can view practice visibility rows"
+  ON public.practice_visibility_users
+  FOR SELECT
+  TO authenticated
+  USING (
+    public.is_practice_author_member(
+      practice_id,
+      auth.uid()
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- 4. RLS — practices and public child metadata

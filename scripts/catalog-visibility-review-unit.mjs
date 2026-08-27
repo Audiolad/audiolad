@@ -384,6 +384,15 @@ function testSourceArchitecture() {
   assert.match(migration, /pg_advisory_xact_lock/);
   assert.match(migration, /ALTER COLUMN catalog_visibility DROP DEFAULT/);
   assert.match(migration, /SET search_path = public, pg_temp/);
+  const allowlistAuthorPolicy = migration.slice(
+    migration.indexOf('CREATE POLICY "Author members can view practice visibility rows"'),
+    migration.indexOf("-- ---------------------------------------------------------------------------\n-- 4. RLS"),
+  );
+  assert.match(
+    allowlistAuthorPolicy,
+    /public\.is_practice_author_member\(\s*practice_id,\s*auth\.uid\(\)\s*\)/,
+  );
+  assert.doesNotMatch(allowlistAuthorPolicy, /FROM public\.practices/);
   const addVisibilityUser = migration.slice(
     migration.indexOf("CREATE OR REPLACE FUNCTION public.add_practice_visibility_user"),
     migration.indexOf("CREATE OR REPLACE FUNCTION public.remove_practice_visibility_user"),

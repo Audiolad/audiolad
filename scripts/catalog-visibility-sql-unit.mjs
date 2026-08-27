@@ -24,6 +24,13 @@ const playlistMigration = readFileSync(
   ),
   "utf8",
 );
+const recursionFixMigration = readFileSync(
+  join(
+    repoRoot,
+    "supabase/migrations/20260830120400_fix_visibility_allowlist_author_policy.sql",
+  ),
+  "utf8",
+);
 
 assert.match(migration, /ADD COLUMN IF NOT EXISTS catalog_visibility text/);
 assert.match(migration, /WHEN is_catalog_listed IS TRUE THEN 'listed'/);
@@ -92,6 +99,11 @@ assert.match(orderMigration, /RAISE EXCEPTION 'practice_not_found'/);
 assert.match(playlistMigration, /Anyone can select public playlist items/);
 assert.match(playlistMigration, /p\.catalog_visibility = 'listed'/);
 assert.match(playlistMigration, /p\.id = playlist_items\.practice_id/);
+assert.match(recursionFixMigration, /practices ↔ practice_visibility_users RLS recursion/);
+assert.match(
+  recursionFixMigration,
+  /public\.is_practice_author_member\(\s*practice_id,\s*auth\.uid\(\)\s*\)/,
+);
 
 const smoke = readFileSync(
   join(repoRoot, "supabase/tests/catalog_visibility_rls_smoke.sql"),
@@ -100,6 +112,8 @@ const smoke = readFileSync(
 assert.match(smoke, /catalog_visibility/);
 assert.match(smoke, /practice_visibility_users/);
 assert.match(smoke, /selected_users/);
+assert.match(smoke, /add_practice_visibility_user/);
+assert.match(smoke, /public\.is_practice_author_member/);
 
 function dockerAvailable() {
   try {
