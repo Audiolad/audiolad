@@ -89,7 +89,7 @@ export function LibraryNavIcon({ active = false, className }: NavIconProps) {
       focusable="false"
     >
       <path
-        d="M12 20.5s-6.75-4.35-6.75-9.1C5.25 7.8 8.2 5.5 12 5.5s6.75 2.3 6.75 5.9c0 4.75-6.75 9.1-6.75 9.1Z"
+        d="M12 20.25 10.45 18.86C6.4 15.24 3.75 12.84 3.75 9.7 3.75 7.29 5.66 5.4 8.05 5.4c1.48 0 2.9.7 3.95 1.8 1.05-1.1 2.47-1.8 3.95-1.8 2.39 0 4.3 1.89 4.3 4.3 0 3.14-2.65 5.54-6.7 9.16L12 20.25Z"
         fill={active ? "currentColor" : "none"}
         stroke="currentColor"
         strokeWidth={active ? 0 : 1.75}
