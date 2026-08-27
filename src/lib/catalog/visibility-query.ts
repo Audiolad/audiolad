@@ -17,6 +17,13 @@ export const GUEST_ORDINARY_CATALOG_VIEWER: OrdinaryCatalogViewer = {
   hiddenPracticeIds: [],
 };
 
+export class OrdinaryCatalogViewerLoadError extends Error {
+  constructor(message = "catalog_viewer_state_unavailable") {
+    super(message);
+    this.name = "OrdinaryCatalogViewerLoadError";
+  }
+}
+
 function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
@@ -54,6 +61,15 @@ export async function loadOrdinaryCatalogViewer(
       .eq("user_id", userId),
     supabase.from("library_saves").select("practice_id").eq("user_id", userId),
   ]);
+
+  if (allowlistResult.error || entitlementResult.error || savesResult.error) {
+    throw new OrdinaryCatalogViewerLoadError(
+      allowlistResult.error?.message ??
+        entitlementResult.error?.message ??
+        savesResult.error?.message ??
+        "catalog_viewer_state_unavailable",
+    );
+  }
 
   const allowlistedPracticeIds = uniqueUuids(
     (allowlistResult.data ?? []).map((row) => String(row.practice_id ?? "")),

@@ -12,6 +12,10 @@ import {
   mapCatalogProductsToSuggestions,
 } from "@/lib/catalog/search-suggestions";
 import { normalizeCatalogTopicParam } from "@/lib/catalog/topic-filter";
+import {
+  loadOrdinaryCatalogViewer,
+  resolveCatalogViewerUserId,
+} from "@/lib/catalog/visibility-query";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +41,8 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
+    const userId = await resolveCatalogViewerUserId(supabase);
+    const viewer = await loadOrdinaryCatalogViewer(supabase, userId);
 
     const [authorResults, productResults] = await Promise.all([
       searchPublishedCatalogAuthors(supabase, {
@@ -48,6 +54,7 @@ export async function GET(request: Request) {
         query: normalizedQuery,
         topicKey,
         limit: CATALOG_PRODUCT_SUGGEST_LIMIT,
+        viewer,
       }),
     ]);
 

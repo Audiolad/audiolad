@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  filterPublicCatalogPracticeRows,
-} from "@/lib/fixtures/test-fixture-marker";
+import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import {
   getProductKindLabel,
@@ -310,7 +308,7 @@ export async function getPublishedCatalogProducts(
     return [];
   }
 
-  const practiceRows = filterPublicCatalogPracticeRows(
+  const practiceRows = filterPublicPracticeRows(
     (practices ?? []) as CatalogPracticeRow[],
   );
 

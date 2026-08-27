@@ -29,8 +29,13 @@ SET catalog_visibility = CASE
 END
 WHERE catalog_visibility IS NULL;
 
+-- No column DEFAULT: BEFORE INSERT trigger derives visibility.
+-- Otherwise DEFAULT 'listed' would hide a legacy INSERT that only
+-- set is_catalog_listed=false and never sent catalog_visibility.
 ALTER TABLE public.practices
-  ALTER COLUMN catalog_visibility SET DEFAULT 'listed',
+  ALTER COLUMN catalog_visibility DROP DEFAULT;
+
+ALTER TABLE public.practices
   ALTER COLUMN catalog_visibility SET NOT NULL;
 
 DO $$
@@ -69,13 +74,14 @@ COMMENT ON COLUMN public.practices.catalog_visibility IS
 CREATE OR REPLACE FUNCTION public.sync_practice_catalog_visibility()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.catalog_visibility IS NULL THEN
       NEW.catalog_visibility := CASE
-        WHEN NEW.is_catalog_listed IS TRUE THEN 'listed'
-        ELSE 'unlisted'
+        WHEN NEW.is_catalog_listed IS FALSE THEN 'unlisted'
+        ELSE 'listed'
       END;
     END IF;
 
@@ -310,9 +316,18 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.is_practice_author_member(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_practice_author_member(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.is_practice_author_member(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_practice_author_member(uuid, uuid) TO service_role;
+
 REVOKE ALL ON FUNCTION public.viewer_can_commercially_access_practice(public.practices, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.viewer_can_commercially_access_practice(public.practices, uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.viewer_can_commercially_access_practice(public.practices, uuid) FROM authenticated;
+
+REVOKE ALL ON FUNCTION public.can_current_viewer_read_practice(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_current_viewer_read_practice(uuid) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- 4. RLS — practices and public child metadata
@@ -750,8 +765,11 @@ BEGIN
     RETURN;
   END IF;
 
-  INSERT INTO public.practice_visibility_lookup_attempts (user_id)
-  VALUES (v_actor);
+  -- Serialize per-actor attempts so parallel requests cannot exceed 20 / 10 min.
+  PERFORM pg_advisory_xact_lock(
+    hashtext('practice_visibility_lookup'),
+    hashtext(v_actor::text)
+  );
 
   SELECT count(*)
   INTO v_recent
@@ -759,9 +777,12 @@ BEGIN
   WHERE a.user_id = v_actor
     AND a.attempted_at > now() - interval '10 minutes';
 
-  IF v_recent > 20 THEN
+  IF v_recent >= 20 THEN
     RETURN;
   END IF;
+
+  INSERT INTO public.practice_visibility_lookup_attempts (user_id)
+  VALUES (v_actor);
 
   BEGIN
     v_uuid := v_query::uuid;
@@ -819,5 +840,278 @@ GRANT EXECUTE ON FUNCTION public.remove_practice_visibility_user(uuid, uuid) TO 
 REVOKE ALL ON FUNCTION public.lookup_practice_visibility_user(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.lookup_practice_visibility_user(uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.lookup_practice_visibility_user(uuid, text) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 8. Public discovery surfaces — selected_users must not leak
+-- ---------------------------------------------------------------------------
+
+DROP FUNCTION IF EXISTS public.is_practice_promo_page_eligible(text, boolean, boolean, boolean);
+
+CREATE OR REPLACE FUNCTION public.is_practice_promo_page_eligible(
+  p_status text,
+  p_is_free boolean,
+  p_is_catalog_listed boolean,
+  p_guest_access_enabled boolean,
+  p_catalog_visibility text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    p_status = 'published'
+    AND COALESCE(
+      p_catalog_visibility,
+      CASE
+        WHEN p_is_catalog_listed IS TRUE THEN 'listed'
+        ELSE 'unlisted'
+      END
+    ) IS DISTINCT FROM 'selected_users'
+    AND (
+      (
+        p_is_free IS TRUE
+        AND p_is_catalog_listed IS TRUE
+      )
+      OR p_guest_access_enabled IS TRUE
+    );
+$$;
+
+COMMENT ON FUNCTION public.is_practice_promo_page_eligible(text, boolean, boolean, boolean, text) IS
+  'Public promo eligibility for listed/unlisted only. selected_users never becomes public via guest_access.';
+
+CREATE OR REPLACE FUNCTION public.get_public_promo_page(
+  p_author_slug text,
+  p_promo_slug text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_page public.promo_pages%ROWTYPE;
+  v_author_slug text;
+  v_products jsonb;
+BEGIN
+  IF p_author_slug IS NULL OR btrim(p_author_slug) = '' THEN
+    RETURN NULL;
+  END IF;
+
+  IF p_promo_slug IS NULL OR btrim(p_promo_slug) = '' THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT pp.*
+  INTO v_page
+  FROM public.promo_pages AS pp
+  INNER JOIN public.authors AS a ON a.id = pp.author_id
+  WHERE a.slug = btrim(p_author_slug)
+    AND pp.slug = btrim(p_promo_slug)
+    AND pp.status = 'published';
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT a.slug
+  INTO v_author_slug
+  FROM public.authors AS a
+  WHERE a.id = v_page.author_id;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'practice_id', p.id,
+        'slug', p.slug,
+        'title', p.title,
+        'format', p.format,
+        'duration_minutes', p.duration_minutes,
+        'cover_url', p.cover_url,
+        'cover_image', p.cover_image,
+        'author_name', a.name,
+        'author_slug', a.slug,
+        'position', ppp.position
+      )
+      ORDER BY ppp.position ASC
+    ),
+    '[]'::jsonb
+  )
+  INTO v_products
+  FROM public.promo_page_products AS ppp
+  INNER JOIN public.practices AS p ON p.id = ppp.practice_id
+  INNER JOIN public.authors AS a ON a.id = p.author_id
+  WHERE ppp.promo_page_id = v_page.id
+    AND (
+      public.is_practice_promo_page_eligible(
+        p.status,
+        p.is_free,
+        p.is_catalog_listed,
+        p.guest_access_enabled,
+        p.catalog_visibility
+      )
+      OR (
+        p.status = 'published'
+        AND p.deleted_at IS NULL
+        AND p.catalog_visibility = 'selected_users'
+        AND public.can_current_viewer_read_practice(p.id)
+        AND (
+          p.guest_access_enabled IS TRUE
+          OR p.is_free IS TRUE
+        )
+      )
+    );
+
+  IF jsonb_array_length(v_products) < 1 THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'promo_page_id', v_page.id,
+    'author_slug', v_author_slug,
+    'slug', v_page.slug,
+    'public_title', v_page.public_title,
+    'public_description', v_page.public_description,
+    'banner_path', v_page.banner_path,
+    'footer_text', v_page.footer_text,
+    'cta_enabled', v_page.cta_enabled,
+    'cta_heading', v_page.cta_heading,
+    'cta_description', v_page.cta_description,
+    'cta_label', v_page.cta_label,
+    'cta_href', v_page.cta_href,
+    'cta_open_in_new_tab', v_page.cta_open_in_new_tab,
+    'published_at', v_page.published_at,
+    'products', v_products
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_public_promo_page(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_promo_page(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_public_promo_page(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_public_promo_page(text, text) TO service_role;
+
+COMMENT ON FUNCTION public.get_public_promo_page(text, text) IS
+  'audiolad:promo-page-public:v2; listed/unlisted stay public; selected_users only for allowlisted/author/admin/entitled viewers';
+
+CREATE OR REPLACE FUNCTION public.get_public_quick_offer(
+  p_slug text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_offer public.quick_offers%ROWTYPE;
+  v_practice public.practices%ROWTYPE;
+  v_materials jsonb;
+BEGIN
+  IF p_slug IS NULL OR btrim(p_slug) = '' THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT *
+  INTO v_offer
+  FROM public.quick_offers AS qo
+  WHERE qo.slug = btrim(p_slug)
+    AND qo.status = 'published';
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT *
+  INTO v_practice
+  FROM public.practices AS p
+  WHERE p.id = v_offer.practice_id
+    AND p.status = 'published'
+    AND p.deleted_at IS NULL
+    AND p.catalog_visibility = 'listed';
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'id', m.id,
+        'offer_id', m.offer_id,
+        'image_path', m.image_path,
+        'format_label', m.format_label,
+        'sort_order', m.sort_order,
+        'created_at', m.created_at,
+        'updated_at', m.updated_at
+      )
+      ORDER BY m.sort_order
+    ),
+    '[]'::jsonb
+  )
+  INTO v_materials
+  FROM public.quick_offer_materials AS m
+  WHERE m.offer_id = v_offer.id;
+
+  RETURN jsonb_build_object(
+    'id', v_offer.id,
+    'author_id', v_offer.author_id,
+    'practice_id', v_offer.practice_id,
+    'title', v_offer.title,
+    'slug', v_offer.slug,
+    'hero_image_path', v_offer.hero_image_path,
+    'short_description', v_offer.short_description,
+    'promo_price', v_offer.promo_price,
+    'cta_text', v_offer.cta_text,
+    'timer_duration_seconds', v_offer.timer_duration_seconds,
+    'status', v_offer.status,
+    'template_key', v_offer.template_key,
+    'mid_cta_after_count', v_offer.mid_cta_after_count,
+    'published_at', v_offer.published_at,
+    'created_at', v_offer.created_at,
+    'updated_at', v_offer.updated_at,
+    'practices', jsonb_build_object(
+      'id', v_practice.id,
+      'slug', v_practice.slug,
+      'title', v_practice.title,
+      'status', v_practice.status,
+      'is_free', v_practice.is_free,
+      'price', v_practice.price,
+      'author_id', v_practice.author_id
+    ),
+    'quick_offer_materials', v_materials
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_public_quick_offer(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_quick_offer(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_public_quick_offer(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_public_quick_offer(text) TO service_role;
+
+COMMENT ON FUNCTION public.get_public_quick_offer(text) IS
+  'audiolad:quick-offer-public:v2; published listed products only; selected_users/unlisted are not public discovery';
+
+DROP POLICY IF EXISTS "Public can read author featured products"
+  ON public.author_featured_products;
+CREATE POLICY "Public can read author featured products"
+  ON public.author_featured_products
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.practices AS p
+      WHERE p.id = author_featured_products.product_id
+        AND p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND p.catalog_visibility = 'listed'
+    )
+    OR (
+      auth.uid() IS NOT NULL
+      AND public.has_platform_permission(auth.uid(), 'admin_panel.access')
+    )
+  );
 
 COMMIT;

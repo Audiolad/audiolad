@@ -10,11 +10,11 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = readFileSync(
-  join(repoRoot, "supabase/migrations/20260830120000_practice_catalog_visibility_modes.sql"),
+  join(repoRoot, "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql"),
   "utf8",
 );
 const orderMigration = readFileSync(
-  join(repoRoot, "supabase/migrations/20260830121000_create_practice_order_visibility.sql"),
+  join(repoRoot, "supabase/migrations/20260830120200_create_practice_order_visibility.sql"),
   "utf8",
 );
 
@@ -26,7 +26,25 @@ assert.match(migration, /practices_catalog_visibility_check/);
 assert.match(migration, /practices_catalog_visibility_listed_sync_check/);
 assert.match(migration, /is_catalog_listed = \(catalog_visibility = 'listed'\)/);
 assert.match(migration, /CREATE OR REPLACE FUNCTION public\.sync_practice_catalog_visibility/);
+assert.match(migration, /SET search_path = public, pg_temp/);
+assert.match(migration, /ALTER COLUMN catalog_visibility DROP DEFAULT/);
+assert.match(migration, /WHEN NEW\.is_catalog_listed IS FALSE THEN 'unlisted'/);
 assert.match(migration, /OLD\.catalog_visibility = 'selected_users'/);
+assert.match(
+  migration,
+  /GRANT EXECUTE ON FUNCTION public\.is_practice_author_member\(uuid, uuid\) TO authenticated/,
+);
+assert.doesNotMatch(
+  migration,
+  /GRANT EXECUTE ON FUNCTION public\.is_practice_author_member\(uuid, uuid\) TO anon/,
+);
+assert.match(migration, /REVOKE ALL ON FUNCTION public\.is_practice_author_member\(uuid, uuid\) FROM anon/);
+assert.match(migration, /catalog_visibility = 'listed'/);
+assert.match(migration, /get_public_quick_offer/);
+assert.match(migration, /IS DISTINCT FROM 'selected_users'/);
+assert.match(migration, /Public can read author featured products/);
+assert.match(migration, /p\.catalog_visibility = 'listed'/);
+assert.match(migration, /pg_advisory_xact_lock/);
 
 assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_visibility_users/);
 assert.match(migration, /CONSTRAINT practice_visibility_users_unique\s+UNIQUE \(practice_id, user_id\)/);
@@ -53,9 +71,13 @@ assert.match(migration, /lookup_practice_visibility_user/);
 assert.match(migration, /add_practice_visibility_user/);
 assert.match(migration, /remove_practice_visibility_user/);
 assert.match(migration, /interval '10 minutes'/);
-assert.match(migration, /v_recent > 20/);
+assert.match(migration, /v_recent >= 20/);
 assert.doesNotMatch(migration, /ilike/);
 assert.doesNotMatch(migration, /searchAudioladProfiles/);
+
+assert.match(migration, /WHEN NEW\.is_catalog_listed IS FALSE THEN 'unlisted'/);
+assert.match(migration, /ELSE 'listed'/);
+assert.match(migration, /NEW\.is_catalog_listed := \(NEW\.catalog_visibility = 'listed'\)/);
 
 assert.match(orderMigration, /CREATE OR REPLACE FUNCTION public\.create_practice_order/);
 assert.match(orderMigration, /viewer_can_commercially_access_practice/);

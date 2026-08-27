@@ -27,19 +27,21 @@
 
 Ключевые поля каталога: `id`, `title`, `slug`, `description`, `format`, `duration_minutes`, `price`, `is_free`, `status`, `product_kind`, `publication_class`, `music_usage_permission`, `catalog_visibility`, `is_catalog_listed`.
 
-`catalog_visibility` — источник истины (`listed` | `unlisted` | `selected_users`). `is_catalog_listed` остаётся совместимым флагом и синхронизируется триггером: `listed` → true, `unlisted`/`selected_users` → false. Backfill: `is_catalog_listed=true` → `listed`, `false` → `unlisted` (никогда `selected_users`).
+`catalog_visibility` — источник истины (`listed` | `unlisted` | `selected_users`). `is_catalog_listed` остаётся совместимым флагом и синхронизируется триггером: `listed` → true, `unlisted`/`selected_users` → false. Backfill: `is_catalog_listed=true` → `listed`, `false` → `unlisted` (никогда `selected_users`). Колонка без DEFAULT: legacy INSERT `is_catalog_listed=false` без `catalog_visibility` становится `unlisted`, а обычный INSERT без обоих полей — `listed` (через default `is_catalog_listed=true`).
 
-Обычный каталог `/catalog` и `/api/catalog`: guest видит только `listed`; авторизованный — `listed` плюс свои `selected_users` по allowlist `practice_visibility_users`. `unlisted` в каталоге нет. Карточка скрывается, если у зрителя есть активный `user_practices` или `library_saves` (это не одно и то же; оба только убирают карточку из обычного каталога). Публичные витрины (главная, sitemap, editorial, страница автора) остаются listed-only.
+Обычный каталог `/catalog` и `/api/catalog`: guest видит только `listed`; авторизованный — `listed` плюс свои `selected_users` по allowlist `practice_visibility_users`. `unlisted` в каталоге нет. Карточка скрывается, если у зрителя есть активный `user_practices` или `library_saves` (это не одно и то же; оба только убирают карточку из обычного каталога). Источник решения ordinary catalog — `applyOrdinaryCatalogEligibility`; legacy post-filter `is_catalog_listed === true` туда не применяется. Если viewer state (allowlist / grants / saves) недоступен, ordinary catalog отвечает ошибкой, а не «у пользователя ничего нет». Публичные витрины (главная, sitemap, editorial, страница автора) остаются listed-only.
 
 Режим «Только по ссылке» = `published` + `unlisted`. Режим «Только выбранным пользователям» = `published` + `selected_users` + строка в `practice_visibility_users`. Allowlist означает только видимость, не grant и не запись в `user_practices`. `approve_and_publish_practice` / `publish_audio_product` сохраняют выбранное `is_catalog_listed` (миграция `20260805194500_preserve_catalog_listed_on_publish.sql`); starters остаются unlisted. Unpublish ставит `is_catalog_listed=false`; триггер переводит `listed` → `unlisted` и оставляет `selected_users`.
 
 Сортировка каталога: `created_at.desc`.
 
-RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published' AND catalog_visibility IN ('listed', 'unlisted')`. `selected_users` читают allowlist / автор / admin / entitled (отдельные политики). `audio_items`, gallery и `practice_topics` публично читаются только если `can_current_viewer_read_practice` разрешает родителя. Allowlist-таблица: клиентский SELECT своих/авторских строк, записи только через SECURITY DEFINER RPC.
+RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published' AND catalog_visibility IN ('listed', 'unlisted')`. `selected_users` читают allowlist / автор / admin / entitled (отдельные политики). `is_practice_author_member(uuid,uuid)` имеет `EXECUTE` у `authenticated` (нужно для RLS) и не имеет у `anon`. `audio_items`, gallery и `practice_topics` публично читаются только если `can_current_viewer_read_practice` разрешает родителя. Allowlist-таблица: клиентский SELECT своих/авторских строк, записи только через SECURITY DEFINER RPC.
 
-#### practice_visibility_users (2026-08-30)
+Публичные discovery RPC: `get_public_quick_offer` отдаёт только `listed`; `get_public_promo_page` не делает `selected_users` публичным из‑за `guest_access_enabled` (гость не видит продукт; allowlisted/author/admin/entitled — да). Публичный SELECT `author_featured_products` не раскрывает `product_id` для `selected_users`; listed и кабинет автора сохраняются.
 
-Миграции: `20260830120000_practice_catalog_visibility_modes.sql`, `20260830121000_create_practice_order_visibility.sql`.
+#### practice_visibility_users (2026-08-27)
+
+Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`.
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
@@ -688,7 +690,7 @@ RLS: публичный SELECT активных акций опубликова�
 | `quick_offers` | Оффер автора: продукт, slug, обложка, описание, promo_price, CTA, timer, status |
 | `quick_offer_materials` | Упорядоченные карточки 3:4. Подпись = автономер + `format_label` (≤ 6 символов, без переносов) |
 
-RLS: `user_can_read_author_promotion(author_id)` (owner/editor или platform admin). Публичное чтение только через `get_public_quick_offer(slug)` — исключительно `status = published`.
+RLS: `user_can_read_author_promotion(author_id)` (owner/editor или platform admin). Публичное чтение только через `get_public_quick_offer(slug)` — `status = published` и продукт с `catalog_visibility = listed`. `selected_users` и `unlisted` не раскрываются через public quick offer. Direct-link acquisition unlisted не меняется.
 
 Ownership: триггер `enforce_quick_offer_product_owner` запрещает привязать чужой `practices.author_id`.
 

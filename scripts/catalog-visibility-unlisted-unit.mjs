@@ -35,7 +35,7 @@ assert.doesNotMatch(
 assert.doesNotMatch(migration, /is_catalog_listed\s*=\s*NOT v_starter/);
 
 const visibilityMigration = read(
-  "supabase/migrations/20260830120000_practice_catalog_visibility_modes.sql",
+  "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql",
 );
 assert.match(visibilityMigration, /catalog_visibility IN \('listed', 'unlisted', 'selected_users'\)/);
 assert.match(visibilityMigration, /is_catalog_listed = \(catalog_visibility = 'listed'\)/);

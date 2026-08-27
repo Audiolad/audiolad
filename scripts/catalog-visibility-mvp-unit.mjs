@@ -339,13 +339,38 @@ function testSourceGuards() {
   const similar = read("src/lib/authors/similar-authors.ts");
   assert.match(similar, /\.eq\("is_catalog_listed", true\)/);
 
+  const catalog = read("src/lib/products/catalog.ts");
+  assert.match(catalog, /applyOrdinaryCatalogEligibility/);
+  assert.match(catalog, /filterPublicPracticeRows/);
+  assert.doesNotMatch(catalog, /filterPublicCatalogPracticeRows/);
+
+  const suggest = read("src/app/api/catalog/search/suggest/route.ts");
+  assert.match(suggest, /loadOrdinaryCatalogViewer/);
+  assert.match(suggest, /resolveCatalogViewerUserId/);
+  assert.match(suggest, /viewer/);
+  assert.doesNotMatch(suggest, /searchParams\.get\(\s*["']userId["']\s*\)/);
+
+  const practicePage = read(
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+  );
+  const metadataFn = practicePage.slice(
+    practicePage.indexOf("export async function generateMetadata"),
+    practicePage.indexOf("export default async function PracticePage"),
+  );
+  assert.match(metadataFn, /canRevealPublicProductPage/);
+  assert.match(metadataFn, /resolveProductAccess/);
+  assert.match(metadataFn, /PRACTICE_UNAVAILABLE_METADATA/);
+
+  const listen = read("src/lib/listen/load-session-payload.ts");
+  assert.match(listen, /catalog_visibility/);
+
   const access = read("src/lib/products/access.ts");
   assert.match(access, /guest_access_enabled === true/);
   assert.match(access, /canSeeProduct/);
   assert.doesNotMatch(access, /from\("user_practices"\)[\s\S]*visibility/);
 
   const claim = read(
-    "supabase/migrations/20260830120000_practice_catalog_visibility_modes.sql",
+    "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql",
   );
   assert.match(claim, /viewer_can_commercially_access_practice/);
   assert.match(claim, /claim_free_practice/);
@@ -359,7 +384,7 @@ function testSourceGuards() {
   );
 
   const order = read(
-    "supabase/migrations/20260830121000_create_practice_order_visibility.sql",
+    "supabase/migrations/20260830120200_create_practice_order_visibility.sql",
   );
   assert.match(order, /viewer_can_commercially_access_practice/);
 

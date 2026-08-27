@@ -68,3 +68,81 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- RLS helper EXECUTE: authenticated yes, anon no.
+DO $$
+BEGIN
+  IF has_function_privilege(
+    'authenticated',
+    'public.is_practice_author_member(uuid,uuid)',
+    'execute'
+  ) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'authenticated must EXECUTE is_practice_author_member';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'public.is_practice_author_member(uuid,uuid)',
+    'execute'
+  ) IS TRUE THEN
+    RAISE EXCEPTION 'anon must not EXECUTE is_practice_author_member';
+  END IF;
+
+  IF has_function_privilege(
+    'authenticated',
+    'public.can_current_viewer_read_practice(uuid)',
+    'execute'
+  ) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'authenticated must EXECUTE can_current_viewer_read_practice';
+  END IF;
+END;
+$$;
+
+-- Featured public read must not be USING (true).
+DO $$
+DECLARE
+  v_def text;
+BEGIN
+  SELECT pg_get_expr(polqual, polrelid)
+  INTO v_def
+  FROM pg_policy
+  WHERE polname = 'Public can read author featured products'
+    AND polrelid = 'public.author_featured_products'::regclass;
+
+  IF v_def IS NULL OR v_def NOT LIKE '%listed%' OR v_def LIKE '%USING (true)%' THEN
+    RAISE EXCEPTION 'featured public policy must hide selected product_id: %', v_def;
+  END IF;
+END;
+$$;
+
+-- Public quick offer / promo helpers must not treat selected as public.
+DO $$
+DECLARE
+  v_quick text;
+  v_promo text;
+  v_eligible text;
+BEGIN
+  SELECT pg_get_functiondef('public.get_public_quick_offer(text)'::regprocedure)
+  INTO v_quick;
+
+  IF v_quick IS NULL OR v_quick NOT LIKE '%catalog_visibility = ''listed''%' THEN
+    RAISE EXCEPTION 'get_public_quick_offer must require listed visibility';
+  END IF;
+
+  SELECT pg_get_functiondef(
+    'public.is_practice_promo_page_eligible(text,boolean,boolean,boolean,text)'::regprocedure
+  )
+  INTO v_eligible;
+
+  IF v_eligible IS NULL OR v_eligible NOT LIKE '%selected_users%' THEN
+    RAISE EXCEPTION 'promo eligibility must mention selected_users exclusion';
+  END IF;
+
+  SELECT pg_get_functiondef('public.get_public_promo_page(text,text)'::regprocedure)
+  INTO v_promo;
+
+  IF v_promo IS NULL OR v_promo NOT LIKE '%can_current_viewer_read_practice%' THEN
+    RAISE EXCEPTION 'get_public_promo_page must be viewer-aware for selected_users';
+  END IF;
+END;
+$$;

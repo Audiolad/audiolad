@@ -80,6 +80,11 @@ export async function loadAuthorSlug(
   return data.slug;
 }
 
+/**
+ * Count of every published product owned by the author, including
+ * unlisted and selected_users. This is an author-capability / first-publish
+ * counter, not a public-catalog visibility count. Do not filter to listed.
+ */
 export async function countAuthorPublishedPractices(
   supabase: SupabaseClient,
   authorId: string,

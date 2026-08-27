@@ -48,6 +48,14 @@ export function canActivatePublishPreviewMode(input: {
  * even with ?preview=publish. Author members (and entitled buyers of
  * unpublished/archived products) can still open the existing PDP.
  */
+export const PRACTICE_UNAVAILABLE_METADATA = {
+  title: "Аудиопродукт – АудиоЛад",
+  robots: {
+    index: false,
+    follow: false,
+  },
+} as const;
+
 export function canRevealPublicProductPage(input: {
   practiceStatus: string | null | undefined;
   access: Pick<

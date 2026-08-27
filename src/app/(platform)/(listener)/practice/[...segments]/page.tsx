@@ -60,6 +60,7 @@ import {
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
   canRevealPublicProductPage,
+  PRACTICE_UNAVAILABLE_METADATA,
   resolvePracticePageRobots,
   shouldIndexPracticePage,
   shouldTrackPracticeListenerAnalytics,
@@ -191,10 +192,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (segments.length !== 2) {
-    return {
-      title: "Аудиопродукт – АудиоЛад",
-      robots: { index: false, follow: false },
-    };
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
   }
 
   const [authorSlug, productSlug] = segments;
@@ -206,13 +204,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   );
 
   if (error || !practice) {
-    return {
-      title: "Аудиопродукт – АудиоЛад",
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let access;
+
+  try {
+    access = await resolveProductAccess(supabase, practice, user?.id ?? null);
+  } catch {
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
+  }
+
+  if (
+    !canRevealPublicProductPage({
+      practiceStatus: practice.status,
+      access,
+      catalogVisibility: practice.catalog_visibility,
+      isCatalogListed: practice.is_catalog_listed,
+    })
+  ) {
+    return { ...PRACTICE_UNAVAILABLE_METADATA };
   }
 
   const trimmedDescription =
