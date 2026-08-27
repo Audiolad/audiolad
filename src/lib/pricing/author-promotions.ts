@@ -4,7 +4,12 @@ import {
   parseIntegerRubles,
   validateSalePriceRubles,
 } from "@/lib/pricing/money";
-import { PERSONAL_TIMER_COPY_MAX_LENGTH } from "@/lib/pricing/personal-timer-copy";
+import {
+  DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+  DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+  PERSONAL_TIMER_COPY_MAX_LENGTH,
+  resolvePersonalTimerCopy,
+} from "@/lib/pricing/personal-timer-copy";
 import { isPricePromotionType } from "@/lib/pricing/resolve";
 import { PRICE_PROMOTION_TYPES } from "@/lib/pricing/types";
 
@@ -43,6 +48,196 @@ export function parseDurationUnit(value: unknown): PromotionDurationUnit | null 
   }
 
   return null;
+}
+
+export const PROMOTION_FULL_WRITE_KEYS = [
+  "name",
+  "promotion_type",
+  "sale_price",
+  "starts_at",
+  "ends_at",
+  "duration_seconds",
+  "duration_amount",
+  "duration_unit",
+  "above_timer_text",
+  "below_button_text",
+] as const;
+
+export type AuthorPromotionFormDraft = {
+  name: string;
+  salePrice: string;
+  promotionType: "calendar" | "personal_countdown";
+  startsAt: string;
+  endsAt: string;
+  durationAmount: string;
+  durationUnit: PromotionDurationUnit;
+  aboveTimerText: string;
+  belowButtonText: string;
+};
+
+export const EMPTY_AUTHOR_PROMOTION_FORM: AuthorPromotionFormDraft = {
+  name: "",
+  salePrice: "499",
+  promotionType: PRICE_PROMOTION_TYPES.PERSONAL_COUNTDOWN,
+  startsAt: "",
+  endsAt: "",
+  durationAmount: "20",
+  durationUnit: "minutes",
+  aboveTimerText: DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+  belowButtonText: DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+};
+
+export type AuthorPromotionFormSource = {
+  name: string;
+  promotion_type: "calendar" | "personal_countdown";
+  sale_price: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  duration_seconds: number | null;
+  above_timer_text?: string | null;
+  below_button_text?: string | null;
+};
+
+export function durationSecondsToAmountUnit(
+  seconds: number | null,
+): { amount: number; unit: PromotionDurationUnit } {
+  if (!seconds || seconds <= 0) {
+    return { amount: 20, unit: "minutes" };
+  }
+
+  if (seconds % 86_400 === 0) {
+    return { amount: seconds / 86_400, unit: "days" };
+  }
+
+  if (seconds % 3_600 === 0) {
+    return { amount: seconds / 3_600, unit: "hours" };
+  }
+
+  const minutes = seconds % 60 === 0 ? seconds / 60 : Math.max(1, Math.round(seconds / 60));
+  return { amount: minutes, unit: "minutes" };
+}
+
+export function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) {
+    return "";
+  }
+
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+export function promotionToFormDraft(
+  row: AuthorPromotionFormSource,
+): AuthorPromotionFormDraft {
+  const duration = durationSecondsToAmountUnit(row.duration_seconds);
+  const copy = resolvePersonalTimerCopy({
+    aboveTimerText: row.above_timer_text,
+    belowButtonText: row.below_button_text,
+  });
+
+  return {
+    name: row.name,
+    salePrice: String(row.sale_price),
+    promotionType: row.promotion_type,
+    startsAt: toDatetimeLocalValue(row.starts_at),
+    endsAt: toDatetimeLocalValue(row.ends_at),
+    durationAmount: String(duration.amount),
+    durationUnit: duration.unit,
+    aboveTimerText: copy.aboveTimerText,
+    belowButtonText: copy.belowButtonText,
+  };
+}
+
+export function buildPromotionWriteBody(
+  draft: AuthorPromotionFormDraft,
+  options?: { isActive?: boolean },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    name: draft.name.trim() || "Акция",
+    promotion_type: draft.promotionType,
+    sale_price: Number(draft.salePrice),
+  };
+
+  if (options && typeof options.isActive === "boolean") {
+    body.is_active = options.isActive;
+  }
+
+  if (draft.promotionType === PRICE_PROMOTION_TYPES.CALENDAR) {
+    body.starts_at = draft.startsAt ? new Date(draft.startsAt).toISOString() : "";
+    body.ends_at = draft.endsAt ? new Date(draft.endsAt).toISOString() : "";
+    return body;
+  }
+
+  body.duration_amount = Number(draft.durationAmount);
+  body.duration_unit = draft.durationUnit;
+  body.duration_seconds = durationToSeconds(
+    Number(draft.durationAmount),
+    draft.durationUnit,
+  );
+  body.above_timer_text = draft.aboveTimerText;
+  body.below_button_text = draft.belowButtonText;
+  return body;
+}
+
+/**
+ * Fields written by PATCH. Never rotates start_token or reassigns
+ * practice_id / ownership. is_active is only written when the body
+ * sends it explicitly, so a full edit cannot silently re-enable a card.
+ */
+export function buildPromotionPatchUpdates(
+  body: Record<string, unknown>,
+  basePrice: number,
+):
+  | { ok: true; updates: Record<string, unknown> }
+  | { ok: false; error: string } {
+  const updates: Record<string, unknown> = {};
+
+  if ("is_active" in body && typeof body.is_active === "boolean") {
+    updates.is_active = body.is_active;
+  }
+
+  const hasFullWrite = PROMOTION_FULL_WRITE_KEYS.some((key) => key in body);
+
+  if (hasFullWrite) {
+    const parsed = parsePromotionWriteBody(body, basePrice);
+
+    if (!parsed.ok) {
+      return parsed;
+    }
+
+    updates.name = parsed.name;
+    updates.promotion_type = parsed.promotionType;
+    updates.sale_price = parsed.salePrice;
+    updates.starts_at = parsed.startsAt;
+    updates.ends_at = parsed.endsAt;
+    updates.duration_seconds = parsed.durationSeconds;
+    updates.above_timer_text = parsed.aboveTimerText;
+    updates.below_button_text = parsed.belowButtonText;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { ok: false, error: "invalid_request" };
+  }
+
+  delete updates.id;
+  delete updates.practice_id;
+  delete updates.start_token;
+
+  return { ok: true, updates };
+}
+
+export function promotionMatchesPractice(
+  row: { id: string; practice_id: string },
+  practiceId: string,
+  promotionId: string,
+): boolean {
+  return row.id === promotionId && row.practice_id === practiceId;
 }
 
 export function parsePromotionWriteBody(

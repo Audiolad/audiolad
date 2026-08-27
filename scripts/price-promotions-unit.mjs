@@ -22,7 +22,17 @@ import {
   mapRpcErrorMessage,
   parsePriceChangedDetail,
 } from "../src/lib/orders/create-order-api.ts";
-import { parsePromotionWriteBody } from "../src/lib/pricing/author-promotions.ts";
+import {
+  EMPTY_AUTHOR_PROMOTION_FORM,
+  buildPromotionPatchUpdates,
+  buildPromotionWriteBody,
+  durationSecondsToAmountUnit,
+  parsePromotionWriteBody,
+  promotionMatchesPractice,
+  promotionToFormDraft,
+  toDatetimeLocalValue,
+} from "../src/lib/pricing/author-promotions.ts";
+import { resolveAuthorPromoPreviewPrice } from "../src/lib/pricing/author-promo-preview.ts";
 import { validatePaidPriceRubles as validatePaidAgain } from "../src/lib/pricing/money.ts";
 import {
   bindPersonalStarts,
@@ -525,6 +535,290 @@ function testOrderSnapshotShape() {
   assertEqual(snapshot.promotion_type, "personal_countdown", "promo type");
 }
 
+function applyPromotionUpdate(store, practiceId, promotionId, updates) {
+  const index = store.findIndex((row) =>
+    promotionMatchesPractice(row, practiceId, promotionId),
+  );
+
+  if (index === -1) {
+    return { ok: false, store };
+  }
+
+  const current = store[index];
+  const next = store.slice();
+  next[index] = {
+    ...current,
+    ...updates,
+    id: current.id,
+    practice_id: current.practice_id,
+    start_token: current.start_token,
+  };
+  return { ok: true, store: next };
+}
+
+function savedPromotionRow(overrides = {}) {
+  return {
+    id: "promo-1",
+    practice_id: "practice-1",
+    name: "Funnel 499",
+    promotion_type: "personal_countdown",
+    sale_price: 499,
+    starts_at: null,
+    ends_at: null,
+    duration_seconds: 20 * 60,
+    above_timer_text: "Предложение действует ещё: {time_left}",
+    below_button_text:
+      "Это предложение показывается вам один раз. После окончания таймера продукт останется доступен по полной цене {full_price}.",
+    is_active: true,
+    start_token: "token-1",
+    ...overrides,
+  };
+}
+
+function testAuthorPromotionEditPrefillAndPersist() {
+  const row = savedPromotionRow({
+    name: "Утро 20 минут",
+    sale_price: 777,
+    duration_seconds: 2 * 60 * 60,
+    above_timer_text: "Над таймером: {time_left}",
+    below_button_text: "Под кнопкой {full_price}",
+    is_active: false,
+  });
+
+  const draft = promotionToFormDraft(row);
+  assertEqual(draft.name, "Утро 20 минут", "prefill name");
+  assertEqual(draft.salePrice, "777", "prefill sale");
+  assertEqual(draft.promotionType, "personal_countdown", "prefill type");
+  assertEqual(draft.durationAmount, "2", "prefill duration amount");
+  assertEqual(draft.durationUnit, "hours", "prefill duration unit");
+  assertEqual(draft.aboveTimerText, "Над таймером: {time_left}", "prefill above");
+  assertEqual(draft.belowButtonText, "Под кнопкой {full_price}", "prefill below");
+
+  const calendar = promotionToFormDraft(
+    savedPromotionRow({
+      promotion_type: "calendar",
+      starts_at: "2026-08-23T10:00:00.000Z",
+      ends_at: "2026-08-24T10:00:00.000Z",
+      duration_seconds: null,
+    }),
+  );
+  assertEqual(calendar.promotionType, "calendar", "calendar type");
+  assertEqual(
+    calendar.startsAt,
+    toDatetimeLocalValue("2026-08-23T10:00:00.000Z"),
+    "calendar start local",
+  );
+  assertEqual(
+    calendar.endsAt,
+    toDatetimeLocalValue("2026-08-24T10:00:00.000Z"),
+    "calendar end local",
+  );
+
+  const duration = durationSecondsToAmountUnit(3 * 86_400);
+  assertEqual(duration.amount, 3, "3 days amount");
+  assertEqual(duration.unit, "days", "3 days unit");
+
+  draft.name = "Ночное окно";
+  draft.salePrice = "399";
+  draft.durationAmount = "45";
+  draft.durationUnit = "minutes";
+  draft.aboveTimerText = "Новый текст над {time_left}";
+  draft.belowButtonText = "Новый текст под {full_price}";
+
+  const writeBody = buildPromotionWriteBody(draft, { isActive: row.is_active });
+  assertEqual(writeBody.is_active, false, "edit keeps disabled");
+  assertEqual(writeBody.name, "Ночное окно", "write name");
+  assertEqual(writeBody.sale_price, 399, "write sale");
+  assertEqual(writeBody.duration_seconds, 45 * 60, "write duration");
+  assertEqual(writeBody.above_timer_text, "Новый текст над {time_left}", "write above");
+  assertEqual(writeBody.below_button_text, "Новый текст под {full_price}", "write below");
+  assert(!("start_token" in writeBody), "write body does not rotate token");
+  assert(!("practice_id" in writeBody), "write body does not reassign product");
+
+  const parsed = buildPromotionPatchUpdates(writeBody, 4999);
+  assert(parsed.ok, "full edit validates");
+  if (!parsed.ok) {
+    return;
+  }
+  assertEqual(parsed.updates.is_active, false, "patch keeps disabled");
+  assert(!("start_token" in parsed.updates), "patch omits start_token");
+  assert(!("practice_id" in parsed.updates), "patch omits practice_id");
+  assert(!("id" in parsed.updates), "patch omits id");
+
+  const store = [row];
+  const updated = applyPromotionUpdate(store, "practice-1", "promo-1", parsed.updates);
+  assert(updated.ok, "same id updates");
+  assertEqual(updated.store.length, 1, "no second row");
+  assertEqual(updated.store[0].id, "promo-1", "same promotion id");
+  assertEqual(updated.store[0].start_token, "token-1", "token unchanged");
+  assertEqual(updated.store[0].practice_id, "practice-1", "product unchanged");
+  assertEqual(updated.store[0].is_active, false, "status preserved");
+  assertEqual(updated.store[0].name, "Ночное окно", "name persisted");
+  assertEqual(updated.store[0].sale_price, 399, "sale persisted");
+  assertEqual(updated.store[0].duration_seconds, 2700, "duration persisted");
+  assertEqual(
+    updated.store[0].above_timer_text,
+    "Новый текст над {time_left}",
+    "above persisted",
+  );
+  assertEqual(
+    updated.store[0].below_button_text,
+    "Новый текст под {full_price}",
+    "below persisted",
+  );
+
+  const cancelled = applyPromotionUpdate(store, "practice-1", "promo-1", {});
+  assertEqual(cancelled.store[0].name, row.name, "cancel leaves name");
+  assertEqual(
+    cancelled.store[0].above_timer_text,
+    row.above_timer_text,
+    "cancel leaves above",
+  );
+  assertEqual(EMPTY_AUTHOR_PROMOTION_FORM.name, "", "cancel returns empty create draft");
+}
+
+function testAuthorPromotionEditOwnershipGate() {
+  const own = savedPromotionRow();
+  const foreign = savedPromotionRow({
+    id: "promo-other",
+    practice_id: "practice-other",
+    name: "Чужая акция",
+  });
+  const store = [own, foreign];
+
+  const swapped = applyPromotionUpdate(store, "practice-1", "promo-other", {
+    name: "hack",
+  });
+  assert(!swapped.ok, "id swap against another product is rejected");
+  assertEqual(swapped.store[1].name, "Чужая акция", "foreign row unchanged");
+
+  const otherPractice = applyPromotionUpdate(store, "practice-other", "promo-1", {
+    name: "hack",
+  });
+  assert(!otherPractice.ok, "own id on another practice is rejected");
+  assertEqual(otherPractice.store[0].name, "Funnel 499", "own row unchanged");
+
+  assert(
+    !promotionMatchesPractice(own, "practice-other", own.id),
+    "owner/product mismatch",
+  );
+  assert(
+    promotionMatchesPractice(own, "practice-1", "promo-1"),
+    "matching practice and id",
+  );
+
+  const omittedActive = buildPromotionPatchUpdates(
+    {
+      name: "Только тексты",
+      promotion_type: "personal_countdown",
+      sale_price: 499,
+      duration_seconds: 1200,
+      above_timer_text: "x {time_left}",
+      below_button_text: "y {full_price}",
+    },
+    4999,
+  );
+  assert(omittedActive.ok, "full write without is_active is valid");
+  if (omittedActive.ok) {
+    assert(
+      !("is_active" in omittedActive.updates),
+      "omitted is_active is not forced true",
+    );
+  }
+}
+
+function testAuthorPromotionEditDoesNotResetStarts() {
+  const existingStart = start({
+    startedAt: "2026-08-23T10:00:00.000Z",
+    expiresAt: "2026-08-23T10:20:00.000Z",
+  });
+  const editedPromo = promotion({
+    name: "После правки",
+    salePrice: 399,
+    durationSeconds: 60 * 60,
+    aboveTimerText: "Новый над {time_left}",
+    belowButtonText: "Новый под {full_price}",
+  });
+  const now = new Date("2026-08-23T10:10:00.000Z");
+
+  const resolved = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [editedPromo],
+    starts: [existingStart],
+    surface: PRICE_SURFACES.PRODUCT,
+    now,
+  });
+  assertEqual(resolved.finalPrice, 399, "live price follows current row");
+  assertEqual(
+    resolved.promotion?.expiresAt,
+    existingStart.expiresAt,
+    "already-started window keeps expires_at",
+  );
+  assertEqual(
+    resolved.promotion?.aboveTimerText,
+    "Новый над {time_left}",
+    "copy follows current row",
+  );
+  assertEqual(
+    resolved.promotion?.belowButtonText,
+    "Новый под {full_price}",
+    "below copy follows current row",
+  );
+
+  const repeat = startPersonalCountdown({
+    store: [existingStart],
+    promotionId: editedPromo.id,
+    visitorId: existingStart.visitorId,
+    userId: null,
+    now,
+    durationSeconds: editedPromo.durationSeconds,
+    id: "must-not-create",
+  });
+  assert(!repeat.created, "duration edit does not create a second start");
+  assertEqual(repeat.store.length, 1, "still one start row");
+  assertEqual(repeat.start.expiresAt, existingStart.expiresAt, "window not reset");
+  assertEqual(repeat.start.startedAt, existingStart.startedAt, "started_at kept");
+}
+
+function testAuthorPromoPreviewUsesUpdatedRowById() {
+  const updated = promotion({
+    id: "promo-1",
+    name: "После правки",
+    salePrice: 333,
+    durationSeconds: 45 * 60,
+    aboveTimerText: "Превью {time_left}",
+    belowButtonText: "Превью {full_price}",
+    startToken: "token-must-not-be-used",
+  });
+  const now = new Date("2026-08-23T12:00:00.000Z");
+  const preview = resolveAuthorPromoPreviewPrice({
+    isFree: false,
+    basePrice: 4999,
+    promotion: updated,
+    now,
+  });
+
+  assert(preview, "preview resolves from promotion id row");
+  assertEqual(preview.finalPrice, 333, "preview uses newly saved price");
+  assertEqual(preview.promotion?.name, "После правки", "preview uses newly saved name");
+  assertEqual(
+    preview.promotion?.aboveTimerText,
+    "Превью {time_left}",
+    "preview uses newly saved above text",
+  );
+  assertEqual(
+    preview.promotion?.belowButtonText,
+    "Превью {full_price}",
+    "preview uses newly saved below text",
+  );
+  assertEqual(
+    preview.promotion?.expiresAt,
+    new Date(now.getTime() + 45 * 60 * 1000).toISOString(),
+    "preview synthesizes duration from the current row",
+  );
+}
+
 function testAuthorPromotionValidation() {
   const ok = parsePromotionWriteBody(
     {
@@ -667,6 +961,20 @@ function testSourceContracts() {
   assert(promoForm.includes("above_timer_text"), "saves above copy");
   assert(promoForm.includes("below_button_text"), "saves below copy");
   assert(promoForm.includes("Предпросмотр акции"), "author promo preview button");
+  assert(promoForm.includes("Редактировать"), "edit button on saved card");
+  assert(promoForm.includes("Сохранить изменения"), "edit submit label");
+  assert(promoForm.includes("Отмена"), "edit cancel label");
+  assert(promoForm.includes("promotionToFormDraft"), "edit reuses form draft");
+  assert(promoForm.includes("buildPromotionWriteBody"), "edit reuses write body");
+  assert(promoForm.includes("method: editingRow ? \"PATCH\" : \"POST\""), "edit patches same id");
+  const cardActions = promoForm.slice(promoForm.indexOf("data-author-promo-preview"));
+  const previewIdx = cardActions.indexOf("Предпросмотр акции");
+  const editIdx = cardActions.indexOf("Редактировать");
+  const toggleIdx = cardActions.indexOf("Выключить");
+  const deleteIdx = cardActions.indexOf("Удалить");
+  assert(previewIdx >= 0 && previewIdx < editIdx, "preview before edit");
+  assert(editIdx < toggleIdx, "edit before toggle");
+  assert(toggleIdx < deleteIdx, "toggle before delete");
   assert(promoForm.includes("buildPracticePromoPreviewPath"), "preview uses promotion id path");
   const previewHref = promoForm.slice(promoForm.indexOf("buildPracticePromoPreviewPath"));
   assert(previewHref.includes("row.id"), "preview href uses promotion id");
@@ -674,6 +982,19 @@ function testSourceContracts() {
     !previewHref.slice(0, 180).includes("start_token"),
     "preview href must not use start_token",
   );
+
+  const patchRoute = readFileSync(
+    join(
+      ROOT,
+      "src/app/api/author/products/[id]/price-promotions/[promotionId]/route.ts",
+    ),
+    "utf8",
+  );
+  assert(patchRoute.includes("requirePracticeMutationAccess"), "update uses create/delete rights");
+  assert(patchRoute.includes("buildPromotionPatchUpdates"), "update reuses write schema");
+  assert(patchRoute.includes('.eq("id", promotionId)'), "update gated by promotion id");
+  assert(patchRoute.includes('.eq("practice_id", id)'), "update gated by practice id");
+  assert(!patchRoute.includes("start_token"), "update never writes start_token");
 
   const offer = readFileSync(
     join(ROOT, "src/components/pricing/ProductPriceOffer.tsx"),
@@ -714,6 +1035,10 @@ function main() {
   testExpiredPersonalPromo();
   testFrontendTamperRejected();
   testOrderSnapshotShape();
+  testAuthorPromotionEditPrefillAndPersist();
+  testAuthorPromotionEditOwnershipGate();
+  testAuthorPromotionEditDoesNotResetStarts();
+  testAuthorPromoPreviewUsesUpdatedRowById();
   testAuthorPromotionValidation();
   testPurchaseRegressionStillUsesIntegerRubles();
   testMigrationContract();

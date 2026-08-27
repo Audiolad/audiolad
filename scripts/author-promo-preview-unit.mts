@@ -728,6 +728,8 @@ function testSourceContracts() {
 
   assert.match(form, /Предпросмотр акции/);
   assert.match(form, /data-author-promo-preview/);
+  assert.match(form, /Редактировать/);
+  assert.match(form, /data-author-promo-edit/);
   assert.match(form, /buildPracticePromoPreviewPath/);
   assert.match(form, /Выключить/);
   assert.match(form, /Удалить/);

@@ -6,7 +6,10 @@ import { useCallback, useEffect, useState } from "react";
 import { formatRubles } from "@/lib/products/price-format";
 import { buildPracticePromoPreviewPath } from "@/lib/products/paths";
 import {
-  durationToSeconds,
+  EMPTY_AUTHOR_PROMOTION_FORM,
+  buildPromotionWriteBody,
+  promotionToFormDraft,
+  type AuthorPromotionFormDraft,
   type PromotionDurationUnit,
 } from "@/lib/pricing/author-promotions";
 import {
@@ -26,6 +29,8 @@ type PromotionRow = {
   starts_at: string | null;
   ends_at: string | null;
   duration_seconds: number | null;
+  above_timer_text?: string | null;
+  below_button_text?: string | null;
   is_active: boolean;
   start_token: string;
 };
@@ -88,22 +93,10 @@ export default function AuthorProductPromotions({
   const [rows, setRows] = useState<PromotionRow[]>([]);
   const [loading, setLoading] = useState(() => Boolean(practiceId));
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [salePrice, setSalePrice] = useState("499");
-  const [promotionType, setPromotionType] = useState<
-    "calendar" | "personal_countdown"
-  >("personal_countdown");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-  const [durationAmount, setDurationAmount] = useState("20");
-  const [durationUnit, setDurationUnit] =
-    useState<PromotionDurationUnit>("minutes");
-  const [aboveTimerText, setAboveTimerText] = useState(
-    DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
-  );
-  const [belowButtonText, setBelowButtonText] = useState(
-    DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<AuthorPromotionFormDraft>(
+    EMPTY_AUTHOR_PROMOTION_FORM,
   );
 
   const applyPromotionsPayload = useCallback(
@@ -170,48 +163,53 @@ export default function AuthorProductPromotions({
     };
   }, [applyPromotionsPayload, practiceId]);
 
-  async function handleCreate() {
+  function resetForm() {
+    setEditingId(null);
+    setDraft(EMPTY_AUTHOR_PROMOTION_FORM);
+  }
+
+  function openEdit(row: PromotionRow) {
+    setEditingId(row.id);
+    setDraft(promotionToFormDraft(row));
+    setError(null);
+  }
+
+  function cancelEdit() {
+    resetForm();
+    setError(null);
+  }
+
+  async function handleSubmit() {
     if (!practiceId) {
       setError("Сначала сохраните продукт.");
       return;
     }
 
-    const sale = Number(salePrice);
+    const sale = Number(draft.salePrice);
 
     if (!Number.isInteger(sale)) {
       setError("Цена акции должна быть целым числом.");
       return;
     }
 
-    setCreating(true);
+    const editingRow = editingId
+      ? rows.find((row) => row.id === editingId)
+      : undefined;
+
+    setSaving(true);
     setError(null);
 
-    const body: Record<string, unknown> = {
-      name: name.trim() || "Акция",
-      promotion_type: promotionType,
-      sale_price: sale,
-      is_active: true,
-    };
-
-    if (promotionType === PRICE_PROMOTION_TYPES.CALENDAR) {
-      body.starts_at = startsAt ? new Date(startsAt).toISOString() : "";
-      body.ends_at = endsAt ? new Date(endsAt).toISOString() : "";
-    } else {
-      body.duration_amount = Number(durationAmount);
-      body.duration_unit = durationUnit;
-      body.duration_seconds = durationToSeconds(
-        Number(durationAmount),
-        durationUnit,
-      );
-      body.above_timer_text = aboveTimerText;
-      body.below_button_text = belowButtonText;
-    }
+    const body = buildPromotionWriteBody(draft, {
+      isActive: editingRow ? editingRow.is_active : true,
+    });
 
     try {
       const response = await fetch(
-        `/api/author/products/${practiceId}/price-promotions`,
+        editingRow
+          ? `/api/author/products/${practiceId}/price-promotions/${editingRow.id}`
+          : `/api/author/products/${practiceId}/price-promotions`,
         {
-          method: "POST",
+          method: editingRow ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
@@ -222,15 +220,17 @@ export default function AuthorProductPromotions({
         setError(
           payload.error === "invalid_sale_price"
             ? "Цена акции должна быть ниже базовой и в диапазоне 49–100 000 ₽."
-            : "Не удалось создать акцию.",
+            : editingRow
+              ? "Не удалось сохранить изменения."
+              : "Не удалось создать акцию.",
         );
         return;
       }
 
-      setName("");
+      resetForm();
       await load();
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
@@ -274,6 +274,10 @@ export default function AuthorProductPromotions({
       return;
     }
 
+    if (editingId === id) {
+      resetForm();
+    }
+
     await load();
   }
 
@@ -285,13 +289,22 @@ export default function AuthorProductPromotions({
     );
   }
 
+  const promotionType = draft.promotionType;
+
   return (
     <div className="space-y-4">
-      <div className="space-y-3 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] p-4">
-        <p className="text-sm font-medium text-[#3f3560]">Новая акция</p>
+      <div
+        className="space-y-3 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] p-4"
+        data-author-promo-form={editingId ? "edit" : "create"}
+      >
+        <p className="text-sm font-medium text-[#3f3560]">
+          {editingId ? "Редактировать акцию" : "Новая акция"}
+        </p>
         <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+          value={draft.name}
+          onChange={(event) =>
+            setDraft((current) => ({ ...current, name: event.target.value }))
+          }
           disabled={disabled}
           placeholder="Название"
           className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
@@ -305,9 +318,14 @@ export default function AuthorProductPromotions({
               min={49}
               max={Math.max(48, basePrice - 1)}
               step={1}
-              value={salePrice}
+              value={draft.salePrice}
               disabled={disabled}
-              onChange={(event) => setSalePrice(event.target.value)}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  salePrice: event.target.value,
+                }))
+              }
               className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
             />
           </label>
@@ -321,17 +339,22 @@ export default function AuthorProductPromotions({
                   event.target.value === "calendar"
                     ? "calendar"
                     : "personal_countdown";
-                setPromotionType(nextType);
-                if (nextType === "personal_countdown") {
-                  setAboveTimerText((current) =>
-                    current.trim() ? current : DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
-                  );
-                  setBelowButtonText((current) =>
-                    current.trim()
-                      ? current
-                      : DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
-                  );
-                }
+                setDraft((current) => ({
+                  ...current,
+                  promotionType: nextType,
+                  aboveTimerText:
+                    nextType === "personal_countdown"
+                      ? current.aboveTimerText.trim()
+                        ? current.aboveTimerText
+                        : DEFAULT_PERSONAL_TIMER_ABOVE_TEXT
+                      : current.aboveTimerText,
+                  belowButtonText:
+                    nextType === "personal_countdown"
+                      ? current.belowButtonText.trim()
+                        ? current.belowButtonText
+                        : DEFAULT_PERSONAL_TIMER_BELOW_TEXT
+                      : current.belowButtonText,
+                }));
               }}
               className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
             >
@@ -347,9 +370,14 @@ export default function AuthorProductPromotions({
               <span className="mb-1 block text-[#7d70a2]">Начало</span>
               <input
                 type="datetime-local"
-                value={startsAt}
+                value={draft.startsAt}
                 disabled={disabled}
-                onChange={(event) => setStartsAt(event.target.value)}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    startsAt: event.target.value,
+                  }))
+                }
                 className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
               />
             </label>
@@ -357,9 +385,14 @@ export default function AuthorProductPromotions({
               <span className="mb-1 block text-[#7d70a2]">Конец</span>
               <input
                 type="datetime-local"
-                value={endsAt}
+                value={draft.endsAt}
                 disabled={disabled}
-                onChange={(event) => setEndsAt(event.target.value)}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    endsAt: event.target.value,
+                  }))
+                }
                 className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
               />
             </label>
@@ -372,19 +405,27 @@ export default function AuthorProductPromotions({
                 type="number"
                 min={1}
                 step={1}
-                value={durationAmount}
+                value={draft.durationAmount}
                 disabled={disabled}
-                onChange={(event) => setDurationAmount(event.target.value)}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    durationAmount: event.target.value,
+                  }))
+                }
                 className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block text-[#7d70a2]">Единица</span>
               <select
-                value={durationUnit}
+                value={draft.durationUnit}
                 disabled={disabled}
                 onChange={(event) =>
-                  setDurationUnit(event.target.value as PromotionDurationUnit)
+                  setDraft((current) => ({
+                    ...current,
+                    durationUnit: event.target.value as PromotionDurationUnit,
+                  }))
                 }
                 className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
               >
@@ -402,11 +443,16 @@ export default function AuthorProductPromotions({
               <span className="mb-1 block text-[#7d70a2]">Текст над таймером</span>
               <textarea
                 data-author-promo-above-timer
-                value={aboveTimerText}
+                value={draft.aboveTimerText}
                 disabled={disabled}
                 maxLength={PERSONAL_TIMER_COPY_MAX_LENGTH}
                 rows={2}
-                onChange={(event) => setAboveTimerText(event.target.value)}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    aboveTimerText: event.target.value,
+                  }))
+                }
                 className="w-full resize-y rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
               />
             </label>
@@ -414,11 +460,16 @@ export default function AuthorProductPromotions({
               <span className="mb-1 block text-[#7d70a2]">Текст под кнопкой</span>
               <textarea
                 data-author-promo-below-button
-                value={belowButtonText}
+                value={draft.belowButtonText}
                 disabled={disabled}
                 maxLength={PERSONAL_TIMER_COPY_MAX_LENGTH}
                 rows={3}
-                onChange={(event) => setBelowButtonText(event.target.value)}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    belowButtonText: event.target.value,
+                  }))
+                }
                 className="w-full resize-y rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
               />
             </label>
@@ -430,14 +481,28 @@ export default function AuthorProductPromotions({
           </div>
         ) : null}
 
-        <button
-          type="button"
-          disabled={disabled || creating}
-          onClick={() => void handleCreate()}
-          className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          Добавить акцию
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={disabled || saving}
+            onClick={() => void handleSubmit()}
+            data-author-promo-submit={editingId ? "edit" : "create"}
+            className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {editingId ? "Сохранить изменения" : "Добавить акцию"}
+          </button>
+          {editingId ? (
+            <button
+              type="button"
+              disabled={disabled || saving}
+              onClick={cancelEdit}
+              data-author-promo-cancel
+              className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+            >
+              Отмена
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className="text-sm text-[#8d4d57]">{error}</p> : null}
@@ -448,6 +513,7 @@ export default function AuthorProductPromotions({
           <li
             key={row.id}
             className="rounded-[18px] border border-[#eadff8] bg-white px-4 py-3"
+            data-author-promo-card={row.id}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -460,9 +526,21 @@ export default function AuthorProductPromotions({
                   · {statusLabel(row)}
                 </p>
                 {row.promotion_type === "personal_countdown" ? (
-                  <p className="mt-2 break-all text-xs text-[#7d70a2]">
-                    Триггер: ?promo={row.start_token}
-                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-[#7d70a2]">
+                    <p className="break-all">
+                      Триггер: ?promo={row.start_token}
+                    </p>
+                    {row.above_timer_text ? (
+                      <p data-author-promo-card-above={row.id}>
+                        {row.above_timer_text}
+                      </p>
+                    ) : null}
+                    {row.below_button_text ? (
+                      <p data-author-promo-card-below={row.id}>
+                        {row.below_button_text}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -481,6 +559,15 @@ export default function AuthorProductPromotions({
                     Предпросмотр акции
                   </Link>
                 ) : null}
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => openEdit(row)}
+                  data-author-promo-edit={row.id}
+                  className="rounded-full border border-[#c6afe6] px-3 py-1.5 text-xs font-semibold text-[#7042c5] disabled:opacity-60"
+                >
+                  Редактировать
+                </button>
                 <button
                   type="button"
                   disabled={disabled}
