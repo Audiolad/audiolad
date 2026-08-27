@@ -84,6 +84,7 @@ import { TARO_BOLSHIH_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-bol
 import { TARO_BOGATSTVA_I_DENGI_PAGE } from "../src/lib/seo/listens/content/taro-bogatstva-i-dengi.ts";
 import { KARTA_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/karta-taro-na-dengi.ts";
 import { TARO_PRIVLECHENIE_DENEG_PAGE } from "../src/lib/seo/listens/content/taro-privlechenie-deneg.ts";
+import { KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE } from "../src/lib/seo/listens/content/karta-taro-dlya-privlecheniya-deneg.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1858,6 +1859,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${fiftySeventhListenHref}`,
     ),
     "directory JSON-LD includes fifty-seventh listen href",
+  );
+
+  const fiftyEighthListenHref = "/listens/karta-taro-dlya-privlecheniya-deneg";
+  const fiftyEighthListenCard = data.articles.find((card) => card.href === fiftyEighthListenHref);
+  assert(fiftyEighthListenCard, "fifty-eighth indexable listen page is listed");
+  assert(
+    fiftyEighthListenCard.title === "Карта Таро для привлечения денег – какие карты выбирают | АудиоЛад",
+    "fifty-eighth listen directory title",
+  );
+  assert(
+    fiftyEighthListenCard.description === KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE.description,
+    "fifty-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/karta-taro-dlya-privlecheniya-deneg",
+    ),
+    "no /articles duplicate for fifty-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${fiftyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes fifty-eighth listen href",
   );
 
 
