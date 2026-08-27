@@ -40,6 +40,40 @@ assert.match(
   /listener-catalog-mobile-search[^"]*xl:hidden/,
   "catalog layout search is mobile-only at xl",
 );
+assert.match(
+  layout,
+  /listener-catalog-mobile-search[^"]*px-5/,
+  "mobile search chrome stays px-5",
+);
+const contentClassMatch = layout.match(
+  /className="listener-catalog-content[^"]*"/,
+);
+assert.ok(contentClassMatch, "catalog content has a className");
+assert.match(
+  contentClassMatch[0],
+  /px-2\.5/,
+  "catalog content uses 10px mobile padding",
+);
+assert.match(
+  contentClassMatch[0],
+  /md:px-5/,
+  "catalog content restores 20px from md",
+);
+assert.match(
+  contentClassMatch[0],
+  /lg:px-10/,
+  "lg catalog content padding stays 40px",
+);
+assert.match(
+  contentClassMatch[0],
+  /xl:px-6/,
+  "xl catalog content padding stays 24px",
+);
+assert.doesNotMatch(
+  contentClassMatch[0],
+  /(?:^|[\s"])px-5(?:[\s"]|$)/,
+  "catalog content has no bare mobile px-5",
+);
 assert.doesNotMatch(
   layout,
   /xl:static|xl:inset-auto|xl:z-auto/,
