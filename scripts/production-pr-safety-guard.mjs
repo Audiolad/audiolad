@@ -20,6 +20,8 @@ const prNumber = process.env.PR_SAFETY_PR_NUMBER?.trim() ?? "";
 const prState = process.env.PR_SAFETY_PR_STATE?.trim() ?? "";
 const prBaseRef = process.env.PR_SAFETY_PR_BASE_REF?.trim() ?? "";
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+const statusOutputPath =
+  process.env.PR_SAFETY_STATUS_OUTPUT ?? process.env.GITHUB_OUTPUT;
 
 function shortSha(sha) {
   return sha ? sha.slice(0, 12) : "unknown";
@@ -371,7 +373,15 @@ async function main() {
     console.log(summary);
   }
 
-  if (reasons.length > 0) process.exitCode = 1;
+  const statusState = reasons.length === 0 ? "success" : "failure";
+  if (statusOutputPath) {
+    await (await import("node:fs/promises")).appendFile(
+      statusOutputPath,
+      `status_state=${statusState}\n`,
+    );
+  }
+
+  if (statusState === "failure") process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {

@@ -1,43 +1,41 @@
-name: Production / PR Safety
+name: Production / PR Safety Runner
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Pull request number to check
+        description: Open pull request number targeting main
         required: true
         type: string
 
 permissions:
   contents: read
   pull-requests: read
+  statuses: write
 
 concurrency:
   group: production-pr-safety-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  production-pr-safety:
-    name: Production / PR Safety
+  production-pr-safety-runner:
+    name: Production / PR Safety Runner
     if: >-
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout current main history
+      - name: Checkout trusted main history
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Resolve current main and PR head
+      - name: Resolve and validate current main and PR head
         id: refs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,8 +75,21 @@ jobs:
           printf 'pr_state=%s\n' "$pr_state" >> "$GITHUB_OUTPUT"
           printf 'pr_base_ref=%s\n' "$pr_base_ref" >> "$GITHUB_OUTPUT"
 
+      - name: Set trusted status pending on PR head
+        id: pending
+        if: github.event_name == 'pull_request_target' && steps.refs.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_SHA: ${{ steps.refs.outputs.pr_sha }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${PR_SHA}" \
+            -f state=pending \
+            -f context='Production / PR Safety' \
+            -f description='Trusted production lineage check is running'
+
       - name: Re-read main immediately before verdict
         id: final-main
+        if: steps.refs.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -90,7 +101,9 @@ jobs:
           fi
           printf 'main_sha=%s\n' "$main_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Evaluate production and PR safety
+      - name: Evaluate trusted production and PR safety
+        id: guard
+        if: steps.refs.outcome == 'success'
         env:
           PR_SAFETY_MAIN_SHA: ${{ steps.refs.outputs.main_sha }}
           PR_SAFETY_FINAL_MAIN_SHA: ${{ steps.final-main.outputs.main_sha }}
@@ -102,24 +115,26 @@ jobs:
           AUDIOLAD_PRODUCTION_HEALTH_URL: https://audiolad.ru/api/health/build
         run: node scripts/production-pr-safety-guard.mjs
 
-  pr-repository-validation:
-    name: PR Repository Validation
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PR head for ordinary validation
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-          persist-credentials: false
+      - name: Resolve final trusted status
+        id: final-status
+        if: always() && github.event_name == 'pull_request_target' && steps.refs.outcome == 'success'
+        env:
+          GUARD_STATE: ${{ steps.guard.outputs.status_state }}
+          GUARD_OUTCOME: ${{ steps.guard.outcome }}
+        run: node scripts/production-pr-safety-status.mjs
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate PR repository
+      - name: Set final trusted status on PR head
+        if: always() && github.event_name == 'pull_request_target' && steps.refs.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_SHA: ${{ steps.refs.outputs.pr_sha }}
+          STATUS_STATE: ${{ steps.final-status.outputs.state }}
+          STATUS_DESCRIPTION: ${{ steps.final-status.outputs.description }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          npm run test:database-migrations
-          npm run build
-          npm run typecheck
-          npm run lint
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${PR_SHA}" \
+            -f state="$STATUS_STATE" \
+            -f context='Production / PR Safety' \
+            -f description="$STATUS_DESCRIPTION" \
+            -f target_url="$RUN_URL"

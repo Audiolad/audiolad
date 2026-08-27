@@ -12,6 +12,7 @@ import {
   resolveProductionHealthUrl,
   validatePrSafetyInput,
 } from "./production-pr-safety-guard.mjs";
+import { resolveTrustedCommitStatus } from "./production-pr-safety-status.mjs";
 
 const prod = "a251297017b07fa3a066a0d9506c7331354e2229";
 const main = "a9314c8319cb288e84b305e07d693a97786df7f7";
@@ -91,6 +92,27 @@ assert.match(
   lineageBlockingReasons({ ...safeLineage, mainChanged: true }).join("\n"),
   /main changed during check/,
 );
+assert.deepEqual(
+  resolveTrustedCommitStatus({ guardOutcome: "success", guardState: "success" }),
+  {
+    state: "success",
+    description: "SAFE TO CONTINUE REVIEW (not deployment approval)",
+  },
+);
+assert.deepEqual(
+  resolveTrustedCommitStatus({ guardOutcome: "failure", guardState: "failure" }),
+  {
+    state: "failure",
+    description: "BLOCK MERGE — see trusted safety summary",
+  },
+);
+assert.deepEqual(
+  resolveTrustedCommitStatus({ guardOutcome: "failure", guardState: "" }),
+  {
+    state: "error",
+    description: "Trusted production lineage check had an internal error",
+  },
+);
 
 const blocked = buildSummary({
   healthUrl: "https://example.test/api/health/build",
@@ -119,33 +141,55 @@ assert.match(blocked, /PR HEAD/);
 assert.match(blocked, /❌ BLOCK MERGE/);
 assert.match(blocked, /not\*\* a deploy approval/);
 
-const workflow = readFileSync(".github/workflows/pr-production-safety.yml", "utf8");
-assert.match(workflow, /pull_request:/);
-assert.match(workflow, /pull_request_target:/);
-assert.match(workflow, /workflow_dispatch:/);
-assert.match(workflow, /pr_number:/);
-assert.match(workflow, /fetch-depth: 0/);
-assert.match(workflow, /persist-credentials: false/);
-assert.match(workflow, /concurrency:/);
-assert.match(workflow, /github\.event_name/);
-assert.match(workflow, /https:\/\/audiolad\.ru\/api\/health\/build/);
-assert.match(workflow, /pr_number must contain digits only/);
-assert.match(workflow, /must target main/);
-assert.match(workflow, /malformed main or PR SHA/);
-assert.match(workflow, /Re-read main immediately before verdict/);
-assert.doesNotMatch(workflow, /\bssh\b/i);
-assert.doesNotMatch(workflow, /DATABASE_URL|SUPABASE.*KEY|production.*secret/i);
-const trustedJob = workflow.slice(
-  workflow.indexOf("  production-pr-safety:"),
-  workflow.indexOf("  pr-repository-validation:"),
+const trustedWorkflow = readFileSync(
+  ".github/workflows/production-pr-safety-trusted.yml",
+  "utf8",
+);
+const validationWorkflow = readFileSync(
+  ".github/workflows/pr-repository-validation.yml",
+  "utf8",
+);
+assert.match(trustedWorkflow, /pull_request_target:/);
+assert.doesNotMatch(trustedWorkflow, /^\s+pull_request:/m);
+assert.match(trustedWorkflow, /workflow_dispatch:/);
+assert.match(trustedWorkflow, /pr_number:/);
+assert.match(trustedWorkflow, /fetch-depth: 0/);
+assert.match(trustedWorkflow, /persist-credentials: false/);
+assert.match(trustedWorkflow, /statuses: write/);
+assert.match(trustedWorkflow, /context='Production \/ PR Safety'/);
+assert.match(trustedWorkflow, /statuses\/\$\{PR_SHA\}/);
+assert.doesNotMatch(trustedWorkflow, /statuses\/\$\{\{\s*github\.sha\s*\}\}/);
+assert.match(trustedWorkflow, /Set trusted status pending on PR head/);
+assert.match(trustedWorkflow, /if: always\(\).*pull_request_target.*steps\.refs\.outcome == 'success'/);
+assert.match(trustedWorkflow, /Re-read main immediately before verdict/);
+assert.match(trustedWorkflow, /pr_number must contain digits only/);
+assert.match(trustedWorkflow, /must target main/);
+assert.match(trustedWorkflow, /malformed main or PR SHA/);
+assert.match(trustedWorkflow, /production-pr-safety-\$\{\{ github\.event_name \}\}-\$\{\{/);
+assert.doesNotMatch(trustedWorkflow, /\bssh\b/i);
+assert.doesNotMatch(trustedWorkflow, /DATABASE_URL|SUPABASE.*KEY|production.*secret/i);
+const trustedJob = trustedWorkflow.slice(
+  trustedWorkflow.indexOf("  production-pr-safety-runner:"),
 );
 assert.doesNotMatch(trustedJob, /checkout --detach "\$pr_sha"/);
 assert.doesNotMatch(trustedJob, /npm ci/);
 assert.match(trustedJob, /github\.event_name == 'pull_request_target'/);
 assert.match(
-  workflow,
-  /production-pr-safety-\$\{\{ github\.event_name \}\}-\$\{\{/,
-  "manual dispatch has an event-specific concurrency group",
+  validationWorkflow,
+  /pull_request:/,
 );
+assert.doesNotMatch(validationWorkflow, /pull_request_target:/);
+assert.doesNotMatch(validationWorkflow, /statuses: write/);
+assert.match(validationWorkflow, /persist-credentials: false/);
+assert.match(
+  validationWorkflow,
+  /github\.event\.pull_request\.head\.sha/,
+  "ordinary validation is the only workflow that checks out PR code",
+);
+
+const docs = readFileSync("docs/ci-production-pr-safety.md", "utf8");
+assert.match(docs, /separate .*PR Repository Validation.*workflow/is);
+assert.match(docs, /does not write the trusted status context/);
+assert.match(docs, /commit status.*Production \/ PR Safety/is);
 
 console.log("production-pr-safety-guard-unit: ok");
