@@ -1268,8 +1268,9 @@ function testSalePriceSnapshotSemantics() {
   const newStarted = new Date(newer.startedAt).getTime();
   const newExpires = new Date(newer.expiresAt).getTime();
   assertEqual(newExpires - newStarted, 600 * 1000, "B: new start uses new duration");
+  const newerDuring = new Date(newStarted + 1000).toISOString();
   assertEqual(
-    resolvePrice(CLEAN_DB, VISITOR_B, null, "product", newer.startedAt).split("|")[0],
+    resolvePrice(CLEAN_DB, VISITOR_B, null, "product", newerDuring).split("|")[0],
     "699",
     "A: new visitor PDP is 699",
   );
@@ -1315,8 +1316,9 @@ function testSalePriceSnapshotSemantics() {
     "699",
     "E: stored snapshot not copied from current promo",
   );
+  const loginDuring = new Date(new Date(afterLogin.startedAt).getTime() + 1000).toISOString();
   assertEqual(
-    resolvePrice(CLEAN_DB, VISITOR_C, USER_LOGIN, "checkout", afterLogin.startedAt).split("|")[0],
+    resolvePrice(CLEAN_DB, VISITOR_C, USER_LOGIN, "checkout", loginDuring).split("|")[0],
     "699",
     "E: login checkout uses guest snapshot",
   );
