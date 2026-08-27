@@ -89,6 +89,7 @@ import { TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE } from "../src/lib/seo/listens/
 import { RASKLAD_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-dengi.ts";
 import { TARO_NA_DENGI_I_UDACHU_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-i-udachu.ts";
 import { BUDUT_LI_DENGI_TARO_PAGE } from "../src/lib/seo/listens/content/budut-li-dengi-taro.ts";
+import { TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-v-blizhayshee-vremya.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1985,6 +1986,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${sixtySecondListenHref}`,
     ),
     "directory JSON-LD includes sixty-second listen href",
+  );
+
+  const sixtyThirdListenHref = "/listens/taro-na-dengi-v-blizhayshee-vremya";
+  const sixtyThirdListenCard = data.articles.find((card) => card.href === sixtyThirdListenHref);
+  assert(sixtyThirdListenCard, "sixty-third indexable listen page is listed");
+  assert(
+    sixtyThirdListenCard.title === "Таро на деньги в ближайшее время – финансовый период | АудиоЛад",
+    "sixty-third listen directory title",
+  );
+  assert(
+    sixtyThirdListenCard.description === TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE.description,
+    "sixty-third listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-na-dengi-v-blizhayshee-vremya",
+    ),
+    "no /articles duplicate for sixty-third listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtyThirdListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-third listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
