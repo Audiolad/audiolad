@@ -419,7 +419,7 @@ assert.equal(
 assert.equal(isPublicationFilePdfMime("application/pdf"), true);
 assert.equal(isPublicationFilePdfMime("application/zip"), false);
 assert.equal(PUBLICATION_FILE_PDF_MIME, "application/pdf");
-assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 5 * 1024 * 1024);
+assert.equal(PUBLICATION_FILE_MAX_PDF_BYTES, 10 * 1024 * 1024);
 assert.equal(PUBLICATION_FILE_LIMITS.maxPdfBytes, PUBLICATION_FILE_MAX_PDF_BYTES);
 assert.equal(PERSONAL_MATERIAL_LIMITS.maxPdfBytes, 20 * 1024 * 1024);
 
@@ -453,24 +453,34 @@ assert.equal(
   "~4.8 MB PDF accepted",
 );
 
-const exactlyFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+const eightToNineMb = pdfBufferWithSize(Math.floor(8.5 * 1024 * 1024));
 assert.equal(
   validatePublicationPdfUpload({
-    file: pdfFileFromBuffer(exactlyFiveMb),
-    buffer: exactlyFiveMb,
+    file: pdfFileFromBuffer(eightToNineMb),
+    buffer: eightToNineMb,
   }).ok,
   true,
-  "exactly 5 MB PDF accepted",
+  "8–9 MB PDF accepted",
 );
 
-const overFiveMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
+const exactlyTenMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES);
+assert.equal(
+  validatePublicationPdfUpload({
+    file: pdfFileFromBuffer(exactlyTenMb),
+    buffer: exactlyTenMb,
+  }).ok,
+  true,
+  "exactly 10 MB PDF accepted",
+);
+
+const overTenMb = pdfBufferWithSize(PUBLICATION_FILE_MAX_PDF_BYTES + 1);
 assert.deepEqual(
   validatePublicationPdfUpload({
-    file: pdfFileFromBuffer(overFiveMb),
-    buffer: overFiveMb,
+    file: pdfFileFromBuffer(overTenMb),
+    buffer: overTenMb,
   }),
   { ok: false, code: "invalid_file_size" },
-  ">5 MB PDF rejected",
+  ">10 MB PDF rejected",
 );
 
 const zipAsPdf = Buffer.from("PK\u0003\u0004not-a-pdf");
@@ -482,6 +492,9 @@ assert.deepEqual(
   { ok: false, code: "invalid_file_type" },
   "non-PDF MIME rejected",
 );
+
+const typesSrc = read("src/lib/course-content/types.ts");
+assert.match(typesSrc, /PUBLICATION_FILE_MAX_PDF_BYTES = 10 \* 1024 \* 1024/);
 
 const validatorsSrc = read("src/lib/course-content/validators.ts");
 assert.match(validatorsSrc, /PUBLICATION_FILE_MAX_PDF_BYTES/);
