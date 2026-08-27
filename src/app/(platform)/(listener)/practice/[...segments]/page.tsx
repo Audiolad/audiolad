@@ -58,10 +58,14 @@ import {
   canActivatePublishListenerViewMode,
   canActivatePublishPreviewMode,
   canPublishFromPublishPreview,
+  canRevealPublicProductPage,
   shouldIndexPracticePage,
   shouldTrackPracticeListenerAnalytics,
 } from "@/lib/products/publish-preview";
-import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
+import {
+  loadPublicAudioItems,
+  shouldLoadPublicAudioItemsOnProductPage,
+} from "@/lib/products/public-audio-items";
 import { resolveListeningNotice } from "@/lib/products/listening-notice";
 import { buildProductCoverAlt } from "@/lib/seo/cover-alt";
 import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld";
@@ -299,6 +303,15 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     return <PracticePageErrorState />;
   }
 
+  if (
+    !canRevealPublicProductPage({
+      practiceStatus: practice.status,
+      access,
+    })
+  ) {
+    notFound();
+  }
+
   const publishPreviewMode = canActivatePublishPreviewMode({
     previewParam,
     practiceStatus: practice.status,
@@ -317,15 +330,22 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   let publicAudioItems: Awaited<ReturnType<typeof loadPublicAudioItems>> = [];
 
   try {
-    publicAudioItems = await loadPublicAudioItems(supabase, {
-      practiceId: practice.id,
-      practiceStatus: practice.status,
-      authorPreview,
-      entitledAccess:
-        access.canListen &&
-        !authorPreview &&
-        !isPracticePublished(practice.status),
-    });
+    publicAudioItems = shouldLoadPublicAudioItemsOnProductPage(
+      practice.publication_class,
+      practice.product_kind,
+    )
+      ? await loadPublicAudioItems(supabase, {
+          practiceId: practice.id,
+          practiceStatus: practice.status,
+          authorPreview,
+          entitledAccess:
+            access.canListen &&
+            !authorPreview &&
+            !isPracticePublished(practice.status),
+          publicationClass: practice.publication_class,
+          productKind: practice.product_kind,
+        })
+      : [];
   } catch {
     return <PracticePageErrorState />;
   }
