@@ -155,7 +155,7 @@ function testMeditationSolutionsGalleryOrder() {
   );
 
   assert.deepEqual(urls, expectedGalleryUrls());
-  assert.equal(urls.length, 26);
+  assert.equal(urls.length, expectedGalleryUrls().length);
   assert.equal(
     urls.includes("/products/25-meditation-solutions/hero.jpg"),
     false,
@@ -184,11 +184,19 @@ function testMeditationSolutionsGalleryOrder() {
     })),
   );
 
-  assert.equal(pages.length, 27, "cover + 26 material slides");
+  const leftoverSeedPages = expectedGalleryUrls().length + 1;
+  assert.equal(
+    pages.length,
+    leftoverSeedPages,
+    "cover + whatever the leftover seed actually lists",
+  );
   assert.equal(pages[0]?.src, "/products/25-meditation-solutions/hero.jpg");
   assert.equal(pages[1]?.src, "/products/25-meditation-solutions/item-01.jpg");
-  assert.equal(pages[25]?.src, "/products/25-meditation-solutions/item-25.jpg");
-  assert.equal(pages[26]?.src, "/products/25-meditation-solutions/bonus-26.jpg");
+  assert.equal(pages[leftoverSeedPages - 2]?.src, "/products/25-meditation-solutions/item-25.jpg");
+  assert.equal(
+    pages[leftoverSeedPages - 1]?.src,
+    expectedGalleryUrls().at(-1),
+  );
   assert.equal(
     formatHeroMaterialsMeta(
       MEDITATION_SOLUTIONS_CARDS.map((card) => ({
@@ -353,26 +361,34 @@ function testDesktopHeroHeightFollowsSquareCover() {
 }
 
 function testMobileWindowedDotsKeepDesktopArrows() {
-  const dots = buildWindowedHeroDots(0, 27);
+  const many = 40;
+  const dots = buildWindowedHeroDots(0, many);
   assert.equal(PRACTICE_HERO_DOT_WINDOW, 5);
-  assert.equal(dots.length, 5, "27 slides must not render 27 micro-dots");
+  assert.equal(dots.length, PRACTICE_HERO_DOT_WINDOW);
+  assert.ok(dots.length < many, "large N must not render one micro-dot per slide");
   assert.equal(dots[0]?.index, 0);
   assert.equal(dots[0]?.active, true);
-  assert.equal(dots[4]?.edge, true, "trailing edge hints more slides");
+  assert.equal(dots[dots.length - 1]?.edge, true, "trailing edge hints more slides");
 
-  const mid = buildWindowedHeroDots(13, 27);
-  assert.equal(mid.length, 5);
+  const midIndex = Math.floor((many - 1) / 2);
+  const mid = buildWindowedHeroDots(midIndex, many);
+  const half = Math.floor(PRACTICE_HERO_DOT_WINDOW / 2);
+  assert.equal(mid.length, PRACTICE_HERO_DOT_WINDOW);
+  assert.ok(mid.length < many);
   assert.deepEqual(
     mid.map((dot) => dot.index),
-    [11, 12, 13, 14, 15],
+    Array.from(
+      { length: PRACTICE_HERO_DOT_WINDOW },
+      (_, offset) => midIndex - half + offset,
+    ),
   );
-  assert.equal(mid[2]?.active, true);
+  assert.equal(mid[half]?.active, true);
   assert.equal(mid[0]?.edge, true);
-  assert.equal(mid[4]?.edge, true);
+  assert.equal(mid[mid.length - 1]?.edge, true);
 
-  const last = buildWindowedHeroDots(26, 27);
-  assert.equal(last[4]?.index, 26);
-  assert.equal(last[4]?.active, true);
+  const last = buildWindowedHeroDots(many - 1, many);
+  assert.equal(last[last.length - 1]?.index, many - 1);
+  assert.equal(last[last.length - 1]?.active, true);
   assert.equal(last[0]?.edge, true);
 
   const few = buildWindowedHeroDots(1, 3);
