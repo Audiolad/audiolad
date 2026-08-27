@@ -193,19 +193,25 @@ function testCollectionFilters() {
   assert.equal(isLibraryFilterId("downloaded"), true);
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const chrome = read("src/components/my-practices/MyPracticesLibraryChrome.tsx");
   const filters = read("src/components/my-practices/MyPracticesLibraryFilters.tsx");
   const search = read("src/components/my-practices/MyPracticesLibrarySearch.tsx");
   const page = read(
     "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
   );
+  const layout = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/layout.tsx",
+  );
   const mobileHeader = read("src/components/listener/LibraryMobileHeader.tsx");
   const shellSearch = read("src/components/listener/DesktopShellSearch.tsx");
 
-  assert.match(library, /MyPracticesLibrarySearch/);
-  assert.match(library, /MyPracticesLibraryFilters/);
+  assert.match(chrome, /MyPracticesLibrarySearch/);
+  assert.match(chrome, /MyPracticesLibraryFilters/);
   assert.match(library, /MyPracticesLibrarySort/);
   assert.match(library, /buildMyPracticesHref/);
+  assert.match(chrome, /buildMyPracticesHref/);
   assert.match(library, /scroll:\s*false/);
+  assert.match(chrome, /scroll:\s*false/);
   assert.doesNotMatch(library, /Мои записи/);
   assert.doesNotMatch(library, /В библиотеке/);
   assert.doesNotMatch(library, /overflow-x-auto px-5 pb-2/);
@@ -224,11 +230,12 @@ function testCollectionFilters() {
   assert.doesNotMatch(filters, /topic=|access=/);
   assert.doesNotMatch(filters, /CatalogMobileFilters|buildCatalogHref/);
 
+  assert.match(layout, /MyPracticesLibraryChrome/);
   assert.match(
-    page,
+    chrome,
     /Всё, что вы сохранили, купили, получили или добавили/,
   );
-  assert.match(page, /Аудиотека/);
+  assert.match(chrome, /Аудиотека/);
   assert.match(
     mobileHeader,
     /Всё, что вы сохранили, купили, получили или добавили/,
@@ -582,6 +589,99 @@ function testEmptySaved() {
   assert.match(library, /getLibraryFilterEmptyCta\(filter\)/);
 }
 
+function testLibrarySearchScrollRoot() {
+  const chrome = read("src/components/my-practices/MyPracticesLibraryChrome.tsx");
+  const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
+  const filters = read("src/components/my-practices/MyPracticesLibraryFilters.tsx");
+  const search = read("src/components/my-practices/MyPracticesLibrarySearch.tsx");
+  const layout = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/layout.tsx",
+  );
+  const page = read(
+    "src/app/(platform)/(listener)/(library)/my-practices/page.tsx",
+  );
+  const bottomNav = read("src/components/BottomNav.tsx");
+  const css = read("src/app/globals.css");
+
+  const replaceCalls = [
+    ...chrome.matchAll(/router\.replace\(([\s\S]*?)\);/g),
+    ...library.matchAll(/router\.replace\(([\s\S]*?)\);/g),
+  ];
+  assert.ok(replaceCalls.length >= 2, "library chrome and grid both replace query");
+  for (const match of replaceCalls) {
+    assert.match(
+      match[1] ?? "",
+      /scroll:\s*false/,
+      "every library router.replace for q/filter/sort keeps scroll: false",
+    );
+  }
+  assert.doesNotMatch(chrome, /router\.push/);
+  assert.doesNotMatch(library, /router\.push/);
+
+  assert.doesNotMatch(chrome, /body\.style\.overflow/);
+  assert.doesNotMatch(library, /body\.style\.overflow/);
+  assert.doesNotMatch(filters, /body\.style\.overflow/);
+  assert.doesNotMatch(search, /body\.style\.overflow/);
+  assert.doesNotMatch(layout, /body\.style\.overflow/);
+  assert.match(filters, /catalog-sheet-lock/);
+  assert.doesNotMatch(filters, /document\.body\.style\.overflow/);
+
+  assert.match(
+    layout,
+    /MyPracticesLibraryChrome/,
+    "search+filters chrome is layout-owned so the input survives q= refresh",
+  );
+  assert.doesNotMatch(
+    page,
+    /MyPracticesLibrarySearch|MyPracticesLibraryFilters|MyPracticesLibraryChrome/,
+    "navigating page slot does not own the search+filters row",
+  );
+  assert.doesNotMatch(
+    library,
+    /MyPracticesLibrarySearch|MyPracticesLibraryFilters/,
+    "page grid tree does not mount the in-flow search input",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*fixed top-0 inset-x-0 z-30/,
+    "mobile search+filters reuse catalog fixed top-0 chrome",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[^"]*xl:hidden/,
+    "fixed library search chrome stays mobile-only",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search-spacer[^"]*xl:hidden/,
+    "fixed library search has the catalog spacer",
+  );
+  assert.match(chrome, /LibraryMobileHeader/, "fixed stack keeps the Аудиотека title");
+  assert.match(
+    chrome,
+    /pt-\[max\(0\.25rem,env\(safe-area-inset-top,0px\)\)\] pb-0/,
+    "fixed library chrome reuses catalog safe-area padding",
+  );
+  assert.doesNotMatch(
+    chrome,
+    /listener-catalog-mobile-search[^"]*sticky/,
+    "mobile library search stays fixed, not sticky",
+  );
+  assert.doesNotMatch(chrome, /body\.style\.overflow|:has\(/);
+  assert.doesNotMatch(layout, /overflow:\s*hidden|body\.style/);
+
+  assert.match(
+    bottomNav,
+    /createPortal\(nav, document\.body\)/,
+    "BottomNav still portals to document.body",
+  );
+  assert.match(
+    css,
+    /\.bottom-nav \{\s*position:\s*fixed;/,
+    "BottomNav stays position:fixed",
+  );
+}
+
 function testSourceBoundaries() {
   const card = read("src/components/my-practices/LibraryCard.tsx");
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
@@ -621,6 +721,7 @@ testSearchMatch();
 testSortOrder();
 testFallbackCover();
 testEmptySaved();
+testLibrarySearchScrollRoot();
 testSourceBoundaries();
 
 console.log("library-audioteka-ui-unit: ok");
