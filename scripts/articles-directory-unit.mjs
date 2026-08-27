@@ -87,6 +87,7 @@ import { TARO_PRIVLECHENIE_DENEG_PAGE } from "../src/lib/seo/listens/content/tar
 import { KARTA_TARO_DLYA_PRIVLECHENIYA_DENEG_PAGE } from "../src/lib/seo/listens/content/karta-taro-dlya-privlecheniya-deneg.ts";
 import { TARO_NA_DENGI_NA_ZASTAVKU_TELEFONA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-na-zastavku-telefona.ts";
 import { RASKLAD_TARO_NA_DENGI_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-dengi.ts";
+import { TARO_NA_DENGI_I_UDACHU_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-i-udachu.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -1933,6 +1934,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${sixtiethListenHref}`,
     ),
     "directory JSON-LD includes sixtieth listen href",
+  );
+
+  const sixtyFirstListenHref = "/listens/taro-na-dengi-i-udachu";
+  const sixtyFirstListenCard = data.articles.find((card) => card.href === sixtyFirstListenHref);
+  assert(sixtyFirstListenCard, "sixty-first indexable listen page is listed");
+  assert(
+    sixtyFirstListenCard.title === "Таро на деньги и удачу – карты, возможности и финансы | АудиоЛад",
+    "sixty-first listen directory title",
+  );
+  assert(
+    sixtyFirstListenCard.description === TARO_NA_DENGI_I_UDACHU_PAGE.description,
+    "sixty-first listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-na-dengi-i-udachu",
+    ),
+    "no /articles duplicate for sixty-first listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtyFirstListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-first listen href",
   );
 
 
