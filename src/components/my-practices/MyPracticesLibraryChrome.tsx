@@ -148,7 +148,7 @@ export default function MyPracticesLibraryChrome() {
     <>
       <div className="listener-catalog-mobile-search fixed top-0 inset-x-0 z-30 bg-platform-surface pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-0 xl:hidden">
         <LibraryMobileHeader />
-        <div className="mt-6 px-5">
+        <div className="mt-3 px-5">
           <SearchFiltersRow searchId={mobileSearchId} {...rowProps} />
         </div>
       </div>
@@ -157,16 +157,16 @@ export default function MyPracticesLibraryChrome() {
         aria-hidden="true"
       >
         <LibraryMobileHeader />
-        <div className="mt-6 px-5">
+        <div className="mt-3 px-5">
           <div className="h-[52px]" />
         </div>
       </div>
       <div className="hidden px-5 lg:px-10 xl:block xl:px-6 xl:pt-3">
         <h1 className="text-[28px] font-semibold">Аудиотека</h1>
         <p className="mt-1 text-sm text-[#7d70a2]">
-          Всё, что вы сохранили, купили, получили или добавили
+          Всё, что вы сохранили, купили, добавили.
         </p>
-        <div className="mt-6">
+        <div className="mt-3">
           <SearchFiltersRow searchId={desktopSearchId} {...rowProps} />
         </div>
       </div>

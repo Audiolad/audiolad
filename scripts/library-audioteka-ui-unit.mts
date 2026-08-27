@@ -233,12 +233,36 @@ function testCollectionFilters() {
   assert.match(layout, /MyPracticesLibraryChrome/);
   assert.match(
     chrome,
-    /Всё, что вы сохранили, купили, получили или добавили/,
+    /Всё, что вы сохранили, купили, добавили\./,
   );
   assert.match(chrome, /Аудиотека/);
   assert.match(
     mobileHeader,
-    /Всё, что вы сохранили, купили, получили или добавили/,
+    /Всё, что вы сохранили, купили, добавили\./,
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search[\s\S]*className="mt-3 px-5"/,
+    "mobile search row gap under subtitle is mt-3 (12px)",
+  );
+  assert.match(
+    chrome,
+    /listener-catalog-mobile-search-spacer[\s\S]*className="mt-3 px-5"/,
+    "invisible spacer clones the same mt-3 search-row gap",
+  );
+  assert.match(
+    chrome,
+    /<p className="mt-1 text-sm text-\[#7d70a2\]">[\s\S]*?<div className="mt-3">/,
+    "desktop search row gap under subtitle is mt-3 (12px)",
+  );
+  assert.doesNotMatch(chrome, /className="mt-6(?: px-5)?"/);
+  assert.doesNotMatch(
+    mobileHeader,
+    /получили или добавили/,
+  );
+  assert.match(
+    layout,
+    /Всё, что вы сохранили, купили, добавили\./,
   );
   assert.doesNotMatch(page, /Ваши подарки, купленные и личные материалы/);
   assert.doesNotMatch(mobileHeader, /Ваши подарки и купленные материалы/);
