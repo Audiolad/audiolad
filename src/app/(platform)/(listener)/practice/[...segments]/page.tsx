@@ -54,6 +54,7 @@ import {
   buildPracticePublishListenerPreviewPath,
   buildPracticePublishPreviewPath,
 } from "@/lib/products/paths";
+import { buildPracticePdpSocialTags } from "@/lib/products/practice-social-preview";
 import {
   canActivatePublishListenerViewMode,
   canActivatePublishPreviewMode,
@@ -236,6 +237,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     : subtitle
       ? truncateDescription(subtitle)
       : descriptionFallback;
+  const social = buildPracticePdpSocialTags({
+    productTitle: practice.title,
+    description: metaDescription,
+    canonical,
+    cover_url: practice.cover_url,
+    cover_image: practice.cover_image,
+    format: practice.format,
+    productKind: practice.product_kind,
+    authorName: getAuthorName(practice),
+  });
 
   return {
     title: isAudioPost
@@ -245,9 +256,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     alternates: {
       canonical,
     },
-    openGraph: {
-      url: canonical,
-    },
+    openGraph: social.openGraph,
+    twitter: social.twitter,
     robots: indexable
       ? undefined
       : {
