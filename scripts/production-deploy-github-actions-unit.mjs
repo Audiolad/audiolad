@@ -86,7 +86,13 @@ function main() {
   assert.match(workflowText, /StrictHostKeyChecking=yes/);
   assert.doesNotMatch(combinedCode, /git reset --hard/);
   assert.doesNotMatch(combinedCode, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
+  assert.match(wrapperText, /^set -euo pipefail$/m);
   assert.match(wrapperText, /unset AUDIOLAD_DEPLOY_OVERRIDE/);
+  assert.match(wrapperText, /unset SSH_CLIENT/);
+  assert.doesNotMatch(workflowText, /SendEnv/);
+  assert.doesNotMatch(combined, /topics_catalog_counts/);
+  assert.doesNotMatch(combined, /playwright/i);
+  assert.doesNotMatch(combined, /deploy\/scripts\/production-smoke-http/);
   assert.doesNotMatch(
     wrapperText,
     /\/var\/www\/audiolad-deploy\/current\/deploy\/scripts/,

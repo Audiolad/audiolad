@@ -11,7 +11,8 @@
 #   git show <sha>:deploy/scripts/run-from-target-sha.sh | bash -s -- <sha>
 #
 # Never via /current. Do not reset the controlling checkout. No override flag.
-set -Eeuo pipefail
+# Same pipefail as the staff one-liner in docs/production-deployment.md.
+set -euo pipefail
 
 usage() {
   cat <<'EOF'
@@ -41,9 +42,11 @@ GIT_WORKDIR=/var/www/audiolad-clean
 DEPLOY_ROOT=/var/www/audiolad-deploy
 export GIT_WORKDIR DEPLOY_ROOT
 
-# Actions must never take the emergency override path.
+# Actions must never take the emergency override path. Do not forward the
+# incoming SSH session environment into deploy.sh.
 unset AUDIOLAD_DEPLOY_OVERRIDE
 unset AUDIOLAD_DEPLOY_OVERRIDE_REASON
+unset SSH_CLIENT SSH_CONNECTION SSH_TTY SSH_AUTH_SOCK SSH_ORIGINAL_COMMAND
 
 git -C "$GIT_WORKDIR" fetch origin main
 ORIGIN_MAIN_SHA="$(git -C "$GIT_WORKDIR" rev-parse --verify origin/main)"

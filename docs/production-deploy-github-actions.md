@@ -32,17 +32,30 @@ PM2 и lock сегодня работают от запускающего пол
 
 `GIT_WORKDIR` в wrapper жёстко `/var/www/audiolad-clean`.
 `DEPLOY_ROOT` жёстко `/var/www/audiolad-deploy`.
-`AUDIOLAD_DEPLOY_OVERRIDE` wrapper снимает; Actions его не выставляет.
+`AUDIOLAD_DEPLOY_OVERRIDE` wrapper снимает (`unset`); Actions его не
+выставляет и не делает `SendEnv`. SSH-переменные сессии (`SSH_CLIENT` и
+др.) wrapper тоже снимает — в `deploy.sh` они не пробрасываются.
 
 Файл `deploy/scripts/github-actions-deploy-wrapper.sh` в репозитории —
 только **шаблон**. Пока bootstrap его не скопировал в
 `/usr/local/sbin/audiolad-deploy`, workflow упадёт на `sudo`.
+Wrapper ставит `set -euo pipefail`, как staff one-liner в
+`docs/production-deployment.md`.
+Прецедент root-owned wrapper на этом сервере:
+`/usr/local/sbin/audiolad-maintenance.sh` (`deploy/docs/MAINTENANCE.md`).
+Тот же стиль установки: `install` в `/usr/local/sbin`, owner root, mode 0755.
 
-Smoke по-прежнему `deploy/scripts/smoke-test.sh` (HTTP,
-`scripts/production-smoke-http.mjs`). Падение smoke до cutover оставляет
-production на предыдущем релизе. Недавний инцидент (`topics_catalog_counts_failed`)
-как раз остановился на этом шаге; новый workflow этот предохранитель
-не обходит.
+Smoke деплоя (не менять и не расширять в этом PR):
+
+```text
+deploy/scripts/smoke-test.sh  ->  scripts/production-smoke-http.mjs
+```
+
+Файла `deploy/scripts/production-smoke-http.mjs` нет. Playwright smoke
+не добавлять. `topics_catalog_counts` **нет** в текущем smoke на `main`;
+не добавлять и не чинить последний неуспешный деплой. Падение текущего
+HTTP-smoke до cutover по-прежнему оставляет production на предыдущем
+релизе (`cleanup_failed_candidate`). Workflow этот предохранитель не обходит.
 
 ## GitHub Environment `production`
 
@@ -55,7 +68,7 @@ secrets.
 
 | Секрет | Назначение |
 |--------|------------|
-| `PRODUCTION_SSH_HOST` | Хост SSH. Production IP уже есть в `docs/RUNBOOK.md` и `docs/operations/production-process-policy.md`. |
+| `PRODUCTION_SSH_HOST` | Хост SSH. В репозитории уже задокументирован Timeweb VPS `72.56.232.160` (`docs/RUNBOOK.md`, `docs/operations/production-process-policy.md`, `AGENTS.md`). |
 | `PRODUCTION_SSH_PORT` | Порт SSH. Обычно `22`; в workflow секрета обязателен, без скрытого fallback. |
 | `PRODUCTION_SSH_USER` | Пользователь `deploy` после bootstrap. |
 | `PRODUCTION_SSH_PRIVATE_KEY` | Приватный ключ этой пары. Не коммитить. |
@@ -96,13 +109,26 @@ Concurrency: группа `production-deploy`, `cancel-in-progress: false`.
 npm run test:production-deploy-gha
 ```
 
+## Факты сервера (уже в репозитории)
+
+| Факт | Значение | Где |
+|------|----------|-----|
+| Production host | Timeweb VPS `72.56.232.160` | `docs/RUNBOOK.md`, `docs/operations/production-process-policy.md`, `AGENTS.md` |
+| Git remote на сервере | `git@github-audiolad:Audiolad/audiolad.git` | `GIT_REPO` в `deploy/scripts/lib/common.sh` |
+| Что это за alias | Запись в **серверном** `~/.ssh/config`, не в Actions | не копировать на github-hosted runner |
+| Прецедент root-owned wrapper | `/usr/local/sbin/audiolad-maintenance.sh` | `deploy/docs/MAINTENANCE.md` |
+
+Actions ходит на VPS своим отдельным SSH-ключом. Alias `github-audiolad`
+нужен только серверу, чтобы `git fetch origin` в `GIT_WORKDIR` доставал
+объекты с GitHub. Runner этот alias не использует.
+
 ## Одноразовый bootstrap на сервере
 
-Выполнять **вручную на production**, не из CI и не из этого workflow.
-Реальный деплой в bootstrap не запускать.
+Выполнять **вручную на production** (`72.56.232.160`), не из CI и не из
+этого workflow. Реальный деплой в bootstrap не запускать.
 
-Хост production задокументирован в `docs/RUNBOOK.md` (Timeweb). Ниже
-`HOST` / `PORT` / публичный ключ — плейсхолдеры.
+Публичный ключ ниже — плейсхолдер. Хост в `ssh-keyscan` — уже
+задокументированный Timeweb VPS.
 
 ```bash
 set -euo pipefail
@@ -118,7 +144,10 @@ install -d -o deploy -g deploy -m 0700 /home/deploy/.ssh
 chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 0600 /home/deploy/.ssh/authorized_keys
 
-# 2) Wrapper из origin/main (не из отстающего worktree, не из /current)
+# 2) Wrapper из origin/main (не из отстающего worktree, не из /current).
+# Тот же стиль, что /usr/local/sbin/audiolad-maintenance.sh:
+# install в /usr/local/sbin, root:root, mode 0755
+# (см. deploy/docs/MAINTENANCE.md).
 GIT_WORKDIR=/var/www/audiolad-clean
 git -C "$GIT_WORKDIR" fetch origin main
 git -C "$GIT_WORKDIR" show origin/main:deploy/scripts/github-actions-deploy-wrapper.sh \
@@ -151,21 +180,25 @@ echo "dry-run rejected missing SHA as expected"
 
 ### known_hosts для секрета
 
-На машине, с которой удобно снять отпечаток (не обязательно с runner):
+На машине, с которой удобно снять отпечаток (не обязательно с runner).
+Хост — задокументированный Timeweb VPS; порт обычно 22:
 
 ```bash
-ssh-keyscan -t ed25519,ecdsa -p PORT HOST
+ssh-keyscan -t ed25519,ecdsa -p 22 72.56.232.160
 ```
 
 Весь вывод кладётся в `PRODUCTION_SSH_KNOWN_HOSTS`. Workflow пишет его в
 временный файл `0600` и вызывает ssh с `UserKnownHostsFile` +
 `IdentitiesOnly=yes`. `StrictHostKeyChecking=no` запрещён.
+Не использовать alias `github-audiolad` — он только для git-remote на
+сервере, не для SSH из Actions.
 
 ## Что этот PR не делает
 
 - не деплоит и не меняет production;
 - не добавляет реальные SSH-ключи или GitHub secrets;
-- не ставит `AUDIOLAD_DEPLOY_OVERRIDE=1`;
-- не обходит smoke и не чинит `topics_catalog_counts_failed`;
+- не ставит `AUDIOLAD_DEPLOY_OVERRIDE=1` и не пробрасывает SSH env в `deploy.sh`;
+- не добавляет Playwright smoke и не добавляет `topics_catalog_counts`;
+- не чинит последний неуспешный деплой;
 - не меняет RLS/БД;
 - не запускает `git reset --hard` и не exec-ит `/current`.
