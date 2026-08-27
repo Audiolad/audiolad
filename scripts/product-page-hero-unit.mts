@@ -241,7 +241,27 @@ function testReusablePdpWiring() {
   assert.match(mobile, /ListenerAppShell|PracticeProductHero/);
   assert.match(desktop, /PracticeProductHero/);
   assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
+  assert.match(hero, /data-practice-hero-type-chip/);
+  assert.doesNotMatch(hero, /w-full|flex-grow/);
   assert.match(hero, /FeaturedProductCard/);
+
+  const chipClass = read("src/components/home/FeaturedProductCard.tsx");
+  const chipClassValue =
+    /export const FEATURED_CARD_CHIP_CLASS =\s*"([^"]+)"/.exec(chipClass)?.[1] ??
+    "";
+  assert.match(chipClassValue, /inline-flex/);
+  assert.match(chipClassValue, /w-fit|featured-card__chip/);
+  assert.doesNotMatch(chipClassValue, /w-full/);
+
+  const css = read("src/app/globals.css");
+  assert.match(
+    css,
+    /\[data-practice-product-hero\][\s\S]*\[data-practice-hero-type-chip\][\s\S]*width:\s*fit-content/,
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero\][\s\S]*\.featured-card__chip[\s\S]*width:\s*fit-content/,
+  );
   assert.match(hero, /practice-product-hero/);
   assert.match(hero, /data-practice-product-hero=\{layout\}/);
   assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);

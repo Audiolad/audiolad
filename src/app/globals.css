@@ -817,6 +817,21 @@ html.catalog-sheet-lock body {
   padding: 1rem;
 }
 
+/*
+ * Product-type chip must hug its label. The shared info column becomes a
+ * flex stack at tablet+, and stretch would otherwise make the pill as wide
+ * as the column. Homepage uses the same .featured-card__chip class with
+ * Tailwind w-fit / self-start; this selector keeps the PDP hero compact
+ * even if those utilities are overridden by later layout rules.
+ */
+[data-practice-product-hero] .featured-card__chip,
+[data-practice-product-hero] [data-practice-hero-type-chip] {
+  width: fit-content;
+  max-width: fit-content;
+  flex-grow: 0;
+  align-self: flex-start;
+}
+
 @media (min-width: 640px) {
   .featured-card {
     display: flex;

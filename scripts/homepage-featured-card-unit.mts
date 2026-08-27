@@ -22,8 +22,13 @@ function testSharedShellIsTheHomepageCard() {
   assert.match(shell, /featured-card__content/);
   assert.match(
     shell,
-    /inline-flex rounded-full bg-\[#f4ecfb\] px-3 py-1 text-xs font-medium text-\[#7042c5\]/,
+    /featured-card__chip inline-flex w-fit self-start rounded-full bg-\[#f4ecfb\] px-3 py-1 text-xs font-medium text-\[#7042c5\]/,
   );
+  const chipClass =
+    /export const FEATURED_CARD_CHIP_CLASS =\s*"([^"]+)"/.exec(shell)?.[1] ?? "";
+  assert.match(chipClass, /inline-flex/);
+  assert.match(chipClass, /w-fit/);
+  assert.doesNotMatch(chipClass, /w-full|flex-grow/);
   assert.match(
     shell,
     /mt-3 text-\[22px\] font-semibold leading-tight text-\[#25135c\]/,
@@ -45,6 +50,7 @@ function testSharedShellIsTheHomepageCard() {
 
   assert.match(pdpHero, /FeaturedProductCard/);
   assert.match(pdpHero, /FEATURED_CARD_CHIP_CLASS/);
+  assert.match(pdpHero, /data-practice-hero-type-chip/);
   assert.match(pdpHero, /FEATURED_CARD_TITLE_CLASS/);
   assert.match(pdpHero, /PracticeHeroGallery/);
   assert.doesNotMatch(pdpHero, /PRODUCT_FORMAT_LINE_CLASS/);
@@ -85,6 +91,11 @@ function testGuestGeometryIsSharedNotHomeScoped() {
     css,
     /\.listener-home-content \.featured-card--guest \.featured-card__cover/,
     "guest desktop geometry is not homepage-only",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero\][\s\S]*\.featured-card__chip[\s\S]*width:\s*fit-content/,
+    "PDP product-type chip hugs its label",
   );
 }
 
