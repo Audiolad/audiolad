@@ -161,6 +161,10 @@ assert.match(trustedWorkflow, /statuses\/\$\{PR_SHA\}/);
 assert.doesNotMatch(trustedWorkflow, /statuses\/\$\{\{\s*github\.sha\s*\}\}/);
 assert.match(trustedWorkflow, /Set trusted status pending on PR head/);
 assert.match(trustedWorkflow, /if: always\(\).*pull_request_target.*steps\.refs\.outcome == 'success'/);
+assert.match(
+  trustedWorkflow,
+  /steps\.refs\.outcome == 'success' && steps\.final-main\.outcome == 'success'/,
+);
 assert.match(trustedWorkflow, /Re-read main immediately before verdict/);
 assert.match(trustedWorkflow, /pr_number must contain digits only/);
 assert.match(trustedWorkflow, /must target main/);

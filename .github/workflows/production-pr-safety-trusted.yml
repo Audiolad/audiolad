@@ -103,7 +103,7 @@ jobs:
 
       - name: Evaluate trusted production and PR safety
         id: guard
-        if: steps.refs.outcome == 'success'
+        if: steps.refs.outcome == 'success' && steps.final-main.outcome == 'success'
         env:
           PR_SAFETY_MAIN_SHA: ${{ steps.refs.outputs.main_sha }}
           PR_SAFETY_FINAL_MAIN_SHA: ${{ steps.final-main.outputs.main_sha }}
