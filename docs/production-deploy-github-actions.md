@@ -71,8 +71,8 @@ secrets.
 | `PRODUCTION_SSH_HOST` | Хост SSH. В репозитории уже задокументирован Timeweb VPS `72.56.232.160` (`docs/RUNBOOK.md`, `docs/operations/production-process-policy.md`, `AGENTS.md`). |
 | `PRODUCTION_SSH_PORT` | Порт SSH. Обычно `22`; в workflow секрета обязателен, без скрытого fallback. |
 | `PRODUCTION_SSH_USER` | Пользователь `deploy` после bootstrap. |
-| `PRODUCTION_SSH_PRIVATE_KEY` | Приватный ключ этой пары. Не коммитить. |
-| `PRODUCTION_SSH_KNOWN_HOSTS` | Вывод `ssh-keyscan` (см. ниже). |
+| `PRODUCTION_SSH_PRIVATE_KEY` | Полный OpenSSH private key dedicated-пары (включая строки `BEGIN`/`END`). Не ключ root. Не коммитить. Как получить — раздел B. |
+| `PRODUCTION_SSH_KNOWN_HOSTS` | Строка known_hosts для `72.56.232.160`, сверенная с `/etc/ssh/ssh_host_ed25519_key.pub` на production. Раздел B. |
 
 Права workflow: только `contents: read`. Третьих SSH marketplace-action нет:
 используется системный `ssh` на `ubuntu-latest`.
@@ -122,25 +122,63 @@ Actions ходит на VPS своим отдельным SSH-ключом. Alia
 нужен только серверу, чтобы `git fetch origin` в `GIT_WORKDIR` доставал
 объекты с GitHub. Runner этот alias не использует.
 
-## Одноразовый bootstrap на сервере
+Это **не** полностью автоматический процесс. Ключевую пару создаёт
+человек; секреты в GitHub Environment копирует человек. CI bootstrap
+не выполняет.
 
-Выполнять **вручную на production** (`72.56.232.160`), не из CI и не из
-этого workflow. Реальный деплой в bootstrap не запускать.
+## Ключевая пара (создать до шага A)
 
-Публичный ключ ниже — плейсхолдер. Хост в `ssh-keyscan` — уже
-задокументированный Timeweb VPS.
+Нужна **новая dedicated** пара `ed25519` только для
+`GitHub Actions → пользователь deploy`. Не брать ключ root. Не коммитить.
+Не оставлять приватный ключ в репозитории и по возможности не оставлять
+его на сервере.
+
+Предпочтительно сгенерировать на доверенной admin-машине (не на
+production и не в runner):
+
+```bash
+ssh-keygen -t ed25519 -f ./audiolad-gha-deploy -C audiolad-gha-deploy -N ""
+```
+
+Появятся два файла (не в git):
+
+| Файл | Куда |
+|------|------|
+| `audiolad-gha-deploy` | полный OpenSSH private key (`-----BEGIN OPENSSH PRIVATE KEY-----` … `-----END OPENSSH PRIVATE KEY-----`) → секрет `PRODUCTION_SSH_PRIVATE_KEY` (шаг B) |
+| `audiolad-gha-deploy.pub` | одна строка `ssh-ed25519 AAAA... audiolad-gha-deploy` → переменная `DEPLOY_GHA_PUBKEY` для шага A и файл `/home/deploy/.ssh/authorized_keys` |
+
+Если генерировать на production неизбежно: писать private key только в
+root-only temp (`umask 077`, например `/root/audiolad-gha-deploy`),
+один раз скопировать в GitHub secret, затем `shred -u` этот private file
+с сервера. Public line оставить для `DEPLOY_GHA_PUBKEY`. Предпочтительнее
+генерация вне сервера.
+
+## A. Server bootstrap (вставить на production)
+
+Выполнять **вручную на production** (`72.56.232.160`), не из CI.
+Реальный деплой не запускать. Сначала на этой shell-сессии задать
+непустой `DEPLOY_GHA_PUBKEY` (публичная строка из `.pub`). Если
+переменная пустая, блок падает **до** `chown` — не существует
+закомментированного create + живого chown отсутствующего файла.
 
 ```bash
 set -euo pipefail
 
-# 1) Пользователь deploy + SSH-каталог
+: "${DEPLOY_GHA_PUBKEY:?Set DEPLOY_GHA_PUBKEY to the ssh-ed25519 public line before bootstrap}"
+case "$DEPLOY_GHA_PUBKEY" in
+  ssh-ed25519\ *) ;;
+  *)
+    echo "ERROR: DEPLOY_GHA_PUBKEY must be one ssh-ed25519 public key line" >&2
+    exit 1
+    ;;
+esac
+
+# 1) Пользователь deploy + SSH-каталог + authorized_keys
 if ! id -u deploy >/dev/null 2>&1; then
   useradd --create-home --home-dir /home/deploy --shell /bin/bash deploy
 fi
 install -d -o deploy -g deploy -m 0700 /home/deploy/.ssh
-# Вставить публичную половину ключа GitHub Actions:
-# printf '%s\n' 'ssh-ed25519 AAAA... audiolad-gha-deploy' \
-#   > /home/deploy/.ssh/authorized_keys
+printf '%s\n' "$DEPLOY_GHA_PUBKEY" > /home/deploy/.ssh/authorized_keys
 chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 0600 /home/deploy/.ssh/authorized_keys
 
@@ -162,9 +200,24 @@ EOF
 chmod 440 /etc/sudoers.d/audiolad-deploy
 visudo -c -f /etc/sudoers.d/audiolad-deploy
 
-# 4) Dry-run: usage/reject, без SHA и без деплоя
-if sudo -n -u deploy sudo -n /usr/local/sbin/audiolad-deploy; then
+# 4) Fail-closed проверки (без деплоя)
+id -u deploy >/dev/null
+test -f /home/deploy/.ssh/authorized_keys
+[[ "$(stat -c '%U:%G %a' /home/deploy/.ssh/authorized_keys)" == "deploy:deploy 600" ]]
+[[ "$(stat -c '%U:%G %a' /usr/local/sbin/audiolad-deploy)" == "root:root 755" ]]
+visudo -c -f /etc/sudoers.d/audiolad-deploy >/dev/null
+
+set +e
+DRY_OUT="$(sudo -n -u deploy sudo -n /usr/local/sbin/audiolad-deploy 2>&1)"
+DRY_STATUS=$?
+set -e
+if [[ "$DRY_STATUS" -eq 0 ]]; then
   echo "ERROR: wrapper accepted a missing SHA" >&2
+  exit 1
+fi
+if printf '%s\n' "$DRY_OUT" | grep -Eiq 'fetch origin|run-from-target-sha|deploy\.sh'; then
+  echo "ERROR: reject must happen before git fetch / deploy.sh" >&2
+  printf '%s\n' "$DRY_OUT" >&2
   exit 1
 fi
 echo "dry-run rejected missing SHA as expected"
@@ -178,18 +231,49 @@ echo "dry-run rejected missing SHA as expected"
 этому бинарю. Настоящая защита от инъекции — отказ wrapper принять всё,
 кроме `^[0-9a-f]{40}$` (ветки, короткие SHA, флаги, метасимволы).
 
-### known_hosts для секрета
+## B. Один раз скопировать в GitHub Environment secrets
 
-На машине, с которой удобно снять отпечаток (не обязательно с runner).
-Хост — задокументированный Timeweb VPS; порт обычно 22:
+Environment `production` создаётся вручную в GitHub UI. Значения ниже
+человек вставляет в secrets. Workflow их сам не создаёт.
+
+| Секрет | Что вставить |
+|--------|----------------|
+| `PRODUCTION_SSH_HOST` | `72.56.232.160` |
+| `PRODUCTION_SSH_PORT` | `22` (если так слушает sshd) |
+| `PRODUCTION_SSH_USER` | `deploy` |
+| `PRODUCTION_SSH_PRIVATE_KEY` | полный текст private key dedicated-пары, включая `BEGIN`/`END` |
+| `PRODUCTION_SSH_KNOWN_HOSTS` | строка known_hosts, построенная и сверенная ниже |
+
+`authorized_keys` на сервере — **публичная** строка той же пары, не private key.
+
+### `PRODUCTION_SSH_KNOWN_HOSTS`: пин с самого сервера
+
+`ssh-keyscan` с чужой машины **недостаточен** сам по себе. Bootstrap идёт
+на доверенном production, поэтому эталон — локальный host key:
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+printf '72.56.232.160 %s\n' "$(awk '{print $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub)"
+```
+
+Первая команда печатает fingerprint (`SHA256:...`). Вторая — строку
+known_hosts для секрета. При необходимости тот же pubkey можно
+экспортировать через `ssh-keygen -f /etc/ssh/ssh_host_ed25519_key.pub -e`.
+
+Если `ssh-keyscan` всё же делают снаружи:
 
 ```bash
 ssh-keyscan -t ed25519,ecdsa -p 22 72.56.232.160
+ssh-keyscan -t ed25519 -p 22 72.56.232.160 | ssh-keygen -lf -
 ```
 
-Весь вывод кладётся в `PRODUCTION_SSH_KNOWN_HOSTS`. Workflow пишет его в
-временный файл `0600` и вызывает ssh с `UserKnownHostsFile` +
-`IdentitiesOnly=yes`. `StrictHostKeyChecking=no` запрещён.
+Этот fingerprint **обязан** совпасть с
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` на production
+**до** вставки в GitHub secret. Не совпало — не вставлять.
+
+Workflow пишет known_hosts во временный файл `0600` и вызывает ssh с
+`UserKnownHostsFile` + `IdentitiesOnly=yes`.
+`StrictHostKeyChecking=yes`. `StrictHostKeyChecking=no` запрещён.
 Не использовать alias `github-audiolad` — он только для git-remote на
 сервере, не для SSH из Actions.
 

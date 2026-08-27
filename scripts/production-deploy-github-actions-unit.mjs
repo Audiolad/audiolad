@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowPath = join(repoRoot, ".github/workflows/production-deploy.yml");
 const wrapperPath = join(repoRoot, "deploy/scripts/github-actions-deploy-wrapper.sh");
+const docsPath = join(repoRoot, "docs/production-deploy-github-actions.md");
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -45,6 +46,51 @@ function runWrapper(args) {
   });
 }
 
+function extractFencedBash(markdown) {
+  const blocks = [];
+  const re = /```bash\n([\s\S]*?)```/g;
+  let match;
+  while ((match = re.exec(markdown))) {
+    blocks.push(match[1]);
+  }
+  return blocks;
+}
+
+function assertBootstrapCreatesAuthorizedKeysBeforeChown(docsText) {
+  const blocks = extractFencedBash(docsText);
+  const bootstrap = blocks.find(
+    (block) => block.includes("authorized_keys") && /chown\b/.test(block),
+  );
+  assert.ok(bootstrap, "docs must contain a pasteable bootstrap bash block");
+  assert.match(
+    bootstrap,
+    /: "\$\{DEPLOY_GHA_PUBKEY:/,
+    "bootstrap must fail closed when DEPLOY_GHA_PUBKEY is empty",
+  );
+
+  let created = false;
+  for (const rawLine of bootstrap.split("\n")) {
+    const line = rawLine.trim();
+    if (line.startsWith("#") || line.length === 0) {
+      continue;
+    }
+    if (
+      /printf\b/.test(line) &&
+      /DEPLOY_GHA_PUBKEY/.test(line) &&
+      /authorized_keys/.test(line)
+    ) {
+      created = true;
+    }
+    if (/chown\b/.test(line) && /authorized_keys/.test(line)) {
+      assert.ok(
+        created,
+        "bootstrap must create authorized_keys from DEPLOY_GHA_PUBKEY before chown; commented-out create + live chown is forbidden",
+      );
+    }
+  }
+  assert.ok(created, "bootstrap must write authorized_keys from DEPLOY_GHA_PUBKEY");
+}
+
 function assertRejectsBeforeGit(args, label) {
   const result = runWrapper(args);
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
@@ -56,6 +102,7 @@ function assertRejectsBeforeGit(args, label) {
 function main() {
   const workflowText = readFileSync(workflowPath, "utf8");
   const wrapperText = readFileSync(wrapperPath, "utf8");
+  const docsText = readFileSync(docsPath, "utf8");
   const workflow = parseYaml(workflowText);
   const combined = `${workflowText}\n${wrapperText}`;
   const combinedCode = combined
@@ -128,6 +175,22 @@ function main() {
   assertRejectsBeforeGit(["--help"], "flag");
   assertRejectsBeforeGit([`${SHA40};reboot`], "metacharacters");
   assertRejectsBeforeGit([`$(${SHA40})`], "command substitution");
+
+  assert.match(
+    docsText,
+    /deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-deploy/,
+  );
+  assertBootstrapCreatesAuthorizedKeysBeforeChown(docsText);
+  assert.match(docsText, /ssh-keygen -lf \/etc\/ssh\/ssh_host_ed25519_key\.pub/);
+  assert.match(docsText, /ssh-keyscan/);
+  assert.match(
+    docsText,
+    /ssh-keyscan[\s\S]{0,400}ssh-keygen -lf \/etc\/ssh\/ssh_host_ed25519_key\.pub|fingerprint[\s\S]{0,400}ssh_host_ed25519_key\.pub|ssh_host_ed25519_key\.pub[\s\S]{0,400}fingerprint|отпечаток[\s\S]{0,400}ssh-keyscan|ssh-keyscan[\s\S]{0,500}совпасть/,
+    "docs must require fingerprint verification of ssh-keyscan vs /etc/ssh/ssh_host_ed25519_key.pub",
+  );
+  const docsBash = extractFencedBash(docsText).join("\n");
+  assert.doesNotMatch(docsBash, /StrictHostKeyChecking=no/);
+  assert.match(docsText, /StrictHostKeyChecking=yes/);
 
   const validationOffset = wrapperText.indexOf("^[0-9a-f]{40}$");
   const gitOffset = wrapperText.indexOf("git -C");
