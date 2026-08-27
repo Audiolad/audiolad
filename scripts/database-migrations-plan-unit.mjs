@@ -289,6 +289,13 @@ function testRepoOneFileOneVersion() {
         "20260829120000_seed_25_meditation_solutions_gallery.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120000_personal_timer_promotion_copy.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -336,8 +343,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260827120000",
     "20260828120000",
     "20260829120000",
+    "20260830120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 15);
+  assert.equal(plan.database_migrations_pending, 16);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -364,8 +372,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260827120000",
     "20260828120000",
     "20260829120000",
+    "20260830120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 9);
+  assert.equal(plan.database_migrations_pending, 10);
 }
 
 function main() {

@@ -13,6 +13,8 @@ type PromotionRow = {
   starts_at: string | null;
   ends_at: string | null;
   duration_seconds: number | null;
+  above_timer_text?: string | null;
+  below_button_text?: string | null;
   is_active: boolean;
   start_token: string;
   created_at: string;
@@ -46,6 +48,10 @@ export function mapPricePromotionRow(row: PromotionRow): PricePromotionRecord | 
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     durationSeconds: row.duration_seconds,
+    aboveTimerText:
+      typeof row.above_timer_text === "string" ? row.above_timer_text : null,
+    belowButtonText:
+      typeof row.below_button_text === "string" ? row.below_button_text : null,
     isActive: row.is_active === true,
     startToken: row.start_token,
     createdAt: row.created_at,
@@ -67,7 +73,7 @@ export function mapPersonalPromotionStart(
 }
 
 export const PRICE_PROMOTION_SELECT =
-  "id, practice_id, name, promotion_type, sale_price, starts_at, ends_at, duration_seconds, is_active, start_token, created_at, updated_at";
+  "id, practice_id, name, promotion_type, sale_price, starts_at, ends_at, duration_seconds, above_timer_text, below_button_text, is_active, start_token, created_at, updated_at";
 
 export const PRICE_PROMOTION_START_SELECT =
   "id, promotion_id, visitor_id, user_id, started_at, expires_at";

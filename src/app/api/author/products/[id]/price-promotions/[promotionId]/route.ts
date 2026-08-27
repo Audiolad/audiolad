@@ -74,6 +74,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       "duration_seconds",
       "duration_amount",
       "duration_unit",
+      "above_timer_text",
+      "below_button_text",
     ].some((key) => key in parsedBody);
 
     if (hasFullWrite) {
@@ -89,6 +91,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.starts_at = parsed.startsAt;
       updates.ends_at = parsed.endsAt;
       updates.duration_seconds = parsed.durationSeconds;
+      updates.above_timer_text = parsed.aboveTimerText;
+      updates.below_button_text = parsed.belowButtonText;
       updates.is_active = parsed.isActive;
     }
 
