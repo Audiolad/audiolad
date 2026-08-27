@@ -46,10 +46,19 @@ read-only GitHub API access.
 
 ## Blocking conditions
 
-The check blocks when production SHA cannot be determined or fetched, production
-is not an ancestor of main or the PR, the PR is behind/diverged from current
-main, duplicate migration versions exist, or a repository validation fails.
-It never rebases or merges a PR.
+The trusted status blocks when:
+
+- production SHA is unavailable or invalid;
+- production commit is unavailable in fetched repository history;
+- production is not an ancestor of main or the PR;
+- the PR is behind or diverged from current main;
+- main changes while the guard runs;
+- duplicate migration versions are found;
+- trusted lineage/migration analysis has an internal failure.
+
+`PR Repository Validation` failures are reported by that separate ordinary CI
+workflow and never become a reason for the trusted status to fail. The trusted
+guard never rebases or merges a PR.
 
 ## Rerun
 
