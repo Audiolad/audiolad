@@ -4,6 +4,7 @@ import {
   isClaimFreePracticeRpcResult,
   mapClaimRpcErrorMessage,
   parseJsonObject,
+  extractClaimPracticeId,
   extractClaimPracticeSlug,
   toClaimLibrarySuccessBody,
 } from "@/lib/library/claim-api";
@@ -41,13 +42,15 @@ export async function POST(request: Request) {
   }
 
   const practiceSlug = extractClaimPracticeSlug(parsedBody);
+  const practiceId = extractClaimPracticeId(parsedBody);
 
-  if (!practiceSlug) {
+  if (!practiceSlug && !practiceId) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
   const { data, error } = await supabase.rpc("claim_free_practice", {
     p_practice_slug: practiceSlug,
+    p_practice_id: practiceId,
   });
 
   if (error) {

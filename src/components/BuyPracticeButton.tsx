@@ -112,8 +112,16 @@ export default function BuyPracticeButton({
 
     async function checkPendingOrder() {
       try {
+        const pendingQuery = new URLSearchParams({
+          practice_slug: practiceSlug,
+        });
+
+        if (practiceId) {
+          pendingQuery.set("practice_id", practiceId);
+        }
+
         const response = await fetch(
-          `/api/orders/pending?practice_slug=${encodeURIComponent(practiceSlug)}`,
+          `/api/orders/pending?${pendingQuery.toString()}`,
         );
 
         if (!isMounted) {
@@ -146,7 +154,7 @@ export default function BuyPracticeButton({
     return () => {
       isMounted = false;
     };
-  }, [practiceSlug]);
+  }, [practiceSlug, practiceId]);
 
   async function handleBuy() {
     setIsLoading(true);
@@ -195,6 +203,7 @@ export default function BuyPracticeButton({
         },
         body: JSON.stringify({
           practice_slug: practiceSlug,
+          practice_id: practiceId,
           analytics_session_id: identity?.sessionId ?? null,
           analytics_anonymous_id: identity?.anonymousId ?? null,
           checkout_origin_path: path,

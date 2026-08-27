@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  extractPracticeId,
   extractPracticeSlug,
   pendingOrderToSuccessBody,
   type PendingOrderRow,
@@ -28,16 +29,23 @@ export async function GET(request: Request) {
   const practiceSlug = extractPracticeSlug({
     practice_slug: searchParams.get("practice_slug") ?? "",
   });
+  const requestedPracticeId = extractPracticeId({
+    practice_id: searchParams.get("practice_id") ?? "",
+  });
 
-  if (!practiceSlug) {
+  if (!practiceSlug && !requestedPracticeId) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  const { data: practice, error: practiceError } = await supabase
-    .from("practices")
-    .select("id")
-    .eq("slug", practiceSlug)
-    .maybeSingle();
+  let practiceQuery = supabase.from("practices").select("id");
+
+  if (requestedPracticeId) {
+    practiceQuery = practiceQuery.eq("id", requestedPracticeId);
+  } else if (practiceSlug) {
+    practiceQuery = practiceQuery.eq("slug", practiceSlug);
+  }
+
+  const { data: practice, error: practiceError } = await practiceQuery.maybeSingle();
 
   if (practiceError) {
     console.error("pending_order_practice_lookup_error", practiceError.message);

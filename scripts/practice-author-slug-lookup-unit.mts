@@ -218,6 +218,38 @@ function testResolverUsesAuthorIdNotEmbedFilter() {
   assert.doesNotMatch(functionBody, /authors!inner/);
 }
 
+function testCheckoutAndClaimPreferPracticeId() {
+  const orderRoute = read("src/app/api/orders/route.ts");
+  const pendingRoute = read("src/app/api/orders/pending/route.ts");
+  const claimRoute = read("src/app/api/library/claim/route.ts");
+  const buyButton = read("src/components/BuyPracticeButton.tsx");
+  const membership = read("src/lib/library/use-library-membership.ts");
+  const checkoutStatus = read("src/app/api/checkout/status/route.ts");
+  const migration = read(
+    "supabase/migrations/20260830120000_practice_rpc_resolve_by_id.sql",
+  );
+
+  assert.match(orderRoute, /p_practice_id: practiceId/);
+  assert.match(pendingRoute, /requestedPracticeId/);
+  assert.match(pendingRoute, /\.eq\("id", requestedPracticeId\)/);
+  assert.match(claimRoute, /p_practice_id: practiceId/);
+  assert.match(buyButton, /practice_id: practiceId/);
+  assert.match(membership, /practice_id: practiceId/);
+  assert.match(checkoutStatus, /orderPracticeId/);
+  assert.match(checkoutStatus, /\.eq\("id", orderPracticeId\)/);
+
+  assert.match(migration, /p_practice_id uuid DEFAULT NULL/);
+  assert.match(migration, /WHERE p\.id = p_practice_id/);
+  assert.match(
+    migration,
+    /CREATE FUNCTION public\.create_practice_order\([\s\S]*p_practice_id uuid DEFAULT NULL/,
+  );
+  assert.match(
+    migration,
+    /CREATE FUNCTION public\.claim_free_practice\([\s\S]*p_practice_id uuid DEFAULT NULL/,
+  );
+}
+
 function testPublicAndPreviewShareResolver() {
   const practicePage = read(
     "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
@@ -251,5 +283,6 @@ await testUnknownProductIsNotFoundNotError();
 await testEmbedFilterWithoutInnerWouldFail();
 testResolverUsesAuthorIdNotEmbedFilter();
 testPublicAndPreviewShareResolver();
+testCheckoutAndClaimPreferPracticeId();
 
 console.log("practice-author-slug-lookup-unit: ok");

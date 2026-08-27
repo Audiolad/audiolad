@@ -4,6 +4,7 @@ import { sanitizeCheckoutOriginPath } from "@/lib/analytics/checkout-origin";
 import {
   extractExpectedAmountMinor,
   extractOrderAnalyticsClaims,
+  extractPracticeId,
   extractPracticeSlug,
   extractQuickOfferId,
   mapRpcErrorMessage,
@@ -58,8 +59,9 @@ export async function POST(request: Request) {
   }
 
   const practiceSlug = extractPracticeSlug(parsedBody);
+  const practiceId = extractPracticeId(parsedBody);
 
-  if (!practiceSlug) {
+  if (!practiceSlug && !practiceId) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.rpc("create_practice_order", {
     p_practice_slug: practiceSlug,
+    p_practice_id: practiceId,
     p_idempotency_key: idempotencyKey,
     p_analytics_session_id: claims.analyticsSessionId,
     p_analytics_anonymous_id: claims.analyticsAnonymousId,

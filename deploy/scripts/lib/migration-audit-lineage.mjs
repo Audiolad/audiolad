@@ -442,6 +442,23 @@ AND NOT EXISTS (
       ),
     ],
   },
+
+  "20260830120000": {
+    extraProbes: [
+      schemaProbe(
+        "function:public.create_practice_order.practice_id_arg",
+        "function",
+        `SELECT to_regprocedure('public.create_practice_order(text, uuid, uuid, text, text, uuid, bigint, text, uuid)') IS NOT NULL`,
+        "create_practice_order accepts optional p_practice_id",
+      ),
+      schemaProbe(
+        "function:public.claim_free_practice.practice_id_arg",
+        "function",
+        `SELECT to_regprocedure('public.claim_free_practice(text, uuid)') IS NOT NULL`,
+        "claim_free_practice accepts optional p_practice_id",
+      ),
+    ],
+  },
 };
 
 export function lineageForVersion(version) {

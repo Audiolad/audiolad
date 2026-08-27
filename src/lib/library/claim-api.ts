@@ -1,4 +1,5 @@
 import {
+  extractPracticeId,
   extractPracticeSlug,
   parseJsonObject,
 } from "@/lib/orders/create-order-api";
@@ -36,6 +37,12 @@ export function extractClaimPracticeSlug(
   body: Record<string, unknown>,
 ): string | null {
   return extractPracticeSlug(body);
+}
+
+export function extractClaimPracticeId(
+  body: Record<string, unknown>,
+): string | null {
+  return extractPracticeId(body);
 }
 
 export { parseJsonObject };

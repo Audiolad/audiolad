@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
   const { data: order, error: orderError } = await serviceRoleClient
     .from("orders")
-    .select("id, status, practice_slug_snapshot, practice_title_snapshot")
+    .select("id, status, practice_id, practice_slug_snapshot, practice_title_snapshot")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -74,12 +74,19 @@ export async function GET(request: Request) {
       : null;
   let authorSlug: string | null = null;
 
-  if (practiceSlug) {
-    const { data: practice } = await serviceRoleClient
+  const orderPracticeId =
+    typeof order.practice_id === "string" ? order.practice_id : null;
+
+  if (orderPracticeId || practiceSlug) {
+    let authorQuery = serviceRoleClient
       .from("practices")
-      .select("authors!practices_author_id_fkey ( slug )")
-      .eq("slug", practiceSlug)
-      .maybeSingle();
+      .select("authors!practices_author_id_fkey ( slug )");
+
+    authorQuery = orderPracticeId
+      ? authorQuery.eq("id", orderPracticeId)
+      : authorQuery.eq("slug", practiceSlug as string);
+
+    const { data: practice } = await authorQuery.maybeSingle();
 
     authorSlug = readNestedAuthorSlug(
       practice && typeof practice === "object"

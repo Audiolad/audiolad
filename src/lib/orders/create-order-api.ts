@@ -88,6 +88,24 @@ export function extractPracticeSlug(
   return trimmed;
 }
 
+export function extractPracticeId(
+  body: Record<string, unknown>,
+): string | null {
+  const value = body.practice_id;
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!UUID_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed.toLowerCase();
+}
+
 export function extractQuickOfferId(
   body: Record<string, unknown>,
 ): string | null {

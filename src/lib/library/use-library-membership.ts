@@ -132,6 +132,7 @@ export function useLibraryMembership({
         },
         body: JSON.stringify({
           practice_slug: practiceSlug,
+          practice_id: practiceId ?? null,
         }),
       });
 
