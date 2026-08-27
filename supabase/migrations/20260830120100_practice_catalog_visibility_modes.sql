@@ -650,6 +650,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_actor uuid;
+  v_recent integer;
 BEGIN
   v_actor := auth.uid();
 
@@ -667,6 +668,30 @@ BEGIN
     RAISE EXCEPTION 'not_authorized'
       USING ERRCODE = '42501';
   END IF;
+
+  -- This RPC accepts a raw UUID, so use the same per-actor ceiling as
+  -- lookup_practice_visibility_user before revealing whether it exists.
+  PERFORM pg_advisory_xact_lock(
+    hashtext('practice_visibility_lookup'),
+    hashtext(v_actor::text)
+  );
+
+  SELECT count(*)
+  INTO v_recent
+  FROM public.practice_visibility_lookup_attempts AS a
+  WHERE a.user_id = v_actor
+    AND a.attempted_at > now() - interval '10 minutes';
+
+  IF v_recent >= 20 THEN
+    RETURN jsonb_build_object(
+      'practice_id', p_practice_id,
+      'user_id', p_user_id,
+      'added', false
+    );
+  END IF;
+
+  INSERT INTO public.practice_visibility_lookup_attempts (user_id)
+  VALUES (v_actor);
 
   IF NOT EXISTS (SELECT 1 FROM public.profiles AS pr WHERE pr.id = p_user_id) THEN
     RAISE EXCEPTION 'not_found'

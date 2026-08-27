@@ -269,27 +269,10 @@ export const loadPublicPlaylistBySlug = cache(
     for (const row of rows) {
       const practice = normalizeOne(row.practices);
 
+      // Public playlist_items RLS permits only listed products. A missing
+      // embed means its product is not public to this viewer, so omit it
+      // completely: neither a placeholder nor practice_id may leak a slot.
       if (!practice || practice.catalog_visibility === "selected_users") {
-        hasUnavailable = true;
-        items.push({
-          practiceId: row.practice_id,
-          audioItemId: row.audio_item_id ?? null,
-          position: row.position,
-          title: "Практика временно недоступна",
-          authorName: null,
-          authorSlug: null,
-          formatLabel: null,
-          metaLabel: null,
-          durationLabel: null,
-          durationSeconds: null,
-          productSlug: null,
-          productHref: null,
-          coverUrl: null,
-          coverImage: null,
-          updatedAt: null,
-          available: false,
-          href: null,
-        });
         continue;
       }
 

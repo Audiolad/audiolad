@@ -17,6 +17,13 @@ const orderMigration = readFileSync(
   join(repoRoot, "supabase/migrations/20260830120200_create_practice_order_visibility.sql"),
   "utf8",
 );
+const playlistMigration = readFileSync(
+  join(
+    repoRoot,
+    "supabase/migrations/20260830120300_public_playlist_selected_visibility.sql",
+  ),
+  "utf8",
+);
 
 assert.match(migration, /ADD COLUMN IF NOT EXISTS catalog_visibility text/);
 assert.match(migration, /WHEN is_catalog_listed IS TRUE THEN 'listed'/);
@@ -82,6 +89,9 @@ assert.match(migration, /NEW\.is_catalog_listed := \(NEW\.catalog_visibility = '
 assert.match(orderMigration, /CREATE OR REPLACE FUNCTION public\.create_practice_order/);
 assert.match(orderMigration, /viewer_can_commercially_access_practice/);
 assert.match(orderMigration, /RAISE EXCEPTION 'practice_not_found'/);
+assert.match(playlistMigration, /Anyone can select public playlist items/);
+assert.match(playlistMigration, /p\.catalog_visibility = 'listed'/);
+assert.match(playlistMigration, /p\.id = playlist_items\.practice_id/);
 
 const smoke = readFileSync(
   join(repoRoot, "supabase/tests/catalog_visibility_rls_smoke.sql"),

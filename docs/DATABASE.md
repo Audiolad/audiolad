@@ -37,11 +37,11 @@
 
 RLS включён. Политика SELECT: `Public can read published practices` — `status = 'published' AND catalog_visibility IN ('listed', 'unlisted')`. `selected_users` читают allowlist / автор / admin / entitled (отдельные политики). `is_practice_author_member(uuid,uuid)` имеет `EXECUTE` у `authenticated` (нужно для RLS) и не имеет у `anon`. `audio_items`, gallery и `practice_topics` публично читаются только если `can_current_viewer_read_practice` разрешает родителя. Allowlist-таблица: клиентский SELECT своих/авторских строк, записи только через SECURITY DEFINER RPC.
 
-Публичные discovery RPC: `get_public_quick_offer` отдаёт только `listed`; `get_public_promo_page` не делает `selected_users` публичным из‑за `guest_access_enabled` (гость не видит продукт; allowlisted/author/admin/entitled — да). Публичный SELECT `author_featured_products` не раскрывает `product_id` для `selected_users`; listed и кабинет автора сохраняются.
+Публичные discovery RPC: `get_public_quick_offer` отдаёт только `listed`; `get_public_promo_page` не делает `selected_users` публичным из‑за `guest_access_enabled` (гость не видит продукт; allowlisted/author/admin/entitled — да). Публичный SELECT `author_featured_products` и `playlist_items` не раскрывает `product_id` / слот для `selected_users`; публичные плейлисты остаются listed-only, кабинет автора и управление плейлистами сохраняются.
 
 #### practice_visibility_users (2026-08-27)
 
-Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`.
+Миграции: `20260830120100_practice_catalog_visibility_modes.sql`, `20260830120200_create_practice_order_visibility.sql`, `20260830120300_public_playlist_selected_visibility.sql`.
 
 | Колонка | Тип | Правила |
 |---------|-----|---------|
@@ -449,6 +449,14 @@ Public slug генерируется только сервером (трансл
 | `cover_url` | text NULL | — | Необязательная обложка трека. Используется только при `practices.use_shared_cover = false`. |
 
 ### Storage paths (`practice-covers`, public)
+
+`practice-covers` — общий public bucket (`storage.buckets.public = true`). Поэтому
+URL `/storage/v1/object/public/practice-covers/...` обходят RLS `storage.objects`.
+После появления `selected_users` это известное ограничение: известный путь обложки
+selected продукта пока можно запросить напрямую. Закрытие требует отдельного
+перехода bucket в private и замены существующих public URL на server-signed delivery;
+row-aware Storage policy в public bucket это не исправляет. Не считать обложку
+секретной до отдельной миграции этой архитектуры.
 
 - Общая обложка: `practices/{practiceId}/cover.{jpg|png|webp}`
 - Обложка трека: `practices/{practiceId}/track-covers/{audioItemId}.{jpg|png|webp}`

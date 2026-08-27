@@ -289,6 +289,20 @@ function testListenUsesRealVisibility() {
   assert.match(listen, /catalog_visibility,/);
   assert.match(listen, /resolveProductAccess/);
 
+  const listenPage = read("src/lib/listen/page-shared.tsx");
+  const practiceSelect = listenPage.slice(
+    listenPage.indexOf('.from("practices")'),
+    listenPage.indexOf(".maybeSingle()", listenPage.indexOf('.from("practices")')),
+  );
+  assert.match(
+    practiceSelect,
+    /is_catalog_listed,\s+catalog_visibility,\s+guest_access_enabled,/,
+    "/listen must pass the stored visibility to resolveProductAccess",
+  );
+
+  const listenAccess = read("src/lib/listen/access.ts");
+  assert.match(listenAccess, /catalog_visibility\?: string \| null/);
+
   const selected = {
     id: SELECTED_ID,
     author_id: "author-1",
@@ -370,6 +384,32 @@ function testSourceArchitecture() {
   assert.match(migration, /pg_advisory_xact_lock/);
   assert.match(migration, /ALTER COLUMN catalog_visibility DROP DEFAULT/);
   assert.match(migration, /SET search_path = public, pg_temp/);
+  const addVisibilityUser = migration.slice(
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.add_practice_visibility_user"),
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.remove_practice_visibility_user"),
+  );
+  assert.match(addVisibilityUser, /pg_advisory_xact_lock/);
+  assert.match(addVisibilityUser, /v_recent >= 20/);
+  assert.match(addVisibilityUser, /INSERT INTO public\.practice_visibility_lookup_attempts/);
+
+  const publicPlaylist = read("src/lib/playlists/public-detail.ts");
+  assert.match(
+    publicPlaylist,
+    /if \(!practice \|\| practice\.catalog_visibility === "selected_users"\) \{\s*continue;/,
+    "public playlist omits inaccessible selected slots rather than creating a placeholder",
+  );
+  assert.doesNotMatch(
+    publicPlaylist,
+    /title: "Практика временно недоступна"/,
+    "public playlist has no selected-product placeholder",
+  );
+
+  const publicPlaylistPolicy = read(
+    "supabase/migrations/20260830120300_public_playlist_selected_visibility.sql",
+  );
+  assert.match(publicPlaylistPolicy, /Public playlist discovery exposes listed published products only/);
+  assert.match(publicPlaylistPolicy, /p\.catalog_visibility = 'listed'/);
+  assert.match(publicPlaylistPolicy, /p\.id = playlist_items\.practice_id/);
 
   const hooks = read("src/lib/seo/indexnow/hooks.ts");
   assert.match(

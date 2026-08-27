@@ -15,6 +15,13 @@
 -- 10. Explicit selected_users → is_catalog_listed=false
 -- 11. Explicit listed → is_catalog_listed=true
 -- 12. UPDATE is_catalog_listed keeps CHECK is_catalog_listed = (catalog_visibility = 'listed')
+-- 13. Anon SELECT playlist_items from a public playlist returns listed product IDs
+--     only; selected_users has no item slot or practice_id.
+-- 14. add_practice_visibility_user rejects a foreign practice and stops raw UUID
+--     attempts after 20 / 10 minutes.
+-- 15. COVER STORAGE FINDING REMAINS: practice-covers is a public bucket, so
+--     known selected cover paths remain fetchable until the separate private-bucket
+--     + signed-delivery migration is approved.
 
 SELECT has_function_privilege(
   'authenticated',

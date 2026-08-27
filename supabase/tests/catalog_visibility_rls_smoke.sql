@@ -15,6 +15,44 @@ BEGIN
 END;
 $$;
 
+-- Raw UUID add RPC is rate-limited like the exact lookup RPC.
+DO $$
+DECLARE
+  v_add text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.add_practice_visibility_user(uuid,uuid)'::regprocedure
+  )
+  INTO v_add;
+
+  IF v_add IS NULL
+     OR v_add NOT LIKE '%pg_advisory_xact_lock%'
+     OR v_add NOT LIKE '%practice_visibility_lookup_attempts%'
+     OR v_add NOT LIKE '%v_recent >= 20%' THEN
+    RAISE EXCEPTION 'add visibility user must rate-limit raw UUID probes';
+  END IF;
+END;
+$$;
+
+-- Public playlist_items must not disclose selected/unlisted practice UUIDs.
+DO $$
+DECLARE
+  v_def text;
+BEGIN
+  SELECT pg_get_expr(polqual, polrelid)
+  INTO v_def
+  FROM pg_policy
+  WHERE polname = 'Anyone can select public playlist items'
+    AND polrelid = 'public.playlist_items'::regclass;
+
+  IF v_def IS NULL
+     OR v_def NOT LIKE '%catalog_visibility%'
+     OR v_def NOT LIKE '%listed%' THEN
+    RAISE EXCEPTION 'public playlist_items policy must be listed-only: %', v_def;
+  END IF;
+END;
+$$;
+
 -- Sync: listed flag cannot drift from catalog_visibility.
 DO $$
 DECLARE
