@@ -1,0 +1,57 @@
+name: Production / PR Safety
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to check
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: production-pr-safety-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  production-pr-safety:
+    name: Production / PR Safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve current main and PR head
+        id: refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          pr_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          pr_clone_url="$(jq -r '.head.repo.clone_url' <<<"$pr_json")"
+          git fetch --no-tags origin "$main_sha"
+          git fetch --no-tags "$pr_clone_url" "$pr_sha"
+          git checkout --detach "$pr_sha"
+          printf 'main_sha=%s\n' "$main_sha" >> "$GITHUB_OUTPUT"
+          printf 'pr_sha=%s\n' "$pr_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Evaluate production and PR safety
+        env:
+          PR_SAFETY_MAIN_SHA: ${{ steps.refs.outputs.main_sha }}
+          PR_SAFETY_PR_SHA: ${{ steps.refs.outputs.pr_sha }}
+          AUDIOLAD_PRODUCTION_HEALTH_URL: https://audiolad.ru/api/health/build
+        run: node scripts/production-pr-safety-guard.mjs
