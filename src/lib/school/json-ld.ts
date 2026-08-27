@@ -3,8 +3,10 @@ import { SCHOOL_ORIGIN } from "@/lib/school/host";
 import { SCHOOL_FAQ_ITEMS } from "@/lib/school/faq";
 import {
   SCHOOL_MENTORING_END_DAY,
+  SCHOOL_MENTORING_END_MONTH_ISO,
   SCHOOL_MENTORING_YEAR,
   SCHOOL_START_DAY,
+  SCHOOL_START_MONTH_ISO,
   SCHOOL_START_YEAR,
 } from "@/lib/school/start";
 import { SCHOOL_SEO_DESCRIPTION, SCHOOL_SEO_TITLE } from "@/lib/school/seo";
@@ -82,8 +84,8 @@ export function buildSchoolLandingJsonLd(): JsonLdNode {
         "@type": "CourseInstance",
         "@id": COURSE_INSTANCE_ID,
         courseMode: "online",
-        startDate: `${SCHOOL_START_YEAR}-08-${SCHOOL_START_DAY}`,
-        endDate: `${SCHOOL_MENTORING_YEAR}-09-${SCHOOL_MENTORING_END_DAY}`,
+        startDate: `${SCHOOL_START_YEAR}-${SCHOOL_START_MONTH_ISO}-${SCHOOL_START_DAY}`,
+        endDate: `${SCHOOL_MENTORING_YEAR}-${SCHOOL_MENTORING_END_MONTH_ISO}-${SCHOOL_MENTORING_END_DAY}`,
         instructor: {
           "@id": PERSON_ID,
         },

@@ -1,8 +1,10 @@
 /** Shared school start date — keep FAQ, hero and final screen aligned. */
-export const SCHOOL_START_DAY = "20";
-export const SCHOOL_START_DAY_END = "21";
-export const SCHOOL_START_MONTH = "августа";
+export const SCHOOL_START_DAY = "29";
+export const SCHOOL_START_DAY_END = "30";
+export const SCHOOL_START_MONTH = "октября";
 export const SCHOOL_START_YEAR = "2026";
+/** ISO month for CourseInstance dates — keep in sync with SCHOOL_START_MONTH. */
+export const SCHOOL_START_MONTH_ISO = "10";
 
 /** Single text node for hero pill — avoids flex collapsing spaces between spans. */
 export const SCHOOL_START_LABEL = `Старт – ${SCHOOL_START_DAY} ${SCHOOL_START_MONTH} ${SCHOOL_START_YEAR} года`;
@@ -21,11 +23,13 @@ export const SCHOOL_INTENSIVE_SCHEDULE_LINE = `${SCHOOL_START_DAY}–${SCHOOL_ST
 export const SCHOOL_INTENSIVE_STANDARD_FEATURE = `Два дня живого онлайн-интенсива – ${SCHOOL_START_DAY} и ${SCHOOL_START_DAY_END} ${SCHOOL_START_MONTH}, с ${SCHOOL_INTENSIVE_TIME_START} до ${SCHOOL_INTENSIVE_TIME_END} ${SCHOOL_TIMEZONE_LABEL}`;
 
 /** Practical mentoring period — Premium and VIP only. */
-export const SCHOOL_MENTORING_START_DAY = "24";
-export const SCHOOL_MENTORING_START_MONTH = "августа";
-export const SCHOOL_MENTORING_END_DAY = "22";
-export const SCHOOL_MENTORING_END_MONTH = "сентября";
+export const SCHOOL_MENTORING_START_DAY = "03";
+export const SCHOOL_MENTORING_START_MONTH = "ноября";
+export const SCHOOL_MENTORING_END_DAY = "30";
+export const SCHOOL_MENTORING_END_MONTH = "ноября";
 export const SCHOOL_MENTORING_YEAR = SCHOOL_START_YEAR;
+/** ISO month for CourseInstance endDate — keep in sync with SCHOOL_MENTORING_END_MONTH. */
+export const SCHOOL_MENTORING_END_MONTH_ISO = "11";
 
 export const SCHOOL_MENTORING_TITLE =
   "Практическое сопровождение (наставничество)";
