@@ -129,12 +129,12 @@ function testProviderAndUi() {
   assert(personal.includes("stopAndClear"), "stops global on local play");
 
   const library = read("src/components/my-practices/MyPracticesLibrary.tsx");
-  assert(library.includes('kind: "private_audio"'), "All tab merges private");
-  assert(library.includes("allEntries"), "All tab merged entries");
   assert(
-    library.includes('activeFilter === "all"'),
-    "All filter special-case rendering",
+    library.includes('kind === "private_audio"'),
+    "library feed still renders private_audio",
   );
+  assert(library.includes("LibraryOwnedCard"), "private/personal use owned tiles");
+  assert(library.includes("filteredEntries"), "unified list is filtered in the UI");
 }
 
 function main() {

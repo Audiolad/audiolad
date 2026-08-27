@@ -513,6 +513,16 @@ html.catalog-sheet-lock body {
   }
 }
 
+@media (max-width: 767px) {
+  .listener-library-grid {
+    margin-left: -0.625rem; /* pull 10px out of parent px-5 → 10px from viewport */
+    margin-right: -0.625rem;
+  }
+  .listener-library-content .catalog-product-grid {
+    gap: 0.375rem; /* 6px */
+  }
+}
+
 .catalog-card-gallery {
   display: flex;
   width: 100%;
@@ -582,6 +592,9 @@ html.catalog-sheet-lock body {
     gap: 0.5rem; /* 8px, half of 1rem */
   }
   .listener-playlists-catalog-content .catalog-product-grid {
+    gap: 0.5rem; /* 8px, half of 1rem */
+  }
+  .listener-library-content .catalog-product-grid {
     gap: 0.5rem; /* 8px, half of 1rem */
   }
 }

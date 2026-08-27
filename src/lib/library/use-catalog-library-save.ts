@@ -122,6 +122,7 @@ export type UseCatalogLibrarySaveInput = {
   isAuthenticated: boolean;
   signInReturnPath: string;
   fetchImpl?: CatalogLibrarySaveFetch;
+  onSavedChange?: (saved: boolean) => void;
 };
 
 export type UseCatalogLibrarySaveResult = {
@@ -250,6 +251,7 @@ export function useCatalogLibrarySave({
   isAuthenticated,
   signInReturnPath,
   fetchImpl,
+  onSavedChange,
 }: UseCatalogLibrarySaveInput): UseCatalogLibrarySaveResult {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
@@ -324,6 +326,8 @@ export function useCatalogLibrarySave({
         if (!result.ok) {
           publishLibrarySave(practiceId, !nextSaved);
           setErrorMessage(result.errorMessage);
+        } else {
+          onSavedChange?.(result.isSaved);
         }
 
         setOptimisticSaved(null);

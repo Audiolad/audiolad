@@ -9,18 +9,21 @@ type CatalogProductHeartButtonProps = {
   product: CatalogCardActionTarget;
   isAuthenticated: boolean;
   signInReturnPath: string;
+  onSavedChange?: (saved: boolean) => void;
 };
 
 export default function CatalogProductHeartButton({
   product,
   isAuthenticated,
   signInReturnPath,
+  onSavedChange,
 }: CatalogProductHeartButtonProps) {
   const { isSaved, isPending, errorMessage, handleClick } = useCatalogLibrarySave({
     practiceId: product.id,
     isSaved: product.isSaved,
     isAuthenticated,
     signInReturnPath,
+    onSavedChange,
   });
 
   function onClick(event: MouseEvent<HTMLButtonElement>) {

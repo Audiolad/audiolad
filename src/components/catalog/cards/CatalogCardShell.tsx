@@ -11,10 +11,15 @@ import { readPaidCatalogOfferPriceLabel } from "@/lib/catalog/offer";
 import { BUY_ACTION_LABEL, PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 import Link from "next/link";
 
+export type CatalogCardPlayback = "default" | "none";
+
 export type CatalogCardLayoutProps = {
   card: CatalogCard;
   isAuthenticated?: boolean;
   signInReturnPath?: string;
+  /** Default keeps /catalog play overlay. Library may pass "none". */
+  playback?: CatalogCardPlayback;
+  onHeartSavedChange?: (saved: boolean) => void;
 };
 
 function resolveActionLabel(card: CatalogCard): string {
@@ -33,6 +38,8 @@ export default function CatalogCardShell({
   card,
   isAuthenticated = false,
   signInReturnPath = "/catalog",
+  playback = "default",
+  onHeartSavedChange,
 }: CatalogCardLayoutProps) {
   const actionTarget = catalogCardToActionTarget(card);
   const paidOfferLabel =
@@ -52,9 +59,12 @@ export default function CatalogCardShell({
           product={actionTarget}
           isAuthenticated={isAuthenticated}
           signInReturnPath={signInReturnPath}
+          onSavedChange={onHeartSavedChange}
         />
 
-        <CatalogProductPlayButton product={actionTarget} />
+        {playback !== "none" ? (
+          <CatalogProductPlayButton product={actionTarget} />
+        ) : null}
       </div>
 
       <Link
