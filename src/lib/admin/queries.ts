@@ -18,6 +18,11 @@ import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-polic
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getOperationalEmailDeliveryForApplication } from "@/lib/email/operational-deliveries";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
+import {
+  buildAdminUsersProfileSearchOr,
+  isAdminExactUuid,
+  isAdminProductSlugQuery,
+} from "@/lib/admin/users-search";
 
 export type AdminStatCard =
   | { kind: "value"; key: string; label: string; value: number }
@@ -414,6 +419,63 @@ function buildDisplayName(
   return "Пользователь";
 }
 
+async function findUserIdsByProductQuery(
+  service: ReturnType<typeof createServiceRoleClient>,
+  search: string,
+): Promise<string[]> {
+  const trimmed = search.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  let practiceQuery = service
+    .from("practices")
+    .select("author_id")
+    .is("deleted_at", null);
+
+  if (isAdminExactUuid(trimmed)) {
+    practiceQuery = practiceQuery.eq("id", trimmed);
+  } else if (isAdminProductSlugQuery(trimmed)) {
+    practiceQuery = practiceQuery.eq("slug", trimmed);
+  } else {
+    return [];
+  }
+
+  const { data: practices, error } = await practiceQuery;
+  if (error || !practices?.length) {
+    return [];
+  }
+
+  const authorIds = [
+    ...new Set(
+      practices
+        .map((row) => row.author_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (authorIds.length === 0) {
+    return [];
+  }
+
+  const { data: members, error: membersError } = await service
+    .from("author_members")
+    .select("user_id")
+    .in("author_id", authorIds);
+
+  if (membersError || !members?.length) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      members
+        .map((row) => row.user_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+}
+
 export async function listAdminUsers(input: {
   page?: number;
   query?: string;
@@ -438,9 +500,12 @@ export async function listAdminUsers(input: {
   }
 
   if (search) {
-    const escaped = search.replace(/[%_,]/g, "");
+    const extraUserIds = await findUserIdsByProductQuery(service, search);
     query = query.or(
-      `full_name.ilike.%${escaped}%,email.ilike.%${escaped}%`,
+      buildAdminUsersProfileSearchOr({
+        search,
+        extraUserIds,
+      }),
     );
   }
 
