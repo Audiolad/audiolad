@@ -80,6 +80,13 @@ import {
   buildPracticeHeroLightMeta,
   resolvePracticeHeroSubtitle,
 } from "@/lib/catalog/product-hero-gallery";
+import {
+  canActivatePromoPreviewMode,
+  resolveAuthorPromoPreview,
+  resolvePromoPreviewPresentationFlags,
+  shouldMountPricePromotionStartHandler,
+} from "@/lib/pricing/author-promo-preview";
+import { resolvePracticePrice } from "@/lib/pricing/resolve";
 import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
@@ -94,6 +101,7 @@ type PageProps = {
     view?: string;
     promo?: string;
     price_promo?: string;
+    promo_preview?: string;
   }>;
 };
 
@@ -265,8 +273,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     view: viewParam,
     promo: promoParam,
     price_promo: pricePromoParam,
+    promo_preview: promoPreviewParam,
   } = await searchParams;
   const promoStartToken = (promoParam ?? pricePromoParam)?.trim() || null;
+  const promoPreviewId = promoPreviewParam?.trim() || null;
   const route = await resolvePracticeRoute(segments);
 
   if (!route) {
@@ -312,12 +322,16 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     notFound();
   }
 
-  const publishPreviewMode = canActivatePublishPreviewMode({
+  const promoPreviewMode = canActivatePromoPreviewMode({
+    promoPreviewId,
+    access,
+  });
+  const publishPreviewActivated = canActivatePublishPreviewMode({
     previewParam,
     practiceStatus: practice.status,
     access,
   });
-  const publishListenerViewMode = canActivatePublishListenerViewMode({
+  const publishListenerViewActivated = canActivatePublishListenerViewMode({
     previewParam,
     viewParam,
     practiceStatus: practice.status,
@@ -350,10 +364,22 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     return <PracticePageErrorState />;
   }
 
-  const buyerPreviewMode =
-    !publishPreviewMode &&
+  const buyerPreviewActivated =
+    !publishPreviewActivated &&
     previewParam === "buyer" &&
     canUseBuyerPreviewMode(access);
+  const {
+    publishPreviewMode,
+    publishListenerViewMode,
+    buyerPreviewMode,
+  } = resolvePromoPreviewPresentationFlags({
+    promoPreviewMode,
+    practiceStatus: practice.status,
+    publishPreviewMode: publishPreviewActivated,
+    publishListenerViewMode: publishListenerViewActivated,
+    buyerPreviewMode: buyerPreviewActivated,
+    canUseBuyerPreview: canUseBuyerPreviewMode(access),
+  });
   const practicePagePath = buildPracticePublicPath(
     resolvedAuthorSlug,
     practice.slug,
@@ -367,14 +393,35 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     practice.slug,
   );
 
-  const visitorId = await readPriceVisitorId();
-  const resolvedPrice = await resolvePracticePriceRpc({
-    supabase,
-    practiceId: practice.id,
-    surface: PRICE_SURFACES.PRODUCT,
-    visitorId,
-    userId: user?.id ?? null,
-  });
+  let resolvedPrice = promoPreviewMode
+    ? await resolveAuthorPromoPreview({
+        supabase,
+        practiceId: practice.id,
+        promotionId: promoPreviewId ?? "",
+        isFree: practice.is_free,
+        basePrice: practice.price,
+        isAuthorMember: access.isAuthorMember,
+      })
+    : null;
+
+  if (!promoPreviewMode) {
+    const visitorId = await readPriceVisitorId();
+    resolvedPrice = await resolvePracticePriceRpc({
+      supabase,
+      practiceId: practice.id,
+      surface: PRICE_SURFACES.PRODUCT,
+      visitorId,
+      userId: user?.id ?? null,
+    });
+  } else if (!resolvedPrice) {
+    resolvedPrice = resolvePracticePrice({
+      isFree: practice.is_free,
+      basePrice: practice.price,
+      promotions: [],
+      starts: [],
+      surface: PRICE_SURFACES.PRODUCT,
+    });
+  }
 
   const presentation = buildPracticeAccessPresentation({
     access,
@@ -624,7 +671,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   return (
     <>
-      {promoStartToken ? (
+      {shouldMountPricePromotionStartHandler({
+        promoStartToken,
+        promoPreviewMode,
+      }) && promoStartToken ? (
         <PricePromotionStartHandler token={promoStartToken} />
       ) : null}
       <JsonLd data={structuredData} />

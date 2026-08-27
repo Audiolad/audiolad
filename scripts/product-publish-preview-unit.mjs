@@ -10,6 +10,7 @@ import {
   resolvePublishPreviewListenerAccess,
 } from "../src/lib/products/practice-access-ui.ts";
 import {
+  buildPracticePromoPreviewPath,
   buildPracticePublishListenerPreviewPath,
   buildPracticePublishPreviewPath,
 } from "../src/lib/products/paths.ts";
@@ -93,6 +94,10 @@ function testPathsHelper() {
   assert.equal(
     buildPracticePublishListenerPreviewPath("anna", "praktika"),
     "/practice/anna/praktika?preview=publish&view=listener",
+  );
+  assert.equal(
+    buildPracticePromoPreviewPath("anna", "praktika", "promo-1"),
+    "/practice/anna/praktika?preview=publish&view=listener&promo_preview=promo-1",
   );
   assert.equal(isPublishPreviewQuery("publish"), true);
   assert.equal(isPublishPreviewQuery("buyer"), false);
@@ -423,6 +428,11 @@ function testSourceContracts() {
     paths,
     /export function buildPracticePublishPreviewPath/,
     "paths helper exists",
+  );
+  assert.match(
+    paths,
+    /export function buildPracticePromoPreviewPath/,
+    "author promo preview path helper exists",
   );
   assert.match(page, /canActivatePublishPreviewMode/);
   assert.match(page, /shouldTrackPracticeListenerAnalytics/);

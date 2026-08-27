@@ -2823,6 +2823,8 @@ export default function AuthorProductForm({
                 practiceId={practiceId || null}
                 basePrice={form.price}
                 disabled={!canEditPublicFields || busy}
+                authorSlug={selectedAuthor?.slug ?? null}
+                productSlug={form.slug || null}
               />
             </div>
           ) : null}

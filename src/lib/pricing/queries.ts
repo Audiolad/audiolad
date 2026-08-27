@@ -59,6 +59,41 @@ export async function loadPricePromotionsForPractice(
   return map.get(practiceId) ?? [];
 }
 
+/**
+ * Loads one saved promotion for author preview, including inactive rows.
+ * Does not load or write `practice_price_promotion_starts`.
+ */
+export async function loadPricePromotionByIdForPractice(
+  supabase: SupabaseClient,
+  practiceId: string,
+  promotionId: string,
+): Promise<PricePromotionRecord | null> {
+  const trimmedPracticeId = practiceId.trim();
+  const trimmedPromotionId = promotionId.trim();
+
+  if (!trimmedPracticeId || !trimmedPromotionId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("practice_price_promotions")
+    .select(PRICE_PROMOTION_SELECT)
+    .eq("id", trimmedPromotionId)
+    .eq("practice_id", trimmedPracticeId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("price_promotion_preview_load_error", error.message);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapPricePromotionRow(data as Parameters<typeof mapPricePromotionRow>[0]);
+}
+
 export async function loadPersonalPromotionStarts(input: {
   supabase: SupabaseClient;
   practiceId: string;
