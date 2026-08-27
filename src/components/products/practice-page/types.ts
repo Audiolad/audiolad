@@ -1,4 +1,5 @@
 import type { ProductTopicLinkItem } from "@/components/products/ProductTopicLinks";
+import type { CatalogSlide } from "@/lib/catalog/dto";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 import type { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 import type { ResolvedListeningNotice } from "@/lib/products/listening-notice";
@@ -38,9 +39,11 @@ export type PracticePageViewModel = {
   accessState: "free" | "paid";
   resolvedAuthorSlug: string;
   authorName: string | null;
+  productTypeLabel: string | null;
   subtitle: string | null;
   description: string | null;
   meta: string | null;
+  gallerySlides: CatalogSlide[];
   presentation: PracticeAccessPresentation;
   practicePagePath: string;
   promoListenPath: string;

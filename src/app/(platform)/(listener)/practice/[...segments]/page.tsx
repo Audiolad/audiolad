@@ -68,6 +68,14 @@ import { buildPracticeJsonLd, shouldEmitPracticeJsonLd } from "@/lib/seo/json-ld
 import { createSupabaseLibrarySavesStore } from "@/lib/library/saves";
 import { createClient } from "@/lib/supabase/server";
 import PricePromotionStartHandler from "@/components/pricing/PricePromotionStartHandler";
+import {
+  catalogGalleryForPublication,
+  loadPublicationGalleriesByIds,
+} from "@/lib/catalog/publication-gallery";
+import {
+  buildPracticeHeroLightMeta,
+  resolvePracticeHeroSubtitle,
+} from "@/lib/catalog/product-hero-gallery";
 import { resolvePracticePriceRpc } from "@/lib/pricing/rpc";
 import { PRICE_SURFACES } from "@/lib/pricing/types";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
@@ -377,11 +385,22 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
   const typeLabel = isAudioPost
     ? AUDIO_POST_KIND_LABEL
     : (musicTypeLabel ?? practice.format);
-  const meta = formatProductMeta({
+  const formatMeta = formatProductMeta({
     format: typeLabel,
     audioCount: isAudioPost ? 1 : publicAudioItems.length,
     totalDurationSeconds,
     durationMinutesFallback: practice.duration_minutes,
+  });
+  const galleryMap = await loadPublicationGalleriesByIds(supabase, [practice.id]);
+  const gallerySlides = catalogGalleryForPublication(
+    practice.publication_class,
+    practice.product_kind,
+    galleryMap.get(practice.id) ?? [],
+  );
+  const meta = buildPracticeHeroLightMeta({
+    gallerySlides,
+    productTypeLabel: typeLabel,
+    formatMeta,
   });
   const recommendation = isAudioPost
     ? resolvePublicPromoRecommendation({
@@ -403,7 +422,10 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     productKind,
     audioCount: publicAudioItems.length,
   });
-  const subtitle = practice.subtitle?.trim() || null;
+  const subtitle = resolvePracticeHeroSubtitle(
+    practice.subtitle,
+    practice.description,
+  );
   const listenDeniedMessage =
     listenParam === "required"
       ? "Для прослушивания необходимо приобрести доступ."
@@ -488,9 +510,11 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     accessState: practice.is_free === true ? "free" : "paid",
     resolvedAuthorSlug,
     authorName,
+    productTypeLabel: typeLabel,
     subtitle,
     description,
     meta,
+    gallerySlides,
     presentation,
     practicePagePath,
     promoListenPath,

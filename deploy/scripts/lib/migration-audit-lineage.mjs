@@ -375,6 +375,28 @@ export const AUDIT_LINEAGE = {
     ],
   },
 
+  "20260829120000": {
+    extraProbes: [
+      dataProbe(
+        "data:publication_gallery_slides.25_meditation_solutions_gallery",
+        `SELECT (
+  SELECT count(*)
+  FROM public.publication_gallery_slides
+  WHERE publication_id = '${MEDITATION_SOLUTIONS_PRACTICE_ID}'
+    AND image_url LIKE '/products/25-meditation-solutions/%'
+    AND image_url NOT LIKE '%/hero.jpg'
+) = 26
+AND NOT EXISTS (
+  SELECT 1
+  FROM public.publication_gallery_slides
+  WHERE publication_id = '${MEDITATION_SOLUTIONS_PRACTICE_ID}'
+    AND image_url LIKE '%/hero.jpg'
+)`,
+        "25-meditation-solutions gallery: 26 material slides, cover stays on practices",
+      ),
+    ],
+  },
+
   "20260828120000": {
     extraProbes: [
       dataProbe(

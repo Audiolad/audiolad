@@ -85,7 +85,7 @@ export default function ProductPriceOffer({
 
   if (!offerActive) {
     return (
-      <p className="text-[28px] font-semibold leading-8 text-[#25135c]">
+      <p data-product-price-offer="regular" className="text-[22px] font-semibold leading-tight text-[#25135c]">
         {formatRubles(basePrice)}
       </p>
     );
@@ -94,19 +94,33 @@ export default function ProductPriceOffer({
   const untilLabel = endsAt ? formatUntilDate(endsAt) : "";
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-[#9a8bb8] line-through">
-        {formatRubles(basePrice)}
-      </p>
-      <p className="text-[32px] font-semibold leading-8 text-[#7042c5]">
-        {formatRubles(salePrice)}
+    <div data-product-price-offer="promo">
+      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-sm text-[#7d70a2] line-through">
+          {formatRubles(basePrice)}
+        </span>
+        <span className="text-[22px] font-semibold leading-tight text-[#25135c]">
+          {formatRubles(salePrice)}
+        </span>
       </p>
       {promotionType === "personal_countdown" ? (
-        <p className="text-sm font-medium text-[#5f4a8f]">
-          Предложение действует ещё {formatRemaining(remainingMs)}
-        </p>
+        <div data-product-price-offer-countdown>
+          <p className="mt-2 text-sm text-[#7d70a2]">
+            Предложение действует ещё:
+          </p>
+          <p className="mt-1 flex items-baseline gap-1.5 text-[#25135c]">
+            <span className="text-sm font-semibold tabular-nums leading-none tracking-wide">
+              {formatRemaining(remainingMs)}
+            </span>
+            <span className="text-sm font-medium leading-none">мин.</span>
+          </p>
+          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+            Это предложение показывается вам один раз. После окончания таймера
+            продукт останется доступен по полной цене {formatRubles(basePrice)}.
+          </p>
+        </div>
       ) : untilLabel ? (
-        <p className="text-sm font-medium text-[#5f4a8f]">
+        <p className="mt-2 text-sm text-[#7d70a2]">
           Акция до {untilLabel}
         </p>
       ) : null}

@@ -35,6 +35,12 @@ function testHeartOnCover() {
   const parts = read(
     "src/components/products/practice-page/PracticePageParts.tsx",
   );
+  const hero = read(
+    "src/components/products/practice-page/PracticeProductHero.tsx",
+  );
+  const gallery = read(
+    "src/components/products/practice-page/PracticeHeroGallery.tsx",
+  );
   const mobile = read(
     "src/components/products/practice-page/PracticePageMobile.tsx",
   );
@@ -48,24 +54,30 @@ function testHeartOnCover() {
   assert.match(parts, /CatalogProductHeartButton/);
   assert.match(parts, /relative aspect-square/);
   assert.match(parts, /function PracticeLibraryActionSection[\s\S]*LibraryAddButton/);
-  assert.match(mobile, /toPracticeHeartProduct\(viewModel\)/);
-  assert.match(desktop, /toPracticeHeartProduct\(viewModel\)/);
+  assert.match(hero, /toPracticeHeartProduct\(viewModel\)/);
+  assert.match(gallery, /CatalogProductHeartButton/);
+  assert.match(mobile, /PracticeProductHero/);
+  assert.match(desktop, /PracticeProductHero/);
   assert.doesNotMatch(mobile, /PracticeLibraryActionSection|LibraryAddButton/);
   assert.doesNotMatch(desktop, /PracticeLibraryActionSection|LibraryAddButton/);
   assert.match(page, /listSavedPracticeIds/);
   assert.match(page, /isSaved/);
 }
 
-function compactBuyClassSource(parts: string) {
-  const start = parts.indexOf("const compactBuyClassName");
-  const end = parts.indexOf(";", start);
-  return parts.slice(start, end);
+function featuredBuyClassSource(card: string) {
+  const start = card.indexOf("export const FEATURED_CARD_PRIMARY_CTA_CLASS");
+  const end = card.indexOf(";", start);
+  return card.slice(start, end);
 }
 
 function testBeforePurchaseRowKeepsBuy() {
   const parts = read(
     "src/components/products/practice-page/PracticePageParts.tsx",
   );
+  const hero = read(
+    "src/components/products/practice-page/PracticeProductHero.tsx",
+  );
+  const featuredCard = read("src/components/home/FeaturedProductCard.tsx");
   const mobile = read(
     "src/components/products/practice-page/PracticePageMobile.tsx",
   );
@@ -87,7 +99,7 @@ function testBeforePurchaseRowKeepsBuy() {
   );
   const legalFn = parts.slice(
     parts.indexOf("function PaymentLegalNote"),
-    parts.indexOf("const compactBuyClassName"),
+    parts.indexOf("export function toPracticeHeartProduct"),
   );
 
   assert.match(
@@ -97,7 +109,7 @@ function testBeforePurchaseRowKeepsBuy() {
   );
   assert.match(meta, /statusBadge/, "non-buy badges stay in meta");
 
-  const purchaseRow = action.indexOf("flex items-center justify-between");
+  const purchaseRow = action.indexOf("data-practice-hero-sell");
   const buyButton = action.indexOf("<BuyPracticeButton");
   const previewPlay = action.indexOf("<PracticeListenCtaLink");
   const legalNote = action.indexOf("<PaymentLegalNote");
@@ -114,21 +126,30 @@ function testBeforePurchaseRowKeepsBuy() {
     "preview play is before PaymentLegalNote",
   );
 
-  assert.match(action, /compactBuyClassName/, "paid buy uses a compact class");
   assert.match(
-    compactBuyClassSource(parts),
+    action,
+    /FEATURED_CARD_PRIMARY_CTA_CLASS/,
+    "paid buy uses the homepage featured CTA class",
+  );
+  assert.match(
+    featuredBuyClassSource(featuredCard),
     /min-h-11/,
-    "mobile buy keeps a 44px touch target",
+    "featured buy keeps a 44px touch target",
   );
   assert.doesNotMatch(
-    compactBuyClassSource(parts),
+    featuredBuyClassSource(featuredCard),
     /\bw-full\b/,
-    "compact buy class is not full width",
+    "featured buy is not a full-width invented plate",
   );
   assert.match(
     action,
-    /className=\{compactBuyClassName\}/,
-    "BuyPracticeButton uses the compact class only",
+    /className=\{FEATURED_CARD_PRIMARY_CTA_CLASS\}/,
+    "BuyPracticeButton uses the featured card CTA class",
+  );
+  assert.doesNotMatch(
+    action,
+    /bg-\[#f4ecfb\]/,
+    "sell zone does not invent a purple price plate",
   );
 
   assert.match(legalFn, /text-xs/, "PaymentLegalNote is smaller");
@@ -146,10 +167,11 @@ function testBeforePurchaseRowKeepsBuy() {
     "listen path does not render BuyPracticeButton",
   );
 
-  const mobileCta = mobile.indexOf("<PracticePrimaryActionSection");
+  const mobileCta = mobile.indexOf("<PracticeProductHero");
   const mobileDescription = mobile.indexOf("description ?");
   const mobileContents = mobile.indexOf("<ProductContentsSection");
-  assert.ok(mobileCta >= 0, "mobile mounts the primary CTA");
+  assert.match(hero, /PracticePrimaryActionSection/, "hero mounts the primary CTA");
+  assert.ok(mobileCta >= 0, "mobile mounts the product hero");
   assert.ok(
     mobileCta < mobileContents,
     "mobile CTA appears before ProductContentsSection",
@@ -163,7 +185,7 @@ function testBeforePurchaseRowKeepsBuy() {
     "mobile contents appear before the description block",
   );
 
-  const desktopCta = desktop.indexOf("<PracticePrimaryActionSection");
+  const desktopCta = desktop.indexOf("<PracticeProductHero");
   const desktopDescription = desktop.indexOf("description ?");
   const desktopContents = desktop.indexOf("<ProductContentsSection");
   assert.doesNotMatch(
@@ -171,7 +193,7 @@ function testBeforePurchaseRowKeepsBuy() {
     /mt-auto/,
     "desktop CTA is not pinned to the cover baseline",
   );
-  assert.ok(desktopCta >= 0, "desktop mounts the primary CTA");
+  assert.ok(desktopCta >= 0, "desktop mounts the product hero");
   assert.ok(
     desktopCta < desktopContents,
     "desktop CTA appears before ProductContentsSection",

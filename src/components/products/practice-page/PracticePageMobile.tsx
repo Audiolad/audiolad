@@ -1,16 +1,14 @@
 import LegalFooter from "@/components/LegalFooter";
 import ListeningNoticeCard from "@/components/products/ListeningNoticeCard";
 import ProductContentsSection from "@/components/products/ProductContentsSection";
+import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
 import {
   PracticeAccessBanners,
   PracticeBackLink,
-  PracticeMetaSection,
-  PracticePrimaryActionSection,
-  PracticeProductCover,
-  toPracticeHeartProduct,
 } from "./PracticePageParts";
+import PracticeProductHero from "./PracticeProductHero";
 import type { PracticePageViewModel } from "./types";
 
 type PracticePageMobileProps = {
@@ -33,24 +31,10 @@ export default function PracticePageMobile({ viewModel }: PracticePageMobileProp
         />
 
         <section className="mt-6">
-          <PracticeProductCover
-            cover={viewModel.mobileCover}
-            priority
-            heartProduct={toPracticeHeartProduct(viewModel)}
-            isAuthenticated={viewModel.isAuthenticated}
-            signInReturnPath={viewModel.practicePagePath}
-          />
+          <PracticeProductHero viewModel={viewModel} layout="mobile" />
         </section>
 
-        <section className="mt-6">
-          <PracticeMetaSection
-            viewModel={viewModel}
-            authorMetaLayout="inline"
-            titleClassName="mt-3 text-[32px] font-semibold leading-[1.15]"
-          />
-        </section>
-
-        <PracticePrimaryActionSection viewModel={viewModel} />
+        <ProductTopicLinks topics={viewModel.practiceTopics} className="mt-4" />
 
         <ProductContentsSection
           items={publicAudioItems}
