@@ -42,8 +42,8 @@ export const AUTHOR_CONTACT_STANDARD_ICON_SRC: Record<
   Exclude<AuthorContactPlatform, "custom">,
   string
 > = {
-  telegram: "/authors/contacts/telegram.svg",
-  max: "/authors/contacts/max.svg",
+  telegram: "/school/messengers/telegram.png",
+  max: "/school/messengers/max.png",
 };
 
 export const AUTHOR_CONTACT_CUSTOM_ICON_SRC = "/authors/contacts/custom.svg";

@@ -15,6 +15,7 @@ import {
   AUTHOR_CONTACT_CUSTOM_ICON_SRC,
 } from "../src/lib/authors/constants.ts";
 import {
+  areAuthorContactDraftsEqual,
   collectAuthorContactSameAs,
   contactsFromProfile,
   draftsToContactPayload,
@@ -346,17 +347,53 @@ function testIconsAndSameAs() {
 }
 
 function testLocalStandardIconsExist() {
+  const constants = read("src/lib/authors/constants.ts");
+
+  assert(
+    AUTHOR_CONTACT_STANDARD_ICON_SRC.telegram ===
+      "/school/messengers/telegram.png",
+    "telegram default uses existing school png",
+  );
+  assert(
+    AUTHOR_CONTACT_STANDARD_ICON_SRC.max === "/school/messengers/max.png",
+    "max default uses existing school png",
+  );
+  assert(
+    AUTHOR_CONTACT_CUSTOM_ICON_SRC === "/authors/contacts/custom.svg",
+    "custom fallback stays local",
+  );
+  assert(!constants.includes("max-source.png"), "max-source.png is not used");
+  assert(
+    !constants.includes("/authors/contacts/telegram.svg"),
+    "temporary telegram svg is not the default",
+  );
+  assert(
+    !constants.includes("/authors/contacts/max.svg"),
+    "temporary max svg is not the default",
+  );
+
   for (const relative of [
-    "public/authors/contacts/telegram.svg",
-    "public/authors/contacts/max.svg",
-    "public/authors/contacts/custom.svg",
+    "public/school/messengers/telegram.png",
+    "public/school/messengers/max.png",
   ]) {
     assert(existsSync(path.join(root, relative)), `${relative} exists`);
-    const svg = read(relative);
-    assert(svg.includes("<svg"), `${relative} is svg`);
-    assert(!/https?:\/\/(?!www\.w3\.org)/.test(svg), `${relative} has no remote icons`);
-    assert(!svg.includes("cdn."), `${relative} is local`);
   }
+
+  assert(
+    !existsSync(path.join(root, "public/authors/contacts/telegram.svg")),
+    "unused telegram svg removed",
+  );
+  assert(
+    !existsSync(path.join(root, "public/authors/contacts/max.svg")),
+    "unused max svg removed",
+  );
+
+  const customSvg = "public/authors/contacts/custom.svg";
+  assert(existsSync(path.join(root, customSvg)), `${customSvg} exists`);
+  const svg = read(customSvg);
+  assert(svg.includes("<svg"), `${customSvg} is svg`);
+  assert(!/https?:\/\/(?!www\.w3\.org)/.test(svg), `${customSvg} has no remote icons`);
+  assert(!svg.includes("cdn."), `${customSvg} is local`);
 }
 
 function testMigrationAndRls() {
@@ -398,7 +435,8 @@ function testServerOwnershipAndPersistence() {
   assert(iconRoute.includes("author-contact-icon"), "contact icon profile");
   assert(iconRoute.includes("AUTHOR_ASSETS_BUCKET"), "reuses author-assets bucket");
   assert(client.includes("contactsFromProfile(profile.contacts"), "load hydrates contacts");
-  assert(client.includes("setContacts(contactsFromProfile(payload.profile.contacts"), "save rehydrates");
+  assert(client.includes("setContacts(nextContacts)"), "save rehydrates");
+  assert(client.includes("contactsFromProfile(payload.profile.contacts"), "save maps server contacts");
 }
 
 function testCabinetUi() {
@@ -424,6 +462,182 @@ function testCabinetUi() {
   assert(editor.includes("aria-label=\"Поднять выше\""), "up control");
   assert(editor.includes("aria-label=\"Опустить ниже\""), "down control");
   assert(editor.includes("Загрузить иконку"), "custom icon upload");
+  assert(editor.includes("resolveAuthorContactIconUrl"), "cabinet preview uses shared icon resolver");
+}
+
+function testExplicitContactSaveReusesProfilePatch() {
+  const client = read("src/components/author-dashboard/AuthorProfileClient.tsx");
+  const editor = read("src/components/author-dashboard/AuthorContactsEditor.tsx");
+  const route = read("src/app/api/author/profile/route.ts");
+
+  assert(editor.includes("Сохранить изменения"), "explicit contacts save button");
+  assert(editor.includes("Сохраняем…"), "in-flight save label");
+  assert(editor.includes("Сохранено"), "saved confirmation");
+  assert(editor.includes("+ Добавить контакт"), "add stays a separate action");
+  assert(
+    editor.includes('disabled={disabled || saving || !dirty}'),
+    "save disabled until contacts are dirty",
+  );
+  assert(editor.includes("onSave"), "contacts save calls parent persist");
+  assert(
+    editor.indexOf("+ Добавить контакт") < editor.indexOf("Сохранить изменения"),
+    "add button stays above save",
+  );
+  assert(editor.includes("w-full"), "save button can use full mobile width");
+  assert(editor.includes("min-w-0"), "contacts save row cannot overflow");
+  assert(editor.includes("max-w-full"), "contacts save row stays within card");
+  assert(
+    editor.includes("sm:w-auto"),
+    "save button does not force a wide desktop row",
+  );
+
+  assert(client.includes("areAuthorContactDraftsEqual"), "dirty uses shared contact compare");
+  assert(client.includes("persistProfile"), "shared persist helper");
+  assert(client.includes("onSave={() =>"), "contacts button wired to persist");
+  assert(client.includes('fetch("/api/author/profile"'), "still uses profile PATCH");
+  assert(client.includes("draftsToContactPayload(contacts)"), "contacts ride the same payload");
+  assert(client.includes("setSavedContacts(nextContacts)"), "success clears dirty from server snapshot");
+  assert(client.includes("setContacts(nextContacts)"), "success rehydrates without wiping drafts");
+  assert(client.includes("saved={Boolean(success) && !contactsDirty}"), "saved only after clean snapshot");
+  assert(!client.includes("/api/author/contacts"), "no parallel contacts backend");
+  assert(route.includes('if ("contacts" in body)'), "same PATCH persists contacts");
+  assert(route.includes("replaceAuthorContacts"), "same replace helper");
+}
+
+function testContactDirtyAndPersistRefresh() {
+  const telegramDraft = {
+    id: TELEGRAM_ID,
+    platform: "telegram",
+    title: "Telegram-канал",
+    description: "Новые практики",
+    url: "https://t.me/sergey",
+    iconUrl: null,
+    iconPath: null,
+    iconImage: null,
+    isVisible: true,
+  };
+  const maxDraft = {
+    id: MAX_ID,
+    platform: "max",
+    title: "MAX-канал",
+    description: "",
+    url: "https://max.ru/sergey",
+    iconUrl: null,
+    iconPath: null,
+    iconImage: null,
+    isVisible: true,
+  };
+
+  assert(areAuthorContactDraftsEqual([], []), "empty equals empty");
+  assert(
+    !areAuthorContactDraftsEqual([], [telegramDraft]),
+    "add contact is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual([telegramDraft], [{ ...telegramDraft, title: "Другое" }]),
+    "title change is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual([telegramDraft], [{ ...telegramDraft, url: "https://t.me/other" }]),
+    "url change is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual(
+      [telegramDraft],
+      [{ ...telegramDraft, description: "Короткий текст" }],
+    ),
+    "short text change is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual(
+      [telegramDraft],
+      [{ ...telegramDraft, isVisible: false }],
+    ),
+    "visibility change is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual(
+      [telegramDraft],
+      [{ ...telegramDraft, platform: "max" }],
+    ),
+    "type change is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual([telegramDraft, maxDraft], [maxDraft, telegramDraft]),
+    "reorder is dirty",
+  );
+  assert(
+    !areAuthorContactDraftsEqual(
+      [telegramDraft],
+      [{ ...telegramDraft, iconUrl: "https://cdn.example/own.webp" }],
+    ),
+    "icon upload is dirty",
+  );
+  assert(
+    areAuthorContactDraftsEqual([telegramDraft, maxDraft], [telegramDraft, maxDraft]),
+    "identical snapshot is clean",
+  );
+
+  const savedMax = normalizeAuthorContacts([
+    contactInput({
+      id: MAX_ID,
+      platform: "max",
+      title: "MAX-канал",
+      url: "https://max.ru/sergey",
+    }),
+  ]);
+  const maxAfterRefresh = contactsFromProfile(
+    savedMax.map((contact, index) => ({ ...contact, sortOrder: index })),
+  );
+  const maxReloaded = normalizeAuthorContacts(draftsToContactPayload(maxAfterRefresh));
+  const maxPublic = selectVisibleAuthorContacts(
+    maxReloaded.map((contact, index) => ({ ...contact, sortOrder: index })),
+  );
+  assert(maxReloaded?.[0]?.title === "MAX-канал", "max title persists after refresh");
+  assert(maxReloaded?.[0]?.url === "https://max.ru/sergey", "max url persists after refresh");
+  assert(
+    maxPublic[0].iconUrl === "/school/messengers/max.png",
+    "public max uses existing max.png",
+  );
+
+  const savedTelegram = normalizeAuthorContacts([
+    contactInput({
+      title: "Telegram-канал",
+      url: "https://t.me/sergey",
+    }),
+  ]);
+  const telegramAfterRefresh = contactsFromProfile(
+    savedTelegram.map((contact, index) => ({ ...contact, sortOrder: index })),
+  );
+  const telegramReloaded = normalizeAuthorContacts(
+    draftsToContactPayload(telegramAfterRefresh),
+  );
+  const telegramPublic = selectVisibleAuthorContacts(
+    telegramReloaded.map((contact, index) => ({ ...contact, sortOrder: index })),
+  );
+  assert(telegramReloaded?.[0]?.title === "Telegram-канал", "telegram title persists");
+  assert(telegramReloaded?.[0]?.url === "https://t.me/sergey", "telegram url persists");
+  assert(
+    telegramPublic[0].iconUrl === "/school/messengers/telegram.png",
+    "public telegram uses existing telegram.png",
+  );
+
+  const savedCustomIcon = normalizeAuthorContacts([
+    contactInput({
+      id: MAX_ID,
+      platform: "max",
+      title: "MAX со своей иконкой",
+      url: "https://max.ru/sergey",
+      iconUrl: "https://cdn.example/own.webp",
+    }),
+  ]);
+  const customPublic = selectVisibleAuthorContacts(
+    savedCustomIcon.map((contact, index) => ({ ...contact, sortOrder: index })),
+  );
+  assert(
+    customPublic[0].iconUrl === "https://cdn.example/own.webp",
+    "uploaded icon still overrides default",
+  );
 }
 
 function testPublicPageUi() {
@@ -521,6 +735,8 @@ const tests = [
   ["migration and RLS", testMigrationAndRls],
   ["ownership and persistence", testServerOwnershipAndPersistence],
   ["cabinet UI", testCabinetUi],
+  ["explicit contact save", testExplicitContactSaveReusesProfilePatch],
+  ["dirty and persist refresh", testContactDirtyAndPersistRefresh],
   ["public page UI", testPublicPageUi],
   ["image pipeline", testImagePipelineExtension],
   ["server-generated icon path", testContactIconPathIsServerGenerated],
