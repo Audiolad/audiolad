@@ -116,10 +116,10 @@ assert(
   "standalone PWA must disable vertical overscroll on html/body",
 );
 assert(
-  /@media \(max-width: 1279px\)[\s\S]*overscroll-behavior-y:\s*none/.test(
+  !/@media \(max-width: 1279px\)\s*\{\s*html,\s*body\s*\{\s*overscroll-behavior-y:\s*none/.test(
     globals,
   ),
-  "ordinary mobile Safari / Chrome / MAX webview must not rubber-band the tabbar",
+  "must not disable overscroll on every mobile browser page",
 );
 assert(
   /\.bottom-nav\s*\{[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*0;/.test(globals),

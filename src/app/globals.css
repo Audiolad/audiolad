@@ -333,17 +333,6 @@ html.catalog-sheet-lock body {
   }
 }
 
-/*
- * Ordinary mobile Safari / Chrome / MAX webview: rubber-band overscroll
- * used to drag the fixed tabbar off the screen bottom. Keep the pin.
- */
-@media (max-width: 1279px) {
-  html,
-  body {
-    overscroll-behavior-y: none;
-  }
-}
-
 @media (max-width: 1279px) {
   html:has(.player-shell) {
     background-color: #24133f;
