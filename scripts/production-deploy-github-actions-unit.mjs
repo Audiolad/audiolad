@@ -208,6 +208,32 @@ function main() {
   assert.match(workflowText, /merge-base --is-ancestor/);
   assert.doesNotMatch(wrapperText, /AUDIOLAD_DEPLOY_OVERRIDE=1/);
 
+  assert.doesNotMatch(workflowText, /actions\/checkout/);
+  assert.doesNotMatch(workflowText, /git submodule/);
+  assert.doesNotMatch(workflowText, /\bgit checkout\b/);
+  const workflowFetchLines = workflowText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#") && /\bgit\b/.test(line) && /\bfetch\b/.test(line));
+  assert.equal(workflowFetchLines.length, 1, "workflow must fetch exactly once");
+  assert.match(workflowFetchLines[0], /fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/);
+  assert.doesNotMatch(workflowFetchLines[0], /refs\/heads\/(?!main\b)/);
+  assert.match(workflowText, /ORIGIN_MAIN_SHA="\$\(git -C "\$\{OBJECT_STORE\}" rev-parse refs\/remotes\/origin\/main\)"/);
+  assert.match(workflowText, /TARGET_SHA="\$\{ORIGIN_MAIN_SHA\}"/);
+
+  const resolveStepOffset = workflowText.indexOf("name: Resolve target SHA");
+  const workflowAncestorOffset = workflowText.indexOf("merge-base --is-ancestor");
+  const sshStepOffset = workflowText.indexOf("name: Deploy via SSH wrapper");
+  assert.ok(resolveStepOffset >= 0, "workflow must resolve the target SHA");
+  assert.ok(
+    workflowAncestorOffset > resolveStepOffset,
+    "workflow ancestry check must live in the resolve step",
+  );
+  assert.ok(
+    sshStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH",
+  );
+
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
 
