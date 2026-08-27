@@ -73,8 +73,23 @@ assert.match(page, /listPublishedCatalog/, "first screen loads listing on the se
 
 assert.match(
   css,
-  /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
-  "mobile grid is 2 columns",
+  /\.catalog-product-grid \{\s*display:\s*grid;\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*0\.75rem;/,
+  "default catalog-product-grid stays 2 columns with 0.75rem gap",
+);
+assert.match(
+  css,
+  /@media \(max-width:\s*767px\) \{\s*\.listener-catalog-content \.catalog-product-grid \{\s*gap:\s*0\.375rem;/,
+  "mobile /catalog grid gap is 0.375rem below 768",
+);
+assert.match(
+  css,
+  /@media \(min-width:\s*768px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);\s*gap:\s*1rem;/,
+  "768 grid stays 3 columns with 1rem gap",
+);
+assert.match(
+  css,
+  /@media \(min-width:\s*1280px\) \{\s*\.catalog-product-grid \{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+  "1280 grid stays 4 columns",
 );
 assert.match(grid, /catalog-product-grid/, "grid uses the 2-column class");
 assert.match(grid, /IntersectionObserver/, "infinite scroll is wired");

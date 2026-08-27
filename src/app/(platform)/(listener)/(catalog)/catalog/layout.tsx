@@ -23,7 +23,7 @@ export default function CatalogListenerLayout({
         aria-hidden="true"
       />
 
-      <div className="listener-catalog-content px-5 lg:px-10 xl:px-6 xl:pt-3 xl:pb-5">
+      <div className="listener-catalog-content px-2.5 md:px-5 lg:px-10 xl:px-6 xl:pt-3 xl:pb-5">
         {children}
       </div>
     </>
