@@ -32,7 +32,7 @@ export default async function MyPracticesPage({
       <div className="hidden xl:block">
         <h1 className="text-[28px] font-semibold">Аудиотека</h1>
         <p className="mt-1 text-sm text-[#7d70a2]">
-          Ваши подарки, купленные и личные материалы
+          Всё, что вы сохранили, купили, получили или добавили
         </p>
       </div>
 

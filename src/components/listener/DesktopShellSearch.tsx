@@ -57,7 +57,9 @@ function CatalogDesktopSearchRow({
  * On /catalog this is the compact chrome row: PlatformCatalogInlineSearch
  * plus CatalogMobileFiltersSlot (passed in from the server shell).
  * On /playlists/catalog the page owns PlaylistCatalogSearch, so this
- * shell slot stays empty. Other routes keep PlatformSearchCombobox.
+ * shell slot stays empty. /my-practices owns its own Audioteka search,
+ * so this shell slot stays empty there too. Other routes keep
+ * PlatformSearchCombobox.
  */
 export default function DesktopShellSearch({
   catalogFilters,
@@ -69,6 +71,10 @@ export default function DesktopShellSearch({
     pathname === "/catalog" || pathname.startsWith("/catalog");
 
   if (isPublicPlaylistCatalogPath(pathname)) {
+    return null;
+  }
+
+  if (pathname === "/my-practices" || pathname.startsWith("/my-practices/")) {
     return null;
   }
 

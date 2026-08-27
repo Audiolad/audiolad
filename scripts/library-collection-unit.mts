@@ -383,8 +383,8 @@ function testSourceBoundaries() {
   );
   assert.doesNotMatch(card, /Избранн/);
 
-  assert.match(library, /isLibraryFilterId/);
-  assert.match(library, /matchesUnifiedLibraryFilter\(entry, activeFilter\)/);
+  assert.match(library, /parseLibraryFilter/);
+  assert.match(library, /applyUnifiedLibraryView/);
 
   assert.doesNotMatch(play, /library\/collection|loadLibraryCollection/);
   assert.doesNotMatch(player, /library\/collection|loadLibraryCollection/);

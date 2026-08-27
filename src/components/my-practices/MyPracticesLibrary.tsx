@@ -1,36 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import LibraryCatalogTile from "@/components/my-practices/LibraryCatalogTile";
 import LibraryOwnedCard from "@/components/my-practices/LibraryOwnedCard";
+import MyPracticesLibraryFilters from "@/components/my-practices/MyPracticesLibraryFilters";
+import MyPracticesLibrarySearch from "@/components/my-practices/MyPracticesLibrarySearch";
+import MyPracticesLibrarySort from "@/components/my-practices/MyPracticesLibrarySort";
 import PlaylistCard from "@/components/playlists/catalog/PlaylistCard";
 import {
   getLibraryFilterEmptyCta,
   getLibraryFilterEmptyMessage,
-  isLibraryFilterId,
   type LibraryFilterId,
 } from "@/lib/library/filters";
-import { matchesUnifiedLibraryFilter } from "@/lib/library/unified-filter";
+import {
+  applyUnifiedLibraryView,
+  buildMyPracticesHref,
+  formatLibraryMaterialsCount,
+  LIBRARY_SEARCH_DEBOUNCE_MS,
+  parseLibraryFilter,
+  parseLibrarySearchQuery,
+  parseLibrarySort,
+  type LibrarySortId,
+} from "@/lib/library/unified-query";
 import { unifiedPlaylistEntryToListingItem } from "@/lib/library/unified-playlist-item";
 import type { UnifiedLibraryEntry } from "@/lib/library/unified-entry";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
-
-type LibraryFilter = {
-  id: LibraryFilterId;
-  label: string;
-};
-
-const FILTERS: LibraryFilter[] = [
-  { id: "all", label: "Все" },
-  { id: "saved", label: "Сохранённые" },
-  { id: "gifts", label: "Подарки" },
-  { id: "purchased", label: "Купленные" },
-  { id: "uploads", label: "Мои записи" },
-];
 
 /** Survives Suspense/remount so remove confirmation is not lost mid-animation. */
 let pendingLibraryRemoveToast: string | null = null;
@@ -41,38 +39,6 @@ type MyPracticesLibraryProps = {
   error: boolean;
   purchasedSlug?: string | null;
 };
-
-function formatPracticesCount(count: number): string {
-  const abs = Math.abs(count);
-  const mod10 = abs % 10;
-  const mod100 = abs % 100;
-
-  let word = "практик";
-
-  if (mod10 === 1 && mod100 !== 11) {
-    word = "практика";
-  } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    word = "практики";
-  }
-
-  return `${count} ${word}`;
-}
-
-function formatUploadsCount(count: number): string {
-  const abs = Math.abs(count);
-  const mod10 = abs % 10;
-  const mod100 = abs % 100;
-
-  let word = "материалов";
-
-  if (mod10 === 1 && mod100 !== 11) {
-    word = "материал";
-  } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    word = "материала";
-  }
-
-  return `${count} ${word}`;
-}
 
 function LibraryFilterEmpty({
   filter,
@@ -188,10 +154,14 @@ export default function MyPracticesLibrary({
 }: MyPracticesLibraryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filterFromQuery = searchParams.get("filter");
-  const activeFilter: LibraryFilterId = isLibraryFilterId(filterFromQuery)
-    ? filterFromQuery
-    : "all";
+  const searchInputId = useId();
+  const activeFilter = parseLibraryFilter(searchParams.get("filter"));
+  const activeSort = parseLibrarySort(searchParams.get("sort"));
+  const queryFromUrl = parseLibrarySearchQuery(searchParams.get("q"));
+  const purchasedFromUrl = searchParams.get("purchased");
+  const [searchValue, setSearchValue] = useState(queryFromUrl);
+  const debounceRef = useRef<number | null>(null);
+  const skipSearchSyncRef = useRef(false);
 
   const [visibleEntries, setVisibleEntries] = useState(entries);
   const [entriesSource, setEntriesSource] = useState(entries);
@@ -216,6 +186,23 @@ export default function MyPracticesLibrary({
   }
 
   useEffect(() => {
+    if (skipSearchSyncRef.current) {
+      skipSearchSyncRef.current = false;
+      return;
+    }
+
+    setSearchValue(queryFromUrl);
+  }, [queryFromUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -228,6 +215,56 @@ export default function MyPracticesLibrary({
     }, remaining || 2800);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  function replaceLibraryQuery(next: {
+    q?: string;
+    filter?: LibraryFilterId;
+    sort?: LibrarySortId;
+  }) {
+    const href = buildMyPracticesHref({
+      q: next.q ?? searchValue,
+      filter: next.filter ?? activeFilter,
+      sort: next.sort ?? activeSort,
+      purchased: purchasedFromUrl,
+    });
+    const currentHref = buildMyPracticesHref({
+      q: queryFromUrl,
+      filter: activeFilter,
+      sort: activeSort,
+      purchased: purchasedFromUrl,
+    });
+
+    if (href === currentHref) {
+      return;
+    }
+
+    if (next.q !== undefined) {
+      skipSearchSyncRef.current = true;
+    }
+
+    router.replace(href, { scroll: false });
+  }
+
+  function flushSearch(nextQuery = searchValue) {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
+    replaceLibraryQuery({ q: nextQuery });
+  }
+
+  function handleSearchChange(nextValue: string) {
+    setSearchValue(nextValue);
+
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = window.setTimeout(() => {
+      replaceLibraryQuery({ q: nextValue });
+    }, LIBRARY_SEARCH_DEBOUNCE_MS);
+  }
 
   function handleRemovedFromLibrary(
     entryId: string,
@@ -282,30 +319,28 @@ export default function MyPracticesLibrary({
 
   const filteredEntries = useMemo(
     () =>
-      visibleEntries.filter((entry) =>
-        matchesUnifiedLibraryFilter(entry, activeFilter),
-      ),
-    [activeFilter, visibleEntries],
+      applyUnifiedLibraryView(visibleEntries, {
+        filter: activeFilter,
+        query: searchValue,
+        sort: activeSort,
+      }),
+    [activeFilter, activeSort, searchValue, visibleEntries],
   );
 
   const privateCount = visibleEntries.filter(
     (entry) => entry.kind === "private_audio",
   ).length;
   const libraryIsEmpty = visibleEntries.length === 0;
+  const hasSearchQuery = parseLibrarySearchQuery(searchValue).length > 0;
 
   function selectFilter(filter: LibraryFilterId) {
-    const params = new URLSearchParams(searchParams.toString());
+    flushSearch();
+    replaceLibraryQuery({ filter, q: searchValue });
+  }
 
-    if (filter === "all") {
-      params.delete("filter");
-    } else {
-      params.set("filter", filter);
-    }
-
-    const query = params.toString();
-    router.replace(query ? `/my-practices?${query}` : "/my-practices", {
-      scroll: false,
-    });
+  function selectSort(sort: LibrarySortId) {
+    flushSearch();
+    replaceLibraryQuery({ sort, q: searchValue });
   }
 
   const showingUploads = activeFilter === "uploads";
@@ -323,7 +358,23 @@ export default function MyPracticesLibrary({
         </div>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-6 flex items-start gap-2">
+        <div className="min-h-[52px] min-w-0 flex-1">
+          <MyPracticesLibrarySearch
+            id={searchInputId}
+            value={searchValue}
+            onChange={handleSearchChange}
+            onSubmit={() => flushSearch()}
+          />
+        </div>
+        <MyPracticesLibraryFilters
+          filter={activeFilter}
+          onApply={selectFilter}
+          onReset={() => selectFilter("all")}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href="/my-library/private-audio/new"
           className="inline-flex min-h-11 items-center justify-center rounded-[16px] border border-[#d9c7f4] bg-white px-4 text-sm font-semibold text-[#7042c5] hover:bg-[#faf6ff]"
@@ -332,44 +383,13 @@ export default function MyPracticesLibrary({
         </Link>
       </div>
 
-      <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5 pb-2">
-        {FILTERS.map((filter) => {
-          const isActive = activeFilter === filter.id;
-
-          return (
-            <button
-              key={filter.id}
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => selectFilter(filter.id)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
-                isActive
-                  ? "border-[#7042c5] bg-[#7042c5] text-white"
-                  : "border-[#e2d7f2] bg-white text-[#25135c] hover:border-[#c9b5e8]"
-              }`}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
-      </div>
-
       <section className="mt-6">
         <div className="flex items-center justify-between">
           <p className="text-sm text-[#7d70a2]">
-            {showingUploads
-              ? `В загрузках: ${formatUploadsCount(privateCount)}`
-              : `В библиотеке: ${formatPracticesCount(filteredEntries.length)}`}
+            {`В аудиотеке: ${formatLibraryMaterialsCount(filteredEntries.length)}`}
           </p>
 
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="text-sm font-medium text-[#7042c5] opacity-60"
-          >
-            Сначала новые⌄
-          </button>
+          <MyPracticesLibrarySort sort={activeSort} onChange={selectSort} />
         </div>
 
         {showUploadsError ? (
@@ -408,6 +428,13 @@ export default function MyPracticesLibrary({
             >
               Обновить
             </Link>
+          </div>
+        ) : filteredEntries.length === 0 && hasSearchQuery ? (
+          <div className="mt-5 rounded-[24px] border border-[#eadff8] bg-[#faf6ff] px-5 py-6 text-center">
+            <p className="text-[17px] font-semibold">Ничего не найдено</p>
+            <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+              Попробуйте другой запрос или сбросьте поиск.
+            </p>
           </div>
         ) : filteredEntries.length === 0 ? (
           <LibraryFilterEmpty
