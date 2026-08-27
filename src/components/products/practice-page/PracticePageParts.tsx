@@ -393,51 +393,95 @@ export function PracticePrimaryActionSection({
                 endsAt={viewModel.priceOffer.endsAt}
                 expiresAt={viewModel.priceOffer.expiresAt}
                 promotionType={viewModel.priceOffer.promotionType}
-              />
-            ) : (
-              <p className={`${FEATURED_CARD_TITLE_CLASS} mt-0`}>
-                {presentation.statusBadge}
-              </p>
-            )}
-          </div>
-          <div
-            data-practice-hero-actions
-            className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
-          >
-            {buyAction.disabled ? (
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} opacity-80 ${disabledButtonClasses()}`}
+                aboveTimerText={viewModel.priceOffer.aboveTimerText}
+                belowButtonText={viewModel.priceOffer.belowButtonText}
               >
-                {buyAction.label}
-              </button>
+                <div
+                  data-practice-hero-actions
+                  className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+                >
+                  {buyAction.disabled ? (
+                    <button
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                      className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} opacity-80 ${disabledButtonClasses()}`}
+                    >
+                      {buyAction.label}
+                    </button>
+                  ) : (
+                    <BuyPracticeButton
+                      practiceSlug={buyAction.practiceSlug}
+                      practiceId={buyAction.practiceId}
+                      authorId={buyAction.authorId}
+                      productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
+                      currency={buyAction.currency}
+                      purchaseSurface={buyAction.purchaseSurface}
+                      label={buyAction.label}
+                      className={FEATURED_CARD_PRIMARY_CTA_CLASS}
+                      signInReturnPath={practicePagePath}
+                    />
+                  )}
+                  {showPrimaryPlay ? (
+                    <PracticeListenCtaLink
+                      authorSlug={resolvedAuthorSlug}
+                      productSlug={practice.slug}
+                      practiceId={practice.id}
+                      playAriaLabel={playLabel}
+                      className={listenClassName}
+                    >
+                      <PlayIcon />
+                      {playLabel}
+                    </PracticeListenCtaLink>
+                  ) : null}
+                </div>
+              </ProductPriceOffer>
             ) : (
-              <BuyPracticeButton
-                practiceSlug={buyAction.practiceSlug}
-                practiceId={buyAction.practiceId}
-                authorId={buyAction.authorId}
-                productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
-                currency={buyAction.currency}
-                purchaseSurface={buyAction.purchaseSurface}
-                label={buyAction.label}
-                className={FEATURED_CARD_PRIMARY_CTA_CLASS}
-                signInReturnPath={practicePagePath}
-              />
+              <>
+                <p className={`${FEATURED_CARD_TITLE_CLASS} mt-0`}>
+                  {presentation.statusBadge}
+                </p>
+                <div
+                  data-practice-hero-actions
+                  className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+                >
+                  {buyAction.disabled ? (
+                    <button
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                      className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} opacity-80 ${disabledButtonClasses()}`}
+                    >
+                      {buyAction.label}
+                    </button>
+                  ) : (
+                    <BuyPracticeButton
+                      practiceSlug={buyAction.practiceSlug}
+                      practiceId={buyAction.practiceId}
+                      authorId={buyAction.authorId}
+                      productPriceMinorSnapshot={buyAction.productPriceMinorSnapshot}
+                      currency={buyAction.currency}
+                      purchaseSurface={buyAction.purchaseSurface}
+                      label={buyAction.label}
+                      className={FEATURED_CARD_PRIMARY_CTA_CLASS}
+                      signInReturnPath={practicePagePath}
+                    />
+                  )}
+                  {showPrimaryPlay ? (
+                    <PracticeListenCtaLink
+                      authorSlug={resolvedAuthorSlug}
+                      productSlug={practice.slug}
+                      practiceId={practice.id}
+                      playAriaLabel={playLabel}
+                      className={listenClassName}
+                    >
+                      <PlayIcon />
+                      {playLabel}
+                    </PracticeListenCtaLink>
+                  ) : null}
+                </div>
+              </>
             )}
-            {showPrimaryPlay ? (
-              <PracticeListenCtaLink
-                authorSlug={resolvedAuthorSlug}
-                productSlug={practice.slug}
-                practiceId={practice.id}
-                playAriaLabel={playLabel}
-                className={listenClassName}
-              >
-                <PlayIcon />
-                {playLabel}
-              </PracticeListenCtaLink>
-            ) : null}
           </div>
         </div>
       ) : showPrimaryPlay ? (

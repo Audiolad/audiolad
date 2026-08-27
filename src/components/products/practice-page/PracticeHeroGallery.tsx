@@ -17,6 +17,7 @@ import {
 } from "@/lib/catalog/product-hero-gallery";
 import type { CatalogSlide } from "@/lib/catalog/dto";
 
+import PracticeProductShareButton from "./PracticeProductShareButton";
 import type { PracticePageCoverData } from "./types";
 
 type PracticeHeroGalleryProps = {
@@ -27,6 +28,9 @@ type PracticeHeroGalleryProps = {
   heartProduct?: CatalogListingItem | null;
   isAuthenticated?: boolean;
   signInReturnPath?: string;
+  shareTitle?: string;
+  sharePath?: string;
+  shareSubtitle?: string | null;
 };
 
 export default function PracticeHeroGallery({
@@ -37,6 +41,9 @@ export default function PracticeHeroGallery({
   heartProduct = null,
   isAuthenticated = false,
   signInReturnPath = "/catalog",
+  shareTitle = "",
+  sharePath = "",
+  shareSubtitle = null,
 }: PracticeHeroGalleryProps) {
   const pages = buildCoverFirstHeroSlides(
     { displayUrl: cover.displayUrl, alt: cover.alt },
@@ -123,13 +130,30 @@ export default function PracticeHeroGallery({
     syncIndex();
   }, [syncIndex]);
 
-  const heart = heartProduct ? (
-    <CatalogProductHeartButton
-      product={heartProduct}
-      isAuthenticated={isAuthenticated}
-      signInReturnPath={signInReturnPath}
+  const share = sharePath ? (
+    <PracticeProductShareButton
+      title={shareTitle}
+      path={sharePath}
+      subtitle={shareSubtitle}
     />
   ) : null;
+  const coverActions =
+    heartProduct || share ? (
+      <div
+        data-practice-hero-cover-actions
+        className="absolute top-2 right-2 z-10 flex items-center gap-1.5"
+      >
+        {heartProduct ? (
+          <CatalogProductHeartButton
+            product={heartProduct}
+            isAuthenticated={isAuthenticated}
+            signInReturnPath={signInReturnPath}
+            className="relative"
+          />
+        ) : null}
+        {share}
+      </div>
+    ) : null;
 
   if (!showSlider) {
     return (
@@ -152,7 +176,7 @@ export default function PracticeHeroGallery({
             <span className="text-[90px] text-white">{cover.symbol}</span>
           </div>
         )}
-        {heart}
+        {coverActions}
       </div>
     );
   }
@@ -261,7 +285,7 @@ export default function PracticeHeroGallery({
         {activeIndex + 1} / {pages.length}
       </p>
 
-      {heart}
+      {coverActions}
     </div>
   );
 

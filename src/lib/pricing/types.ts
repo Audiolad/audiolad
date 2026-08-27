@@ -23,6 +23,8 @@ export type PricePromotionRecord = {
   startsAt: string | null;
   endsAt: string | null;
   durationSeconds: number | null;
+  aboveTimerText: string | null;
+  belowButtonText: string | null;
   isActive: boolean;
   startToken: string;
   createdAt: string;
@@ -45,6 +47,8 @@ export type ResolvedPromotion = {
   salePrice: number;
   endsAt: string | null;
   expiresAt: string | null;
+  aboveTimerText: string | null;
+  belowButtonText: string | null;
 };
 
 export type ResolvedPracticePrice = {

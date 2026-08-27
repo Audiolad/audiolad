@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  buildPersonalTimerOfferCopy,
+  isPersonalTimerPromotionType,
+} from "@/lib/pricing/personal-timer-copy";
 import { formatRubles } from "@/lib/products/price-format";
 
 type ProductPriceOfferProps = {
@@ -11,20 +15,10 @@ type ProductPriceOfferProps = {
   endsAt: string | null;
   expiresAt: string | null;
   promotionType: "calendar" | "personal_countdown" | null;
+  aboveTimerText?: string | null;
+  belowButtonText?: string | null;
+  children?: ReactNode;
 };
-
-function formatRemaining(totalMs: number): string {
-  const totalSeconds = Math.max(0, Math.floor(totalMs / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
 
 function formatUntilDate(value: string): string {
   const date = new Date(value);
@@ -47,6 +41,9 @@ export default function ProductPriceOffer({
   endsAt,
   expiresAt,
   promotionType,
+  aboveTimerText,
+  belowButtonText,
+  children,
 }: ProductPriceOfferProps) {
   const router = useRouter();
   const deadline = expiresAt ?? endsAt;
@@ -85,13 +82,24 @@ export default function ProductPriceOffer({
 
   if (!offerActive) {
     return (
-      <p data-product-price-offer="regular" className="text-[22px] font-semibold leading-tight text-[#25135c]">
-        {formatRubles(basePrice)}
-      </p>
+      <>
+        <p data-product-price-offer="regular" className="text-[22px] font-semibold leading-tight text-[#25135c]">
+          {formatRubles(basePrice)}
+        </p>
+        {children}
+      </>
     );
   }
 
   const untilLabel = endsAt ? formatUntilDate(endsAt) : "";
+  const personalTimerCopy = isPersonalTimerPromotionType(promotionType)
+    ? buildPersonalTimerOfferCopy({
+        remainingMs,
+        basePrice,
+        aboveTimerText,
+        belowButtonText,
+      })
+    : null;
 
   return (
     <div data-product-price-offer="promo">
@@ -103,27 +111,32 @@ export default function ProductPriceOffer({
           {formatRubles(salePrice)}
         </span>
       </p>
-      {promotionType === "personal_countdown" ? (
+      {personalTimerCopy ? (
         <div data-product-price-offer-countdown>
-          <p className="mt-2 text-sm text-[#7d70a2]">
-            Предложение действует ещё:
+          <p
+            data-product-price-offer-headline
+            className="mt-2 text-sm text-[#7d70a2]"
+          >
+            {personalTimerCopy.above}
           </p>
-          <p className="mt-1 flex items-baseline gap-1.5 text-[#25135c]">
-            <span className="text-sm font-semibold tabular-nums leading-none tracking-wide">
-              {formatRemaining(remainingMs)}
-            </span>
-            <span className="text-sm font-medium leading-none">мин.</span>
-          </p>
-          <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-            Это предложение показывается вам один раз. После окончания таймера
-            продукт останется доступен по полной цене {formatRubles(basePrice)}.
+          {children}
+          <p
+            data-product-price-offer-explanation
+            className="mt-2 text-sm leading-5 text-[#7d70a2]"
+          >
+            {personalTimerCopy.below}
           </p>
         </div>
-      ) : untilLabel ? (
-        <p className="mt-2 text-sm text-[#7d70a2]">
-          Акция до {untilLabel}
-        </p>
-      ) : null}
+      ) : (
+        <>
+          {untilLabel ? (
+            <p className="mt-2 text-sm text-[#7d70a2]">
+              Акция до {untilLabel}
+            </p>
+          ) : null}
+          {children}
+        </>
+      )}
     </div>
   );
 }

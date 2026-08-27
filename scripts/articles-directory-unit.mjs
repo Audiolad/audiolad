@@ -92,6 +92,8 @@ import { BUDUT_LI_DENGI_TARO_PAGE } from "../src/lib/seo/listens/content/budut-l
 import { TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE } from "../src/lib/seo/listens/content/taro-na-dengi-v-blizhayshee-vremya.ts";
 import { TARO_DOHODY_PAGE } from "../src/lib/seo/listens/content/taro-dohody.ts";
 import { TARO_RABOTA_I_FINANSY_PAGE } from "../src/lib/seo/listens/content/taro-rabota-i-finansy.ts";
+import { TARO_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-rabota.ts";
+import { TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-na-rabotu.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2061,6 +2063,54 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${sixtyFifthListenHref}`,
     ),
     "directory JSON-LD includes sixty-fifth listen href",
+  );
+
+  const sixtySixthListenHref = "/listens/taro-rabota";
+  const sixtySixthListenCard = data.articles.find((card) => card.href === sixtySixthListenHref);
+  assert(sixtySixthListenCard, "sixty-sixth indexable listen page is listed");
+  assert(
+    sixtySixthListenCard.title === "Таро работа – что происходит в работе и на что обратить внимание | АудиоЛад",
+    "sixty-sixth listen directory title",
+  );
+  assert(
+    sixtySixthListenCard.description === TARO_RABOTA_PAGE.description,
+    "sixty-sixth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-rabota",
+    ),
+    "no /articles duplicate for sixty-sixth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtySixthListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-sixth listen href",
+  );
+
+  const sixtySeventhListenHref = "/listens/taro-na-rabotu";
+  const sixtySeventhListenCard = data.articles.find((card) => card.href === sixtySeventhListenHref);
+  assert(sixtySeventhListenCard, "sixty-seventh indexable listen page is listed");
+  assert(
+    sixtySeventhListenCard.title === "Таро на работу – рабочая ситуация и вопросы к картам | АудиоЛад",
+    "sixty-seventh listen directory title",
+  );
+  assert(
+    sixtySeventhListenCard.description === TARO_NA_RABOTU_PAGE.description,
+    "sixty-seventh listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-na-rabotu",
+    ),
+    "no /articles duplicate for sixty-seventh listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${sixtySeventhListenHref}`,
+    ),
+    "directory JSON-LD includes sixty-seventh listen href",
   );
 
 const articleCards = listArticleDirectoryCards();

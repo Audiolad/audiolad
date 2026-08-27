@@ -63,6 +63,8 @@ import { BUDUT_LI_DENGI_TARO_PAGE } from "./content/budut-li-dengi-taro";
 import { TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE } from "./content/taro-na-dengi-v-blizhayshee-vremya";
 import { TARO_DOHODY_PAGE } from "./content/taro-dohody";
 import { TARO_RABOTA_I_FINANSY_PAGE } from "./content/taro-rabota-i-finansy";
+import { TARO_RABOTA_PAGE } from "./content/taro-rabota";
+import { TARO_NA_RABOTU_PAGE } from "./content/taro-na-rabotu";
 import type { ListenPageDefinition } from "./types";
 
 /**
@@ -135,6 +137,8 @@ const LISTEN_PAGE_DEFINITIONS: readonly ListenPageDefinition[] = [
   TARO_NA_DENGI_V_BLIZHAYSHEE_VREMYA_PAGE,
   TARO_DOHODY_PAGE,
   TARO_RABOTA_I_FINANSY_PAGE,
+  TARO_RABOTA_PAGE,
+  TARO_NA_RABOTU_PAGE,
 ];
 
 const LISTEN_PAGE_BY_SLUG = new Map<string, ListenPageDefinition>(

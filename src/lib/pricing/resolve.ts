@@ -85,6 +85,8 @@ function toResolvedPromotion(
     salePrice: promotion.salePrice,
     endsAt: promotion.endsAt,
     expiresAt,
+    aboveTimerText: promotion.aboveTimerText ?? null,
+    belowButtonText: promotion.belowButtonText ?? null,
   };
 }
 

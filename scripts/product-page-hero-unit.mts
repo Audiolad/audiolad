@@ -13,6 +13,12 @@ import {
   resolvePracticeHeroSubtitle,
   shouldRenderProductHeroSlider,
 } from "../src/lib/catalog/product-hero-gallery";
+import {
+  DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+  buildPersonalTimerOfferCopy,
+  formatPersonalTimerRemaining,
+} from "../src/lib/pricing/personal-timer-copy";
+import { formatRubles } from "../src/lib/products/price-format";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -65,6 +71,11 @@ function testSliderOnlyWhenGalleryExists() {
   assert.match(productHero, /data-practice-hero-has-gallery/);
   assert.match(productHero, /PracticeHeroGallery/);
   assert.match(productHero, /FeaturedProductCard/);
+  assert.match(productHero, /shareTitle=\{viewModel\.practice\.title\}/);
+  assert.match(productHero, /sharePath=\{viewModel\.practicePagePath\}/);
+  assert.match(hero, /PracticeProductShareButton/);
+  assert.match(hero, /data-practice-hero-cover-actions/);
+  assert.match(hero, /className="absolute top-2 right-2 z-10 flex items-center gap-1\.5"/);
 }
 
 function testPromoBlockOnlyWhenOfferActive() {
@@ -96,14 +107,23 @@ function testPromoBlockOnlyWhenOfferActive() {
   const hero = read(
     "src/components/products/practice-page/PracticeProductHero.tsx",
   );
+  const minutesCopy = buildPersonalTimerOfferCopy({
+    remainingMs: (19 * 60 + 40) * 1000,
+    basePrice: 2888,
+  });
+  assert.equal(formatPersonalTimerRemaining((19 * 60 + 40) * 1000), "19:40 мин.");
+  assert.equal(
+    minutesCopy.above,
+    `Предложение действует ещё: ${formatPersonalTimerRemaining((19 * 60 + 40) * 1000)}`,
+  );
+  assert.equal(minutesCopy.below.includes(formatRubles(2888)), true);
+  assert.match(DEFAULT_PERSONAL_TIMER_ABOVE_TEXT, /\{time_left\}/);
   assert.match(offer, /data-product-price-offer="promo"/);
   assert.match(offer, /data-product-price-offer="regular"/);
-  assert.match(offer, /Предложение действует ещё:/);
-  assert.match(offer, /мин\./);
-  assert.match(
-    offer,
-    /Это предложение показывается вам один раз\. После окончания таймера/,
-  );
+  assert.match(offer, /buildPersonalTimerOfferCopy/);
+  assert.match(offer, /data-product-price-offer-headline/);
+  assert.match(offer, /data-product-price-offer-explanation/);
+  assert.doesNotMatch(offer, /4 999|4999/);
   assert.match(hero, /isHeroPromoOfferActive/);
   assert.match(hero, /data-practice-hero-has-promo/);
 }

@@ -42,6 +42,18 @@ function testPublicPageSections() {
   assert(page.includes("AuthorProductsSection"), "products section wired");
   assert(page.includes("AuthorAboutSection"), "about section wired");
   assert(page.includes("AuthorContactsSection"), "contacts section wired");
+  const contacts = read("src/lib/authors/contacts.ts");
+  const constants = read("src/lib/authors/constants.ts");
+  assert(contacts.includes("resolveAuthorContactIconUrl"), "public contacts resolve icons");
+  assert(
+    constants.includes('/school/messengers/max.png'),
+    "public max default is existing school png",
+  );
+  assert(
+    constants.includes('/school/messengers/telegram.png'),
+    "public telegram default is existing school png",
+  );
+  assert(!constants.includes("max-source.png"), "public profile does not use max-source.png");
   assert(page.includes("SimilarAuthorsSection"), "similar authors wired");
   assert(page.includes("openGraph"), "SEO open graph metadata");
   assert(page.includes("canonical"), "canonical metadata");

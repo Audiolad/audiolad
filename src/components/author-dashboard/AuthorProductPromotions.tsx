@@ -7,6 +7,13 @@ import {
   durationToSeconds,
   type PromotionDurationUnit,
 } from "@/lib/pricing/author-promotions";
+import {
+  DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+  DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+  PERSONAL_TIMER_COPY_MAX_LENGTH,
+  PERSONAL_TIMER_FULL_PRICE_TOKEN,
+  PERSONAL_TIMER_TIME_LEFT_TOKEN,
+} from "@/lib/pricing/personal-timer-copy";
 import { PRICE_PROMOTION_TYPES } from "@/lib/pricing/types";
 
 type PromotionRow = {
@@ -86,6 +93,12 @@ export default function AuthorProductPromotions({
   const [durationAmount, setDurationAmount] = useState("20");
   const [durationUnit, setDurationUnit] =
     useState<PromotionDurationUnit>("minutes");
+  const [aboveTimerText, setAboveTimerText] = useState(
+    DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+  );
+  const [belowButtonText, setBelowButtonText] = useState(
+    DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+  );
 
   const applyPromotionsPayload = useCallback(
     (payload: { promotions?: PromotionRow[]; error?: string }, ok: boolean) => {
@@ -184,6 +197,8 @@ export default function AuthorProductPromotions({
         Number(durationAmount),
         durationUnit,
       );
+      body.above_timer_text = aboveTimerText;
+      body.below_button_text = belowButtonText;
     }
 
     try {
@@ -295,13 +310,23 @@ export default function AuthorProductPromotions({
             <select
               value={promotionType}
               disabled={disabled}
-              onChange={(event) =>
-                setPromotionType(
+              onChange={(event) => {
+                const nextType =
                   event.target.value === "calendar"
                     ? "calendar"
-                    : "personal_countdown",
-                )
-              }
+                    : "personal_countdown";
+                setPromotionType(nextType);
+                if (nextType === "personal_countdown") {
+                  setAboveTimerText((current) =>
+                    current.trim() ? current : DEFAULT_PERSONAL_TIMER_ABOVE_TEXT,
+                  );
+                  setBelowButtonText((current) =>
+                    current.trim()
+                      ? current
+                      : DEFAULT_PERSONAL_TIMER_BELOW_TEXT,
+                  );
+                }
+              }}
               className="w-full rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 outline-none focus:border-[#9a74d8]"
             >
               <option value="personal_countdown">Персональный таймер</option>
@@ -364,6 +389,40 @@ export default function AuthorProductPromotions({
             </label>
           </div>
         )}
+
+        {promotionType === "personal_countdown" ? (
+          <div className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-[#7d70a2]">Текст над таймером</span>
+              <textarea
+                data-author-promo-above-timer
+                value={aboveTimerText}
+                disabled={disabled}
+                maxLength={PERSONAL_TIMER_COPY_MAX_LENGTH}
+                rows={2}
+                onChange={(event) => setAboveTimerText(event.target.value)}
+                className="w-full resize-y rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-[#7d70a2]">Текст под кнопкой</span>
+              <textarea
+                data-author-promo-below-button
+                value={belowButtonText}
+                disabled={disabled}
+                maxLength={PERSONAL_TIMER_COPY_MAX_LENGTH}
+                rows={3}
+                onChange={(event) => setBelowButtonText(event.target.value)}
+                className="w-full resize-y rounded-[14px] border border-[#e4d7f4] bg-white px-3 py-2 text-sm outline-none focus:border-[#9a74d8]"
+              />
+            </label>
+            <p className="text-xs leading-5 text-[#7d70a2]">
+              {PERSONAL_TIMER_TIME_LEFT_TOKEN} — оставшееся время
+              <br />
+              {PERSONAL_TIMER_FULL_PRICE_TOKEN} — обычная цена продукта
+            </p>
+          </div>
+        ) : null}
 
         <button
           type="button"

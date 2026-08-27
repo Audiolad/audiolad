@@ -612,7 +612,7 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 
 ## Прайс и акции (base price + promotions, 2026-08-23)
 
-Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`, `20260823183000_price_promotion_oneshot_bind.sql`, `20260823190000_start_practice_price_promotion_qualify_identifiers.sql`.
+Миграции: `20260823180000_practice_price_promotions.sql`, `20260823181000_create_practice_order_price_promotions.sql`, `20260823183000_price_promotion_oneshot_bind.sql`, `20260823190000_start_practice_price_promotion_qualify_identifiers.sql`, `20260830120000_personal_timer_promotion_copy.sql`.
 
 Деньги:
 
@@ -633,6 +633,8 @@ RLS включён, политик нет. `REVOKE ALL` у `PUBLIC` / `anon` / `
 | `sale_price` | integer | 49–100000, должна быть строго ниже `practices.price` на resolve |
 | `starts_at` / `ends_at` | timestamptz | обязательны для `calendar`, `ends_at > starts_at` |
 | `duration_seconds` | integer | обязателен для `personal_countdown`, 60–2 592 000 |
+| `above_timer_text` | text NULL | опциональный текст над таймером; 1–280 после trim; `NULL` → дефолт с `{time_left}` |
+| `below_button_text` | text NULL | опциональный текст под CTA; 1–280 после trim; `NULL` → дефолт с `{full_price}` |
 | `is_active` | boolean | default true |
 | `start_token` | text UNIQUE | универсальный триггер персонального таймера |
 | `created_at` / `updated_at` | timestamptz | |

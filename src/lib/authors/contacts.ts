@@ -148,6 +148,38 @@ export function draftsToContactPayload(contacts: AuthorContactDraft[]) {
   }));
 }
 
+function contactDraftIdentity(contact: AuthorContactDraft) {
+  return {
+    id: contact.id,
+    platform: contact.platform,
+    title: contact.title,
+    description: contact.description,
+    url: contact.url,
+    iconUrl: contact.iconUrl,
+    iconPath: contact.iconPath,
+    isVisible: contact.isVisible,
+  };
+}
+
+export function areAuthorContactDraftsEqual(
+  left: AuthorContactDraft[],
+  right: AuthorContactDraft[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((contact, index) => {
+    const other = right[index];
+    const leftIdentity = contactDraftIdentity(contact);
+    const rightIdentity = contactDraftIdentity(other);
+
+    return (Object.keys(leftIdentity) as Array<keyof typeof leftIdentity>).every(
+      (key) => leftIdentity[key] === rightIdentity[key],
+    );
+  });
+}
+
 export function resolveAuthorContactIconUrl(
   platform: AuthorContactPlatform,
   iconUrl?: string | null,

@@ -56,6 +56,8 @@ function promotion(overrides) {
     startsAt: null,
     endsAt: null,
     durationSeconds: 20 * 60,
+    aboveTimerText: null,
+    belowButtonText: null,
     isActive: true,
     startToken: "token-1",
     createdAt: "2026-08-23T00:00:00.000Z",
@@ -537,6 +539,8 @@ function testAuthorPromotionValidation() {
   assert(ok.ok, "valid personal");
   if (ok.ok) {
     assertEqual(ok.durationSeconds, 1200, "20 minutes");
+    assertEqual(ok.aboveTimerText, null, "missing copy stays null");
+    assertEqual(ok.belowButtonText, null, "missing copy stays null");
   }
 
   const badPrice = parsePromotionWriteBody(
@@ -621,6 +625,13 @@ function testMigrationContract() {
   assert(qualify.includes("CREATE OR REPLACE FUNCTION public.start_practice_price_promotion"), "qualify hotfix");
   assert(qualify.includes("starts.promotion_id"), "qualified promotion_id");
   assert(!qualify.includes("RETURNING *"), "no RETURNING * in hotfix");
+
+  const copyMigration = readFileSync(
+    join(ROOT, "supabase/migrations/20260830120000_personal_timer_promotion_copy.sql"),
+    "utf8",
+  );
+  assert(copyMigration.includes("above_timer_text"), "copy column");
+  assert(copyMigration.includes("below_button_text"), "below copy column");
 }
 
 function testSourceContracts() {
@@ -644,6 +655,24 @@ function testSourceContracts() {
   );
   assert(form.includes("AuthorProductPromotions"), "promotions UI");
   assert(form.includes("type=\"number\""), "manual price input");
+
+  const promoForm = readFileSync(
+    join(ROOT, "src/components/author-dashboard/AuthorProductPromotions.tsx"),
+    "utf8",
+  );
+  assert(promoForm.includes("Текст над таймером"), "above-timer label");
+  assert(promoForm.includes("Текст под кнопкой"), "below-button label");
+  assert(promoForm.includes("DEFAULT_PERSONAL_TIMER_ABOVE_TEXT"), "default above");
+  assert(promoForm.includes("DEFAULT_PERSONAL_TIMER_BELOW_TEXT"), "default below");
+  assert(promoForm.includes("above_timer_text"), "saves above copy");
+  assert(promoForm.includes("below_button_text"), "saves below copy");
+
+  const offer = readFileSync(
+    join(ROOT, "src/components/pricing/ProductPriceOffer.tsx"),
+    "utf8",
+  );
+  assert(offer.includes("buildPersonalTimerOfferCopy"), "PDP substitutes copy");
+  assert(!offer.includes("4 999"), "no hardcoded ruble amount");
 
   const startRoute = readFileSync(
     join(ROOT, "src/app/api/price-promotions/start/route.ts"),
