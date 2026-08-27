@@ -28,6 +28,10 @@ const practiceMobilePage = readFileSync(
   "src/components/products/practice-page/PracticePageMobile.tsx",
   "utf8",
 );
+const practiceHero = readFileSync(
+  "src/components/products/practice-page/PracticeProductHero.tsx",
+  "utf8",
+);
 const practiceParts = readFileSync(
   "src/components/products/practice-page/PracticePageParts.tsx",
   "utf8",
@@ -89,8 +93,7 @@ assert(
   "public product page loads topics on server",
 );
 assert(
-  practiceMobilePage.includes("ProductTopicLinks") ||
-    practiceMobilePage.includes("PracticeMetaSection"),
+  practiceMobilePage.includes("ProductTopicLinks"),
   "public product page renders ProductTopicLinks",
 );
 assert(
@@ -98,16 +101,12 @@ assert(
   "desktop page renders ProductTopicLinks below hero",
 );
 assert(
-  practiceDesktopPage.includes("showTopics={false}"),
-  "desktop meta hides topics to avoid duplicate",
+  practiceHero.includes("showTopics={false}"),
+  "hero meta hides topics to avoid duplicate",
 );
 assert(
-  practiceDesktopPage.includes('authorMetaLayout="inline"'),
-  "desktop uses inline author/meta row",
-);
-assert(
-  practiceDesktopPage.includes("h-0 min-h-full"),
-  "desktop pins info column height to cover",
+  practiceHero.includes('authorMetaLayout="inline"'),
+  "hero uses inline author/meta row",
 );
 assert(
   practiceParts.includes("showTopics = true"),
@@ -118,8 +117,8 @@ assert(
   "PracticeMetaSection authorMetaLayout defaults to stacked",
 );
 assert(
-  !practiceMobilePage.includes("showTopics={false}"),
-  "mobile keeps topics in meta flow",
+  practiceMobilePage.includes("<ProductTopicLinks"),
+  "mobile keeps topics below the hero",
 );
 assert(component.includes("flex-wrap"), "topic chips wrap horizontally");
 assert(

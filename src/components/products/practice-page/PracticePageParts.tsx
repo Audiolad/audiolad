@@ -195,8 +195,8 @@ function PaymentLegalNote() {
   );
 }
 
-const compactBuyClassName =
-  "inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-[16px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-2.5 text-sm font-semibold text-white";
+const heroBuyClassName =
+  "inline-flex min-h-12 w-full items-center justify-center whitespace-nowrap rounded-[18px] bg-gradient-to-r from-[#7042c5] to-[#9974d8] px-5 py-3 text-[16px] font-semibold text-white";
 
 export function toPracticeHeartProduct(
   viewModel: PracticePageViewModel,
@@ -384,7 +384,10 @@ export function PracticePrimaryActionSection({
   return (
     <section className={className}>
       {buyAction ? (
-        <div className="flex items-center justify-between gap-3 rounded-[20px] bg-[#f4ecfb] px-4 py-3">
+        <div
+          data-practice-hero-sell
+          className="flex flex-col gap-3 rounded-[20px] bg-[#f4ecfb] px-4 py-4"
+        >
           <div className="min-w-0">
             {viewModel.priceOffer ? (
               <ProductPriceOffer
@@ -405,7 +408,7 @@ export function PracticePrimaryActionSection({
               type="button"
               disabled
               aria-disabled="true"
-              className={`${compactBuyClassName} opacity-80 ${disabledButtonClasses()}`}
+              className={`${heroBuyClassName} opacity-80 ${disabledButtonClasses()}`}
             >
               {buyAction.label}
             </button>
@@ -418,7 +421,7 @@ export function PracticePrimaryActionSection({
               currency={buyAction.currency}
               purchaseSurface={buyAction.purchaseSurface}
               label={buyAction.label}
-              className={compactBuyClassName}
+              className={heroBuyClassName}
               signInReturnPath={practicePagePath}
             />
           )}

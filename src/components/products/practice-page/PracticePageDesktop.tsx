@@ -7,11 +7,8 @@ import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import {
   PracticeAccessBanners,
   PracticeBackLink,
-  PracticeMetaSection,
-  PracticePrimaryActionSection,
-  PracticeProductCover,
-  toPracticeHeartProduct,
 } from "./PracticePageParts";
+import PracticeProductHero from "./PracticeProductHero";
 import type { PracticePageViewModel } from "./types";
 
 type PracticePageDesktopProps = {
@@ -40,33 +37,8 @@ export default function PracticePageDesktop({ viewModel }: PracticePageDesktopPr
           publishPreview={viewModel.publishPreview}
         />
 
-        <section className="mt-6 grid min-w-0 grid-cols-[minmax(240px,280px)_minmax(0,1fr)] gap-x-6 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-x-8 2xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-          <div className="w-full max-w-[280px] xl:max-w-[300px] 2xl:max-w-[360px]">
-            <PracticeProductCover
-              cover={viewModel.desktopCover}
-              priority
-              heartProduct={toPracticeHeartProduct(viewModel)}
-              isAuthenticated={viewModel.isAuthenticated}
-              signInReturnPath={viewModel.practicePagePath}
-            />
-          </div>
-
-          <div className="flex min-w-0 max-w-full flex-col">
-            <div className="min-w-0">
-              <PracticeMetaSection
-                viewModel={viewModel}
-                subtitleClamp
-                titleClassName="mt-2 text-[34px] font-semibold leading-[1.12] xl:text-[36px]"
-                showTopics={false}
-                authorMetaLayout="inline"
-              />
-            </div>
-
-            <PracticePrimaryActionSection
-              viewModel={viewModel}
-              className="mt-4 shrink-0"
-            />
-          </div>
+        <section className="mt-6 min-w-0">
+          <PracticeProductHero viewModel={viewModel} layout="desktop" />
         </section>
 
         <ProductTopicLinks topics={practiceTopics} className="mt-4" />

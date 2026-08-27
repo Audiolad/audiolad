@@ -15,6 +15,9 @@ const mobile = read(
 const desktop = read(
   "src/components/products/practice-page/PracticePageDesktop.tsx",
 );
+const hero = read(
+  "src/components/products/practice-page/PracticeProductHero.tsx",
+);
 const parts = read(
   "src/components/products/practice-page/PracticePageParts.tsx",
 );
@@ -49,8 +52,9 @@ function testPracticeHasNoClaimCta() {
 
 function testHeartRemains() {
   assert.match(parts, /CatalogProductHeartButton/);
-  assert.match(mobile, /toPracticeHeartProduct\(viewModel\)/);
-  assert.match(desktop, /toPracticeHeartProduct\(viewModel\)/);
+  assert.match(hero, /toPracticeHeartProduct\(viewModel\)/);
+  assert.match(mobile, /PracticeProductHero/);
+  assert.match(desktop, /PracticeProductHero/);
   assert.match(page, /listSavedPracticeIds/);
   assert.match(page, /isSaved/);
 }
@@ -58,8 +62,9 @@ function testHeartRemains() {
 function testBuyRemains() {
   assert.match(parts, /BuyPracticeButton/);
   assert.match(parts, /PracticePrimaryActionSection/);
-  assert.match(mobile, /PracticePrimaryActionSection/);
-  assert.match(desktop, /PracticePrimaryActionSection/);
+  assert.match(hero, /PracticePrimaryActionSection/);
+  assert.match(mobile, /PracticeProductHero/);
+  assert.match(desktop, /PracticeProductHero/);
 }
 
 function testPdpDoesNotCallLibraryClaim() {
