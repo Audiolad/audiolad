@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import LibraryCatalogTile from "@/components/my-practices/LibraryCatalogTile";
 import LibraryOwnedCard from "@/components/my-practices/LibraryOwnedCard";
-import MyPracticesLibraryFilters from "@/components/my-practices/MyPracticesLibraryFilters";
-import MyPracticesLibrarySearch from "@/components/my-practices/MyPracticesLibrarySearch";
 import MyPracticesLibrarySort from "@/components/my-practices/MyPracticesLibrarySort";
 import PlaylistCard from "@/components/playlists/catalog/PlaylistCard";
 import {
@@ -20,7 +18,6 @@ import {
   applyUnifiedLibraryView,
   buildMyPracticesHref,
   formatLibraryMaterialsCount,
-  LIBRARY_SEARCH_DEBOUNCE_MS,
   parseLibraryFilter,
   parseLibrarySearchQuery,
   parseLibrarySort,
@@ -154,14 +151,10 @@ export default function MyPracticesLibrary({
 }: MyPracticesLibraryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchInputId = useId();
   const activeFilter = parseLibraryFilter(searchParams.get("filter"));
   const activeSort = parseLibrarySort(searchParams.get("sort"));
   const queryFromUrl = parseLibrarySearchQuery(searchParams.get("q"));
   const purchasedFromUrl = searchParams.get("purchased");
-  const [searchValue, setSearchValue] = useState(queryFromUrl);
-  const debounceRef = useRef<number | null>(null);
-  const skipSearchSyncRef = useRef(false);
 
   const [visibleEntries, setVisibleEntries] = useState(entries);
   const [entriesSource, setEntriesSource] = useState(entries);
@@ -186,23 +179,6 @@ export default function MyPracticesLibrary({
   }
 
   useEffect(() => {
-    if (skipSearchSyncRef.current) {
-      skipSearchSyncRef.current = false;
-      return;
-    }
-
-    setSearchValue(queryFromUrl);
-  }, [queryFromUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current !== null) {
-        window.clearTimeout(debounceRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -217,12 +193,11 @@ export default function MyPracticesLibrary({
   }, [toast]);
 
   function replaceLibraryQuery(next: {
-    q?: string;
     filter?: LibraryFilterId;
     sort?: LibrarySortId;
   }) {
     const href = buildMyPracticesHref({
-      q: next.q ?? searchValue,
+      q: queryFromUrl,
       filter: next.filter ?? activeFilter,
       sort: next.sort ?? activeSort,
       purchased: purchasedFromUrl,
@@ -238,32 +213,7 @@ export default function MyPracticesLibrary({
       return;
     }
 
-    if (next.q !== undefined) {
-      skipSearchSyncRef.current = true;
-    }
-
     router.replace(href, { scroll: false });
-  }
-
-  function flushSearch(nextQuery = searchValue) {
-    if (debounceRef.current !== null) {
-      window.clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-
-    replaceLibraryQuery({ q: nextQuery });
-  }
-
-  function handleSearchChange(nextValue: string) {
-    setSearchValue(nextValue);
-
-    if (debounceRef.current !== null) {
-      window.clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = window.setTimeout(() => {
-      replaceLibraryQuery({ q: nextValue });
-    }, LIBRARY_SEARCH_DEBOUNCE_MS);
   }
 
   function handleRemovedFromLibrary(
@@ -321,26 +271,24 @@ export default function MyPracticesLibrary({
     () =>
       applyUnifiedLibraryView(visibleEntries, {
         filter: activeFilter,
-        query: searchValue,
+        query: queryFromUrl,
         sort: activeSort,
       }),
-    [activeFilter, activeSort, searchValue, visibleEntries],
+    [activeFilter, activeSort, queryFromUrl, visibleEntries],
   );
 
   const privateCount = visibleEntries.filter(
     (entry) => entry.kind === "private_audio",
   ).length;
   const libraryIsEmpty = visibleEntries.length === 0;
-  const hasSearchQuery = parseLibrarySearchQuery(searchValue).length > 0;
+  const hasSearchQuery = queryFromUrl.length > 0;
 
   function selectFilter(filter: LibraryFilterId) {
-    flushSearch();
-    replaceLibraryQuery({ filter, q: searchValue });
+    replaceLibraryQuery({ filter });
   }
 
   function selectSort(sort: LibrarySortId) {
-    flushSearch();
-    replaceLibraryQuery({ sort, q: searchValue });
+    replaceLibraryQuery({ sort });
   }
 
   const showingUploads = activeFilter === "uploads";
@@ -357,22 +305,6 @@ export default function MyPracticesLibrary({
           Практика добавлена в Аудиотеку
         </div>
       ) : null}
-
-      <div className="mt-6 flex items-start gap-2">
-        <div className="min-h-[52px] min-w-0 flex-1">
-          <MyPracticesLibrarySearch
-            id={searchInputId}
-            value={searchValue}
-            onChange={handleSearchChange}
-            onSubmit={() => flushSearch()}
-          />
-        </div>
-        <MyPracticesLibraryFilters
-          filter={activeFilter}
-          onApply={selectFilter}
-          onReset={() => selectFilter("all")}
-        />
-      </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
