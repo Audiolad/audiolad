@@ -116,6 +116,20 @@ assert(
   "standalone PWA must disable vertical overscroll on html/body",
 );
 assert(
+  !/@media \(max-width: 1279px\)\s*\{\s*html,\s*body\s*\{\s*overscroll-behavior-y:\s*none/.test(
+    globals,
+  ),
+  "must not disable overscroll on every mobile browser page",
+);
+assert(
+  /\.bottom-nav\s*\{[\s\S]*?top:\s*auto;[\s\S]*?bottom:\s*0;/.test(globals),
+  "bottom-nav must stay pinned to the screen bottom (top:auto; bottom:0)",
+);
+assert(
+  /\.bottom-nav\s*\{[\s\S]*?overscroll-behavior:\s*none/.test(globals),
+  "bottom-nav itself must not participate in overscroll",
+);
+assert(
   miniPlayer.includes("BOTTOM_NAV_MAIN_HEIGHT_PX") &&
     miniPlayer.includes("env(safe-area-inset-bottom") &&
     miniPlayer.includes("var(--bottom-nav-viewport-offset, 0px)"),

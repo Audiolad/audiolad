@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { MEDITATION_SOLUTIONS_CARDS } from "../src/lib/landings/25-meditation-solutions/content";
 import {
+  PRACTICE_HERO_DOT_WINDOW,
   buildCoverFirstHeroSlides,
   buildPracticeHeroLightMeta,
+  buildWindowedHeroDots,
   formatHeroMaterialsMeta,
   isHeroPromoOfferActive,
   resolvePracticeHeroSubtitle,
@@ -153,7 +155,7 @@ function testMeditationSolutionsGalleryOrder() {
   );
 
   assert.deepEqual(urls, expectedGalleryUrls());
-  assert.equal(urls.length, 26);
+  assert.equal(urls.length, expectedGalleryUrls().length);
   assert.equal(
     urls.includes("/products/25-meditation-solutions/hero.jpg"),
     false,
@@ -182,11 +184,19 @@ function testMeditationSolutionsGalleryOrder() {
     })),
   );
 
-  assert.equal(pages.length, 27, "cover + 26 material slides");
+  const leftoverSeedPages = expectedGalleryUrls().length + 1;
+  assert.equal(
+    pages.length,
+    leftoverSeedPages,
+    "cover + whatever the leftover seed actually lists",
+  );
   assert.equal(pages[0]?.src, "/products/25-meditation-solutions/hero.jpg");
   assert.equal(pages[1]?.src, "/products/25-meditation-solutions/item-01.jpg");
-  assert.equal(pages[25]?.src, "/products/25-meditation-solutions/item-25.jpg");
-  assert.equal(pages[26]?.src, "/products/25-meditation-solutions/bonus-26.jpg");
+  assert.equal(pages[leftoverSeedPages - 2]?.src, "/products/25-meditation-solutions/item-25.jpg");
+  assert.equal(
+    pages[leftoverSeedPages - 1]?.src,
+    expectedGalleryUrls().at(-1),
+  );
   assert.equal(
     formatHeroMaterialsMeta(
       MEDITATION_SOLUTIONS_CARDS.map((card) => ({
@@ -232,6 +242,8 @@ function testReusablePdpWiring() {
   assert.match(desktop, /PracticeProductHero/);
   assert.match(hero, /FEATURED_CARD_CHIP_CLASS/);
   assert.match(hero, /FeaturedProductCard/);
+  assert.match(hero, /practice-product-hero/);
+  assert.match(hero, /data-practice-product-hero=\{layout\}/);
   assert.doesNotMatch(hero, /PRODUCT_FORMAT_LINE_CLASS/);
   assert.doesNotMatch(hero, /grid-cols-\[minmax/);
   assert.match(landing, /MeditationSolutionsLandingView/);
@@ -273,11 +285,154 @@ function testStandardPdpNotBroken() {
   assert.match(desktop, /description \?/);
 }
 
+function testDesktopHeroHeightFollowsSquareCover() {
+  const css = read("src/app/globals.css");
+  const hero = read(
+    "src/components/products/practice-page/PracticeProductHero.tsx",
+  );
+  const parts = read(
+    "src/components/products/practice-page/PracticePageParts.tsx",
+  );
+
+  const desktopBlock = css.slice(
+    css.indexOf('[data-practice-product-hero="desktop"]'),
+  );
+
+  assert.match(
+    hero,
+    /className="practice-product-hero"/,
+    "PDP hero is marked for scoped geometry",
+  );
+  assert.match(
+    desktopBlock,
+    /\[data-practice-product-hero="desktop"\] \.featured-card__cover\s*\{[^}]*aspect-ratio:\s*1 \/ 1/,
+    "desktop cover stays 1:1",
+  );
+  assert.match(
+    desktopBlock,
+    /\[data-practice-product-hero="desktop"\] \.featured-card__content\s*\{[^}]*position:\s*absolute/,
+    "info column is fitted inside the square height",
+  );
+  assert.match(
+    desktopBlock,
+    /inset:\s*0 0 0 min\(56%, 360px\)/,
+    "info column starts at the square cover edge",
+  );
+  assert.doesNotMatch(
+    desktopBlock.slice(
+      0,
+      desktopBlock.indexOf("[data-practice-product-hero=\"mobile\"]") === -1
+        ? desktopBlock.length
+        : desktopBlock.indexOf("[data-practice-product-hero=\"mobile\"]"),
+    ),
+    /object-fit:\s*cover/,
+    "do not stretch the cover to fill leftover white",
+  );
+  assert.match(
+    desktopBlock,
+    /\.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*nowrap/,
+    "desktop Buy + Listen stay on one row",
+  );
+  assert.match(
+    css,
+    /\[data-practice-product-hero="mobile"\] \.practice-product-hero__actions\s*\{[^}]*flex-wrap:\s*wrap/,
+    "mobile buttons may wrap when the row is tight",
+  );
+  assert.match(
+    desktopBlock,
+    /\.practice-product-hero__legal\s*\{[^}]*font-size:\s*10px/,
+    "legal copy is visually secondary on desktop",
+  );
+  assert.match(
+    desktopBlock,
+    /\[data-practice-hero-has-promo="true"\][\s\S]*gap:\s*0\.25rem/,
+    "promo state uses denser gaps instead of a hardcoded no-promo height",
+  );
+  assert.match(parts, /data-practice-hero-actions/);
+  assert.match(parts, /data-practice-hero-legal/);
+  assert.match(parts, /FEATURED_CARD_ACTIONS_CLASS/);
+  assert.match(parts, /FEATURED_CARD_PRIMARY_CTA_CLASS/);
+  assert.match(parts, /FEATURED_CARD_SECONDARY_CTA_CLASS/);
+  assert.doesNotMatch(
+    parts,
+    /heroBuyClassName|w-full rounded-\[22px\] bg-\[#7c3fe4\]/,
+    "no invented button design",
+  );
+}
+
+function testMobileWindowedDotsKeepDesktopArrows() {
+  const many = 40;
+  const dots = buildWindowedHeroDots(0, many);
+  assert.equal(PRACTICE_HERO_DOT_WINDOW, 5);
+  assert.equal(dots.length, PRACTICE_HERO_DOT_WINDOW);
+  assert.ok(dots.length < many, "large N must not render one micro-dot per slide");
+  assert.equal(dots[0]?.index, 0);
+  assert.equal(dots[0]?.active, true);
+  assert.equal(dots[dots.length - 1]?.edge, true, "trailing edge hints more slides");
+
+  const midIndex = Math.floor((many - 1) / 2);
+  const mid = buildWindowedHeroDots(midIndex, many);
+  const half = Math.floor(PRACTICE_HERO_DOT_WINDOW / 2);
+  assert.equal(mid.length, PRACTICE_HERO_DOT_WINDOW);
+  assert.ok(mid.length < many);
+  assert.deepEqual(
+    mid.map((dot) => dot.index),
+    Array.from(
+      { length: PRACTICE_HERO_DOT_WINDOW },
+      (_, offset) => midIndex - half + offset,
+    ),
+  );
+  assert.equal(mid[half]?.active, true);
+  assert.equal(mid[0]?.edge, true);
+  assert.equal(mid[mid.length - 1]?.edge, true);
+
+  const last = buildWindowedHeroDots(many - 1, many);
+  assert.equal(last[last.length - 1]?.index, many - 1);
+  assert.equal(last[last.length - 1]?.active, true);
+  assert.equal(last[0]?.edge, true);
+
+  const few = buildWindowedHeroDots(1, 3);
+  assert.equal(few.length, 3);
+  assert.equal(
+    few.filter((dot) => dot.edge).length,
+    0,
+    "short galleries need no edge shrink",
+  );
+
+  const hero = read("src/components/products/practice-page/PracticeHeroGallery.tsx");
+  const productHero = read(
+    "src/components/products/practice-page/PracticeProductHero.tsx",
+  );
+  const css = read("src/app/globals.css");
+
+  assert.match(productHero, /showMobileDots=\{layout === "mobile"\}/);
+  assert.match(hero, /buildWindowedHeroDots/);
+  assert.match(hero, /data-practice-hero-dots/);
+  assert.match(hero, /data-practice-hero-gallery-counter/);
+  assert.match(hero, /data-practice-hero-gallery-prev/);
+  assert.match(hero, /hidden h-8 w-8[\s\S]*sm:inline-flex/);
+  assert.match(hero, /practice-hero-media/);
+  assert.match(hero, /buildWindowedHeroDots\(activeIndex, pages\.length\)/);
+
+  assert.match(
+    css,
+    /@media \(min-width: 640px\)[\s\S]*\.practice-hero-media\s*\{[^}]*display:\s*contents/,
+    "tablet/desktop unwrap the mobile media wrapper",
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 640px\)[\s\S]*\.practice-hero-dots\s*\{[^}]*display:\s*none/,
+    "dots stay off desktop so hover arrows remain the nav",
+  );
+}
+
 testSliderOnlyWhenGalleryExists();
 testPromoBlockOnlyWhenOfferActive();
 testNoGalleryNoPromoFallback();
 testMeditationSolutionsGalleryOrder();
 testReusablePdpWiring();
 testStandardPdpNotBroken();
+testDesktopHeroHeightFollowsSquareCover();
+testMobileWindowedDotsKeepDesktopArrows();
 
 console.log("product-page-hero-unit: ok");

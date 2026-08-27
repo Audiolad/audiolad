@@ -180,7 +180,10 @@ function PaymentLegalNote() {
     "text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
   return (
-    <p className="mt-2 text-xs leading-5 text-[#7d70a2]">
+    <p
+      data-practice-hero-legal
+      className="practice-product-hero__legal mt-2 text-xs leading-5 text-[#7d70a2]"
+    >
       Нажимая кнопку оплаты, вы соглашаетесь с условиями{" "}
       <Link href="/offer" className={linkClassName}>
         публичной оферты
@@ -397,7 +400,10 @@ export function PracticePrimaryActionSection({
               </p>
             )}
           </div>
-          <div className={FEATURED_CARD_ACTIONS_CLASS}>
+          <div
+            data-practice-hero-actions
+            className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+          >
             {buyAction.disabled ? (
               <button
                 type="button"
@@ -435,7 +441,10 @@ export function PracticePrimaryActionSection({
           </div>
         </div>
       ) : showPrimaryPlay ? (
-        <div className={FEATURED_CARD_ACTIONS_CLASS}>
+        <div
+          data-practice-hero-actions
+          className={`${FEATURED_CARD_ACTIONS_CLASS} practice-product-hero__actions`}
+        >
           <PracticeListenCtaLink
             authorSlug={resolvedAuthorSlug}
             productSlug={practice.slug}
