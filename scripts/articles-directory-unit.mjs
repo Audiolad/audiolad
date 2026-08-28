@@ -100,6 +100,7 @@ import { TARO_NOVAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-nov
 import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-novuyu-rabotu.ts";
 import { TARO_BYVSHAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-byvshaya-rabota.ts";
 import { TARO_RABOTA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-rabota-blizhayshee-budushchee.ts";
+import { TARO_NA_RABOTU_NA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-na-rabotu-na-blizhayshee-budushchee.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2261,6 +2262,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyThirdListenHref}`,
     ),
     "directory JSON-LD includes seventy-third listen href",
+  );
+
+  const seventyFourthListenHref = "/listens/taro-na-rabotu-na-blizhayshee-budushchee";
+  const seventyFourthListenCard = data.articles.find((card) => card.href === seventyFourthListenHref);
+  assert(seventyFourthListenCard, "seventy-fourth indexable listen page is listed");
+  assert(
+    seventyFourthListenCard.title === "Таро на работу на ближайшее будущее – рабочий период | АудиоЛад",
+    "seventy-fourth listen directory title",
+  );
+  assert(
+    seventyFourthListenCard.description === TARO_NA_RABOTU_NA_BLIZHAYSHEE_BUDUSHCHEE_PAGE.description,
+    "seventy-fourth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-na-rabotu-na-blizhayshee-budushchee",
+    ),
+    "no /articles duplicate for seventy-fourth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyFourthListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-fourth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
