@@ -1,8 +1,4 @@
 import ProfilePageShell from "@/components/profile/ProfilePageShell";
-import {
-  profilePageGridClassName,
-  profilePagePaddingClassName,
-} from "@/lib/profile/layout";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
