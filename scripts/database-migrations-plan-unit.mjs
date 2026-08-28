@@ -315,6 +315,70 @@ function testRepoOneFileOneVersion() {
         "20260901120000_analytics_link_signup_idempotent.sql",
     ),
   );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120100_practice_catalog_visibility_modes.sql",
+    ),
+    false,
+    "unapplied visibility 20100 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120200_create_practice_order_visibility.sql",
+    ),
+    false,
+    "unapplied visibility 20200 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120300_public_playlist_selected_visibility.sql",
+    ),
+    false,
+    "unapplied visibility 20300 stamp must leave the active migrations directory",
+  );
+  assert.equal(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260830120400_fix_visibility_allowlist_author_policy.sql",
+    ),
+    false,
+    "unapplied visibility 20400 stamp must leave the active migrations directory",
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260902120100_practice_catalog_visibility_modes.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260902120200_create_practice_order_visibility.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260902120300_public_playlist_selected_visibility.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260902120400_fix_visibility_allowlist_author_policy.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -364,12 +428,12 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260829120000",
     "20260829130000",
     "20260830120000",
-    "20260830120100",
-    "20260830120200",
-    "20260830120300",
-    "20260830120400",
     "20260831120000",
     "20260901120000",
+    "20260902120100",
+    "20260902120200",
+    "20260902120300",
+    "20260902120400",
   ]);
   assert.equal(plan.database_migrations_pending, 23);
 }
@@ -400,12 +464,12 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260829120000",
     "20260829130000",
     "20260830120000",
-    "20260830120100",
-    "20260830120200",
-    "20260830120300",
-    "20260830120400",
     "20260831120000",
     "20260901120000",
+    "20260902120100",
+    "20260902120200",
+    "20260902120300",
+    "20260902120400",
   ]);
   assert.equal(plan.database_migrations_pending, 17);
 }
@@ -443,14 +507,57 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
   assert.deepEqual(plan.pending, [
     "20260829130000",
     "20260830120000",
-    "20260830120100",
-    "20260830120200",
-    "20260830120300",
-    "20260830120400",
     "20260831120000",
     "20260901120000",
+    "20260902120100",
+    "20260902120200",
+    "20260902120300",
+    "20260902120400",
   ]);
   assert.equal(plan.database_migrations_pending, 8);
+}
+
+function testProductionLikePendingAfterVisibilityRestamp() {
+  const listed = listLocalMigrationFiles(
+    join(dirname(fileURLToPath(import.meta.url)), "../supabase/migrations"),
+  );
+  const maxRemote = "20260831120000";
+  assert.ok(listed.versions.includes(maxRemote));
+  assert.equal(listed.versions.includes("20260830120100"), false);
+  assert.equal(listed.versions.includes("20260830120200"), false);
+  assert.equal(listed.versions.includes("20260830120300"), false);
+  assert.equal(listed.versions.includes("20260830120400"), false);
+  const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
+  const plan = planDatabaseMigrations({
+    localVersions: listed.versions,
+    remoteVersions,
+  });
+  const hasHole = plan.pending.some((version) => version < maxRemote);
+  assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.deepEqual(plan.pending, [
+    "20260901120000",
+    "20260902120100",
+    "20260902120200",
+    "20260902120300",
+    "20260902120400",
+  ]);
+  assert.equal(plan.database_migrations_pending, 5);
+}
+
+function testExtraRemoteVersionDoesNotAbort() {
+  const plan = planDatabaseMigrations({
+    localVersions: ["20260830120000", "20260831120000", "20260902120100"],
+    remoteVersions: [
+      "20260830120000",
+      "20260830120100",
+      "20260831120000",
+    ],
+  });
+  assert.equal(plan.action, "apply");
+  assert.equal(plan.code, "apply");
+  assert.deepEqual(plan.pending, ["20260902120100"]);
 }
 
 function main() {
@@ -469,6 +576,8 @@ function main() {
   testProductionLikePendingAfterQuickOffersRestamp();
   testProductionLikePendingAfterPlaylistRestamp();
   testOrdinaryDeployAfterLatestMainHasNoHole();
+  testProductionLikePendingAfterVisibilityRestamp();
+  testExtraRemoteVersionDoesNotAbort();
   console.log("database-migrations-plan-unit: all tests passed");
 }
 

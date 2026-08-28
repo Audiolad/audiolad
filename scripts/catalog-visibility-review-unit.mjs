@@ -372,7 +372,7 @@ function testSourceArchitecture() {
   assert.match(visibility, /savesResult\.error/);
 
   const migration = read(
-    "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql",
+    "supabase/migrations/20260902120100_practice_catalog_visibility_modes.sql",
   );
   assert.match(
     migration,
@@ -414,7 +414,7 @@ function testSourceArchitecture() {
   );
 
   const publicPlaylistPolicy = read(
-    "supabase/migrations/20260830120300_public_playlist_selected_visibility.sql",
+    "supabase/migrations/20260902120300_public_playlist_selected_visibility.sql",
   );
   assert.match(publicPlaylistPolicy, /Public playlist discovery exposes listed published products only/);
   assert.match(publicPlaylistPolicy, /p\.catalog_visibility = 'listed'/);

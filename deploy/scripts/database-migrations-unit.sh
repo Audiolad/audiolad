@@ -336,6 +336,48 @@ assert_contains "preflight select1 unavailable" "database_migration_target_unava
 assert_not_contains "last output no secret url" "$SECRET_DB_URL" "$STAGE_OUTPUT"
 assert_not_contains "last output no secret pass" "super-secret-pass" "$STAGE_OUTPUT"
 
+# --- production-like visibility restamp: old 201-204 absent, latest=20260831120000 ---
+reset_state
+write_env "$DEPLOY_ROOT/shared/.env.production"
+rel_vis="$(make_release "rel-visibility-forward" \
+  20260830120000 \
+  20260831120000 \
+  20260901120000 \
+  20260902120100 \
+  20260902120200 \
+  20260902120300 \
+  20260902120400)"
+baseline_remote 20260830120000 20260831120000
+run_stage "$rel_vis"
+assert_eq "visibility restamp stage status" "0" "$STAGE_STATUS"
+assert_eq "visibility restamp apply count" "5" "$(apply_count)"
+assert_eq "visibility restamp history inserts" "5" "$(history_inserts)"
+assert_contains "visibility restamp pending=5" "database_migrations_pending=5" "$STAGE_OUTPUT"
+assert_contains "visibility restamp apply succeeded" "database_migration_apply_succeeded" "$STAGE_OUTPUT"
+assert_not_contains "visibility restamp no drift" "database_migration_history_drift" "$STAGE_OUTPUT"
+assert_contains "visibility restamp applied analytics" "20260901120000" "$(cat "$FAKE_STATE/remote")"
+assert_contains "visibility restamp applied modes" "20260902120100" "$(cat "$FAKE_STATE/remote")"
+assert_contains "visibility restamp applied order" "20260902120200" "$(cat "$FAKE_STATE/remote")"
+assert_contains "visibility restamp applied playlist" "20260902120300" "$(cat "$FAKE_STATE/remote")"
+assert_contains "visibility restamp applied author policy" "20260902120400" "$(cat "$FAKE_STATE/remote")"
+
+# --- leftover old 201-204 still abort (do not teach planner to apply backdated pending) ---
+reset_state
+write_env "$DEPLOY_ROOT/shared/.env.production"
+rel_vis_hole="$(make_release "rel-visibility-hole" \
+  20260830120000 \
+  20260830120100 \
+  20260830120200 \
+  20260830120300 \
+  20260830120400 \
+  20260831120000 \
+  20260901120000)"
+baseline_remote 20260830120000 20260831120000
+run_stage "$rel_vis_hole"
+assert_eq "leftover 201-204 stage status" "1" "$STAGE_STATUS"
+assert_contains "leftover 201-204 drift" "database_migration_history_drift" "$STAGE_OUTPUT"
+assert_eq "leftover 201-204 apply count" "0" "$(apply_count)"
+
 echo "=== results: pass=${PASS} fail=${FAIL} ==="
 if (( FAIL > 0 )); then
   exit 1

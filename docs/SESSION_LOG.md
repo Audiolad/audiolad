@@ -4,6 +4,18 @@
 
 ---
 
+## Сессия — 28 августа 2026 (catalog visibility forward restamp)
+
+**Сделано:**
+
+- Четыре неприменённые visibility-миграции `20260830120100`–`20260830120400` убраны из `supabase/migrations/` (они были старше production `20260831120000` и давали `database_migration_history_drift`).
+- Forward restamp без изменения SQL: `20260902120100`–`20260902120400`. Архив оригиналов: `deploy/migration-baseline/catalog-visibility-20260830/`.
+- Planner не менялся. `20260830120000_personal_timer_promotion_copy.sql` и `20260715170000_practice_catalog_visibility_and_entitlement_access.sql` не трогались.
+
+**Следующий шаг:** отдельный подтверждённый deploy; SQL на production не применялся из этой сессии.
+
+---
+
 ## Сессия — 25 августа 2026 (editorial listed_at on publish)
 
 **Сделано:**

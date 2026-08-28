@@ -126,6 +126,15 @@ Logs:
 If any pending local version is older than max(remote), deploy aborts with
 `database_migration_history_drift`. It does not repair history.
 
+Unapplied backdated files must leave `supabase/migrations/` and move to a
+forward stamp greater than both max(local) and max(remote). Catalog
+visibility `20260830120100`–`20400` is archived under
+`deploy/migration-baseline/catalog-visibility-20260830/` and restamped to
+`20260902120100`–`20400`. See
+`deploy/migration-baseline/CATALOG_VISIBILITY_FORWARD_REVERSION.md`.
+Copying under a new name while leaving the old files in the scan
+directory does not fix drift.
+
 Do not repair blindly. Compare release migration files with
 `supabase_migrations.schema_migrations`, then decide.
 

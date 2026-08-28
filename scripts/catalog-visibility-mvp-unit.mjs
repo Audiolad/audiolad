@@ -370,7 +370,7 @@ function testSourceGuards() {
   assert.doesNotMatch(access, /from\("user_practices"\)[\s\S]*visibility/);
 
   const claim = read(
-    "supabase/migrations/20260830120100_practice_catalog_visibility_modes.sql",
+    "supabase/migrations/20260902120100_practice_catalog_visibility_modes.sql",
   );
   assert.match(claim, /viewer_can_commercially_access_practice/);
   assert.match(claim, /claim_free_practice/);
@@ -384,7 +384,7 @@ function testSourceGuards() {
   );
 
   const order = read(
-    "supabase/migrations/20260830120200_create_practice_order_visibility.sql",
+    "supabase/migrations/20260902120200_create_practice_order_visibility.sql",
   );
   assert.match(order, /viewer_can_commercially_access_practice/);
 

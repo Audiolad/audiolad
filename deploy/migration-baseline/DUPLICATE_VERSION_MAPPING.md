@@ -31,3 +31,7 @@ remain after the kept file and before the next unrelated neighbor.
 
 Do not invent a parallel history table. After a one-time baseline, ordinary
 deploy applies pending files by these unique versions.
+
+Catalog visibility `20260830120100`–`20400` is a later **forward restamp**
+(not a same-day duplicate prefix). See
+`deploy/migration-baseline/CATALOG_VISIBILITY_FORWARD_REVERSION.md`.

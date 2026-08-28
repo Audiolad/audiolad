@@ -22,6 +22,34 @@ const EXPECTED_KEEP = [
   "20260728120000_author_payout_profiles.sql",
 ];
 
+const VISIBILITY_REVERSION = join(
+  ROOT,
+  "deploy/migration-baseline/CATALOG_VISIBILITY_FORWARD_REVERSION.md",
+);
+const VISIBILITY_ARCHIVE = join(
+  ROOT,
+  "deploy/migration-baseline/catalog-visibility-20260830",
+);
+
+const EXPECTED_VISIBILITY_REVERSIONS = [
+  [
+    "20260830120100_practice_catalog_visibility_modes.sql",
+    "20260902120100_practice_catalog_visibility_modes.sql",
+  ],
+  [
+    "20260830120200_create_practice_order_visibility.sql",
+    "20260902120200_create_practice_order_visibility.sql",
+  ],
+  [
+    "20260830120300_public_playlist_selected_visibility.sql",
+    "20260902120300_public_playlist_selected_visibility.sql",
+  ],
+  [
+    "20260830120400_fix_visibility_allowlist_author_policy.sql",
+    "20260902120400_fix_visibility_allowlist_author_policy.sql",
+  ],
+];
+
 function main() {
   assert.equal(existsSync(MAPPING), true, "DUPLICATE_VERSION_MAPPING.md must exist");
   const mappingText = readFileSync(MAPPING, "utf8");
@@ -34,6 +62,20 @@ function main() {
   for (const keep of EXPECTED_KEEP) {
     assert.equal(existsSync(join(MIGRATIONS, keep)), true, `kept file missing: ${keep}`);
     assert.match(mappingText, new RegExp(keep.replace(/\./g, "\\.")));
+  }
+
+  assert.equal(existsSync(VISIBILITY_REVERSION), true, "visibility reversion mapping must exist");
+  const reversionText = readFileSync(VISIBILITY_REVERSION, "utf8");
+  for (const [oldName, newName] of EXPECTED_VISIBILITY_REVERSIONS) {
+    assert.match(reversionText, new RegExp(oldName.replace(/\./g, "\\.")));
+    assert.match(reversionText, new RegExp(newName.replace(/\./g, "\\.")));
+    assert.equal(existsSync(join(MIGRATIONS, oldName)), false, `old file must be gone: ${oldName}`);
+    assert.equal(existsSync(join(MIGRATIONS, newName)), true, `new file must exist: ${newName}`);
+    assert.equal(
+      existsSync(join(VISIBILITY_ARCHIVE, oldName)),
+      true,
+      `archived original missing: ${oldName}`,
+    );
   }
 
   const listed = listLocalMigrationFiles(MIGRATIONS);
