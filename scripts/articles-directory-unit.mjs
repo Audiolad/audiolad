@@ -98,6 +98,7 @@ import { RASKLAD_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/rask
 import { KARTY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/karty-taro-na-rabotu.ts";
 import { TARO_NOVAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-novaya-rabota.ts";
 import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-novuyu-rabotu.ts";
+import { TARO_BYVSHAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-byvshaya-rabota.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2211,6 +2212,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyFirstListenHref}`,
     ),
     "directory JSON-LD includes seventy-first listen href",
+  );
+
+  const seventySecondListenHref = "/listens/taro-byvshaya-rabota";
+  const seventySecondListenCard = data.articles.find((card) => card.href === seventySecondListenHref);
+  assert(seventySecondListenCard, "seventy-second indexable listen page is listed");
+  assert(
+    seventySecondListenCard.title === "Таро бывшая работа – прошлое место и незавершённые вопросы | АудиоЛад",
+    "seventy-second listen directory title",
+  );
+  assert(
+    seventySecondListenCard.description === TARO_BYVSHAYA_RABOTA_PAGE.description,
+    "seventy-second listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-byvshaya-rabota",
+    ),
+    "no /articles duplicate for seventy-second listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventySecondListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-second listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
