@@ -1539,6 +1539,115 @@ FROM public.create_practice_order(
   );
 }
 
+function testAuthorPromotionEditDoesNotRewriteStarts() {
+  prepareStartDb(CLEAN_DB);
+
+  const first = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(first.reused, "f", "author-edit: buyer start inserts");
+  assertEqual(first.salePrice, "499", "author-edit: first start snapshots 499");
+  pinVisitorWindow(CLEAN_DB, VISITOR);
+
+  const before = lastTuple(
+    CLEAN_DB,
+    `SELECT format(
+       '%s|%s|%s|%s',
+       id::text,
+       start_token,
+       is_active::text,
+       count(*) OVER ()
+     )
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    before,
+    `${PROMO_ID}|${TOKEN}|t|1`,
+    "author-edit: one enabled promotion before save",
+  );
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET
+       name = 'Funnel 699',
+       sale_price = 699,
+       duration_seconds = 2700,
+       is_active = true
+     WHERE id = '${PROMO_ID}'`,
+  );
+
+  const after = lastTuple(
+    CLEAN_DB,
+    `SELECT format(
+       '%s|%s|%s|%s|%s|%s',
+       id::text,
+       start_token,
+       is_active::text,
+       sale_price::text,
+       duration_seconds::text,
+       (SELECT count(*) FROM public.practice_price_promotions)
+     )
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    after,
+    `${PROMO_ID}|${TOKEN}|t|699|2700|1`,
+    "author-edit: same id/token/enabled; no second row",
+  );
+  assertStartRowUntouched(CLEAN_DB, VISITOR, "499", "author-edit");
+
+  assertEqual(
+    resolvePrice(CLEAN_DB, VISITOR, null, "product", "2026-08-23T10:10:00Z").split("|")[0],
+    "499",
+    "author-edit: existing buyer PDP=499",
+  );
+  const existingCheckout = resolvePrice(
+    CLEAN_DB,
+    VISITOR,
+    null,
+    "checkout",
+    "2026-08-23T10:10:00Z",
+  ).split("|");
+  assertEqual(existingCheckout[0], "499", "author-edit: existing buyer checkout=499");
+  assertEqual(existingCheckout[2], "Funnel 699", "author-edit: name edit is live");
+
+  const reuse = startRow(CLEAN_DB, VISITOR, null);
+  assertEqual(reuse.reused, "t", "author-edit: existing start is reused");
+  assertEqual(reuse.salePrice, "499", "author-edit: reuse keeps snapshot 499");
+  assertEqual(reuse.expiresAt, "2026-08-23T10:20:00Z", "author-edit: expires_at unchanged");
+
+  const newer = startRow(CLEAN_DB, VISITOR_B, null);
+  assertEqual(newer.reused, "f", "author-edit: new buyer start inserts");
+  assertEqual(newer.salePrice, "699", "author-edit: new start snapshots 699");
+  const newStarted = new Date(newer.startedAt).getTime();
+  const newExpires = new Date(newer.expiresAt).getTime();
+  assertEqual(newExpires - newStarted, 2700 * 1000, "author-edit: new start uses 45 min");
+
+  psql(
+    CLEAN_DB,
+    `UPDATE public.practice_price_promotions
+     SET is_active = false
+     WHERE id = '${PROMO_ID}'`,
+  );
+  const disabled = lastTuple(
+    CLEAN_DB,
+    `SELECT format('%s|%s|%s', id::text, start_token, is_active::text)
+     FROM public.practice_price_promotions
+     WHERE id = '${PROMO_ID}'`,
+  );
+  assertEqual(
+    disabled,
+    `${PROMO_ID}|${TOKEN}|f`,
+    "author-edit: disable keeps id and start_token",
+  );
+  assertEqual(
+    scalar(CLEAN_DB, "SELECT count(*) FROM public.practice_price_promotions"),
+    "1",
+    "author-edit: disable does not insert a second promotion",
+  );
+}
+
 function testMigrationContract() {
   const oneshot = readFileSync(M183, "utf8");
   assert(oneshot.includes("ON CONFLICT (promotion_id, visitor_id) DO NOTHING"), "conflict");
@@ -1598,6 +1707,7 @@ function main() {
   testStartRpcSemantics();
   testSalePriceSnapshotSemantics();
   testSnapshotOnlyAppliesBelowCurrentBase();
+  testAuthorPromotionEditDoesNotRewriteStarts();
   console.log(`price-promotions-sql-unit: ok (${backend})`);
 }
 

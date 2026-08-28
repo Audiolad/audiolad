@@ -4,7 +4,7 @@ import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { parsePromotionWriteBody } from "@/lib/pricing/author-promotions";
+import { buildPromotionPatchUpdates } from "@/lib/pricing/author-promotions";
 import { PRICE_PROMOTION_SELECT } from "@/lib/pricing/map";
 import { parseJsonObject } from "@/lib/orders/create-order-api";
 
@@ -57,48 +57,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
+    const parsedUpdates = buildPromotionPatchUpdates(
+      parsedBody,
+      priced.price ?? 0,
+    );
+
+    if (!parsedUpdates.ok) {
+      return NextResponse.json({ error: parsedUpdates.error }, { status: 400 });
+    }
+
     const updates: Record<string, unknown> = {
+      ...parsedUpdates.updates,
       updated_at: new Date().toISOString(),
     };
-
-    if ("is_active" in parsedBody && typeof parsedBody.is_active === "boolean") {
-      updates.is_active = parsedBody.is_active;
-    }
-
-    const hasFullWrite = [
-      "name",
-      "promotion_type",
-      "sale_price",
-      "starts_at",
-      "ends_at",
-      "duration_seconds",
-      "duration_amount",
-      "duration_unit",
-      "above_timer_text",
-      "below_button_text",
-    ].some((key) => key in parsedBody);
-
-    if (hasFullWrite) {
-      const parsed = parsePromotionWriteBody(parsedBody, priced.price ?? 0);
-
-      if (!parsed.ok) {
-        return NextResponse.json({ error: parsed.error }, { status: 400 });
-      }
-
-      updates.name = parsed.name;
-      updates.promotion_type = parsed.promotionType;
-      updates.sale_price = parsed.salePrice;
-      updates.starts_at = parsed.startsAt;
-      updates.ends_at = parsed.endsAt;
-      updates.duration_seconds = parsed.durationSeconds;
-      updates.above_timer_text = parsed.aboveTimerText;
-      updates.below_button_text = parsed.belowButtonText;
-      updates.is_active = parsed.isActive;
-    }
-
-    if (Object.keys(updates).length <= 1) {
-      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-    }
 
     const { data, error } = await supabase
       .from("practice_price_promotions")
