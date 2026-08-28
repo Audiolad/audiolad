@@ -333,6 +333,8 @@ function testSourceGuards() {
     "src/app/api/author/products/[id]/visibility-users/lookup/route.ts",
   );
   assert.match(lookupRoute, /lookup_practice_visibility_user/);
+  assert.match(lookupRoute, /search_practice_visibility_users/);
+  assert.match(lookupRoute, /requirePracticeMutationAccess/);
   assert.doesNotMatch(lookupRoute, /searchAudioladProfiles/);
   assert.doesNotMatch(lookupRoute, /createServiceRoleClient/);
 

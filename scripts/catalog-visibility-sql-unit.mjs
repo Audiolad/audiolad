@@ -105,6 +105,25 @@ assert.match(
   /public\.is_practice_author_member\(\s*practice_id,\s*auth\.uid\(\)\s*\)/,
 );
 
+const searchMigration = readFileSync(
+  join(
+    repoRoot,
+    "supabase/migrations/20260903120000_search_practice_visibility_users.sql",
+  ),
+  "utf8",
+);
+assert.match(searchMigration, /search_practice_visibility_users/);
+assert.match(searchMigration, /is_practice_author_member/);
+assert.match(searchMigration, /char_length\(v_query\) < 2/);
+assert.match(searchMigration, /practice_visibility_search_attempts/);
+assert.doesNotMatch(searchMigration, /INSERT INTO public\.user_practices/);
+assert.doesNotMatch(
+  searchMigration,
+  /ALTER TABLE public\.practice_visibility_users/,
+);
+assert.doesNotMatch(searchMigration, /ALTER TABLE public\.practices/);
+assert.doesNotMatch(searchMigration, /SET\s+catalog_visibility/);
+
 const smoke = readFileSync(
   join(repoRoot, "supabase/tests/catalog_visibility_rls_smoke.sql"),
   "utf8",
