@@ -101,6 +101,7 @@ import { RASKLAD_TARO_NA_NOVUYU_RABOTU_PAGE } from "../src/lib/seo/listens/conte
 import { TARO_BYVSHAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-byvshaya-rabota.ts";
 import { TARO_RABOTA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-rabota-blizhayshee-budushchee.ts";
 import { TARO_NA_RABOTU_NA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/listens/content/taro-na-rabotu-na-blizhayshee-budushchee.ts";
+import { VOPROSY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-na-rabotu.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2286,6 +2287,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyFourthListenHref}`,
     ),
     "directory JSON-LD includes seventy-fourth listen href",
+  );
+
+
+  const seventyFifthListenHref = "/listens/voprosy-taro-na-rabotu";
+  const seventyFifthListenCard = data.articles.find((card) => card.href === seventyFifthListenHref);
+  assert(seventyFifthListenCard, "seventy-fifth indexable listen page is listed");
+  assert(
+    seventyFifthListenCard.title === "Вопросы Таро на работу – как правильно спрашивать карты | АудиоЛад",
+    "seventy-fifth listen directory title",
+  );
+  assert(
+    seventyFifthListenCard.description === VOPROSY_TARO_NA_RABOTU_PAGE.description,
+    "seventy-fifth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/voprosy-taro-na-rabotu",
+    ),
+    "no /articles duplicate for seventy-fifth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyFifthListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-fifth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
