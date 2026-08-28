@@ -11,9 +11,11 @@ import {
 } from "@/lib/author-payout-profiles/service";
 import { isAuthorEditablePayoutProfileStatus } from "@/lib/author-payout-profiles/status";
 import {
+  AuthorAccessError,
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { requireCurrentAuthorTermsAcceptance } from "@/lib/author-terms/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -104,8 +106,16 @@ function handlePayoutProfileError(error: unknown) {
   return handleAuthorRouteError(error);
 }
 
+async function assertPayoutNotInSupportMode() {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    throw new AuthorAccessError("support_sensitive_route_blocked", 403);
+  }
+}
+
 export async function GET(request: Request) {
   try {
+    await assertPayoutNotInSupportMode();
     const authorId = resolveAuthorId(request);
 
     if (!authorId) {
@@ -141,6 +151,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    await assertPayoutNotInSupportMode();
     if (!isPayoutProfilesEnabled()) {
       return featureDisabledResponse();
     }
@@ -178,6 +189,7 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    await assertPayoutNotInSupportMode();
     if (!isPayoutProfilesEnabled()) {
       return featureDisabledResponse();
     }

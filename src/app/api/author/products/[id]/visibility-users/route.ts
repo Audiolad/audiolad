@@ -15,25 +15,24 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const { supabase } = await requirePracticeAccess(id);
-    const { data, error } = await supabase.rpc("list_practice_visibility_users", {
-      p_practice_id: id,
-    });
-
-    if (error) {
-      console.error("list_practice_visibility_users_error", error.message);
-      return NextResponse.json({ error: "internal_error" }, { status: 500 });
-    }
-
-    const users = (data ?? []).map(
-      (row: {
+    const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+    const { data, error } = await callAuthorUserRpc<
+      {
         user_id?: string;
         display_name?: string;
         first_name?: string | null;
         last_name?: string | null;
         masked_email?: string | null;
         created_at?: string;
-      }) => toVisibilityListUser(row),
-    );
+      }[]
+    >(supabase, "list_practice_visibility_users", { p_practice_id: id });
+
+    if (error) {
+      console.error("list_practice_visibility_users_error", error.message);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+
+    const users = (data ?? []).map((row) => toVisibilityListUser(row));
 
     return NextResponse.json({ users });
   } catch (error) {
@@ -67,10 +66,15 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { data, error } = await supabase.rpc("add_practice_visibility_user", {
-      p_practice_id: id,
-      p_user_id: userId,
-    });
+    const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+    const { data, error } = await callAuthorUserRpc(
+      supabase,
+      "add_practice_visibility_user",
+      {
+        p_practice_id: id,
+        p_user_id: userId,
+      },
+    );
 
     if (error) {
       if (error.message === "not_found") {
@@ -97,10 +101,15 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { error } = await supabase.rpc("remove_practice_visibility_user", {
-      p_practice_id: id,
-      p_user_id: userId,
-    });
+    const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+    const { error } = await callAuthorUserRpc(
+      supabase,
+      "remove_practice_visibility_user",
+      {
+        p_practice_id: id,
+        p_user_id: userId,
+      },
+    );
 
     if (error) {
       console.error("remove_practice_visibility_user_error", error.message);

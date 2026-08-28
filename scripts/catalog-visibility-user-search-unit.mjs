@@ -182,6 +182,7 @@ function testAuthAndPrivacySourceGuards() {
   assert.match(lookupRoute, /search_practice_visibility_users/);
   assert.match(lookupRoute, /lookup_practice_visibility_user/);
   assert.match(lookupRoute, /shouldSearchVisibilityUsers/);
+  assert.match(lookupRoute, /callAuthorUserRpc/);
   assert.doesNotMatch(lookupRoute, /createServiceRoleClient/);
   assert.doesNotMatch(lookupRoute, /searchAudioladProfiles/);
   assert.doesNotMatch(lookupRoute, /from\("profiles"\)/);
@@ -193,6 +194,7 @@ function testAuthAndPrivacySourceGuards() {
   );
   assert.match(searchFn, /v_actor := auth\.uid\(\)/);
   assert.match(searchFn, /IF v_actor IS NULL THEN/);
+  assert.match(searchFn, /actor_can_manage_practice_as_author/);
   assert.match(searchFn, /is_practice_author_member/);
   assert.match(searchFn, /RAISE EXCEPTION 'not_authenticated'/);
   assert.match(searchFn, /RAISE EXCEPTION 'not_authorized'/);
@@ -255,8 +257,13 @@ function testAuthAndPrivacySourceGuards() {
   );
   assert.match(
     searchFn,
+    /actor_can_manage_practice_as_author/,
+    "10 other author cannot use the endpoint; support mode uses the same gate",
+  );
+  assert.match(
+    searchFn,
     /is_practice_author_member/,
-    "10 other author cannot use the endpoint",
+    "10 isolated apply without support mode still fail-closes on membership",
   );
   assert.match(
     searchFn,
@@ -269,6 +276,16 @@ function testAuthAndPrivacySourceGuards() {
   );
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.search_practice_visibility_users\(uuid, text\) FROM anon/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.search_practice_visibility_users\(uuid, text\) TO authenticated/);
+  assert.match(
+    migration,
+    /search_practice_visibility_users_with_support_proof/,
+    "support-mode search uses the same proof wrapper pattern as lookup",
+  );
+  assert.match(
+    migration,
+    /list_practice_visibility_users_with_support_proof/,
+    "list support wrapper is restamped to the masked list columns",
+  );
 
   assert.match(listRoute, /add_practice_visibility_user/);
   assert.match(editor, /visibility-users\/lookup/);

@@ -90,6 +90,14 @@ export async function createStudioRenderJob(projectId: string): Promise<StudioRe
     }
   }
 
+  const { recordAuthorSupportAudit } = await import("@/lib/author-support/audit");
+  await recordAuthorSupportAudit({
+    action: "studio_render_queued",
+    resourceType: "studio_render_job",
+    resourceId: project.id,
+    metadata: { project_revision: project.revision },
+  });
+
   const { data: job, error } = await service.from("studio_render_jobs").insert({
     project_id: project.id,
     author_id: project.author_id,

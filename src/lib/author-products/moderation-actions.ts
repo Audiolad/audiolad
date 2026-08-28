@@ -24,9 +24,12 @@ export async function submitPracticeForModeration(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc("submit_practice_for_moderation", {
-    p_practice_id: practiceId,
-  });
+  const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
+    "submit_practice_for_moderation",
+    { p_practice_id: practiceId },
+  );
 
   if (error) {
     throw mapModerationRpcError(error);
@@ -39,11 +42,11 @@ export async function withdrawPracticeFromModeration(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc(
+  const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+  const { data, error } = await callAuthorUserRpc(
+    supabase,
     "withdraw_practice_from_moderation",
-    {
-      p_practice_id: practiceId,
-    },
+    { p_practice_id: practiceId },
   );
 
   if (error) {

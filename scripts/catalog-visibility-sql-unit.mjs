@@ -113,7 +113,9 @@ const searchMigration = readFileSync(
   "utf8",
 );
 assert.match(searchMigration, /search_practice_visibility_users/);
+assert.match(searchMigration, /actor_can_manage_practice_as_author/);
 assert.match(searchMigration, /is_practice_author_member/);
+assert.match(searchMigration, /search_practice_visibility_users_with_support_proof/);
 assert.match(searchMigration, /char_length\(v_query\) < 2/);
 assert.match(searchMigration, /practice_visibility_search_attempts/);
 assert.match(searchMigration, /window_started_at/);

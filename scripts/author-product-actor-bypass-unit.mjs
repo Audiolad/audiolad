@@ -13,14 +13,17 @@ function read(relativePath) {
 
 function testActorHelperUsesRoleNotAuthorHardcode() {
   const moderation = read("src/lib/author-products/moderation.ts");
-  assert.match(moderation, /export async function actorCanBypassProductModeration/);
-  assert.match(moderation, /author_products\.moderate/);
-  assert.match(moderation, /getAuthorCanBypassProductModeration/);
+  const actor = read("src/lib/author-products/moderation-actor.ts");
+  assert.match(actor, /export async function actorCanBypassProductModeration/);
+  assert.match(actor, /author_products\.moderate/);
+  assert.match(actor, /getAuthorCanBypassProductModeration/);
+  assert.doesNotMatch(actor, /Орий/);
+  assert.doesNotMatch(actor, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
   assert.doesNotMatch(moderation, /Орий/);
   assert.doesNotMatch(moderation, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 
   assert.match(
-    moderation,
+    actor,
     /userId\s*\n\s*\? await actorCanBypassProductModeration/,
   );
   assert.match(
@@ -28,7 +31,7 @@ function testActorHelperUsesRoleNotAuthorHardcode() {
     /options\?\.canBypass/,
   );
   assert.match(
-    moderation,
+    actor,
     /export async function assertPracticePublicContentEditableForActor/,
   );
 }

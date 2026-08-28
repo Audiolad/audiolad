@@ -119,7 +119,12 @@ BEGIN
       USING ERRCODE = '28000';
   END IF;
 
-  IF NOT public.is_practice_author_member(p_practice_id, v_actor) THEN
+  IF to_regprocedure('public.actor_can_manage_practice_as_author(uuid)') IS NOT NULL THEN
+    IF NOT public.actor_can_manage_practice_as_author(p_practice_id) THEN
+      RAISE EXCEPTION 'not_authorized'
+        USING ERRCODE = '42501';
+    END IF;
+  ELSIF NOT public.is_practice_author_member(p_practice_id, v_actor) THEN
     RAISE EXCEPTION 'not_authorized'
       USING ERRCODE = '42501';
   END IF;
@@ -287,7 +292,12 @@ BEGIN
       USING ERRCODE = '28000';
   END IF;
 
-  IF NOT public.is_practice_author_member(p_practice_id, v_user_id) THEN
+  IF to_regprocedure('public.actor_can_manage_practice_as_author(uuid)') IS NOT NULL THEN
+    IF NOT public.actor_can_manage_practice_as_author(p_practice_id) THEN
+      RAISE EXCEPTION 'not_authorized'
+        USING ERRCODE = '42501';
+    END IF;
+  ELSIF NOT public.is_practice_author_member(p_practice_id, v_user_id) THEN
     RAISE EXCEPTION 'not_authorized'
       USING ERRCODE = '42501';
   END IF;
@@ -326,5 +336,67 @@ COMMENT ON FUNCTION public.list_practice_visibility_users(uuid) IS
 REVOKE ALL ON FUNCTION public.list_practice_visibility_users(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.list_practice_visibility_users(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.list_practice_visibility_users(uuid) TO authenticated;
+
+-- Support-mode wrappers must match the restamped list/search return types.
+-- list_practice_visibility_users now returns first_name/last_name/masked_email,
+-- so the older 3-column wrapper from 20260901130000 must be replaced.
+DROP FUNCTION IF EXISTS public.list_practice_visibility_users_with_support_proof(text, uuid);
+
+CREATE FUNCTION public.list_practice_visibility_users_with_support_proof(
+  p_token_hash text,
+  p_practice_id uuid
+)
+RETURNS TABLE (
+  user_id uuid,
+  display_name text,
+  first_name text,
+  last_name text,
+  masked_email text,
+  created_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM public.set_author_support_session_proof(p_token_hash);
+  RETURN QUERY
+  SELECT *
+  FROM public.list_practice_visibility_users(p_practice_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.search_practice_visibility_users_with_support_proof(
+  p_token_hash text,
+  p_practice_id uuid,
+  p_query text
+)
+RETURNS TABLE (
+  user_id uuid,
+  display_name text,
+  first_name text,
+  last_name text,
+  masked_email text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM public.set_author_support_session_proof(p_token_hash);
+  RETURN QUERY
+  SELECT *
+  FROM public.search_practice_visibility_users(p_practice_id, p_query);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.list_practice_visibility_users_with_support_proof(text, uuid)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.list_practice_visibility_users_with_support_proof(text, uuid)
+  TO authenticated;
+REVOKE ALL ON FUNCTION public.search_practice_visibility_users_with_support_proof(text, uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_practice_visibility_users_with_support_proof(text, uuid, text)
+  TO authenticated;
 
 COMMIT;

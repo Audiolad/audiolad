@@ -467,3 +467,58 @@ export async function uploadStudioProjectAsset({
 
   return body.asset;
 }
+
+export async function replaceStudioProjectAsset({
+  projectId,
+  assetId,
+  file,
+  signal,
+}: {
+  projectId: string;
+  assetId: string;
+  file: File;
+  signal?: AbortSignal;
+}): Promise<StudioUploadedAsset> {
+  const formData = new FormData();
+  formData.set("file", file);
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
+    { method: "PUT", body: formData, signal },
+  );
+  if (!response.ok) {
+    throw await toStudioFetchError(response);
+  }
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("asset" in body) ||
+    !isUploadedAsset(body.asset)
+  ) {
+    throw new StudioPersistenceClientError("server_error", response.status);
+  }
+  return body.asset;
+}
+
+export async function deleteStudioProjectAsset({
+  projectId,
+  assetId,
+  signal,
+}: {
+  projectId: string;
+  assetId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const response = await studioFetch(
+    `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
+    { method: "DELETE", signal },
+  );
+  if (!response.ok) {
+    throw await toStudioFetchError(response);
+  }
+}

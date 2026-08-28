@@ -65,10 +65,12 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
+    const { callAuthorUserRpc } = await import("@/lib/author-support/context");
     const exactLookup = validateVisibilityLookupQuery(trimmed) === null;
 
     if (exactLookup) {
-      const { data, error } = await supabase.rpc(
+      const { data, error } = await callAuthorUserRpc(
+        supabase,
         "lookup_practice_visibility_user",
         {
           p_practice_id: id,
@@ -110,7 +112,8 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await callAuthorUserRpc(
+      supabase,
       "search_practice_visibility_users",
       {
         p_practice_id: id,
