@@ -96,6 +96,7 @@ import { TARO_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-rabota.ts"
 import { TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/taro-na-rabotu.ts";
 import { RASKLAD_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/rasklad-taro-na-rabotu.ts";
 import { KARTY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/karty-taro-na-rabotu.ts";
+import { TARO_NOVAYA_RABOTA_PAGE } from "../src/lib/seo/listens/content/taro-novaya-rabota.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2161,6 +2162,30 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${sixtyNinthListenHref}`,
     ),
     "directory JSON-LD includes sixty-ninth listen href",
+  );
+
+  const seventiethListenHref = "/listens/taro-novaya-rabota";
+  const seventiethListenCard = data.articles.find((card) => card.href === seventiethListenHref);
+  assert(seventiethListenCard, "seventieth indexable listen page is listed");
+  assert(
+    seventiethListenCard.title === "Таро новая работа – переход и новое место через карты | АудиоЛад",
+    "seventieth listen directory title",
+  );
+  assert(
+    seventiethListenCard.description === TARO_NOVAYA_RABOTA_PAGE.description,
+    "seventieth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-novaya-rabota",
+    ),
+    "no /articles duplicate for seventieth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventiethListenHref}`,
+    ),
+    "directory JSON-LD includes seventieth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
