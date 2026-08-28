@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  buildDockerPsqlArgs,
+  parseAllowedDatabaseName,
   parseAllowedDatabaseUrl,
 } from "./catalog-visibility-grant-persistence.mjs";
 
@@ -40,6 +42,46 @@ assert.equal(
   ).ok,
   false,
 );
+assert.equal(parseAllowedDatabaseName(DEFAULT_DB).ok, true);
+for (const unsafeDatabase of ["postgres", "template0", "template1"]) {
+  assert.match(
+    parseAllowedDatabaseName(unsafeDatabase).reason,
+    /unsafe database name/,
+  );
+}
+assert.equal(
+  parseAllowedDatabaseName("audiolad_other_isolated").ok,
+  false,
+  "Docker transport rejects arbitrary database names",
+);
+assert.equal(
+  parseAllowedDatabaseName(
+    "audiolad_other_isolated",
+    "audiolad_other_isolated",
+  ).ok,
+  true,
+  "Docker transport accepts only an exact opt-in database name",
+);
+const dockerArgs = buildDockerPsqlArgs({
+  container: "supabase-db",
+  user: "supabase_admin",
+  databaseName: DEFAULT_DB,
+});
+assert.deepEqual(dockerArgs.slice(0, 5), [
+  "exec",
+  "-i",
+  "supabase-db",
+  "psql",
+  "-U",
+]);
+assert.deepEqual(dockerArgs.slice(5), [
+  "supabase_admin",
+  "-d",
+  DEFAULT_DB,
+  "-v",
+  "ON_ERROR_STOP=1",
+]);
+assert.equal(dockerArgs.includes("postgres"), false);
 
 const transactionSql = readFileSync(
   "supabase/tests/catalog_visibility_grant_persistence_copy.sql",
@@ -98,7 +140,15 @@ const runner = readFileSync("scripts/catalog-visibility-grant-persistence.mjs", 
 assert.match(runner, /AUDIOLAD_VISIBILITY_GRANT_PERSISTENCE_DATABASE_URL/);
 assert.match(runner, /DEFAULT_ALLOWED_DATABASE = "audiolad_pr138_visibility_test"/);
 assert.match(runner, /\["postgres", "template0", "template1"\]/);
-assert.match(runner, /runPsql\(databaseUrl, postcheckSql\)/);
+assert.match(runner, /runUrlPsql\(databaseUrl, sqlPath\)/);
+assert.match(runner, /runDockerPsql\(dockerArgs, sqlPath\)/);
+assert.match(runner, /AUDIOLAD_VISIBILITY_GRANT_PERSISTENCE_TRANSPORT/);
+assert.match(runner, /transport === "docker"/);
+assert.match(runner, /if \(databaseUrl\) \{[\s\S]*?\} else if \(transport === "docker"\)/);
+assert.match(runner, /AUDIOLAD_VISIBILITY_GRANT_PERSISTENCE_DOCKER_CONTAINER/);
+assert.match(runner, /AUDIOLAD_VISIBILITY_GRANT_PERSISTENCE_PSQL_USER/);
+assert.match(runner, /docker.*exec.*-i/s);
+assert.match(runner, /input: readFileSync\(sqlPath, "utf8"\)/);
 assert.doesNotMatch(runner, /\|\|\s*true/);
 
 console.log("catalog-visibility-grant-persistence-unit: ok");
