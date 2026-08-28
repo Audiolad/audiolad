@@ -1,4 +1,3 @@
-import type { ContinueListeningItem } from "@/lib/home/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import type { ProfileApplicationVariant } from "@/lib/author-applications/types";
 
@@ -20,12 +19,6 @@ export type ProfileCardData = {
   authorWorkspaceCountLabel: string | null;
 };
 
-export type ProfileContinueState =
-  | { kind: "item"; item: ContinueListeningItem }
-  | { kind: "empty" }
-  | { kind: "hidden" }
-  | { kind: "error" };
-
 export type ProfileAuthorSection =
   | { kind: "member"; workspaces: AuthorWorkspace[] }
   | {
@@ -36,7 +29,6 @@ export type ProfileAuthorSection =
 
 export type ProfilePageData = {
   card: ProfileCardData;
-  continueState: ProfileContinueState;
   counters: ProfileCounter[];
   authorSection: ProfileAuthorSection;
   showAdminPanel: boolean;

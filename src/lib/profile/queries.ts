@@ -3,15 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { hasAdminPanelAccess } from "@/lib/auth/platform-admin";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
-import {
-  enrichCatalogProducts,
-  getContinueListening,
-  loadAudioSummaryMap,
-} from "@/lib/home/listening-progress";
-import type { ContinueListeningItem } from "@/lib/home/types";
 import { resolveInitialPlayback } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
-import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 
 import { getCurrentAuthorApplication } from "@/lib/author-applications/queries";
@@ -26,7 +19,6 @@ import {
 import type {
   ProfileAuthorSection,
   ProfileCardData,
-  ProfileContinueState,
   ProfileCounter,
   ProfilePageData,
 } from "./types";
@@ -190,48 +182,6 @@ async function countCompletedPractices(
   return { count: completedCount, error: false };
 }
 
-async function loadContinueListeningItem(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<{ item: ContinueListeningItem | null; error: boolean }> {
-  try {
-    const catalogProducts = await getPublishedCatalogProducts(supabase);
-    const practiceIds = catalogProducts.map((product) => product.id);
-    const audioSummaryMap = await loadAudioSummaryMap(supabase, practiceIds);
-    const allProducts = enrichCatalogProducts(catalogProducts, audioSummaryMap);
-    const catalogProductMap = new Map(
-      allProducts.map((product) => [product.id, product]),
-    );
-
-    const item = await getContinueListening(
-      supabase,
-      userId,
-      catalogProductMap,
-      audioSummaryMap,
-    );
-
-    return { item, error: false };
-  } catch (error) {
-    console.error("profile_continue_listening_error", error);
-    return { item: null, error: true };
-  }
-}
-
-function buildContinueState(
-  item: ContinueListeningItem | null,
-  hasError: boolean,
-): ProfileContinueState {
-  if (hasError) {
-    return { kind: "error" };
-  }
-
-  if (item) {
-    return { kind: "item", item };
-  }
-
-  return { kind: "empty" };
-}
-
 function buildAuthorSection(
   workspaces: AuthorWorkspace[],
   applicationVariant: ProfileApplicationVariant | null,
@@ -295,7 +245,6 @@ export async function getProfilePageData(
     libraryCount,
     playlistsCount,
     completedCount,
-    continueResult,
     authorWorkspaces,
     authorApplication,
     showAdminPanel,
@@ -308,7 +257,6 @@ export async function getProfilePageData(
     countActiveLibraryItems(supabase, user.id),
     countOwnedPlaylists(supabase, user.id),
     countCompletedPractices(supabase, user.id),
-    loadContinueListeningItem(supabase, user.id),
     listAuthorWorkspacesForUser(user.id).catch((error) => {
       console.error("profile_author_workspaces_error", error);
       return [] as Awaited<ReturnType<typeof listAuthorWorkspacesForUser>>;
@@ -344,10 +292,6 @@ export async function getProfilePageData(
 
   return {
     card,
-    continueState: buildContinueState(
-      continueResult.item,
-      continueResult.error,
-    ),
     counters: buildCounters(libraryCount, playlistsCount, completedCount),
     authorSection: buildAuthorSection(
       authorWorkspaces,
