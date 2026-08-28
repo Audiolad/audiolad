@@ -17,19 +17,41 @@ jobs:
     name: PR Repository Validation
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR head for ordinary validation
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-          persist-credentials: false
+      - name: Materialize validated PR tree without checkout
+        env:
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$PR_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "PR head SHA is malformed" >&2
+            exit 1
+          fi
+          if [[ ! "$PR_CLONE_URL" =~ ^https://github\.com/ ]]; then
+            echo "PR head clone URL is invalid" >&2
+            exit 1
+          fi
+          OBJECT_STORE="$(mktemp -d)"
+          PR_WORKSPACE="$(mktemp -d)"
+          git -C "${OBJECT_STORE}" init --quiet
+          git -C "${OBJECT_STORE}" fetch --no-tags "${PR_CLONE_URL}" "${PR_SHA}"
+          git -C "${OBJECT_STORE}" cat-file -e "${PR_SHA}^{commit}"
+          git -C "${OBJECT_STORE}" archive "${PR_SHA}" | tar -x -C "${PR_WORKSPACE}"
+          printf 'OBJECT_STORE=%s\n' "${OBJECT_STORE}" >> "${GITHUB_ENV}"
+          printf 'PR_WORKSPACE=%s\n' "${PR_WORKSPACE}" >> "${GITHUB_ENV}"
 
       - name: Install dependencies
+        working-directory: ${{ env.PR_WORKSPACE }}
         run: npm ci
 
       - name: Validate PR repository
+        working-directory: ${{ env.PR_WORKSPACE }}
         run: |
           npm run test:database-migrations
           npm run build
           npm run typecheck
           npm run lint
+
+      - name: Remove PR temporary stores
+        if: always()
+        run: rm -rf "${OBJECT_STORE}" "${PR_WORKSPACE}"
