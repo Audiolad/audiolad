@@ -308,6 +308,13 @@ function testRepoOneFileOneVersion() {
         "20260831120000_personal_start_sale_price_snapshot.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260901120000_analytics_link_signup_idempotent.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -358,8 +365,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260829130000",
     "20260830120000",
     "20260831120000",
+    "20260901120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 18);
+  assert.equal(plan.database_migrations_pending, 19);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -389,8 +397,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260829130000",
     "20260830120000",
     "20260831120000",
+    "20260901120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 12);
+  assert.equal(plan.database_migrations_pending, 13);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -423,8 +432,13 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
   assert.equal(hasHole, false, `unexpected hole in pending=${JSON.stringify(plan.pending)}`);
   assert.equal(plan.action, "apply");
   assert.equal(plan.code, "apply");
-  assert.deepEqual(plan.pending, ["20260829130000", "20260830120000", "20260831120000"]);
-  assert.equal(plan.database_migrations_pending, 3);
+  assert.deepEqual(plan.pending, [
+    "20260829130000",
+    "20260830120000",
+    "20260831120000",
+    "20260901120000",
+  ]);
+  assert.equal(plan.database_migrations_pending, 4);
 }
 
 function main() {

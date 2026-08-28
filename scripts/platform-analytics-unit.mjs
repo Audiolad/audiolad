@@ -65,10 +65,16 @@ function testListeningMilestones() {
 function testApiRoutes() {
   const sessionRoute = readSource("src/app/api/analytics/session/route.ts");
   const trackRoute = readSource("src/app/api/analytics/track/route.ts");
+  const linkRoute = readSource("src/app/api/analytics/session/link/route.ts");
+  const signupRoute = readSource("src/app/api/analytics/signup/complete/route.ts");
 
   assert(sessionRoute.includes("upsert_analytics_session"), "session rpc wired");
   assert(trackRoute.includes("insert_platform_analytics_event"), "track rpc wired");
   assert(trackRoute.includes("rate_limited"), "track rate limit");
+  assert(linkRoute.includes("link_analytics_session_user"), "link rpc wired");
+  assert(signupRoute.includes("record_platform_signup_completed"), "signup rpc wired");
+  assert(linkRoute.includes("status: 204"), "link fail-soft 204");
+  assert(signupRoute.includes("status: 204"), "signup fail-soft 204");
 }
 
 function testAdminDashboard() {
@@ -181,9 +187,14 @@ function testIntegrations() {
   const migration = readSource(
     "supabase/migrations/20260717130000_platform_analytics_signup_completion.sql",
   );
+  const stampede = readSource(
+    "supabase/migrations/20260901120000_analytics_link_signup_idempotent.sql",
+  );
 
   assert(migration.includes("record_platform_signup_completed"), "signup completion rpc");
   assert(migration.includes("signup_completed_user_uidx"), "unique signup index");
+  assert(stampede.includes("IF v_session_user IS NOT DISTINCT FROM v_user_id THEN"), "link idempotent");
+  assert(stampede.includes("already_recorded"), "signup already_recorded fast path");
   assert(providers.includes("PlatformAnalyticsProvider"), "global analytics provider");
   assert(providers.includes("YandexMetrika"), "yandex metrika provider");
   assert(

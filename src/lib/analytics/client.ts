@@ -13,6 +13,10 @@ import {
   writeSessionState,
 } from "@/lib/analytics/session-state";
 import {
+  createKeyedSingleFlight,
+  shouldSettleAnalyticsHttpAttempt,
+} from "@/lib/analytics/single-flight";
+import {
   isYandexMetrikaGoalName,
   sendYandexGoal,
 } from "@/lib/analytics/yandex-metrika";
@@ -48,14 +52,18 @@ export type TrackPlatformEventResult = {
   accepted: boolean;
 };
 
-let cachedSessionId: string | null = null;
-let sessionInitPromise: Promise<string | null> | null = null;
-
 type PostJsonResult<T> = {
   ok: boolean;
   status: number;
   data: T | null;
 };
+
+let cachedSessionId: string | null = null;
+let sessionInitPromise: Promise<string | null> | null = null;
+const linkSessionFlight = createKeyedSingleFlight<PostJsonResult<{ linked?: boolean }>>();
+const signupCompleteFlight = createKeyedSingleFlight<
+  PostJsonResult<{ recorded?: boolean }>
+>();
 
 async function postJson<T>(url: string, body: unknown): Promise<PostJsonResult<T>> {
   try {
@@ -164,10 +172,18 @@ export async function linkAnalyticsSessionUser(): Promise<void> {
     return;
   }
 
-  await postJson("/api/analytics/session/link", {
-    session_id: sessionId,
-    anonymous_id: getOrCreateAnonymousId(),
-  });
+  const anonymousId = getOrCreateAnonymousId();
+  const key = `${sessionId}:${anonymousId}`;
+
+  await linkSessionFlight.run(
+    key,
+    () =>
+      postJson<{ linked?: boolean }>("/api/analytics/session/link", {
+        session_id: sessionId,
+        anonymous_id: anonymousId,
+      }),
+    { settle: (result) => shouldSettleAnalyticsHttpAttempt(result.status) },
+  );
 }
 
 /** Close active identity links for the current authenticated user (call before sign-out). */
@@ -182,15 +198,20 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
     return false;
   }
 
-  const result = await postJson<{ recorded?: boolean }>(
-    "/api/analytics/signup/complete",
-    {
-      session_id: sessionId,
-      anonymous_id: getOrCreateAnonymousId(),
-    },
+  const anonymousId = getOrCreateAnonymousId();
+  const key = `${sessionId}:${anonymousId}`;
+
+  const result = await signupCompleteFlight.run(
+    key,
+    () =>
+      postJson<{ recorded?: boolean }>("/api/analytics/signup/complete", {
+        session_id: sessionId,
+        anonymous_id: anonymousId,
+      }),
+    { settle: (attempt) => shouldSettleAnalyticsHttpAttempt(attempt.status) },
   );
 
-  const recorded = Boolean(result.data?.recorded);
+  const recorded = Boolean(result?.data?.recorded);
 
   if (recorded) {
     sendYandexGoal("signup_completed");
