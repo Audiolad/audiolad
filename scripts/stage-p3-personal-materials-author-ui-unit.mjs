@@ -84,6 +84,23 @@ function testCreateComponent() {
   assert(create.includes("createAuthorPersonalMaterial"), "POST create");
   assert(create.includes("router.replace"), "redirect after create");
   assert(create.includes("returnUrl"), "create passes return url");
+  assert(create.includes("PersonalMaterialClientErrorAlert"), "create shows shared error alert");
+  assert(create.includes("<form"), "create uses a parent form");
+  assert(!create.includes("<form action="), "create form is not a support-exit form");
+
+  const alert = read("src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx");
+  const exitControl = read("src/components/author-support/AuthorSupportExitForm.tsx");
+  assert(alert.includes("AuthorSupportExitForm"), "alert uses shared support exit");
+  assert(!alert.includes("<form"), "alert does not emit a form");
+  assert(exitControl.includes('type="button"'), "support exit is a button");
+  assert(exitControl.includes("startTransition"), "support exit calls server action via transition");
+  assert(exitControl.includes("stopAuthorSupportMode"), "support exit calls canonical stop");
+  assert(!exitControl.includes("<form"), "support exit is not a form");
+  assert(!exitControl.includes("fetch("), "support exit does not fetch");
+  assert(
+    !/<form[\s\S]*<form/.test(`${create}\n${alert}\n${exitControl}`),
+    "create diagnostics does not emit a nested support-exit form",
+  );
 }
 
 function testEditorComponent() {

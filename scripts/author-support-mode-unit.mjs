@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 
 import {
+  AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES,
   AUTHOR_SUPPORT_COOKIE_NAME,
   AUTHOR_SUPPORT_TTL_SECONDS,
   assertSupportAuthorScope,
@@ -415,10 +416,26 @@ assert.match(supportActionsUi, /startAuthorSupportMode/);
 assert.doesNotMatch(supportActionsUi, /impersonat/i);
 
 const banner = read("src/components/author-support/AuthorSupportBanner.tsx");
-assert.match(banner, /Режим сопровождения/);
+assert.match(banner, /Режим поддержки/);
+assert.match(banner, /вы работаете от имени/);
 assert.match(banner, /записываются в журнал/);
-assert.match(banner, /Вернуться в админку/);
-assert.match(banner, /stopAuthorSupportMode/);
+assert.match(banner, /AuthorSupportExitForm/);
+assert.doesNotMatch(banner, /Вернуться в админку/);
+assert.doesNotMatch(banner, /Режим сопровождения/);
+
+const exitForm = read("src/components/author-support/AuthorSupportExitForm.tsx");
+assert.match(exitForm, /stopAuthorSupportMode/);
+assert.match(exitForm, /Выйти из режима поддержки/);
+assert.match(exitForm, /useTransition/);
+assert.match(exitForm, /startTransition/);
+assert.match(exitForm, /type="button"/);
+assert.match(exitForm, /Выходим…/);
+assert.doesNotMatch(exitForm, /<form/);
+assert.doesNotMatch(exitForm, /fetch\(/);
+
+const bannerGate = read("src/components/author-support/AuthorSupportBannerGate.tsx");
+assert.match(bannerGate, /readAuthorSupportCookie/);
+assert.match(bannerGate, /isSupportMode === true \|\| Boolean\(supportCookie\)/);
 
 const dashboardLayout = read("src/app/(platform)/author-dashboard/layout.tsx");
 assert.match(dashboardLayout, /AuthorSupportBannerGate/);
@@ -463,6 +480,7 @@ assert.doesNotMatch(read("src/lib/author-support/actions.ts"), /impersonate\?use
 
 const clientBundleGuards = [
   "src/components/author-support/AuthorSupportBanner.tsx",
+  "src/components/author-support/AuthorSupportExitForm.tsx",
   "src/components/author-support/AuthorSupportModeProvider.tsx",
   "src/components/admin/AdminUserSupportActions.tsx",
 ];
@@ -635,6 +653,116 @@ assert.equal(
   false,
 );
 
+const ownPersonalMaterialAudioPost =
+  "/api/author/personal-materials/c202e2da/audio";
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: ownPersonalMaterialAudioPost,
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
+  AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.includes("/api/author/personal-materials"),
+  false,
+);
+const personalMaterialsInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "personal_materials",
+);
+assert.equal(personalMaterialsInventory?.disposition, "blocked");
+
+function proxyGuardBlocksSupportMutation(supportCookie, pathname, method) {
+  return Boolean(supportCookie) && isAuthorSupportBlockedMutation({ pathname, method });
+}
+
+// A. No support cookie. Real owner mutates own personal material. Allowed.
+assert.equal(
+  proxyGuardBlocksSupportMutation("", ownPersonalMaterialAudioPost, "POST"),
+  false,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(null, ownPersonalMaterialAudioPost, "POST"),
+  false,
+);
+
+// B. Support cookie active. Forbidden mutations stay 403 / support_mutation_blocked.
+const activeSupportCookie = "opaque-author-support-token";
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, ownPersonalMaterialAudioPost, "POST"),
+  true,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(
+    activeSupportCookie,
+    "/api/author/personal-materials/c202e2da",
+    "PATCH",
+  ),
+  true,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/promotion/pages", "POST"),
+  true,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/onboarding", "POST"),
+  true,
+);
+
+// Allowed prefixes still allowed while support cookie is present.
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/products/abc", "PATCH"),
+  false,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/studio/projects", "POST"),
+  false,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(activeSupportCookie, "/api/author/profile", "PATCH"),
+  false,
+);
+
+// Sensitive paths stay blocked.
+for (const sensitivePath of [
+  "/settings",
+  "/profile/edit",
+  "/author-dashboard/finance",
+  "/api/author/payout-profile",
+  "/api/author/finance/summary",
+]) {
+  assert.equal(isAuthorSupportSensitivePath(sensitivePath), true, sensitivePath);
+  assert.equal(
+    proxyGuardBlocksSupportMutation(activeSupportCookie, sensitivePath, "GET"),
+    true,
+    sensitivePath,
+  );
+}
+
+// Canonical exit: revoke/end session, clear cookie, then own POST is not blocked.
+const exitActions = read("src/lib/author-support/actions.ts");
+assert.match(exitActions, /export async function stopAuthorSupportMode/);
+assert.match(exitActions, /support_session_ended/);
+assert.match(exitActions, /revokeAuthorSupportSession/);
+assert.match(exitActions, /revokeAuthorSupportSessionsForActor/);
+assert.match(exitActions, /clearAuthorSupportCookie/);
+assert.match(exitActions, /resolveAuthorSupportReturnPath/);
+assert.doesNotMatch(exitActions, /cookies\(\)\.delete/);
+
+let leftoverSupportCookie = activeSupportCookie;
+const exitSession = { revokedAt: null, ended: false };
+exitSession.revokedAt = new Date().toISOString();
+exitSession.ended = true;
+leftoverSupportCookie = "";
+assert.ok(exitSession.revokedAt);
+assert.equal(exitSession.ended, true);
+assert.equal(leftoverSupportCookie, "");
+
+// C. After canonical exit, same own POST audio is NOT blocked by this guard.
+assert.equal(
+  proxyGuardBlocksSupportMutation(leftoverSupportCookie, ownPersonalMaterialAudioPost, "POST"),
+  false,
+);
+
 assert.match(sql, /author_support_request_token_hash/);
 assert.match(sql, /set_author_support_session_proof/);
 assert.match(sql, /s\.token_hash = v_proof/);
@@ -711,6 +839,37 @@ for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
 
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);
+assert.match(proxy, /supportCookie &&/);
+assert.doesNotMatch(
+  read("src/lib/author-support/policy.ts"),
+  /\/api\/author\/personal-materials/,
+);
+
+const personalErrors = read("src/lib/personal-materials/client/errors.ts");
+assert.match(personalErrors, /support_mutation_blocked/);
+assert.match(personalErrors, /Выйдите из режима поддержки и повторите действие/);
+assert.doesNotMatch(personalErrors, /повторите загрузку/);
+assert.match(
+  read("src/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload.tsx"),
+  /PersonalMaterialClientErrorAlert/,
+);
+const supportErrorAlert = read(
+  "src/components/personal-materials/PersonalMaterialClientErrorAlert.tsx",
+);
+assert.match(supportErrorAlert, /AuthorSupportExitForm/);
+assert.doesNotMatch(supportErrorAlert, /<form/);
+
+const createDiagnostics = read(
+  "src/components/author-dashboard/personal-materials/AuthorDiagnosticsCreateClient.tsx",
+);
+assert.match(createDiagnostics, /<form/);
+assert.match(createDiagnostics, /PersonalMaterialClientErrorAlert/);
+assert.match(createDiagnostics, /onSubmit/);
+assert.doesNotMatch(createDiagnostics, /<form[\s\S]*<form/);
+assert.doesNotMatch(
+  `${createDiagnostics}\n${supportErrorAlert}\n${exitForm}`,
+  /<form[\s\S]*<form/,
+);
 
 assert.doesNotMatch(read("src/lib/author-support/actions.ts"), /console\.error\("author_support_audit_insert_failed"\)/);
 

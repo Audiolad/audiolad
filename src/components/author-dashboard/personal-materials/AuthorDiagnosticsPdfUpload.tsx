@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import { getPersonalMaterialDownloadErrorMessage } from "@/lib/personal-materials/client/errors";
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 import {
@@ -98,6 +99,7 @@ export default function AuthorDiagnosticsPdfUpload({
     ? (pdfOriginalFilename ?? selectedName ?? "document.pdf")
     : selectedName;
   const displaySize = hasPdf ? pdfSizeBytes : selectedSize;
+  const displayedError = localError ?? error ?? null;
 
   return (
     <section
@@ -202,10 +204,8 @@ export default function AuthorDiagnosticsPdfUpload({
         </div>
       ) : null}
 
-      {localError || error ? (
-        <p className="mt-3 text-sm text-[#b42318]" role="alert">
-          {localError ?? error}
-        </p>
+      {displayedError ? (
+        <PersonalMaterialClientErrorAlert message={displayedError} />
       ) : null}
     </section>
   );

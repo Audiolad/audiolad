@@ -1,4 +1,4 @@
-import { stopAuthorSupportMode } from "@/lib/author-support/actions";
+import { AuthorSupportExitForm } from "./AuthorSupportExitForm";
 
 type AuthorSupportBannerProps = {
   actingDisplayName: string;
@@ -24,24 +24,13 @@ export function AuthorSupportBanner({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-semibold">Режим сопровождения</p>
+          <p className="font-semibold">Режим поддержки</p>
           <p className={dark ? "mt-1 text-[#cfc4e4]" : "mt-1 text-[#6a5a8a]"}>
-            Вы помогаете: {actingDisplayName} · {actingAuthorName}. Изменения
-            записываются в журнал.
+            Режим поддержки: вы работаете от имени {actingDisplayName} ·{" "}
+            {actingAuthorName}. Изменения записываются в журнал.
           </p>
         </div>
-        <form action={stopAuthorSupportMode}>
-          <button
-            type="submit"
-            className={
-              dark
-                ? "inline-flex min-h-10 items-center justify-center rounded-full border border-white/25 px-4 text-sm font-semibold text-white"
-                : "inline-flex min-h-10 items-center justify-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
-            }
-          >
-            Вернуться в админку
-          </button>
-        </form>
+        <AuthorSupportExitForm variant={dark ? "dark" : "light"} />
       </div>
     </div>
   );

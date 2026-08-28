@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import AuthorDiagnosticsFormFields from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsFormFields";
+import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import {
   createAuthorPersonalMaterial,
   instantiateAuthorPersonalMaterialTemplate,
@@ -228,9 +229,7 @@ export default function AuthorDiagnosticsCreateClient({
           Имя клиента и аудио нужно будет заполнить в редакторе перед активацией.
         </p>
         {submitError ? (
-          <p className="mt-4 text-sm text-[#b42318]" role="alert">
-            {submitError}
-          </p>
+          <PersonalMaterialClientErrorAlert message={submitError} className="mt-4" />
         ) : null}
         <button
           type="button"
@@ -294,9 +293,7 @@ export default function AuthorDiagnosticsCreateClient({
       </section>
 
       {submitError ? (
-        <p className="mt-4 text-sm text-[#b42318]" role="alert">
-          {submitError}
-        </p>
+        <PersonalMaterialClientErrorAlert message={submitError} className="mt-4" />
       ) : null}
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">

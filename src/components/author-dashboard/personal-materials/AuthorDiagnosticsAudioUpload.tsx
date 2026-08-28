@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import { getPersonalMaterialDownloadErrorMessage } from "@/lib/personal-materials/client/errors";
 import { PERSONAL_MATERIAL_LIMITS } from "@/lib/personal-materials/types";
 import {
@@ -115,6 +116,7 @@ export default function AuthorDiagnosticsAudioUpload({
     ? (audioOriginalFilename ?? selectedName ?? "audio.mp3")
     : selectedName;
   const displaySize = hasAudio ? audioSizeBytes : selectedSize;
+  const displayedError = localError ?? error ?? null;
 
   return (
     <section
@@ -224,10 +226,8 @@ export default function AuthorDiagnosticsAudioUpload({
         </div>
       ) : null}
 
-      {localError || error ? (
-        <p className="mt-3 text-sm text-[#b42318]" role="alert">
-          {localError ?? error}
-        </p>
+      {displayedError ? (
+        <PersonalMaterialClientErrorAlert message={displayedError} />
       ) : null}
     </section>
   );
