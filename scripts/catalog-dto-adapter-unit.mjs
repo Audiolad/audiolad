@@ -282,6 +282,13 @@ for (const file of frontendFiles) {
   assert.doesNotMatch(sourceText, /audio_items/, `${file} has no audio_items`);
 }
 
+const dtoSource = read("src/lib/catalog/dto.ts");
+assert.doesNotMatch(
+  dtoSource,
+  /start_token|startToken/,
+  "public catalog DTO does not expose start_token",
+);
+
 const adapterSource = read("src/lib/catalog/legacy-adapter.ts");
 assert.match(adapterSource, /productKind/, "adapter may read legacy kind");
 assert.match(adapterSource, /source\.format/, "adapter maps display_label from format");

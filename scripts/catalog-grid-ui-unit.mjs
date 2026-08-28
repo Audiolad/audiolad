@@ -144,6 +144,19 @@ assert.match(card, /readPaidCatalogOfferCompareAtLabel/, "compare-at comes from 
 assert.match(card, /data-catalog-card-compare-at/, "struck full price is marked");
 assert.match(card, /line-through/, "compare-at is struck");
 assert.doesNotMatch(card, /Предложение действует|20 минут|setInterval/, "catalog card has no timer copy");
+assert.doesNotMatch(
+  card,
+  /text-\[21px\]|text-\[22px\]/,
+  "catalog card does not copy PDP struck/sale sizes",
+);
+assert.match(card, /text-xs leading-4/, "catalog price stays card-sized");
+const gallery = read("src/components/catalog/cards/CatalogCardGallery.tsx");
+assert.match(gallery, /card\.paths\.pdp/, "cover/gallery opens the same card PDP path");
+assert.doesNotMatch(gallery, /\?promo=/, "gallery does not hardcode promo query");
+const play = read("src/components/products/CatalogProductPlayButton.tsx");
+assert.doesNotMatch(play, /promo|start_token/, "play overlay does not start a promotion");
+const heart = read("src/components/products/CatalogProductHeartButton.tsx");
+assert.doesNotMatch(heart, /promo|paths\.pdp/, "heart/save does not open PDP or start a promo");
 assert.match(card, /class === "post"/, "posts never render an offer price");
 assert.match(card, /data-catalog-card-price/, "paid price is a visual marker");
 assert.match(
