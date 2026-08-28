@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
+  classifyAnalyticsRpcError,
+  invokeAnalyticsRpc,
+  isAnalyticsCircuitOpen,
+} from "@/lib/analytics/rpc-protection";
+import {
   checkAnalyticsRateLimit,
   parsePlatformTrackBody,
 } from "@/lib/analytics/sanitize";
@@ -32,34 +37,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
+  if (isAnalyticsCircuitOpen()) {
+    return NextResponse.json({ error: "overloaded" }, { status: 503 });
+  }
+
   const supabase = await createClientFromRequest(request);
 
-  const { data, error } = await supabase.rpc("insert_platform_analytics_event", {
-    p_session_id: parsed.session_id,
-    p_anonymous_id: parsed.anonymous_id,
-    p_event_name: parsed.event_name,
-    p_path: parsed.path,
-    p_practice_id: parsed.practice_id,
-    p_audio_item_id: parsed.audio_item_id,
-    p_properties: parsed.properties,
-    p_client_event_id: parsed.client_event_id,
-    p_user_agent: request.headers.get("user-agent"),
-    p_client_version: parsed.client_version,
-    p_author_id: parsed.author_id,
-  });
+  const { data, error, kind } = await invokeAnalyticsRpc(
+    supabase.rpc("insert_platform_analytics_event", {
+      p_session_id: parsed.session_id,
+      p_anonymous_id: parsed.anonymous_id,
+      p_event_name: parsed.event_name,
+      p_path: parsed.path,
+      p_practice_id: parsed.practice_id,
+      p_audio_item_id: parsed.audio_item_id,
+      p_properties: parsed.properties,
+      p_client_event_id: parsed.client_event_id,
+      p_user_agent: request.headers.get("user-agent"),
+      p_client_version: parsed.client_version,
+      p_author_id: parsed.author_id,
+    }),
+  );
 
   if (error) {
+    const message = (error.message ?? "").toLowerCase();
     if (
-      error.message.toLowerCase().includes("event_name_not_allowed") ||
-      error.message.toLowerCase().includes("session_mismatch") ||
-      error.message.toLowerCase().includes("session_required") ||
-      error.message.toLowerCase().includes("author_required") ||
-      error.message.toLowerCase().includes("author_not_found")
+      message.includes("event_name_not_allowed") ||
+      message.includes("session_mismatch") ||
+      message.includes("session_required") ||
+      message.includes("author_required") ||
+      message.includes("author_not_found")
     ) {
       return NextResponse.json({ error: "invalid_event" }, { status: 400 });
     }
 
+    const classified = classifyAnalyticsRpcError(error);
     console.error("platform_analytics_track_error", error.message);
+
+    if (kind === "overload" || kind === "timeout" || classified.kind === "overload") {
+      return NextResponse.json({ error: "overloaded" }, { status: 503 });
+    }
+
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 

@@ -721,6 +721,18 @@ Ownership: триггер `enforce_quick_offer_product_owner` запрещает
 
 Claim (INSERT) выполняется до SMTP. Повторный вызов с тем же `user_id` не отправляет письмо. Не использовать author sale / moderation outbox workers для welcome.
 
+## Analytics heavy RPC (2026-08-28)
+
+Миграция: `supabase/migrations/20260901120000_analytics_heavy_rpc_idempotent.sql`.
+
+`link_analytics_session_user`: если `analytics_sessions.user_id` уже равен `auth.uid()`, функция сразу возвращает `true` — без `pg_advisory_xact_lock`, без массового `UPDATE analytics_events`, без повторного `link_analytics_identity`. Первый link по-прежнему пишет session/events (`user_id IS NULL`) и identity/first-touch.
+
+`record_platform_signup_completed`: семантика `signup_completed` / first-touch сохранена. Повторный вызов для уже записанной регистрации и уже принадлежащей сессии не вызывает link. Новый session после регистрации по-прежнему линкуется.
+
+`ensure_anonymous_first_touch` / `ensure_user_first_touch`: существование first-touch проверяется до advisory lock; lock берётся только на мутацию.
+
+Приложение защищает `POST /api/analytics/session/link` и `POST /api/analytics/signup/complete` process-local rate limit + circuit breaker до RPC. Состояние breaker в Postgres не хранится.
+
 ## Схема, триггеры, RLS
 
 Таблица `profiles` задокументирована выше. Таблица `practices` — частично. `playlists` / `playlist_items` — в этом разделе. Остальные таблицы требуют изучения через Supabase Studio.

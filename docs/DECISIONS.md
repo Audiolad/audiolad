@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-08-28 — Analytics heavy RPC protection
+
+**Контекст:** один клиент (~400–500/мин) вызывал `POST /api/analytics/session/link` и `POST /api/analytics/signup/complete` на каждом `onAuthStateChange`, включая `TOKEN_REFRESHED`. `SIGNED_IN` делал link + signup/complete, а signup RPC снова вызывал link. Тяжёлые UPDATE + `pg_advisory_xact_lock` → 55P03 → пул PostgREST (10) → PGRST003 → 504 на несвязанных RPC.
+
+**Решение:**
+
+- Frontend: link/signup только на реальный anonymous → authenticated переход. `TOKEN_REFRESHED` не вызывает RPC. `SIGNED_IN` канонически идёт только в signup/complete. In-flight + completed dedupe на пару session+user.
+- Server: process-local rate limit (`checkAnalyticsRateLimit`), in-flight/success cache и circuit breaker **до** RPC. AbortController timeout, без `Promise.race`.
+- SQL: уже принадлежащая пользователю сессия возвращается сразу; advisory lock только если first-touch ещё нет.
+- Track retry: ограниченный backoff + jitter; PGRST003/55P03/503/504 не ретраятся в tight loop.
+
+Не менять: personal materials SAVE/activate, upload, nginx, отдельные DB pools, rollback `0bb70eca`.
+
+**Принято:** владелец продукта (задание P0/P1 analytics RPC protection).
+
+---
+
 ## 2026-08-25 — Editorial publish stamps listed_at
 
 **Контекст:** `/playlists/catalog` показывает только строки с `listed_at IS NOT NULL`. Публикация редакционного плейлиста писала `visibility` + `slug` + `published_at`, поэтому новый editorial playlist появлялся в старом блоке «Плейлисты АудиоЛада» и не попадал в витрину.

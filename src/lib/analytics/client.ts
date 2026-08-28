@@ -1,9 +1,11 @@
 import type { PlatformAnalyticsEventName } from "@/lib/analytics/constants";
 import { createClientEventId } from "@/lib/analytics/event-id";
 import { getOrCreateAnonymousId } from "@/lib/analytics/identity-storage";
+import { ANALYTICS_RPC_TIMEOUT_MS } from "@/lib/analytics/constants";
 import {
   enqueueAnalyticsRetry,
   flushAnalyticsRetryQueue,
+  shouldRetryAnalyticsFailure,
   type AnalyticsRetryItem,
   type AnalyticsRetrySendResult,
 } from "@/lib/analytics/retry-queue";
@@ -12,10 +14,7 @@ import {
   readSessionState,
   writeSessionState,
 } from "@/lib/analytics/session-state";
-import {
-  createKeyedSingleFlight,
-  shouldSettleAnalyticsHttpAttempt,
-} from "@/lib/analytics/single-flight";
+import { createKeyedSingleFlight } from "@/lib/analytics/single-flight";
 import {
   isYandexMetrikaGoalName,
   sendYandexGoal,
@@ -56,16 +55,45 @@ type PostJsonResult<T> = {
   ok: boolean;
   status: number;
   data: T | null;
+  error: string | null;
+};
+
+type PostJsonOptions = {
+  timeoutMs?: number;
+  keepalive?: boolean;
 };
 
 let cachedSessionId: string | null = null;
 let sessionInitPromise: Promise<string | null> | null = null;
-const linkSessionFlight = createKeyedSingleFlight<PostJsonResult<{ linked?: boolean }>>();
+const linkSessionFlight = createKeyedSingleFlight<
+  PostJsonResult<{ linked?: boolean; reason?: string }>
+>();
 const signupCompleteFlight = createKeyedSingleFlight<
-  PostJsonResult<{ recorded?: boolean }>
+  PostJsonResult<{ recorded?: boolean; reason?: string }>
 >();
 
-async function postJson<T>(url: string, body: unknown): Promise<PostJsonResult<T>> {
+function readErrorCode(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+
+  const error = (data as { error?: unknown }).error;
+  return typeof error === "string" && error.trim() ? error.trim() : null;
+}
+
+async function postJson<T>(
+  url: string,
+  body: unknown,
+  options: PostJsonOptions = {},
+): Promise<PostJsonResult<T>> {
+  const timeoutMs = options.timeoutMs;
+  const controller =
+    typeof timeoutMs === "number" ? new AbortController() : null;
+  const timer =
+    controller && typeof timeoutMs === "number"
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -73,14 +101,24 @@ async function postJson<T>(url: string, body: unknown): Promise<PostJsonResult<T
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
-      keepalive: true,
+      keepalive: options.keepalive ?? false,
+      ...(controller ? { signal: controller.signal } : {}),
     });
 
     const data = (await response.json().catch(() => null)) as T | null;
 
-    return { ok: response.ok, status: response.status, data };
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+      error: readErrorCode(data),
+    };
   } catch {
-    return { ok: false, status: 0, data: null };
+    return { ok: false, status: 0, data: null, error: "aborted" };
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -103,17 +141,42 @@ function touchSessionState(): void {
 }
 
 async function sendRetryItem(item: AnalyticsRetryItem): Promise<AnalyticsRetrySendResult> {
-  const result = await postJson(item.url, item.body);
+  const result = await postJson(item.url, item.body, { timeoutMs: ANALYTICS_RPC_TIMEOUT_MS });
 
   if (result.ok) {
     return { ok: true };
   }
 
-  if (result.status === 0 || result.status === 429 || result.status >= 500) {
-    return { ok: false, retry: true };
+  return {
+    ok: false,
+    retry: shouldRetryAnalyticsFailure(result.status, result.error),
+  };
+}
+
+export function resolveAnalyticsSessionId(): string | null {
+  if (cachedSessionId) {
+    return cachedSessionId;
   }
 
-  return { ok: false, retry: false };
+  const localState = readSessionState();
+  if (localState && isSessionStateActive(localState)) {
+    cachedSessionId = localState.sessionId;
+    return localState.sessionId;
+  }
+
+  return null;
+}
+
+function isSuccessfulLinkAttempt(
+  result: PostJsonResult<{ linked?: boolean; reason?: string }>,
+): boolean {
+  return result.ok && result.data?.reason !== "degraded" && Boolean(result.data?.linked);
+}
+
+function isSuccessfulSignupAttempt(
+  result: PostJsonResult<{ recorded?: boolean; reason?: string }>,
+): boolean {
+  return result.ok && result.data?.reason !== "degraded" && Boolean(result.data?.recorded);
 }
 
 export async function ensureAnalyticsSession(
@@ -165,25 +228,44 @@ export async function ensureAnalyticsSession(
   return sessionInitPromise;
 }
 
-export async function linkAnalyticsSessionUser(): Promise<void> {
-  const sessionId = cachedSessionId;
+export async function linkAnalyticsSessionUser(): Promise<boolean> {
+  const sessionId = resolveAnalyticsSessionId();
 
   if (!sessionId) {
-    return;
+    return false;
   }
 
   const anonymousId = getOrCreateAnonymousId();
   const key = `${sessionId}:${anonymousId}`;
 
-  await linkSessionFlight.run(
+  const result = await linkSessionFlight.run(
     key,
     () =>
-      postJson<{ linked?: boolean }>("/api/analytics/session/link", {
-        session_id: sessionId,
-        anonymous_id: anonymousId,
-      }),
-    { settle: (result) => shouldSettleAnalyticsHttpAttempt(result.status) },
+      postJson<{ linked?: boolean; reason?: string }>(
+        "/api/analytics/session/link",
+        {
+          session_id: sessionId,
+          anonymous_id: anonymousId,
+        },
+        { timeoutMs: ANALYTICS_RPC_TIMEOUT_MS },
+      ),
+    { settle: isSuccessfulLinkAttempt },
   );
+
+  if (!result) {
+    return linkSessionFlight.hasSettled(key);
+  }
+
+  if (!isSuccessfulLinkAttempt(result)) {
+    console.info("analytics_session_link_client", {
+      event: "degraded",
+      status: result.status,
+      error: result.error,
+    });
+    return false;
+  }
+
+  return true;
 }
 
 /** Close active identity links for the current authenticated user (call before sign-out). */
@@ -192,7 +274,7 @@ export async function unlinkAnalyticsIdentity(): Promise<void> {
 }
 
 export async function recordPlatformSignupCompleted(): Promise<boolean> {
-  const sessionId = cachedSessionId;
+  const sessionId = resolveAnalyticsSessionId();
 
   if (!sessionId) {
     return false;
@@ -204,14 +286,31 @@ export async function recordPlatformSignupCompleted(): Promise<boolean> {
   const result = await signupCompleteFlight.run(
     key,
     () =>
-      postJson<{ recorded?: boolean }>("/api/analytics/signup/complete", {
-        session_id: sessionId,
-        anonymous_id: anonymousId,
-      }),
-    { settle: (attempt) => shouldSettleAnalyticsHttpAttempt(attempt.status) },
+      postJson<{ recorded?: boolean; reason?: string }>(
+        "/api/analytics/signup/complete",
+        {
+          session_id: sessionId,
+          anonymous_id: anonymousId,
+        },
+        { timeoutMs: ANALYTICS_RPC_TIMEOUT_MS },
+      ),
+    { settle: isSuccessfulSignupAttempt },
   );
 
-  const recorded = Boolean(result?.data?.recorded);
+  if (!result) {
+    return signupCompleteFlight.hasSettled(key);
+  }
+
+  if (!result.ok || result.data?.reason === "degraded") {
+    console.info("analytics_signup_complete_client", {
+      event: "degraded",
+      status: result.status,
+      error: result.error,
+    });
+    return false;
+  }
+
+  const recorded = Boolean(result.data?.recorded);
 
   if (recorded) {
     sendYandexGoal("signup_completed");
@@ -242,12 +341,9 @@ export async function trackPlatformEvent(
     client_version: CLIENT_VERSION,
   };
 
-  const result = await postJson("/api/analytics/track", body);
+  const result = await postJson("/api/analytics/track", body, { keepalive: true });
 
-  if (
-    !result.ok &&
-    (result.status === 0 || result.status === 429 || result.status >= 500)
-  ) {
+  if (!result.ok && shouldRetryAnalyticsFailure(result.status, result.error)) {
     enqueueAnalyticsRetry({
       id: clientEventId,
       url: "/api/analytics/track",
