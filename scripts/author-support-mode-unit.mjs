@@ -362,6 +362,21 @@ assert.match(auth, /requestedAuthorMatchesSupport/);
 assert.match(auth, /author\.can_bypass_product_moderation === true \|\| actorCanBypass/);
 assert.match(auth, /eq\("user_id", user\.id\)/);
 
+const productEditPage = read(
+  "src/app/(platform)/author-dashboard/products/[id]/page.tsx",
+);
+const productEditHelper = read("src/lib/author-products/dashboard-edit-page.ts");
+assert.match(productEditPage, /loadAuthorDashboardProductEditData/);
+assert.doesNotMatch(productEditPage, /from\("author_members"\)/);
+assert.doesNotMatch(productEditPage, /requirePracticeMutationAccess/);
+assert.match(productEditHelper, /requirePracticeAccess\(practiceId\)/);
+assert.match(
+  productEditHelper,
+  /getAuthorProductDetail\(access\.supabase, practiceId\)/,
+);
+assert.doesNotMatch(productEditHelper, /from\("author_members"\)/);
+assert.doesNotMatch(productEditHelper, /requirePracticeMutationAccess/);
+
 const moderationActor = read("src/lib/author-products/moderation-actor.ts");
 assert.match(moderationActor, /resolveSupportBypassCapability/);
 assert.match(moderationActor, /author_products\.moderate/);
