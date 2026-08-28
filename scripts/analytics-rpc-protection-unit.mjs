@@ -32,10 +32,8 @@ import {
   shouldRetryAnalyticsFailure,
 } from "../src/lib/analytics/retry-queue.ts";
 import {
-  STORM_EDGE_IP_EXAMPLE,
+  STORM_CLIENT_IP_EXAMPLE,
   getTrustedClientIp,
-  isCloudflareIp,
-  isTrustedProxyIp,
 } from "../src/lib/http/trusted-client-ip.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -55,13 +53,11 @@ function makeRequest(ip, bearer) {
   return new Request("https://audiolad.ru/api/analytics/session/link", { headers });
 }
 
-function makeCloudflareRequest(clientIp, edgeIp = STORM_EDGE_IP_EXAMPLE, extra = {}) {
+function makeNginxRequest(clientIp, extra = {}) {
   return new Request("https://audiolad.ru/api/analytics/session/link", {
     headers: {
-      "x-real-ip": edgeIp,
-      "x-forwarded-for": `${clientIp}, ${edgeIp}`,
-      "cf-connecting-ip": clientIp,
-      "cf-ray": "8a1b2c3d4e5f6a7b-DME",
+      "x-real-ip": clientIp,
+      "x-forwarded-for": `${clientIp}`,
       ...extra,
     },
   });
@@ -439,7 +435,23 @@ function testSourceContracts() {
   assert.equal(protection.includes("Promise.race"), false);
   assert.match(protection, /getTrustedClientIp/);
   assert.match(protection, /Never used for authorization/);
-  assert.match(read("src/lib/http/trusted-client-ip.ts"), /cf-connecting-ip/);
+  const helper = read("src/lib/http/trusted-client-ip.ts");
+  assert.match(helper, /X-Real-IP/);
+  assert.match(helper, /RIGHTMOST/);
+  assert.equal(helper.includes('headers.get("cf-connecting-ip")'), false);
+  assert.equal(helper.includes("isCloudflareIp"), false);
+  assert.match(trackRoute, /getTrustedClientIp/);
+  assert.equal(trackRoute.includes('split(",")[0]'), false);
+  assert.match(read("src/app/api/analytics/session/route.ts"), /getTrustedClientIp/);
+  assert.equal(
+    read("src/app/api/analytics/session/route.ts").includes('split(",")[0]'),
+    false,
+  );
+  assert.equal(
+    read("src/lib/personal-materials/server/rate-limit.ts").includes("getTrustedClientIp"),
+    false,
+    "personal-materials rate-limit must stay untouched",
+  );
   assert.match(read("src/app/api/analytics/signup/complete/route.ts"), /createClientFromRequest/);
   assert.match(read("src/app/api/analytics/signup/complete/route.ts"), /getUser/);
   assert.equal(
@@ -473,24 +485,24 @@ function testSourceContracts() {
 }
 
 function testTrustedClientIpExtraction() {
-  assert.equal(isCloudflareIp(STORM_EDGE_IP_EXAMPLE), true, "104.30.175.37 is Cloudflare-owned");
-  assert.equal(isTrustedProxyIp(STORM_EDGE_IP_EXAMPLE), true);
-  assert.equal(isTrustedProxyIp("127.0.0.1"), true);
-  assert.equal(isTrustedProxyIp("203.0.113.10"), false);
+  const viaRealIp = makeNginxRequest(STORM_CLIENT_IP_EXAMPLE, {
+    "x-forwarded-for": `8.8.8.8, ${STORM_CLIENT_IP_EXAMPLE}`,
+  });
+  assert.equal(
+    getTrustedClientIp(viaRealIp),
+    STORM_CLIENT_IP_EXAMPLE,
+    "X-Real-IP is the nginx TCP peer and must be used as the client",
+  );
 
-  const viaCf = makeCloudflareRequest("203.0.113.50");
-  assert.equal(getTrustedClientIp(viaCf), "203.0.113.50");
-
-  const nginxWithoutCfHeaders = new Request("https://audiolad.ru/api/analytics/session/link", {
+  const rightmostOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
     headers: {
-      "x-real-ip": STORM_EDGE_IP_EXAMPLE,
-      "x-forwarded-for": `203.0.113.50, ${STORM_EDGE_IP_EXAMPLE}`,
+      "x-forwarded-for": `8.8.8.8, ${STORM_CLIENT_IP_EXAMPLE}`,
     },
   });
   assert.equal(
-    getTrustedClientIp(nginxWithoutCfHeaders),
-    "203.0.113.50",
-    "nginx X-Real-IP=edge + XFF walk must yield the real client",
+    getTrustedClientIp(rightmostOnly),
+    STORM_CLIENT_IP_EXAMPLE,
+    "without X-Real-IP, rightmost XFF (nginx-appended hop) is the client",
   );
 
   const spoofed = new Request("https://audiolad.ru/api/analytics/session/link", {
@@ -502,48 +514,33 @@ function testTrustedClientIpExtraction() {
   assert.equal(
     getTrustedClientIp(spoofed),
     "203.0.113.10",
-    "untrusted XFF leftmost hop must be ignored",
+    "untrusted leftmost XFF hop must be ignored",
   );
 
-  const spoofedXffOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
+  const cfHeadersIgnored = new Request("https://audiolad.ru/api/analytics/session/link", {
     headers: {
-      "x-forwarded-for": `8.8.8.8, ${STORM_EDGE_IP_EXAMPLE}`,
-    },
-  });
-  assert.equal(
-    getTrustedClientIp(spoofedXffOnly),
-    "unknown",
-    "direct client must not become trusted by appending a Cloudflare hop",
-  );
-
-  const cfHeadersWithoutRealIp = new Request("https://audiolad.ru/api/analytics/session/link", {
-    headers: {
-      "cf-connecting-ip": "203.0.113.77",
+      "x-real-ip": "203.0.113.10",
+      "cf-connecting-ip": "198.51.100.1",
       "cf-ray": "8a1b2c3d4e5f6a7b-DME",
     },
   });
-  assert.equal(getTrustedClientIp(cfHeadersWithoutRealIp), "203.0.113.77");
-
-  const edgeOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
-    headers: {
-      "x-real-ip": STORM_EDGE_IP_EXAMPLE,
-      "x-forwarded-for": STORM_EDGE_IP_EXAMPLE,
-    },
-  });
   assert.equal(
-    getTrustedClientIp(edgeOnly),
-    "unknown",
-    "Cloudflare/proxy peer must not become the client cap",
+    getTrustedClientIp(cfHeadersIgnored),
+    "203.0.113.10",
+    "CF-Connecting-IP must not override nginx $remote_addr",
   );
 
-  assert.equal(isCloudflareIp(`::ffff:${STORM_EDGE_IP_EXAMPLE}`), true);
+  const empty = new Request("https://audiolad.ru/api/analytics/session/link", {
+    headers: {},
+  });
+  assert.equal(getTrustedClientIp(empty), "unknown");
 }
 
 async function testDifferentRealClientsDoNotShareCap() {
   resetAnalyticsRpcProtectionForTests();
   const first = guardAnalyticsHeavyRpc({
     route: "session_link",
-    request: makeCloudflareRequest("203.0.113.21"),
+    request: makeNginxRequest("203.0.113.21"),
     sessionId: "44444444-4444-4444-8444-444444444444",
     userId: "user-d",
   });
@@ -552,31 +549,102 @@ async function testDifferentRealClientsDoNotShareCap() {
 
   const second = guardAnalyticsHeavyRpc({
     route: "session_link",
-    request: makeCloudflareRequest("203.0.113.22"),
+    request: makeNginxRequest("203.0.113.22"),
     sessionId: "55555555-5555-4555-8555-555555555555",
     userId: "user-e",
   });
-  assert.equal(second.action, "rpc", "different real client IPs must not share the edge cap");
+  assert.equal(second.action, "rpc", "different real client IPs must not share a cap");
   second.release("ok");
 }
 
-async function testManyUsersBehindOneEdgeDoNotBlockEachOther() {
+async function testSpoofedXffCannotStealAnotherClientCap() {
   resetAnalyticsRpcProtectionForTests();
-  let rpc = 0;
-  for (let i = 0; i < 25; i += 1) {
-    const clientIp = `198.51.100.${i + 1}`;
+  const victimIp = "203.0.113.21";
+  const attackerIp = "198.51.100.9";
+  const victimSession = "77777777-7777-4777-8777-777777777777";
+
+  for (let i = 0; i < 20; i += 1) {
     const decision = guardAnalyticsHeavyRpc({
       route: "signup_complete",
-      request: makeCloudflareRequest(clientIp),
-      sessionId: `66666666-6666-4666-8666-${String(i).padStart(12, "0")}`,
-      userId: `edge-user-${i}`,
+      request: makeNginxRequest(victimIp),
+      sessionId: `88888888-8888-4888-8888-${String(i).padStart(12, "0")}`,
+      userId: `victim-${i}`,
     });
-    if (decision.action === "rpc") {
-      rpc += 1;
+    assert.equal(decision.action, "rpc");
+    decision.release("ok");
+  }
+
+  const victimBlocked = guardAnalyticsHeavyRpc({
+    route: "signup_complete",
+    request: makeNginxRequest(victimIp),
+    sessionId: victimSession,
+    userId: "victim-blocked",
+  });
+  assert.equal(victimBlocked.action, "rate_limited");
+
+  const spoofAttempt = guardAnalyticsHeavyRpc({
+    route: "signup_complete",
+    request: makeNginxRequest(attackerIp, {
+      "x-forwarded-for": `${victimIp}, ${attackerIp}`,
+    }),
+    sessionId: "99999999-9999-4999-8999-999999999999",
+    userId: "attacker",
+  });
+  assert.equal(
+    spoofAttempt.action,
+    "rpc",
+    "spoofed leftmost XFF must not consume or share the victim IP cap",
+  );
+  spoofAttempt.release("ok");
+}
+
+async function testNatSessionsKeepSeparatePairKeys() {
+  resetAnalyticsRpcProtectionForTests();
+  const natIp = STORM_CLIENT_IP_EXAMPLE;
+  const sessionA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const sessionB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+  const keyA = buildAnalyticsHeavyRpcKey({
+    route: "session_link",
+    ip: getTrustedClientIp(makeNginxRequest(natIp)),
+    userId: null,
+    sessionId: sessionA,
+  });
+  const keyB = buildAnalyticsHeavyRpcKey({
+    route: "session_link",
+    ip: getTrustedClientIp(makeNginxRequest(natIp)),
+    userId: null,
+    sessionId: sessionB,
+  });
+  assert.notEqual(keyA, keyB, "NAT peers must keep separate pair keys via session id");
+
+  for (let i = 0; i < 3; i += 1) {
+    const decision = guardAnalyticsHeavyRpc({
+      route: "session_link",
+      request: makeNginxRequest(natIp),
+      sessionId: sessionA,
+      userId: "nat-a",
+    });
+    if (i === 0) {
+      assert.equal(decision.action, "rpc");
       decision.release("ok");
+    } else {
+      assert.equal(decision.action, "deduped");
     }
   }
-  assert.equal(rpc, 25, "25 users behind one Cloudflare edge must not share a 20/min cap");
+
+  const otherSession = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request: makeNginxRequest(natIp),
+    sessionId: sessionB,
+    userId: "nat-b",
+  });
+  assert.equal(
+    otherSession.action,
+    "rpc",
+    "another session behind the same NAT must not share the pair key",
+  );
+  otherSession.release("ok");
 }
 
 function testExistingRateLimiterStillUsed() {
@@ -603,7 +671,8 @@ async function main() {
   testSourceContracts();
   testTrustedClientIpExtraction();
   await testDifferentRealClientsDoNotShareCap();
-  await testManyUsersBehindOneEdgeDoNotBlockEachOther();
+  await testSpoofedXffCannotStealAnotherClientCap();
+  await testNatSessionsKeepSeparatePairKeys();
   testExistingRateLimiterStillUsed();
   console.log("analytics-rpc-protection-unit: ok");
 }
