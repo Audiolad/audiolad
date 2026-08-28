@@ -10,12 +10,17 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readdirSync } from "node:fs";
+
 import {
   AUTHOR_SUPPORT_COOKIE_NAME,
   AUTHOR_SUPPORT_TTL_SECONDS,
   assertSupportAuthorScope,
   buildAuthorSupportCookieOptions,
+  evaluateAuthorMembersCanMutate,
+  evaluateAuthorSupportSqlAuthority,
   evaluateAuthorSupportStart,
+  isAuthorSupportBlockedMutation,
   isAuthorSupportSensitivePath,
   isAuthorSupportSessionUsable,
   resolveAuthorSupportLandingPath,
@@ -23,6 +28,10 @@ import {
   resolveSupportBypassCapability,
   sanitizeAuthorSupportAuditMetadata,
 } from "../src/lib/author-support/policy.ts";
+import {
+  AUTHOR_SUPPORT_MUTATION_INVENTORY,
+  listAuthorSupportInventoryRoutePatterns,
+} from "../src/lib/author-support/mutation-inventory.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -353,11 +362,13 @@ assert.match(auth, /requestedAuthorMatchesSupport/);
 assert.match(auth, /author\.can_bypass_product_moderation === true \|\| actorCanBypass/);
 assert.match(auth, /eq\("user_id", user\.id\)/);
 
-const moderation = read("src/lib/author-products/moderation.ts");
-assert.match(moderation, /resolveSupportBypassCapability/);
-assert.match(moderation, /author_products\.moderate/);
+const moderationActor = read("src/lib/author-products/moderation-actor.ts");
+assert.match(moderationActor, /resolveSupportBypassCapability/);
+assert.match(moderationActor, /author_products\.moderate/);
+assert.match(moderationActor, /peekAuthorExecutionContext/);
+assert.doesNotMatch(read("src/lib/author-products/moderation.ts"), /author-support\/context/);
 
-const sql = read("supabase/migrations/20260901120000_author_support_mode.sql");
+const sql = read("supabase/migrations/20260901130000_author_support_mode.sql");
 assert.match(sql, /CREATE TABLE IF NOT EXISTS public.author_support_sessions/);
 assert.match(sql, /CREATE TABLE IF NOT EXISTS public.author_support_audit_events/);
 assert.match(sql, /actor_user_id/);
@@ -452,5 +463,236 @@ const diagnosticsPage = read(
 assert.match(diagnosticsPage, /requireAdminPermission\("users\.view"\)/);
 assert.match(diagnosticsPage, /getAdminProductDiagnostics/);
 assert.doesNotMatch(diagnosticsPage, /impersonat/i);
+
+const proofSession = {
+  actorUserId: ownerId,
+  tokenHash: "a".repeat(64),
+  actingAuthorId: targetAuthorId,
+  actingUserId: targetUserId,
+  revokedAt: null,
+  expiresAt: new Date(Date.now() + 60_000).toISOString(),
+};
+
+// 1. normal author member without support still works
+assert.equal(
+  evaluateAuthorMembersCanMutate({
+    authUid: targetUserId,
+    isAuthorMember: true,
+    supportAllows: false,
+  }),
+  true,
+);
+
+// 2 + 3 + 10. platform owner without cookie/proof cannot mutate; session row alone grants nothing
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: null,
+    session: proofSession,
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "owner",
+  }),
+  false,
+);
+assert.equal(
+  evaluateAuthorMembersCanMutate({
+    authUid: ownerId,
+    isAuthorMember: false,
+    supportAllows: false,
+  }),
+  false,
+);
+
+// 4. correct proof grants only actingAuthorId
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: proofSession.tokenHash,
+    session: proofSession,
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "editor",
+  }),
+  true,
+);
+
+// 5. wrong token/proof
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: "b".repeat(64),
+    session: proofSession,
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "owner",
+  }),
+  false,
+);
+
+// 6. expired
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: proofSession.tokenHash,
+    session: {
+      ...proofSession,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    },
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "owner",
+  }),
+  false,
+);
+
+// 7. revoked
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: proofSession.tokenHash,
+    session: { ...proofSession, revokedAt: new Date().toISOString() },
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "owner",
+  }),
+  false,
+);
+
+// 8. target membership removed
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: proofSession.tokenHash,
+    session: proofSession,
+    resourceAuthorId: targetAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: null,
+  }),
+  false,
+);
+
+// 9. other authorId
+assert.equal(
+  evaluateAuthorSupportSqlAuthority({
+    authUid: ownerId,
+    requestTokenHash: proofSession.tokenHash,
+    session: proofSession,
+    resourceAuthorId: otherAuthorId,
+    actorIsPlatformOwner: true,
+    actingUserMembershipRole: "owner",
+  }),
+  false,
+);
+
+// 11. admin moderation capability does not leak into target author capabilities
+assert.equal(
+  resolveSupportBypassCapability({
+    authorCanBypass: false,
+    actorHasModeratePermission: true,
+    isSupportMode: true,
+  }),
+  false,
+);
+
+// 12. after exit, normal admin behavior is restored
+assert.equal(
+  resolveSupportBypassCapability({
+    authorCanBypass: false,
+    actorHasModeratePermission: true,
+    isSupportMode: false,
+  }),
+  true,
+);
+
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/promotion/pages",
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/products/abc",
+    method: "PATCH",
+  }),
+  false,
+);
+
+assert.match(sql, /author_support_request_token_hash/);
+assert.match(sql, /set_author_support_session_proof/);
+assert.match(sql, /s\.token_hash = v_proof/);
+assert.match(sql, /RETURN NULL/);
+assert.match(sql, /audiolad:publish-audio-product:v10/);
+assert.match(sql, /preserves is_catalog_listed/);
+assert.match(sql, /COALESCE\(v_practice\.is_catalog_listed, true\)/);
+assert.match(sql, /audiolad:actor-bypass-product-moderation:v1/);
+assert.match(sql, /Product is not published\./);
+assert.match(sql, /Editing mode requires published\/unpublished approved/);
+assert.match(sql, /pg_advisory_xact_lock/);
+assert.match(sql, /lookup_practice_visibility_user/);
+assert.doesNotMatch(sql, /CREATE OR REPLACE FUNCTION public\.sync_practice_catalog_visibility/);
+
+const audit = read("src/lib/author-support/audit.ts");
+assert.match(audit, /AuthorSupportAuditError/);
+assert.match(audit, /throw new AuthorSupportAuditError/);
+assert.doesNotMatch(audit, /console\.error\("author_support_audit_insert_failed"\)/);
+
+assert.match(context, /callAuthorUserRpc/);
+assert.match(context, /p_token_hash/);
+assert.match(context, /AUTHOR_SUPPORT_RPC_WRAPPERS/);
+
+assert.match(studioRepo, /studio_asset_replaced/);
+assert.match(studioRepo, /studio_asset_deleted/);
+assert.match(studioRepo, /replaceStudioProjectAsset/);
+assert.match(studioRepo, /deleteStudioProjectAsset/);
+
+const inventoryRoutes = new Set(listAuthorSupportInventoryRoutePatterns());
+function walkRoutes(dir, acc = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkRoutes(full, acc);
+      continue;
+    }
+    if (entry.name === "route.ts") {
+      acc.push(path.relative(root, full).replaceAll("\\", "/"));
+    }
+  }
+  return acc;
+}
+
+const authorRoutes = walkRoutes(path.join(root, "src/app/api/author"));
+const studioRoutes = walkRoutes(path.join(root, "src/app/api/studio"));
+const mutatingRouteRe = /export async function (POST|PATCH|PUT|DELETE)/;
+for (const routePath of [...authorRoutes, ...studioRoutes]) {
+  const source = read(routePath);
+  if (!mutatingRouteRe.test(source)) {
+    continue;
+  }
+  if (routePath.includes("/stats/") || routePath.includes("/authors/route.ts")) {
+    continue;
+  }
+  assert.ok(
+    inventoryRoutes.has(routePath),
+    `support inventory missing mutating route ${routePath}`,
+  );
+}
+
+for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
+  assert.ok(
+    item.disposition === "allowed_audited" || item.disposition === "blocked",
+    item.key,
+  );
+  if (item.disposition === "allowed_audited") {
+    assert.ok(item.action, item.key);
+  }
+}
+
+assert.match(proxy, /isAuthorSupportBlockedMutation/);
+assert.match(proxy, /support_mutation_blocked/);
+
+assert.doesNotMatch(read("src/lib/author-support/actions.ts"), /console\.error\("author_support_audit_insert_failed"\)/);
 
 console.log("author-support-mode-unit: ok");

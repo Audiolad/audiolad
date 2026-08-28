@@ -82,11 +82,7 @@ export async function requireAuthorPromotionAccess(authorId: string) {
 export async function requireAuthorPromotionMutationAccess(authorId: string) {
   const execution = await peekAuthorExecutionContext();
   if (execution?.isSupportMode) {
-    const membership = await requireAuthorMutationMembership(authorId);
-    return {
-      ...membership,
-      isPlatformAdmin: false,
-    };
+    throw new AuthorAccessError("support_mutation_blocked", 403);
   }
 
   const { supabase, user } = await requireAuthenticatedUser();

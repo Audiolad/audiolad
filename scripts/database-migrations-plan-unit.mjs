@@ -308,6 +308,11 @@ function testRepoOneFileOneVersion() {
         "20260831120000_personal_start_sale_price_snapshot.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) => row.filename === "20260901130000_author_support_mode.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -362,8 +367,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 22);
+  assert.equal(plan.database_migrations_pending, 23);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -397,8 +403,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 16);
+  assert.equal(plan.database_migrations_pending, 17);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -439,8 +446,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260830120300",
     "20260830120400",
     "20260831120000",
+    "20260901130000",
   ]);
-  assert.equal(plan.database_migrations_pending, 7);
+  assert.equal(plan.database_migrations_pending, 8);
 }
 
 function main() {

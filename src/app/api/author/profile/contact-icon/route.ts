@@ -61,7 +61,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId, {
+      action: "author_profile_updated",
+    });
 
     const { data: existing } = await supabase
       .from("author_contacts")
@@ -126,7 +128,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_file_size" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId, {
+      action: "author_profile_updated",
+    });
 
     const { data: existing } = await supabase
       .from("author_contacts")

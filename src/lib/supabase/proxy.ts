@@ -3,7 +3,11 @@ import {
   isAuthEntryRoute,
   isPrivateRoute,
 } from "@/lib/auth/routes";
-import { AUTHOR_SUPPORT_COOKIE_NAME, isAuthorSupportSensitivePath } from "@/lib/author-support/policy";
+import {
+  AUTHOR_SUPPORT_COOKIE_NAME,
+  isAuthorSupportBlockedMutation,
+  isAuthorSupportSensitivePath,
+} from "@/lib/author-support/policy";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SerializeOptions } from "cookie";
@@ -150,6 +154,33 @@ export async function updateSession(
 
   const supportCookie = request.cookies.get(AUTHOR_SUPPORT_COOKIE_NAME)?.value;
   if (supportCookie && isAuthorSupportSensitivePath(pathname)) {
+    return redirectWithSupabaseCookies(
+      request,
+      pendingCookies,
+      pendingHeaders,
+      "/author-dashboard",
+    );
+  }
+
+  if (
+    supportCookie &&
+    isAuthorSupportBlockedMutation({
+      pathname,
+      method: request.method,
+    })
+  ) {
+    if (pathname.startsWith("/api/")) {
+      const blocked = NextResponse.json(
+        { error: "support_mutation_blocked" },
+        { status: 403 },
+      );
+      return applySupabaseCookiesAndHeaders(
+        blocked,
+        pendingCookies,
+        pendingHeaders,
+      );
+    }
+
     return redirectWithSupabaseCookies(
       request,
       pendingCookies,

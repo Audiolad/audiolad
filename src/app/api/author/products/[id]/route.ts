@@ -38,7 +38,7 @@ import {
   publicationClassToCabinetBranch,
   publicationClassToLegacyKind,
 } from "@/lib/author-products/publication-class";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import {
   generateUniqueSlug,
   getAuthorProductDetail,

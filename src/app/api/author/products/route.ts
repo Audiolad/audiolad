@@ -89,6 +89,15 @@ export async function POST(request: Request) {
     }
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { recordAuthorSupportAudit } = await import(
+      "@/lib/author-support/audit"
+    );
+    await recordAuthorSupportAudit({
+      action: "product_created",
+      resourceType: "practice",
+      resourceId: authorId,
+      metadata: { title },
+    });
     const product = await createDraftProduct(supabase, {
       authorId,
       title,

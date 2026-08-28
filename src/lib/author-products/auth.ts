@@ -279,15 +279,35 @@ export async function assertAuthorCommercialWriteAllowed(
   await requireCurrentAuthorTermsAcceptance(authorId);
 }
 
-export async function requireAuthorMutationMembership(authorId: string) {
+export async function requireAuthorMutationMembership(
+  authorId: string,
+  supportAudit?: { action: string; resourceType?: string },
+) {
   const context = await requireAuthorMembership(authorId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
+  if (supportAudit) {
+    const { recordAuthorSupportAudit } = await import(
+      "@/lib/author-support/audit"
+    );
+    await recordAuthorSupportAudit({
+      action: supportAudit.action,
+      resourceType: supportAudit.resourceType ?? "author",
+      resourceId: authorId,
+    });
+  }
   return context;
 }
 
 export async function requirePracticeMutationAccess(practiceId: string) {
   const context = await requirePracticeAccess(practiceId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
+  const { recordAuthorSupportAudit } = await import("@/lib/author-support/audit");
+  await recordAuthorSupportAudit({
+    action: "product_updated",
+    resourceType: "practice",
+    resourceId: practiceId,
+    metadata: { gate: "requirePracticeMutationAccess" },
+  });
   return context;
 }
 
@@ -458,6 +478,21 @@ export function handleAuthorRouteError(error: unknown) {
       },
       { status: error.status },
     );
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "author_support_audit_failed" &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
+    return jsonError("author_support_audit_failed", error.status);
+  }
+
+  if (error instanceof Error && error.message === "author_support_proof_missing") {
+    return jsonError("forbidden", 403);
   }
 
   console.error("author_route_unhandled_error", error);

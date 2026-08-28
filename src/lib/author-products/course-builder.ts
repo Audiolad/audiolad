@@ -22,7 +22,7 @@ import {
   type CourseCompletionCtaInput,
   type CoursePublishContentSnapshot,
 } from "@/lib/author-products/course-builder-shared";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { validatePositionReorderBatch } from "@/lib/author-products/reorder-batch";
 import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,

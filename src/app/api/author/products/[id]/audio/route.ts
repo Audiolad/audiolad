@@ -7,7 +7,7 @@ import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import {
   AUDIO_ITEM_DETAIL_SELECT,
   getAuthorProductDetail,

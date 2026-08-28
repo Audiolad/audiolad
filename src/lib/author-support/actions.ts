@@ -65,20 +65,25 @@ export async function startAuthorSupportMode(formData: FormData): Promise<void> 
   }
 
   const token = createAuthorSupportToken();
-  await createAuthorSupportSession({
+  const session = await createAuthorSupportSession({
     token,
     actorUserId: owner.userId,
     actingUserId: targetUserId,
     actingAuthorId: targetAuthorId,
   });
+  try {
+    await recordAuthorSupportSessionAudit({
+      action: "support_session_started",
+      actorUserId: owner.userId,
+      actingUserId: targetUserId,
+      actingAuthorId: targetAuthorId,
+      metadata: { destination },
+    });
+  } catch (error) {
+    await revokeAuthorSupportSession(session.id);
+    throw error;
+  }
   await writeAuthorSupportCookie(token);
-  await recordAuthorSupportSessionAudit({
-    action: "support_session_started",
-    actorUserId: owner.userId,
-    actingUserId: targetUserId,
-    actingAuthorId: targetAuthorId,
-    metadata: { destination },
-  });
 
   redirect(
     resolveAuthorSupportLandingPath({
@@ -93,13 +98,13 @@ export async function stopAuthorSupportMode(): Promise<void> {
   const returnUserId = execution?.isSupportMode ? execution.actingUserId : null;
 
   if (execution?.isSupportMode && execution.sessionId && execution.actingAuthorId) {
-    await revokeAuthorSupportSession(execution.sessionId);
     await recordAuthorSupportSessionAudit({
       action: "support_session_ended",
       actorUserId: execution.realUserId,
       actingUserId: execution.actingUserId,
       actingAuthorId: execution.actingAuthorId,
     });
+    await revokeAuthorSupportSession(execution.sessionId);
   } else {
     const supabase = await createClient();
     const {

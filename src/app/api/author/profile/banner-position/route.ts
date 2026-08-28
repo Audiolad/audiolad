@@ -35,7 +35,9 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId, {
+      action: "author_profile_updated",
+    });
 
     const { data: existing, error: lookupError } = await supabase
       .from("authors")

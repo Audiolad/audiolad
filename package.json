@@ -88,7 +88,7 @@
     "test:audio-post": "npx tsx scripts/product-kind-audio-post-unit.mjs && node scripts/audio-post-migration-sql-unit.mjs && npx tsx scripts/audio-post-public-unit.mjs && npx tsx scripts/product-playback-click-unit.mjs && npx tsx scripts/audio-post-inline-playback-unit.mjs && npx tsx scripts/audio-post-analytics-unit.mjs",
     "test:commercial-application:integration": "AUDIOLAD_DEPLOY_ROOT=/tmp/audiolad-test-user-reset-nonprod AUDIOLAD_PRODUCTION_MARKER=/tmp/audiolad-test-user-reset-nonprod-marker AUDIOLAD_TEST_DATABASE=1 AUDIOLAD_TEST_USER_RESET_INTEGRATION=1 node scripts/author-commercial-application-integration.mjs",
     "test:admin-support-diagnostics": "npx tsx scripts/admin-support-diagnostics-unit.mjs",
-    "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs",
+    "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs && node scripts/author-support-sql-unit.mjs && node scripts/author-support-sql-integration.mjs",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",
     "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs",

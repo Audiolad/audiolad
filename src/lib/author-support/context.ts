@@ -8,8 +8,12 @@ import { isPlatformOwner } from "@/lib/auth/platform-admin";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import {
+  AUTHOR_SUPPORT_RPC_WRAPPERS,
+  type AuthorSupportRpcName,
+} from "./proof";
 import { assertSupportAuthorScope } from "./policy";
-import { readAuthorSupportCookie } from "./session";
+import { hashAuthorSupportToken, readAuthorSupportCookie } from "./session";
 import {
   loadActingAuthorMembership,
   lookupAuthorSupportSessionByToken,
@@ -120,10 +124,40 @@ export async function getAuthorRpcClient(
   fallback: SupabaseClient,
 ): Promise<SupabaseClient> {
   const execution = await peekAuthorExecutionContext();
-  if (execution?.isSupportMode) {
-    return createClient();
+  if (!execution?.isSupportMode) {
+    return fallback;
   }
-  return fallback;
+
+  const token = await readAuthorSupportCookie();
+  if (!token) {
+    throw new Error("author_support_proof_missing");
+  }
+
+  return createClient();
+}
+
+export async function callAuthorUserRpc<T = unknown>(
+  fallback: SupabaseClient,
+  fn: AuthorSupportRpcName,
+  args: Record<string, unknown>,
+): Promise<{ data: T | null; error: { message: string } | null }> {
+  const execution = await peekAuthorExecutionContext();
+  if (!execution?.isSupportMode) {
+    return fallback.rpc(fn, args);
+  }
+
+  const token = await readAuthorSupportCookie();
+  if (!token) {
+    throw new Error("author_support_proof_missing");
+  }
+
+  const proofHash = hashAuthorSupportToken(token);
+  const userClient = await getAuthorRpcClient(fallback);
+  const wrapped = AUTHOR_SUPPORT_RPC_WRAPPERS[fn];
+  return userClient.rpc(wrapped, {
+    p_token_hash: proofHash,
+    ...args,
+  });
 }
 
 export function requestedAuthorMatchesSupport(

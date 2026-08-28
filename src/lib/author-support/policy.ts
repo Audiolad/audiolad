@@ -5,13 +5,35 @@ export const AUTHOR_SUPPORT_SESSION_ACTIONS = [
   "support_session_ended",
 ] as const;
 export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
+  "product_created",
   "product_updated",
   "product_track_updated",
+  "product_cover_updated",
+  "product_topics_updated",
+  "product_visibility_updated",
+  "product_course_updated",
+  "product_gallery_updated",
+  "product_price_promotion_updated",
   "product_submitted_for_moderation",
+  "product_withdrawn_from_moderation",
+  "product_published",
+  "product_unpublished",
+  "product_editing_started",
+  "product_soft_deleted",
+  "author_profile_updated",
+  "studio_project_created",
   "studio_project_updated",
+  "studio_project_deleted",
   "studio_asset_uploaded",
   "studio_asset_replaced",
   "studio_asset_deleted",
+  "studio_render_queued",
+] as const;
+
+export const AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES = [
+  "/api/author/products",
+  "/api/studio/projects",
+  "/api/author/profile",
 ] as const;
 
 export type AuthorSupportDestination = "cabinet" | "studio";
@@ -66,6 +88,93 @@ export function isAuthorSupportSensitivePath(pathname: string): boolean {
   return SENSITIVE_PATH_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   );
+}
+
+export function isAuthorSupportAllowedMutationPath(pathname: string): boolean {
+  const path = pathname.split("?")[0] ?? pathname;
+  return AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
+export function isAuthorSupportBlockedMutation(input: {
+  pathname: string;
+  method?: string;
+}): boolean {
+  const path = input.pathname.split("?")[0] ?? input.pathname;
+  if (isAuthorSupportSensitivePath(path)) {
+    return true;
+  }
+
+  const method = (input.method ?? "GET").toUpperCase();
+  const mutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+  if (!mutating) {
+    return false;
+  }
+
+  if (isAuthorSupportAllowedMutationPath(path)) {
+    return false;
+  }
+
+  return path.startsWith("/api/author/") || path.startsWith("/api/studio/");
+}
+
+export function evaluateAuthorSupportSqlAuthority(input: {
+  authUid: string | null;
+  requestTokenHash: string | null;
+  session: {
+    actorUserId: string;
+    tokenHash: string;
+    actingAuthorId: string;
+    actingUserId: string;
+    revokedAt: string | null;
+    expiresAt: string;
+  } | null;
+  resourceAuthorId: string;
+  actorIsPlatformOwner: boolean;
+  actingUserMembershipRole: "owner" | "editor" | null;
+  nowMs?: number;
+}): boolean {
+  if (!input.authUid || !input.requestTokenHash || !input.session) {
+    return false;
+  }
+  if (input.session.actorUserId !== input.authUid) {
+    return false;
+  }
+  if (input.session.tokenHash !== input.requestTokenHash) {
+    return false;
+  }
+  if (input.session.actingAuthorId !== input.resourceAuthorId) {
+    return false;
+  }
+  if (input.session.revokedAt) {
+    return false;
+  }
+  const nowMs = input.nowMs ?? Date.now();
+  if (new Date(input.session.expiresAt).getTime() <= nowMs) {
+    return false;
+  }
+  if (!input.actorIsPlatformOwner) {
+    return false;
+  }
+  if (
+    input.actingUserMembershipRole !== "owner" &&
+    input.actingUserMembershipRole !== "editor"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function evaluateAuthorMembersCanMutate(input: {
+  authUid: string | null;
+  isAuthorMember: boolean;
+  supportAllows: boolean;
+}): boolean {
+  if (!input.authUid) {
+    return false;
+  }
+  return input.isAuthorMember === true || input.supportAllows === true;
 }
 
 export function evaluateAuthorSupportStart(

@@ -73,7 +73,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(authorId, {
+      action: "author_profile_updated",
+    });
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
