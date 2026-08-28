@@ -105,6 +105,7 @@ import { VOPROSY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/vopr
 import { TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE } from "../src/lib/seo/listens/content/taro-kakaya-rabota-mne-podhodit.ts";
 import { TARO_NA_SITUATSIYU_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-na-situatsiyu-na-rabote.ts";
 import { TARO_POISK_RABOTY_PAGE } from "../src/lib/seo/listens/content/taro-poisk-raboty.ts";
+import { NAYDU_LI_YA_RABOTU_TARO_PAGE } from "../src/lib/seo/listens/content/naydu-li-ya-rabotu-taro.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2389,6 +2390,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventyEighthListenHref}`,
     ),
     "directory JSON-LD includes seventy-eighth listen href",
+  );
+
+
+  const seventyNinthListenHref = "/listens/naydu-li-ya-rabotu-taro";
+  const seventyNinthListenCard = data.articles.find((card) => card.href === seventyNinthListenHref);
+  assert(seventyNinthListenCard, "seventy-ninth indexable listen page is listed");
+  assert(
+    seventyNinthListenCard.title === "Найду ли я работу – Таро, поиск и трудоустройство | АудиоЛад",
+    "seventy-ninth listen directory title",
+  );
+  assert(
+    seventyNinthListenCard.description === NAYDU_LI_YA_RABOTU_TARO_PAGE.description,
+    "seventy-ninth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/naydu-li-ya-rabotu-taro",
+    ),
+    "no /articles duplicate for seventy-ninth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyNinthListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-ninth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
