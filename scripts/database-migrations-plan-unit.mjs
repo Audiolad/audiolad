@@ -391,6 +391,12 @@ function testRepoOneFileOneVersion() {
   assert.ok(
     listed.files.some(
       (row) =>
+        row.filename === "20260902120100_analytics_heavy_rpc_idempotent.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
+      (row) =>
         row.filename ===
         "20260903120000_search_practice_visibility_users.sql",
     ),
@@ -452,9 +458,10 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260901120400",
     "20260901130000",
     "20260902120000",
+    "20260902120100",
     "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 26);
+  assert.equal(plan.database_migrations_pending, 27);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -491,9 +498,10 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260901120400",
     "20260901130000",
     "20260902120000",
+    "20260902120100",
     "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 20);
+  assert.equal(plan.database_migrations_pending, 21);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -537,9 +545,10 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260901120400",
     "20260901130000",
     "20260902120000",
+    "20260902120100",
     "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 11);
+  assert.equal(plan.database_migrations_pending, 12);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
@@ -624,9 +633,15 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
     livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(supportStamp),
     "course readiness stamp must follow the support-mode migration",
   );
+  assert.ok(listed.versions.includes("20260902120100"));
+  assert.ok(livePlan.pending.includes("20260902120100"));
   assert.ok(
-    livePlan.pending.indexOf(searchStamp) > livePlan.pending.indexOf(courseStamp),
-    "visibility user search stamp must follow course readiness",
+    livePlan.pending.indexOf("20260902120100") > livePlan.pending.indexOf(courseStamp),
+    "analytics RPC protection stamp must follow course readiness",
+  );
+  assert.ok(
+    livePlan.pending.indexOf(searchStamp) > livePlan.pending.indexOf("20260902120100"),
+    "visibility user search stamp must follow analytics RPC protection",
   );
 }
 

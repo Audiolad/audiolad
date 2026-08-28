@@ -1,10 +1,47 @@
 export const RETRY_QUEUE_KEY = "audiolad_analytics_retry_queue";
 const RETRY_TTL_MS = 48 * 60 * 60 * 1000;
 const MAX_QUEUE_ITEMS = 100;
-const MAX_ATTEMPTS = 8;
+const MAX_ATTEMPTS = 5;
 const LOCK_NAME = "audiolad-analytics-retry-queue";
 const LOCK_FALLBACK_KEY = "audiolad_analytics_retry_queue_lock";
 const LOCK_FALLBACK_TTL_MS = 15_000;
+const RETRY_BASE_DELAY_MS = 1_000;
+const RETRY_MAX_DELAY_MS = 30_000;
+
+export function computeAnalyticsRetryDelayMs(
+  attempts: number,
+  jitterMs: number = Math.floor(Math.random() * 250),
+): number {
+  const exp = Math.max(0, attempts);
+  const base = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** exp);
+  return base + Math.max(0, jitterMs);
+}
+
+export function shouldRetryAnalyticsFailure(
+  status: number,
+  errorCode?: string | null,
+): boolean {
+  if (errorCode && /pgrst003|55p03|overloaded/i.test(errorCode)) {
+    return false;
+  }
+
+  if (status === 503 || status === 504) {
+    return false;
+  }
+
+  return status === 0 || status === 429 || status >= 500;
+}
+
+export function isAnalyticsRetryItemReady(
+  item: Pick<AnalyticsRetryItem, "attempts" | "lastAttemptAt">,
+  now: number = Date.now(),
+): boolean {
+  if (item.lastAttemptAt == null) {
+    return true;
+  }
+
+  return now >= item.lastAttemptAt + computeAnalyticsRetryDelayMs(item.attempts, 0);
+}
 
 export type AnalyticsRetryItem = {
   id: string;
@@ -204,7 +241,14 @@ export async function flushAnalyticsRetryQueue(
 
     const remaining: AnalyticsRetryItem[] = [];
 
+    const now = Date.now();
+
     for (const item of items) {
+      if (!isAnalyticsRetryItemReady(item, now)) {
+        remaining.push(item);
+        continue;
+      }
+
       try {
         const result = await sendFn(item);
 

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { parseSessionBody, checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
+import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 function getClientKey(request: Request, anonymousId: string): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return `${forwarded ?? "unknown"}:${anonymousId}`;
+  return `${getTrustedClientIp(request)}:${anonymousId}`;
 }
 
 export async function POST(request: Request) {

@@ -59,6 +59,7 @@ export function isPlatformAnalyticsEventName(
 export const SESSION_STORAGE_KEY = "audiolad_analytics_session_id";
 export const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 export const PAGE_VIEW_DEDUP_MS = 5_000;
+export const ANALYTICS_RPC_TIMEOUT_MS = 5_000;
 
 export const AUDIO_PROGRESS_MILESTONES = [
   { ratio: 0.25, event: "audio_progress_25" as const },

@@ -555,7 +555,8 @@ function testSourceContracts() {
 
   assert(client.includes("linkSessionFlight"), "link single-flight");
   assert(client.includes("signupCompleteFlight"), "signup single-flight");
-  assert(client.includes("shouldSettleAnalyticsHttpAttempt"), "no retry after terminal HTTP");
+  assert(client.includes("isSuccessfulLinkAttempt"), "link settles only on real success");
+  assert(client.includes("isSuccessfulSignupAttempt"), "signup settles only on real success");
   assert(
     !client.includes('enqueueAnalyticsRetry') ||
       !/enqueueAnalyticsRetry\(\{\s*id:[\s\S]*session\/link/.test(client),
