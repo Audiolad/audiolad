@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PracticeRow } from "@/lib/author-products/types";
 import { hasPermission } from "@/lib/auth/platform-access";
+import { resolveSupportBypassCapability } from "@/lib/author-support/policy";
 
 export const MODERATION_STATUS = {
   NOT_SUBMITTED: "not_submitted",
@@ -189,11 +190,25 @@ export async function actorCanBypassProductModeration(
   authorId: string,
   userId: string,
 ): Promise<boolean> {
-  if (await getAuthorCanBypassProductModeration(supabase, authorId)) {
-    return true;
-  }
+  const authorCanBypass = await getAuthorCanBypassProductModeration(
+    supabase,
+    authorId,
+  );
+  const { peekAuthorExecutionContext } = await import(
+    "@/lib/author-support/context"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const actorHasModeratePermission = await hasPermission(
+    supabase,
+    userId,
+    "author_products.moderate",
+  );
 
-  return hasPermission(supabase, userId, "author_products.moderate");
+  return resolveSupportBypassCapability({
+    authorCanBypass,
+    actorHasModeratePermission,
+    isSupportMode: execution?.isSupportMode === true,
+  });
 }
 
 /**

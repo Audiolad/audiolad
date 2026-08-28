@@ -7,6 +7,7 @@ import {
   requireAuthenticatedUser,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { resolveStudioActor, toStudioActorView } from "../guest-access";
@@ -309,6 +310,12 @@ export async function updateStudioProject(input: {
   if (!data) {
     throw new StudioApiError("project_conflict", 409);
   }
+  await recordAuthorSupportAudit({
+    action: "studio_project_updated",
+    resourceType: "studio_project",
+    resourceId: input.projectId,
+    metadata: { changed_fields: ["name", "project_data", "revision"] },
+  });
   return data as StudioProjectRow;
 }
 
@@ -337,6 +344,12 @@ export async function softDeleteStudioProject(input: {
   if (!data) {
     throw new StudioApiError("project_conflict", 409);
   }
+  await recordAuthorSupportAudit({
+    action: "studio_project_updated",
+    resourceType: "studio_project",
+    resourceId: input.projectId,
+    metadata: { changed_fields: ["status"], status: "deleted" },
+  });
 }
 
 export async function listStudioAssets(projectId: string) {
@@ -432,6 +445,12 @@ export async function uploadReservedStudioAsset(
     console.error("studio_asset_upload_error", error.message);
     throw new StudioApiError("storage_upload_failed", 502);
   }
+  await recordAuthorSupportAudit({
+    action: "studio_asset_uploaded",
+    resourceType: "studio_project_asset",
+    resourceId: asset.id,
+    metadata: { project_id: asset.project_id },
+  });
 }
 
 export async function getStudioProjectAsset(

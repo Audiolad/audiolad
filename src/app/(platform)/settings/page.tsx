@@ -17,6 +17,7 @@ import {
   SETTINGS_LEGAL_SECTION_ID,
 } from "@/lib/profile/constants";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { PRIVATE_PAGE_ROBOTS } from "@/lib/seo/private-robots";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -43,6 +44,11 @@ function BackIcon() {
 }
 
 export default async function SettingsPage() {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    redirect("/author-dashboard");
+  }
+
   const supabase = await createClient();
 
   const {

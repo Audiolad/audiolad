@@ -62,6 +62,7 @@ import {
 } from "@/lib/seo/indexnow/hooks";
 import { hasPracticePublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validatePaidPriceRubles } from "@/lib/pricing/money";
 import { slugifyTitle } from "@/lib/author-products/utils";
@@ -660,6 +661,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     await syncPracticeAudioCompatibility(supabase, id);
+
+    const changedFields = Object.keys(updates).filter((key) => key !== "updated_at");
+    await recordAuthorSupportAudit({
+      action: "product_updated",
+      resourceType: "practice",
+      resourceId: id,
+      metadata: {
+        changed_fields: changedFields,
+        ...(Object.prototype.hasOwnProperty.call(updates, "format")
+          ? { format: updates.format }
+          : {}),
+      },
+    });
 
     const product = await getAuthorProductDetail(supabase, id);
 

@@ -24,7 +24,9 @@ export async function submitPracticeForModeration(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc("submit_practice_for_moderation", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { data, error } = await rpc.rpc("submit_practice_for_moderation", {
     p_practice_id: practiceId,
   });
 
@@ -39,7 +41,9 @@ export async function withdrawPracticeFromModeration(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc(
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { data, error } = await rpc.rpc(
     "withdraw_practice_from_moderation",
     {
       p_practice_id: practiceId,

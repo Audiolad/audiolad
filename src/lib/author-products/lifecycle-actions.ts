@@ -57,7 +57,9 @@ export async function unpublishApprovedPractice(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc("unpublish_approved_practice", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { data, error } = await rpc.rpc("unpublish_approved_practice", {
     p_practice_id: practiceId,
   });
 
@@ -72,7 +74,9 @@ export async function startPracticeEditing(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc("start_practice_editing", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { data, error } = await rpc.rpc("start_practice_editing", {
     p_practice_id: practiceId,
   });
 
@@ -88,7 +92,9 @@ export async function softDeletePractice(
   practiceId: string,
   deletionReason?: string | null,
 ): Promise<PracticeRow> {
-  const { data, error } = await supabase.rpc("soft_delete_practice", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { data, error } = await rpc.rpc("soft_delete_practice", {
     p_practice_id: practiceId,
     p_deletion_reason: deletionReason ?? null,
   });

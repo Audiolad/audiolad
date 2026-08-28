@@ -459,7 +459,9 @@ export async function publishPracticeProduct(
   practiceId: string,
   publishedAt: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("publish_audio_product", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { error } = await rpc.rpc("publish_audio_product", {
     p_practice_id: practiceId,
     p_published_at: publishedAt,
   });
@@ -484,7 +486,9 @@ export async function unpublishPracticeProduct(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("unpublish_approved_practice", {
+  const { getAuthorRpcClient } = await import("@/lib/author-support/context");
+  const rpc = await getAuthorRpcClient(supabase);
+  const { error } = await rpc.rpc("unpublish_approved_practice", {
     p_practice_id: practiceId,
   });
 

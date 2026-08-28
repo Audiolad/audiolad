@@ -3,6 +3,7 @@ import {
   isAuthEntryRoute,
   isPrivateRoute,
 } from "@/lib/auth/routes";
+import { AUTHOR_SUPPORT_COOKIE_NAME, isAuthorSupportSensitivePath } from "@/lib/author-support/policy";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SerializeOptions } from "cookie";
@@ -144,6 +145,16 @@ export async function updateSession(
       pendingCookies,
       pendingHeaders,
       destination,
+    );
+  }
+
+  const supportCookie = request.cookies.get(AUTHOR_SUPPORT_COOKIE_NAME)?.value;
+  if (supportCookie && isAuthorSupportSensitivePath(pathname)) {
+    return redirectWithSupabaseCookies(
+      request,
+      pendingCookies,
+      pendingHeaders,
+      "/author-dashboard",
     );
   }
 

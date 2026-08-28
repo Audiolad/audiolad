@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
+import { AuthorSupportBannerGate } from "@/components/author-support/AuthorSupportBannerGate";
 import { ListenerAppShell } from "@/components/listener/ListenerAppShell";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 import { readListenerSidebarPinnedState } from "@/lib/navigation/listener-sidebar";
@@ -27,7 +28,7 @@ export default async function AuthorDashboardRouteLayout({
       mode="author"
       initialSidebarPinned={initialSidebarPinned}
     >
-      {children}
+      <AuthorSupportBannerGate>{children}</AuthorSupportBannerGate>
     </ListenerAppShell>
   );
 }

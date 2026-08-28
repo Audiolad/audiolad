@@ -18,6 +18,7 @@ import {
   saleLockConflictResponse,
 } from "@/lib/author-products/sale-lock";
 import { buildAudioItemStoragePath } from "@/lib/author-products/utils";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RouteContext = {
@@ -132,6 +133,15 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     await syncPracticeAudioCompatibility(supabase, id);
+    await recordAuthorSupportAudit({
+      action: "product_track_updated",
+      resourceType: "audio_item",
+      resourceId: audioId,
+      metadata: {
+        practice_id: id,
+        changed_fields: ["audio_path", "duration_seconds"],
+      },
+    });
 
     const product = await getAuthorProductDetail(supabase, id);
 

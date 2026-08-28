@@ -9,6 +9,7 @@ import {
   AUTHOR_FINANCE_SECTION_TITLE,
 } from "@/lib/author-finance/labels";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,11 @@ function NoAuthorAccess() {
 }
 
 export default async function AuthorFinancePage() {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    redirect("/author-dashboard");
+  }
+
   const supabase = await createClient();
 
   const {
