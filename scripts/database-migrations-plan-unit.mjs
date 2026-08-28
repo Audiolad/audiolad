@@ -383,6 +383,13 @@ function testRepoOneFileOneVersion() {
         row.filename === "20260902120000_course_moderation_readiness.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename ===
+        "20260903120000_search_practice_visibility_users.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {
@@ -439,8 +446,9 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260901120300",
     "20260901120400",
     "20260902120000",
+    "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 24);
+  assert.equal(plan.database_migrations_pending, 25);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -476,8 +484,9 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260901120300",
     "20260901120400",
     "20260902120000",
+    "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 18);
+  assert.equal(plan.database_migrations_pending, 19);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -520,8 +529,9 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260901120300",
     "20260901120400",
     "20260902120000",
+    "20260903120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 9);
+  assert.equal(plan.database_migrations_pending, 10);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
@@ -591,10 +601,17 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
   }
   const lastVisibility = "20260901120400";
   const courseStamp = "20260902120000";
+  const searchStamp = "20260903120000";
   assert.ok(livePlan.pending.includes(courseStamp));
+  assert.ok(listed.versions.includes(searchStamp));
+  assert.ok(livePlan.pending.includes(searchStamp));
   assert.ok(
     livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(lastVisibility),
     "course readiness stamp must follow restamped visibility migrations",
+  );
+  assert.ok(
+    livePlan.pending.indexOf(searchStamp) > livePlan.pending.indexOf(courseStamp),
+    "visibility user search stamp must follow course readiness",
   );
 }
 
