@@ -104,6 +104,7 @@ import { TARO_NA_RABOTU_NA_BLIZHAYSHEE_BUDUSHCHEE_PAGE } from "../src/lib/seo/li
 import { VOPROSY_TARO_NA_RABOTU_PAGE } from "../src/lib/seo/listens/content/voprosy-taro-na-rabotu.ts";
 import { TARO_KAKAYA_RABOTA_MNE_PODHODIT_PAGE } from "../src/lib/seo/listens/content/taro-kakaya-rabota-mne-podhodit.ts";
 import { TARO_NA_SITUATSIYU_NA_RABOTE_PAGE } from "../src/lib/seo/listens/content/taro-na-situatsiyu-na-rabote.ts";
+import { TARO_POISK_RABOTY_PAGE } from "../src/lib/seo/listens/content/taro-poisk-raboty.ts";
 import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import {
@@ -2363,6 +2364,31 @@ function testListenPagesAppearInDirectory() {
       (item) => item.url === `https://audiolad.ru${seventySeventhListenHref}`,
     ),
     "directory JSON-LD includes seventy-seventh listen href",
+  );
+
+
+  const seventyEighthListenHref = "/listens/taro-poisk-raboty";
+  const seventyEighthListenCard = data.articles.find((card) => card.href === seventyEighthListenHref);
+  assert(seventyEighthListenCard, "seventy-eighth indexable listen page is listed");
+  assert(
+    seventyEighthListenCard.title === "Таро поиск работы – расклад и вопросы во время поиска | АудиоЛад",
+    "seventy-eighth listen directory title",
+  );
+  assert(
+    seventyEighthListenCard.description === TARO_POISK_RABOTY_PAGE.description,
+    "seventy-eighth listen directory description",
+  );
+  assert(
+    !data.articles.some(
+      (card) => card.href === "/articles/taro-poisk-raboty",
+    ),
+    "no /articles duplicate for seventy-eighth listen slug",
+  );
+  assert(
+    collection.mainEntity.itemListElement.some(
+      (item) => item.url === `https://audiolad.ru${seventyEighthListenHref}`,
+    ),
+    "directory JSON-LD includes seventy-eighth listen href",
   );
 
 const articleCards = listArticleDirectoryCards();
