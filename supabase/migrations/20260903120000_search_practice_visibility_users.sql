@@ -152,25 +152,25 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    INSERT INTO public.practice_visibility_search_attempts (
+    INSERT INTO public.practice_visibility_search_attempts AS a (
       user_id,
       window_started_at,
       attempt_count
     )
     VALUES (v_actor, now(), 1);
   ELSIF v_window <= now() - interval '1 minute' THEN
-    UPDATE public.practice_visibility_search_attempts
+    UPDATE public.practice_visibility_search_attempts AS a
     SET
       window_started_at = now(),
       attempt_count = 1
-    WHERE user_id = v_actor;
+    WHERE a.user_id = v_actor;
   ELSIF v_count >= 60 THEN
     RAISE EXCEPTION 'rate_limited'
       USING ERRCODE = 'P0001';
   ELSE
-    UPDATE public.practice_visibility_search_attempts
-    SET attempt_count = attempt_count + 1
-    WHERE user_id = v_actor;
+    UPDATE public.practice_visibility_search_attempts AS a
+    SET attempt_count = a.attempt_count + 1
+    WHERE a.user_id = v_actor;
   END IF;
 
   BEGIN
@@ -258,7 +258,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.search_practice_visibility_users(uuid, text) IS
-  'audiolad:visibility-search:v2; author-only name/exact-email/uuid allowlist lookup; masked email; never writes user_practices';
+  'audiolad:visibility-search:v3; author-only name/exact-email/uuid allowlist lookup; masked email; never writes user_practices; qualified attempts.user_id';
 
 REVOKE ALL ON FUNCTION public.search_practice_visibility_users(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.search_practice_visibility_users(uuid, text) FROM anon;

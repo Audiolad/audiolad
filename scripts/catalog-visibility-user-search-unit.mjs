@@ -313,6 +313,51 @@ function testAuthAndPrivacySourceGuards() {
   assert.doesNotMatch(helpers, /from\("profiles"\)/);
 }
 
+function testRateLimitSqlQualifiesUserId() {
+  const migration = read(
+    "supabase/migrations/20260903120000_search_practice_visibility_users.sql",
+  );
+  const searchFn = migration.slice(
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.search_practice_visibility_users"),
+    migration.indexOf("COMMENT ON FUNCTION public.search_practice_visibility_users"),
+  );
+  const listFn = migration.slice(
+    migration.indexOf("CREATE FUNCTION public.list_practice_visibility_users("),
+    migration.indexOf("COMMENT ON FUNCTION public.list_practice_visibility_users"),
+  );
+
+  assert.doesNotMatch(
+    searchFn,
+    /WHERE\s+user_id\s*=/,
+    "RETURNS TABLE user_id is an out-variable; qualify attempts.user_id in WHERE",
+  );
+  assert.doesNotMatch(
+    searchFn,
+    /SET\s+user_id\b/,
+    "must not SET bare user_id against the attempts table",
+  );
+  assert.match(
+    searchFn,
+    /WHERE a\.user_id = v_actor/,
+    "rate-limit SELECT/UPDATE must use alias a.user_id",
+  );
+  assert.match(
+    searchFn,
+    /UPDATE public\.practice_visibility_search_attempts AS a/,
+    "rate-limit UPDATE must alias the attempts table",
+  );
+  assert.doesNotMatch(
+    listFn,
+    /WHERE\s+user_id\s*=/,
+    "list RPC must not use bare user_id in WHERE",
+  );
+  assert.doesNotMatch(
+    listFn,
+    /SET\s+user_id\b/,
+    "list RPC must not SET bare user_id",
+  );
+}
+
 function testDuplicateSelectedUser() {
   const selected = [{ userId: GERMAN_ID, displayName: "Герман Иванов" }];
   assert.equal(
@@ -510,6 +555,7 @@ testUuidSearch();
 testShortQueryDoesNotSearch();
 testResultCap();
 testAuthAndPrivacySourceGuards();
+testRateLimitSqlQualifiesUserId();
 testDuplicateSelectedUser();
 testSelectedListUsesMaskedIdentity();
 testLookupJsonNeverIncludesRawEmail();
