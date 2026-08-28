@@ -7,6 +7,8 @@ export const ANALYTICS_HEAVY_RPC_PAIR_LIMIT = 3;
 export const ANALYTICS_HEAVY_RPC_IP_LIMIT = 20;
 export const ANALYTICS_HEAVY_RPC_WINDOW_MS = 60_000;
 export const ANALYTICS_SUCCESS_CACHE_TTL_MS = 10 * 60_000;
+/** Lazy prune when the success cache grows past this many keys. */
+export const ANALYTICS_SUCCESS_CACHE_PRUNE_SIZE = 256;
 export const ANALYTICS_CIRCUIT_WINDOW_MS = 15_000;
 export const ANALYTICS_CIRCUIT_OPEN_MS = 30_000;
 export const ANALYTICS_CIRCUIT_FAILURE_THRESHOLD = 3;
@@ -146,6 +148,14 @@ function pruneFailures(now: number): void {
   }
 }
 
+function pruneExpiredSuccess(now: number): void {
+  for (const [key, until] of successUntil) {
+    if (until <= now) {
+      successUntil.delete(key);
+    }
+  }
+}
+
 export function isAnalyticsCircuitOpen(now: number = nowMs()): boolean {
   return now < circuitOpenUntil;
 }
@@ -207,7 +217,16 @@ export function getAnalyticsRpcProtectionMetrics() {
     circuitOpenCount,
     overloadErrorCount,
     circuitOpen: isAnalyticsCircuitOpen(),
+    successCacheSize: successUntil.size,
   };
+}
+
+export function getAnalyticsSuccessCacheSizeForTests(): number {
+  return successUntil.size;
+}
+
+export function seedAnalyticsSuccessCacheForTests(key: string, untilMs: number): void {
+  successUntil.set(key, untilMs);
 }
 
 export function resetAnalyticsRpcProtectionForTests(): void {
@@ -240,6 +259,8 @@ export function guardAnalyticsHeavyRpc(input: {
     userId,
     sessionId: input.sessionId,
   });
+
+  pruneExpiredSuccess(now);
 
   if (isAnalyticsCircuitOpen(now)) {
     logProtection("circuit_open", { route: input.route });

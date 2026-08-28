@@ -90,6 +90,3 @@ export function getTrustedClientIp(request: Request): string {
 
   return "unknown";
 }
-
-/** Storm diagnosis connecting client (Cloudflare WARP/egress), not origin edge. */
-export const STORM_CLIENT_IP_EXAMPLE = "104.30.175.37";

@@ -4,6 +4,10 @@
  * TOKEN_REFRESHED and other non-transition events must not re-link.
  * SIGNED_IN is the only event that records signup_completed (canonical owner).
  * Existing sessions (INITIAL_SESSION / getSession) only link ownership.
+ *
+ * Link success and signup success are separate. A successful INITIAL_SESSION
+ * link must not suppress a later SIGNED_IN signup. Degraded / 429 / 503 /
+ * timeout must not mark a flow completed.
  */
 
 export type AnalyticsAuthSyncEvent =
@@ -29,13 +33,14 @@ export type AnalyticsAuthSyncResult = {
 };
 
 export type AnalyticsAuthSyncHandlers = {
-  link: () => Promise<void>;
+  link: () => Promise<boolean>;
   signup: () => Promise<boolean>;
 };
 
 type PairState = {
   inflight: Promise<AnalyticsAuthSyncResult> | null;
-  completed: boolean;
+  linkCompleted: boolean;
+  signupCompleted: boolean;
 };
 
 export function isAnalyticsAuthLinkEvent(event: string): boolean {
@@ -53,6 +58,14 @@ export function analyticsAuthPairKey(
   return `${analyticsSessionId}:${userId}`;
 }
 
+function isFlowCompleted(pair: PairState, flow: "link" | "signup"): boolean {
+  if (flow === "signup") {
+    return pair.signupCompleted;
+  }
+
+  return pair.linkCompleted || pair.signupCompleted;
+}
+
 export function createAnalyticsAuthSyncController() {
   const pairs = new Map<string, PairState>();
   let dedupedCount = 0;
@@ -62,7 +75,11 @@ export function createAnalyticsAuthSyncController() {
     if (existing) {
       return existing;
     }
-    const created: PairState = { inflight: null, completed: false };
+    const created: PairState = {
+      inflight: null,
+      linkCompleted: false,
+      signupCompleted: false,
+    };
     pairs.set(key, created);
     return created;
   }
@@ -108,30 +125,38 @@ export function createAnalyticsAuthSyncController() {
 
     const key = analyticsAuthPairKey(analyticsSessionId, userId);
     const pair = getPair(key);
-
-    if (pair.completed) {
-      logDedupe("completed", event);
-      return { ran: false, reason: "completed", flow: null };
-    }
-
-    if (pair.inflight) {
-      logDedupe("inflight", event);
-      await pair.inflight;
-      return { ran: false, reason: "inflight", flow: null };
-    }
-
     const flow: "signup" | "link" = isAnalyticsAuthSignupEvent(event)
       ? "signup"
       : "link";
 
+    while (isFlowCompleted(pair, flow) || pair.inflight) {
+      if (isFlowCompleted(pair, flow)) {
+        logDedupe("completed", event);
+        return { ran: false, reason: "completed", flow: null };
+      }
+
+      logDedupe("inflight", event);
+      await pair.inflight;
+    }
+
     const work = (async (): Promise<AnalyticsAuthSyncResult> => {
       try {
-        if (flow === "signup") {
-          await input.handlers.signup();
-        } else {
-          await input.handlers.link();
+        const ok =
+          flow === "signup"
+            ? await input.handlers.signup()
+            : await input.handlers.link();
+
+        if (!ok) {
+          return { ran: false, reason: "failed", flow };
         }
-        pair.completed = true;
+
+        if (flow === "signup") {
+          pair.signupCompleted = true;
+          pair.linkCompleted = true;
+        } else {
+          pair.linkCompleted = true;
+        }
+
         return { ran: true, reason: flow === "signup" ? "signup" : "linked", flow };
       } catch (error) {
         console.info("analytics_auth_sync", {

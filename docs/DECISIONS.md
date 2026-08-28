@@ -14,7 +14,7 @@
 
 - Frontend: link/signup только на реальный anonymous → authenticated переход. `TOKEN_REFRESHED` не вызывает RPC. `SIGNED_IN` канонически идёт только в signup/complete. In-flight + completed dedupe на пару session+user.
 - Server: process-local rate limit (`checkAnalyticsRateLimit`), in-flight/success cache и circuit breaker **до** RPC. AbortController timeout, без `Promise.race`.
-- IP cap: `getTrustedClientIp` = X-Real-IP (`$remote_addr`) иначе правый XFF. Cloudflare не перед origin. `104.30.175.37` — connecting client (WARP/egress), не edge Audiolad. JWT `sub` — только non-critical discriminator, не authz.
+- IP cap: `getTrustedClientIp` = X-Real-IP (`$remote_addr`) иначе правый XFF. Cloudflare не перед origin. Cap keyed by the single connecting client / egress, not a shared proxy edge. JWT `sub` — только non-critical discriminator, не authz.
 - SQL: уже принадлежащая пользователю сессия возвращается сразу; advisory lock только если first-touch ещё нет.
 - Track retry: ограниченный backoff + jitter; PGRST003/55P03/503/504 не ретраятся в tight loop.
 

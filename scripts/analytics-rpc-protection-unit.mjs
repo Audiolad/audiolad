@@ -15,15 +15,18 @@ import {
 } from "../src/lib/analytics/auth-sync.ts";
 import {
   ANALYTICS_CIRCUIT_FAILURE_THRESHOLD,
+  ANALYTICS_SUCCESS_CACHE_PRUNE_SIZE,
   buildAnalyticsHeavyRpcKey,
   classifyAnalyticsRpcError,
   getAnalyticsRpcProtectionMetrics,
+  getAnalyticsSuccessCacheSizeForTests,
   guardAnalyticsHeavyRpc,
   isAnalyticsCircuitOpen,
   isAnalyticsOverloadStatus,
   peekJwtSubject,
   recordAnalyticsRpcOverloadForTests,
   resetAnalyticsRpcProtectionForTests,
+  seedAnalyticsSuccessCacheForTests,
 } from "../src/lib/analytics/rpc-protection.ts";
 import { checkAnalyticsRateLimit } from "../src/lib/analytics/sanitize.ts";
 import {
@@ -31,10 +34,7 @@ import {
   isAnalyticsRetryItemReady,
   shouldRetryAnalyticsFailure,
 } from "../src/lib/analytics/retry-queue.ts";
-import {
-  STORM_CLIENT_IP_EXAMPLE,
-  getTrustedClientIp,
-} from "../src/lib/http/trusted-client-ip.ts";
+import { getTrustedClientIp } from "../src/lib/http/trusted-client-ip.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -87,6 +87,7 @@ async function testTokenRefreshedDoesNotLink() {
   const handlers = {
     link: async () => {
       links += 1;
+      return true;
     },
     signup: async () => {
       signups += 1;
@@ -123,6 +124,7 @@ async function testSignedInDedupe() {
   const handlers = {
     link: async () => {
       links += 1;
+      return true;
     },
     signup: async () => {
       signups += 1;
@@ -163,7 +165,7 @@ async function testDifferentUsersStillWork() {
   const controller = createAnalyticsAuthSyncController();
   const signups = [];
   const handlersFor = (userId) => ({
-    link: async () => {},
+    link: async () => true,
     signup: async () => {
       signups.push(userId);
       return true;
@@ -435,6 +437,13 @@ function testSourceContracts() {
   assert.equal(protection.includes("Promise.race"), false);
   assert.match(protection, /getTrustedClientIp/);
   assert.match(protection, /Never used for authorization/);
+  assert.match(protection, /pruneExpiredSuccess/);
+  assert.equal(protection.includes("setInterval"), false);
+  const authSync = read("src/lib/analytics/auth-sync.ts");
+  assert.match(authSync, /linkCompleted/);
+  assert.match(authSync, /signupCompleted/);
+  assert.equal(authSync.includes("pair.completed"), false);
+  assert.match(read("src/lib/analytics/client.ts"), /Promise<boolean>/);
   const helper = read("src/lib/http/trusted-client-ip.ts");
   assert.match(helper, /X-Real-IP/);
   assert.match(helper, /RIGHTMOST/);
@@ -485,23 +494,23 @@ function testSourceContracts() {
 }
 
 function testTrustedClientIpExtraction() {
-  const viaRealIp = makeNginxRequest(STORM_CLIENT_IP_EXAMPLE, {
-    "x-forwarded-for": `8.8.8.8, ${STORM_CLIENT_IP_EXAMPLE}`,
+  const viaRealIp = makeNginxRequest("203.0.113.80", {
+    "x-forwarded-for": "8.8.8.8, 203.0.113.80",
   });
   assert.equal(
     getTrustedClientIp(viaRealIp),
-    STORM_CLIENT_IP_EXAMPLE,
+    "203.0.113.80",
     "X-Real-IP is the nginx TCP peer and must be used as the client",
   );
 
   const rightmostOnly = new Request("https://audiolad.ru/api/analytics/session/link", {
     headers: {
-      "x-forwarded-for": `8.8.8.8, ${STORM_CLIENT_IP_EXAMPLE}`,
+      "x-forwarded-for": "8.8.8.8, 203.0.113.80",
     },
   });
   assert.equal(
     getTrustedClientIp(rightmostOnly),
-    STORM_CLIENT_IP_EXAMPLE,
+    "203.0.113.80",
     "without X-Real-IP, rightmost XFF (nginx-appended hop) is the client",
   );
 
@@ -600,7 +609,7 @@ async function testSpoofedXffCannotStealAnotherClientCap() {
 
 async function testNatSessionsKeepSeparatePairKeys() {
   resetAnalyticsRpcProtectionForTests();
-  const natIp = STORM_CLIENT_IP_EXAMPLE;
+  const natIp = "203.0.113.80";
   const sessionA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const sessionB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
@@ -647,6 +656,172 @@ async function testNatSessionsKeepSeparatePairKeys() {
   otherSession.release("ok");
 }
 
+async function testExpiredSuccessCacheIsPruned() {
+  resetAnalyticsRpcProtectionForTests();
+  const sessionId = "12121212-1212-4121-8121-121212121212";
+  const request = makeNginxRequest("203.0.113.40");
+  const first = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request,
+    sessionId,
+    userId: "cache-user",
+  });
+  assert.equal(first.action, "rpc");
+  first.release("ok");
+  assert.equal(getAnalyticsSuccessCacheSizeForTests(), 1);
+
+  const cached = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request,
+    sessionId,
+    userId: "cache-user",
+  });
+  assert.equal(cached.action, "deduped");
+
+  seedAnalyticsSuccessCacheForTests(first.key, Date.now() - 1);
+  assert.equal(getAnalyticsSuccessCacheSizeForTests(), 1);
+
+  const afterTtl = guardAnalyticsHeavyRpc({
+    route: "session_link",
+    request,
+    sessionId,
+    userId: "cache-user",
+  });
+  assert.equal(afterTtl.action, "rpc", "same key must pass the guard again after TTL");
+  afterTtl.release("ok");
+  assert.equal(getAnalyticsSuccessCacheSizeForTests(), 1);
+
+  const expiredNow = Date.now() - 1;
+  for (let i = 0; i < ANALYTICS_SUCCESS_CACHE_PRUNE_SIZE + 10; i += 1) {
+    seedAnalyticsSuccessCacheForTests(`expired-key-${i}`, expiredNow);
+  }
+  assert.ok(
+    getAnalyticsSuccessCacheSizeForTests() > ANALYTICS_SUCCESS_CACHE_PRUNE_SIZE,
+    "seeded expired keys must fill the map",
+  );
+
+  const pruneProbe = guardAnalyticsHeavyRpc({
+    route: "signup_complete",
+    request: makeNginxRequest("198.51.100.40"),
+    sessionId: "13131313-1313-4131-8131-131313131313",
+    userId: "prune-user",
+  });
+  assert.equal(pruneProbe.action, "rpc");
+  pruneProbe.release("ok");
+  assert.ok(
+    getAnalyticsSuccessCacheSizeForTests() <= 3,
+    `expired keys must be deleted, size=${getAnalyticsSuccessCacheSizeForTests()}`,
+  );
+  assert.equal(getAnalyticsRpcProtectionMetrics().successCacheSize, getAnalyticsSuccessCacheSizeForTests());
+}
+
+async function testDegradedDoesNotCompletePair() {
+  const controller = createAnalyticsAuthSyncController();
+  let signups = 0;
+  const handlers = {
+    link: async () => false,
+    signup: async () => {
+      signups += 1;
+      return false;
+    },
+  };
+  const input = {
+    userId: "user-degraded",
+    analyticsSessionId: "session-degraded",
+    handlers,
+  };
+
+  const first = await controller.sync("SIGNED_IN", input);
+  assert.equal(first.ran, false);
+  assert.equal(first.reason, "failed");
+  assert.equal(signups, 1);
+
+  const later = await controller.sync("SIGNED_IN", input);
+  assert.equal(later.ran, false);
+  assert.equal(later.reason, "failed");
+  assert.equal(signups, 2, "later real SIGNED_IN may attempt once after degraded");
+
+  const refresh = await controller.sync("TOKEN_REFRESHED", input);
+  assert.equal(refresh.reason, "skipped_event");
+  assert.equal(signups, 2, "TOKEN_REFRESHED must stay 0 RPC after degraded");
+}
+
+async function testInitialSessionLinkDoesNotSuppressSignup() {
+  const controller = createAnalyticsAuthSyncController();
+  let links = 0;
+  let signups = 0;
+  const handlers = {
+    link: async () => {
+      links += 1;
+      return true;
+    },
+    signup: async () => {
+      signups += 1;
+      return true;
+    },
+  };
+  const input = {
+    userId: "user-race",
+    analyticsSessionId: "session-race",
+    handlers,
+  };
+
+  const linked = await controller.sync("INITIAL_SESSION", input);
+  assert.equal(linked.ran, true);
+  assert.equal(linked.reason, "linked");
+  assert.equal(links, 1);
+  assert.equal(signups, 0);
+
+  const signedIn = await controller.sync("SIGNED_IN", input);
+  assert.equal(signedIn.ran, true);
+  assert.equal(signedIn.reason, "signup");
+  assert.equal(links, 1);
+  assert.equal(signups, 1, "INITIAL_SESSION link must not suppress SIGNED_IN signup");
+
+  const again = await controller.sync("SIGNED_IN", input);
+  assert.equal(again.reason, "completed");
+  assert.equal(signups, 1);
+}
+
+async function testInitialSessionInflightThenSignedInSignup() {
+  const controller = createAnalyticsAuthSyncController();
+  let links = 0;
+  let signups = 0;
+  let releaseLink;
+  const hang = new Promise((resolve) => {
+    releaseLink = resolve;
+  });
+  const handlers = {
+    link: async () => {
+      links += 1;
+      await hang;
+      return true;
+    },
+    signup: async () => {
+      signups += 1;
+      return true;
+    },
+  };
+  const input = {
+    userId: "user-inflight-race",
+    analyticsSessionId: "session-inflight-race",
+    handlers,
+  };
+
+  const initial = controller.sync("INITIAL_SESSION", input);
+  const signedIn = controller.sync("SIGNED_IN", input);
+  await Promise.resolve();
+  assert.equal(links, 1);
+  assert.equal(signups, 0);
+  releaseLink();
+
+  const [linked, signup] = await Promise.all([initial, signedIn]);
+  assert.equal(linked.reason, "linked");
+  assert.equal(signup.reason, "signup");
+  assert.equal(links, 1);
+  assert.equal(signups, 1);
+}
+
 function testExistingRateLimiterStillUsed() {
   const key = `analytics-rpc-protection-unit:${Date.now()}`;
   assert.equal(checkAnalyticsRateLimit(key, 2, 60_000), true);
@@ -673,6 +848,10 @@ async function main() {
   await testDifferentRealClientsDoNotShareCap();
   await testSpoofedXffCannotStealAnotherClientCap();
   await testNatSessionsKeepSeparatePairKeys();
+  await testExpiredSuccessCacheIsPruned();
+  await testDegradedDoesNotCompletePair();
+  await testInitialSessionLinkDoesNotSuppressSignup();
+  await testInitialSessionInflightThenSignedInSignup();
   testExistingRateLimiterStillUsed();
   console.log("analytics-rpc-protection-unit: ok");
 }
