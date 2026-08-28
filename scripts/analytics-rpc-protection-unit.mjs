@@ -332,19 +332,20 @@ function testRetryBackoffNoAmplify() {
 }
 
 function testSqlIdempotentAndLockPlacement() {
-  const sql = read("supabase/migrations/20260901120000_analytics_heavy_rpc_idempotent.sql");
+  const sql = read("supabase/migrations/20260902120100_analytics_heavy_rpc_idempotent.sql");
   const link = latestFunctionBody(sql, "link_analytics_session_user");
   const signup = latestFunctionBody(sql, "record_platform_signup_completed");
   const anonFt = latestFunctionBody(sql, "ensure_anonymous_first_touch");
   const userFt = latestFunctionBody(sql, "ensure_user_first_touch");
 
-  assert.match(link, /cheap idempotent return: already owned by this user/);
-  assert.match(link, /user_id IS NOT DISTINCT FROM v_user_id/);
+  assert.match(link, /already owned — return immediately/);
+  assert.match(link, /v_session_user IS NOT DISTINCT FROM v_user_id/);
   assert.equal(link.includes("pg_advisory_xact_lock"), false, "link itself has no lock");
   assert.match(link, /e\.user_id IS NULL/);
   assert.match(link, /link_analytics_identity/);
+  assert.match(sql, /SET lock_timeout = '250ms'/);
 
-  const cheapIdx = link.indexOf("cheap idempotent return");
+  const cheapIdx = link.indexOf("already owned — return immediately");
   const updateEventsIdx = link.indexOf("UPDATE public.analytics_events");
   const identityIdx = link.indexOf("link_analytics_identity");
   assert.ok(cheapIdx < updateEventsIdx);
@@ -354,13 +355,12 @@ function testSqlIdempotentAndLockPlacement() {
   assert.match(signup, /already_recorded/);
   assert.match(signup, /link_analytics_session_user/);
   assert.match(signup, /not_new_registration/);
+  assert.match(signup, /s\.user_id IS NOT DISTINCT FROM v_user_id/);
 
-  const alreadyOwned = signup.indexOf(
-    "IF v_session_user_id IS NOT DISTINCT FROM v_user_id THEN",
-  );
+  const skipOwned = signup.indexOf("s.user_id IS NOT DISTINCT FROM v_user_id");
   const firstLink = signup.lastIndexOf("PERFORM public.link_analytics_session_user");
-  assert.ok(alreadyOwned >= 0);
-  assert.ok(firstLink > alreadyOwned, "first-touch path still links when needed");
+  assert.ok(skipOwned >= 0);
+  assert.ok(firstLink > skipOwned, "first-touch path still links when needed");
 
   const anonSelectExisting = anonFt.indexOf("subject_type = 'anonymous'");
   const anonLock = anonFt.indexOf("pg_advisory_xact_lock");

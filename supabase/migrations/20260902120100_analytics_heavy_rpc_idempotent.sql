@@ -1,8 +1,28 @@
 BEGIN;
 
--- P1: already-linked analytics sessions must return immediately.
--- No advisory lock, no mass event UPDATE, no identity re-link, no extra writes.
--- First-touch advisory locks only when a first-touch row is actually missing.
+-- =============================================================================
+-- Stop PostgREST pool starvation from link/signup RPC repeats.
+--
+-- Repeats used to UPDATE analytics_sessions, scan/UPDATE analytics_events,
+-- touch analytics_identity_links, then take pg_advisory_xact_lock
+-- hashtext('ft:user:' || user_id) via link_analytics_identity →
+-- ensure_user_first_touch. Each repeat held a PostgREST connection for the
+-- whole wait (lock_timeout 8s → 55P03 → pool saturate → PGRST003).
+--
+-- App-only single-flight is not enough: each tab / Next isolate still
+-- reaches PostgREST. Early-return here before any UPDATE / advisory lock.
+-- Advisory locks are kept — they are not the stampede; repeats are.
+--
+-- PRODUCTION DRIFT (2026-08-28, read-only pg_get_functiondef): both live
+-- RPCs already have function-level SET lock_timeout = '250ms'. That clause
+-- is NOT in origin/main (last replacements: 20260725160000 / 20260717130000).
+-- CREATE OR REPLACE must keep the live 250ms setting. Omitting it would
+-- revert waiters to the authenticator role lock_timeout of 8s.
+-- HISTORICAL INCIDENT: 8s lock waits starved the PostgREST pool.
+-- CURRENT LIVE MITIGATION: 250ms is already on production.
+-- THIS MIGRATION: preserves 250ms AND adds SQL early-return.
+-- Do not change role-level timeouts or the PostgREST connection-pool size.
+-- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.link_analytics_session_user(
   p_session_id uuid,
@@ -12,11 +32,13 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
+SET lock_timeout = '250ms'
 AS $$
 DECLARE
   v_user_id uuid;
-  v_session public.analytics_sessions%ROWTYPE;
+  v_session_user uuid;
   v_updated int := 0;
+  v_already_linked boolean := false;
 BEGIN
   v_user_id := auth.uid();
 
@@ -28,8 +50,11 @@ BEGIN
     RETURN false;
   END IF;
 
-  SELECT s.*
-  INTO v_session
+  -- Snapshot read only (AccessShare). Does not wait on RowExclusive from a
+  -- concurrent first-time UPDATE. Committed already-linked sessions return
+  -- before any row or advisory lock.
+  SELECT s.user_id
+  INTO v_session_user
   FROM public.analytics_sessions AS s
   WHERE s.id = p_session_id
     AND s.anonymous_id = btrim(p_anonymous_id);
@@ -38,8 +63,9 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- cheap idempotent return: already owned by this user
-  IF v_session.user_id IS NOT DISTINCT FROM v_user_id THEN
+  -- P0 overlay: already owned — return immediately. No lock, no event
+  -- UPDATE, no identity re-link. Keep 250ms lock_timeout from #156.
+  IF v_session_user IS NOT DISTINCT FROM v_user_id THEN
     RETURN true;
   END IF;
 
@@ -59,7 +85,6 @@ BEGIN
 
   GET DIAGNOSTICS v_updated = ROW_COUNT;
 
-  -- Real first link only: attach leftover anonymous events.
   UPDATE public.analytics_events AS e
   SET user_id = v_user_id
   WHERE e.session_id = p_session_id
@@ -75,7 +100,7 @@ REVOKE ALL ON FUNCTION public.link_analytics_session_user(uuid, text) FROM PUBLI
 GRANT EXECUTE ON FUNCTION public.link_analytics_session_user(uuid, text) TO authenticated;
 
 COMMENT ON FUNCTION public.link_analytics_session_user(uuid, text) IS
-  'audiolad:analytics-rpc-protection:v1; cheap idempotent return when session already owned; first-link still writes + identity';
+  'audiolad:analytics-rpc-protection:v2; #156 + cheap already-owned return; 250ms lock_timeout';
 
 CREATE OR REPLACE FUNCTION public.record_platform_signup_completed(
   p_session_id uuid,
@@ -85,10 +110,10 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
+SET lock_timeout = '250ms'
 AS $$
 DECLARE
   v_user_id uuid;
-  v_session_user_id uuid;
   v_profile_created_at timestamptz;
   v_analytics_launch_cutoff constant timestamptz := timestamptz '2026-07-16 00:00:00+00';
   v_event_id uuid;
@@ -103,28 +128,33 @@ BEGIN
     RETURN jsonb_build_object('recorded', false, 'reason', 'session_required');
   END IF;
 
-  SELECT s.user_id
-  INTO v_session_user_id
-  FROM public.analytics_sessions AS s
-  WHERE s.id = p_session_id
-    AND s.anonymous_id = btrim(p_anonymous_id);
-
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('recorded', false, 'reason', 'session_mismatch');
-  END IF;
-
+  -- Exactly-once: unique index analytics_events_signup_completed_user_uidx.
+  -- Repeats must not enter the heavy link path first.
   IF EXISTS (
     SELECT 1
     FROM public.analytics_events AS e
     WHERE e.event_name = 'signup_completed'
       AND e.user_id = v_user_id
   ) THEN
-    IF v_session_user_id IS NOT DISTINCT FROM v_user_id THEN
-      RETURN jsonb_build_object('recorded', false, 'reason', 'already_recorded');
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.analytics_sessions AS s
+      WHERE s.id = p_session_id
+        AND s.anonymous_id = btrim(p_anonymous_id)
+        AND s.user_id IS NOT DISTINCT FROM v_user_id
+    ) THEN
+      PERFORM public.link_analytics_session_user(p_session_id, p_anonymous_id);
     END IF;
-
-    PERFORM public.link_analytics_session_user(p_session_id, p_anonymous_id);
     RETURN jsonb_build_object('recorded', false, 'reason', 'already_recorded');
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.analytics_sessions AS s
+    WHERE s.id = p_session_id
+      AND s.anonymous_id = btrim(p_anonymous_id)
+  ) THEN
+    RETURN jsonb_build_object('recorded', false, 'reason', 'session_mismatch');
   END IF;
 
   SELECT p.created_at
@@ -133,11 +163,15 @@ BEGIN
   WHERE p.id = v_user_id;
 
   IF NOT FOUND OR v_profile_created_at < v_analytics_launch_cutoff THEN
-    IF v_session_user_id IS NOT DISTINCT FROM v_user_id THEN
-      RETURN jsonb_build_object('recorded', false, 'reason', 'not_new_registration');
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.analytics_sessions AS s
+      WHERE s.id = p_session_id
+        AND s.anonymous_id = btrim(p_anonymous_id)
+        AND s.user_id IS NOT DISTINCT FROM v_user_id
+    ) THEN
+      PERFORM public.link_analytics_session_user(p_session_id, p_anonymous_id);
     END IF;
-
-    PERFORM public.link_analytics_session_user(p_session_id, p_anonymous_id);
     RETURN jsonb_build_object('recorded', false, 'reason', 'not_new_registration');
   END IF;
 
@@ -176,7 +210,7 @@ REVOKE ALL ON FUNCTION public.record_platform_signup_completed(uuid, text) FROM 
 GRANT EXECUTE ON FUNCTION public.record_platform_signup_completed(uuid, text) TO authenticated;
 
 COMMENT ON FUNCTION public.record_platform_signup_completed(uuid, text) IS
-  'audiolad:analytics-rpc-protection:v1; idempotent signup_completed; skip link when already owned';
+  'audiolad:analytics-rpc-protection:v2; #156 + skip link when already owned; 250ms lock_timeout';
 
 CREATE OR REPLACE FUNCTION public.ensure_anonymous_first_touch(
   p_session_id uuid
