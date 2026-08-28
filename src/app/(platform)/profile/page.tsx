@@ -1,4 +1,3 @@
-import ProfileContinueSection from "@/components/profile/ProfileContinueSection";
 import ProfilePageHeader from "@/components/profile/ProfilePageHeader";
 import ProfilePageShell from "@/components/profile/ProfilePageShell";
 import {
@@ -55,7 +54,6 @@ export default async function ProfilePage({
       ) : null}
 
       <ProfileUserCard card={profileData.card} />
-      <ProfileContinueSection state={profileData.continueState} />
       <ProfileCounters counters={profileData.counters} />
       <ProfileQuickLinks
         showMyMaterialsNav={shellData.showMyMaterialsNav}

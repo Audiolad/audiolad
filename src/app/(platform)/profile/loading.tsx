@@ -1,8 +1,4 @@
 import ProfilePageShell from "@/components/profile/ProfilePageShell";
-import {
-  profilePageGridClassName,
-  profilePagePaddingClassName,
-} from "@/lib/profile/layout";
 
 function SkeletonBlock({ className }: { className: string }) {
   return (
@@ -20,8 +16,6 @@ export default function ProfileLoading() {
       </header>
 
       <SkeletonBlock className="mt-6 h-[180px] min-w-0 xl:h-[196px]" />
-
-      <SkeletonBlock className="mt-6 h-[220px] min-w-0 xl:mt-6 xl:h-[260px] xl:self-start" />
 
       <div className="mt-5 grid min-w-0 grid-cols-3 gap-3">
         <SkeletonBlock className="h-[72px]" />
