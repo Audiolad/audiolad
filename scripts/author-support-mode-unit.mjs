@@ -458,6 +458,11 @@ assert.match(payoutRoute, /support_sensitive_route_blocked/);
 const productPatch = read("src/app/api/author/products/[id]/route.ts");
 assert.match(productPatch, /product_updated/);
 assert.match(productPatch, /changed_fields/);
+assert.match(productPatch, /authorizePracticeAuthorAssignment/);
+assert.doesNotMatch(
+  productPatch,
+  /\.from\("author_members"\)[\s\S]*\.eq\("user_id", user\.id\)/,
+);
 
 const submitRoute = read("src/app/api/author/products/[id]/submit-for-moderation/route.ts");
 assert.match(submitRoute, /product_submitted_for_moderation/);

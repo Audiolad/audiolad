@@ -81,6 +81,18 @@ import {
   type ProductFieldErrorCode,
 } from "@/lib/author-products/limits";
 import {
+  applyProductEditorSaveToDirty,
+  isProductEditorDirty,
+  serializeProductEditorBaseline,
+  shouldSubmitProductAfterSave,
+} from "@/lib/author-products/editor-save-state";
+import {
+  getProductCreateErrorMessage,
+  getProductSaveErrorMessage,
+  logProductSaveFailure,
+} from "@/lib/author-products/save-errors";
+import { buildUnlockedProductIdentityFields } from "@/lib/author-products/save-payload";
+import {
   mergeServerAudioItems,
   mergeServerProductIntoForm,
   productDetailToFormSnapshot,
@@ -374,7 +386,11 @@ function buildProductSavePayload(
   slugLocked: boolean,
 ) {
   return {
-    ...(slugLocked ? {} : { author_id: form.authorId, slug: form.slug }),
+    ...buildUnlockedProductIdentityFields({
+      slugLocked,
+      authorId: form.authorId,
+      slug: form.slug,
+    }),
     title: form.title.trim(),
     subtitle: form.subtitle.trim() || null,
     description: form.description.trim() || null,
@@ -484,6 +500,19 @@ export default function AuthorProductForm({
   const [submitIssueScrollKey, setSubmitIssueScrollKey] = useState(0);
   const [practiceId, setPracticeId] = useState(initialProduct?.practice.id ?? "");
   const practiceIdRef = useRef(initialProduct?.practice.id ?? "");
+  const savedBaselineRef = useRef<string | null>(
+    initialProduct
+      ? serializeProductEditorBaseline(
+          productDetailToFormSnapshot(initialProduct),
+          initialProduct.audio_items,
+        )
+      : null,
+  );
+  const [editorDirty, setEditorDirty] = useState(() =>
+    initialProduct
+      ? false
+      : true,
+  );
   const [contentLockedAfterSale, setContentLockedAfterSale] = useState(
     initialProduct?.contentLockedAfterSale === true,
   );
@@ -706,6 +735,11 @@ export default function AuthorProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practiceId]);
 
+  useEffect(() => {
+    const current = serializeProductEditorBaseline(form, audioItems);
+    setEditorDirty(isProductEditorDirty(current, savedBaselineRef.current));
+  }, [form, audioItems]);
+
   const slugLocked =
     form.status === "published" ||
     form.status === "unpublished" ||
@@ -810,7 +844,17 @@ export default function AuthorProductForm({
     };
 
     if (!response.ok || !payload.product?.practice.id) {
-      setError("Не удалось создать черновик.");
+      logProductSaveFailure({
+        stage: "create_draft",
+        error: payload.error,
+        status: response.status,
+      });
+      setError(
+        getProductCreateErrorMessage({
+          error: payload.error,
+          status: response.status,
+        }),
+      );
       return null;
     }
 
@@ -1015,7 +1059,9 @@ export default function AuthorProductForm({
     return true;
   }
 
-  async function reloadSavedProduct(targetPracticeId: string): Promise<boolean> {
+  async function reloadSavedProduct(
+    targetPracticeId: string,
+  ): Promise<AuthorProductDetail | null> {
     const [productResponse, topicsResponse] = await Promise.all([
       fetch(`/api/author/products/${targetPracticeId}`, {
         cache: "no-store",
@@ -1035,7 +1081,7 @@ export default function AuthorProductForm({
     };
 
     if (!productResponse.ok || !productPayload.product) {
-      return false;
+      return null;
     }
 
     setForm(
@@ -1047,7 +1093,7 @@ export default function AuthorProductForm({
       await applyTopicFormData(topicsPayload.topics);
     }
 
-    return true;
+    return productPayload.product;
   }
 
   async function saveProduct(): Promise<boolean> {
@@ -1079,6 +1125,7 @@ export default function AuthorProductForm({
       const payload = (await response.json()) as {
         product?: AuthorProductDetail;
         error?: string;
+        message?: string;
       };
 
       if (!response.ok || !payload.product) {
@@ -1104,10 +1151,18 @@ export default function AuthorProductForm({
           }
         }
 
+        logProductSaveFailure({
+          stage: "patch_product",
+          practiceId: id,
+          error: payload.error,
+          status: response.status,
+        });
         setError(
-          payload.error === "update_failed"
-            ? "Не удалось сохранить изменения продукта. Обновите страницу и попробуйте снова."
-            : "Не удалось сохранить аудиопродукт.",
+          getProductSaveErrorMessage({
+            error: payload.error,
+            message: payload.message,
+            status: response.status,
+          }),
         );
         return false;
       }
@@ -1149,10 +1204,23 @@ export default function AuthorProductForm({
         return false;
       }
 
+      savedBaselineRef.current = serializeProductEditorBaseline(
+        productDetailToFormSnapshot(reloaded),
+        reloaded.audio_items,
+      );
+      setEditorDirty(applyProductEditorSaveToDirty({ dirty: true, saved: true }));
       router.refresh();
       return true;
     } catch {
-      setError("Не удалось сохранить аудиопродукт.");
+      logProductSaveFailure({
+        stage: "save_product",
+        practiceId: practiceIdRef.current,
+        networkError: true,
+      });
+      setError(getProductSaveErrorMessage({ networkError: true }));
+      setEditorDirty(
+        applyProductEditorSaveToDirty({ dirty: editorDirty, saved: false }),
+      );
       return false;
     } finally {
       setBusy(false);
@@ -1548,7 +1616,7 @@ export default function AuthorProductForm({
       }
       const id = ensured.practiceId;
       const saved = await saveProduct();
-      if (!saved) {
+      if (!shouldSubmitProductAfterSave(saved)) {
         requestScrollToFirstSubmitIssue();
         return;
       }
