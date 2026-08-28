@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { mapModerationRpcError } from "@/lib/author-products/moderation";
+import {
+  mapModerationRpcError,
+  mapProductNotReadyUserMessage,
+  type PublishRpcErrorSource,
+} from "@/lib/author-products/moderation";
 import type { PracticeRow } from "@/lib/author-products/types";
 import { coercePracticeRow } from "@/lib/author-products/types";
 
@@ -16,11 +20,12 @@ function coerceRpcPractice(data: unknown, fallbackMessage: string): PracticeRow 
   return coercePracticeRow(data as Parameters<typeof coercePracticeRow>[0]);
 }
 
-function mapAdminDecisionError(message: string): {
+function mapAdminDecisionError(error: PublishRpcErrorSource): {
   status: number;
   code: string;
   message: string;
 } {
+  const message = typeof error === "string" ? error : error.message ?? "";
   const normalized = message.toLowerCase();
 
   if (normalized.includes("moderation_state_changed")) {
@@ -57,15 +62,15 @@ function mapAdminDecisionError(message: string): {
   }
 
   if (normalized.includes("product_not_ready")) {
+    const mapped = mapProductNotReadyUserMessage(error);
     return {
       status: 400,
-      code: "product_not_ready",
-      message:
-        "Продукт не готов к публикации. Проверьте обложку, аудио, темы, описание и цену.",
+      code: mapped.code,
+      message: mapped.message,
     };
   }
 
-  return mapModerationRpcError(message);
+  return mapModerationRpcError(error);
 }
 
 /**
@@ -81,7 +86,7 @@ export async function approveAndPublishPractice(
   });
 
   if (error) {
-    throw mapAdminDecisionError(error.message);
+    throw mapAdminDecisionError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось одобрить продукт.");
@@ -98,7 +103,7 @@ export async function requestPracticeChanges(
   });
 
   if (error) {
-    throw mapAdminDecisionError(error.message);
+    throw mapAdminDecisionError(error);
   }
 
   return coerceRpcPractice(data, "Не удалось отправить замечания автору.");

@@ -130,6 +130,8 @@ Eligibility только в приложении через `isProductGalleryEli
 
 Для `audio_post`: всегда бесплатный (`is_free=true`, `price=0`), публичный формат «Аудиопост», ровно один `audio_item` на уровне publish readiness / UX (не CHECK на число треков). Поле `description` для `audio_post` необязательно (`assert_practice_moderation_ready` / TS publish readiness); для `practice` и `music` описание по-прежнему обязательно. Миграция: `20260805193000_audio_post_optional_description.sql`.
 
+Для `publication_class='course'` `assert_practice_moderation_ready` не требует плоских `audio_items`. Готовность курса — семантическая: ≥1 `course_lessons` и у каждого урока ≥1 валидный блок (`text` с непустым `payload.text`, `audio` с загруженным `audio_items`, либо `file` с `publication_files`). Остаточные плоские треки курс не валят. Остальные классы сохраняют прежние правила `audio_items`. Миграция: `20260901120000_course_moderation_readiness.sql`.
+
 #### promo_* — универсальная внутренняя рекомендация (2026-08-05)
 
 Миграция: `20260805120000_practice_product_kind_audio_post.sql`.

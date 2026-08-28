@@ -91,6 +91,20 @@ export const COURSE_BUILDER_LEGACY_AUDIO_NOTICE =
 export const COURSE_PUBLISH_MISSING_CONTENT_CODE = "missing_course_content";
 export const COURSE_PUBLISH_MISSING_CONTENT_MESSAGE =
   "Добавьте хотя бы один урок с содержимым.";
+export const COURSE_PUBLISH_MISSING_LESSONS_CODE = "missing_course_lessons";
+export const COURSE_PUBLISH_MISSING_LESSONS_MESSAGE =
+  "Добавьте хотя бы один урок.";
+export const COURSE_PUBLISH_EMPTY_LESSON_CODE = "empty_course_lesson";
+export const COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE = "incomplete_course_audio";
+export const COURSE_PUBLISH_MISSING_FILE_CODE = "missing_course_file";
+export const COURSE_PUBLISH_EMPTY_LESSON_FALLBACK =
+  "Один из уроков курса пока не содержит готового материала.";
+export const COURSE_PUBLISH_INCOMPLETE_AUDIO_FALLBACK =
+  "В одном из уроков курса аудио ещё не загружено.";
+export const COURSE_PUBLISH_MISSING_FILE_FALLBACK =
+  "В одном из уроков курса не прикреплён PDF-файл.";
+export const COURSE_PUBLISH_NOT_READY_FALLBACK =
+  "Продукт ещё не готов к публикации. Проверьте обязательные поля, тему и материалы курса.";
 
 export type CourseBuilderAudioAsset = {
   id: string;
@@ -147,10 +161,39 @@ export type CourseBuilderSnapshot = {
   orphan_audio_item_count: number;
 };
 
+export type CoursePublishLessonInput = {
+  id?: string | null;
+  title?: string | null;
+  blocks?: ReadonlyArray<{
+    type?: string | null;
+    asset_id?: string | null;
+    payload?: unknown;
+    audio?: CourseBuilderAudioAsset | null;
+    file?: (CourseBuilderFileAsset & { storage_path?: string | null }) | null;
+  }>;
+};
+
 export type CoursePublishContentSnapshot = {
   lessonCount: number;
   blockCount: number;
+  lessons?: readonly CoursePublishLessonInput[];
 };
+
+export type CourseLessonReadinessFailure = {
+  ok: false;
+  code:
+    | typeof COURSE_PUBLISH_MISSING_LESSONS_CODE
+    | typeof COURSE_PUBLISH_EMPTY_LESSON_CODE
+    | typeof COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE
+    | typeof COURSE_PUBLISH_MISSING_FILE_CODE;
+  message: string;
+  lessonTitle: string | null;
+  lessonId: string | null;
+};
+
+export type CourseLessonReadinessResult =
+  | { ok: true }
+  | CourseLessonReadinessFailure;
 
 export type CourseCompletionCtaInput = {
   title: string | null;
@@ -196,12 +239,168 @@ export function assertBlockBelongsToLesson(input: {
   return { ok: true };
 }
 
+function readCourseTextPayload(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "";
+  }
+
+  const text = (payload as { text?: unknown }).text;
+  return typeof text === "string" ? text : "";
+}
+
+export function isValidCourseTextBlock(payload: unknown): boolean {
+  return readCourseTextPayload(payload).trim() !== "";
+}
+
+export function isValidCourseAudioAsset(
+  audio:
+    | Pick<CourseBuilderAudioAsset, "title" | "audio_path" | "duration_seconds">
+    | null
+    | undefined,
+): boolean {
+  return Boolean(
+    audio &&
+      audio.title?.trim() &&
+      audio.audio_path?.trim() &&
+      audio.duration_seconds &&
+      audio.duration_seconds > 0,
+  );
+}
+
+export function isValidCourseFileAsset(
+  file:
+    | (Pick<CourseBuilderFileAsset, "original_name" | "size_bytes"> & {
+        storage_path?: string | null;
+      })
+    | null
+    | undefined,
+): boolean {
+  if (!file || !file.original_name?.trim() || !(file.size_bytes > 0)) {
+    return false;
+  }
+
+  if ("storage_path" in file && file.storage_path != null) {
+    return Boolean(file.storage_path.trim());
+  }
+
+  return true;
+}
+
+export function formatEmptyCourseLessonMessage(title?: string | null): string {
+  const trimmed = title?.trim();
+  return trimmed
+    ? `В уроке «${trimmed}» пока нет содержимого.`
+    : COURSE_PUBLISH_EMPTY_LESSON_FALLBACK;
+}
+
+export function formatIncompleteCourseAudioMessage(
+  title?: string | null,
+): string {
+  const trimmed = title?.trim();
+  return trimmed
+    ? `В уроке «${trimmed}» аудио ещё не загружено.`
+    : COURSE_PUBLISH_INCOMPLETE_AUDIO_FALLBACK;
+}
+
+export function formatMissingCourseFileMessage(title?: string | null): string {
+  const trimmed = title?.trim();
+  return trimmed
+    ? `В уроке «${trimmed}» не прикреплён PDF-файл.`
+    : COURSE_PUBLISH_MISSING_FILE_FALLBACK;
+}
+
+/**
+ * Per-lesson semantic content for publication_class=course.
+ * Matches assert_practice_moderation_ready v4: every lesson needs ≥1 valid
+ * nonempty text / ready audio / real file block. Row counts are not enough.
+ */
+export function evaluateCourseLessonsReadiness(
+  lessons: ReadonlyArray<CoursePublishLessonInput> | null | undefined,
+): CourseLessonReadinessResult {
+  const list = lessons ?? [];
+
+  if (list.length === 0) {
+    return {
+      ok: false,
+      code: COURSE_PUBLISH_MISSING_LESSONS_CODE,
+      message: COURSE_PUBLISH_MISSING_LESSONS_MESSAGE,
+      lessonTitle: null,
+      lessonId: null,
+    };
+  }
+
+  for (const lesson of list) {
+    const blocks = lesson.blocks ?? [];
+    const hasValidBlock = blocks.some((block) => {
+      if (block.type === "text") {
+        return isValidCourseTextBlock(block.payload);
+      }
+
+      if (block.type === "audio") {
+        return isValidCourseAudioAsset(block.audio);
+      }
+
+      if (block.type === "file") {
+        return isValidCourseFileAsset(block.file);
+      }
+
+      return false;
+    });
+
+    if (hasValidBlock) {
+      continue;
+    }
+
+    const lessonTitle = lesson.title?.trim() || null;
+    const lessonId = lesson.id ?? null;
+
+    if (blocks.some((block) => block.type === "audio")) {
+      return {
+        ok: false,
+        code: COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE,
+        message: formatIncompleteCourseAudioMessage(lessonTitle),
+        lessonTitle,
+        lessonId,
+      };
+    }
+
+    if (blocks.some((block) => block.type === "file")) {
+      return {
+        ok: false,
+        code: COURSE_PUBLISH_MISSING_FILE_CODE,
+        message: formatMissingCourseFileMessage(lessonTitle),
+        lessonTitle,
+        lessonId,
+      };
+    }
+
+    return {
+      ok: false,
+      code: COURSE_PUBLISH_EMPTY_LESSON_CODE,
+      message: formatEmptyCourseLessonMessage(lessonTitle),
+      lessonTitle,
+      lessonId,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Author-form / TS publish gate for course content.
+ *
+ * publishedAt skip: already-published courses can republish / start-editing
+ * without re-blocking the client on empty snapshot counts (legacy published
+ * courses may predate course_lessons). SQL assert_practice_moderation_ready
+ * still validates lessons on every submit/publish RPC.
+ */
 export function evaluateCoursePublishContentGate(input: {
   publicationClass: string | null | undefined;
   productKind: string | null | undefined;
   publishedAt: string | null | undefined;
-  lessonCount: number;
-  blockCount: number;
+  lessonCount?: number;
+  blockCount?: number;
+  lessons?: ReadonlyArray<CoursePublishLessonInput> | null;
 }): { ok: true } | { ok: false; code: string; message: string } {
   if (!isCoursePublication(input.publicationClass, input.productKind)) {
     return { ok: true };
@@ -211,26 +410,26 @@ export function evaluateCoursePublishContentGate(input: {
     return { ok: true };
   }
 
-  if (input.lessonCount >= 1 && input.blockCount >= 1) {
+  const semantic = evaluateCourseLessonsReadiness(input.lessons);
+
+  if (semantic.ok) {
     return { ok: true };
   }
 
   return {
     ok: false,
-    code: COURSE_PUBLISH_MISSING_CONTENT_CODE,
-    message: COURSE_PUBLISH_MISSING_CONTENT_MESSAGE,
+    code: semantic.code,
+    message: semantic.message,
   };
 }
 
 export function shouldSkipFlatAudioPublishRequirement(input: {
   publicationClass: string | null | undefined;
   productKind: string | null | undefined;
-  blockCount: number;
+  blockCount?: number;
 }): boolean {
-  return (
-    isCoursePublication(input.publicationClass, input.productKind) &&
-    input.blockCount > 0
-  );
+  void input.blockCount;
+  return isCoursePublication(input.publicationClass, input.productKind);
 }
 
 /** New `publication_class=course` drafts do not get the shared empty audio slot. */
@@ -278,7 +477,7 @@ export function resolveCourseBuilderPanes(input: {
 }
 
 export function countCoursePublishContentFromLessons(
-  lessons: ReadonlyArray<{ blocks?: readonly unknown[] }>,
+  lessons: ReadonlyArray<CoursePublishLessonInput>,
 ): CoursePublishContentSnapshot {
   return {
     lessonCount: lessons.length,
@@ -286,6 +485,7 @@ export function countCoursePublishContentFromLessons(
       (sum, lesson) => sum + (lesson.blocks?.length ?? 0),
       0,
     ),
+    lessons,
   };
 }
 
@@ -367,6 +567,14 @@ export function getCourseBuilderErrorMessage(code: string | undefined): string {
       return "Укажите название урока.";
     case COURSE_PUBLISH_MISSING_CONTENT_CODE:
       return COURSE_PUBLISH_MISSING_CONTENT_MESSAGE;
+    case COURSE_PUBLISH_MISSING_LESSONS_CODE:
+      return COURSE_PUBLISH_MISSING_LESSONS_MESSAGE;
+    case COURSE_PUBLISH_EMPTY_LESSON_CODE:
+      return COURSE_PUBLISH_EMPTY_LESSON_FALLBACK;
+    case COURSE_PUBLISH_INCOMPLETE_AUDIO_CODE:
+      return COURSE_PUBLISH_INCOMPLETE_AUDIO_FALLBACK;
+    case COURSE_PUBLISH_MISSING_FILE_CODE:
+      return COURSE_PUBLISH_MISSING_FILE_FALLBACK;
     case "invalid_file_type":
       return COURSE_BUILDER_PDF_WRONG_TYPE;
     case "invalid_file_size":

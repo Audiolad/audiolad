@@ -377,6 +377,12 @@ function testRepoOneFileOneVersion() {
         "20260901120400_fix_visibility_allowlist_author_policy.sql",
     ),
   );
+  assert.ok(
+    listed.files.some(
+      (row) =>
+        row.filename === "20260901120000_course_moderation_readiness.sql",
+    ),
+  );
 }
 
 function testUnappliedOlderStampStillHoles() {

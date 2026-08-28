@@ -98,6 +98,7 @@ function readinessPair(practice, audioItems, options) {
     audioItems,
     accessStatus: options.accessStatus,
     activeTopicCount: options.activeTopicCount,
+    courseContent: options.courseContent,
   });
   return {
     tsReadiness,
@@ -264,31 +265,48 @@ assert.equal(usd.tsReadiness.ok, true);
 assert.equal(usd.dbReadiness.ok, false);
 assert.equal(usd.fieldsReady, false);
 
-// SQL-only: course with lessons/blocks and no flat audio
+// Course with a nonempty text lesson and no flat audio: TS and SQL agree READY
 const courseNoAudio = readinessPair(
   basePractice({
     publication_class: "course",
     title: "Курс без плоского аудио",
     slug: "kurs-bez-audio",
+    format: "Курс",
   }),
   [],
   {
     accessStatus: "free",
     activeTopicCount: 1,
-    courseContent: { lessonCount: 1, blockCount: 1 },
+    courseContent: {
+      lessonCount: 1,
+      blockCount: 1,
+      lessons: [
+        {
+          id: "lesson-1",
+          title: "Урок 1",
+          blocks: [{ type: "text", payload: { text: "Текст урока" } }],
+        },
+      ],
+    },
   },
 );
 assert.equal(
   courseNoAudio.tsReadiness.ok,
   true,
-  "TS skips flat audio for a course with blocks",
+  "TS skips flat audio for a course with a valid text lesson",
 );
-assert.ok(
+assert.equal(
+  courseNoAudio.dbReadiness.ok,
+  true,
+  "SQL mirror no longer requires audio_items for a text course",
+);
+assert.equal(
   courseNoAudio.dbReadiness.checks.some(
     (check) => check.code === "missing_audio" && !check.ok,
   ),
+  false,
 );
-assert.equal(courseNoAudio.fieldsReady, false);
+assert.equal(courseNoAudio.fieldsReady, true);
 
 // Submit UI eligibility
 const submitted = evaluateAuthorSubmitEligibility({
