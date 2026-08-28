@@ -38,6 +38,8 @@ export type PersonalPromotionStart = {
   userId: string | null;
   startedAt: string;
   expiresAt: string;
+  /** Integer rubles frozen on first personal start. Resolver uses this, not live promotion.salePrice. */
+  salePriceSnapshot: number;
 };
 
 export type ResolvedPromotion = {

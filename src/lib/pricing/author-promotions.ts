@@ -187,8 +187,10 @@ export function buildPromotionWriteBody(
 
 /**
  * Fields written by PATCH. Never rotates start_token or reassigns
- * practice_id / ownership. is_active is only written when the body
- * sends it explicitly, so a full edit cannot silently re-enable a card.
+ * practice_id / ownership. Never writes practice_price_promotion_starts
+ * (existing sale_price_snapshot / expires_at stay frozen). is_active is
+ * only written when the body sends it explicitly, so a full edit cannot
+ * silently re-enable a card.
  */
 export function buildPromotionPatchUpdates(
   body: Record<string, unknown>,

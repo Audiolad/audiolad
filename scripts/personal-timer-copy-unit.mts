@@ -53,6 +53,7 @@ function start(overrides: Record<string, unknown> = {}) {
     userId: null,
     startedAt: "2026-08-23T10:00:00.000Z",
     expiresAt: "2026-08-23T10:20:00.000Z",
+    salePriceSnapshot: 499,
     ...overrides,
   };
 }
@@ -229,6 +230,35 @@ function testActivePersonalPassesCopyThroughResolve() {
   );
 }
 
+function testAuthorCopyEditIsLiveWhileSnapshotStays() {
+  const resolved = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [
+      promotion({
+        salePrice: 699,
+        aboveTimerText: `Новый над ${PERSONAL_TIMER_TIME_LEFT_TOKEN}`,
+        belowButtonText: `Новый под ${PERSONAL_TIMER_FULL_PRICE_TOKEN}`,
+      }),
+    ],
+    starts: [start({ salePriceSnapshot: 499 })],
+    surface: PRICE_SURFACES.PRODUCT,
+    now: new Date("2026-08-23T10:10:00.000Z"),
+  });
+
+  assert.equal(resolved.salePrice, 499, "in-flight start keeps snapshot after author price edit");
+  assert.equal(
+    resolved.promotion?.aboveTimerText,
+    `Новый над ${PERSONAL_TIMER_TIME_LEFT_TOKEN}`,
+    "copy edit is live immediately",
+  );
+  assert.equal(
+    resolved.promotion?.belowButtonText,
+    `Новый под ${PERSONAL_TIMER_FULL_PRICE_TOKEN}`,
+    "below copy edit is live immediately",
+  );
+}
+
 function testParseCopyFields() {
   const withCopy = parsePromotionWriteBody(
     {
@@ -352,6 +382,7 @@ testSubstituteDoesNotInventTokens();
 testNoPromotionAndOtherTypeDoNotGetPersonalCopy();
 testExpiredPersonalLeavesBasePrice();
 testActivePersonalPassesCopyThroughResolve();
+testAuthorCopyEditIsLiveWhileSnapshotStays();
 testParseCopyFields();
 testSourceContracts();
 

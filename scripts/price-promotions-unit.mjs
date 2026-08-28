@@ -84,6 +84,7 @@ function start(overrides) {
     userId: null,
     startedAt: "2026-08-23T10:00:00.000Z",
     expiresAt: "2026-08-23T10:20:00.000Z",
+    salePriceSnapshot: 499,
     ...overrides,
   };
 }
@@ -209,6 +210,7 @@ function testOneShotPersonalCountdown() {
     userId: null,
     now,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
     id: "start-1",
   });
   assert(first.created, "first visit creates start");
@@ -222,6 +224,7 @@ function testOneShotPersonalCountdown() {
     userId: null,
     now: later,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
     id: "start-repeat",
   });
   assert(!repeat.created, "repeat before expiry reuses");
@@ -236,6 +239,7 @@ function testOneShotPersonalCountdown() {
     userId: null,
     now: afterExpiry,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
     id: "start-after",
   });
   assert(!after.created, "repeat after expiry does not restart");
@@ -261,6 +265,7 @@ function testOneShotPersonalCountdown() {
     userId: null,
     now: afterExpiry,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
     id: "start-other",
   });
   assert(other.created, "new visitor gets their own window");
@@ -332,6 +337,7 @@ function testGuestLoginKeepsOriginalWindow() {
     userId: null,
     now: new Date("2026-08-23T10:00:00.000Z"),
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
     id: "guest-1",
   });
   const userId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -372,6 +378,7 @@ function testGuestLoginKeepsOriginalWindow() {
     userId,
     now: new Date("2026-08-23T10:12:00.000Z"),
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
     id: "should-not-create",
   });
   assert(!startAfterLogin.created, "login does not create a second countdown");
@@ -391,6 +398,7 @@ function testGuestExpiryThenLoginDoesNotRevive() {
     userId: null,
     now: new Date("2026-08-23T10:00:00.000Z"),
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
     id: "guest-expired",
   });
   const userId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -408,6 +416,7 @@ function testGuestExpiryThenLoginDoesNotRevive() {
     userId,
     now: afterExpiry,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 699,
     id: "revive",
   });
   assert(!started.created, "expired guest start is not recreated after login");
@@ -438,6 +447,7 @@ function testParallelStartsShareOneWindow() {
     userId: null,
     now,
     durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
   };
 
   const first = startPersonalCountdown({ ...input, id: "parallel-a" });
@@ -727,58 +737,217 @@ function testAuthorPromotionEditOwnershipGate() {
   }
 }
 
-function testAuthorPromotionEditDoesNotResetStarts() {
-  const existingStart = start({
-    startedAt: "2026-08-23T10:00:00.000Z",
-    expiresAt: "2026-08-23T10:20:00.000Z",
+function testAuthorPromotionEditKeepsExistingStartSnapshot() {
+  const original = promotion({
+    name: "Funnel 499",
+    salePrice: 499,
+    durationSeconds: 20 * 60,
+    aboveTimerText: "Старый над {time_left}",
+    belowButtonText: "Старый под {full_price}",
+    isActive: true,
+    startToken: "token-1",
   });
+  const buyerNow = new Date("2026-08-23T10:00:00.000Z");
+  const first = startPersonalCountdown({
+    store: [],
+    promotionId: original.id,
+    visitorId: "11111111-1111-4111-8111-111111111111",
+    userId: null,
+    now: buyerNow,
+    durationSeconds: original.durationSeconds,
+    salePriceSnapshot: original.salePrice,
+    id: "buyer-start-1",
+  });
+  assert(first.created, "buyer start inserts");
+  assertEqual(first.start.salePriceSnapshot, 499, "buyer start snapshots 499");
+  assertEqual(first.start.expiresAt, "2026-08-23T10:20:00.000Z", "buyer window 20 min");
+
+  const draft = promotionToFormDraft({
+    name: original.name,
+    promotion_type: original.promotionType,
+    sale_price: original.salePrice,
+    starts_at: original.startsAt,
+    ends_at: original.endsAt,
+    duration_seconds: original.durationSeconds,
+    above_timer_text: original.aboveTimerText,
+    below_button_text: original.belowButtonText,
+  });
+  draft.name = "Funnel 699";
+  draft.salePrice = "699";
+  draft.durationAmount = "45";
+  draft.durationUnit = "minutes";
+  draft.aboveTimerText = "Новый над {time_left}";
+  draft.belowButtonText = "Новый под {full_price}";
+
+  const writeBody = buildPromotionWriteBody(draft, { isActive: true });
+  const parsed = buildPromotionPatchUpdates(writeBody, 4999);
+  assert(parsed.ok, "author edit validates");
+  if (!parsed.ok) {
+    return;
+  }
+
+  const promoStore = [
+    savedPromotionRow({
+      name: original.name,
+      sale_price: 499,
+      duration_seconds: 20 * 60,
+      above_timer_text: original.aboveTimerText,
+      below_button_text: original.belowButtonText,
+      is_active: true,
+      start_token: "token-1",
+    }),
+  ];
+  const updated = applyPromotionUpdate(
+    promoStore,
+    "practice-1",
+    "promo-1",
+    parsed.updates,
+  );
+  assert(updated.ok, "edit updates same row");
+  assertEqual(updated.store.length, 1, "edit does not insert a second promotion");
+  assertEqual(updated.store[0].id, "promo-1", "promotion id unchanged");
+  assertEqual(updated.store[0].start_token, "token-1", "start_token unchanged");
+  assertEqual(updated.store[0].is_active, true, "enabled preserved");
+  assertEqual(updated.store[0].sale_price, 699, "live sale_price is 699");
+  assertEqual(updated.store[0].duration_seconds, 45 * 60, "live duration is 45 min");
+
   const editedPromo = promotion({
-    name: "После правки",
-    salePrice: 399,
-    durationSeconds: 60 * 60,
+    name: "Funnel 699",
+    salePrice: 699,
+    durationSeconds: 45 * 60,
     aboveTimerText: "Новый над {time_left}",
     belowButtonText: "Новый под {full_price}",
+    startToken: "token-1",
+    isActive: true,
   });
-  const now = new Date("2026-08-23T10:10:00.000Z");
+  const during = new Date("2026-08-23T10:10:00.000Z");
 
-  const resolved = resolvePracticePrice({
+  assertEqual(first.start.salePriceSnapshot, 499, "edit does not rewrite snapshot");
+  assertEqual(
+    first.start.expiresAt,
+    "2026-08-23T10:20:00.000Z",
+    "edit does not rewrite expires_at",
+  );
+  assertEqual(first.store.length, 1, "edit writes no start rows");
+
+  const existingProduct = resolvePracticePrice({
     isFree: false,
     basePrice: 4999,
     promotions: [editedPromo],
-    starts: [existingStart],
+    starts: first.store,
     surface: PRICE_SURFACES.PRODUCT,
-    now,
+    now: during,
   });
-  assertEqual(resolved.finalPrice, 399, "live price follows current row");
+  assertEqual(existingProduct.finalPrice, 499, "existing buyer PDP=499");
+  assertEqual(existingProduct.salePrice, 499, "existing buyer sale is snapshot");
   assertEqual(
-    resolved.promotion?.expiresAt,
-    existingStart.expiresAt,
-    "already-started window keeps expires_at",
+    existingProduct.promotion?.name,
+    "Funnel 699",
+    "name edit is live immediately",
   );
   assertEqual(
-    resolved.promotion?.aboveTimerText,
+    existingProduct.promotion?.aboveTimerText,
     "Новый над {time_left}",
-    "copy follows current row",
+    "text edits visible immediately",
   );
   assertEqual(
-    resolved.promotion?.belowButtonText,
+    existingProduct.promotion?.belowButtonText,
     "Новый под {full_price}",
     "below copy follows current row",
   );
+  assertEqual(
+    existingProduct.promotion?.expiresAt,
+    first.start.expiresAt,
+    "existing timer still uses original expires_at",
+  );
 
-  const repeat = startPersonalCountdown({
-    store: [existingStart],
+  const existingCheckout = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [editedPromo],
+    starts: first.store,
+    surface: PRICE_SURFACES.CHECKOUT,
+    now: during,
+  });
+  assertEqual(existingCheckout.finalPrice, 499, "existing buyer checkout=499");
+  assertEqual(existingCheckout.salePrice, 499, "checkout uses snapshot, not live 699");
+
+  const preview = resolveAuthorPromoPreviewPrice({
+    isFree: false,
+    basePrice: 4999,
+    promotion: editedPromo,
+    now: during,
+  });
+  assert(preview, "promo_preview resolves from live promotion");
+  assertEqual(preview.finalPrice, 699, "author promo_preview=699");
+  assertEqual(preview.salePrice, 699, "preview uses live promotion.sale_price");
+  assertEqual(
+    preview.promotion?.expiresAt,
+    new Date(during.getTime() + 45 * 60 * 1000).toISOString(),
+    "preview synthesizes the newly saved duration",
+  );
+  assertEqual(first.store.length, 1, "promo_preview writes no starts");
+
+  const reuse = startPersonalCountdown({
+    store: first.store,
     promotionId: editedPromo.id,
-    visitorId: existingStart.visitorId,
+    visitorId: first.start.visitorId,
     userId: null,
-    now,
+    now: during,
     durationSeconds: editedPromo.durationSeconds,
+    salePriceSnapshot: editedPromo.salePrice,
     id: "must-not-create",
   });
-  assert(!repeat.created, "duration edit does not create a second start");
-  assertEqual(repeat.store.length, 1, "still one start row");
-  assertEqual(repeat.start.expiresAt, existingStart.expiresAt, "window not reset");
-  assertEqual(repeat.start.startedAt, existingStart.startedAt, "started_at kept");
+  assert(!reuse.created, "duration/price edit does not create a second start");
+  assertEqual(reuse.store.length, 1, "still one start row");
+  assertEqual(reuse.start.salePriceSnapshot, 499, "reuse keeps snapshot 499");
+  assertEqual(reuse.start.expiresAt, first.start.expiresAt, "reuse keeps expires_at");
+  assertEqual(reuse.start.startedAt, first.start.startedAt, "started_at kept");
+
+  const newer = startPersonalCountdown({
+    store: first.store,
+    promotionId: editedPromo.id,
+    visitorId: "22222222-2222-4222-8222-222222222222",
+    userId: null,
+    now: during,
+    durationSeconds: editedPromo.durationSeconds,
+    salePriceSnapshot: editedPromo.salePrice,
+    id: "buyer-start-2",
+  });
+  assert(newer.created, "new buyer start inserts");
+  assertEqual(newer.start.salePriceSnapshot, 699, "new buyer start snapshot=699");
+  assertEqual(
+    newer.start.expiresAt,
+    new Date(during.getTime() + 45 * 60 * 1000).toISOString(),
+    "new start uses new duration",
+  );
+
+  const disabledStore = [
+    savedPromotionRow({
+      is_active: false,
+      start_token: "token-1",
+    }),
+  ];
+  const disabledWrite = buildPromotionWriteBody(draft, { isActive: false });
+  const disabledParsed = buildPromotionPatchUpdates(disabledWrite, 4999);
+  assert(disabledParsed.ok, "disabled edit validates");
+  if (!disabledParsed.ok) {
+    return;
+  }
+  const disabledUpdated = applyPromotionUpdate(
+    disabledStore,
+    "practice-1",
+    "promo-1",
+    disabledParsed.updates,
+  );
+  assertEqual(disabledUpdated.store.length, 1, "disabled edit still one row");
+  assertEqual(disabledUpdated.store[0].id, "promo-1", "disabled edit keeps id");
+  assertEqual(
+    disabledUpdated.store[0].start_token,
+    "token-1",
+    "disabled edit keeps start_token",
+  );
+  assertEqual(disabledUpdated.store[0].is_active, false, "disabled preserved");
 }
 
 function testAuthorPromoPreviewUsesUpdatedRowById() {
@@ -867,6 +1036,291 @@ function testPurchaseRegressionStillUsesIntegerRubles() {
   assert(validatePaidPriceRubles(2888).ok, "old chip still valid");
 }
 
+function testPersonalStartKeepsSalePriceSnapshot() {
+  const now = new Date("2026-08-23T10:00:00.000Z");
+  const during = new Date("2026-08-23T10:10:00.000Z");
+  const visitorId = "11111111-1111-4111-8111-111111111111";
+  const newVisitor = "22222222-2222-4222-8222-222222222222";
+
+  const first = startPersonalCountdown({
+    store: [],
+    promotionId: "promo-1",
+    visitorId,
+    userId: null,
+    now,
+    durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
+    id: "snap-1",
+  });
+  assertEqual(first.start.salePriceSnapshot, 499, "A: first start freezes 499");
+
+  const live699 = promotion({
+    salePrice: 699,
+    name: "Funnel 699",
+    aboveTimerText: "New headline {time_left}",
+    belowButtonText: "New note {full_price}",
+    durationSeconds: 10 * 60,
+  });
+
+  const reuse = startPersonalCountdown({
+    store: first.store,
+    promotionId: "promo-1",
+    visitorId,
+    userId: null,
+    now: during,
+    durationSeconds: 10 * 60,
+    salePriceSnapshot: 699,
+    id: "snap-reuse",
+  });
+  assert(!reuse.created, "A/B: reuse does not insert");
+  assertEqual(reuse.start.salePriceSnapshot, 499, "A: reuse keeps snapshot 499");
+  assertEqual(reuse.start.expiresAt, first.start.expiresAt, "B: reuse keeps expires_at");
+
+  const existingProduct = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699],
+    starts: startsForSubject(reuse.store, visitorId, null),
+    surface: PRICE_SURFACES.PRODUCT,
+    now: during,
+  });
+  assertEqual(existingProduct.finalPrice, 499, "A: existing PDP stays 499");
+  assertEqual(existingProduct.salePrice, 499, "A: existing salePrice is snapshot");
+  assertEqual(existingProduct.promotion?.salePrice, 499, "A: resolved promo uses snapshot");
+  assertEqual(existingProduct.promotion?.name, "Funnel 699", "C: live name is visible");
+  assertEqual(
+    existingProduct.promotion?.aboveTimerText,
+    "New headline {time_left}",
+    "C: live above copy is visible",
+  );
+  assertEqual(
+    existingProduct.promotion?.belowButtonText,
+    "New note {full_price}",
+    "C: live below copy is visible",
+  );
+
+  const existingCheckout = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699],
+    starts: startsForSubject(reuse.store, visitorId, null),
+    surface: PRICE_SURFACES.CHECKOUT,
+    now: during,
+  });
+  assertEqual(existingCheckout.finalPrice, 499, "A: existing checkout stays 499");
+  assertEqual(existingCheckout.finalPriceMinor, 49900, "A: checkout minor is 49900");
+
+  const newer = startPersonalCountdown({
+    store: reuse.store,
+    promotionId: "promo-1",
+    visitorId: newVisitor,
+    userId: null,
+    now: during,
+    durationSeconds: 10 * 60,
+    salePriceSnapshot: 699,
+    id: "snap-new",
+  });
+  assert(newer.created, "A: new visitor inserts");
+  assertEqual(newer.start.salePriceSnapshot, 699, "A: new visitor snapshots 699");
+  assertEqual(newer.start.expiresAt, "2026-08-23T10:20:00.000Z", "B: new start uses new duration");
+
+  const newProduct = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699],
+    starts: startsForSubject(newer.store, newVisitor, null),
+    surface: PRICE_SURFACES.PRODUCT,
+    now: during,
+  });
+  assertEqual(newProduct.finalPrice, 699, "A: new visitor PDP is 699");
+
+  const afterExpiry = new Date("2026-08-23T10:25:00.000Z");
+  const expiredRepeat = startPersonalCountdown({
+    store: reuse.store,
+    promotionId: "promo-1",
+    visitorId,
+    userId: null,
+    now: afterExpiry,
+    durationSeconds: 10 * 60,
+    salePriceSnapshot: 699,
+    id: "snap-expired",
+  });
+  assert(!expiredRepeat.created, "D: ?promo= after expiry does not restart");
+  assertEqual(expiredRepeat.start.expiresAt, first.start.expiresAt, "D: expired window kept");
+  const expiredPrice = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699],
+    starts: startsForSubject(expiredRepeat.store, visitorId, null),
+    surface: PRICE_SURFACES.PRODUCT,
+    now: afterExpiry,
+  });
+  assertEqual(expiredPrice.finalPrice, 4999, "D: expired start is base price");
+  assertEqual(expiredPrice.promotion, null, "D: no promo after expiry");
+
+  const guest = startPersonalCountdown({
+    store: [],
+    promotionId: "promo-1",
+    visitorId,
+    userId: null,
+    now,
+    durationSeconds: 20 * 60,
+    salePriceSnapshot: 499,
+    id: "snap-guest",
+  });
+  const bound = bindPersonalStarts(guest.store, visitorId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  assertEqual(bound[0].salePriceSnapshot, 499, "E: bind keeps guest snapshot");
+  const afterBind = startPersonalCountdown({
+    store: bound,
+    promotionId: "promo-1",
+    visitorId,
+    userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    now: during,
+    durationSeconds: 10 * 60,
+    salePriceSnapshot: 699,
+    id: "snap-bind-reuse",
+  });
+  assert(!afterBind.created, "E: login does not create a start");
+  assertEqual(afterBind.start.salePriceSnapshot, 499, "E: login does not copy live 699");
+  const loginCheckout = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699],
+    starts: startsForSubject(
+      afterBind.store,
+      visitorId,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    ),
+    surface: PRICE_SURFACES.CHECKOUT,
+    now: during,
+  });
+  assertEqual(loginCheckout.finalPrice, 499, "E: guest→login checkout stays 499");
+
+  const disabled = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [promotion({ salePrice: 699, isActive: false })],
+    starts: [start({ salePriceSnapshot: 499 })],
+    surface: PRICE_SURFACES.PRODUCT,
+    now: during,
+  });
+  assertEqual(disabled.finalPrice, 4999, "disable stops applying the offer");
+  assertEqual(disabled.promotion, null, "disable drops the promotion");
+
+  const calendar = promotion({
+    id: "cal-1",
+    promotionType: PRICE_PROMOTION_TYPES.CALENDAR,
+    salePrice: 888,
+    startsAt: "2026-08-23T09:00:00.000Z",
+    endsAt: "2026-08-23T18:00:00.000Z",
+    durationSeconds: null,
+  });
+  const catalogCalendar = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [calendar],
+    starts: [],
+    surface: PRICE_SURFACES.CATALOG,
+    now: during,
+  });
+  assertEqual(catalogCalendar.finalPrice, 888, "F: catalog calendar still applies");
+
+  const personalPlusCalendar = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699, calendar],
+    starts: [start({ salePriceSnapshot: 499 })],
+    surface: PRICE_SURFACES.PRODUCT,
+    now: during,
+  });
+  assertEqual(personalPlusCalendar.finalPrice, 499, "F: snapshot still wins over higher calendar");
+  assertEqual(
+    personalPlusCalendar.promotion?.promotionType,
+    "personal_countdown",
+    "F: personal snapshot is the winner",
+  );
+
+  const expiredPersonalCalendar = resolvePracticePrice({
+    isFree: false,
+    basePrice: 4999,
+    promotions: [live699, calendar],
+    starts: [start({ salePriceSnapshot: 499, expiresAt: "2026-08-23T10:05:00.000Z" })],
+    surface: PRICE_SURFACES.PRODUCT,
+    now: during,
+  });
+  assertEqual(expiredPersonalCalendar.finalPrice, 888, "F: calendar applies after personal expiry");
+
+  const parallelA = start({
+    id: "parallel-a",
+    startedAt: "2026-08-23T10:00:00.000Z",
+    expiresAt: "2026-08-23T10:20:00.000Z",
+    salePriceSnapshot: 499,
+  });
+  const parallelB = start({
+    id: "parallel-b",
+    startedAt: "2026-08-23T10:00:01.000Z",
+    expiresAt: "2026-08-23T10:20:01.000Z",
+    salePriceSnapshot: 699,
+  });
+  const merged = mergeParallelPersonalStarts(parallelA, parallelB);
+  assertEqual(merged.length, 1, "parallel keeps one canonical start");
+  assertEqual(merged[0].salePriceSnapshot, 499, "canonical start keeps earliest snapshot");
+}
+
+function testSnapshotOnlyAppliesBelowCurrentBase() {
+  const visitorStart = start({ salePriceSnapshot: 499 });
+  const during = new Date("2026-08-23T10:10:00.000Z");
+  const promo = promotion();
+
+  const afterLoweredBase = (surface) =>
+    resolvePracticePrice({
+      isFree: false,
+      basePrice: 399,
+      promotions: [promo],
+      starts: [visitorStart],
+      surface,
+      now: during,
+    });
+
+  const product = afterLoweredBase(PRICE_SURFACES.PRODUCT);
+  assertEqual(product.finalPrice, 399, "1: PDP uses current base when snapshot >= base");
+  assertEqual(product.salePrice, null, "1: snapshot 499 is not applied against base 399");
+  assertEqual(product.promotion, null, "1: no promo when snapshot is not below base");
+
+  const checkout = afterLoweredBase(PRICE_SURFACES.CHECKOUT);
+  assertEqual(checkout.finalPrice, 399, "1: checkout uses current base 399");
+  assertEqual(checkout.finalPriceMinor, 39900, "1: checkout minor is 39900");
+  assertEqual(visitorStart.salePriceSnapshot, 499, "1: start snapshot is not rewritten");
+  assertEqual(
+    visitorStart.expiresAt,
+    "2026-08-23T10:20:00.000Z",
+    "1: start expires_at is not rewritten",
+  );
+
+  const afterRaisedBase = (surface) =>
+    resolvePracticePrice({
+      isFree: false,
+      basePrice: 5999,
+      promotions: [promo],
+      starts: [visitorStart],
+      surface,
+      now: during,
+    });
+
+  const raisedProduct = afterRaisedBase(PRICE_SURFACES.PRODUCT);
+  assertEqual(raisedProduct.finalPrice, 499, "2: raised base keeps snapshot 499 on PDP");
+  assertEqual(raisedProduct.salePrice, 499, "2: snapshot still applies below 5999");
+
+  const raisedCheckout = afterRaisedBase(PRICE_SURFACES.CHECKOUT);
+  assertEqual(raisedCheckout.finalPrice, 499, "2: raised base keeps snapshot 499 at checkout");
+  assertEqual(visitorStart.salePriceSnapshot, 499, "2: start snapshot still untouched");
+  assertEqual(
+    visitorStart.expiresAt,
+    "2026-08-23T10:20:00.000Z",
+    "2: start expires_at still untouched",
+  );
+}
+
 function testMigrationContract() {
   const schema = readFileSync(
     join(ROOT, "supabase/migrations/20260823180000_practice_price_promotions.sql"),
@@ -926,6 +1380,20 @@ function testMigrationContract() {
   );
   assert(copyMigration.includes("above_timer_text"), "copy column");
   assert(copyMigration.includes("below_button_text"), "below copy column");
+
+  const snapshotMigration = readFileSync(
+    join(ROOT, "supabase/migrations/20260831120000_personal_start_sale_price_snapshot.sql"),
+    "utf8",
+  );
+  assert(snapshotMigration.includes("sale_price_snapshot"), "snapshot column");
+  assert(snapshotMigration.includes("sale_price := v_existing.sale_price_snapshot"), "reuse returns snapshot");
+  assert(snapshotMigration.includes("canonical.sale_price_snapshot"), "resolve uses snapshot");
+  assert(
+    snapshotMigration.includes("canonical.sale_price_snapshot > 0") &&
+      snapshotMigration.includes("canonical.sale_price_snapshot < v_practice.price"),
+    "snapshot applies only below current base",
+  );
+  assert(!snapshotMigration.includes("sale_price := v_promo.sale_price"), "start no longer returns live sale on reuse");
 }
 
 function testSourceContracts() {
@@ -995,6 +1463,10 @@ function testSourceContracts() {
   assert(patchRoute.includes('.eq("id", promotionId)'), "update gated by promotion id");
   assert(patchRoute.includes('.eq("practice_id", id)'), "update gated by practice id");
   assert(!patchRoute.includes("start_token"), "update never writes start_token");
+  assert(
+    !patchRoute.includes("practice_price_promotion_starts"),
+    "author edit never rewrites existing starts or their snapshot",
+  );
 
   const offer = readFileSync(
     join(ROOT, "src/components/pricing/ProductPriceOffer.tsx"),
@@ -1002,6 +1474,9 @@ function testSourceContracts() {
   );
   assert(offer.includes("buildPersonalTimerOfferCopy"), "PDP substitutes copy");
   assert(!offer.includes("4 999"), "no hardcoded ruble amount");
+
+  const startSelect = readFileSync(join(ROOT, "src/lib/pricing/map.ts"), "utf8");
+  assert(startSelect.includes("sale_price_snapshot"), "start select loads snapshot");
 
   const startRoute = readFileSync(
     join(ROOT, "src/app/api/price-promotions/start/route.ts"),
@@ -1037,8 +1512,10 @@ function main() {
   testOrderSnapshotShape();
   testAuthorPromotionEditPrefillAndPersist();
   testAuthorPromotionEditOwnershipGate();
-  testAuthorPromotionEditDoesNotResetStarts();
+  testAuthorPromotionEditKeepsExistingStartSnapshot();
   testAuthorPromoPreviewUsesUpdatedRowById();
+  testPersonalStartKeepsSalePriceSnapshot();
+  testSnapshotOnlyAppliesBelowCurrentBase();
   testAuthorPromotionValidation();
   testPurchaseRegressionStillUsesIntegerRubles();
   testMigrationContract();
