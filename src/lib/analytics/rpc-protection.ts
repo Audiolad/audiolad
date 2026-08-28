@@ -280,8 +280,6 @@ export function guardAnalyticsHeavyRpc(input: {
       inflightKeys.delete(key);
       if (result === "ok") {
         successUntil.set(key, nowMs() + ANALYTICS_SUCCESS_CACHE_TTL_MS);
-      } else if (result === "overload" || result === "timeout") {
-        recordOverload(nowMs());
       }
     },
   };
@@ -332,6 +330,9 @@ export async function invokeAnalyticsRpc<T>(
     const classified = classifyAnalyticsRpcError(result.error);
 
     if (result.error) {
+      if (classified.kind === "overload" || classified.kind === "timeout") {
+        recordOverload(nowMs());
+      }
       logProtection("rpc_error", {
         latency_ms: latencyMs,
         code: classified.code,
@@ -361,6 +362,10 @@ export async function invokeAnalyticsRpc<T>(
       code: error instanceof Error && error.name === "AbortError" ? "timeout" : null,
     });
 
+    if (classified.kind === "overload" || classified.kind === "timeout") {
+      recordOverload(nowMs());
+    }
+
     logProtection("rpc_error", {
       latency_ms: latencyMs,
       code: classified.code,
@@ -369,7 +374,7 @@ export async function invokeAnalyticsRpc<T>(
 
     return {
       data: null,
-      error: { message: classified.kind, code: classified.code },
+      error: { message: classified.kind, code: classified.code ?? undefined },
       latencyMs,
       kind: classified.kind,
       code: classified.code,

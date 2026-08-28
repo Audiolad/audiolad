@@ -67,14 +67,14 @@ export function createAnalyticsAuthSyncController() {
     return created;
   }
 
-  function logDedupe(reason: "inflight" | "completed", extra: Record<string, string>) {
+  function logDedupe(reason: "inflight" | "completed", authEvent: string) {
     dedupedCount += 1;
     if (dedupedCount === 1 || dedupedCount % 25 === 0) {
       console.info("analytics_auth_sync", {
         event: "deduped",
         reason,
+        auth_event: authEvent,
         deduped_count: dedupedCount,
-        ...extra,
       });
     }
   }
@@ -110,13 +110,14 @@ export function createAnalyticsAuthSyncController() {
     const pair = getPair(key);
 
     if (pair.completed) {
-      logDedupe("completed", { event });
+      logDedupe("completed", event);
       return { ran: false, reason: "completed", flow: null };
     }
 
     if (pair.inflight) {
-      logDedupe("inflight", { event });
-      return pair.inflight;
+      logDedupe("inflight", event);
+      await pair.inflight;
+      return { ran: false, reason: "inflight", flow: null };
     }
 
     const flow: "signup" | "link" = isAnalyticsAuthSignupEvent(event)
