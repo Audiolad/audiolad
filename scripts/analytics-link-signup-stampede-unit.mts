@@ -417,11 +417,13 @@ function simulateStampede(input: StampedeInput): StampedeResult {
   return result;
 }
 
+const FUNCTION_LOCK_TIMEOUT_MS = 250;
+const HISTORICAL_ROLE_LOCK_TIMEOUT_MS = 8_000;
+
 const STORM = {
   attemptsPerTab: 10,
   tabs: 8,
   poolSize: 10,
-  lockTimeoutMs: 8_000,
   poolAcquireTimeoutMs: 10_000,
   heavyWorkMs: 2_000,
   cheapWorkMs: 5,
@@ -429,28 +431,44 @@ const STORM = {
   catalogStartMs: 50,
 } as const;
 
-function testLegacyStampedeSaturatesPool() {
-  const legacy = simulateStampede({
+function testHistoricalIncident8sStarvesPool() {
+  const historical = simulateStampede({
     ...STORM,
+    lockTimeoutMs: HISTORICAL_ROLE_LOCK_TIMEOUT_MS,
     singleFlightPerTab: false,
     sqlEarlyReturn: false,
     retryOnTransient: true,
   });
 
-  assert.ok(legacy.heavy > 1, `legacy heavy=${legacy.heavy}`);
-  assert.equal(legacy.cheap, 0, "legacy has no fast no-op");
+  assert.ok(historical.heavy > 1, `historical heavy=${historical.heavy}`);
+  assert.equal(historical.cheap, 0, "historical has no fast no-op");
   assert.ok(
-    legacy.lockTimeout > 0 || legacy.poolTimeout > 0,
-    `legacy must 55P03/PGRST003 lock=${legacy.lockTimeout} pool=${legacy.poolTimeout}`,
+    historical.lockTimeout > 0 || historical.poolTimeout > 0,
+    `historical 8s waits must 55P03/PGRST003 lock=${historical.lockTimeout} pool=${historical.poolTimeout}`,
   );
-  assert.ok(legacy.retries > 0, "legacy retries amplify the storm");
-  assert.equal(legacy.catalogOk, false, "catalog cannot proceed during legacy burst");
-  assert.equal(legacy.catalogPoolTimeout, true, "catalog sees PGRST003 in the model");
+  assert.ok(historical.retries > 0, "historical retries amplify the storm");
+  assert.equal(historical.catalogOk, false, "catalog cannot proceed during 8s burst");
+  assert.equal(historical.catalogPoolTimeout, true, "catalog sees PGRST003 in the 8s model");
+}
+
+function testLive250msMitigationIsNotThePr156Fix() {
+  assert.equal(FUNCTION_LOCK_TIMEOUT_MS, 250, "live function lock_timeout is 250ms");
+  const liveOnly = simulateStampede({
+    ...STORM,
+    lockTimeoutMs: FUNCTION_LOCK_TIMEOUT_MS,
+    singleFlightPerTab: false,
+    sqlEarlyReturn: false,
+    retryOnTransient: false,
+  });
+  assert.ok(liveOnly.heavy > 1, "250ms alone still enters the heavy path repeatedly");
+  assert.equal(liveOnly.cheap, 0, "250ms alone has no SQL early-return");
 }
 
 function testFixedStampedeIsCheapAndLetsCatalogThrough() {
+  assert.equal(FUNCTION_LOCK_TIMEOUT_MS, 250, "fixed RPC lock_timeout is 250ms, not 8s");
   const fixed = simulateStampede({
     ...STORM,
+    lockTimeoutMs: FUNCTION_LOCK_TIMEOUT_MS,
     singleFlightPerTab: true,
     sqlEarlyReturn: true,
     retryOnTransient: false,
@@ -501,7 +519,13 @@ function testSourceContracts() {
   );
   assert(!sql.includes("pg_try_advisory"), "do not replace advisory locks with try-lock");
   assert(!sql.includes("PGRST_DB_POOL"), "do not touch pool settings");
-  assert(!/\bSET\s+lock_timeout\b/i.test(sql), "do not change lock_timeout in SQL body");
+  assert(
+    (sql.match(/^SET lock_timeout = '250ms'$/gm) || []).length === 2,
+    "keep live function-level SET lock_timeout = '250ms' on both RPCs",
+  );
+  assert(sql.includes("SET search_path = public, pg_temp"), "keep search_path");
+  assert(!/SET\s+lock_timeout\s*=\s*'(?!250ms)/.test(sql), "do not invent a new timeout");
+  assert(!sql.includes("statement_timeout"), "do not change statement_timeout");
 
   assert(p1.includes("UPDATE public.analytics_events AS e"), "link updates session events");
   assert(p1.includes("WHERE e.session_id = p_session_id"), "events filtered by session");
@@ -550,7 +574,8 @@ async function main() {
   testIdempotencyPolicy();
   await testSingleFlightCollapsesIdenticalKeys();
   await testSingleFlightDoesNotRetry5xxInLifecycle();
-  testLegacyStampedeSaturatesPool();
+  testHistoricalIncident8sStarvesPool();
+  testLive250msMitigationIsNotThePr156Fix();
   testFixedStampedeIsCheapAndLetsCatalogThrough();
   testSourceContracts();
   testEventsPerSessionEvidence();

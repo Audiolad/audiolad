@@ -195,6 +195,10 @@ function testIntegrations() {
   assert(migration.includes("signup_completed_user_uidx"), "unique signup index");
   assert(stampede.includes("IF v_session_user IS NOT DISTINCT FROM v_user_id THEN"), "link idempotent");
   assert(stampede.includes("already_recorded"), "signup already_recorded fast path");
+  assert(
+    (stampede.match(/^SET lock_timeout = '250ms'$/gm) || []).length === 2,
+    "preserve live 250ms lock_timeout on both RPCs",
+  );
   assert(providers.includes("PlatformAnalyticsProvider"), "global analytics provider");
   assert(providers.includes("YandexMetrika"), "yandex metrika provider");
   assert(

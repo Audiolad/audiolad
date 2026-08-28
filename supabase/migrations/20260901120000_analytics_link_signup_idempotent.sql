@@ -12,6 +12,16 @@ BEGIN;
 -- App-only single-flight is not enough: each tab / Next isolate still
 -- reaches PostgREST. Early-return here before any UPDATE / advisory lock.
 -- Advisory locks are kept — they are not the stampede; repeats are.
+--
+-- PRODUCTION DRIFT (2026-08-28, read-only pg_get_functiondef): both live
+-- RPCs already have function-level SET lock_timeout = '250ms'. That clause
+-- is NOT in origin/main (last replacements: 20260725160000 / 20260717130000).
+-- CREATE OR REPLACE must keep the live 250ms setting. Omitting it would
+-- revert waiters to the authenticator role lock_timeout of 8s.
+-- HISTORICAL INCIDENT: 8s lock waits starved the PostgREST pool.
+-- CURRENT LIVE MITIGATION: 250ms is already on production.
+-- THIS MIGRATION: preserves 250ms AND adds SQL early-return.
+-- Do not change role-level timeouts or the PostgREST connection-pool size.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.link_analytics_session_user(
@@ -22,6 +32,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
+SET lock_timeout = '250ms'
 AS $$
 DECLARE
   v_user_id uuid;
@@ -108,6 +119,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
+SET lock_timeout = '250ms'
 AS $$
 DECLARE
   v_user_id uuid;
