@@ -25,9 +25,23 @@ const ERROR_MESSAGES: Record<string, string> = {
   storage_upload_failed: "Не удалось загрузить файл. Повторите попытку.",
   upload_failed: "Не удалось загрузить файл. Повторите попытку.",
   conflict: "Действие сейчас недоступно для этого материала.",
+  support_mutation_blocked:
+    "Сейчас включён режим поддержки другого автора. Выйдите из режима поддержки и повторите загрузку.",
   internal_error: "Не удалось выполнить действие. Попробуйте ещё раз.",
   load_failed: "Не удалось загрузить данные. Попробуйте ещё раз.",
 };
+
+export const PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE =
+  ERROR_MESSAGES.support_mutation_blocked;
+
+export const PERSONAL_MATERIAL_UPLOAD_SERVER_ERROR_MESSAGE =
+  "Не удалось загрузить файл из-за ошибки сервера. Повторите попытку позже.";
+
+export function isPersonalMaterialSupportMutationBlockedMessage(
+  message: string,
+): boolean {
+  return message === PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE;
+}
 
 export function mapPersonalMaterialClientError(
   code: string | undefined,
@@ -50,6 +64,10 @@ export function getPersonalMaterialListErrorMessage(): string {
 }
 
 export function getPersonalMaterialUploadErrorMessage(code?: string): string {
+  if (code === "support_mutation_blocked") {
+    return ERROR_MESSAGES.support_mutation_blocked;
+  }
+
   if (code === "invalid_file_type") {
     return ERROR_MESSAGES.invalid_file_type;
   }
@@ -75,17 +93,21 @@ export function getPersonalMaterialUploadErrorMessage(code?: string): string {
   }
 
   if (code === "internal_error") {
-    return "Не удалось загрузить файл из-за ошибки сервера. Повторите попытку позже.";
+    return PERSONAL_MATERIAL_UPLOAD_SERVER_ERROR_MESSAGE;
   }
 
   if (code === "invalid_audio_duration") {
     return ERROR_MESSAGES.invalid_audio_duration;
   }
 
-  return "Не удалось загрузить файл из-за ошибки сервера. Повторите попытку позже.";
+  return PERSONAL_MATERIAL_UPLOAD_SERVER_ERROR_MESSAGE;
 }
 
 export function getPersonalMaterialPdfUploadErrorMessage(code?: string): string {
+  if (code === "support_mutation_blocked") {
+    return ERROR_MESSAGES.support_mutation_blocked;
+  }
+
   if (code === "invalid_file_type") {
     return "Можно загрузить только PDF-документ.";
   }
@@ -127,6 +149,9 @@ export function getPersonalMaterialDownloadErrorMessage(error: unknown): string 
 
 export function getPersonalMaterialActivationErrorMessage(error?: unknown): string {
   if (error instanceof PersonalMaterialClientError) {
+    if (error.code === "support_mutation_blocked") {
+      return ERROR_MESSAGES.support_mutation_blocked;
+    }
     if (error.code === "client_name_required") {
       return ERROR_MESSAGES.client_name_required;
     }

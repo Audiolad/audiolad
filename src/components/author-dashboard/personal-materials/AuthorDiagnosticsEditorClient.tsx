@@ -8,6 +8,7 @@ import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav
 import AuthorDiagnosticsAttachmentDownloadButton from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAttachmentDownloadButton";
 import AuthorDiagnosticsAudioUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsAudioUpload";
 import AuthorDiagnosticsPdfUpload from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsPdfUpload";
+import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import PersonalMaterialPdfDocument from "@/components/personal-materials/PersonalMaterialPdfDocument";
 import AuthorDiagnosticsClientMessagePanel from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsClientMessagePanel";
 import AuthorDiagnosticsConfirmModal from "@/components/author-dashboard/personal-materials/AuthorDiagnosticsConfirmModal";
@@ -660,20 +661,17 @@ export default function AuthorDiagnosticsEditorClient({
         </div>
 
         {toast ? (
-          <p
-            className={`mt-4 text-sm font-medium ${
-              toastTone === "error" ? "text-[#b42318]" : "text-[#3d8d65]"
-            }`}
-            role={toastTone === "error" ? "alert" : "status"}
-          >
-            {toast}
-          </p>
+          toastTone === "error" ? (
+            <PersonalMaterialClientErrorAlert message={toast} className="mt-4" />
+          ) : (
+            <p className="mt-4 text-sm font-medium text-[#3d8d65]" role="status">
+              {toast}
+            </p>
+          )
         ) : null}
 
         {actionError ? (
-          <p className="mt-4 text-sm text-[#b42318]" role="alert">
-            {actionError}
-          </p>
+          <PersonalMaterialClientErrorAlert message={actionError} className="mt-4" />
         ) : null}
       </div>
 
@@ -695,9 +693,7 @@ export default function AuthorDiagnosticsEditorClient({
         </div>
 
         {saveError ? (
-          <p className="mt-3 text-sm text-[#b42318]" role="alert">
-            {saveError}
-          </p>
+          <PersonalMaterialClientErrorAlert message={saveError} />
         ) : null}
 
         {isEditable ? (

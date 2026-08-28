@@ -11,6 +11,7 @@ import {
   isPersonalMaterialClientError,
   updateAuthorPersonalMaterialSettings,
 } from "@/lib/personal-materials/client/api";
+import { PersonalMaterialClientErrorAlert } from "@/components/personal-materials/PersonalMaterialClientErrorAlert";
 import { getPersonalMaterialErrorMessage } from "@/lib/personal-materials/client/errors";
 
 type AuthorDiagnosticsMessageTemplateEditorProps = {
@@ -181,9 +182,7 @@ export default function AuthorDiagnosticsMessageTemplateEditor({
                 </p>
               ) : null}
               {saveError ? (
-                <p className="mt-2 text-sm text-[#b42318]" role="alert">
-                  {saveError}
-                </p>
+                <PersonalMaterialClientErrorAlert message={saveError} className="mt-2" />
               ) : null}
               {savedNotice ? (
                 <p className="mt-2 text-sm font-medium text-[#3d8d65]" role="status">

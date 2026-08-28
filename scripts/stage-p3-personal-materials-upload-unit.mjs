@@ -11,7 +11,13 @@ import {
   isPathInsidePersonalMaterialRoot,
 } from "../src/lib/personal-materials/storage.ts";
 import {
+  getPersonalMaterialActivationErrorMessage,
+  getPersonalMaterialErrorMessage,
+  getPersonalMaterialPdfUploadErrorMessage,
   getPersonalMaterialUploadErrorMessage,
+  PersonalMaterialClientError,
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+  PERSONAL_MATERIAL_UPLOAD_SERVER_ERROR_MESSAGE,
 } from "../src/lib/personal-materials/client/errors.ts";
 import {
   isAllowedClientMp3File,
@@ -99,6 +105,51 @@ assert.match(
 assert.match(
   getPersonalMaterialUploadErrorMessage("internal_error"),
   /ошибки сервера/i,
+);
+assert.equal(
+  getPersonalMaterialUploadErrorMessage("internal_error"),
+  PERSONAL_MATERIAL_UPLOAD_SERVER_ERROR_MESSAGE,
+);
+assert.equal(
+  getPersonalMaterialUploadErrorMessage("file_too_large"),
+  "Размер файла превышает 50 МБ.",
+);
+assert.equal(
+  getPersonalMaterialUploadErrorMessage("invalid_audio_duration"),
+  "Не удалось определить длительность MP3-файла.",
+);
+assert.equal(
+  getPersonalMaterialUploadErrorMessage("storage_upload_failed"),
+  "Не удалось загрузить файл. Повторите попытку.",
+);
+
+assert.equal(
+  getPersonalMaterialUploadErrorMessage("support_mutation_blocked"),
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+);
+assert.doesNotMatch(
+  getPersonalMaterialUploadErrorMessage("support_mutation_blocked"),
+  /ошибки сервера/,
+);
+assert.equal(
+  getPersonalMaterialErrorMessage(
+    new PersonalMaterialClientError("support_mutation_blocked", 403),
+  ),
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+);
+assert.equal(
+  getPersonalMaterialPdfUploadErrorMessage("support_mutation_blocked"),
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+);
+assert.equal(
+  getPersonalMaterialActivationErrorMessage(
+    new PersonalMaterialClientError("support_mutation_blocked", 403),
+  ),
+  PERSONAL_MATERIAL_SUPPORT_MUTATION_BLOCKED_MESSAGE,
+);
+assert.equal(
+  getPersonalMaterialErrorMessage(new PersonalMaterialClientError("internal_error", 500)),
+  "Не удалось выполнить действие. Попробуйте ещё раз.",
 );
 
 assert.equal(PERSONAL_MATERIAL_LIMITS.maxAudioBytes, 50 * 1024 * 1024);
