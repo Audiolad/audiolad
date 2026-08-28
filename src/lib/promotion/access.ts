@@ -9,9 +9,16 @@ import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorMemberRole, AuthorWorkspace } from "@/lib/author-products/types";
 import { hasPermission } from "@/lib/auth/platform-access";
 
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+
 export async function listPromotionWorkspaces(
   userId: string,
 ): Promise<AuthorWorkspace[]> {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    return listAuthorWorkspacesForUser(userId);
+  }
+
   const { supabase } = await requireAuthenticatedUser();
   const admin = await hasPermission(supabase, userId, "authors.manage");
 
@@ -43,6 +50,15 @@ export async function listPromotionWorkspaces(
 }
 
 export async function requireAuthorPromotionAccess(authorId: string) {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    const membership = await requireAuthorMembership(authorId);
+    return {
+      ...membership,
+      isPlatformAdmin: false,
+    };
+  }
+
   const { supabase, user } = await requireAuthenticatedUser();
   const admin = await hasPermission(supabase, user.id, "authors.manage");
 
@@ -64,6 +80,11 @@ export async function requireAuthorPromotionAccess(authorId: string) {
 }
 
 export async function requireAuthorPromotionMutationAccess(authorId: string) {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    throw new AuthorAccessError("support_mutation_blocked", 403);
+  }
+
   const { supabase, user } = await requireAuthenticatedUser();
   const admin = await hasPermission(supabase, user.id, "authors.manage");
 

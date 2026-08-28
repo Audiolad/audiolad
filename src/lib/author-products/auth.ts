@@ -92,6 +92,37 @@ export async function listAuthorWorkspacesForUser(
   userId: string,
   supabaseClient?: SupabaseClient,
 ): Promise<AuthorWorkspace[]> {
+  const { peekAuthorExecutionContext } = await import(
+    "@/lib/author-support/context"
+  );
+  const { loadActingAuthorMembership } = await import(
+    "@/lib/author-support/store"
+  );
+  const execution = await peekAuthorExecutionContext();
+  if (
+    execution?.isSupportMode &&
+    execution.realUserId === userId &&
+    execution.actingAuthorId
+  ) {
+    const membership = await loadActingAuthorMembership({
+      actingUserId: execution.actingUserId,
+      actingAuthorId: execution.actingAuthorId,
+    });
+    if (!membership) {
+      return [];
+    }
+    return [
+      {
+        id: execution.actingAuthorId,
+        name: membership.authorName,
+        slug: membership.authorSlug,
+        role: membership.role,
+        accessStatus: membership.accessStatus,
+        canBypassProductModeration: membership.canBypassProductModeration,
+      },
+    ];
+  }
+
   const supabase = supabaseClient ?? (await createClient());
 
   const { data, error } = await supabase
@@ -170,6 +201,36 @@ export async function getAuthorAccessStatusForMembership(
 
 export async function requireAuthorMembership(authorId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
+  const {
+    peekAuthorExecutionContext,
+    requestedAuthorMatchesSupport,
+    getAuthorDataClient,
+  } = await import("@/lib/author-support/context");
+  const { loadActingAuthorMembership } = await import(
+    "@/lib/author-support/store"
+  );
+  const execution = await peekAuthorExecutionContext();
+
+  if (execution?.isSupportMode) {
+    if (!requestedAuthorMatchesSupport(execution, authorId) || !execution.actingAuthorId) {
+      throw new AuthorAccessError("forbidden", 403);
+    }
+
+    const membership = await loadActingAuthorMembership({
+      actingUserId: execution.actingUserId,
+      actingAuthorId: execution.actingAuthorId,
+    });
+    if (!membership) {
+      throw new AuthorAccessError("forbidden", 403);
+    }
+
+    return {
+      supabase: await getAuthorDataClient(execution, supabase),
+      user,
+      role: membership.role,
+      accessStatus: membership.accessStatus,
+    };
+  }
 
   const { data, error } = await supabase
     .from("author_members")
@@ -218,22 +279,54 @@ export async function assertAuthorCommercialWriteAllowed(
   await requireCurrentAuthorTermsAcceptance(authorId);
 }
 
-export async function requireAuthorMutationMembership(authorId: string) {
+export async function requireAuthorMutationMembership(
+  authorId: string,
+  supportAudit?: { action: string; resourceType?: string },
+) {
   const context = await requireAuthorMembership(authorId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
+  if (supportAudit) {
+    const { recordAuthorSupportAudit } = await import(
+      "@/lib/author-support/audit"
+    );
+    await recordAuthorSupportAudit({
+      action: supportAudit.action,
+      resourceType: supportAudit.resourceType ?? "author",
+      resourceId: authorId,
+    });
+  }
   return context;
 }
 
 export async function requirePracticeMutationAccess(practiceId: string) {
   const context = await requirePracticeAccess(practiceId);
   assertAuthorContentMutationsAllowed(context.accessStatus);
+  const { recordAuthorSupportAudit } = await import("@/lib/author-support/audit");
+  await recordAuthorSupportAudit({
+    action: "product_updated",
+    resourceType: "practice",
+    resourceId: practiceId,
+    metadata: { gate: "requirePracticeMutationAccess" },
+  });
   return context;
 }
 
 export async function requirePracticeAccess(practiceId: string) {
   const { supabase, user } = await requireAuthenticatedUser();
+  const {
+    peekAuthorExecutionContext,
+    requestedAuthorMatchesSupport,
+    getAuthorDataClient,
+  } = await import("@/lib/author-support/context");
+  const { loadActingAuthorMembership } = await import(
+    "@/lib/author-support/store"
+  );
+  const execution = await peekAuthorExecutionContext();
+  const dataClient = execution
+    ? await getAuthorDataClient(execution, supabase)
+    : supabase;
 
-  const { data: practice, error: practiceError } = await supabase
+  const { data: practice, error: practiceError } = await dataClient
     .from("practices")
     .select(
       "id, author_id, status, moderation_status, deleted_at, slug, published_at, use_shared_cover, product_kind, publication_class, music_usage_permission, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab, is_catalog_listed, catalog_visibility",
@@ -248,6 +341,46 @@ export async function requirePracticeAccess(practiceId: string) {
 
   if (!practice?.id || !practice.author_id || practice.deleted_at) {
     throw new AuthorAccessError("not_found", 404);
+  }
+
+  if (execution?.isSupportMode) {
+    if (!requestedAuthorMatchesSupport(execution, practice.author_id)) {
+      throw new AuthorAccessError("forbidden", 403);
+    }
+
+    const membership = await loadActingAuthorMembership({
+      actingUserId: execution.actingUserId,
+      actingAuthorId: execution.actingAuthorId as string,
+    });
+    if (!membership) {
+      throw new AuthorAccessError("forbidden", 403);
+    }
+
+    return {
+      supabase: dataClient,
+      user,
+      practice: practice as {
+        id: string;
+        author_id: string;
+        status: string;
+        moderation_status: string | null;
+        deleted_at: string | null;
+        slug: string;
+        published_at: string | null;
+        use_shared_cover: boolean;
+        product_kind?: string | null;
+        publication_class?: string | null;
+        music_usage_permission?: string | null;
+        promo_enabled?: boolean | null;
+        promo_title?: string | null;
+        promo_text?: string | null;
+        promo_button_text?: string | null;
+        promo_url?: string | null;
+        promo_open_in_new_tab?: boolean | null;
+      },
+      role: membership.role,
+      accessStatus: membership.accessStatus,
+    };
   }
 
   const { data: membership, error: membershipError } = await supabase
@@ -345,6 +478,21 @@ export function handleAuthorRouteError(error: unknown) {
       },
       { status: error.status },
     );
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "author_support_audit_failed" &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
+    return jsonError("author_support_audit_failed", error.status);
+  }
+
+  if (error instanceof Error && error.message === "author_support_proof_missing") {
+    return jsonError("forbidden", 403);
   }
 
   console.error("author_route_unhandled_error", error);

@@ -51,7 +51,8 @@ assert.match(publishRoute, /assertPublishModerationAllowed/);
 assert.match(publishRoute, /moderationGate/);
 
 const moderation = read("src/lib/author-products/moderation.ts");
-assert.match(moderation, /export async function assertPublishModerationAllowed/);
+const moderationActor = read("src/lib/author-products/moderation-actor.ts");
+assert.match(moderationActor, /export async function assertPublishModerationAllowed/);
 assert.match(moderation, /moderation_required/);
 assert.match(moderation, /can_bypass_product_moderation|getAuthorCanBypassProductModeration/);
 

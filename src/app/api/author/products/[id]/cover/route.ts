@@ -4,7 +4,7 @@ import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { removePracticeCoverFiles } from "@/lib/author-products/utils";

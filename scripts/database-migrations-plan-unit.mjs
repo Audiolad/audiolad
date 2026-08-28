@@ -379,6 +379,11 @@ function testRepoOneFileOneVersion() {
   );
   assert.ok(
     listed.files.some(
+      (row) => row.filename === "20260901130000_author_support_mode.sql",
+    ),
+  );
+  assert.ok(
+    listed.files.some(
       (row) =>
         row.filename === "20260902120000_course_moderation_readiness.sql",
     ),
@@ -438,9 +443,10 @@ function testProductionLikePendingAfterQuickOffersRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260901130000",
     "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 24);
+  assert.equal(plan.database_migrations_pending, 25);
 }
 
 function testProductionLikePendingAfterPlaylistRestamp() {
@@ -475,9 +481,10 @@ function testProductionLikePendingAfterPlaylistRestamp() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260901130000",
     "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 18);
+  assert.equal(plan.database_migrations_pending, 19);
 }
 
 function testOrdinaryDeployAfterLatestMainHasNoHole() {
@@ -519,9 +526,10 @@ function testOrdinaryDeployAfterLatestMainHasNoHole() {
     "20260901120200",
     "20260901120300",
     "20260901120400",
+    "20260901130000",
     "20260902120000",
   ]);
-  assert.equal(plan.database_migrations_pending, 9);
+  assert.equal(plan.database_migrations_pending, 10);
 }
 
 function testReissuedVisibilityAfterProductionMaxHasNoHole() {
@@ -568,6 +576,7 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
       `reissued visibility version must exist locally: ${version}`,
     );
   }
+  assert.ok(listed.versions.includes("20260901130000"));
   assert.ok(listed.versions.includes("20260902120000"));
   const remoteVersions = listed.versions.filter((version) => version <= maxRemote);
   assert.equal(remoteVersions.includes("20260830120100"), false);
@@ -590,11 +599,17 @@ function testReissuedVisibilityAfterProductionMaxHasNoHole() {
     assert.equal(livePlan.pending.includes(hole), false);
   }
   const lastVisibility = "20260901120400";
+  const supportStamp = "20260901130000";
   const courseStamp = "20260902120000";
+  assert.ok(livePlan.pending.includes(supportStamp));
   assert.ok(livePlan.pending.includes(courseStamp));
   assert.ok(
-    livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(lastVisibility),
-    "course readiness stamp must follow restamped visibility migrations",
+    livePlan.pending.indexOf(supportStamp) > livePlan.pending.indexOf(lastVisibility),
+    "support-mode stamp must follow restamped visibility migrations",
+  );
+  assert.ok(
+    livePlan.pending.indexOf(courseStamp) > livePlan.pending.indexOf(supportStamp),
+    "course readiness stamp must follow the support-mode migration",
   );
 }
 

@@ -9,6 +9,7 @@ import { submitPracticeForModeration } from "@/lib/author-products/moderation-ac
 import { countCoursePublishContent } from "@/lib/author-products/course-builder";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { evaluatePublishReadiness } from "@/lib/author-products/publish";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
 
 type RouteContext = {
@@ -72,6 +73,11 @@ export async function POST(_request: Request, context: RouteContext) {
 
     try {
       await submitPracticeForModeration(supabase, id);
+      await recordAuthorSupportAudit({
+        action: "product_submitted_for_moderation",
+        resourceType: "practice",
+        resourceId: id,
+      });
     } catch (submitError) {
       if (
         submitError &&

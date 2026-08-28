@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdminUserSupportActions } from "@/components/admin/AdminUserSupportActions";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { getPlatformOwnerSessionIfOwner } from "@/lib/admin/require-platform-owner";
 import { getAdminUserDetail } from "@/lib/admin/user-detail";
 import { isAdminExactUuid } from "@/lib/admin/users-search";
 import { getProductKindLabel } from "@/lib/author-products/product-kind";
@@ -41,13 +43,28 @@ function DetailRow({
   );
 }
 
+const SUPPORT_START_ERRORS: Record<string, string> = {
+  not_platform_owner: "Только владелец платформы может открыть кабинет автора.",
+  target_not_found: "Пользователь не найден.",
+  author_membership_required:
+    "У пользователя нет членства в этом авторском пространстве.",
+  invalid_request: "Некорректный запрос сопровождения.",
+};
+
 export default async function AdminUserDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ userId: string }>;
+  searchParams?: Promise<{ support_error?: string }>;
 }) {
   await requireAdminPermission("users.view");
+  const ownerSession = await getPlatformOwnerSessionIfOwner();
   const { userId } = await params;
+  const query = (await searchParams) ?? {};
+  const supportError = query.support_error
+    ? SUPPORT_START_ERRORS[query.support_error] ?? SUPPORT_START_ERRORS.invalid_request
+    : null;
 
   if (!isAdminExactUuid(userId)) {
     notFound();
@@ -86,6 +103,11 @@ export default async function AdminUserDetailPage({
         <p className="mt-1 text-sm text-[#796ba0]">
           Карточка поддержки. Только просмотр.
         </p>
+        {supportError ? (
+          <p className="mt-3 rounded-[16px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
+            {supportError}
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-[22px] border border-[#eadff8] bg-white p-5">
@@ -146,6 +168,12 @@ export default async function AdminUserDetailPage({
                     <td className="px-3 py-3 text-[#796ba0]">
                       {space.accessStatusLabel}
                       {space.canBypassProductModeration ? " · обход модерации" : ""}
+                      {ownerSession ? (
+                        <AdminUserSupportActions
+                          targetUserId={detail.id}
+                          targetAuthorId={space.authorId}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 ))}

@@ -460,10 +460,15 @@ export async function publishPracticeProduct(
   practiceId: string,
   publishedAt: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("publish_audio_product", {
-    p_practice_id: practiceId,
-    p_published_at: publishedAt,
-  });
+  const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+  const { error } = await callAuthorUserRpc(
+    supabase,
+    "publish_audio_product",
+    {
+      p_practice_id: practiceId,
+      p_published_at: publishedAt,
+    },
+  );
 
   if (error) {
     const publishMapped = mapPublishRpcError(error);
@@ -485,9 +490,12 @@ export async function unpublishPracticeProduct(
   supabase: SupabaseClient,
   practiceId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("unpublish_approved_practice", {
-    p_practice_id: practiceId,
-  });
+  const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+  const { error } = await callAuthorUserRpc(
+    supabase,
+    "unpublish_approved_practice",
+    { p_practice_id: practiceId },
+  );
 
   if (error) {
     const mapped = mapPublishRpcError(error);

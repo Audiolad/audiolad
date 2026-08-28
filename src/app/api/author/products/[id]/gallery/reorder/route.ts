@@ -12,7 +12,7 @@ import {
   reorderAuthorGallerySlides,
   type GalleryReorderSlideInput,
 } from "@/lib/author-products/gallery";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 import {
   loadAuthorSlug,

@@ -1,6 +1,7 @@
 import ProfileAvatarEditor from "@/components/profile/ProfileAvatarEditor";
 import { profileEditPaddingClassName } from "@/lib/profile/layout";
 import { createUserAvatarSignedUrl } from "@/lib/profile/avatar";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import Link from "next/link";
@@ -95,6 +96,11 @@ export default async function EditProfilePage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    redirect("/author-dashboard");
+  }
+
   const params = await searchParams;
   const errorMessage = params.error
     ? ERROR_MESSAGES[params.error]

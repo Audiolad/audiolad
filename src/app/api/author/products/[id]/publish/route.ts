@@ -6,7 +6,7 @@ import {
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
-import { assertPublishModerationAllowed } from "@/lib/author-products/moderation";
+import { assertPublishModerationAllowed } from "@/lib/author-products/moderation-actor";
 import { countCoursePublishContent } from "@/lib/author-products/course-builder";
 import {
   evaluatePublishReadiness,

@@ -5,7 +5,7 @@ import {
   requirePracticeAccess,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 import {

@@ -15,7 +15,7 @@ import {
   replaceAuthorGallerySlideImage,
 } from "@/lib/author-products/gallery";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
-import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation";
+import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import {
   cleanupImageManifest,
   primaryPublicUrl,

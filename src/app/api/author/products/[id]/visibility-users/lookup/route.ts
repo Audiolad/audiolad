@@ -37,7 +37,9 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const { data, error } = await supabase.rpc(
+    const { callAuthorUserRpc } = await import("@/lib/author-support/context");
+    const { data, error } = await callAuthorUserRpc(
+      supabase,
       "lookup_practice_visibility_user",
       {
         p_practice_id: id,

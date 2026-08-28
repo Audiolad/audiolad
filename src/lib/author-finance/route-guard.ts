@@ -22,6 +22,7 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import type { AuthorMemberRole } from "@/lib/author-products/types";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,6 +40,11 @@ export type AuthorFinanceContext = {
 export async function requireAuthorFinanceAccess(
   request: Request,
 ): Promise<AuthorFinanceContext> {
+  const execution = await peekAuthorExecutionContext();
+  if (execution?.isSupportMode) {
+    throw new AuthorAccessError("support_sensitive_route_blocked", 403);
+  }
+
   const url = new URL(request.url);
   const claimed = url.searchParams.get("author_id")?.trim() ?? "";
 
