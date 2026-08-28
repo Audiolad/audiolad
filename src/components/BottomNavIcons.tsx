@@ -144,3 +144,82 @@ export function ProfileNavIcon({ active = false, className }: NavIconProps) {
     </svg>
   );
 }
+
+export function HelpNavIcon({ active = false, className }: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${iconBase} ${className ?? ""}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle {...strokeProps(active)} cx="12" cy="12" r="9" />
+      <path
+        {...strokeProps(active)}
+        d="M9.6 9.4a2.4 2.4 0 0 1 4.7.8c0 1.4-1.3 2-2.1 2.5-.6.4-.9.8-.9 1.5"
+      />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function HistoryNavIcon({ active = false, className }: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${iconBase} ${className ?? ""}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle {...strokeProps(active)} cx="12" cy="12" r="8.25" />
+      <path {...strokeProps(active)} d="M12 8v4.25L15 14.5" />
+    </svg>
+  );
+}
+
+export function EditorialPlaylistsNavIcon({
+  active = false,
+  className,
+}: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${iconBase} ${className ?? ""}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        {...strokeProps(active)}
+        d="M6 7.5h12M6 12h12M6 16.5h7.5"
+      />
+      <path
+        {...strokeProps(active)}
+        d="M16.4 14.6 18 16.2l2.6-2.8"
+      />
+    </svg>
+  );
+}
+
+export function EditorialDirectionsNavIcon({
+  active = false,
+  className,
+}: NavIconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`${iconBase} ${className ?? ""}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path {...strokeProps(active)} d="M12 4.5v15" />
+      <path
+        {...strokeProps(active)}
+        d="M12 7.25h6.25L16.4 9.5l1.85 2.25H12"
+      />
+      <path
+        {...strokeProps(active)}
+        d="M12 12.75H6.1L7.85 15 6.1 17.25H12"
+      />
+    </svg>
+  );
+}

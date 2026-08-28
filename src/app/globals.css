@@ -26,6 +26,8 @@
 
   /* Listener desktop shell foundation (unused until later stages; 0 = no layout impact). */
   --listener-sidebar-width: 240px;
+  --listener-sidebar-collapsed-width: 72px;
+  --listener-sidebar-flyout-z: 45;
   --listener-now-playing-width: 320px;
   --listener-desktop-player-height: 0px;
   --listener-topbar-height: 56px;
@@ -133,6 +135,33 @@
     inset: 0;
     width: 100%;
     background: rgba(196, 181, 253, 0.14);
+  }
+}
+
+.listener-app-shell[data-sidebar-pinned="collapsed"] {
+  --listener-sidebar-width: var(--listener-sidebar-collapsed-width);
+}
+
+.listener-sidebar-flyout {
+  z-index: var(--listener-sidebar-flyout-z, 45);
+}
+
+@media (min-width: 1280px) {
+  .listener-app-shell__body {
+    transition: grid-template-columns 180ms ease;
+  }
+
+  .listener-desktop-sidebar {
+    transition: width 180ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .listener-app-shell__body,
+  .listener-desktop-sidebar,
+  .listener-sidebar-flyout {
+    transition: none;
+    animation: none;
   }
 }
 
