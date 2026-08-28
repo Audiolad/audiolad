@@ -7,13 +7,23 @@
  */
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const BASE = process.argv[2] ?? "http://127.0.0.1:3000";
 
 function loadEnv() {
+  const envPath = [
+    process.env.AUDIOLAD_ADMIN_VERIFICATION_ENV_FILE,
+    "/var/www/audiolad-deploy/current/.env.local",
+    "/var/www/audiolad/.env.local",
+  ].find((candidate) => candidate && existsSync(candidate));
+
+  if (!envPath) {
+    throw new Error("admin_verification_environment_missing");
+  }
+
   return Object.fromEntries(
-    readFileSync("/var/www/audiolad/.env.local", "utf8")
+    readFileSync(envPath, "utf8")
       .split("\n")
       .filter((line) => line && line.includes("=") && !line.startsWith("#"))
       .map((line) => {
@@ -82,39 +92,48 @@ async function getAuthCookies(baseUrl, email) {
   ];
 }
 
-function daysAgoIso(days) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
-
 async function sqlStats(service) {
-  const sevenDaysAgo = daysAgoIso(7);
-  const thirtyDaysAgo = daysAgoIso(30);
+  const snapshotNow = new Date();
+  const snapshotNowIso = snapshotNow.toISOString();
+  const sevenDaysAgo = new Date(snapshotNow.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const thirtyDaysAgo = new Date(snapshotNow.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     usersTotal,
     users7d,
     users30d,
-    authorsTotal,
+    ownerMembers,
     applicationsTotal,
-    applicationsNew,
+    applicationsSubmitted7d,
+    applicationsAwaitingReview,
     publishedPractices,
-    completedListens,
-    paidOrders,
-    revenueResult,
+    playbackStarts,
+    completions,
+    succeededPayments,
+    confirmedRefunds,
   ] = await Promise.all([
     service.from("profiles").select("*", { count: "exact", head: true }),
     service
       .from("profiles")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", sevenDaysAgo),
+      .gte("created_at", sevenDaysAgo)
+      .lt("created_at", snapshotNowIso),
     service
       .from("profiles")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", thirtyDaysAgo),
-    service.from("author_members").select("user_id", { count: "exact", head: true }),
+      .gte("created_at", thirtyDaysAgo)
+      .lt("created_at", snapshotNowIso),
+    service
+      .from("author_members")
+      .select("user_id, author_id, authors!inner(access_status)")
+      .eq("role", "owner")
+      .not("authors.access_status", "in", "(suspended,terminated)"),
     service.from("author_applications").select("*", { count: "exact", head: true }),
+    service
+      .from("author_applications")
+      .select("*", { count: "exact", head: true })
+      .gte("submitted_at", sevenDaysAgo)
+      .lt("submitted_at", snapshotNowIso),
     service
       .from("author_applications")
       .select("*", { count: "exact", head: true })
@@ -122,61 +141,90 @@ async function sqlStats(service) {
     service
       .from("practices")
       .select("*", { count: "exact", head: true })
-      .eq("status", "published"),
+      .eq("status", "published")
+      .eq("product_kind", "practice")
+      .is("deleted_at", null),
     service
-      .from("practice_audio_progress")
+      .from("analytics_events")
       .select("*", { count: "exact", head: true })
-      .eq("completed", true),
+      .eq("event_name", "audio_play_started")
+      .eq("is_bot", false)
+      .eq("is_staff", false)
+      .eq("is_test", false),
     service
-      .from("orders")
+      .from("analytics_events")
       .select("*", { count: "exact", head: true })
-      .eq("status", "paid"),
-    service.from("orders").select("amount_minor").eq("status", "paid"),
+      .eq("event_name", "audio_completed")
+      .eq("is_bot", false)
+      .eq("is_staff", false)
+      .eq("is_test", false),
+    service
+      .from("payments")
+      .select("order_id, amount_minor")
+      .eq("status", "succeeded")
+      .eq("is_test", false),
+    service
+      .from("payment_refunds")
+      .select("amount_minor")
+      .eq("status", "succeeded")
+      .eq("is_test", false)
+      .not("confirmed_at", "is", null),
   ]);
 
   const { data: practices } = await service
     .from("practices")
     .select("id")
-    .eq("status", "published");
+    .eq("status", "published")
+    .eq("product_kind", "practice")
+    .is("deleted_at", null);
 
   let publishedPrograms = 0;
 
   if (practices?.length) {
     const { data: audioItems } = await service
       .from("audio_items")
-      .select("practice_id")
+      .select("id, practice_id")
       .in(
         "practice_id",
         practices.map((row) => row.id),
       )
       .eq("status", "published");
 
-    const counts = new Map();
+    const tracksByPractice = new Map();
 
     for (const item of audioItems ?? []) {
-      counts.set(item.practice_id, (counts.get(item.practice_id) ?? 0) + 1);
+      const tracks = tracksByPractice.get(item.practice_id) ?? new Set();
+      tracks.add(item.id);
+      tracksByPractice.set(item.practice_id, tracks);
     }
 
-    publishedPrograms = [...counts.values()].filter((count) => count >= 2).length;
+    publishedPrograms = [...tracksByPractice.values()].filter((tracks) => tracks.size >= 2).length;
   }
 
-  const revenueMinor = (revenueResult.data ?? []).reduce(
+  const revenueMinor = (succeededPayments.data ?? []).reduce(
+    (sum, row) => sum + (typeof row.amount_minor === "number" ? row.amount_minor : 0),
+    0,
+  ) - (confirmedRefunds.data ?? []).reduce(
     (sum, row) => sum + (typeof row.amount_minor === "number" ? row.amount_minor : 0),
     0,
   );
+  const owners = ownerMembers.data ?? [];
 
   return {
     usersTotal: usersTotal.count ?? 0,
     users7d: users7d.count ?? 0,
     users30d: users30d.count ?? 0,
-    authorsTotal: authorsTotal.count ?? 0,
+    authorsTotal: new Set(owners.map((member) => member.user_id)).size,
+    authorWorkspacesTotal: new Set(owners.map((member) => member.author_id)).size,
     applicationsTotal: applicationsTotal.count ?? 0,
-    applicationsNew: applicationsNew.count ?? 0,
+    applicationsSubmitted7d: applicationsSubmitted7d.count ?? 0,
+    applicationsAwaitingReview: applicationsAwaitingReview.count ?? 0,
     publishedPractices: publishedPractices.count ?? 0,
     publishedPrograms,
-    completedListens: completedListens.count ?? 0,
-    paidOrders: paidOrders.count ?? 0,
-    revenueRub: revenueMinor / 100,
+    playbackStarts: playbackStarts.count ?? 0,
+    completions: completions.count ?? 0,
+    paidOrders: new Set((succeededPayments.data ?? []).map((payment) => payment.order_id)).size,
+    revenueMinor,
   };
 }
 
@@ -189,29 +237,25 @@ async function fetchAdminOverviewNumbers(page) {
   for (const card of cards) {
     const label = (await card.locator("p").first().textContent())?.trim() ?? "";
     const valueText = (await card.locator("p").nth(1).textContent())?.trim() ?? "";
-    const unavailable = (await card.locator("p").nth(1).textContent())?.includes(
-      "не собираются",
-    );
-
-    if (label.includes("не собираются") || unavailable) {
-      continue;
-    }
-
     const numeric = valueText.replace(/[^\d,.-]/g, "").replace(",", ".");
     const parsed = Number.parseFloat(numeric);
 
-    if (label.includes("выручка")) {
-      result.revenueRub = parsed;
+    if (label.toLowerCase().includes("выручка")) {
+      result.revenueMinor = Math.round(parsed * 100);
     } else if (label.includes("Всего пользователей")) {
       result.usersTotal = parsed;
-    } else if (label.includes("7 дней")) {
+    } else if (label.includes("Новых пользователей за 7 дней")) {
       result.users7d = parsed;
-    } else if (label.includes("30 дней")) {
+    } else if (label.includes("Новых пользователей за 30 дней")) {
       result.users30d = parsed;
+    } else if (label.includes("Заявок подано за 7 дней")) {
+      result.applicationsSubmitted7d = parsed;
     } else if (label.includes("авторов")) {
       result.authorsTotal = parsed;
-    } else if (label.includes("Новых заявок")) {
-      result.applicationsNew = parsed;
+    } else if (label.includes("Авторских пространств")) {
+      result.authorWorkspacesTotal = parsed;
+    } else if (label.includes("Ожидают рассмотрения")) {
+      result.applicationsAwaitingReview = parsed;
     } else if (label.includes("Всего заявок")) {
       result.applicationsTotal = parsed;
     } else if (label.includes("аудиопрактик")) {
@@ -219,7 +263,9 @@ async function fetchAdminOverviewNumbers(page) {
     } else if (label.includes("программ")) {
       result.publishedPrograms = parsed;
     } else if (label.includes("Дослушиваний")) {
-      result.completedListens = parsed;
+      result.completions = parsed;
+    } else if (label.includes("Запусков прослушивания")) {
+      result.playbackStarts = parsed;
     } else if (label.includes("заказов")) {
       result.paidOrders = parsed;
     }
@@ -451,6 +497,15 @@ async function main() {
   const stats = await sqlStats(service);
   console.log("sql_stats", stats);
 
+  if (process.env.AUDIOLAD_ADMIN_VERIFICATION_LEGACY !== "1") {
+    console.log("admin-panel-verification: read-only stats check completed");
+    return;
+  }
+
+  if (new URL(BASE).hostname === "audiolad.ru") {
+    throw new Error("legacy_mutation_scenarios_are_forbidden_on_production");
+  }
+
   const { data: ownerProfile } = await service
     .from("profiles")
     .select("id, role")
@@ -519,13 +574,28 @@ async function main() {
     assertEq("users7d", uiStats.users7d, stats.users7d);
     assertEq("users30d", uiStats.users30d, stats.users30d);
     assertEq("authorsTotal", uiStats.authorsTotal, stats.authorsTotal);
-    assertEq("applicationsNew", uiStats.applicationsNew, stats.applicationsNew);
+    assertEq(
+      "authorWorkspacesTotal",
+      uiStats.authorWorkspacesTotal,
+      stats.authorWorkspacesTotal,
+    );
+    assertEq(
+      "applicationsSubmitted7d",
+      uiStats.applicationsSubmitted7d,
+      stats.applicationsSubmitted7d,
+    );
+    assertEq(
+      "applicationsAwaitingReview",
+      uiStats.applicationsAwaitingReview,
+      stats.applicationsAwaitingReview,
+    );
     assertEq("applicationsTotal", uiStats.applicationsTotal, stats.applicationsTotal);
     assertEq("publishedPractices", uiStats.publishedPractices, stats.publishedPractices);
     assertEq("publishedPrograms", uiStats.publishedPrograms, stats.publishedPrograms);
-    assertEq("completedListens", uiStats.completedListens, stats.completedListens);
+    assertEq("playbackStarts", uiStats.playbackStarts, stats.playbackStarts);
+    assertEq("completions", uiStats.completions, stats.completions);
     assertEq("paidOrders", uiStats.paidOrders, stats.paidOrders);
-    assertEq("revenueRub", uiStats.revenueRub, stats.revenueRub);
+    assertEq("revenueMinor", uiStats.revenueMinor, stats.revenueMinor);
 
     await ownerPage.goto(`${BASE}/admin/author-applications`, {
       waitUntil: "networkidle",

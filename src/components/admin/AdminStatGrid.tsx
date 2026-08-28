@@ -4,12 +4,13 @@ type AdminStatGridProps = {
   cards: AdminStatCard[];
 };
 
-function formatRub(value: number): string {
+function formatRub(minor: number): string {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency: "RUB",
-    maximumFractionDigits: 0,
-  }).format(value);
+    minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(minor / 100);
 }
 
 export default function AdminStatGrid({ cards }: AdminStatGridProps) {
@@ -30,7 +31,7 @@ export default function AdminStatGrid({ cards }: AdminStatGridProps) {
 
           {card.kind === "currency" ? (
             <p className="mt-2 text-3xl font-semibold text-[#7042c5]">
-              {formatRub(card.valueRub)}
+              {formatRub(card.valueMinor)}
             </p>
           ) : null}
 

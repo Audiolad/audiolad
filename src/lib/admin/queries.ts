@@ -19,6 +19,13 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getOperationalEmailDeliveryForApplication } from "@/lib/email/operational-deliveries";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 import {
+  calculateNetRevenueMinor,
+  countDistinctOwnerUsers,
+  countDistinctOwnerWorkspaces,
+  countPublishedPracticePrograms,
+  createOperationalTimeRange,
+} from "@/lib/admin/operational-overview";
+import {
   buildAdminUsersProfileSearchOr,
   isAdminExactUuid,
   isAdminProductSlugQuery,
@@ -26,7 +33,7 @@ import {
 
 export type AdminStatCard =
   | { kind: "value"; key: string; label: string; value: number }
-  | { kind: "currency"; key: string; label: string; valueRub: number }
+  | { kind: "currency"; key: string; label: string; valueMinor: number }
   | { kind: "unavailable"; key: string; label: string; reason: string };
 
 export type AdminOverviewStats = {
@@ -73,21 +80,21 @@ export type AdminUsersPageData = {
 
 const USERS_PAGE_SIZE = 20;
 
-function daysAgoIso(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
-
 async function countPublishedPrograms(
   service: ReturnType<typeof createServiceRoleClient>,
 ): Promise<number> {
   const { data: practices, error } = await service
     .from("practices")
     .select("id")
-    .eq("status", "published");
+    .eq("status", "published")
+    .eq("product_kind", "practice")
+    .is("deleted_at", null);
 
-  if (error || !practices?.length) {
+  if (error) {
+    throw new Error("admin_published_programs_load_failed");
+  }
+
+  if (!practices?.length) {
     return 0;
   }
 
@@ -95,55 +102,58 @@ async function countPublishedPrograms(
 
   const { data: audioItems, error: audioError } = await service
     .from("audio_items")
-    .select("practice_id")
+    .select("id, practice_id")
     .in("practice_id", practiceIds)
     .eq("status", "published");
 
   if (audioError) {
-    return 0;
+    throw new Error("admin_published_program_tracks_load_failed");
   }
 
-  const counts = new Map<string, number>();
-
-  for (const item of audioItems ?? []) {
-    counts.set(item.practice_id, (counts.get(item.practice_id) ?? 0) + 1);
-  }
-
-  return [...counts.values()].filter((count) => count >= 2).length;
+  return countPublishedPracticePrograms(audioItems ?? []);
 }
 
 export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   const service = createServiceRoleClient();
-  const nowIso = new Date().toISOString();
-  const sevenDaysAgo = daysAgoIso(7);
-  const thirtyDaysAgo = daysAgoIso(30);
+  const timeRange = createOperationalTimeRange();
 
   const [
     usersTotal,
     users7d,
     users30d,
-    authorsTotal,
+    ownerMembers,
     applicationsTotal,
-    applicationsNew,
+    applicationsSubmitted7d,
+    applicationsAwaitingReview,
     publishedPractices,
     publishedPrograms,
-    completedListens,
-    paidOrders,
-    revenueResult,
+    playbackStarts,
+    completions,
+    succeededPayments,
+    confirmedRefunds,
   ] = await Promise.all([
     service.from("profiles").select("*", { count: "exact", head: true }),
     service
       .from("profiles")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", sevenDaysAgo),
+      .gte("created_at", timeRange.sevenDaysAgoIso)
+      .lt("created_at", timeRange.snapshotNowIso),
     service
       .from("profiles")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", thirtyDaysAgo),
+      .gte("created_at", timeRange.thirtyDaysAgoIso)
+      .lt("created_at", timeRange.snapshotNowIso),
     service
       .from("author_members")
-      .select("user_id", { count: "exact", head: true }),
+      .select("user_id, author_id, authors!inner(access_status)")
+      .eq("role", "owner")
+      .not("authors.access_status", "in", "(suspended,terminated)"),
     service.from("author_applications").select("*", { count: "exact", head: true }),
+    service
+      .from("author_applications")
+      .select("*", { count: "exact", head: true })
+      .gte("submitted_at", timeRange.sevenDaysAgoIso)
+      .lt("submitted_at", timeRange.snapshotNowIso),
     service
       .from("author_applications")
       .select("*", { count: "exact", head: true })
@@ -151,31 +161,64 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     service
       .from("practices")
       .select("*", { count: "exact", head: true })
-      .eq("status", "published"),
+      .eq("status", "published")
+      .eq("product_kind", "practice")
+      .is("deleted_at", null),
     countPublishedPrograms(service),
     service
-      .from("practice_audio_progress")
+      .from("analytics_events")
       .select("*", { count: "exact", head: true })
-      .eq("completed", true),
-    service
-      .from("orders")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "paid")
+      .eq("event_name", "audio_play_started")
+      .eq("is_bot", false)
+      .eq("is_staff", false)
       .eq("is_test", false),
-    // P3.0: gross from succeeded non-test payments (not orders.paid).
+    service
+      .from("analytics_events")
+      .select("*", { count: "exact", head: true })
+      .eq("event_name", "audio_completed")
+      .eq("is_bot", false)
+      .eq("is_staff", false)
+      .eq("is_test", false),
     service
       .from("payments")
-      .select("amount_minor")
+      .select("order_id, amount_minor")
       .eq("status", "succeeded")
       .eq("is_test", false),
+    service
+      .from("payment_refunds")
+      .select("amount_minor")
+      .eq("status", "succeeded")
+      .eq("is_test", false)
+      .not("confirmed_at", "is", null),
   ]);
 
-  const revenueMinor = (revenueResult.data ?? []).reduce(
-    (sum, row) => sum + (typeof row.amount_minor === "number" ? row.amount_minor : 0),
-    0,
-  );
+  if (
+    [
+      usersTotal,
+      users7d,
+      users30d,
+      ownerMembers,
+      applicationsTotal,
+      applicationsSubmitted7d,
+      applicationsAwaitingReview,
+      publishedPractices,
+      playbackStarts,
+      completions,
+      succeededPayments,
+      confirmedRefunds,
+    ].some((result) => result.error)
+  ) {
+    throw new Error("admin_overview_stats_load_failed");
+  }
 
-  const authorMemberCount = authorsTotal.count ?? 0;
+  const owners = ownerMembers.data ?? [];
+  const successfulOrderCount = new Set(
+    (succeededPayments.data ?? []).map((payment) => payment.order_id),
+  ).size;
+  const revenueMinor = calculateNetRevenueMinor(
+    succeededPayments.data ?? [],
+    confirmedRefunds.data ?? [],
+  );
 
   const cards: AdminStatCard[] = [
     {
@@ -187,26 +230,38 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     {
       kind: "value",
       key: "users_7d",
-      label: "Новых за 7 дней",
+      label: "Новых пользователей за 7 дней",
       value: users7d.count ?? 0,
     },
     {
       kind: "value",
       key: "users_30d",
-      label: "Новых за 30 дней",
+      label: "Новых пользователей за 30 дней",
       value: users30d.count ?? 0,
     },
     {
       kind: "value",
       key: "authors_total",
       label: "Всего авторов",
-      value: authorMemberCount,
+      value: countDistinctOwnerUsers(owners),
     },
     {
       kind: "value",
-      key: "applications_new",
-      label: "Новых заявок на авторство",
-      value: applicationsNew.count ?? 0,
+      key: "author_workspaces_total",
+      label: "Авторских пространств",
+      value: countDistinctOwnerWorkspaces(owners),
+    },
+    {
+      kind: "value",
+      key: "applications_submitted_7d",
+      label: "Заявок подано за 7 дней",
+      value: applicationsSubmitted7d.count ?? 0,
+    },
+    {
+      kind: "value",
+      key: "applications_awaiting_review",
+      label: "Ожидают рассмотрения",
+      value: applicationsAwaitingReview.count ?? 0,
     },
     {
       kind: "value",
@@ -227,34 +282,34 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
       value: publishedPrograms,
     },
     {
-      kind: "unavailable",
+      kind: "value",
       key: "playback_starts",
-      label: "Общих запусков прослушивания",
-      reason: "Данные пока не собираются",
+      label: "Запусков прослушивания",
+      value: playbackStarts.count ?? 0,
     },
     {
       kind: "value",
       key: "completions",
-      label: "Дослушиваний (progress DB)",
-      value: completedListens.count ?? 0,
+      label: "Дослушиваний",
+      value: completions.count ?? 0,
     },
     {
       kind: "value",
       key: "paid_orders",
       label: "Успешных заказов",
-      value: paidOrders.count ?? 0,
+      value: successfulOrderCount,
     },
     {
       kind: "currency",
       key: "revenue",
-      label: "Подтверждённая выручка (без test)",
-      valueRub: revenueMinor / 100,
+      label: "Выручка после возвратов",
+      valueMinor: revenueMinor,
     },
   ];
 
   return {
     cards,
-    generatedAt: nowIso,
+    generatedAt: timeRange.snapshotNowIso,
   };
 }
 
