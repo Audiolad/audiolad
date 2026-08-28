@@ -228,6 +228,18 @@ async function sqlStats(service) {
   };
 }
 
+async function canonicalSqlStats(service) {
+  const { data, error } = await service.rpc("admin_operational_overview_snapshot", {
+    p_snapshot_now: new Date().toISOString(),
+  });
+
+  if (error || !data || typeof data !== "object") {
+    throw new Error("admin_operational_overview_snapshot_failed");
+  }
+
+  return data;
+}
+
 async function fetchAdminOverviewNumbers(page) {
   const cards = await page
     .locator('section[aria-labelledby="admin-overview-heading"] article')
@@ -494,7 +506,7 @@ async function main() {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  const stats = await sqlStats(service);
+  const stats = await canonicalSqlStats(service);
   console.log("sql_stats", stats);
 
   if (process.env.AUDIOLAD_ADMIN_VERIFICATION_LEGACY !== "1") {

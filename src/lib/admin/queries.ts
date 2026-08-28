@@ -19,10 +19,6 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getOperationalEmailDeliveryForApplication } from "@/lib/email/operational-deliveries";
 import { getPlatformRoleLabel } from "@/lib/auth/platform-admin";
 import {
-  calculateNetRevenueMinor,
-  countDistinctOwnerUsers,
-  countDistinctOwnerWorkspaces,
-  countPublishedPracticePrograms,
   createOperationalTimeRange,
 } from "@/lib/admin/operational-overview";
 import {
@@ -80,230 +76,117 @@ export type AdminUsersPageData = {
 
 const USERS_PAGE_SIZE = 20;
 
-async function countPublishedPrograms(
-  service: ReturnType<typeof createServiceRoleClient>,
-): Promise<number> {
-  const { data: practices, error } = await service
-    .from("practices")
-    .select("id")
-    .eq("status", "published")
-    .eq("product_kind", "practice")
-    .is("deleted_at", null);
+function getOverviewStat(
+  raw: Record<string, unknown>,
+  key: string,
+): number {
+  const value = raw[key];
 
-  if (error) {
-    throw new Error("admin_published_programs_load_failed");
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
   }
 
-  if (!practices?.length) {
-    return 0;
-  }
-
-  const practiceIds = practices.map((row) => row.id);
-
-  const { data: audioItems, error: audioError } = await service
-    .from("audio_items")
-    .select("id, practice_id")
-    .in("practice_id", practiceIds)
-    .eq("status", "published");
-
-  if (audioError) {
-    throw new Error("admin_published_program_tracks_load_failed");
-  }
-
-  return countPublishedPracticePrograms(audioItems ?? []);
+  throw new Error(`admin_overview_stat_invalid:${key}`);
 }
 
 export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   const service = createServiceRoleClient();
   const timeRange = createOperationalTimeRange();
 
-  const [
-    usersTotal,
-    users7d,
-    users30d,
-    ownerMembers,
-    applicationsTotal,
-    applicationsSubmitted7d,
-    applicationsAwaitingReview,
-    publishedPractices,
-    publishedPrograms,
-    playbackStarts,
-    completions,
-    succeededPayments,
-    confirmedRefunds,
-  ] = await Promise.all([
-    service.from("profiles").select("*", { count: "exact", head: true }),
-    service
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", timeRange.sevenDaysAgoIso)
-      .lt("created_at", timeRange.snapshotNowIso),
-    service
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", timeRange.thirtyDaysAgoIso)
-      .lt("created_at", timeRange.snapshotNowIso),
-    service
-      .from("author_members")
-      .select("user_id, author_id, authors!inner(access_status)")
-      .eq("role", "owner")
-      .not("authors.access_status", "in", "(suspended,terminated)"),
-    service.from("author_applications").select("*", { count: "exact", head: true }),
-    service
-      .from("author_applications")
-      .select("*", { count: "exact", head: true })
-      .gte("submitted_at", timeRange.sevenDaysAgoIso)
-      .lt("submitted_at", timeRange.snapshotNowIso),
-    service
-      .from("author_applications")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "submitted"),
-    service
-      .from("practices")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "published")
-      .eq("product_kind", "practice")
-      .is("deleted_at", null),
-    countPublishedPrograms(service),
-    service
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .eq("event_name", "audio_play_started")
-      .eq("is_bot", false)
-      .eq("is_staff", false)
-      .eq("is_test", false),
-    service
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .eq("event_name", "audio_completed")
-      .eq("is_bot", false)
-      .eq("is_staff", false)
-      .eq("is_test", false),
-    service
-      .from("payments")
-      .select("order_id, amount_minor")
-      .eq("status", "succeeded")
-      .eq("is_test", false),
-    service
-      .from("payment_refunds")
-      .select("amount_minor")
-      .eq("status", "succeeded")
-      .eq("is_test", false)
-      .not("confirmed_at", "is", null),
-  ]);
+  const { data, error } = await service.rpc("admin_operational_overview_snapshot", {
+    p_snapshot_now: timeRange.snapshotNowIso,
+  });
 
-  if (
-    [
-      usersTotal,
-      users7d,
-      users30d,
-      ownerMembers,
-      applicationsTotal,
-      applicationsSubmitted7d,
-      applicationsAwaitingReview,
-      publishedPractices,
-      playbackStarts,
-      completions,
-      succeededPayments,
-      confirmedRefunds,
-    ].some((result) => result.error)
-  ) {
+  if (error || !data || typeof data !== "object") {
     throw new Error("admin_overview_stats_load_failed");
   }
 
-  const owners = ownerMembers.data ?? [];
-  const successfulOrderCount = new Set(
-    (succeededPayments.data ?? []).map((payment) => payment.order_id),
-  ).size;
-  const revenueMinor = calculateNetRevenueMinor(
-    succeededPayments.data ?? [],
-    confirmedRefunds.data ?? [],
-  );
+  const stats = data as Record<string, unknown>;
 
   const cards: AdminStatCard[] = [
     {
       kind: "value",
       key: "users_total",
       label: "Всего пользователей",
-      value: usersTotal.count ?? 0,
+      value: getOverviewStat(stats, "users_total"),
     },
     {
       kind: "value",
       key: "users_7d",
       label: "Новых пользователей за 7 дней",
-      value: users7d.count ?? 0,
+      value: getOverviewStat(stats, "users_7d"),
     },
     {
       kind: "value",
       key: "users_30d",
       label: "Новых пользователей за 30 дней",
-      value: users30d.count ?? 0,
+      value: getOverviewStat(stats, "users_30d"),
     },
     {
       kind: "value",
       key: "authors_total",
       label: "Всего авторов",
-      value: countDistinctOwnerUsers(owners),
+      value: getOverviewStat(stats, "authors_total"),
     },
     {
       kind: "value",
       key: "author_workspaces_total",
       label: "Авторских пространств",
-      value: countDistinctOwnerWorkspaces(owners),
+      value: getOverviewStat(stats, "author_workspaces_total"),
     },
     {
       kind: "value",
       key: "applications_submitted_7d",
       label: "Заявок подано за 7 дней",
-      value: applicationsSubmitted7d.count ?? 0,
+      value: getOverviewStat(stats, "applications_submitted_7d"),
     },
     {
       kind: "value",
       key: "applications_awaiting_review",
       label: "Ожидают рассмотрения",
-      value: applicationsAwaitingReview.count ?? 0,
+      value: getOverviewStat(stats, "applications_awaiting_review"),
     },
     {
       kind: "value",
       key: "applications_total",
       label: "Всего заявок на авторство",
-      value: applicationsTotal.count ?? 0,
+      value: getOverviewStat(stats, "applications_total"),
     },
     {
       kind: "value",
       key: "practices_published",
       label: "Опубликованных аудиопрактик",
-      value: publishedPractices.count ?? 0,
+      value: getOverviewStat(stats, "practices_published"),
     },
     {
       kind: "value",
       key: "programs_published",
       label: "Опубликованных программ (≥2 трека)",
-      value: publishedPrograms,
+      value: getOverviewStat(stats, "programs_published"),
     },
     {
       kind: "value",
       key: "playback_starts",
       label: "Запусков прослушивания",
-      value: playbackStarts.count ?? 0,
+      value: getOverviewStat(stats, "playback_starts"),
     },
     {
       kind: "value",
       key: "completions",
       label: "Дослушиваний",
-      value: completions.count ?? 0,
+      value: getOverviewStat(stats, "completions"),
     },
     {
       kind: "value",
       key: "paid_orders",
       label: "Успешных заказов",
-      value: successfulOrderCount,
+      value: getOverviewStat(stats, "paid_orders"),
     },
     {
       kind: "currency",
       key: "revenue",
       label: "Выручка после возвратов",
-      valueMinor: revenueMinor,
+      valueMinor: getOverviewStat(stats, "revenue_minor"),
     },
   ];
 

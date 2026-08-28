@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  calculateNetRevenueMinor,
-  countDistinctOwnerUsers,
-  countDistinctOwnerWorkspaces,
-  countPublishedPracticePrograms,
   createOperationalTimeRange,
 } from "../src/lib/admin/operational-overview";
 
@@ -16,52 +12,15 @@ assert.equal(range.snapshotNowIso, "2026-08-28T14:00:00.000Z");
 assert.equal(range.sevenDaysAgoIso, "2026-08-21T14:00:00.000Z");
 assert.equal(range.thirtyDaysAgoIso, "2026-07-29T14:00:00.000Z");
 
-const owners = [
-  { user_id: "owner-a", author_id: "workspace-a" },
-  { user_id: "owner-a", author_id: "workspace-b" },
-  { user_id: "owner-a", author_id: "workspace-b" },
-  { user_id: "owner-b", author_id: "workspace-c" },
-];
-
-assert.equal(countDistinctOwnerUsers(owners), 2);
-assert.equal(countDistinctOwnerWorkspaces(owners), 3);
-
-assert.equal(
-  countPublishedPracticePrograms([
-    { id: "track-1", practice_id: "program-a" },
-    { id: "track-2", practice_id: "program-a" },
-    { id: "track-2", practice_id: "program-a" },
-    { id: "track-3", practice_id: "single-a" },
-  ]),
-  1,
-);
-
-assert.equal(
-  calculateNetRevenueMinor(
-    [{ amount_minor: 199_250 }, { amount_minor: 50 }],
-    [{ amount_minor: 50 }],
-  ),
-  199_250,
-);
-
 const queries = readFileSync("src/lib/admin/queries.ts", "utf8");
+const migration = readFileSync(
+  "supabase/migrations/20260904120000_admin_operational_overview_snapshot.sql",
+  "utf8",
+);
 
 for (const expected of [
   'createOperationalTimeRange()',
-  '.gte("created_at", timeRange.sevenDaysAgoIso)',
-  '.lt("created_at", timeRange.snapshotNowIso)',
-  '.gte("submitted_at", timeRange.sevenDaysAgoIso)',
-  '.eq("role", "owner")',
-  '.not("authors.access_status", "in", "(suspended,terminated)")',
-  '.eq("product_kind", "practice")',
-  '.is("deleted_at", null)',
-  '.eq("event_name", "audio_play_started")',
-  '.eq("event_name", "audio_completed")',
-  '.eq("is_bot", false)',
-  '.eq("is_staff", false)',
-  '.eq("is_test", false)',
-  '.from("payment_refunds")',
-  '.not("confirmed_at", "is", null)',
+  'rpc("admin_operational_overview_snapshot"',
   'key: "author_workspaces_total"',
   'key: "applications_submitted_7d"',
   'key: "applications_awaiting_review"',
@@ -72,5 +31,28 @@ for (const expected of [
 }
 
 assert.ok(!queries.includes('.from("practice_audio_progress")'));
+
+for (const expected of [
+  "p_snapshot_now - interval '7 days'",
+  "p_snapshot_now - interval '30 days'",
+  "count(DISTINCT user_id)",
+  "count(DISTINCT author_id)",
+  "am.role = 'owner'",
+  "a.access_status NOT IN ('suspended', 'terminated')",
+  "aa.submitted_at >= t.seven_days_ago",
+  "aa.submitted_at < t.snapshot_now",
+  "p.product_kind = 'practice'",
+  "p.deleted_at IS NULL",
+  "count(DISTINCT ai.id) >= 2",
+  "event_name = 'audio_play_started'",
+  "event_name = 'audio_completed'",
+  "is_bot = false",
+  "is_staff = false",
+  "is_test = false",
+  "count(DISTINCT order_id)",
+  "r.confirmed_at IS NOT NULL",
+]) {
+  assert.ok(migration.includes(expected), `missing SQL aggregation contract: ${expected}`);
+}
 
 console.log("admin-operational-overview-unit: ok");
