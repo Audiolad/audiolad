@@ -361,7 +361,7 @@ function testSourceArchitecture() {
   const suggest = read("src/app/api/catalog/search/suggest/route.ts");
   assert.match(suggest, /loadOrdinaryCatalogViewer/);
   assert.match(suggest, /resolveCatalogViewerUserId\(supabase\)/);
-  assert.match(suggest, /viewer,/);
+  assert.match(suggest, /viewer:\s*\{\s*\.\.\.ordinaryViewer,\s*visitorId,\s*userId,/);
   assert.doesNotMatch(suggest, /searchParams\.get\(\s*["']userId["']\s*\)/);
   assert.doesNotMatch(suggest, /searchParams\.get\(\s*["']user_id["']\s*\)/);
 
